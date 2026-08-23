@@ -1,12 +1,20 @@
-import type { Command } from './types';
+import type { Command, ResourceKind } from './types';
 import type { ObservedEntity, PlayerObservation } from '../protocol/types';
 
 const distance = (a: ObservedEntity, b: ObservedEntity) => Math.hypot(a.x - b.x, a.y - b.y);
 
+const ASSIGNMENT: ResourceKind[] = ['food', 'wood', 'food', 'gold', 'wood', 'food'];
+
+const HOUSE_SPOTS: { x: number; y: number }[] = [
+  { x: -1, y: -4 }, { x: 2, y: -4 }, { x: -4, y: -2 }, { x: 5, y: -4 }, { x: -4, y: 1 },
+];
+const BARRACKS_SPOT = { x: 1, y: 5 };
+
 /**
- * The example strategy. It sees only its canonical player observation and
- * expresses every intent through public commands, exactly like an external
- * agent.
+ * The example strategy: gather food/wood/gold, keep housing ahead of
+ * population, build a barracks, train villagers and militia, and attack with
+ * groups of three. It sees only its canonical observation and acts only
+ * through public commands.
  */
 export function exampleAiCommands(observation: PlayerObservation): Command[] {
   if (observation.winner) return [];
@@ -17,32 +25,45 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   const militia = mine.filter(e => e.kind === 'militia');
   const tc = mine.find(e => e.kind === 'town-center');
   const barracks = mine.find(e => e.kind === 'barracks');
+  const direction = tc && tc.x < observation.mapWidth / 2 ? 1 : -1;
+  const place = (offset: { x: number; y: number }) =>
+    tc ? { x: tc.x + direction * offset.x, y: tc.y + offset.y } : offset;
 
   for (const [index, villager] of villagers.entries()) {
     if (villager.order !== 'idle') continue;
-    const wanted = index % 3 === 0 ? 'food' : 'wood';
-    const resource = observation.entities
+    const wanted = ASSIGNMENT[index % ASSIGNMENT.length];
+    const node = observation.entities
       .filter(e => e.kind === 'resource' && e.resource === wanted)
-      .sort((a, b) => distance(villager, a) - distance(villager, b))[0];
-    if (resource) {
+      .sort((a, b) => distance(villager, a) - distance(villager, b) || a.id - b.id)[0];
+    if (node) {
       commands.push({
         kind: 'order', player, entityIds: [villager.id],
-        target: { x: resource.x, y: resource.y }, targetId: resource.id,
+        target: { x: node.x, y: node.y }, targetId: node.id,
       });
     }
   }
 
-  if (!barracks && villagers[0] && tc && observation.wood >= 175) {
-    const direction = tc.x < 16 ? 1 : -1;
-    commands.push({
-      kind: 'build', player, builderId: villagers[0].id, building: 'barracks',
-      target: { x: tc.x + direction * 3, y: tc.y + 3 },
-    });
+  const idleBuilder = villagers.find(e => e.order === 'idle') ?? villagers[0];
+  const housesUnderway = mine.some(e => e.kind === 'house' && (e.buildProgress ?? 1) < 1);
+  const headroom = observation.populationCap - observation.population;
+  if (idleBuilder && headroom <= 1 && !housesUnderway && observation.wood >= 25) {
+    // Cycle deterministically through candidate spots so a blocked placement
+    // is retried elsewhere on the next decision.
+    const attempt = mine.filter(e => e.kind === 'house').length + Math.floor(observation.time / 2);
+    const spot = HOUSE_SPOTS[attempt % HOUSE_SPOTS.length];
+    commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'house', target: place(spot) });
   }
-  if (tc && !tc.training && villagers.length < 6 && observation.food >= 50) {
+  if (!barracks && idleBuilder && observation.wood >= 175) {
+    commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'barracks', target: place(BARRACKS_SPOT) });
+  }
+
+  if (tc && !tc.training && villagers.length < 8 && observation.food >= 50 && headroom > 0) {
     commands.push({ kind: 'train', player, buildingId: tc.id, unit: 'villager' });
   }
-  if (barracks && !barracks.training && observation.food >= 60 && observation.wood >= 20) {
+  if (
+    barracks && (barracks.buildProgress ?? 1) >= 1 && !barracks.training &&
+    observation.food >= 50 && observation.gold >= 20 && headroom > 0
+  ) {
     commands.push({ kind: 'train', player, buildingId: barracks.id, unit: 'militia' });
   }
 
@@ -55,7 +76,7 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
       : tc ? { x: observation.mapWidth - tc.x, y: tc.y } : undefined;
     if (target) {
       commands.push({
-        kind: 'order', player, entityIds: idleMilitia.map(e => e.id),
+        kind: 'order', player, entityIds: idleMilitia.map(e => e.id).sort((a, b) => a - b),
         target, targetId: enemyTc?.id,
       });
     }

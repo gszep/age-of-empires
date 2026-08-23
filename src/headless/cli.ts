@@ -7,7 +7,8 @@
  * Strategies: `builtin` (example AI), `idle`, or `cmd:<shell command>` for a
  * JSONL subprocess.
  */
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { FALLBACK_RULES, rulesFromManifest, type GameRules } from '../sim/data';
 import { runMatch, type Strategy } from './runner';
 import { builtinStrategy, subprocessStrategy } from './strategies';
 import { validateMatchConfig, explain } from '../protocol/validate';
@@ -49,12 +50,20 @@ if (!validateMatchConfig(config)) {
   process.exit(2);
 }
 
+// DAT-backed rules whenever the locally imported manifest exists.
+const manifestPath = args.data ?? 'public/imported/aoe2/manifest.json';
+const rules: GameRules = args.data !== 'fallback' && existsSync(manifestPath)
+  ? rulesFromManifest(JSON.parse(readFileSync(manifestPath, 'utf8')))
+  : FALLBACK_RULES;
+console.error(`rules: ${rules.origin}`);
+
 const result = await runMatch(config, {
   1: strategyFor(args.p1 ?? 'builtin'),
   2: strategyFor(args.p2 ?? 'builtin'),
-});
+}, rules);
 
 const output = JSON.stringify(result, null, 2);
 if (args.out) writeFileSync(args.out, `${output}\n`);
-else console.log(output);
+else await new Promise<void>(resolve => process.stdout.write(`${output}\n`, () => resolve()));
+// Subprocess strategies keep stdin open; end explicitly once output is flushed.
 process.exit(0);

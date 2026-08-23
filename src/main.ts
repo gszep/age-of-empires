@@ -2,7 +2,8 @@ import * as THREE from 'three/webgpu';
 import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
 import { observe } from './sim/observe';
-import { applyCommand, createGame, nearestEntity, stepGame } from './sim/game';
+import { applyCommand, createGame, gameTimeSeconds, nearestEntity, stepGame } from './sim/game';
+import { FALLBACK_RULES, TICK_SECONDS, rulesFromManifest, type ContentManifest, type GameRules } from './sim/data';
 import type { BuildingKind, Entity, Point } from './sim/types';
 import { createMilitiaMesh, loadMilitiaAssets, updateMilitiaMesh } from './view/militia';
 
@@ -42,7 +43,13 @@ const midline = new THREE.Mesh(
 midline.position.z = 0.01;
 scene.add(midline);
 
-let game = createGame(42);
+let rules: GameRules = FALLBACK_RULES;
+try {
+  const response = await fetch('/imported/aoe2/manifest.json');
+  if (response.ok) rules = rulesFromManifest(await response.json() as ContentManifest);
+} catch { /* open fallback rules */ }
+
+let game = createGame(42, rules);
 let selectedIds: number[] = [];
 let buildMode: BuildingKind | undefined;
 let paused = false;
@@ -58,13 +65,16 @@ function geometryFor(entity: Entity): THREE.BufferGeometry {
   if (entity.kind === 'barracks') return new THREE.BoxGeometry(2, 2, 0.45);
   if (entity.kind === 'house') return new THREE.ConeGeometry(0.8, 1.4, 4);
   if (entity.kind === 'resource' && entity.resourceKind === 'wood') return new THREE.CircleGeometry(0.52, 8);
+  if (entity.kind === 'resource' && entity.resourceKind === 'gold') return new THREE.CircleGeometry(0.45, 6);
   if (entity.kind === 'resource') return new THREE.CircleGeometry(0.42, 12);
   if (entity.kind === 'militia') return new THREE.ConeGeometry(0.42, 0.9, 3);
   return new THREE.CircleGeometry(0.36, 16);
 }
 
 function colorFor(entity: Entity): number {
-  if (entity.kind === 'resource') return entity.resourceKind === 'wood' ? 0x23552e : 0xd94d79;
+  if (entity.kind === 'resource') {
+    return entity.resourceKind === 'wood' ? 0x23552e : entity.resourceKind === 'gold' ? 0xe3b64f : 0xd94d79;
+  }
   return ownerColors[entity.owner];
 }
 
@@ -90,7 +100,7 @@ function syncScene(): void {
         : order.kind === 'attack' || order.kind === 'gather'
           ? game.entities.find(candidate => candidate.id === order.targetId)?.position
           : undefined;
-      updateMilitiaMesh(militiaAssets, object, entity, target, game.time);
+      updateMilitiaMesh(militiaAssets, object, entity, target, gameTimeSeconds(game));
     }
     const offset = object.userData.spriteOffset ?? { x: 0, y: 0 };
     object.position.set(entity.position.x - game.width / 2 + offset.x, entity.position.y - game.height / 2 + offset.y, entity.kind === 'resource' ? 0.08 : 0.18);
@@ -140,7 +150,7 @@ renderer.domElement.addEventListener('pointerdown', event => {
   if (buildMode) {
     const builder = game.entities.find(e => selectedIds.includes(e.id) && e.owner === 1 && e.kind === 'villager');
     const result = builder
-      ? applyCommand(game, { kind: 'build', player: 1, builderId: builder.id, building: buildMode, target: point })
+      ? applyCommand(game, { kind: 'build', player: 1, builderIds: [builder.id], building: buildMode, target: point })
       : { ok: false as const, reason: 'select a villager first' };
     showMessage(result.ok ? `${buildMode} built` : result.reason);
     buildMode = undefined;
@@ -160,9 +170,10 @@ function selected(): Entity | undefined { return game.entities.find(e => e.id ==
 
 function updateHud(): void {
   const p = game.players[1];
+  const time = gameTimeSeconds(game);
   document.querySelector('#topbar')!.innerHTML = `
-    <span>🍖 ${Math.floor(p.food)}</span><span>🪵 ${Math.floor(p.wood)}</span><span>👥 ${p.population}/${p.populationCap}</span>
-    <span class="spacer"></span><span>${Math.floor(game.time / 60)}:${String(Math.floor(game.time % 60)).padStart(2, '0')}</span>
+    <span>🍖 ${p.food}</span><span>🪵 ${p.wood}</span><span>🪙 ${p.gold}</span><span>👥 ${p.population}/${p.populationCap}</span>
+    <span class="spacer"></span><span>${Math.floor(time / 60)}:${String(Math.floor(time % 60)).padStart(2, '0')}</span>
     <button data-action="pause">${paused ? '▶' : 'Ⅱ'}</button><button data-action="fullscreen">⛶</button>`;
   const entity = selected();
   const status = document.querySelector<HTMLDivElement>('#status')!;
@@ -172,7 +183,7 @@ function updateHud(): void {
     : 'Tap a blue unit or building.<br>Then tap ground, resources, or enemies.';
   const actions: string[] = [];
   if (entity?.kind === 'town-center') actions.push('<button data-action="villager">Train villager · 50 🍖</button>');
-  if (entity?.kind === 'barracks') actions.push('<button data-action="militia">Train militia · 60 🍖 20 🪵</button>');
+  if (entity?.kind === 'barracks') actions.push('<button data-action="militia">Train militia · 50 🍖 20 🪙</button>');
   if (entity?.kind === 'villager') {
     actions.push('<button data-action="barracks">Build barracks · 175 🪵</button>');
     actions.push('<button data-action="house">Build house · 25 🪵</button>');
@@ -195,7 +206,7 @@ document.querySelector('#hud')!.addEventListener('click', event => {
   const entity = selected();
   if (action === 'pause') paused = !paused;
   if (action === 'fullscreen') void enterLandscape();
-  if (action === 'restart') { game = createGame(Date.now() >>> 0); selectedIds = []; paused = false; }
+  if (action === 'restart') { game = createGame(Date.now() >>> 0, rules); selectedIds = []; paused = false; }
   if (action === 'army') selectedIds = game.entities.filter(e => e.owner === 1 && e.kind === 'militia').map(e => e.id);
   if ((action === 'villager' || action === 'militia') && entity) {
     const result = applyCommand(game, { kind: 'train', player: 1, buildingId: entity.id, unit: action });
@@ -226,14 +237,14 @@ renderer.setAnimationLoop(now => {
   const elapsed = Math.min(0.1, (now - previous) / 1000);
   previous = now;
   if (!paused) accumulator += elapsed;
-  while (accumulator >= 0.05) {
-    stepGame(game, 0.05);
-    aiClock += 0.05;
+  while (accumulator >= TICK_SECONDS) {
+    stepGame(game);
+    aiClock += TICK_SECONDS;
     if (aiClock >= 0.5) {
       for (const command of exampleAiCommands(observe(game, 2))) applyCommand(game, command);
       aiClock = 0;
     }
-    accumulator -= 0.05;
+    accumulator -= TICK_SECONDS;
   }
   selectedIds = selectedIds.filter(id => game.entities.some(e => e.id === id));
   syncScene();

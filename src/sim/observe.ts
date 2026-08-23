@@ -1,14 +1,20 @@
-import { STATS } from './data';
-import type { Entity, GameState, PlayerId } from './types';
+import { TICK_SECONDS, isBuilding, isUnit } from './data';
+import type { Entity, GameState, PlayerId, UnitKind } from './types';
 import type { ObservedEntity, PlayerObservation } from '../protocol/types';
 
 const distance = (a: Entity, b: Entity) =>
   Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y);
 
+function lineOfSight(state: GameState, entity: Entity): number {
+  if (isUnit(entity.kind)) return state.rules.units[entity.kind as UnitKind].lineOfSight;
+  if (isBuilding(entity.kind)) return state.rules.buildings[entity.kind].lineOfSight;
+  return 0;
+}
+
 function isVisible(state: GameState, player: PlayerId, entity: Entity): boolean {
   if (entity.owner === player || entity.owner === 0) return true;
   return state.entities.some(
-    own => own.owner === player && distance(own, entity) <= STATS[own.kind].lineOfSight,
+    own => own.owner === player && distance(own, entity) <= lineOfSight(state, own),
   );
 }
 
@@ -24,11 +30,18 @@ function observeEntity(entity: Entity, player: PlayerId): ObservedEntity {
   };
   if (entity.resourceKind) observed.resource = entity.resourceKind;
   if (entity.amount !== undefined) observed.amount = Math.floor(entity.amount);
+  if (entity.buildProgress !== undefined) observed.buildProgress = Math.round(entity.buildProgress * 1000) / 1000;
   if (entity.owner === player) {
-    // Orders, activities, and production queues stay hidden from opponents.
+    // Orders, activities, carried loads, and production stay hidden from opponents.
     observed.activity = entity.activity;
     observed.order = entity.order.kind;
-    if (entity.training) observed.training = { ...entity.training };
+    if (entity.carrying) observed.carrying = { ...entity.carrying };
+    if (entity.training) {
+      observed.training = {
+        kind: entity.training.kind,
+        remainingSeconds: Math.round(entity.training.remainingTicks * TICK_SECONDS * 100) / 100,
+      };
+    }
   }
   return observed;
 }
@@ -38,12 +51,13 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
   const self = state.players[player];
   const observation: PlayerObservation = {
     version: 1,
-    time: Math.round(state.time * 100) / 100,
+    time: Math.round(state.tick * TICK_SECONDS * 100) / 100,
     player,
     mapWidth: state.width,
     mapHeight: state.height,
-    food: Math.floor(self.food),
-    wood: Math.floor(self.wood),
+    food: self.food,
+    wood: self.wood,
+    gold: self.gold,
     population: self.population,
     populationCap: self.populationCap,
     entities: state.entities
@@ -71,10 +85,10 @@ export function describeObservation(observation: PlayerObservation): string {
   const parts = [
     `t=${observation.time.toFixed(1)}`,
     `p${observation.player}`,
-    `food=${observation.food} wood=${observation.wood} pop=${observation.population}/${observation.populationCap}`,
+    `food=${observation.food} wood=${observation.wood} gold=${observation.gold} pop=${observation.population}/${observation.populationCap}`,
     `own: ${countByKind(mine) || 'none'}${idle ? ` (${idle} idle)` : ''}`,
     `enemy seen: ${countByKind(enemies) || 'none'}`,
-    `resource nodes: ${nodes.filter(e => e.resource === 'food').length} food, ${nodes.filter(e => e.resource === 'wood').length} wood`,
+    `resource nodes: ${nodes.filter(e => e.resource === 'food').length} food, ${nodes.filter(e => e.resource === 'wood').length} wood, ${nodes.filter(e => e.resource === 'gold').length} gold`,
   ];
   if (observation.winner) parts.push(observation.winner === observation.player ? 'result: victory' : 'result: defeat');
   return parts.join(' | ');

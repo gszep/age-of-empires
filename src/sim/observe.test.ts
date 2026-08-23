@@ -41,7 +41,7 @@ describe('player observations', () => {
 
   it('emits schema-valid observations throughout a running match', () => {
     const state = createGame(3);
-    for (let i = 0; i < 200; i++) stepGame(state, 0.05);
+    for (let i = 0; i < 200; i++) stepGame(state);
     for (const player of [1, 2] as const) {
       const observation = observe(state, player);
       expect(validateObservation(observation), explain(validateObservation)).toBe(true);

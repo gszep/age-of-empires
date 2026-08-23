@@ -12,6 +12,7 @@
     "mapHeight": { "type": "number", "exclusiveMinimum": 0 },
     "food": { "type": "integer", "minimum": 0 },
     "wood": { "type": "integer", "minimum": 0 },
+    "gold": { "type": "integer", "minimum": 0 },
     "population": { "type": "integer", "minimum": 0 },
     "populationCap": { "type": "integer", "minimum": 0 },
     "entities": {
@@ -28,17 +29,27 @@
           "y": { "type": "number" },
           "hp": { "type": "number" },
           "maxHp": { "type": "number" },
-          "resource": { "enum": ["food", "wood"] },
+          "resource": { "enum": ["food", "wood", "gold"] },
           "amount": { "type": "integer", "minimum": 0 },
-          "activity": { "enum": ["idle", "moving", "gathering", "attacking"] },
-          "order": { "enum": ["idle", "move", "gather", "attack"] },
+          "buildProgress": { "type": "number", "minimum": 0, "maximum": 1 },
+          "activity": { "enum": ["idle", "moving", "gathering", "carrying", "building", "attacking"] },
+          "order": { "enum": ["idle", "move", "gather", "build", "attack"] },
+          "carrying": {
+            "type": "object",
+            "properties": {
+              "kind": { "enum": ["food", "wood", "gold"] },
+              "amount": { "type": "integer", "minimum": 0 }
+            },
+            "required": ["kind", "amount"],
+            "additionalProperties": false
+          },
           "training": {
             "type": "object",
             "properties": {
               "kind": { "enum": ["villager", "militia"] },
-              "remaining": { "type": "number", "minimum": 0 }
+              "remainingSeconds": { "type": "number", "minimum": 0 }
             },
-            "required": ["kind", "remaining"],
+            "required": ["kind", "remainingSeconds"],
             "additionalProperties": false
           }
         },
@@ -47,6 +58,6 @@
       }
     }
   },
-  "required": ["version", "time", "player", "mapWidth", "mapHeight", "food", "wood", "population", "populationCap", "entities"],
+  "required": ["version", "time", "player", "mapWidth", "mapHeight", "food", "wood", "gold", "population", "populationCap", "entities"],
   "additionalProperties": false
 }

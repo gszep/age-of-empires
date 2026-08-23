@@ -12,10 +12,12 @@ export interface ObservedEntity {
   maxHp: number;
   resource?: ResourceKind;
   amount?: number;
+  buildProgress?: number;
   /** Own entities only; hidden from opponents. */
   activity?: Activity;
   order?: Order['kind'];
-  training?: { kind: UnitKind; remaining: number };
+  carrying?: { kind: ResourceKind; amount: number };
+  training?: { kind: UnitKind; remainingSeconds: number };
 }
 
 export interface PlayerObservation {
@@ -27,6 +29,7 @@ export interface PlayerObservation {
   mapHeight: number;
   food: number;
   wood: number;
+  gold: number;
   population: number;
   populationCap: number;
   entities: ObservedEntity[];
@@ -49,6 +52,7 @@ export interface MatchConfig {
 export interface PlayerSummary {
   food: number;
   wood: number;
+  gold: number;
   population: number;
   entities: number;
 }

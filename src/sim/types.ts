@@ -1,9 +1,11 @@
+import type { GameRules } from './data';
+
 export type PlayerId = 1 | 2;
-export type ResourceKind = 'food' | 'wood';
+export type ResourceKind = 'food' | 'wood' | 'gold';
 export type UnitKind = 'villager' | 'militia';
 export type BuildingKind = 'town-center' | 'barracks' | 'house';
 export type EntityKind = UnitKind | BuildingKind | 'resource';
-export type Activity = 'idle' | 'moving' | 'gathering' | 'attacking';
+export type Activity = 'idle' | 'moving' | 'gathering' | 'carrying' | 'building' | 'attacking';
 
 export interface Point { x: number; y: number }
 
@@ -11,6 +13,7 @@ export type Order =
   | { kind: 'idle' }
   | { kind: 'move'; target: Point }
   | { kind: 'gather'; targetId: number }
+  | { kind: 'build'; targetId: number }
   | { kind: 'attack'; targetId: number };
 
 export interface Entity {
@@ -23,23 +26,32 @@ export interface Entity {
   radius: number;
   activity: Activity;
   order: Order;
+  /** Resource nodes. */
   resourceKind?: ResourceKind;
   amount?: number;
+  /** Villagers. */
   carrying?: { kind: ResourceKind; amount: number };
-  training?: { kind: UnitKind; remaining: number };
+  gatherProgress?: number;
+  /** Buildings. */
+  buildProgress?: number; // 0..1; undefined once complete
+  training?: { kind: UnitKind; remainingTicks: number };
+  rally?: { target: Point; targetId?: number };
+  attackCooldown?: number; // ticks until the next hit may land
 }
 
 export interface PlayerState {
   id: PlayerId;
   food: number;
   wood: number;
+  gold: number;
   population: number;
   populationCap: number;
 }
 
 export interface GameState {
+  rules: GameRules;
   seed: number;
-  time: number;
+  tick: number;
   nextId: number;
   width: number;
   height: number;
@@ -51,4 +63,6 @@ export interface GameState {
 export type Command =
   | { kind: 'order'; player: PlayerId; entityIds: number[]; target: Point; targetId?: number }
   | { kind: 'train'; player: PlayerId; buildingId: number; unit: UnitKind }
-  | { kind: 'build'; player: PlayerId; builderId: number; building: BuildingKind; target: Point };
+  | { kind: 'build'; player: PlayerId; builderIds: number[]; building: BuildingKind; target: Point }
+  | { kind: 'rally'; player: PlayerId; buildingId: number; target: Point; targetId?: number }
+  | { kind: 'stop'; player: PlayerId; entityIds: number[] };
