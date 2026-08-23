@@ -8,7 +8,7 @@ Read `docs/autonomous-plan.md`, then execute its phases in order without waiting
 - Use the owned DAT/RMS/AI/XS data, open-source parsers, and documented references. Do not disassemble `AoE2DE_s.exe`.
 - Never commit Steam credentials, game files, converted Microsoft assets, `.local/`, `.tools/`, or `public/imported/`.
 - Preserve the current Tailscale routes and Vite mobile URL. Never run `tailscale serve reset`.
-- Match AoE2DE's isometric presentation and HUD/menu layout closely. Import original UI art/icons locally from the owned `widgetui` depot, retain an open fallback, and adapt target sizes—not information architecture—for landscape touch.
+- Desktop/laptop is the canonical play experience. Match AoE2DE's isometric presentation, HUD/menu layout, density, hotkeys, and pointer interactions closely. Mobile is a secondary remote-QA surface only; responsive accommodations must not distort the core design or create a separate UI.
 - Prefer narrow maintained libraries over custom commodity infrastructure, but fixture-test them before adoption. Follow `docs/library-strategy.md`.
 - Do not copy GPL/AGPL code into this MIT repository. External tools and architectural study are acceptable.
 - Avoid speculative frameworks, generic abstractions, duplicate sources of truth, and tests written only to raise coverage.

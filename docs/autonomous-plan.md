@@ -2,12 +2,12 @@
 
 ## Stop condition
 
-Deliver a mobile-playable, deterministic 1v1 Dark Age skirmish with imported AoE2DE visuals and data-backed economy, construction, production, combat, visibility, an external strategy protocol, and reproducible headless batches.
+Deliver a desktop-first, deterministic 1v1 Dark Age skirmish with imported AoE2DE visuals and data-backed economy, construction, production, combat, visibility, an external strategy protocol, and reproducible headless batches. Mobile remains a secondary remote quality-control surface.
 
 It is complete when:
 
 - a human can gather food/wood/gold, return resources, build houses/barracks, train villagers/militia, fight, and win;
-- the battlefield, HUD, command grid, selection panel, minimap, menus, icons, typography, colors, and interaction hierarchy closely match AoE2DE's WEST/Dark Age presentation while remaining touch-usable;
+- the battlefield, HUD, command grid, selection panel, minimap, menus, icons, typography, colors, density, hotkeys, and pointer interactions closely match AoE2DE's WEST/Dark Age desktop presentation;
 - the example AI performs the same loop through the public command interface;
 - units navigate around buildings/resources without drifting through them;
 - combat uses discrete attack timing, DAT armor classes/minimum damage, and activity-driven animation;
@@ -15,7 +15,7 @@ It is complete when:
 - an arbitrary subprocess strategy can play through JSONL without a browser;
 - at least 16 seeded headless matches run concurrently and produce replayable results;
 - any match can be replayed in the browser with matching periodic checksums;
-- landscape Chrome on karasu remains usable.
+- landscape Chrome on karasu remains usable for verification without influencing desktop layout decisions.
 
 Do not expand to additional ages, civilizations, naval play, campaigns, or multiplayer networking before this target passes.
 
@@ -82,19 +82,19 @@ Implement:
 
 Add explored/currently-visible state and player-filtered memory with `lastSeenAt`. Visibility is authoritative simulation state. Add isometric terrain/depth ordering, shadows, player-color masks, health/construction indicators, and selection/task feedback.
 
-Recreate AoE2DE's information architecture rather than inventing a generic mobile HUD:
+Recreate AoE2DE's desktop information architecture rather than inventing a generic responsive HUD:
 
 - compact resource/population strip across the top and menu controls at the edge;
 - bottom WEST-styled frame with selected-object portrait/stats, command-button grid, production queue, and minimap;
 - imported unit/building/technology/action icons with normal/hover/pressed/disabled states;
 - AoE-like parchment, stone/wood/metal borders, gold highlights, player colors, serif display text, compact numeric labels, notifications, tooltips, pause/settings, victory/defeat, and skirmish setup menus;
-- desktop hotkeys plus touch targets of at least 42 CSS pixels, long-press help, safe-area support, and no accidental map commands through the HUD.
+- AoE-like keyboard hotkeys, mouse selection, drag selection, edge/camera movement, pointer tooltips, and command feedback.
 
-Treat original `widgetui` layouts/textures as patch-matched reference inputs. Do not clone desktop pixel coordinates blindly: preserve panel roles, hierarchy, aspect, and visual language while scaling/reflowing for landscape phones. UI state and button legality come only from canonical observations. Preserve an open placeholder skin when imported assets are absent.
+Treat original `widgetui` layouts/textures as patch-matched reference inputs. Desktop/laptop layout and interaction fidelity wins whenever it conflicts with touch convenience. Mobile may scale the complete desktop composition, add safe-area padding, and enlarge controls only behind a narrow-screen mode; it must not move core panels, remove information, simplify commands, or create separate gameplay behavior. UI state and button legality come only from canonical observations. Preserve an open placeholder skin when imported assets are absent.
 
-Do not replace Three.js unless an imported-asset mobile benchmark demonstrates a concrete problem.
+Do not replace Three.js unless representative desktop profiling demonstrates a concrete problem.
 
-**Gate:** side-by-side reference checks show the same recognizable composition and states; all controls remain touch-usable; privileged truth and player observations differ correctly; imported assets load without console errors; frame time and memory are recorded on a representative match.
+**Gate:** desktop side-by-side reference checks show the same recognizable composition and states; keyboard/mouse play is complete; privileged truth and player observations differ correctly; imported assets load without console errors; desktop frame time and memory are recorded. Run a secondary mobile smoke test without blocking desktop-fidelity work.
 
 ## Phase 6 — Batches, replay, and live agents
 
@@ -110,9 +110,9 @@ Add paired seeds, result summaries, confidence intervals, and strategy artifact 
 
 Report:
 
-- mobile URL and controls;
+- desktop URL, controls, hotkeys, and secondary mobile verification URL;
 - implemented and deliberately omitted mechanics;
-- measured headless throughput and mobile performance;
+- measured headless throughput and desktop performance;
 - compatibility evidence and known discrepancies;
 - exact test commands and results;
 - the smallest recommended next milestone.

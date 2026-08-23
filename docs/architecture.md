@@ -75,4 +75,4 @@ The first slice deliberately includes the whole product loop at low fidelity:
 - fullscreen/landscape request on mobile;
 - deterministic fixed-step tests.
 
-It deliberately omits pathfinding, collision, construction time, resource drop-off, fog of war, projectiles, civilization data, and batch execution. These should be deepened one vertical mechanic at a time after mobile play validates the interaction loop.
+It deliberately omits pathfinding, collision, construction time, resource drop-off, fog of war, projectiles, civilization data, and batch execution. These should be deepened one vertical mechanic at a time; desktop/laptop is the canonical play target and mobile is only a remote verification surface.

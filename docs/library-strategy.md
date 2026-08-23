@@ -13,7 +13,7 @@ The project should not build commodity infrastructure from scratch, but it also 
 |---|---|---|
 | AoE DAT import | `genieutils-py` 0.1.2 as an external Python tool | Successfully parsed our patch-matched `VER 8.9` DAT, avoids writing a binary parser; LGPL remains isolated from the MIT runtime |
 | AoE SLD conversion | openage converter as an external tool | Strongest maintained format implementation; outputs PNG atlas and hotspot metadata; GPL tool remains outside runtime |
-| Rendering | Three.js `WebGPURenderer` with WebGL 2 fallback | Already proven on the phone; supports the desired WebGPU path and keeps rendering separate |
+| Rendering | Three.js `WebGPURenderer` with WebGL 2 fallback | Already proven in the browser; supports the desired WebGPU path and keeps rendering separate |
 | Schemas | JSON Schema plus Ajv when generated content is introduced | Standard, language-neutral contracts for Python importer, TypeScript runtime, agents, and future SDKs |
 | Testing | Vitest now; add `fast-check` for invariant/property testing | Mature TypeScript test workflow and reproducible generative tests |
 | RMS parsing | Evaluate MIT-licensed Mangudai before writing a parser | Native JS/TS AST; use `rms-check` externally as a GPL compatibility oracle |
@@ -53,12 +53,12 @@ An ECS does not create determinism. Stable IDs, fixed ticks, explicit system ord
 
 PixiJS is the strongest mature sprite-heavy 2D renderer and may batch AoE atlases more naturally. Three.js remains the current choice because:
 
-- it already works on the target phone;
+- it already works across the current browser targets;
 - the user explicitly values Three.js/WebGPU tooling;
 - VOIDSTRIKE validates the broad browser-RTS architecture;
 - switching renderers before measuring atlas performance would not improve simulation research.
 
-Keep the renderer adapter narrow. Re-evaluate PixiJS if the imported-sprite spike shows unacceptable batching complexity, memory, or mobile frame time.
+Keep the renderer adapter narrow. Re-evaluate PixiJS only if representative desktop profiling shows unacceptable batching complexity, memory, or frame time.
 
 ### Recast Navigation
 
