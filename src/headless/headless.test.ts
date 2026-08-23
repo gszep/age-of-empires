@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { runMatch } from './runner';
-import { builtinStrategy, subprocessStrategy } from './strategies';
+import { replayRecord, runMatch } from './runner';
+import { builtinStrategy, mcpStrategy, subprocessStrategy, websocketStrategy } from './strategies';
+import { WebSocketServer } from 'ws';
 import { parseStrategyLine } from '../protocol/validate';
-import { validateMatchResult, explain } from '../protocol/validate';
+import { validateMatchRecord, validateMatchResult, explain } from '../protocol/validate';
 
 describe('headless matches', () => {
   it('completes a builtin-vs-idle match with a winner and valid result', async () => {
-    const result = await runMatch(
+    const { result } = await runMatch(
       { version: 1, seed: 7, maxTimeSeconds: 1800 },
       { 1: { decide: () => [] }, 2: builtinStrategy() },
     );
@@ -22,7 +23,7 @@ describe('headless matches', () => {
   });
 
   it('records rejected commands with diagnostics instead of applying them', async () => {
-    const result = await runMatch(
+    const { result } = await runMatch(
       { version: 1, seed: 3, maxTimeSeconds: 1 },
       {
         1: { decide: () => [{ kind: 'train', player: 1, buildingId: 99_999, unit: 'villager' }] },
@@ -34,7 +35,7 @@ describe('headless matches', () => {
   });
 
   it('runs the example AI as a JSONL subprocess to victory', async () => {
-    const result = await runMatch(
+    const { result } = await runMatch(
       { version: 1, seed: 7, maxTimeSeconds: 1800, decideIntervalSeconds: 5 },
       {
         1: { decide: () => [] },
@@ -43,6 +44,61 @@ describe('headless matches', () => {
     );
     expect(result.winner).toBe(2);
   }, 120_000);
+
+  it('replays a command stream with matching checksums and detects tampering', async () => {
+    const { record } = await runMatch(
+      { version: 1, seed: 12, maxTimeSeconds: 6 },
+      { 1: builtinStrategy(), 2: builtinStrategy() },
+    );
+    expect(record.checksums.length).toBeGreaterThan(0);
+    expect(validateMatchRecord(record), explain(validateMatchRecord)).toBe(true);
+    expect(replayRecord(record)).toEqual({ ok: true, checked: record.checksums.length });
+    const tampered = structuredClone(record);
+    tampered.checksums[0].hash = '00000000';
+    expect(replayRecord(tampered)).toMatchObject({ ok: false, mismatchTick: tampered.checksums[0].tick });
+  });
+
+  it('proceeds without late commands in deadline mode', async () => {
+    const { record } = await runMatch(
+      { version: 1, seed: 2, maxTimeSeconds: 0.2 },
+      {
+        1: subprocessStrategy('npx tsx src/headless/delayed-strategy-fixture.ts', { mode: 'deadline', deadlineMs: 5 }),
+        2: { decide: () => [] },
+      },
+    );
+    expect(record.commands).toEqual([]);
+  });
+
+  it('uses a WebSocket strategy with the public messages', async () => {
+    const server = new WebSocketServer({ port: 0 });
+    await new Promise<void>(resolve => server.once('listening', resolve));
+    server.on('connection', socket => socket.on('message', raw => {
+      const input = JSON.parse(String(raw));
+      socket.send(JSON.stringify({ type: 'commands', time: input.observation.time, commands: [] }));
+    }));
+    const address = server.address();
+    if (typeof address === 'string' || address === null) throw new Error('WebSocket fixture did not bind');
+    try {
+      const { record } = await runMatch(
+        { version: 1, seed: 4, maxTimeSeconds: 0.05 },
+        { 1: websocketStrategy(`ws://127.0.0.1:${address.port}`), 2: { decide: () => [] } },
+      );
+      expect(record.commands).toEqual([]);
+    } finally {
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  });
+
+  it('uses an MCP tool as a strategy through the SDK transport', async () => {
+    const { record } = await runMatch(
+      { version: 1, seed: 4, maxTimeSeconds: 0.05 },
+      {
+        1: mcpStrategy({ command: 'npx', args: ['tsx', 'src/headless/mcp-fixture-server.ts'], timeoutMs: 30_000 }),
+        2: { decide: () => [] },
+      },
+    );
+    expect(record.commands).toEqual([]);
+  }, 45_000);
 
   it('fails clearly on malformed subprocess output', async () => {
     await expect(

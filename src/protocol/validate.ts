@@ -11,7 +11,7 @@ import { Ajv, type ValidateFunction } from 'ajv';
 const schemaDirectory = join(dirname(fileURLToPath(import.meta.url)), '../../schemas');
 
 const ajv = new Ajv({ allErrors: false });
-for (const name of ['command', 'observation', 'strategy-message', 'match-config', 'match-result']) {
+for (const name of ['command', 'observation', 'strategy-message', 'match-config', 'match-result', 'match-record']) {
   ajv.addSchema(JSON.parse(readFileSync(join(schemaDirectory, `${name}.schema.json`), 'utf8')));
 }
 
@@ -31,6 +31,7 @@ export const validateObservation = validator('observation');
 export const validateStrategyMessage = validator('strategy-message');
 export const validateMatchConfig = validator('match-config');
 export const validateMatchResult = validator('match-result');
+export const validateMatchRecord = validator('match-record');
 
 /** Parse one strategy JSONL line, throwing a clear diagnostic on bad input. */
 export function parseStrategyLine(line: string): { time: number; commands: unknown[] } {

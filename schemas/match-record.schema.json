@@ -1,0 +1,40 @@
+{
+  "$id": "https://open-empires-lab/match-record.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MatchRecord",
+  "type": "object",
+  "properties": {
+    "version": { "const": 1 },
+    "seed": { "type": "integer" },
+    "rulesOrigin": { "enum": ["fallback", "imported"] },
+    "decideIntervalSeconds": { "type": "number", "exclusiveMinimum": 0 },
+    "maxTimeSeconds": { "type": "number", "exclusiveMinimum": 0 },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "tick": { "type": "integer", "minimum": 0 },
+          "command": { "$ref": "https://open-empires-lab/command.schema.json" }
+        },
+        "required": ["tick", "command"],
+        "additionalProperties": false
+      }
+    },
+    "checksums": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "tick": { "type": "integer", "minimum": 1 },
+          "hash": { "type": "string", "pattern": "^[0-9a-f]{8}$" }
+        },
+        "required": ["tick", "hash"],
+        "additionalProperties": false
+      }
+    },
+    "result": { "$ref": "https://open-empires-lab/match-result.schema.json" }
+  },
+  "required": ["version", "seed", "rulesOrigin", "decideIntervalSeconds", "maxTimeSeconds", "commands", "checksums", "result"],
+  "additionalProperties": false
+}

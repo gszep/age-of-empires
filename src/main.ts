@@ -5,6 +5,8 @@ import { observe } from './sim/observe';
 import { applyCommand, createGame, gameTimeSeconds, placementLegal, stepGame } from './sim/game';
 import { FALLBACK_RULES, TICK_SECONDS, rulesFromManifest, type ContentManifest, type GameRules } from './sim/data';
 import { isTileVisible } from './sim/visibility';
+import { checksumState } from './sim/checksum';
+import type { MatchRecord } from './protocol/types';
 import type { BuildingKind, Entity, GameState, Point } from './sim/types';
 import { loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, TILE_W, TILE_H } from './view/iso';
@@ -33,6 +35,44 @@ let selectedIds: number[] = [];
 let buildMode: BuildingKind | undefined;
 let paused = false;
 let aiClock = 0;
+
+interface ReplayState {
+  record: MatchRecord;
+  commands: MatchRecord['commands'];
+  checksums: Map<number, string>;
+  lastTick: number;
+  verified: number;
+  failed: boolean;
+}
+let replay: ReplayState | undefined;
+
+function startReplay(raw: unknown): void {
+  const record = raw as MatchRecord;
+  if (!record || record.version !== 1 || !Array.isArray(record.commands) || !Array.isArray(record.checksums)) {
+    hud.showMessage('Not a valid replay file');
+    return;
+  }
+  if (record.rulesOrigin !== rules.origin) {
+    hud.showMessage(`Replay was recorded with ${record.rulesOrigin} rules; local rules are ${rules.origin}`);
+    return;
+  }
+  game = createGame(record.seed, rules);
+  selectedIds = [];
+  buildMode = undefined;
+  paused = false;
+  hud.hideEnd();
+  for (const view of views.values()) scene.remove(view.group);
+  views.clear();
+  replay = {
+    record,
+    commands: [...record.commands],
+    checksums: new Map(record.checksums.map(entry => [entry.tick, entry.hash])),
+    lastTick: record.checksums.at(-1)?.tick ?? 0,
+    verified: 0,
+    failed: false,
+  };
+  hud.showMessage(`Replaying seed ${record.seed}`);
+}
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x18140c);
@@ -74,9 +114,11 @@ const hud = new Hud(app, uiAssets, {
     if (action === 'resume') paused = false;
     if (action === 'restart') restart();
   },
+  onReplayFile: record => startReplay(record),
 });
 
 function restart(): void {
+  replay = undefined;
   game = createGame((Date.now() >>> 0) || 1, rules);
   selectedIds = [];
   buildMode = undefined;
@@ -99,6 +141,7 @@ function selectIdleVillager(): void {
 }
 
 function runUiCommand(id: string): void {
+  if (replay) return;
   const selection = ownSelected();
   if (id === 'build-house' || id === 'build-barracks') {
     buildMode = id === 'build-house' ? 'house' : 'barracks';
@@ -155,7 +198,7 @@ renderer.domElement.addEventListener('contextmenu', event => event.preventDefaul
 renderer.domElement.addEventListener('pointerdown', event => {
   const point = screenToWorld(event.clientX, event.clientY);
   if (event.button === 0) {
-    if (buildMode) {
+    if (buildMode && !replay) {
       const builder = ownSelected().find(e => e.kind === 'villager');
       const result = builder
         ? applyCommand(game, { kind: 'build', player: 1, builderIds: ownSelected().filter(e => e.kind === 'villager').map(e => e.id), building: buildMode, target: point })
@@ -214,6 +257,7 @@ addEventListener('pointerup', event => {
 });
 
 function contextOrder(point: Point, _clientX: number, _clientY: number): void {
+  if (replay) return; // spectating: inputs must not perturb the command stream
   const selection = ownSelected();
   const target = pickEntity(point);
   const units = selection.filter(e => e.kind === 'villager' || e.kind === 'militia');
@@ -470,11 +514,31 @@ renderer.setAnimationLoop(now => {
   if (!paused && !game.winner) {
     accumulator += elapsed;
     while (accumulator >= TICK_SECONDS) {
-      stepGame(game);
-      aiClock += TICK_SECONDS;
-      if (aiClock >= 0.5) {
-        for (const command of exampleAiCommands(observe(game, 2))) applyCommand(game, command);
-        aiClock = 0;
+      if (replay) {
+        if (game.tick >= replay.lastTick) { accumulator = 0; break; }
+        while (replay.commands.length && replay.commands[0].tick === game.tick) {
+          applyCommand(game, replay.commands.shift()!.command);
+        }
+        stepGame(game);
+        const expected = replay.checksums.get(game.tick);
+        if (expected !== undefined && !replay.failed) {
+          if (checksumState(game) === expected) {
+            replay.verified++;
+          } else {
+            replay.failed = true;
+            hud.showMessage(`Replay desync at tick ${game.tick}`);
+          }
+        }
+        if (game.tick === replay.lastTick && !replay.failed) {
+          hud.showMessage(`Replay verified: ${replay.verified} checksums match`);
+        }
+      } else {
+        stepGame(game);
+        aiClock += TICK_SECONDS;
+        if (aiClock >= 0.5) {
+          for (const command of exampleAiCommands(observe(game, 2))) applyCommand(game, command);
+          aiClock = 0;
+        }
       }
       accumulator -= TICK_SECONDS;
     }

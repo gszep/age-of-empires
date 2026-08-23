@@ -10,7 +10,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { FALLBACK_RULES, rulesFromManifest, type GameRules } from '../sim/data';
 import { runMatch, type Strategy } from './runner';
-import { builtinStrategy, subprocessStrategy } from './strategies';
+import { builtinStrategy, mcpStrategy, subprocessStrategy, websocketStrategy } from './strategies';
 import { validateMatchConfig, explain } from '../protocol/validate';
 import type { MatchConfig } from '../protocol/types';
 
@@ -31,7 +31,10 @@ function strategyFor(name: string): Strategy {
   if (name === 'builtin') return builtinStrategy();
   if (name === 'idle') return { decide: () => [] };
   if (name.startsWith('cmd:')) return subprocessStrategy(name.slice(4));
-  throw new Error(`unknown strategy '${name}'; use builtin, idle, or cmd:<shell command>`);
+  if (name.startsWith('deadline-cmd:')) return subprocessStrategy(name.slice(13), { mode: 'deadline', deadlineMs: 100 });
+  if (name.startsWith('ws:')) return websocketStrategy(name.slice(3));
+  if (name.startsWith('mcp:')) return mcpStrategy({ command: 'sh', args: ['-lc', name.slice(4)] });
+  throw new Error(`unknown strategy '${name}'; use builtin, idle, cmd:<shell>, deadline-cmd:<shell>, ws:<url>, or mcp:<shell>`);
 }
 
 let args: Record<string, string>;
@@ -39,7 +42,7 @@ try {
   args = parseArgs(process.argv.slice(2));
 } catch (error) {
   console.error((error as Error).message);
-  console.error('usage: npm run match -- [--seed n] [--p1 builtin|idle|cmd:...] [--p2 ...] [--max-time s] [--interval s] [--out file]');
+  console.error('usage: npm run match -- [--seed n] [--p1 builtin|idle|cmd:...] [--p2 ...] [--max-time s] [--interval s] [--out file] [--replay file]');
   process.exit(2);
 }
 const config: MatchConfig = { version: 1, seed: Number(args.seed ?? 1) };
@@ -57,10 +60,11 @@ const rules: GameRules = args.data !== 'fallback' && existsSync(manifestPath)
   : FALLBACK_RULES;
 console.error(`rules: ${rules.origin}`);
 
-const result = await runMatch(config, {
+const { result, record } = await runMatch(config, {
   1: strategyFor(args.p1 ?? 'builtin'),
   2: strategyFor(args.p2 ?? 'builtin'),
 }, rules);
+if (args.replay) writeFileSync(args.replay, `${JSON.stringify(record)}\n`);
 
 const output = JSON.stringify(result, null, 2);
 if (args.out) writeFileSync(args.out, `${output}\n`);

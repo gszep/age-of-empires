@@ -18,6 +18,8 @@ The project should not build commodity infrastructure from scratch, but it also 
 | Testing | Vitest now; add `fast-check` for invariant/property testing | Mature TypeScript test workflow and reproducible generative tests |
 | RMS parsing | Evaluate MIT-licensed Mangudai before writing a parser | Native JS/TS AST; use `rms-check` externally as a GPL compatibility oracle |
 | Browser concurrency | Native Web Workers and structured clone first | Standard platform API; add Comlink only if message boilerplate becomes material |
+| MCP strategies | `@modelcontextprotocol/sdk` 1.30 | Maintained protocol handshake and stdio transport behind one strategy adapter; fixture-tested with a real MCP server/tool |
+| WebSocket strategies | `ws` 8.18 for Node test/server fixtures; native `WebSocket` client | Narrow transport boundary using the same versioned messages as JSONL |
 
 `aoe2-genie-tooling` 1.2.4 was also tested, but rejected for this pinned manifest because its parser reported 22,449 trailing bytes. This is why every library choice needs a real fixture rather than relying only on advertised format support.
 

@@ -31,6 +31,7 @@ export interface HudCallbacks {
   onMinimapNavigate(point: Point): void;
   onSelectIdleVillager(): void;
   onMenu(action: 'resume' | 'restart' | 'pause'): void;
+  onReplayFile(record: unknown): void;
 }
 
 const REFERENCE_WIDTH = 3840;
@@ -96,6 +97,8 @@ export class Hud {
         <h2>Menu</h2>
         <button data-menu="resume">Resume</button>
         <button data-menu="restart">Restart</button>
+        <button data-menu="load-replay">Load replay…</button>
+        <input id="replay-file" type="file" accept=".json" style="display:none">
       </div>
       <div id="end-dialog" class="dialog hidden"><h2 id="end-title"></h2><button data-menu="restart">Play again</button></div>
     `;
@@ -146,6 +149,17 @@ export class Hud {
       else if (menu === 'resume') { this.toggleMenu(false); this.callbacks.onMenu('resume'); }
       else if (menu === 'pause') this.callbacks.onMenu('pause');
       else if (menu === 'restart') { this.toggleMenu(false); this.callbacks.onMenu('restart'); }
+      else if (menu === 'load-replay') this.root.querySelector<HTMLInputElement>('#replay-file')!.click();
+    });
+    this.root.querySelector<HTMLInputElement>('#replay-file')!.addEventListener('change', async event => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        this.callbacks.onReplayFile(JSON.parse(await file.text()));
+        this.toggleMenu(false);
+      } catch {
+        this.showMessage('Not a valid replay file');
+      }
     });
     const minimapCanvas = this.root.querySelector<HTMLCanvasElement>('#minimap-canvas')!;
     const navigate = (event: PointerEvent) => {

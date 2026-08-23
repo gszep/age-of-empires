@@ -85,6 +85,18 @@ export interface RememberedEntityObservation {
   lastSeenAt: number;
 }
 
+/** Everything needed to reproduce a match tick-for-tick. */
+export interface MatchRecord {
+  version: typeof PROTOCOL_VERSION;
+  seed: number;
+  rulesOrigin: 'fallback' | 'imported';
+  decideIntervalSeconds: number;
+  maxTimeSeconds: number;
+  commands: { tick: number; command: Command }[];
+  checksums: { tick: number; hash: string }[];
+  result: MatchResult;
+}
+
 /** Runner -> strategy JSONL line. */
 export interface StrategyInputMessage {
   type: 'observation';
