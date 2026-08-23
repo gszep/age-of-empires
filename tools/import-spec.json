@@ -139,6 +139,7 @@
   "ui": {
     "style": "West",
     "panels": [
+      "blanktoppanel",
       "resourcepanel",
       "commandpanel",
       "mappanel",

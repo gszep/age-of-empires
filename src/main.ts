@@ -2,47 +2,26 @@ import * as THREE from 'three/webgpu';
 import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
 import { observe } from './sim/observe';
-import { applyCommand, createGame, gameTimeSeconds, nearestEntity, stepGame } from './sim/game';
+import { applyCommand, createGame, gameTimeSeconds, placementLegal, stepGame } from './sim/game';
 import { FALLBACK_RULES, TICK_SECONDS, rulesFromManifest, type ContentManifest, type GameRules } from './sim/data';
-import type { BuildingKind, Entity, Point } from './sim/types';
-import { createMilitiaMesh, loadMilitiaAssets, updateMilitiaMesh } from './view/militia';
+import { isTileVisible } from './sim/visibility';
+import type { BuildingKind, Entity, GameState, Point } from './sim/types';
+import { loadContentAssets, loadUiAssets } from './view/assets';
+import { worldToIso, isoToWorld, TILE_W, TILE_H } from './view/iso';
+import { createEntityView, updateEntityView, entityKey, type EntityView } from './view/sprites';
+import { createGround, createFog } from './view/world';
+import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
-app.innerHTML = `
-  <div id="hud">
-    <div class="topbar" id="topbar"></div>
-    <div id="message"></div>
-    <div class="status" id="status"></div>
-    <div class="actions" id="actions"></div>
-  </div>
-  <div class="rotate"><div><strong>Best played sideways</strong><br>Rotate your phone for the full battlefield.<br><button id="landscape">Enter landscape</button></div></div>`;
 
-const renderer = new THREE.WebGPURenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.6));
+const renderer = new THREE.WebGPURenderer({ antialias: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
-app.prepend(renderer.domElement);
+renderer.domElement.classList.add('battlefield');
+app.appendChild(renderer.domElement);
 await renderer.init();
-const militiaAssets = await loadMilitiaAssets();
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x526f45);
-const camera = new THREE.OrthographicCamera(-16, 16, 9, -9, 0.1, 100);
-camera.position.set(0, 0, 30);
-camera.lookAt(0, 0, 0);
-
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(32, 18),
-  new THREE.MeshBasicMaterial({ color: 0x78945c }),
-);
-scene.add(ground);
-
-const midline = new THREE.Mesh(
-  new THREE.PlaneGeometry(0.06, 17.5),
-  new THREE.MeshBasicMaterial({ color: 0xc7d8a5, transparent: true, opacity: 0.18 }),
-);
-midline.position.z = 0.01;
-scene.add(midline);
-
+const [assets, uiAssets] = await Promise.all([loadContentAssets(), loadUiAssets()]);
 let rules: GameRules = FALLBACK_RULES;
 try {
   const response = await fetch('/imported/aoe2/manifest.json');
@@ -54,176 +33,424 @@ let selectedIds: number[] = [];
 let buildMode: BuildingKind | undefined;
 let paused = false;
 let aiClock = 0;
-const meshes = new Map<number, THREE.Object3D>();
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x18140c);
+const camera = new THREE.OrthographicCamera(-innerWidth / 2, innerWidth / 2, innerHeight / 2, -innerHeight / 2, -1000, 1000);
+camera.position.z = 10;
+let cameraCenter = { ...worldToIso(8, 9) };
+let zoom = 1;
+
+scene.add(createGround(game));
+const fog = createFog(game);
+scene.add(fog.mesh);
+
+const views = new Map<string, EntityView>();
+const ringGeometry = new THREE.RingGeometry(50, 53, 32);
+const ringPool: THREE.Mesh[] = [];
 const selectionRings = new THREE.Group();
+selectionRings.renderOrder = 900;
 scene.add(selectionRings);
 
-const ownerColors = { 0: 0xffffff, 1: 0x3b8cff, 2: 0xef4747 } as const;
+// Building placement ghost.
+const ghost = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.4, depthTest: false, depthWrite: false }),
+);
+ghost.visible = false;
+ghost.renderOrder = 6000;
+scene.add(ghost);
+let pointerWorld: Point = { x: 16, y: 9 };
 
-function geometryFor(entity: Entity): THREE.BufferGeometry {
-  if (entity.kind === 'town-center') return new THREE.BoxGeometry(2.5, 2.5, 0.55);
-  if (entity.kind === 'barracks') return new THREE.BoxGeometry(2, 2, 0.45);
-  if (entity.kind === 'house') return new THREE.ConeGeometry(0.8, 1.4, 4);
-  if (entity.kind === 'resource' && entity.resourceKind === 'wood') return new THREE.CircleGeometry(0.52, 8);
-  if (entity.kind === 'resource' && entity.resourceKind === 'gold') return new THREE.CircleGeometry(0.45, 6);
-  if (entity.kind === 'resource') return new THREE.CircleGeometry(0.42, 12);
-  if (entity.kind === 'militia') return new THREE.ConeGeometry(0.42, 0.9, 3);
-  return new THREE.CircleGeometry(0.36, 16);
+const hud = new Hud(app, uiAssets, {
+  onCommand: id => runUiCommand(id),
+  onMinimapNavigate: canvasPoint => {
+    const world = hud.minimap.fromCanvas(game, canvasPoint.x, canvasPoint.y);
+    cameraCenter = worldToIso(world.x, world.y);
+  },
+  onSelectIdleVillager: () => selectIdleVillager(),
+  onMenu: action => {
+    if (action === 'pause') paused = !paused;
+    if (action === 'resume') paused = false;
+    if (action === 'restart') restart();
+  },
+});
+
+function restart(): void {
+  game = createGame((Date.now() >>> 0) || 1, rules);
+  selectedIds = [];
+  buildMode = undefined;
+  paused = false;
+  hud.hideEnd();
+  for (const view of views.values()) scene.remove(view.group);
+  views.clear();
 }
 
-function colorFor(entity: Entity): number {
-  if (entity.kind === 'resource') {
-    return entity.resourceKind === 'wood' ? 0x23552e : entity.resourceKind === 'gold' ? 0xe3b64f : 0xd94d79;
-  }
-  return ownerColors[entity.owner];
+const ownSelected = (): Entity[] =>
+  game.entities.filter(e => selectedIds.includes(e.id) && e.owner === 1 && !e.dead);
+
+function selectIdleVillager(): void {
+  const idle = game.entities.filter(e => e.owner === 1 && e.kind === 'villager' && !e.dead && e.order.kind === 'idle');
+  if (!idle.length) { hud.showMessage('No idle villagers'); return; }
+  const current = idle.findIndex(e => selectedIds.includes(e.id));
+  const next = idle[(current + 1) % idle.length];
+  selectedIds = [next.id];
+  cameraCenter = worldToIso(next.position.x, next.position.y);
 }
 
-function syncScene(): void {
-  const live = new Set(game.entities.map(e => e.id));
-  for (const [id, mesh] of meshes) {
-    if (!live.has(id)) { scene.remove(mesh); meshes.delete(id); }
+function runUiCommand(id: string): void {
+  const selection = ownSelected();
+  if (id === 'build-house' || id === 'build-barracks') {
+    buildMode = id === 'build-house' ? 'house' : 'barracks';
+    return;
   }
+  if (id === 'stop') {
+    if (selection.length) applyCommand(game, { kind: 'stop', player: 1, entityIds: selection.map(e => e.id) });
+    return;
+  }
+  if (id === 'train-villager' || id === 'train-militia') {
+    const building = selection.find(e => e.kind === (id === 'train-villager' ? 'town-center' : 'barracks'));
+    if (!building) return;
+    const result = applyCommand(game, {
+      kind: 'train', player: 1, buildingId: building.id,
+      unit: id === 'train-villager' ? 'villager' : 'militia',
+    });
+    if (!result.ok) hud.showMessage(result.reason);
+    return;
+  }
+  if (id === 'cancel') buildMode = undefined;
+}
+
+/** Screen pixel -> world tile point under the current camera. */
+function screenToWorld(clientX: number, clientY: number): Point {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const sx = (clientX - rect.left - rect.width / 2) / zoom + cameraCenter.x;
+  const sy = -((clientY - rect.top - rect.height / 2) / zoom) + cameraCenter.y;
+  return isoToWorld(sx, sy);
+}
+
+function pickEntity(point: Point): Entity | undefined {
+  let best: Entity | undefined;
+  let bestDistance = Infinity;
   for (const entity of game.entities) {
-    let object = meshes.get(entity.id);
-    if (!object) {
-      object = entity.kind === 'militia' && militiaAssets
-        ? createMilitiaMesh(militiaAssets, entity.owner as 1 | 2)
-        : new THREE.Mesh(geometryFor(entity), new THREE.MeshBasicMaterial({ color: colorFor(entity) }));
-      object.userData.entityId = entity.id;
-      meshes.set(entity.id, object);
-      scene.add(object);
+    if (entity.dead) continue;
+    if (entity.owner !== 1 && entity.owner !== 0 && !isTileVisible(game, 1, entity.position.x, entity.position.y)) continue;
+    const d = Math.hypot(entity.position.x - point.x, entity.position.y - point.y) - entity.radius;
+    if (d < Math.min(bestDistance, 0.9)) {
+      best = entity;
+      bestDistance = d;
     }
-    if (entity.kind === 'militia' && militiaAssets && object instanceof THREE.Mesh) {
-      const order = entity.order;
-      const target = order.kind === 'move'
-        ? order.target
-        : order.kind === 'attack' || order.kind === 'gather'
-          ? game.entities.find(candidate => candidate.id === order.targetId)?.position
-          : undefined;
-      updateMilitiaMesh(militiaAssets, object, entity, target, gameTimeSeconds(game));
+  }
+  return best;
+}
+
+// ---------------------------------------------------------------------------
+// Pointer input: left select / drag box, right context order, edge scrolling.
+const selectionBox = document.createElement('div');
+selectionBox.id = 'selection-box';
+app.appendChild(selectionBox);
+let dragStart: { x: number; y: number } | undefined;
+
+renderer.domElement.addEventListener('contextmenu', event => event.preventDefault());
+renderer.domElement.addEventListener('pointerdown', event => {
+  const point = screenToWorld(event.clientX, event.clientY);
+  if (event.button === 0) {
+    if (buildMode) {
+      const builder = ownSelected().find(e => e.kind === 'villager');
+      const result = builder
+        ? applyCommand(game, { kind: 'build', player: 1, builderIds: ownSelected().filter(e => e.kind === 'villager').map(e => e.id), building: buildMode, target: point })
+        : { ok: false as const, reason: 'Select a villager first' };
+      if (!result.ok) hud.showMessage(result.reason);
+      buildMode = undefined;
+      return;
     }
-    const offset = object.userData.spriteOffset ?? { x: 0, y: 0 };
-    object.position.set(entity.position.x - game.width / 2 + offset.x, entity.position.y - game.height / 2 + offset.y, entity.kind === 'resource' ? 0.08 : 0.18);
-    if (entity.kind === 'house' || (entity.kind === 'militia' && !militiaAssets)) object.rotation.z = Math.PI;
-    if (!object.userData.militia) {
-      const health = Math.max(0.25, entity.hp / entity.maxHp);
-      object.scale.set(health < 0.99 ? 0.92 + health * 0.08 : 1, health < 0.99 ? 0.92 + health * 0.08 : 1, 1);
+    dragStart = { x: event.clientX, y: event.clientY };
+  } else if (event.button === 2) {
+    contextOrder(point, event.clientX, event.clientY);
+  }
+});
+addEventListener('pointermove', event => {
+  if (event.target === renderer.domElement || dragStart) {
+    pointerWorld = screenToWorld(event.clientX, event.clientY);
+  }
+  if (!dragStart) return;
+  const x = Math.min(dragStart.x, event.clientX);
+  const y = Math.min(dragStart.y, event.clientY);
+  selectionBox.style.display = 'block';
+  selectionBox.style.left = `${x}px`;
+  selectionBox.style.top = `${y}px`;
+  selectionBox.style.width = `${Math.abs(event.clientX - dragStart.x)}px`;
+  selectionBox.style.height = `${Math.abs(event.clientY - dragStart.y)}px`;
+});
+addEventListener('pointerup', event => {
+  if (event.button !== 0 || !dragStart) return;
+  selectionBox.style.display = 'none';
+  const wasDrag = Math.abs(event.clientX - dragStart.x) + Math.abs(event.clientY - dragStart.y) > 8;
+  if (wasDrag) {
+    const a = screenToWorld(dragStart.x, dragStart.y);
+    const b = screenToWorld(event.clientX, event.clientY);
+    const c = screenToWorld(dragStart.x, event.clientY);
+    const d = screenToWorld(event.clientX, dragStart.y);
+    const minX = Math.min(a.x, b.x, c.x, d.x);
+    const maxX = Math.max(a.x, b.x, c.x, d.x);
+    const minY = Math.min(a.y, b.y, c.y, d.y);
+    const maxY = Math.max(a.y, b.y, c.y, d.y);
+    const units = game.entities.filter(e =>
+      !e.dead && e.owner === 1 && (e.kind === 'villager' || e.kind === 'militia') &&
+      e.position.x >= minX && e.position.x <= maxX && e.position.y >= minY && e.position.y <= maxY,
+    );
+    if (units.length) selectedIds = units.map(e => e.id);
+  } else {
+    const target = pickEntity(screenToWorld(event.clientX, event.clientY));
+    if (target && target.owner === 1) {
+      selectedIds = event.shiftKey ? [...new Set([...selectedIds, target.id])] : [target.id];
+    } else if (target) {
+      selectedIds = [target.id];
+    } else if (!event.shiftKey) {
+      selectedIds = [];
+    }
+  }
+  dragStart = undefined;
+});
+
+function contextOrder(point: Point, _clientX: number, _clientY: number): void {
+  const selection = ownSelected();
+  const target = pickEntity(point);
+  const units = selection.filter(e => e.kind === 'villager' || e.kind === 'militia');
+  if (units.length) {
+    const result = applyCommand(game, {
+      kind: 'order', player: 1, entityIds: units.map(e => e.id),
+      target: point, targetId: target && target.id !== units[0].id ? target.id : undefined,
+    });
+    if (!result.ok) hud.showMessage(result.reason);
+    return;
+  }
+  const building = selection.find(e => e.kind === 'town-center' || e.kind === 'barracks');
+  if (building) {
+    applyCommand(game, { kind: 'rally', player: 1, buildingId: building.id, target: point, targetId: target?.id });
+    hud.showMessage('Rally point set');
+  }
+}
+
+// Keyboard: camera, hotkeys, menu.
+const heldKeys = new Set<string>();
+addEventListener('keydown', event => {
+  const key = event.key;
+  if (key.startsWith('Arrow')) { heldKeys.add(key); event.preventDefault(); return; }
+  if (key === 'Escape') {
+    if (buildMode) buildMode = undefined;
+    else if (hud.menuOpen) hud.toggleMenu(false);
+    else hud.toggleMenu(true);
+    return;
+  }
+  if (key === 'F3') { paused = !paused; event.preventDefault(); return; }
+  if (key === 'F10') { hud.toggleMenu(); event.preventDefault(); return; }
+  if (key === '.') { selectIdleVillager(); return; }
+  if (key === 'h' || key === 'H') {
+    const tc = game.entities.find(e => e.owner === 1 && e.kind === 'town-center' && !e.dead);
+    if (tc) {
+      selectedIds = [tc.id];
+      cameraCenter = worldToIso(tc.position.x, tc.position.y);
+    }
+    return;
+  }
+  const commands = currentCommands();
+  const match = commands.find(c => c.hotkey === key.toLowerCase() && c.enabled);
+  if (match) runUiCommand(match.id);
+});
+addEventListener('keyup', event => heldKeys.delete(event.key));
+addEventListener('wheel', event => {
+  if ((event.target as HTMLElement).closest('#hud')) return;
+  zoom = Math.max(0.4, Math.min(2, zoom * (event.deltaY > 0 ? 0.9 : 1.1)));
+}, { passive: true });
+
+function panCamera(dt: number): void {
+  const speed = 900 * dt / zoom;
+  let dx = 0;
+  let dy = 0;
+  if (heldKeys.has('ArrowLeft')) dx -= 1;
+  if (heldKeys.has('ArrowRight')) dx += 1;
+  if (heldKeys.has('ArrowUp')) dy += 1;
+  if (heldKeys.has('ArrowDown')) dy -= 1;
+  cameraCenter.x += dx * speed;
+  cameraCenter.y += dy * speed;
+  const bounds = worldToIso(game.width, game.height);
+  const limitX = Math.abs((game.width + game.height) * TILE_W / 4);
+  cameraCenter.x = Math.max(-limitX, Math.min(limitX, cameraCenter.x));
+  cameraCenter.y = Math.max(bounds.y - TILE_H, Math.min(TILE_H * 2, cameraCenter.y));
+}
+
+// ---------------------------------------------------------------------------
+// Command grid derived from the current selection and player resources.
+function currentCommands(): CommandButton[] {
+  const selection = ownSelected();
+  const player = game.players[1];
+  const buttons: CommandButton[] = [];
+  if (buildMode) {
+    return [{ id: 'cancel', label: 'Cancel placement', hotkey: 'escape', enabled: true, active: true }];
+  }
+  if (selection.some(e => e.kind === 'villager')) {
+    buttons.push({
+      id: 'build-house', label: 'Build House (25 wood)', hotkey: 'q', enabled: player.wood >= rules.buildings.house.cost.wood,
+      icon: hud.iconFor('Buildings', 34),
+    });
+    buttons.push({
+      id: 'build-barracks', label: 'Build Barracks (175 wood)', hotkey: 'w', enabled: player.wood >= rules.buildings.barracks.cost.wood,
+      icon: hud.iconFor('Buildings', 2),
+    });
+  }
+  if (selection.some(e => e.kind === 'villager' || e.kind === 'militia')) {
+    buttons.push({ id: 'stop', label: 'Stop', hotkey: 's', enabled: true });
+  }
+  const tc = selection.find(e => e.kind === 'town-center' && e.buildProgress === undefined);
+  if (tc) {
+    buttons.push({
+      id: 'train-villager', label: 'Train Villager (50 food)', hotkey: 'q',
+      enabled: !tc.training && player.food >= rules.units.villager.cost.food && player.population < player.populationCap,
+      icon: hud.iconFor('Units', 15),
+    });
+  }
+  const barracks = selection.find(e => e.kind === 'barracks' && e.buildProgress === undefined);
+  if (barracks) {
+    buttons.push({
+      id: 'train-militia', label: 'Train Militia (50 food, 20 gold)', hotkey: 'q',
+      enabled: !barracks.training && player.food >= rules.units.militia.cost.food && player.gold >= rules.units.militia.cost.gold && player.population < player.populationCap,
+      icon: hud.iconFor('Units', 8),
+    });
+  }
+  return buttons;
+}
+
+function selectionInfo(): SelectionInfo | undefined {
+  const selection = ownSelected().length ? ownSelected() : game.entities.filter(e => selectedIds.includes(e.id) && !e.dead);
+  const entity = selection[0];
+  if (!entity) return undefined;
+  const names: Record<string, string> = {
+    villager: 'Villager', militia: 'Militia', 'town-center': 'Town Center',
+    barracks: 'Barracks', house: 'House', resource: 'Resource',
+  };
+  const name = entity.kind === 'resource'
+    ? entity.resourceKind === 'food' ? 'Forage Bush' : entity.resourceKind === 'gold' ? 'Gold Mine' : 'Tree'
+    : names[entity.kind];
+  const details: string[] = [];
+  if (selection.length > 1) details.push(`${selection.length} selected`);
+  if (entity.amount !== undefined) details.push(`${Math.floor(entity.amount)} ${entity.resourceKind}`);
+  if (entity.carrying) details.push(`Carrying ${entity.carrying.amount} ${entity.carrying.kind}`);
+  let progress: SelectionInfo['progress'];
+  if (entity.buildProgress !== undefined) {
+    progress = { label: 'Building', fraction: entity.buildProgress };
+  } else if (entity.training) {
+    const total = rules.units[entity.training.kind].trainSeconds / TICK_SECONDS;
+    progress = {
+      label: `Training ${entity.training.kind}`,
+      fraction: 1 - entity.training.remainingTicks / total,
+    };
+  }
+  const iconIndex = assets?.entities[entityKey(entity)]?.iconId;
+  const category = entity.kind === 'villager' || entity.kind === 'militia' ? 'Units' : 'Buildings';
+  return {
+    name,
+    icon: entity.kind !== 'resource' ? hud.iconFor(category, iconIndex) : undefined,
+    hp: entity.hp,
+    maxHp: entity.maxHp,
+    details,
+    progress,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scene sync.
+function entityVisible(entity: Entity): boolean {
+  if (entity.owner === 1) return true;
+  return isTileVisible(game, 1, entity.position.x, entity.position.y);
+}
+
+function syncScene(time: number): void {
+  const wanted = new Set<string>();
+  for (const entity of game.entities) {
+    if (!entityVisible(entity)) continue;
+    if (entity.owner === 0 && !isTileVisible(game, 1, entity.position.x, entity.position.y)) {
+      // Gaia in unseen tiles is handled through memory below.
+      continue;
+    }
+    const key = `e${entity.id}`;
+    wanted.add(key);
+    let view = views.get(key);
+    if (!view) {
+      view = createEntityView(assets, entity);
+      views.set(key, view);
+      scene.add(view.group);
+    }
+    updateEntityView(view, assets, game, entity, time);
+  }
+  // Remembered fogged entities render as static snapshots (fog dims them).
+  for (const remembered of Object.values(game.visibility[1].memory)) {
+    if (isTileVisible(game, 1, remembered.x, remembered.y)) continue;
+    const key = `m${remembered.id}`;
+    wanted.add(key);
+    let view = views.get(key);
+    if (!view) {
+      const fake: Entity = {
+        id: remembered.id, kind: remembered.kind, owner: remembered.owner,
+        position: { x: remembered.x, y: remembered.y },
+        hp: remembered.hp, maxHp: remembered.maxHp, radius: 0.5,
+        activity: 'idle', order: { kind: 'idle' },
+        resourceKind: remembered.resource, amount: remembered.amount,
+      };
+      view = createEntityView(assets, fake);
+      updateEntityView(view, assets, game, fake, 0);
+      views.set(key, view);
+      scene.add(view.group);
+    }
+  }
+  for (const [key, view] of views) {
+    if (!wanted.has(key)) {
+      scene.remove(view.group);
+      views.delete(key);
     }
   }
 
-  selectionRings.clear();
-  for (const id of selectedIds) {
-    const entity = game.entities.find(e => e.id === id);
-    if (!entity) continue;
+  // Selection rings from a reusable pool.
+  while (ringPool.length < selectedIds.length) {
     const ring = new THREE.Mesh(
-      new THREE.RingGeometry(entity.radius + 0.12, entity.radius + 0.23, 24),
-      new THREE.MeshBasicMaterial({ color: 0xffe177, side: THREE.DoubleSide }),
+      ringGeometry,
+      new THREE.MeshBasicMaterial({ color: 0xf5f0dc, transparent: true, depthTest: false, depthWrite: false }),
     );
-    ring.position.set(entity.position.x - game.width / 2, entity.position.y - game.height / 2, 0.12);
+    ring.renderOrder = 950;
+    ringPool.push(ring);
     selectionRings.add(ring);
   }
-}
+  for (const [index, ring] of ringPool.entries()) {
+    const entity = index < selectedIds.length
+      ? game.entities.find(e => e.id === selectedIds[index] && !e.dead)
+      : undefined;
+    ring.visible = !!entity;
+    if (!entity) continue;
+    const iso = worldToIso(entity.position.x, entity.position.y);
+    const radius = Math.max(0.4, entity.radius) * TILE_W * 0.75;
+    ring.position.set(iso.x, iso.y, 0);
+    ring.scale.set(radius / 50, radius / 50 * (TILE_H / TILE_W), 1);
+  }
 
-function worldPoint(event: PointerEvent): Point {
-  const rect = renderer.domElement.getBoundingClientRect();
-  const ndc = new THREE.Vector2(
-    ((event.clientX - rect.left) / rect.width) * 2 - 1,
-    -((event.clientY - rect.top) / rect.height) * 2 + 1,
-  );
-  const ray = new THREE.Raycaster();
-  ray.setFromCamera(ndc, camera);
-  const hit = new THREE.Vector3();
-  ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), hit);
-  return { x: hit.x + game.width / 2, y: hit.y + game.height / 2 };
-}
-
-function showMessage(text: string): void {
-  const message = document.querySelector<HTMLDivElement>('#message')!;
-  message.textContent = text;
-  message.classList.add('show');
-  window.setTimeout(() => message.classList.remove('show'), 1300);
-}
-
-renderer.domElement.addEventListener('pointerdown', event => {
-  const point = worldPoint(event);
-  if (point.x < 0 || point.x > game.width || point.y < 0 || point.y > game.height) return;
+  // Placement ghost.
   if (buildMode) {
-    const builder = game.entities.find(e => selectedIds.includes(e.id) && e.owner === 1 && e.kind === 'villager');
-    const result = builder
-      ? applyCommand(game, { kind: 'build', player: 1, builderIds: [builder.id], building: buildMode, target: point })
-      : { ok: false as const, reason: 'select a villager first' };
-    showMessage(result.ok ? `${buildMode} built` : result.reason);
-    buildMode = undefined;
-    return;
+    const half = rules.buildings[buildMode].radius;
+    const legal = placementLegal(game, buildMode, pointerWorld).ok;
+    const iso = worldToIso(pointerWorld.x, pointerWorld.y);
+    ghost.visible = true;
+    ghost.position.set(iso.x, iso.y, 0);
+    ghost.scale.set(half * 2 * TILE_W, half * 2 * TILE_H, 1);
+    (ghost.material as THREE.MeshBasicMaterial).color.set(legal ? 0x7fff9e : 0xff5f5f);
+  } else {
+    ghost.visible = false;
   }
-  const target = nearestEntity(game, point);
-  if (target?.owner === 1) {
-    selectedIds = [target.id];
-    return;
-  }
-  const units = game.entities.filter(e => selectedIds.includes(e.id) && (e.kind === 'villager' || e.kind === 'militia'));
-  if (units.length) applyCommand(game, { kind: 'order', player: 1, entityIds: units.map(e => e.id), target: point, targetId: target?.id });
-  else selectedIds = [];
-});
-
-function selected(): Entity | undefined { return game.entities.find(e => e.id === selectedIds[0]); }
-
-function updateHud(): void {
-  const p = game.players[1];
-  const time = gameTimeSeconds(game);
-  document.querySelector('#topbar')!.innerHTML = `
-    <span>🍖 ${p.food}</span><span>🪵 ${p.wood}</span><span>🪙 ${p.gold}</span><span>👥 ${p.population}/${p.populationCap}</span>
-    <span class="spacer"></span><span>${Math.floor(time / 60)}:${String(Math.floor(time % 60)).padStart(2, '0')}</span>
-    <button data-action="pause">${paused ? '▶' : 'Ⅱ'}</button><button data-action="fullscreen">⛶</button>`;
-  const entity = selected();
-  const status = document.querySelector<HTMLDivElement>('#status')!;
-  status.innerHTML = game.winner
-    ? `<strong>${game.winner === 1 ? 'Victory!' : 'Defeat'}</strong><br><button data-action="restart">Play again</button>`
-    : entity ? `<strong>${entity.kind}</strong><br>HP ${Math.ceil(entity.hp)}/${entity.maxHp}${buildMode ? `<br>Tap map to place ${buildMode}` : ''}`
-    : 'Tap a blue unit or building.<br>Then tap ground, resources, or enemies.';
-  const actions: string[] = [];
-  if (entity?.kind === 'town-center') actions.push('<button data-action="villager">Train villager · 50 🍖</button>');
-  if (entity?.kind === 'barracks') actions.push('<button data-action="militia">Train militia · 50 🍖 20 🪙</button>');
-  if (entity?.kind === 'villager') {
-    actions.push('<button data-action="barracks">Build barracks · 175 🪵</button>');
-    actions.push('<button data-action="house">Build house · 25 🪵</button>');
-  }
-  if (game.entities.some(e => e.owner === 1 && e.kind === 'militia')) actions.push('<button data-action="army">Select army</button>');
-  document.querySelector('#actions')!.innerHTML = actions.join('');
 }
-
-async function enterLandscape(): Promise<void> {
-  try {
-    if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
-    const orientation = screen.orientation as ScreenOrientation & { lock?: (mode: 'landscape') => Promise<void> };
-    await orientation.lock?.('landscape');
-  } catch { showMessage('Rotate your phone manually'); }
-}
-
-document.querySelector('#hud')!.addEventListener('pointerdown', event => event.stopPropagation());
-document.querySelector('#hud')!.addEventListener('click', event => {
-  const action = (event.target as HTMLElement).closest<HTMLButtonElement>('button')?.dataset.action;
-  const entity = selected();
-  if (action === 'pause') paused = !paused;
-  if (action === 'fullscreen') void enterLandscape();
-  if (action === 'restart') { game = createGame(Date.now() >>> 0, rules); selectedIds = []; paused = false; }
-  if (action === 'army') selectedIds = game.entities.filter(e => e.owner === 1 && e.kind === 'militia').map(e => e.id);
-  if ((action === 'villager' || action === 'militia') && entity) {
-    const result = applyCommand(game, { kind: 'train', player: 1, buildingId: entity.id, unit: action });
-    if (!result.ok) showMessage(result.reason);
-  }
-  if (action === 'barracks' || action === 'house') buildMode = action;
-});
-document.querySelector('#landscape')!.addEventListener('click', () => void enterLandscape());
 
 function resize(): void {
-  const aspect = innerWidth / innerHeight;
-  const mapAspect = game.width / game.height;
-  if (aspect > mapAspect) {
-    camera.left = -9 * aspect; camera.right = 9 * aspect; camera.top = 9; camera.bottom = -9;
-  } else {
-    camera.left = -16; camera.right = 16; camera.top = 16 / aspect; camera.bottom = -16 / aspect;
-  }
+  camera.left = -innerWidth / 2;
+  camera.right = innerWidth / 2;
+  camera.top = innerHeight / 2;
+  camera.bottom = -innerHeight / 2;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 }
@@ -232,22 +459,51 @@ resize();
 
 let previous = performance.now();
 let accumulator = 0;
-let lastHud = 0;
+let hudClock = 0;
+let ended = false;
+
 renderer.setAnimationLoop(now => {
   const elapsed = Math.min(0.1, (now - previous) / 1000);
   previous = now;
-  if (!paused) accumulator += elapsed;
-  while (accumulator >= TICK_SECONDS) {
-    stepGame(game);
-    aiClock += TICK_SECONDS;
-    if (aiClock >= 0.5) {
-      for (const command of exampleAiCommands(observe(game, 2))) applyCommand(game, command);
-      aiClock = 0;
+  panCamera(elapsed);
+
+  if (!paused && !game.winner) {
+    accumulator += elapsed;
+    while (accumulator >= TICK_SECONDS) {
+      stepGame(game);
+      aiClock += TICK_SECONDS;
+      if (aiClock >= 0.5) {
+        for (const command of exampleAiCommands(observe(game, 2))) applyCommand(game, command);
+        aiClock = 0;
+      }
+      accumulator -= TICK_SECONDS;
     }
-    accumulator -= TICK_SECONDS;
   }
-  selectedIds = selectedIds.filter(id => game.entities.some(e => e.id === id));
-  syncScene();
-  if (now - lastHud > 200) { updateHud(); lastHud = now; }
+
+  selectedIds = selectedIds.filter(id => game.entities.some(e => e.id === id && !e.dead));
+  syncScene(gameTimeSeconds(game));
+  fog.update(game);
+
+  camera.position.set(cameraCenter.x, cameraCenter.y, 10);
+  camera.zoom = zoom;
+  camera.updateProjectionMatrix();
+
+  hudClock += elapsed;
+  if (hudClock > 0.15) {
+    hudClock = 0;
+    hud.updateResources(game, 1);
+    hud.setCommands(currentCommands());
+    hud.setSelection(selectionInfo());
+    hud.minimap.draw(game, isoToWorld(cameraCenter.x, cameraCenter.y), {
+      w: innerWidth / zoom / TILE_W * 1.2,
+      h: innerHeight / zoom / TILE_H * 0.9,
+    });
+    if (game.winner && !ended) {
+      ended = true;
+      hud.showEnd(game.winner === 1);
+    }
+    if (!game.winner) ended = false;
+  }
+
   renderer.render(scene, camera);
 });

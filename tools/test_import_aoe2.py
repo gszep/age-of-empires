@@ -113,7 +113,8 @@ class UiImportIntegrationTest(unittest.TestCase):
     def test_panels_keep_source_geometry_and_materials(self):
         layouts = self.result["layouts"]
         self.assertEqual(
-            set(layouts), {"resourcepanel", "commandpanel", "mappanel", "blankbottompanel", "menupanel"}
+            set(layouts),
+            {"blanktoppanel", "resourcepanel", "commandpanel", "mappanel", "blankbottompanel", "menupanel"},
         )
         resource = layouts["resourcepanel"]
         self.assertEqual(resource["viewPort"]["width"], 1935)
