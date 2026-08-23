@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+__pycache__/
+*.pyc
+
+# Local toolchains and proprietary, user-imported AoE content
+.tools/
+.local/
+public/imported/

@@ -1,0 +1,10 @@
+# Import-time tools only; never linked into the TypeScript runtime.
+genieutils-py==0.1.2
+Cython==3.2.9
+numpy==2.5.2
+pillow==12.3.0
+lz4==4.4.5
+Mako==1.4.1
+Pygments==2.21.0
+setuptools==84.0.0
+toml==0.10.2

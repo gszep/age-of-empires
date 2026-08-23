@@ -1,0 +1,16 @@
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body, #app { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #182119; color: #fff; font-family: system-ui, sans-serif; touch-action: none; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+#hud { position: fixed; inset: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); pointer-events: none; }
+.topbar { pointer-events: auto; position: absolute; top: 8px; left: 8px; right: 8px; display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 12px; background: #101711dc; box-shadow: 0 2px 12px #0008; font-weight: 700; font-size: 14px; }
+.topbar .spacer { flex: 1; }
+button { min-height: 42px; border: 1px solid #d8bc73; border-radius: 10px; padding: 7px 12px; background: #263828ed; color: white; font: 700 13px system-ui; }
+button:active { background: #49634b; transform: translateY(1px); }
+.actions { pointer-events: auto; position: absolute; right: 8px; bottom: 8px; display: flex; max-width: min(70vw, 550px); gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+.status { pointer-events: auto; position: absolute; left: 8px; bottom: 8px; max-width: 31vw; padding: 8px 10px; border-radius: 10px; background: #101711dc; font-size: 12px; }
+#message { position: absolute; top: 62px; left: 50%; transform: translateX(-50%); padding: 8px 15px; border-radius: 10px; background: #161b16e8; font-weight: 700; opacity: 0; transition: opacity .2s; }
+#message.show { opacity: 1; }
+.rotate { display: none; position: fixed; inset: 0; z-index: 20; place-items: center; text-align: center; background: #182119f4; padding: 30px; font-size: 20px; }
+.rotate button { margin-top: 18px; }
+@media (orientation: portrait) { .rotate { display: grid; } }
+@media (max-height: 440px) { .topbar { font-size: 12px; padding: 5px 8px; } button { min-height: 38px; padding: 5px 9px; } .status { font-size: 11px; } }
