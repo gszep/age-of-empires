@@ -1,0 +1,53 @@
+{
+  "$id": "https://open-empires-lab/command.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Command",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "kind": { "const": "order" },
+        "player": { "enum": [1, 2] },
+        "entityIds": { "type": "array", "items": { "type": "integer" }, "minItems": 1 },
+        "target": { "$ref": "#/definitions/point" },
+        "targetId": { "type": "integer" }
+      },
+      "required": ["kind", "player", "entityIds", "target"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": { "const": "train" },
+        "player": { "enum": [1, 2] },
+        "buildingId": { "type": "integer" },
+        "unit": { "enum": ["villager", "militia"] }
+      },
+      "required": ["kind", "player", "buildingId", "unit"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": { "const": "build" },
+        "player": { "enum": [1, 2] },
+        "builderId": { "type": "integer" },
+        "building": { "enum": ["barracks", "house"] },
+        "target": { "$ref": "#/definitions/point" }
+      },
+      "required": ["kind", "player", "builderId", "building", "target"],
+      "additionalProperties": false
+    }
+  ],
+  "definitions": {
+    "point": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      },
+      "required": ["x", "y"],
+      "additionalProperties": false
+    }
+  }
+}

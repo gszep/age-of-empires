@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import './view/style.css';
-import { runExampleAi } from './sim/ai';
+import { exampleAiCommands } from './sim/ai';
+import { observe } from './sim/observe';
 import { applyCommand, createGame, nearestEntity, stepGame } from './sim/game';
 import type { BuildingKind, Entity, Point } from './sim/types';
 import { createMilitiaMesh, loadMilitiaAssets, updateMilitiaMesh } from './view/militia';
@@ -138,8 +139,10 @@ renderer.domElement.addEventListener('pointerdown', event => {
   if (point.x < 0 || point.x > game.width || point.y < 0 || point.y > game.height) return;
   if (buildMode) {
     const builder = game.entities.find(e => selectedIds.includes(e.id) && e.owner === 1 && e.kind === 'villager');
-    if (!builder || !applyCommand(game, { kind: 'build', player: 1, builderId: builder.id, building: buildMode, target: point })) showMessage('Not enough wood or select a villager');
-    else showMessage(`${buildMode} built`);
+    const result = builder
+      ? applyCommand(game, { kind: 'build', player: 1, builderId: builder.id, building: buildMode, target: point })
+      : { ok: false as const, reason: 'select a villager first' };
+    showMessage(result.ok ? `${buildMode} built` : result.reason);
     buildMode = undefined;
     return;
   }
@@ -195,7 +198,8 @@ document.querySelector('#hud')!.addEventListener('click', event => {
   if (action === 'restart') { game = createGame(Date.now() >>> 0); selectedIds = []; paused = false; }
   if (action === 'army') selectedIds = game.entities.filter(e => e.owner === 1 && e.kind === 'militia').map(e => e.id);
   if ((action === 'villager' || action === 'militia') && entity) {
-    if (!applyCommand(game, { kind: 'train', player: 1, buildingId: entity.id, unit: action })) showMessage('Cannot train yet');
+    const result = applyCommand(game, { kind: 'train', player: 1, buildingId: entity.id, unit: action });
+    if (!result.ok) showMessage(result.reason);
   }
   if (action === 'barracks' || action === 'house') buildMode = action;
 });
@@ -225,7 +229,10 @@ renderer.setAnimationLoop(now => {
   while (accumulator >= 0.05) {
     stepGame(game, 0.05);
     aiClock += 0.05;
-    if (aiClock >= 0.5) { runExampleAi(game, 2); aiClock = 0; }
+    if (aiClock >= 0.5) {
+      for (const command of exampleAiCommands(observe(game, 2))) applyCommand(game, command);
+      aiClock = 0;
+    }
     accumulator -= 0.05;
   }
   selectedIds = selectedIds.filter(id => game.entities.some(e => e.id === id));

@@ -1,0 +1,17 @@
+{
+  "$id": "https://open-empires-lab/strategy-message.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StrategyMessage",
+  "description": "A single JSONL line written by a subprocess strategy.",
+  "type": "object",
+  "properties": {
+    "type": { "const": "commands" },
+    "time": { "type": "number", "minimum": 0 },
+    "commands": {
+      "type": "array",
+      "items": { "$ref": "https://open-empires-lab/command.schema.json" }
+    }
+  },
+  "required": ["type", "time", "commands"],
+  "additionalProperties": false
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { runExampleAi } from './ai';
+import { exampleAiCommands } from './ai';
+import { observe } from './observe';
 import { applyCommand, createGame, stepGame } from './game';
 
 function digest(state: ReturnType<typeof createGame>): string {
@@ -17,7 +18,7 @@ describe('simulation', () => {
   it('trains a villager from a town center', () => {
     const state = createGame();
     const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
-    expect(applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' })).toBe(true);
+    expect(applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' })).toEqual({ ok: true });
     for (let i = 0; i < 81; i++) stepGame(state, 0.1);
     expect(state.players[1].population).toBe(4);
   });
@@ -25,9 +26,9 @@ describe('simulation', () => {
   it('walks into range before attacking', () => {
     const state = createGame();
     const builder = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
-    expect(applyCommand(state, { kind: 'build', player: 1, builderId: builder.id, building: 'barracks', target: { x: 7, y: 9 } })).toBe(true);
+    expect(applyCommand(state, { kind: 'build', player: 1, builderId: builder.id, building: 'barracks', target: { x: 7, y: 9 } })).toEqual({ ok: true });
     const barracks = state.entities.find(e => e.owner === 1 && e.kind === 'barracks')!;
-    expect(applyCommand(state, { kind: 'train', player: 1, buildingId: barracks.id, unit: 'militia' })).toBe(true);
+    expect(applyCommand(state, { kind: 'train', player: 1, buildingId: barracks.id, unit: 'militia' })).toEqual({ ok: true });
     for (let i = 0; i < 101; i++) stepGame(state, 0.1);
 
     const militia = state.entities.find(e => e.owner === 1 && e.kind === 'militia')!;
@@ -46,9 +47,21 @@ describe('simulation', () => {
   it('lets the example AI finish a match against a passive opponent', () => {
     const state = createGame(7);
     for (let i = 0; i < 6_000 && !state.winner; i++) {
-      if (i % 5 === 0) runExampleAi(state, 2);
+      if (i % 5 === 0) {
+        for (const command of exampleAiCommands(observe(state, 2))) applyCommand(state, command);
+      }
       stepGame(state, 0.1);
     }
     expect(state.winner).toBe(2);
+  });
+
+  it('rejects invalid commands with a diagnostic reason', () => {
+    const state = createGame();
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    expect(applyCommand(state, { kind: 'train', player: 2, buildingId: tc.id, unit: 'villager' }))
+      .toEqual({ ok: false, reason: `building ${tc.id} is not owned` });
+    state.players[1].food = 0;
+    expect(applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' }))
+      .toEqual({ ok: false, reason: 'not enough resources' });
   });
 });

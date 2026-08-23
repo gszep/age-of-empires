@@ -1,0 +1,14 @@
+{
+  "$id": "https://open-empires-lab/match-config.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MatchConfig",
+  "type": "object",
+  "properties": {
+    "version": { "const": 1 },
+    "seed": { "type": "integer", "minimum": 1 },
+    "maxTimeSeconds": { "type": "number", "exclusiveMinimum": 0 },
+    "decideIntervalSeconds": { "type": "number", "exclusiveMinimum": 0 }
+  },
+  "required": ["version", "seed"],
+  "additionalProperties": false
+}

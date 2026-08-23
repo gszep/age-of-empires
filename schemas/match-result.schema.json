@@ -1,0 +1,50 @@
+{
+  "$id": "https://open-empires-lab/match-result.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MatchResult",
+  "type": "object",
+  "properties": {
+    "version": { "const": 1 },
+    "seed": { "type": "integer" },
+    "timeSeconds": { "type": "number", "minimum": 0 },
+    "winner": { "enum": [1, 2] },
+    "players": {
+      "type": "object",
+      "properties": {
+        "1": { "$ref": "#/definitions/playerSummary" },
+        "2": { "$ref": "#/definitions/playerSummary" }
+      },
+      "required": ["1", "2"],
+      "additionalProperties": false
+    },
+    "rejectedCommands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "time": { "type": "number" },
+          "player": { "enum": [1, 2] },
+          "reason": { "type": "string" },
+          "command": {}
+        },
+        "required": ["time", "player", "reason", "command"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["version", "seed", "timeSeconds", "players", "rejectedCommands"],
+  "additionalProperties": false,
+  "definitions": {
+    "playerSummary": {
+      "type": "object",
+      "properties": {
+        "food": { "type": "integer" },
+        "wood": { "type": "integer" },
+        "population": { "type": "integer" },
+        "entities": { "type": "integer" }
+      },
+      "required": ["food", "wood", "population", "entities"],
+      "additionalProperties": false
+    }
+  }
+}

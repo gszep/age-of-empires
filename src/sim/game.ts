@@ -63,31 +63,45 @@ function spend(state: GameState, player: PlayerId, kind: UnitKind | BuildingKind
   return true;
 }
 
-export function applyCommand(state: GameState, command: Command): boolean {
-  if (state.winner || command.player !== 1 && command.player !== 2) return false;
+export type CommandResult = { ok: true } | { ok: false; reason: string };
+
+const rejected = (reason: string): CommandResult => ({ ok: false, reason });
+
+export function applyCommand(state: GameState, command: Command): CommandResult {
+  if (state.winner) return rejected('match is over');
+  if (command.player !== 1 && command.player !== 2) return rejected('unknown player');
   if (command.kind === 'order') {
     const targetEntity = command.targetId ? state.entities.find(e => e.id === command.targetId) : undefined;
+    if (command.targetId && !targetEntity) return rejected(`target ${command.targetId} does not exist`);
+    let ordered = 0;
     for (const entity of state.entities) {
       if (!command.entityIds.includes(entity.id) || entity.owner !== command.player || !isUnit(entity.kind)) continue;
       if (targetEntity?.kind === 'resource' && entity.kind === 'villager') entity.order = { kind: 'gather', targetId: targetEntity.id };
       else if (targetEntity && targetEntity.owner !== 0 && targetEntity.owner !== command.player) entity.order = { kind: 'attack', targetId: targetEntity.id };
       else entity.order = { kind: 'move', target: { ...command.target } };
       entity.activity = 'moving';
+      ordered++;
     }
-    return true;
+    return ordered ? { ok: true } : rejected('no owned units matched the order');
   }
   if (command.kind === 'train') {
     const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player);
-    const valid = building && !building.training && ((building.kind === 'town-center' && command.unit === 'villager') || (building.kind === 'barracks' && command.unit === 'militia'));
-    if (!valid || state.players[command.player].population >= state.players[command.player].populationCap || !spend(state, command.player, command.unit)) return false;
+    if (!building) return rejected(`building ${command.buildingId} is not owned`);
+    if (building.training) return rejected('building is already training');
+    const valid = (building.kind === 'town-center' && command.unit === 'villager') || (building.kind === 'barracks' && command.unit === 'militia');
+    if (!valid) return rejected(`${building.kind} cannot train ${command.unit}`);
+    if (state.players[command.player].population >= state.players[command.player].populationCap) return rejected('population cap reached');
+    if (!spend(state, command.player, command.unit)) return rejected('not enough resources');
     building.training = { kind: command.unit, remaining: command.unit === 'villager' ? 8 : 10 };
-    return true;
+    return { ok: true };
   }
   const builder = state.entities.find(e => e.id === command.builderId && e.owner === command.player && e.kind === 'villager');
-  if (!builder || command.building === 'town-center' || !spend(state, command.player, command.building)) return false;
+  if (!builder) return rejected('builder must be an owned villager');
+  if (command.building === 'town-center') return rejected('town centers cannot be built');
+  if (!spend(state, command.player, command.building)) return rejected('not enough resources');
   addEntity(state, command.building, command.player, command.target);
   recalculatePopulation(state);
-  return true;
+  return { ok: true };
 }
 
 function moveToward(entity: Entity, target: Point, speed: number, dt: number): boolean {

@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
+    "match": "tsx src/headless/cli.ts",
     "tools:setup": "tools/bootstrap.sh",
     "import:aoe2": "tools/import_aoe2.sh",
     "test:import": ".tools/import-venv/bin/python -m unittest discover -s tools -p 'test_*.py' -v"
@@ -15,7 +16,10 @@
     "three": "^0.180.0"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "@types/three": "^0.180.0",
+    "ajv": "^8.20.0",
+    "tsx": "^4.23.12",
     "typescript": "^5.9.2",
     "vite": "^7.1.7",
     "vitest": "^3.2.4"
