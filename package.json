@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "tools:setup": "tools/bootstrap.sh",
-    "import:militia": "tools/import_militia.sh",
+    "import:aoe2": "tools/import_aoe2.sh",
     "test:import": ".tools/import-venv/bin/python -m unittest discover -s tools -p 'test_*.py' -v"
   },
   "dependencies": {

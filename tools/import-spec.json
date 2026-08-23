@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 2,
+  "civIndex": 1,
+  "gaiaIndex": 0,
+  "entities": [
+    {
+      "key": "militia",
+      "unitId": 74,
+      "category": "unit",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "attack": { "slot": "attack" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "villager",
+      "unitId": 83,
+      "category": "unit",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "attack": { "slot": "attack" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "villager-builder",
+      "unitId": 118,
+      "category": "unit-variant",
+      "task": { "actionType": 101 },
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "work": { "task": { "actionType": 101 }, "graphic": "proceeding" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "villager-forager",
+      "unitId": 120,
+      "category": "unit-variant",
+      "task": { "actionType": 5, "classId": 7 },
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "work": { "task": { "actionType": 5, "classId": 7 }, "graphic": "proceeding" },
+        "carry": { "task": { "actionType": 5, "classId": 7 }, "graphic": "carrying" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "villager-lumberjack",
+      "unitId": 123,
+      "category": "unit-variant",
+      "task": { "actionType": 110, "classId": 15 },
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "work": { "task": { "actionType": 110, "classId": 15 }, "graphic": "working" },
+        "carry": { "task": { "actionType": 110, "classId": 15 }, "graphic": "carrying" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "villager-goldminer",
+      "unitId": 579,
+      "category": "unit-variant",
+      "task": { "actionType": 5, "unitId": 66 },
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "work": { "task": { "actionType": 5, "unitId": 66 }, "graphic": "proceeding" },
+        "carry": { "task": { "actionType": 5, "unitId": 66 }, "graphic": "carrying" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "town-center",
+      "unitId": 109,
+      "category": "building",
+      "includeAnnexes": true,
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "barracks",
+      "unitId": 12,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "house",
+      "unitId": 70,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "berries",
+      "unitId": 59,
+      "civ": "gaia",
+      "category": "resource",
+      "animations": {
+        "idle": { "slot": "standing" }
+      }
+    },
+    {
+      "key": "gold",
+      "unitId": 66,
+      "civ": "gaia",
+      "category": "resource",
+      "animations": {
+        "idle": { "slot": "standing" }
+      }
+    },
+    {
+      "key": "tree-oak",
+      "unitId": 349,
+      "civ": "gaia",
+      "category": "resource",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "death": { "slot": "dying" }
+      }
+    }
+  ],
+  "ui": {
+    "style": "West",
+    "panels": [
+      "resourcepanel",
+      "commandpanel",
+      "mappanel",
+      "blankbottompanel",
+      "menupanel"
+    ],
+    "iconCategories": {
+      "Buildings": "entities",
+      "Units": "entities",
+      "StatIcons": "all",
+      "MenuIcons": "all"
+    },
+    "materialPrefixes": ["IconAction"],
+    "textureDirectories": ["textures/ingame/staticons"]
+  }
+}

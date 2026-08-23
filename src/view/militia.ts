@@ -3,29 +3,32 @@ import type { Entity, Point } from '../sim/types';
 
 type Frame = { x: number; y: number; w: number; h: number; cx: number; cy: number };
 type Atlas = { image: string; size: [number, number]; frames: Frame[] };
-type Manifest = {
-  unit: { animations: Record<string, { frames: number; directions: number; frameSeconds: number }> };
+type ImportedEntity = {
+  animations: Record<string, { frames: number; directions: number; frameSeconds: number }>;
   atlases: Record<string, Atlas>;
 };
+type Manifest = { entities: Record<string, ImportedEntity> };
 
-export type MilitiaAssets = { manifest: Manifest; textures: Record<string, THREE.Texture> };
+export type MilitiaAssets = { unit: ImportedEntity; textures: Record<string, THREE.Texture> };
 
 export async function loadMilitiaAssets(): Promise<MilitiaAssets | undefined> {
   try {
-    const base = '/imported/aoe2/militia/';
+    const base = '/imported/aoe2/';
     const manifest = await fetch(`${base}manifest.json`).then(response => {
       if (!response.ok) throw new Error(String(response.status));
       return response.json() as Promise<Manifest>;
     });
+    const unit = manifest.entities['militia'];
+    if (!unit) return undefined;
     const textures: Record<string, THREE.Texture> = {};
-    await Promise.all(Object.entries(manifest.atlases).map(async ([state, atlas]) => {
+    await Promise.all(Object.entries(unit.atlases).map(async ([state, atlas]) => {
       const texture = await new THREE.TextureLoader().loadAsync(base + atlas.image);
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.magFilter = THREE.NearestFilter;
       texture.minFilter = THREE.LinearFilter;
       textures[state] = texture;
     }));
-    return { manifest, textures };
+    return { unit, textures };
   } catch {
     return undefined;
   }
@@ -55,8 +58,8 @@ export function updateMilitiaMesh(
     mesh.userData.animationState = state;
     mesh.userData.animationStartedAt = time;
   }
-  const animation = assets.manifest.unit.animations[state];
-  const atlas = assets.manifest.atlases[state];
+  const animation = assets.unit.animations[state];
+  const atlas = assets.unit.atlases[state];
   const material = mesh.material as THREE.MeshBasicMaterial;
   if (material.map !== assets.textures[state]) {
     material.map = assets.textures[state];
