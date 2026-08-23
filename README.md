@@ -47,5 +47,6 @@ Imported Microsoft content is generated under ignored `public/imported/` and is 
 - `docs/library-strategy.md` — adopt/evaluate/reference decisions for external libraries
 - `docs/agent-runtime.md` — structured observations, arbitrary strategy processes, live agents, and batched search
 - `docs/autonomous-plan.md` — current execution phases and acceptance gates
+- `docs/ui-reference.md` — downloaded WidgetUI geometry, states, icons, navigation, and audio evidence
 
 This is an intentionally shallow horizontal slice, not yet an AoE II-compatible simulation. Construction, gathering, combat, and pathing are simplified so the complete play/evaluate loop can be tested first.

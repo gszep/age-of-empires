@@ -25,7 +25,7 @@ Replace the one-off militia packaging internals with a small declarative import 
 
 Import only fields consumed by the slice: IDs, costs, HP, speed, collision/clearance, capacity, train/build times, attacks/armor, tasks, graphic IDs, frame timing, and source provenance. Import idle/walk/work/build/attack/death visuals as applicable.
 
-Also import the minimal WEST UI set from `widgetui`: top/resource and bottom bars, map/command/selection/menu panels, food/wood/gold/population symbols, unit/building/action icons, button states, and relevant menu decoration. Use the current `resourcepanel.json`, `commandpanel.json`, `mappanel.json`, `blankbottompanel.json`, `icons.json`, and `materials.json` as layout/material evidence. Convert DDS icons locally through Pillow or another maintained decoder. Keep all generated content local and hashed.
+Following `docs/ui-reference.md`, also import the minimal WEST UI set from `widgetui`: top/resource and bottom bars, map/command/selection/menu panels, food/wood/gold/population symbols, unit/building/action icons, button states, and relevant menu decoration. Use the current `resourcepanel.json`, `commandpanel.json`, `mappanel.json`, `blankbottompanel.json`, `icons.json`, and `materials.json` as layout/material evidence. Convert DDS icons locally through Pillow or another maintained decoder. Keep all generated content local and hashed.
 
 **Gate:** one command regenerates byte-identical manifests/atlases/UI assets; integration tests resolve every required DAT and widget reference/source file.
 
