@@ -33,10 +33,55 @@ describe('player observations', () => {
     applyCommand(state, { kind: 'train', player: 2, buildingId: enemyTc.id, unit: 'villager' });
     const ownMilitia = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
     ownMilitia.position = { x: enemyTc.position.x - 3, y: enemyTc.position.y };
+    stepGame(state); // visibility is authoritative state, refreshed by the tick
 
     const observed = observe(state, 1).entities.find(e => e.id === enemyTc.id)!;
     expect(observed.training).toBeUndefined();
     expect(observe(state, 2).entities.find(e => e.id === enemyTc.id)!.training).toBeDefined();
+  });
+
+  it('remembers fogged buildings with lastSeenAt and forgets razed ones on resight', () => {
+    const state = createGame(11);
+    const rules = state.rules.buildings.house;
+    const enemyHouse = {
+      id: state.nextId++, kind: 'house' as const, owner: 2 as const, position: { x: 20, y: 9 },
+      hp: rules.hp, maxHp: rules.hp, radius: rules.radius, activity: 'idle' as const, order: { kind: 'idle' as const },
+    };
+    state.entities.push(enemyHouse);
+    const scout = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    scout.position = { x: 17, y: 9 };
+    stepGame(state);
+    expect(observe(state, 1).entities.some(e => e.id === enemyHouse.id)).toBe(true);
+
+    // Walk away: the house drops into memory.
+    scout.position = { x: 5, y: 9 };
+    stepGame(state);
+    const fogged = observe(state, 1);
+    expect(fogged.entities.some(e => e.id === enemyHouse.id)).toBe(false);
+    const remembered = fogged.memory.find(e => e.id === enemyHouse.id);
+    expect(remembered).toBeDefined();
+    expect(remembered!.lastSeenAt).toBeLessThanOrEqual(fogged.time);
+
+    // Raze it while unseen; memory persists until the tile is seen again.
+    enemyHouse.hp = 0;
+    for (let i = 0; i < 80; i++) stepGame(state);
+    expect(observe(state, 1).memory.some(e => e.id === enemyHouse.id)).toBe(true);
+    scout.position = { x: 17, y: 9 };
+    stepGame(state);
+    expect(observe(state, 1).memory.some(e => e.id === enemyHouse.id)).toBe(false);
+  });
+
+  it('hides unexplored gaia resources until scouted', () => {
+    const state = createGame(11);
+    const observation = observe(state, 1);
+    const farNodes = state.entities.filter(
+      e => e.kind === 'resource' && e.position.x > 18,
+    );
+    expect(farNodes.length).toBeGreaterThan(0);
+    for (const node of farNodes) {
+      expect(observation.entities.some(e => e.id === node.id)).toBe(false);
+      expect(observation.memory.some(e => e.id === node.id)).toBe(false);
+    }
   });
 
   it('emits schema-valid observations throughout a running match', () => {

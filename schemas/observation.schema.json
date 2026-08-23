@@ -15,6 +15,31 @@
     "gold": { "type": "integer", "minimum": 0 },
     "population": { "type": "integer", "minimum": 0 },
     "populationCap": { "type": "integer", "minimum": 0 },
+    "memory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "kind": { "enum": ["villager", "militia", "town-center", "barracks", "house", "resource"] },
+          "owner": { "enum": [0, 1, 2] },
+          "x": { "type": "number" },
+          "y": { "type": "number" },
+          "hp": { "type": "number" },
+          "maxHp": { "type": "number" },
+          "resource": { "enum": ["food", "wood", "gold"] },
+          "amount": { "type": "integer", "minimum": 0 },
+          "buildProgress": { "type": "number", "minimum": 0, "maximum": 1 },
+          "lastSeenAt": { "type": "number", "minimum": 0 }
+        },
+        "required": ["id", "kind", "owner", "x", "y", "hp", "maxHp", "lastSeenAt"],
+        "additionalProperties": false
+      }
+    },
+    "explored": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[01]+$" }
+    },
     "entities": {
       "type": "array",
       "items": {
@@ -58,6 +83,6 @@
       }
     }
   },
-  "required": ["version", "time", "player", "mapWidth", "mapHeight", "food", "wood", "gold", "population", "populationCap", "entities"],
+  "required": ["version", "time", "player", "mapWidth", "mapHeight", "food", "wood", "gold", "population", "populationCap", "entities", "memory", "explored"],
   "additionalProperties": false
 }

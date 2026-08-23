@@ -2,6 +2,7 @@ import { FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isBuilding, isUnit } fr
 import type { AttackValue, GameRules } from './data';
 import { buildNavGrid, findPath, isBlocked, separateUnits, tileOf, type NavGrid } from './nav';
 import { random01 } from './random';
+import { createVisibility, updateVisibility } from './visibility';
 import type {
   BuildingKind, Command, Entity, GameState, PlayerId, Point, ResourceKind, UnitKind,
 } from './types';
@@ -49,7 +50,9 @@ export function createGame(seed = 42, rules: GameRules = FALLBACK_RULES): GameSt
       1: { id: 1, ...rules.startingResources, population: 0, populationCap: 0 },
       2: { id: 2, ...rules.startingResources, population: 0, populationCap: 0 },
     },
+    visibility: undefined as never,
   };
+  state.visibility = createVisibility(state);
   for (const player of [1, 2] as PlayerId[]) {
     const mirror = (point: Point): Point => player === 1 ? point : { x: state.width - point.x, y: point.y };
     const tcRules = rules.buildings['town-center'];
@@ -63,6 +66,7 @@ export function createGame(seed = 42, rules: GameRules = FALLBACK_RULES): GameSt
     cluster(state, 'gold', mirror({ x: 4, y: 3.5 }), 4);
   }
   recalculatePopulation(state);
+  updateVisibility(state);
   return state;
 }
 
@@ -541,6 +545,8 @@ export function stepGame(state: GameState): void {
       recalculatePopulation(state);
     }
   }
+
+  updateVisibility(state);
 
   const newlyDead = state.entities.some(e => !e.dead && (e.hp <= 0 || (e.kind === 'resource' && (e.amount ?? 0) <= 0)));
   if (newlyDead) {

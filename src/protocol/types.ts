@@ -33,6 +33,10 @@ export interface PlayerObservation {
   population: number;
   populationCap: number;
   entities: ObservedEntity[];
+  /** Last-seen snapshots of entities not currently visible. */
+  memory: RememberedEntityObservation[];
+  /** Row strings of 0/1 explored tiles, indexed [y][x]. */
+  explored: string[];
 }
 
 export interface RejectedCommand {
@@ -64,6 +68,21 @@ export interface MatchResult {
   winner?: PlayerId;
   players: Record<PlayerId, PlayerSummary>;
   rejectedCommands: RejectedCommand[];
+}
+
+export interface RememberedEntityObservation {
+  id: number;
+  kind: EntityKind;
+  owner: PlayerId | 0;
+  x: number;
+  y: number;
+  hp: number;
+  maxHp: number;
+  resource?: ResourceKind;
+  amount?: number;
+  buildProgress?: number;
+  /** Seconds of game time when this entity was last seen. */
+  lastSeenAt: number;
 }
 
 /** Runner -> strategy JSONL line. */

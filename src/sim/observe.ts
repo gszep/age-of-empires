@@ -1,22 +1,7 @@
-import { TICK_SECONDS, isBuilding, isUnit } from './data';
-import type { Entity, GameState, PlayerId, UnitKind } from './types';
-import type { ObservedEntity, PlayerObservation } from '../protocol/types';
-
-const distance = (a: Entity, b: Entity) =>
-  Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y);
-
-function lineOfSight(state: GameState, entity: Entity): number {
-  if (isUnit(entity.kind)) return state.rules.units[entity.kind as UnitKind].lineOfSight;
-  if (isBuilding(entity.kind)) return state.rules.buildings[entity.kind].lineOfSight;
-  return 0;
-}
-
-function isVisible(state: GameState, player: PlayerId, entity: Entity): boolean {
-  if (entity.owner === player || entity.owner === 0) return true;
-  return state.entities.some(
-    own => !own.dead && own.owner === player && distance(own, entity) <= lineOfSight(state, own),
-  );
-}
+import { TICK_SECONDS } from './data';
+import { isEntityVisible } from './visibility';
+import type { Entity, GameState, PlayerId } from './types';
+import type { ObservedEntity, PlayerObservation, RememberedEntityObservation } from '../protocol/types';
 
 function observeEntity(entity: Entity, player: PlayerId): ObservedEntity {
   const observed: ObservedEntity = {
@@ -49,6 +34,25 @@ function observeEntity(entity: Entity, player: PlayerId): ObservedEntity {
 /** Canonical player-filtered observation; the only sanctioned agent input. */
 export function observe(state: GameState, player: PlayerId): PlayerObservation {
   const self = state.players[player];
+  const visibility = state.visibility[player];
+  const visibleIds = new Set<number>();
+  const entities: ObservedEntity[] = [];
+  for (const entity of state.entities) {
+    if (entity.dead || !isEntityVisible(state, player, entity)) continue;
+    visibleIds.add(entity.id);
+    entities.push(observeEntity(entity, player));
+  }
+  const memory: RememberedEntityObservation[] = Object.values(visibility.memory)
+    .filter(remembered => !visibleIds.has(remembered.id))
+    .sort((a, b) => a.id - b.id)
+    .map(remembered => ({
+      ...remembered,
+      lastSeenAt: Math.round(remembered.lastSeenAt * TICK_SECONDS * 100) / 100,
+    }));
+  const explored: string[] = [];
+  for (let y = 0; y < state.height; y++) {
+    explored.push(visibility.explored.slice(y * state.width, (y + 1) * state.width).join(''));
+  }
   const observation: PlayerObservation = {
     version: 1,
     time: Math.round(state.tick * TICK_SECONDS * 100) / 100,
@@ -60,9 +64,9 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
     gold: self.gold,
     population: self.population,
     populationCap: self.populationCap,
-    entities: state.entities
-      .filter(entity => !entity.dead && isVisible(state, player, entity))
-      .map(entity => observeEntity(entity, player)),
+    entities,
+    memory,
+    explored,
   };
   if (state.winner) observation.winner = state.winner;
   return observation;
@@ -72,8 +76,11 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
 export function describeObservation(observation: PlayerObservation): string {
   const mine = observation.entities.filter(e => e.owner === observation.player);
   const enemies = observation.entities.filter(e => e.owner !== 0 && e.owner !== observation.player);
-  const nodes = observation.entities.filter(e => e.kind === 'resource');
-  const countByKind = (entities: ObservedEntity[]) => {
+  const nodes = [
+    ...observation.entities.filter(e => e.kind === 'resource'),
+    ...observation.memory.filter(e => e.kind === 'resource'),
+  ];
+  const countByKind = (entities: { kind: string }[]) => {
     const counts = new Map<string, number>();
     for (const entity of entities) counts.set(entity.kind, (counts.get(entity.kind) ?? 0) + 1);
     return [...counts.entries()]
@@ -88,6 +95,7 @@ export function describeObservation(observation: PlayerObservation): string {
     `food=${observation.food} wood=${observation.wood} gold=${observation.gold} pop=${observation.population}/${observation.populationCap}`,
     `own: ${countByKind(mine) || 'none'}${idle ? ` (${idle} idle)` : ''}`,
     `enemy seen: ${countByKind(enemies) || 'none'}`,
+    `remembered: ${observation.memory.length}`,
     `resource nodes: ${nodes.filter(e => e.resource === 'food').length} food, ${nodes.filter(e => e.resource === 'wood').length} wood, ${nodes.filter(e => e.resource === 'gold').length} gold`,
   ];
   if (observation.winner) parts.push(observation.winner === observation.player ? 'result: victory' : 'result: defeat');

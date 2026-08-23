@@ -1,7 +1,9 @@
 import type { Command, ResourceKind } from './types';
-import type { ObservedEntity, PlayerObservation } from '../protocol/types';
+import type { PlayerObservation } from '../protocol/types';
 
-const distance = (a: ObservedEntity, b: ObservedEntity) => Math.hypot(a.x - b.x, a.y - b.y);
+interface Spotted { id: number; kind: string; owner: number; x: number; y: number; resource?: ResourceKind; training?: unknown; buildProgress?: number; order?: string }
+
+const distance = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
 const ASSIGNMENT: ResourceKind[] = ['food', 'wood', 'food', 'gold', 'wood', 'food'];
 
@@ -20,6 +22,8 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   if (observation.winner) return [];
   const player = observation.player;
   const commands: Command[] = [];
+  // Visible entities plus fogged memory: everything legitimately known.
+  const known: Spotted[] = [...observation.entities, ...observation.memory];
   const mine = observation.entities.filter(e => e.owner === player);
   const villagers = mine.filter(e => e.kind === 'villager');
   const militia = mine.filter(e => e.kind === 'militia');
@@ -32,7 +36,7 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   for (const [index, villager] of villagers.entries()) {
     if (villager.order !== 'idle') continue;
     const wanted = ASSIGNMENT[index % ASSIGNMENT.length];
-    const node = observation.entities
+    const node = known
       .filter(e => e.kind === 'resource' && e.resource === wanted)
       .sort((a, b) => distance(villager, a) - distance(villager, b) || a.id - b.id)[0];
     if (node) {
@@ -70,7 +74,7 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   const enemyUnits = observation.entities.filter(
     e => e.owner !== 0 && e.owner !== player && (e.kind === 'villager' || e.kind === 'militia'),
   );
-  const enemyTcVisible = observation.entities.find(e => e.kind === 'town-center' && e.owner !== 0 && e.owner !== player);
+  const enemyTcVisible = known.find(e => e.kind === 'town-center' && e.owner !== 0 && e.owner !== player);
 
   // Endgame raze: militia alone barely dent a town center (DAT armor), so
   // once the enemy field is clear, villagers join the demolition.
@@ -79,7 +83,8 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     if (razers.length) {
       commands.push({
         kind: 'order', player, entityIds: razers.map(e => e.id).sort((a, b) => a - b),
-        target: { x: enemyTcVisible.x, y: enemyTcVisible.y }, targetId: enemyTcVisible.id,
+        target: { x: enemyTcVisible.x, y: enemyTcVisible.y },
+        targetId: observation.entities.some(e => e.id === enemyTcVisible.id) ? enemyTcVisible.id : undefined,
       });
     }
   }
@@ -94,7 +99,8 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     if (target) {
       commands.push({
         kind: 'order', player, entityIds: idleMilitia.map(e => e.id).sort((a, b) => a - b),
-        target, targetId: enemyTc?.id,
+        target,
+        targetId: enemyTc && observation.entities.some(e => e.id === enemyTc.id) ? enemyTc.id : undefined,
       });
     }
   }

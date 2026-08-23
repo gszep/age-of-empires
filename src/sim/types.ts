@@ -1,4 +1,5 @@
 import type { GameRules } from './data';
+import type { PlayerVisibility } from './visibility';
 
 export type PlayerId = 1 | 2;
 export type ResourceKind = 'food' | 'wood' | 'gold';
@@ -65,6 +66,7 @@ export interface GameState {
   height: number;
   entities: Entity[];
   players: Record<PlayerId, PlayerState>;
+  visibility: Record<PlayerId, PlayerVisibility>;
   winner?: PlayerId;
 }
 
