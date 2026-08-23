@@ -19,13 +19,24 @@ It is complete when:
 
 Do not expand to additional ages, civilizations, naval play, campaigns, or multiplayer networking before this target passes.
 
+## Source priority for compatibility
+
+The owned, patch-matched Steam content is the primary implementation input, not merely visual inspiration. Before introducing a hard-coded value or handmade substitute, search the downloaded DAT, RMS, AI/XS, graphics, `widgetui`, localization, and sound metadata. Prefer, in order:
+
+1. deterministic local conversion/import of the original asset or datum;
+2. project code implementing behavior described by those inputs;
+3. focused runtime observation or documented reference where behavior lives only in the executable;
+4. a clearly recorded approximation only when the first three are unavailable.
+
+This applies to entity statistics, animation IDs/timing, terrain and entity art, player colors, UI geometry, panel textures, icons, labels, hotkeys, widget states, and sound-event selection. Derive generated manifests and layout constants from source files rather than transcribing or eyeballing them. Keep imported Microsoft content local and ignored, and keep the open fallback usable, but optimize fidelity for owners who run the importer.
+
 ## Phase 1 — Generalize imported content
 
 Replace the one-off militia packaging internals with a small declarative import specification while retaining militia as the fixture. Add villager, town center, barracks, house, tree, berries, and gold.
 
 Import only fields consumed by the slice: IDs, costs, HP, speed, collision/clearance, capacity, train/build times, attacks/armor, tasks, graphic IDs, frame timing, and source provenance. Import idle/walk/work/build/attack/death visuals as applicable.
 
-Following `docs/ui-reference.md`, also import the minimal WEST UI set from `widgetui`: top/resource and bottom bars, map/command/selection/menu panels, food/wood/gold/population symbols, unit/building/action icons, button states, and relevant menu decoration. Use the current `resourcepanel.json`, `commandpanel.json`, `mappanel.json`, `blankbottompanel.json`, `icons.json`, and `materials.json` as layout/material evidence. Convert DDS icons locally through Pillow or another maintained decoder. Keep all generated content local and hashed.
+Following `docs/ui-reference.md`, also import the minimal WEST UI set from `widgetui`: top/resource and bottom bars, map/command/selection/menu panels, food/wood/gold/population symbols, unit/building/action icons, button states, and relevant menu decoration. Extract consumed geometry, anchors, fonts, material references, hotkeys, tab order, and click-sound aliases from the current `resourcepanel.json`, `commandpanel.json`, `mappanel.json`, `blankbottompanel.json`, `icons.json`, `materials.json`, and `sounds.json`; do not manually recreate values already present there. Convert DDS icons locally through Pillow or another maintained decoder. Keep all generated content local and hashed.
 
 **Gate:** one command regenerates byte-identical manifests/atlases/UI assets; integration tests resolve every required DAT and widget reference/source file.
 
@@ -90,7 +101,7 @@ Recreate AoE2DE's desktop information architecture rather than inventing a gener
 - AoE-like parchment, stone/wood/metal borders, gold highlights, player colors, serif display text, compact numeric labels, notifications, tooltips, pause/settings, victory/defeat, and skirmish setup menus;
 - AoE-like keyboard hotkeys, mouse selection, drag selection, edge/camera movement, pointer tooltips, and command feedback.
 
-Treat original `widgetui` layouts/textures as patch-matched reference inputs. Desktop/laptop layout and interaction fidelity wins whenever it conflicts with touch convenience. Mobile may scale the complete desktop composition, add safe-area padding, and enlarge controls only behind a narrow-screen mode; it must not move core panels, remove information, simplify commands, or create separate gameplay behavior. UI state and button legality come only from canonical observations. Preserve an open placeholder skin when imported assets are absent.
+Use original imported `widgetui` layouts, textures, icons, fonts where available, and sound-event assignments in the owned-content mode; they are implementation inputs, not just mood-board references. Drive layout constants from generated metadata and reproduce runtime behavior around them. Desktop/laptop layout and interaction fidelity wins whenever it conflicts with touch convenience. Mobile may scale the complete desktop composition, add safe-area padding, and enlarge controls only behind a narrow-screen mode; it must not move core panels, remove information, simplify commands, or create separate gameplay behavior. UI state and button legality come only from canonical observations. Preserve an open placeholder skin when imported assets are absent.
 
 Do not replace Three.js unless representative desktop profiling demonstrates a concrete problem.
 

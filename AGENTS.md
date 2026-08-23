@@ -5,7 +5,8 @@ Read `docs/autonomous-plan.md`, then execute its phases in order without waiting
 ## Non-negotiable boundaries
 
 - `src/sim` is authoritative. Rendering, UI, agents, and imported assets never mutate game state directly.
-- Use the owned DAT/RMS/AI/XS data, open-source parsers, and documented references. Do not disassemble `AoE2DE_s.exe`.
+- **Downloaded-content first:** before hand-authoring any gameplay value, visual, layout, icon, string, animation timing, or audio cue, inspect the patch-matched owned DAT/RMS/AI/XS, `widgetui`, graphics, localization, and sound metadata. Use the original local asset/data through a deterministic importer wherever it exists; do not redraw or eyeball an approximation merely because that is faster. Approximate only behavior or content not represented in the downloaded files, and record the evidence and discrepancy. Do not disassemble `AoE2DE_s.exe`.
+- Keep a functional open fallback for users without the owned game, but do not let fallback limitations lower the fidelity of the local imported mode.
 - Never commit Steam credentials, game files, converted Microsoft assets, `.local/`, `.tools/`, or `public/imported/`.
 - Preserve the current Tailscale routes and Vite mobile URL. Never run `tailscale serve reset`.
 - Desktop/laptop is the canonical play experience. Match AoE2DE's isometric presentation, HUD/menu layout, density, hotkeys, and pointer interactions closely. Mobile is a secondary remote-QA surface only; responsive accommodations must not distort the core design or create a separate UI.
