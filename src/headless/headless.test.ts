@@ -7,7 +7,7 @@ import { validateMatchResult, explain } from '../protocol/validate';
 describe('headless matches', () => {
   it('completes a builtin-vs-idle match with a winner and valid result', async () => {
     const result = await runMatch(
-      { version: 1, seed: 7, maxTimeSeconds: 900 },
+      { version: 1, seed: 7, maxTimeSeconds: 1800 },
       { 1: { decide: () => [] }, 2: builtinStrategy() },
     );
     expect(result.winner).toBe(2);
@@ -35,7 +35,7 @@ describe('headless matches', () => {
 
   it('runs the example AI as a JSONL subprocess to victory', async () => {
     const result = await runMatch(
-      { version: 1, seed: 7, maxTimeSeconds: 900, decideIntervalSeconds: 5 },
+      { version: 1, seed: 7, maxTimeSeconds: 1800, decideIntervalSeconds: 5 },
       {
         1: { decide: () => [] },
         2: subprocessStrategy('npx tsx src/headless/builtin-strategy-cli.ts', 30_000),

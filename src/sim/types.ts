@@ -5,7 +5,7 @@ export type ResourceKind = 'food' | 'wood' | 'gold';
 export type UnitKind = 'villager' | 'militia';
 export type BuildingKind = 'town-center' | 'barracks' | 'house';
 export type EntityKind = UnitKind | BuildingKind | 'resource';
-export type Activity = 'idle' | 'moving' | 'gathering' | 'carrying' | 'building' | 'attacking';
+export type Activity = 'idle' | 'moving' | 'gathering' | 'carrying' | 'building' | 'attacking' | 'dying';
 
 export interface Point { x: number; y: number }
 
@@ -36,7 +36,15 @@ export interface Entity {
   buildProgress?: number; // 0..1; undefined once complete
   training?: { kind: UnitKind; remainingTicks: number };
   rally?: { target: Point; targetId?: number };
-  attackCooldown?: number; // ticks until the next hit may land
+  attackCooldown?: number; // ticks until a new swing may start
+  attackWindup?: number; // ticks until the started swing releases damage
+  /** Corpse state: plays the death animation, then despawns. */
+  dead?: boolean;
+  decayTicks?: number;
+  /** Navigation. */
+  path?: Point[];
+  pathGoal?: Point;
+  stuckTicks?: number;
 }
 
 export interface PlayerState {

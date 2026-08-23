@@ -1,5 +1,6 @@
 import { FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isBuilding, isUnit } from './data';
-import type { GameRules } from './data';
+import type { AttackValue, GameRules } from './data';
+import { buildNavGrid, findPath, isBlocked, separateUnits, tileOf, type NavGrid } from './nav';
 import { random01 } from './random';
 import type {
   BuildingKind, Command, Entity, GameState, PlayerId, Point, ResourceKind, UnitKind,
@@ -70,10 +71,10 @@ export const gameTimeSeconds = (state: GameState): number => state.tick * TICK_S
 function recalculatePopulation(state: GameState): void {
   for (const player of [1, 2] as PlayerId[]) {
     state.players[player].population = state.entities
-      .filter(e => e.owner === player && isUnit(e.kind))
+      .filter(e => !e.dead && e.owner === player && isUnit(e.kind))
       .reduce((sum, e) => sum + state.rules.units[e.kind as UnitKind].popCost, 0);
     state.players[player].populationCap = state.rules.startingPopulationCap + state.entities
-      .filter(e => e.owner === player && isBuilding(e.kind) && e.buildProgress === undefined)
+      .filter(e => !e.dead && e.owner === player && isBuilding(e.kind) && e.buildProgress === undefined)
       .reduce((sum, e) => sum + state.rules.buildings[e.kind as BuildingKind].popSupport, 0);
   }
 }
@@ -102,6 +103,7 @@ export function placementLegal(state: GameState, building: BuildingKind, target:
   }
   // Units are ignored: real AoE nudges them off foundations (recorded approximation).
   for (const entity of state.entities) {
+    if (entity.dead) continue;
     if (!isBuilding(entity.kind) && entity.kind !== 'resource') continue;
     if (footprintsOverlap(target, half, entity.position, entity.radius)) {
       return rejected(`placement overlaps ${entity.kind} ${entity.id}`);
@@ -133,14 +135,14 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
 
   if (command.kind === 'order' || command.kind === 'stop') {
     const targetEntity = 'targetId' in command && command.targetId
-      ? state.entities.find(e => e.id === command.targetId)
+      ? state.entities.find(e => e.id === command.targetId && !e.dead)
       : undefined;
     if (command.kind === 'order' && command.targetId && !targetEntity) {
       return rejected(`target ${command.targetId} does not exist`);
     }
     let matched = 0;
     for (const entity of state.entities) {
-      if (!command.entityIds.includes(entity.id) || entity.owner !== command.player || !isUnit(entity.kind)) continue;
+      if (entity.dead || !command.entityIds.includes(entity.id) || entity.owner !== command.player || !isUnit(entity.kind)) continue;
       matched++;
       if (command.kind === 'stop') {
         entity.order = { kind: 'idle' };
@@ -153,7 +155,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
   }
 
   if (command.kind === 'train') {
-    const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player);
+    const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
     if (!building) return rejected(`building ${command.buildingId} is not owned`);
     if (building.buildProgress !== undefined) return rejected('building is under construction');
     if (building.training) return rejected('building is already training');
@@ -168,7 +170,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
   }
 
   if (command.kind === 'rally') {
-    const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player);
+    const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
     if (!building || !isBuilding(building.kind)) return rejected(`building ${command.buildingId} is not owned`);
     building.rally = { target: { ...command.target }, targetId: command.targetId };
     return { ok: true };
@@ -177,7 +179,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
   const rules = state.rules.buildings[command.building];
   if (!rules.buildable) return rejected(`${command.building} cannot be built`);
   const builders = state.entities.filter(
-    e => command.builderIds.includes(e.id) && e.owner === command.player && e.kind === 'villager',
+    e => !e.dead && command.builderIds.includes(e.id) && e.owner === command.player && e.kind === 'villager',
   );
   if (!builders.length) return rejected('builders must be owned villagers');
   const legal = placementLegal(state, command.building, command.target);
@@ -208,14 +210,63 @@ function moveToward(entity: Entity, target: Point, speed: number): boolean {
   return false;
 }
 
+function clearPath(entity: Entity): void {
+  entity.path = undefined;
+  entity.pathGoal = undefined;
+  entity.stuckTicks = 0;
+}
+
+/**
+ * Grid path following with repathing on dynamic obstruction or lack of
+ * progress. Returns true once the destination (or its nearest reachable
+ * tile) is reached.
+ */
+function moveAlong(state: GameState, grid: NavGrid, entity: Entity, destination: Point, speed: number, directRange = 0): boolean {
+  // Final approach straight at an interaction target whose footprint blocks
+  // the grid; the caller's range check stops movement at its edge.
+  if (directRange > 0 && distance(entity.position, destination) <= directRange) {
+    return moveToward(entity, destination, speed);
+  }
+  const goalChanged = !entity.pathGoal ||
+    Math.abs(entity.pathGoal.x - destination.x) > 0.5 || Math.abs(entity.pathGoal.y - destination.y) > 0.5;
+  const nextBlocked = entity.path?.length
+    ? isBlocked(grid, Math.floor(entity.path[0].x), Math.floor(entity.path[0].y))
+    : false;
+  if (goalChanged || nextBlocked || !entity.path || (entity.stuckTicks ?? 0) > 30) {
+    entity.path = findPath(grid, entity.position, destination);
+    entity.pathGoal = { ...destination };
+    entity.stuckTicks = 0;
+    if (!entity.path) return true; // unreachable: give up where we stand
+  }
+  const before = { ...entity.position };
+  while (entity.path.length && distance(entity.position, entity.path[0]) <= 0.12) entity.path.shift();
+  if (!entity.path.length) {
+    const tile = tileOf(destination);
+    const arrivedExactly = !isBlocked(grid, tile.x, tile.y)
+      ? moveToward(entity, destination, speed)
+      : true;
+    if (arrivedExactly) clearPath(entity);
+    return arrivedExactly;
+  }
+  moveToward(entity, entity.path[0], speed);
+  if (distance(before, entity.position) < speed * TICK_SECONDS * 0.5) {
+    entity.stuckTicks = (entity.stuckTicks ?? 0) + 1;
+  } else {
+    entity.stuckTicks = 0;
+  }
+  return false;
+}
+
 const inRange = (entity: Entity, target: Entity, margin = 0.15): boolean =>
   distance(entity.position, target.position) <= entity.radius + target.radius + margin;
+
+const interactionRange = (target: Entity): number => target.radius + 1.6;
 
 function nearestNode(state: GameState, from: Point, resource: ResourceKind): Entity | undefined {
   let best: Entity | undefined;
   let bestDistance = Infinity;
   for (const entity of state.entities) {
-    if (entity.kind !== 'resource' || entity.resourceKind !== resource || (entity.amount ?? 0) <= 0) continue;
+    if (entity.dead || entity.kind !== 'resource' || entity.resourceKind !== resource || (entity.amount ?? 0) <= 0) continue;
     const d = distance(from, entity.position);
     if (d < bestDistance || (d === bestDistance && best && entity.id < best.id)) {
       best = entity;
@@ -229,7 +280,7 @@ function nearestDropSite(state: GameState, entity: Entity): Entity | undefined {
   let best: Entity | undefined;
   let bestDistance = Infinity;
   for (const candidate of state.entities) {
-    if (candidate.owner !== entity.owner || candidate.kind !== 'town-center' || candidate.buildProgress !== undefined) continue;
+    if (candidate.dead || candidate.owner !== entity.owner || candidate.kind !== 'town-center' || candidate.buildProgress !== undefined) continue;
     const d = distance(entity.position, candidate.position);
     if (d < bestDistance || (d === bestDistance && best && candidate.id < best.id)) {
       best = candidate;
@@ -243,9 +294,38 @@ function becomeIdle(entity: Entity): void {
   entity.order = { kind: 'idle' };
   entity.activity = 'idle';
   entity.gatherProgress = 0;
+  entity.attackWindup = undefined;
+  entity.path = undefined;
+  entity.pathGoal = undefined;
 }
 
-function updateGatherer(state: GameState, entity: Entity): void {
+/** AoE2 damage: bonus per shared armor class, then a minimum of 1. */
+export function computeDamage(attacks: AttackValue[], armors: AttackValue[]): number {
+  let total = 0;
+  for (const attack of attacks) {
+    const armor = armors.find(a => a.class === attack.class);
+    if (!armor) continue;
+    total += Math.max(0, attack.amount - armor.amount);
+  }
+  return Math.max(1, total);
+}
+
+function armorsOf(state: GameState, entity: Entity): AttackValue[] {
+  if (isUnit(entity.kind)) return state.rules.units[entity.kind as UnitKind].armors;
+  if (isBuilding(entity.kind)) return state.rules.buildings[entity.kind as BuildingKind].armors;
+  return [];
+}
+
+function kill(state: GameState, entity: Entity): void {
+  entity.dead = true;
+  entity.activity = 'dying';
+  entity.order = { kind: 'idle' };
+  entity.training = undefined;
+  entity.decayTicks = 60; // death animation window before the corpse despawns
+  clearPath(entity);
+}
+
+function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'gather') return;
   const speed = state.rules.units.villager.speed;
   const capacity = state.rules.carryCapacity;
@@ -255,16 +335,17 @@ function updateGatherer(state: GameState, entity: Entity): void {
     const drop = nearestDropSite(state, entity);
     if (!drop) { becomeIdle(entity); return; }
     entity.activity = 'carrying';
-    if (inRange(entity, drop)) {
+    if (inRange(entity, drop, 0.3)) {
       state.players[entity.owner as PlayerId][carrying.kind] += carrying.amount;
       entity.carrying = undefined;
+      clearPath(entity);
     } else {
-      moveToward(entity, drop.position, speed);
+      moveAlong(state, grid, entity, drop.position, speed, interactionRange(drop));
     }
     return;
   }
 
-  let node = state.entities.find(e => e.id === (entity.order as { targetId: number }).targetId && (e.amount ?? 0) > 0);
+  let node = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId && (e.amount ?? 0) > 0);
   if (!node) {
     const wanted = carrying?.kind ?? undefined;
     node = wanted ? nearestNode(state, entity.position, wanted) : undefined;
@@ -272,23 +353,24 @@ function updateGatherer(state: GameState, entity: Entity): void {
     else if (carrying && carrying.amount > 0) {
       // Nothing left to gather: bank what is carried, then idle.
       const drop = nearestDropSite(state, entity);
-      if (drop && inRange(entity, drop)) {
+      if (drop && inRange(entity, drop, 0.3)) {
         state.players[entity.owner as PlayerId][carrying.kind] += carrying.amount;
         entity.carrying = undefined;
         becomeIdle(entity);
       } else if (drop) {
         entity.activity = 'carrying';
-        moveToward(entity, drop.position, speed);
+        moveAlong(state, grid, entity, drop.position, speed, interactionRange(drop));
       } else becomeIdle(entity);
       return;
     } else { becomeIdle(entity); return; }
   }
 
-  if (!inRange(entity, node)) {
+  if (!inRange(entity, node, 0.3)) {
     entity.activity = carrying && carrying.amount > 0 ? 'carrying' : 'moving';
-    moveToward(entity, node.position, speed);
+    moveAlong(state, grid, entity, node.position, speed, interactionRange(node));
     return;
   }
+  clearPath(entity);
 
   entity.activity = 'gathering';
   const resource = node.resourceKind!;
@@ -302,50 +384,84 @@ function updateGatherer(state: GameState, entity: Entity): void {
   }
 }
 
-function updateBuilder(state: GameState, entity: Entity, builderCounts: Map<number, number>): void {
+function updateBuilder(state: GameState, grid: NavGrid, entity: Entity, builderCounts: Map<number, number>): void {
   if (entity.order.kind !== 'build') return;
-  const site = state.entities.find(e => e.id === (entity.order as { targetId: number }).targetId);
+  const site = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
   if (!site || site.buildProgress === undefined) { becomeIdle(entity); return; }
-  if (!inRange(entity, site, 0.3)) {
+  if (!inRange(entity, site, 0.4)) {
     entity.activity = 'moving';
-    moveToward(entity, site.position, state.rules.units.villager.speed);
+    moveAlong(state, grid, entity, site.position, state.rules.units.villager.speed, interactionRange(site));
     return;
   }
+  clearPath(entity);
   entity.activity = 'building';
   builderCounts.set(site.id, (builderCounts.get(site.id) ?? 0) + 1);
 }
 
-function updateAttacker(state: GameState, entity: Entity): void {
+function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'attack') return;
-  const target = state.entities.find(e => e.id === (entity.order as { targetId: number }).targetId);
+  const target = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
   if (!target || target.owner === entity.owner || target.hp <= 0) { becomeIdle(entity); return; }
   const rules = state.rules.units[entity.kind as UnitKind];
-  if (!inRange(entity, target, 0.25)) {
+  if (!inRange(entity, target, 0.35)) {
+    // Leaving range cancels a started swing: no damage before release.
+    entity.attackWindup = undefined;
     entity.activity = 'moving';
-    moveToward(entity, target.position, rules.speed);
+    moveAlong(state, grid, entity, target.position, rules.speed, interactionRange(target));
     return;
   }
+  clearPath(entity);
   entity.activity = 'attacking';
-  entity.attackCooldown = (entity.attackCooldown ?? 0) - 1;
-  if ((entity.attackCooldown ?? 0) <= 0) {
-    target.hp -= rules.attackDamage;
-    entity.attackCooldown = Math.round(rules.attackReloadSeconds * TICKS_PER_SECOND);
+  if (entity.attackCooldown !== undefined && entity.attackCooldown > 0) {
+    entity.attackCooldown -= 1;
+    return;
+  }
+  if (entity.attackWindup === undefined) {
+    entity.attackWindup = Math.max(1, Math.round(rules.attackReleaseSeconds * TICKS_PER_SECOND));
+  }
+  entity.attackWindup -= 1;
+  if (entity.attackWindup <= 0) {
+    target.hp -= computeDamage(rules.attacks, armorsOf(state, target));
+    if (target.hp <= 0) kill(state, target);
+    entity.attackWindup = undefined;
+    entity.attackCooldown = Math.max(1, Math.round(rules.attackReloadSeconds * TICKS_PER_SECOND) - Math.max(1, Math.round(rules.attackReleaseSeconds * TICKS_PER_SECOND)));
   }
 }
 
-function updateUnit(state: GameState, entity: Entity, builderCounts: Map<number, number>): void {
+/** Idle military units acquire the nearest living enemy in line of sight. */
+function autoAcquire(state: GameState, entity: Entity): void {
+  if (entity.kind !== 'militia' || entity.order.kind !== 'idle') return;
+  const los = state.rules.units.militia.lineOfSight;
+  let best: Entity | undefined;
+  let bestDistance = Infinity;
+  for (const candidate of state.entities) {
+    if (candidate.dead || candidate.owner === 0 || candidate.owner === entity.owner) continue;
+    const d = distance(entity.position, candidate.position) - candidate.radius;
+    if (d <= los && (d < bestDistance - 1e-9 || (Math.abs(d - bestDistance) <= 1e-9 && (best?.id ?? Infinity) > candidate.id))) {
+      best = candidate;
+      bestDistance = d;
+    }
+  }
+  if (best) {
+    entity.order = { kind: 'attack', targetId: best.id };
+    entity.activity = 'moving';
+  }
+}
+
+function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCounts: Map<number, number>): void {
   switch (entity.order.kind) {
     case 'move': {
       entity.activity = 'moving';
       const rules = state.rules.units[entity.kind as UnitKind];
-      if (moveToward(entity, entity.order.target, rules.speed)) becomeIdle(entity);
+      if (moveAlong(state, grid, entity, entity.order.target, rules.speed)) becomeIdle(entity);
       return;
     }
-    case 'gather': return updateGatherer(state, entity);
-    case 'build': return updateBuilder(state, entity, builderCounts);
-    case 'attack': return updateAttacker(state, entity);
+    case 'gather': return updateGatherer(state, grid, entity);
+    case 'build': return updateBuilder(state, grid, entity, builderCounts);
+    case 'attack': return updateAttacker(state, grid, entity);
     default:
       entity.activity = 'idle';
+      if (state.tick % 10 === 0) autoAcquire(state, entity);
   }
 }
 
@@ -379,14 +495,34 @@ function updateBuildingProduction(state: GameState, entity: Entity): void {
   recalculatePopulation(state);
 }
 
+function isDefeated(state: GameState, player: PlayerId): boolean {
+  const alive = state.entities.filter(e => !e.dead && e.owner === player);
+  if (!alive.some(e => e.kind === 'town-center')) return true;
+  // Domination: no units and nothing that can produce them (approximation of
+  // AoE2 conquest, which requires razing everything).
+  return !alive.some(e => isUnit(e.kind)) &&
+    !alive.some(e => (e.kind === 'barracks' || e.kind === 'town-center') && e.buildProgress === undefined);
+}
+
 export function stepGame(state: GameState): void {
   if (state.winner) return;
   state.tick += 1;
+  const grid = buildNavGrid(state);
   const builderCounts = new Map<number, number>();
+  const movable: Entity[] = [];
   for (const entity of [...state.entities]) {
-    if (isUnit(entity.kind)) updateUnit(state, entity, builderCounts);
-    else if (isBuilding(entity.kind) && entity.buildProgress === undefined) updateBuildingProduction(state, entity);
+    if (entity.dead) {
+      entity.decayTicks = (entity.decayTicks ?? 0) - 1;
+      continue;
+    }
+    if (isUnit(entity.kind)) {
+      updateUnit(state, grid, entity, builderCounts);
+      movable.push(entity);
+    } else if (isBuilding(entity.kind) && entity.buildProgress === undefined) {
+      updateBuildingProduction(state, entity);
+    }
   }
+  separateUnits(state, movable, grid);
   for (const site of state.entities) {
     if (site.buildProgress === undefined) continue;
     const builders = builderCounts.get(site.id) ?? 0;
@@ -406,13 +542,23 @@ export function stepGame(state: GameState): void {
     }
   }
 
-  const destroyedTownCenters = state.entities.filter(e => e.kind === 'town-center' && e.hp <= 0);
-  const removed = state.entities.some(e => e.hp <= 0 || (e.kind === 'resource' && (e.amount ?? 0) <= 0));
-  if (removed) {
-    state.entities = state.entities.filter(e => e.hp > 0 && (e.kind !== 'resource' || (e.amount ?? 0) > 0));
-    recalculatePopulation(state);
+  const newlyDead = state.entities.some(e => !e.dead && (e.hp <= 0 || (e.kind === 'resource' && (e.amount ?? 0) <= 0)));
+  if (newlyDead) {
+    for (const entity of state.entities) {
+      if (!entity.dead && (entity.hp <= 0 || (entity.kind === 'resource' && (entity.amount ?? 0) <= 0))) kill(state, entity);
+    }
   }
-  for (const tc of destroyedTownCenters) state.winner = tc.owner === 1 ? 2 : 1;
+  const expired = state.entities.some(e => e.dead && (e.decayTicks ?? 0) <= 0);
+  if (expired) state.entities = state.entities.filter(e => !e.dead || (e.decayTicks ?? 0) > 0);
+  if (newlyDead || expired) recalculatePopulation(state);
+
+  if (newlyDead) {
+    const p1Out = isDefeated(state, 1);
+    const p2Out = isDefeated(state, 2);
+    if (p1Out && !p2Out) state.winner = 2;
+    else if (p2Out && !p1Out) state.winner = 1;
+    else if (p1Out && p2Out) state.winner = 2; // simultaneous: attacker's tick order favors 2 deterministically
+  }
 }
 
 export function nearestEntity(state: GameState, point: Point, maxDistance = 1.3): Entity | undefined {

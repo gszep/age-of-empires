@@ -5,6 +5,8 @@ export const TICKS_PER_SECOND = 20;
 
 export interface Cost { food: number; wood: number; gold: number }
 
+export interface AttackValue { class: number; amount: number }
+
 export interface UnitRules {
   hp: number;
   radius: number;
@@ -14,8 +16,11 @@ export interface UnitRules {
   trainSeconds: number;
   trainedAt: BuildingKind;
   popCost: number;
-  attackDamage: number;
+  attacks: AttackValue[];
+  armors: AttackValue[];
   attackReloadSeconds: number;
+  /** Seconds into the swing when damage lands (DAT frame delay x frame time). */
+  attackReleaseSeconds: number;
 }
 
 export interface BuildingRules {
@@ -26,6 +31,7 @@ export interface BuildingRules {
   buildSeconds: number;
   popSupport: number;
   buildable: boolean;
+  armors: AttackValue[];
 }
 
 export interface ResourceNodeRules {
@@ -59,25 +65,34 @@ export const FALLBACK_RULES: GameRules = {
   units: {
     villager: {
       hp: 25, radius: 0.2, speed: 0.8, lineOfSight: 4, cost: cost(50), trainSeconds: 25,
-      trainedAt: 'town-center', popCost: 1, attackDamage: 3, attackReloadSeconds: 2,
+      trainedAt: 'town-center', popCost: 1,
+      attacks: [{ class: 11, amount: 3 }, { class: 4, amount: 3 }, { class: 13, amount: 6 }],
+      armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }],
+      attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
     },
     militia: {
       hp: 40, radius: 0.2, speed: 0.9, lineOfSight: 4, cost: cost(50, 0, 20), trainSeconds: 21,
-      trainedAt: 'barracks', popCost: 1, attackDamage: 4, attackReloadSeconds: 2,
+      trainedAt: 'barracks', popCost: 1,
+      attacks: [{ class: 4, amount: 4 }],
+      armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 1 }],
+      attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
     },
   },
   buildings: {
     'town-center': {
       hp: 2400, radius: 2, lineOfSight: 8, cost: cost(0, 275), buildSeconds: 100,
       popSupport: 5, buildable: false,
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 3 }, { class: 3, amount: 5 }],
     },
     barracks: {
       hp: 1200, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
       popSupport: 0, buildable: true,
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
     },
     house: {
       hp: 550, radius: 1, lineOfSight: 2, cost: cost(0, 25), buildSeconds: 25,
       popSupport: 5, buildable: true,
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: -2 }, { class: 3, amount: 7 }],
     },
   },
   nodes: {
@@ -98,10 +113,16 @@ interface ManifestEntity {
   populationCost?: number;
   train?: { buildingId: number; seconds: number };
   build?: { builderId: number; seconds: number };
-  combat?: { reloadSeconds: number; attacks: { class: number; amount: number }[] };
+  combat?: {
+    reloadSeconds: number;
+    frameDelay: number;
+    attacks: AttackValue[];
+    armors: AttackValue[];
+  };
   gather?: { resource: ResourceKind; ratePerSecond: number; capacity: number };
   storage?: Partial<Record<ResourceKind, number>>;
   popSupport?: number;
+  animations?: Record<string, { frameSeconds: number }>;
 }
 
 export interface ContentManifest { entities: Record<string, ManifestEntity> }
@@ -109,9 +130,8 @@ export interface ContentManifest { entities: Record<string, ManifestEntity> }
 const manifestCost = (entity: ManifestEntity): Cost =>
   cost(entity.cost?.food ?? 0, entity.cost?.wood ?? 0, entity.cost?.gold ?? 0);
 
-/** Base melee damage: the class-4 attack amount (armor classes arrive in phase 4). */
-const baseDamage = (entity: ManifestEntity): number =>
-  entity.combat?.attacks.find(attack => attack.class === 4)?.amount ?? 0;
+// Zero-amount entries stay: armor-class membership decides bonus damage.
+const attackValues = (values: AttackValue[] | undefined): AttackValue[] => values ?? [];
 
 /** Build DAT-backed rules from the imported content manifest. */
 export function rulesFromManifest(manifest: ContentManifest): GameRules {
@@ -125,8 +145,12 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     trainSeconds: e[key].train?.seconds ?? 25,
     trainedAt,
     popCost: e[key].populationCost ?? 1,
-    attackDamage: baseDamage(e[key]),
+    attacks: attackValues(e[key].combat?.attacks),
+    armors: attackValues(e[key].combat?.armors),
     attackReloadSeconds: e[key].combat?.reloadSeconds ?? 2,
+    attackReleaseSeconds: Math.round(
+      (e[key].combat?.frameDelay ?? 10) * (e[key].animations?.attack?.frameSeconds ?? 0.05) * 100,
+    ) / 100,
   });
   const building = (key: string, buildable: boolean): BuildingRules => ({
     hp: e[key].hitPoints,
@@ -136,6 +160,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     buildSeconds: e[key].build?.seconds ?? 25,
     popSupport: e[key].popSupport ?? 0,
     buildable,
+    armors: attackValues(e[key].combat?.armors),
   });
   const node = (key: string, resource: ResourceKind): ResourceNodeRules => ({
     resource,

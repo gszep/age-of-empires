@@ -60,7 +60,17 @@ PixiJS is the strongest mature sprite-heavy 2D renderer and may batch AoE atlase
 
 Keep the renderer adapter narrow. Re-evaluate PixiJS only if representative desktop profiling shows unacceptable batching complexity, memory, or frame time.
 
-### Recast Navigation
+### Recast Navigation (evaluated for phase 4: referenced, not adopted)
+
+Decision for the Dark Age slice: the phase-4 compatibility suite (direct path,
+blocked destination, detour, one-tile gap, crossing groups, surround, dynamic
+insertion) is satisfied by a ~150-line deterministic 8-connected tile A* with
+strict tie-breaking (`src/sim/nav.ts`), so no navigation dependency was added.
+Recast/Detour models free-space navmeshes and crowd steering; reproducing AoE
+tile obstruction, corner rules, and cross-run determinism through its adapter
+would cost more than the grid search it replaces (decision rule 6). Re-evaluate
+if maps grow beyond trivial A* scale or formations arrive.
+
 
 `recast-navigation-js` is active, MIT-licensed, backed by mature Recast/Detour, supports dynamic tile-cache obstacles, and integrates with Three.js. It is a strong library for navmesh games.
 

@@ -14,7 +14,7 @@ function lineOfSight(state: GameState, entity: Entity): number {
 function isVisible(state: GameState, player: PlayerId, entity: Entity): boolean {
   if (entity.owner === player || entity.owner === 0) return true;
   return state.entities.some(
-    own => own.owner === player && distance(own, entity) <= lineOfSight(state, own),
+    own => !own.dead && own.owner === player && distance(own, entity) <= lineOfSight(state, own),
   );
 }
 
@@ -25,7 +25,7 @@ function observeEntity(entity: Entity, player: PlayerId): ObservedEntity {
     owner: entity.owner,
     x: Math.round(entity.position.x * 100) / 100,
     y: Math.round(entity.position.y * 100) / 100,
-    hp: Math.ceil(entity.hp),
+    hp: Math.max(0, Math.ceil(entity.hp)),
     maxHp: entity.maxHp,
   };
   if (entity.resourceKind) observed.resource = entity.resourceKind;
@@ -61,7 +61,7 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
     population: self.population,
     populationCap: self.populationCap,
     entities: state.entities
-      .filter(entity => isVisible(state, player, entity))
+      .filter(entity => !entity.dead && isVisible(state, player, entity))
       .map(entity => observeEntity(entity, player)),
   };
   if (state.winner) observation.winner = state.winner;

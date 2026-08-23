@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { exampleAiCommands } from './ai';
 import { observe } from './observe';
-import { applyCommand, createGame, stepGame } from './game';
+import { applyCommand, computeDamage, createGame, stepGame } from './game';
 
 function digest(state: ReturnType<typeof createGame>): string {
   return JSON.stringify(state);
@@ -30,9 +30,9 @@ describe('simulation', () => {
     expect(state.players[1].population).toBe(4);
   });
 
-  it('walks into range before attacking and hits on discrete cooldowns', () => {
+  it('walks into range, winds up, and releases discrete armor-based hits', () => {
     const state = createGame();
-    const militiaRules = state.rules.units.militia;
+    const villagerRules = state.rules.units.villager;
     const target = state.entities.find(e => e.owner === 2 && e.kind === 'town-center')!;
     const attacker = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
     applyCommand(state, { kind: 'order', player: 1, entityIds: [attacker.id], target: target.position, targetId: target.id });
@@ -43,10 +43,21 @@ describe('simulation', () => {
 
     for (let i = 0; i < 4000 && attacker.activity !== 'attacking'; i++) stepGame(state);
     expect(attacker.activity).toBe('attacking');
-    expect(target.hp).toBe(initialHp - state.rules.units.villager.attackDamage);
-    // No second hit lands before the reload elapses.
-    run(state, Math.round(militiaRules.attackReloadSeconds * 20) - 2);
-    expect(target.hp).toBe(initialHp - state.rules.units.villager.attackDamage);
+    // No damage lands before the swing releases.
+    expect(target.hp).toBe(initialHp);
+    // The tick that flipped to 'attacking' already consumed one windup tick.
+    const releaseTicks = Math.max(1, Math.round(villagerRules.attackReleaseSeconds * 20));
+    run(state, releaseTicks - 2);
+    expect(target.hp).toBe(initialHp);
+    run(state, 1);
+    // Villager vs town center: class-11 bonus 3, melee zeroed by armor.
+    const expected = computeDamage(villagerRules.attacks, state.rules.buildings['town-center'].armors);
+    expect(target.hp).toBe(initialHp - expected);
+    // The next hit lands one full reload after the first.
+    run(state, Math.round(villagerRules.attackReloadSeconds * 20) - 1);
+    expect(target.hp).toBe(initialHp - expected);
+    run(state, 1);
+    expect(target.hp).toBe(initialHp - expected * 2);
   });
 
   it('lets the example AI finish a match against a passive opponent', () => {

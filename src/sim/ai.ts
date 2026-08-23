@@ -67,9 +67,26 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     commands.push({ kind: 'train', player, buildingId: barracks.id, unit: 'militia' });
   }
 
+  const enemyUnits = observation.entities.filter(
+    e => e.owner !== 0 && e.owner !== player && (e.kind === 'villager' || e.kind === 'militia'),
+  );
+  const enemyTcVisible = observation.entities.find(e => e.kind === 'town-center' && e.owner !== 0 && e.owner !== player);
+
+  // Endgame raze: militia alone barely dent a town center (DAT armor), so
+  // once the enemy field is clear, villagers join the demolition.
+  if (enemyTcVisible && militia.length >= 3 && enemyUnits.length === 0) {
+    const razers = villagers.filter(e => e.order !== 'attack');
+    if (razers.length) {
+      commands.push({
+        kind: 'order', player, entityIds: razers.map(e => e.id).sort((a, b) => a - b),
+        target: { x: enemyTcVisible.x, y: enemyTcVisible.y }, targetId: enemyTcVisible.id,
+      });
+    }
+  }
+
   const idleMilitia = militia.filter(e => e.order === 'idle');
   if (idleMilitia.length && militia.length >= 3) {
-    const enemyTc = observation.entities.find(e => e.kind === 'town-center' && e.owner !== 0 && e.owner !== player);
+    const enemyTc = enemyTcVisible;
     // March toward the mirrored base position until the enemy town center is seen.
     const target = enemyTc
       ? { x: enemyTc.x, y: enemyTc.y }
