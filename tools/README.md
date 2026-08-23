@@ -36,6 +36,14 @@ the owned fixture, including determinism checks.
 - Forager and gold-miner work animations use the task `proceeding` graphic; the
   DAT `working` graphic is `-1` and the attack graphic is a placeholder file
   named `None` in this build.
+- Only the main SLD layer (0) is converted. The pinned openage decoder
+  segfaults/aborts nondeterministically (`Abort trap: 6`, `Segmentation
+  fault: 11`, ~15% success on repeats of the same file) when decoding
+  supplemental shadow (1) and player-color mask (4) layers, which would break
+  byte-identical regeneration. The viewer approximates player color by
+  tinting until a fixed upstream revision is validated. Each atlas converts
+  in an isolated subprocess because the decoder also degrades within one
+  long-lived process.
 - Building destruction graphics are converted without their fire-overlay delta
   graphics (for example graphic 419 deltas 12178–12183).
 - Corpse/decay graphics and dead-unit chains (tree stumps) are not imported yet.

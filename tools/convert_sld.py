@@ -9,12 +9,22 @@ from pathlib import Path
 from typing import Any
 
 
-def convert(source: Path, output: Path, expected_frames: int) -> dict[str, Any]:
+# SLD layers: 0 main graphics, 1 shadow, 4 player-color mask. Only the main
+# layer is converted: the pinned openage decoder segfaults nondeterministically
+# on supplemental shadow/mask layers (recorded evidence, see tools/README.md),
+# which would break byte-identical regeneration.
+LAYERS = {"": 0}
+
+
+def convert(source: Path, output: Path, expected_frames: int, layer: int = 0) -> dict[str, Any]:
     from openage.convert.entity_object.export.texture import Texture
     from openage.convert.processor.export.texture_merge import merge_frames
     from openage.convert.value_object.read.media.sld import SLD
 
-    texture = Texture(SLD(source.read_bytes()), layer=0)
+    sld = SLD(source.read_bytes())
+    if layer != 0 and len(sld.get_frames(layer)) == 0:
+        return {}
+    texture = Texture(sld, layer=layer)
     texture.image_metadata = {}
     merge_frames(texture)
     metadata = texture.image_metadata
@@ -33,17 +43,63 @@ def convert(source: Path, output: Path, expected_frames: int) -> dict[str, Any]:
     }
 
 
+def extra_layer_states(category: str) -> set[str]:
+    """States whose shadow/player-color layers are exported.
+
+    Building destruction shadow layers hit pathological packing times in the
+    pinned openage packer and carry no player color, so they are skipped.
+    """
+    if category in ("unit", "unit-variant"):
+        return {"idle", "walk", "work", "carry", "attack", "death"}
+    if category == "building":
+        return {"idle", "construction"}
+    return {"idle"}
+
+
 def convert_animations(
-    animations: dict[str, Any], graphics_dir: Path, out_dir: Path, key: str, prefix: str = ""
+    animations: dict[str, Any], graphics_dir: Path, out_dir: Path, key: str,
+    category: str, prefix: str = ""
 ) -> dict[str, Any]:
     atlases: dict[str, Any] = {}
+    with_layers = extra_layer_states(category)
     for state, animation in animations.items():
         expected = animation["frames"] * animation["directions"]
-        name = f"{prefix}{state}"
-        atlas = convert(graphics_dir / animation["source"], out_dir / f"{name}.png", expected)
-        atlas["image"] = f"{key}/{name}.png"
-        atlases[name] = atlas
+        for suffix, layer in LAYERS.items():
+            if suffix and state not in with_layers:
+                continue
+            name = f"{prefix}{state}" + (f"-{suffix}" if suffix else "")
+            atlas = convert(graphics_dir / animation["source"], out_dir / f"{name}.png", expected, layer)
+            if not atlas:
+                continue
+            atlas["image"] = f"{key}/{name}.png"
+            atlases[name] = atlas
     return atlases
+
+
+def atlas_jobs(imported: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every atlas to produce: (key, name, source, expected frames, layer)."""
+    jobs: list[dict[str, Any]] = []
+
+    def add(key: str, category: str, animations: dict[str, Any], prefix: str = "") -> None:
+        with_layers = extra_layer_states(category)
+        for state, animation in animations.items():
+            for suffix, layer in LAYERS.items():
+                if suffix and state not in with_layers:
+                    continue
+                name = f"{prefix}{state}" + (f"-{suffix}" if suffix else "")
+                jobs.append({
+                    "key": key,
+                    "name": name,
+                    "source": animation["source"],
+                    "expected": animation["frames"] * animation["directions"],
+                    "layer": layer,
+                })
+
+    for key, entity in imported["entities"].items():
+        add(key, entity["category"], entity["animations"])
+        for index, annex in enumerate(entity.get("annexes", [])):
+            add(key, "building", annex["animations"], prefix=f"annex{index}-")
+    return jobs
 
 
 def main() -> None:
@@ -56,27 +112,90 @@ def main() -> None:
         default=Path.home() / "Steam/steamapps/content/app_813780/depot_813784/resources/_common/drs/graphics",
     )
     parser.add_argument("--out", type=Path, default=root / "public/imported/aoe2")
+    parser.add_argument("--atlas", help="worker mode: convert one atlas, format key:name:layer")
     args = parser.parse_args()
 
     imported = json.loads(args.content.read_text())
+    jobs = atlas_jobs(imported)
+
+    if args.atlas:
+        job = next(
+            j for j in jobs
+            if f"{j['key']}:{j['name']}:{j['layer']}" == args.atlas
+        )
+        out_dir = args.out / job["key"]
+        atlas = convert(
+            args.graphics / job["source"], out_dir / f"{job['name']}.png", job["expected"], job["layer"]
+        )
+        if atlas:
+            atlas["image"] = f"{job['key']}/{job['name']}.png"
+        (out_dir / f"{job['name']}.atlas.json").write_text(
+            json.dumps(atlas, separators=(",", ":"), sort_keys=True)
+        )
+        return
+
+    # The pinned openage native decoder aborts/hangs unpredictably inside a
+    # long-lived process, so every atlas converts in an isolated subprocess
+    # with one retry before failing the pipeline.
+    import subprocess
+    import sys
+
+    args.out.mkdir(parents=True, exist_ok=True)
+    atlases: dict[str, dict[str, Any]] = {}
+    skipped: list[str] = []
+    for job in jobs:
+        identifier = f"{job['key']}:{job['name']}:{job['layer']}"
+        marker = args.out / job["key"] / f"{job['name']}.atlas.json"
+        command = [
+            sys.executable, __file__,
+            "--content", str(args.content),
+            "--graphics", str(args.graphics),
+            "--out", str(args.out),
+            "--atlas", identifier,
+        ]
+        failed = False
+        for attempt in (1, 2):
+            failed = False
+            try:
+                subprocess.run(command, check=True, timeout=600)
+                break
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                failed = True
+        if failed:
+            if job["layer"] == 0:
+                raise RuntimeError(f"required atlas conversion failed twice: {identifier}")
+            # Supplemental shadow/mask layers that the pinned decoder cannot
+            # convert are recorded and skipped rather than failing the import.
+            skipped.append(identifier)
+            (args.out / job["key"] / f"{job['name']}.png").unlink(missing_ok=True)
+            print(f"skipped {identifier}")
+            continue
+        atlas = json.loads(marker.read_text())
+        marker.unlink()
+        if atlas:
+            atlases.setdefault(job["key"], {})[job["name"]] = atlas
+        print(identifier)
+
     entities: dict[str, Any] = {}
     for key, entity in imported["entities"].items():
-        out_dir = args.out / key
         entity = dict(entity)
-        entity["atlases"] = convert_animations(entity["animations"], args.graphics, out_dir, key)
+        entity["atlases"] = {
+            name: atlas for name, atlas in atlases.get(key, {}).items() if not name.startswith("annex")
+        }
         for index, annex in enumerate(entity.get("annexes", [])):
-            annex["atlases"] = convert_animations(
-                annex["animations"], args.graphics, out_dir, key, prefix=f"annex{index}-"
-            )
+            annex["atlases"] = {
+                name: atlas
+                for name, atlas in atlases.get(key, {}).items()
+                if name.startswith(f"annex{index}-")
+            }
         entities[key] = entity
-        print(key)
 
     manifest = {
         "schemaVersion": imported["schemaVersion"],
         "source": imported["source"],
         "entities": entities,
+        "skippedAtlases": sorted(skipped),
     }
-    args.out.mkdir(parents=True, exist_ok=True)
     manifest_path = args.out / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n")
     print(manifest_path)
