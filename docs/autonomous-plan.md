@@ -7,6 +7,7 @@ Deliver a mobile-playable, deterministic 1v1 Dark Age skirmish with imported AoE
 It is complete when:
 
 - a human can gather food/wood/gold, return resources, build houses/barracks, train villagers/militia, fight, and win;
+- the battlefield, HUD, command grid, selection panel, minimap, menus, icons, typography, colors, and interaction hierarchy closely match AoE2DE's WEST/Dark Age presentation while remaining touch-usable;
 - the example AI performs the same loop through the public command interface;
 - units navigate around buildings/resources without drifting through them;
 - combat uses discrete attack timing, DAT armor classes/minimum damage, and activity-driven animation;
@@ -22,9 +23,11 @@ Do not expand to additional ages, civilizations, naval play, campaigns, or multi
 
 Replace the one-off militia packaging internals with a small declarative import specification while retaining militia as the fixture. Add villager, town center, barracks, house, tree, berries, and gold.
 
-Import only fields consumed by the slice: IDs, costs, HP, speed, collision/clearance, capacity, train/build times, attacks/armor, tasks, graphic IDs, frame timing, and source provenance. Import idle/walk/work/build/attack/death visuals as applicable. Keep generated content local and hashed.
+Import only fields consumed by the slice: IDs, costs, HP, speed, collision/clearance, capacity, train/build times, attacks/armor, tasks, graphic IDs, frame timing, and source provenance. Import idle/walk/work/build/attack/death visuals as applicable.
 
-**Gate:** one command regenerates byte-identical manifests/atlases; integration tests resolve every required DAT reference and source file.
+Also import the minimal WEST UI set from `widgetui`: top/resource and bottom bars, map/command/selection/menu panels, food/wood/gold/population symbols, unit/building/action icons, button states, and relevant menu decoration. Use the current `resourcepanel.json`, `commandpanel.json`, `mappanel.json`, `blankbottompanel.json`, `icons.json`, and `materials.json` as layout/material evidence. Convert DDS icons locally through Pillow or another maintained decoder. Keep all generated content local and hashed.
+
+**Gate:** one command regenerates byte-identical manifests/atlases/UI assets; integration tests resolve every required DAT and widget reference/source file.
 
 ## Phase 2 — Stable public contracts and headless execution
 
@@ -75,13 +78,23 @@ Implement:
 
 **Gate:** no damage before range/release; no movement through footprints; navigation scenarios and combat golden tests pass; militia cannot erase a town center because of placeholder DPS.
 
-## Phase 5 — Visibility, viewer, and mobile UX
+## Phase 5 — Visibility and AoE2DE-faithful viewer
 
-Add explored/currently-visible state and player-filtered memory with `lastSeenAt`. Visibility is authoritative simulation state. Add isometric terrain/depth ordering, shadows, player-color masks, health/construction indicators, and concise selection/task UI.
+Add explored/currently-visible state and player-filtered memory with `lastSeenAt`. Visibility is authoritative simulation state. Add isometric terrain/depth ordering, shadows, player-color masks, health/construction indicators, and selection/task feedback.
 
-Do not replace Three.js unless an imported-asset mobile benchmark demonstrates a concrete problem. Preserve open placeholders when local assets are absent.
+Recreate AoE2DE's information architecture rather than inventing a generic mobile HUD:
 
-**Gate:** privileged truth and player observations differ correctly; mobile controls remain usable; imported assets load without console errors; frame time and memory are recorded on a representative match.
+- compact resource/population strip across the top and menu controls at the edge;
+- bottom WEST-styled frame with selected-object portrait/stats, command-button grid, production queue, and minimap;
+- imported unit/building/technology/action icons with normal/hover/pressed/disabled states;
+- AoE-like parchment, stone/wood/metal borders, gold highlights, player colors, serif display text, compact numeric labels, notifications, tooltips, pause/settings, victory/defeat, and skirmish setup menus;
+- desktop hotkeys plus touch targets of at least 42 CSS pixels, long-press help, safe-area support, and no accidental map commands through the HUD.
+
+Treat original `widgetui` layouts/textures as patch-matched reference inputs. Do not clone desktop pixel coordinates blindly: preserve panel roles, hierarchy, aspect, and visual language while scaling/reflowing for landscape phones. UI state and button legality come only from canonical observations. Preserve an open placeholder skin when imported assets are absent.
+
+Do not replace Three.js unless an imported-asset mobile benchmark demonstrates a concrete problem.
+
+**Gate:** side-by-side reference checks show the same recognizable composition and states; all controls remain touch-usable; privileged truth and player observations differ correctly; imported assets load without console errors; frame time and memory are recorded on a representative match.
 
 ## Phase 6 — Batches, replay, and live agents
 
