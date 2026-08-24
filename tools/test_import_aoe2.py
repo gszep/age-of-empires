@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -12,7 +13,10 @@ from import_ui import extract_ui
 from convert_sld import convert
 
 
-ROOT = Path.home() / "Steam/steamapps/content/app_813780"
+ROOT = Path(os.environ.get(
+    "AOE2DE_DEPOT_ROOT",
+    Path.home() / "Steam/steamapps/content/app_813780",
+)).expanduser()
 DAT = ROOT / "depot_813781/resources/_common/dat/empires2_x2_p1.dat"
 SOUNDS = ROOT / "depot_813781/resources/_common/dat/sounds.json"
 GRAPHICS = ROOT / "depot_813784/resources/_common/drs/graphics"

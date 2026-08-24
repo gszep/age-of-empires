@@ -39,7 +39,7 @@ npm run test:live-agent   # opt-in: one bounded call using existing machine auth
 
 Strategies may be `builtin`, `idle`, `cmd:<shell>`, `deadline-cmd:<shell>`, `ws:<url>`, or `mcp:<shell>`. JSONL subprocesses, WebSockets, and MCP tools all return the same versioned public commands consumed by the browser and simulation.
 
-Imported Microsoft content is generated under ignored `public/imported/` and is never committed. Batch results, replay files, and local tool state belong under ignored `.local/`.
+Imported Microsoft content is generated under ignored `public/imported/` and is never committed. Owners can follow the cross-platform [Steam asset setup guide](docs/owned-assets-setup.md), including Linux, macOS, and Windows/WSL2 paths. Batch results, replay files, and local tool state belong under ignored `.local/`.
 
 ## Architecture
 

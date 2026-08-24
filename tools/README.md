@@ -10,6 +10,8 @@ public/imported/ browser-ready local atlases/manifests
 
 No Steam credentials, Steam configuration, DAT files, SLD files, or converted Microsoft assets belong in this repository.
 
+See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matched SteamCMD downloads and source paths on macOS, Linux, and Windows/WSL2. `npm run import:aoe2` reads `AOE2DE_DEPOT_ROOT`, defaulting to `~/Steam/steamapps/content/app_813780`.
+
 ## Pipeline
 
 `npm run import:aoe2` (= `tools/import_aoe2.sh`) regenerates everything byte-identically:
