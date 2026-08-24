@@ -8,6 +8,7 @@ import { isTileVisible } from './sim/visibility';
 import { checksumState } from './sim/checksum';
 import type { MatchRecord } from './protocol/types';
 import type { BuildingKind, Entity, GameState, Point } from './sim/types';
+import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, TILE_W, TILE_H } from './view/iso';
 import { createEntityView, updateEntityView, entityKey, type EntityView } from './view/sprites';
@@ -39,7 +40,9 @@ try {
   if (response.ok) rules = rulesFromManifest(await response.json() as ContentManifest);
 } catch { /* open fallback rules */ }
 
-let game = createGame(42, rules);
+const restored = loadSession(rules);
+let game = restored ?? createGame(42, rules);
+if (restored) console.info(`[dev] resumed match at tick ${restored.tick}; menu restart starts a new one`);
 let selectedIds: number[] = [];
 let buildMode: BuildingKind | undefined;
 let paused = false;
@@ -65,6 +68,9 @@ function startReplay(raw: unknown): void {
     hud.showMessage(`Replay was recorded with ${record.rulesOrigin} rules; local rules are ${rules.origin}`);
     return;
   }
+  // A replay drives its own command stream; snapshotting it would resume a
+  // spectated match as if it were played.
+  clearSession();
   game = createGame(record.seed, rules);
   selectedIds = [];
   buildMode = undefined;
@@ -133,6 +139,7 @@ let hud = createHud();
 
 function restart(): void {
   replay = undefined;
+  clearSession();
   game = createGame((Date.now() >>> 0) || 1, rules);
   selectedIds = [];
   buildMode = undefined;
@@ -515,6 +522,13 @@ function resize(): void {
 addEventListener('resize', resize);
 resize();
 
+// Snapshot the live match so a full reload (a simulation edit, or any change
+// HMR cannot accept) resumes instead of restarting. Reloads fire pagehide;
+// visibilitychange also covers a tab being backgrounded and discarded.
+const snapshot = (): void => { if (!replay) saveSession(game); };
+addEventListener('pagehide', snapshot);
+addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') snapshot(); });
+
 let previous = performance.now();
 let accumulator = 0;
 let hudClock = 0;
@@ -651,6 +665,10 @@ if (import.meta.hot) {
       }
       if (hudModule) view.Hud = hudModule.Hud;
       rebuildPresentation();
+      const swapped = [
+        assetsModule && 'assets', world && 'world', sprites && 'sprites', hudModule && 'hud',
+      ].filter(Boolean).join(', ');
+      console.info(`[hmr] rebuilt presentation (${swapped}) at tick ${game.tick}`);
     },
   );
 }
