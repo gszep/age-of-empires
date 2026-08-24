@@ -68,8 +68,14 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     for (const atlas of Object.values(atlases)) {
       jobs.push(loader.loadAsync(CONTENT_BASE + atlas.image).then(texture => {
         texture.colorSpace = THREE.SRGBColorSpace;
-        texture.magFilter = THREE.NearestFilter;
+        // Sprites are x1 art drawn at 1:1 CSS pixels, so a HiDPI backing store
+        // or zoom magnifies them; nearest sampling turned that into visible
+        // blocks. Filter linearly (applyFrame insets the UVs by half a texel so
+        // neighbouring atlas frames cannot bleed in). Mipmaps stay off: they
+        // would blend across frame boundaries within the atlas.
+        texture.magFilter = THREE.LinearFilter;
         texture.minFilter = THREE.LinearFilter;
+        texture.generateMipmaps = false;
         textures.set(atlas.image, texture);
       }));
     }

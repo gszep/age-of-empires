@@ -128,10 +128,14 @@ function applyFrame(
   if (meshMaterial.map !== texture) { meshMaterial.map = texture; meshMaterial.needsUpdate = true; }
   meshMaterial.color.set(tint);
   const [atlasWidth, atlasHeight] = atlas.size;
-  const left = frame.x / atlasWidth;
-  const right = (frame.x + frame.w) / atlasWidth;
-  const top = 1 - frame.y / atlasHeight;
-  const bottom = 1 - (frame.y + frame.h) / atlasHeight;
+  // Half-texel inset: linear filtering samples across the frame edge, which
+  // would drag in whichever neighbouring frame the packer placed alongside.
+  const insetX = 0.5 / atlasWidth;
+  const insetY = 0.5 / atlasHeight;
+  const left = frame.x / atlasWidth + insetX;
+  const right = (frame.x + frame.w) / atlasWidth - insetX;
+  const top = 1 - frame.y / atlasHeight - insetY;
+  const bottom = 1 - (frame.y + frame.h) / atlasHeight + insetY;
   const uv = mesh.geometry.getAttribute('uv') as THREE.BufferAttribute;
   if (uv.getX(0) !== left || uv.getY(0) !== top || uv.getX(1) !== right || uv.getY(2) !== bottom) {
     uv.setXY(0, left, top);
