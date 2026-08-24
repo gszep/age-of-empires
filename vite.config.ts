@@ -1,6 +1,9 @@
-import { defineConfig } from 'vite';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  // Worktrees under .claude/ carry a full copy of the suite; collecting them
+  // doubles every run and reports stale branches as if they were this tree.
+  test: { exclude: [...configDefaults.exclude, '.claude/**'] },
   // Public deployments must never package locally converted Microsoft assets.
   // The viewer automatically uses its open fallback when this directory is absent.
   publicDir: process.env.OPEN_CONTENT_ONLY === '1' ? false : 'public',
