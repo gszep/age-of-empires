@@ -60,6 +60,36 @@ describe('simulation', () => {
     expect(target.hp).toBe(initialHp - expected * 2);
   });
 
+  it('lands every crowded attacker\'s hits on a shared target', () => {
+    // Attackers packed against a building are nudged apart by separation. A
+    // nudge that crosses the range margin used to discard the swing in
+    // progress, so a tight group could loop between "almost swung" and "reset"
+    // and land far less than its combined damage.
+    const attackersDealing = (count: number): number => {
+      const state = createGame();
+      const target = state.entities.find(e => e.owner === 2 && e.kind === 'town-center')!;
+      const villagers = state.entities.filter(e => e.owner === 1 && e.kind === 'villager').slice(0, count);
+      expect(villagers).toHaveLength(count);
+      // Stack them along the axis to the target so separation pushes outward.
+      const side = target.position.x > state.width / 2 ? -1 : 1;
+      const contact = target.radius + villagers[0].radius + 0.1;
+      for (const [index, villager] of villagers.entries()) {
+        villager.position = { x: target.position.x + side * (contact + index * 0.05), y: target.position.y };
+      }
+      applyCommand(state, {
+        kind: 'order', player: 1, entityIds: villagers.map(e => e.id),
+        target: target.position, targetId: target.id,
+      });
+      const initialHp = target.hp;
+      run(state, Math.round(state.rules.units.villager.attackReloadSeconds * 20) * 3);
+      return initialHp - target.hp;
+    };
+
+    const single = attackersDealing(1);
+    expect(single).toBeGreaterThan(0);
+    expect(attackersDealing(3)).toBe(single * 3);
+  });
+
   it('lets the example AI finish a match against a passive opponent', () => {
     const state = createGame(7);
     for (let i = 0; i < 40_000 && !state.winner; i++) {

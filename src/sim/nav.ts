@@ -159,6 +159,13 @@ const isTraveling = (entity: Entity): boolean =>
   entity.activity === 'moving' || entity.activity === 'carrying';
 
 /**
+ * A unit that has reached its target and started swinging holds its ground.
+ * Nudging it outward crosses the attack range margin, which discards the swing
+ * in progress, so a tight group would trade hits for shoving.
+ */
+const isEngaged = (entity: Entity): boolean => entity.activity === 'attacking';
+
+/**
  * Deterministic pairwise separation so stationary units do not stack.
  * Traveling units pass through others (AoE2 lets crossing groups overlap in
  * motion); they spread out once they stop.
@@ -169,6 +176,7 @@ export function separateUnits(state: GameState, movable: Entity[], grid: NavGrid
       const a = movable[i];
       const b = movable[j];
       if (isTraveling(a) || isTraveling(b)) continue;
+      if (isEngaged(a) || isEngaged(b)) continue;
       const dx = b.position.x - a.position.x;
       const dy = b.position.y - a.position.y;
       const minDistance = a.radius + b.radius;
