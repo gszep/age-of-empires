@@ -14,6 +14,15 @@ import { createEntityView, updateEntityView, entityKey, type EntityView } from '
 import { createGround, createFog } from './view/world';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 
+/**
+ * Mutable presentation bindings so Vite can hot-swap rendering, animation, and
+ * HUD code into a running match (see the `import.meta.hot` block at the end of
+ * this file). `src/sim` is deliberately excluded: patching tick logic into an
+ * already-ticked GameState can silently diverge live state from what a
+ * deterministic replay would produce, so simulation edits force a full reload.
+ */
+const view = { createGround, createFog, createEntityView, updateEntityView, entityKey, Hud };
+
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
 const renderer = new THREE.WebGPURenderer({ antialias: false });
@@ -23,7 +32,7 @@ renderer.domElement.classList.add('battlefield');
 app.appendChild(renderer.domElement);
 await renderer.init();
 
-const [assets, uiAssets] = await Promise.all([loadContentAssets(), loadUiAssets()]);
+let [assets, uiAssets] = await Promise.all([loadContentAssets(), loadUiAssets()]);
 let rules: GameRules = FALLBACK_RULES;
 try {
   const response = await fetch('/imported/aoe2/manifest.json');
@@ -61,7 +70,7 @@ function startReplay(raw: unknown): void {
   buildMode = undefined;
   paused = false;
   hud.hideEnd();
-  for (const view of views.values()) scene.remove(view.group);
+  for (const entityView of views.values()) scene.remove(entityView.group);
   views.clear();
   replay = {
     record,
@@ -81,8 +90,9 @@ camera.position.z = 10;
 let cameraCenter = { ...worldToIso(8, 9) };
 let zoom = 1;
 
-scene.add(createGround(game));
-const fog = createFog(game);
+let ground = view.createGround(game);
+scene.add(ground);
+let fog = view.createFog(game);
 scene.add(fog.mesh);
 
 const views = new Map<string, EntityView>();
@@ -102,20 +112,24 @@ ghost.renderOrder = 6000;
 scene.add(ghost);
 let pointerWorld: Point = { x: 16, y: 9 };
 
-const hud = new Hud(app, uiAssets, {
-  onCommand: id => runUiCommand(id),
-  onMinimapNavigate: canvasPoint => {
-    const world = hud.minimap.fromCanvas(game, canvasPoint.x, canvasPoint.y);
-    cameraCenter = worldToIso(world.x, world.y);
-  },
-  onSelectIdleVillager: () => selectIdleVillager(),
-  onMenu: action => {
-    if (action === 'pause') paused = !paused;
-    if (action === 'resume') paused = false;
-    if (action === 'restart') restart();
-  },
-  onReplayFile: record => startReplay(record),
-});
+function createHud(): Hud {
+  return new view.Hud(app, uiAssets, {
+    onCommand: id => runUiCommand(id),
+    onMinimapNavigate: canvasPoint => {
+      const world = hud.minimap.fromCanvas(game, canvasPoint.x, canvasPoint.y);
+      cameraCenter = worldToIso(world.x, world.y);
+    },
+    onSelectIdleVillager: () => selectIdleVillager(),
+    onMenu: action => {
+      if (action === 'pause') paused = !paused;
+      if (action === 'resume') paused = false;
+      if (action === 'restart') restart();
+    },
+    onReplayFile: record => startReplay(record),
+  });
+}
+
+let hud = createHud();
 
 function restart(): void {
   replay = undefined;
@@ -124,7 +138,7 @@ function restart(): void {
   buildMode = undefined;
   paused = false;
   hud.hideEnd();
-  for (const view of views.values()) scene.remove(view.group);
+  for (const entityView of views.values()) scene.remove(entityView.group);
   views.clear();
 }
 
@@ -390,7 +404,7 @@ function selectionInfo(): SelectionInfo | undefined {
       fraction: 1 - entity.training.remainingTicks / total,
     };
   }
-  const iconIndex = assets?.entities[entityKey(entity)]?.iconId;
+  const iconIndex = assets?.entities[view.entityKey(entity)]?.iconId;
   const category = entity.kind === 'villager' || entity.kind === 'militia' ? 'Units' : 'Buildings';
   return {
     name,
@@ -419,21 +433,21 @@ function syncScene(time: number): void {
     }
     const key = `e${entity.id}`;
     wanted.add(key);
-    let view = views.get(key);
-    if (!view) {
-      view = createEntityView(assets, entity);
-      views.set(key, view);
-      scene.add(view.group);
+    let entityView = views.get(key);
+    if (!entityView) {
+      entityView = view.createEntityView(assets, entity);
+      views.set(key, entityView);
+      scene.add(entityView.group);
     }
-    updateEntityView(view, assets, game, entity, time);
+    view.updateEntityView(entityView, assets, game, entity, time);
   }
   // Remembered fogged entities render as static snapshots (fog dims them).
   for (const remembered of Object.values(game.visibility[1].memory)) {
     if (isTileVisible(game, 1, remembered.x, remembered.y)) continue;
     const key = `m${remembered.id}`;
     wanted.add(key);
-    let view = views.get(key);
-    if (!view) {
+    let entityView = views.get(key);
+    if (!entityView) {
       const fake: Entity = {
         id: remembered.id, kind: remembered.kind, owner: remembered.owner,
         position: { x: remembered.x, y: remembered.y },
@@ -441,15 +455,15 @@ function syncScene(time: number): void {
         activity: 'idle', order: { kind: 'idle' },
         resourceKind: remembered.resource, amount: remembered.amount,
       };
-      view = createEntityView(assets, fake);
-      updateEntityView(view, assets, game, fake, 0);
-      views.set(key, view);
-      scene.add(view.group);
+      entityView = view.createEntityView(assets, fake);
+      view.updateEntityView(entityView, assets, game, fake, 0);
+      views.set(key, entityView);
+      scene.add(entityView.group);
     }
   }
-  for (const [key, view] of views) {
+  for (const [key, entityView] of views) {
     if (!wanted.has(key)) {
-      scene.remove(view.group);
+      scene.remove(entityView.group);
       views.delete(key);
     }
   }
@@ -571,3 +585,72 @@ renderer.setAnimationLoop(now => {
 
   renderer.render(scene, camera);
 });
+
+// ---------------------------------------------------------------------------
+// Hot module replacement for the presentation layer.
+//
+// Rendering, animation, and HUD code is rebuilt from the live GameState so a
+// visual fix lands in the match being played instead of restarting it. Edits to
+// `src/sim`, `src/protocol`, `./view/iso`, or this file are not accepted here
+// and fall through to Vite's default full reload: those either own or reshape
+// authoritative state, and hot-patching them risks a silent divergence from
+// what a deterministic replay of the same seed would produce.
+function disposeMesh(mesh: THREE.Mesh): void {
+  mesh.geometry.dispose();
+  const material = mesh.material;
+  if (Array.isArray(material)) material.forEach(entry => entry.dispose());
+  else material.dispose();
+}
+
+/** Recreate every view-owned object from the current simulation state. */
+function rebuildPresentation(): void {
+  scene.remove(ground);
+  disposeMesh(ground);
+  ground = view.createGround(game);
+  scene.add(ground);
+
+  scene.remove(fog.mesh);
+  disposeMesh(fog.mesh);
+  fog = view.createFog(game);
+  scene.add(fog.mesh);
+  fog.update(game);
+
+  for (const entityView of views.values()) scene.remove(entityView.group);
+  views.clear();
+
+  const menuWasOpen = hud.menuOpen;
+  hud.destroy();
+  hud = createHud();
+  if (menuWasOpen) hud.toggleMenu(true);
+  hud.updateResources(game, 1);
+  hud.setCommands(currentCommands());
+  hud.setSelection(selectionInfo());
+  if (game.winner) hud.showEnd(game.winner === 1);
+
+  syncScene(gameTimeSeconds(game));
+}
+
+if (import.meta.hot) {
+  import.meta.hot.accept(
+    ['./view/world', './view/sprites', './view/hud', './view/assets'],
+    async ([world, sprites, hudModule, assetsModule]) => {
+      if (assetsModule) {
+        [assets, uiAssets] = await Promise.all([
+          assetsModule.loadContentAssets(),
+          assetsModule.loadUiAssets(),
+        ]);
+      }
+      if (world) {
+        view.createGround = world.createGround;
+        view.createFog = world.createFog;
+      }
+      if (sprites) {
+        view.createEntityView = sprites.createEntityView;
+        view.updateEntityView = sprites.updateEntityView;
+        view.entityKey = sprites.entityKey;
+      }
+      if (hudModule) view.Hud = hudModule.Hud;
+      rebuildPresentation();
+    },
+  );
+}

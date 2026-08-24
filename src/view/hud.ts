@@ -47,6 +47,7 @@ export class Hud {
   private endDialog!: HTMLElement;
   private buttons = new Map<string, HTMLButtonElement>();
   private lastCommandSignature = '';
+  private onResize = (): void => this.applyScale();
 
   constructor(
     parent: HTMLElement,
@@ -61,7 +62,13 @@ export class Hud {
     const canvas = this.root.querySelector<HTMLCanvasElement>('#minimap-canvas')!;
     this.minimap = new Minimap(canvas);
     this.applyScale();
-    addEventListener('resize', () => this.applyScale());
+    addEventListener('resize', this.onResize);
+  }
+
+  /** Detach every DOM node and listener this HUD owns (hot reload rebuilds it). */
+  destroy(): void {
+    removeEventListener('resize', this.onResize);
+    this.root.remove();
   }
 
   private texture(name: string): string {
