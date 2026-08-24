@@ -9,8 +9,9 @@ npm install
 npm run dev
 ```
 
-- Desktop: <http://localhost:5173/>
-- Tailnet verification: <https://calcifer.tail6e864b.ts.net:5173/>
+- Public open-content build: <https://empires.gszep.com/>
+- Desktop development: <http://localhost:5173/>
+- Tailnet imported-content verification: <https://calcifer.tail6e864b.ts.net:5173/>
 
 The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the same complete composition for remote QA.
 
@@ -48,4 +49,5 @@ Imported Microsoft content is generated under ignored `public/imported/` and is 
 - `src/headless/` — JSONL/MCP/WebSocket strategies, match/replay runner, concurrent paired batches, and opt-in live-agent check
 - `src/view/` and `src/main.ts` — observation-driven WEST HUD, dimetric renderer, fog, minimap, interactions, and replay playback
 - `tools/` — deterministic local DAT/SLD/widgetui import pipeline
+- `deploy/` — legally isolated open-content Cloud Run deployment and operations notes
 - `docs/final-handoff.md` — delivered scope, measurements, discrepancies, and verification evidence

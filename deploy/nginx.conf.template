@@ -8,6 +8,12 @@ server {
     add_header Cache-Control "no-cache" always;
   }
 
+  # The open build intentionally has no owned-content manifests. A real 404
+  # lets the viewer select its fallback; serving index.html here breaks JSON.
+  location /imported/ {
+    return 404;
+  }
+
   location /assets/ {
     add_header Cache-Control "public, max-age=31536000, immutable" always;
     try_files $uri =404;

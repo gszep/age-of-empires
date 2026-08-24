@@ -7,7 +7,8 @@ npm install
 npm run dev
 ```
 
-- Canonical desktop URL: <http://localhost:5173/>
+- Public open-content URL: <https://empires.gszep.com/>
+- Canonical local/imported desktop URL: <http://localhost:5173/>
 - Tailnet/mobile QA URL (preserved): <https://calcifer.tail6e864b.ts.net:5173/>
 
 Controls and hotkeys are listed in the root `README.md`. The essential loop is left/drag selection, right-click context orders, villager build commands, town-center/barracks training, and destruction of the opposing town center. `F10 → Load replay…` plays a headless record and checks its periodic hashes.
