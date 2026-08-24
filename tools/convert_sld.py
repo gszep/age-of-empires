@@ -52,6 +52,25 @@ def convert(source: Path, output: Path, expected_frames: int, layer: int = 0) ->
     }
 
 
+def convert_shadow(source: Path, output: Path, expected_frames: int) -> dict[str, Any]:
+    """Decode and pack an SLD's shadow layer.
+
+    Uses tools/sld_shadow.py rather than the openage decoder, whose BC4 path
+    corrupts the heap on this layer. Pure Python, so a bad file raises here
+    instead of taking the process down with it.
+    """
+    from sld_shadow import decode_shadows, pack_shadow_atlas
+
+    frames = decode_shadows(source.read_bytes())
+    playable = min(expected_frames, len(frames))
+    if playable == 0 or not any(f is not None and not f.empty for f in frames[:playable]):
+        return {}
+    image, atlas = pack_shadow_atlas(frames, playable)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    image.save(output, optimize=True)
+    return atlas
+
+
 def convert_terrain(
     terrain: dict[str, Any], terrain_dir: Path, out_dir: Path, hashes: dict[str, str]
 ) -> dict[str, Any]:
@@ -212,6 +231,29 @@ def main() -> None:
             atlases.setdefault(job["key"], {})[job["name"]] = atlas
         print(identifier)
 
+    # Shadow layers decode in-process: tools/sld_shadow.py is pure Python, so
+    # unlike the native main-layer decoder it cannot take the run down. A
+    # failure costs that entity its shadow and is recorded, never fatal.
+    shadow_skipped: list[str] = []
+    for job in jobs:
+        if job["layer"] != 0:
+            continue
+        identifier = f"{job['key']}:{job['name']}:shadow"
+        try:
+            atlas = convert_shadow(
+                args.graphics / job["source"],
+                args.out / job["key"] / f"{job['name']}-shadow.png",
+                job["expected"],
+            )
+        except Exception as error:  # noqa: BLE001 - one bad layer must not stop the import
+            shadow_skipped.append(identifier)
+            print(f"skipped {identifier}: {error}")
+            continue
+        if atlas:
+            atlas["image"] = f"{job['key']}/{job['name']}-shadow.png"
+            atlases.setdefault(job["key"], {})[f"{job['name']}-shadow"] = atlas
+        print(identifier)
+
     entities: dict[str, Any] = {}
     for key, entity in imported["entities"].items():
         entity = dict(entity)
@@ -237,6 +279,7 @@ def main() -> None:
         "entities": entities,
         "terrain": terrain,
         "skippedAtlases": sorted(skipped),
+        "skippedShadows": sorted(shadow_skipped),
     }
     manifest_path = args.out / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n")

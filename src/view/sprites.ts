@@ -13,6 +13,7 @@ interface Piece {
 
 export interface EntityView {
   group: THREE.Group;
+  shadow: Piece;
   body: Piece;
   annexes: Piece[];
   fallback: boolean;
@@ -32,6 +33,11 @@ function makePiece(): Piece {
 
 export function createEntityView(assets: ContentAssets | undefined, entity: Entity): EntityView {
   const group = new THREE.Group();
+  // Added first so it draws under the body; renderOrder keeps it under every
+  // other entity's body too, so a unit never stands inside its neighbour's
+  // shadow.
+  const shadow = makePiece();
+  group.add(shadow.mesh);
   const body = makePiece();
   group.add(body.mesh);
   const annexes: Piece[] = [];
@@ -44,7 +50,7 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
       group.add(piece.mesh);
     }
   }
-  const view: EntityView = { group, body, annexes, fallback: !imported, facing: entity.owner === 2 ? Math.PI : 0 };
+  const view: EntityView = { group, shadow, body, annexes, fallback: !imported, facing: entity.owner === 2 ? Math.PI : 0 };
   if (!imported) buildFallback(view, entity);
   return view;
 }
@@ -122,7 +128,8 @@ function applyFrame(
   const mesh = piece.mesh;
   const texture = assets.textures.get(atlas.image);
   const frame = atlas.frames[Math.min(frameIndex, atlas.frames.length - 1)];
-  if (!texture || !frame) { mesh.visible = false; return; }
+  // Shadow atlases hold zero-sized entries where a frame casts none.
+  if (!texture || !frame || frame.w === 0 || frame.h === 0) { mesh.visible = false; return; }
   mesh.visible = true;
   const meshMaterial = mesh.material as THREE.MeshBasicMaterial;
   if (meshMaterial.map !== texture) { meshMaterial.map = texture; meshMaterial.needsUpdate = true; }
@@ -237,6 +244,17 @@ export function updateEntityView(
   const tint = entity.owner !== 0 && (entity.kind === 'villager' || entity.kind === 'militia')
     ? (entity.owner === 1 ? 0xcdd8ff : 0xffcdc4)
     : 0xffffff;
+
+  // Imported shadow layer, anchored by its own hotspot like the body. Every
+  // shadow draws below every body so entities never occlude each other's.
+  const shadowAtlas = imported?.atlases[`${choice.name}-shadow`];
+  if (shadowAtlas && !entity.dead) {
+    applyFrame(view.shadow, assets, shadowAtlas, frameIndex, { x: 0, y: 0 }, entity, 0xffffff);
+    view.shadow.mesh.renderOrder = 500 + depth;
+    (view.shadow.mesh.material as THREE.MeshBasicMaterial).opacity = 0.55;
+  } else {
+    view.shadow.mesh.visible = false;
+  }
 
   applyFrame(view.body, assets, atlas, frameIndex, { x: 0, y: 0 }, entity, tint);
   view.body.mesh.renderOrder = 1000 + depth * 10;

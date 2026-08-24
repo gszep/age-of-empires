@@ -39,6 +39,54 @@ class ContentImportIntegrationTest(unittest.TestCase):
     def setUpClass(cls):
         cls.result = extracted_content()
 
+    def test_shadow_layer_decodes_against_its_own_block_counts(self):
+        # The command array must account for every block in the layer grid, and
+        # the drawn blocks must consume the layer's remaining bytes exactly.
+        # Both invariants failing silently is what a mis-parsed container looks
+        # like, so assert them rather than just eyeballing the output.
+        from sld_shadow import (COMMAND_COUNT, FILE_HEADER, FRAME_HEADER, GRAPHICS_HEADER,
+                                LAYER_LENGTH, LAYER_MAIN, LAYER_SHADOW, decode_shadows)
+        source = GRAPHICS / "b_dark_barracks_age1_x1.sld"
+        data = source.read_bytes()
+        offset = FILE_HEADER.size
+        _cw, _ch, _hx, _hy, frame_type, _u, _i = FRAME_HEADER.unpack_from(data, offset)
+        offset += FRAME_HEADER.size
+        checked = 0
+        for mask in (LAYER_MAIN, LAYER_SHADOW):
+            self.assertTrue(frame_type & mask)
+            start = offset
+            length = LAYER_LENGTH.unpack_from(data, offset)[0]
+            cursor = offset + LAYER_LENGTH.size
+            x1, y1, x2, y2, _flag, _u1 = GRAPHICS_HEADER.unpack_from(data, cursor)
+            cursor += GRAPHICS_HEADER.size
+            count = COMMAND_COUNT.unpack_from(data, cursor)[0]
+            commands = data[cursor + 2:cursor + 2 + count * 2]
+            skips = sum(commands[i] for i in range(0, len(commands), 2))
+            draws = sum(commands[i + 1] for i in range(0, len(commands), 2))
+            blocks = ((x2 - x1 + 3) // 4) * ((y2 - y1 + 3) // 4)
+            self.assertEqual(skips + draws, blocks)
+            self.assertEqual(draws * 8, length - (cursor + 2 + count * 2 - start))
+            checked += 1
+            offset = start + length
+            offset += (4 - offset) % 4
+        self.assertEqual(checked, 2)
+
+        frame = decode_shadows(data)[0]
+        self.assertEqual((frame.width, frame.height), (316, 212))
+        self.assertTrue(any(frame.alpha))
+
+    def test_shadow_atlas_frames_track_the_main_layer(self):
+        from convert_sld import convert_shadow
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory) / "walk-shadow.png"
+            atlas = convert_shadow(GRAPHICS / "u_vil_male_lumberjack_walkA_x1.sld", out, 30 * 16)
+            # The renderer indexes shadow frames with the body's frame index.
+            self.assertEqual(atlas["framesInFile"], 30 * 16)
+            self.assertTrue(out.is_file())
+            with Image.open(out) as image:
+                self.assertEqual(image.mode, "RGBA")
+                self.assertEqual(list(image.size), atlas["size"])
+
     def test_ground_terrain_comes_from_the_dat(self):
         ground = self.result["terrain"]["ground"]
         # Grass is DAT terrain 0; its texture name and tile span drive the
