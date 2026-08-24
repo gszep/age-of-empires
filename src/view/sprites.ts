@@ -146,15 +146,20 @@ function applyFrame(
   mesh.position.set(iso.x + frame.w / 2 - frame.cx, iso.y - frame.h / 2 + frame.cy, 0);
 }
 
-/** DE sprite direction 0 faces south; frames rotate counter-clockwise. */
+/**
+ * DE sprite frame 0 faces screen-east; frames rotate clockwise as the index
+ * increases (openage's DE exporter encodes this as start_angle=270 with
+ * degree 0 = south/front-facing, degree increasing clockwise; see
+ * convert/entity_object/export/metadata_export.py in the pinned openage
+ * checkout). facing is a world-space angle; convert to screen space first.
+ */
 function directionIndex(facing: number, directions: number): number {
-  // facing is a world-space angle; convert to screen space.
   const dx = Math.cos(facing);
   const dy = Math.sin(facing);
   const screenX = dx - dy;
   const screenDown = (dx + dy) / 2;
-  const fromSouth = Math.atan2(screenX, screenDown);
-  const index = Math.round(fromSouth / (2 * Math.PI) * directions);
+  const angle = Math.atan2(-screenX, screenDown) + Math.PI / 2;
+  const index = Math.round(angle / (2 * Math.PI) * directions);
   return ((index % directions) + directions) % directions;
 }
 

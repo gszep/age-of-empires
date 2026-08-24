@@ -88,8 +88,21 @@ def strip_widget(node: dict[str, Any], used_materials: set[str], used_sounds: se
     return result
 
 
+def resolve_texture(widgetui: Path, relative: str) -> Path:
+    exact = widgetui / relative
+    if exact.exists():
+        return exact
+    # materials.json references extensions case-insensitively (fine on the
+    # shipped Windows/NTFS install); some depot files are actually .DDS.
+    if exact.parent.is_dir():
+        for candidate in exact.parent.iterdir():
+            if candidate.name.lower() == exact.name.lower():
+                return candidate
+    return exact
+
+
 def convert_texture(widgetui: Path, relative: str, out_root: Path) -> str:
-    source = widgetui / relative
+    source = resolve_texture(widgetui, relative)
     target_relative = relative
     if source.suffix.lower() == ".dds":
         target_relative = str(Path(relative).with_suffix(".png"))
@@ -123,7 +136,7 @@ def material_entry(
             # material and record the gap instead of inventing a texture.
             entry["unresolvedTexture"] = reference
         else:
-            hashes[relative] = sha256(widgetui / relative)
+            hashes[relative] = sha256(resolve_texture(widgetui, relative))
             entry["texture"] = convert_texture(widgetui, relative, out_root)
     return entry
 
@@ -214,7 +227,7 @@ def extract_ui(
         elif name in textures:
             # icons.json may name a texture directly instead of a material
             relative = textures[name]
-            hashes[relative] = sha256(widgetui / relative)
+            hashes[relative] = sha256(resolve_texture(widgetui, relative))
             resolved_materials[name] = {
                 "type": "Texture",
                 "blend": None,
