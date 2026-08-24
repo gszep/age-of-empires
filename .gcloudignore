@@ -1,0 +1,9 @@
+.gcloudignore
+.git
+.github
+.local
+.tools
+node_modules
+dist
+public/imported
+*.log

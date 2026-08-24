@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:public": "OPEN_CONTENT_ONLY=1 tsc --noEmit && OPEN_CONTENT_ONLY=1 vite build",
     "test": "vitest run",
     "match": "tsx src/headless/cli.ts",
     "batch": "tsx src/headless/batch.ts",
