@@ -89,6 +89,12 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
       texture.magFilter = THREE.LinearFilter;
       texture.minFilter = THREE.LinearMipmapLinearFilter;
       texture.generateMipmaps = true;
+      // The dimetric projection squashes a tile to half its height, so the
+      // ground minifies about twice as fast vertically as horizontally.
+      // Isotropic mipmapping would pick the level for the worst axis and blur
+      // away detail the 2048px source actually has; sample along the axis
+      // instead. 16 is the WebGPU maximum.
+      texture.anisotropy = 16;
       textures.set(slot.image, texture);
     }));
   }
