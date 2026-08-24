@@ -200,6 +200,23 @@ def extract_entity(
     return entity
 
 
+def terrain_entry(dat: DatFile, terrain_id: int) -> dict[str, Any]:
+    """Texture name, tile span, and minimap color for one DAT terrain slot."""
+    terrain = dat.terrain_block.terrains[terrain_id]
+    if not terrain.name_2:
+        raise ValueError(f"terrain {terrain_id} has no texture name")
+    width, height = terrain.terrain_dimensions
+    return {
+        "terrainId": terrain_id,
+        "name": terrain.name,
+        "texture": terrain.name_2,
+        # Tiles covered by one repeat of the texture, so the view can lay it out
+        # at the authored scale instead of guessing a tiling rate.
+        "dimensions": [width, height],
+        "minimapColor": list(terrain.colors),
+    }
+
+
 def extract(dat_path: Path, graphics_dir: Path, spec: dict[str, Any], source: dict[str, Any]) -> dict[str, Any]:
     dat = DatFile.parse(dat_path)
     hashes: dict[str, str] = {"dat": sha256(dat_path)}
@@ -209,7 +226,12 @@ def extract(dat_path: Path, graphics_dir: Path, spec: dict[str, Any], source: di
         entities[entity_spec["key"]] = extract_entity(
             dat, dat.civs[civ_index].units, entity_spec, graphics_dir, hashes
         )
+    terrain = {
+        key: terrain_entry(dat, slot["terrainId"])
+        for key, slot in spec.get("terrain", {}).items()
+    }
     return {
+        "terrain": terrain,
         "schemaVersion": spec["schemaVersion"],
         "source": {
             "game": "aoe2de",

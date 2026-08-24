@@ -1,30 +1,50 @@
 import * as THREE from 'three/webgpu';
 import { TILE_W, TILE_H, worldToIso } from './iso';
+import type { ContentAssets } from './assets';
 import type { GameState } from '../sim/types';
 
-/** Two-tone grass diamond grid (terrain textures are not imported yet). */
-export function createGround(state: GameState): THREE.Mesh {
+/**
+ * Ground plane in the dimetric projection. With imported content the DAT's
+ * terrain texture is sampled in world-tile space, so one repeat spans the
+ * authored `dimensions` tiles (10x10 for Grass) and the surface stays
+ * continuous across tile edges. Without it, a two-tone diamond grid stands in.
+ */
+export function createGround(state: GameState, assets?: ContentAssets): THREE.Mesh {
+  const ground = assets?.terrain?.ground;
+  const texture = ground && assets?.textures.get(ground.image);
   const positions: number[] = [];
   const colors: number[] = [];
+  const uvs: number[] = [];
   const light = new THREE.Color(0x6f8f4a);
   const dark = new THREE.Color(0x66854a);
+  const [spanX, spanY] = ground?.dimensions ?? [1, 1];
   for (let y = 0; y < state.height; y++) {
     for (let x = 0; x < state.width; x++) {
       const color = (x + y) % 2 === 0 ? light : dark;
-      const north = worldToIso(x, y);
-      const east = worldToIso(x + 1, y);
-      const south = worldToIso(x + 1, y + 1);
-      const west = worldToIso(x, y + 1);
+      const corners = {
+        north: { iso: worldToIso(x, y), u: x / spanX, v: y / spanY },
+        east: { iso: worldToIso(x + 1, y), u: (x + 1) / spanX, v: y / spanY },
+        south: { iso: worldToIso(x + 1, y + 1), u: (x + 1) / spanX, v: (y + 1) / spanY },
+        west: { iso: worldToIso(x, y + 1), u: x / spanX, v: (y + 1) / spanY },
+      };
+      const { north, east, south, west } = corners;
       for (const [a, b, c] of [[north, east, south], [north, south, west]] as const) {
-        positions.push(a.x, a.y, 0, b.x, b.y, 0, c.x, c.y, 0);
-        for (let i = 0; i < 3; i++) colors.push(color.r, color.g, color.b);
+        for (const corner of [a, b, c]) {
+          positions.push(corner.iso.x, corner.iso.y, 0);
+          uvs.push(corner.u, corner.v);
+          colors.push(color.r, color.g, color.b);
+        }
       }
     }
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  if (!texture) geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const material = texture
+    ? new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
+    : new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(geometry, material);
   mesh.renderOrder = 0;
   return mesh;
 }

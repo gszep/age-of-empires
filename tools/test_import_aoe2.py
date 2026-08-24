@@ -10,7 +10,7 @@ from PIL import Image
 
 from import_content import extract
 from import_ui import extract_ui
-from convert_sld import convert
+from convert_sld import convert, convert_terrain
 
 
 ROOT = Path(os.environ.get(
@@ -21,6 +21,7 @@ DAT = ROOT / "depot_813781/resources/_common/dat/empires2_x2_p1.dat"
 SOUNDS = ROOT / "depot_813781/resources/_common/dat/sounds.json"
 GRAPHICS = ROOT / "depot_813784/resources/_common/drs/graphics"
 WIDGETUI = ROOT / "depot_813782/widgetui"
+TERRAIN = ROOT / "depot_813782/resources/_common/terrain/textures/2x"
 SPEC = json.loads(Path(__file__).with_name("import-spec.json").read_text())
 SOURCE = Path(__file__).with_name("aoe2-source.json")
 OPENAGE = Path(__file__).resolve().parents[1] / ".tools/openage-src"
@@ -37,6 +38,28 @@ class ContentImportIntegrationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.result = extracted_content()
+
+    def test_ground_terrain_comes_from_the_dat(self):
+        ground = self.result["terrain"]["ground"]
+        # Grass is DAT terrain 0; its texture name and tile span drive the
+        # renderer, so neither may be transcribed by hand.
+        self.assertEqual(ground["terrainId"], 0)
+        self.assertEqual(ground["name"], "Grass")
+        self.assertEqual(ground["texture"], "g_grs")
+        self.assertEqual(ground["dimensions"], [10, 10])
+
+    def test_terrain_texture_converts_to_a_loadable_png(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            hashes: dict[str, str] = {}
+            converted = convert_terrain(self.result["terrain"], TERRAIN, out, hashes)
+            image_path = out / converted["ground"]["image"]
+            self.assertTrue(image_path.is_file())
+            with Image.open(image_path) as image:
+                self.assertEqual(image.mode, "RGBA")
+                # Square power-of-two tiling texture; seams show otherwise.
+                self.assertEqual(image.width, image.height)
+            self.assertIn("terrain/g_grs.dds", hashes)
 
     def test_militia_fixture_keeps_patch_matched_rules(self):
         unit = self.result["entities"]["militia"]

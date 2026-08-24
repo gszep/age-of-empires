@@ -4,9 +4,18 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 # SLD layers: 0 main graphics, 1 shadow, 4 player-color mask. Only the main
@@ -41,6 +50,28 @@ def convert(source: Path, output: Path, expected_frames: int, layer: int = 0) ->
         "framesInFile": len(frames),
         "frames": frames[:playable],
     }
+
+
+def convert_terrain(
+    terrain: dict[str, Any], terrain_dir: Path, out_dir: Path, hashes: dict[str, str]
+) -> dict[str, Any]:
+    """Terrain ships as plain DDS tiling textures, so Pillow converts them
+    directly; the openage SLD decoder is not involved."""
+    from PIL import Image
+
+    converted: dict[str, Any] = {}
+    for key, slot in terrain.items():
+        source = terrain_dir / f"{slot['texture']}.dds"
+        if not source.is_file():
+            raise FileNotFoundError(f"terrain texture missing: {source}")
+        relative = f"terrain/{slot['texture']}.png"
+        target = out_dir / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(source) as image:
+            image.convert("RGBA").save(target, optimize=True)
+        hashes[f"terrain/{source.name}"] = sha256(source)
+        converted[key] = {**slot, "image": relative}
+    return converted
 
 
 def extra_layer_states(category: str) -> set[str]:
@@ -110,6 +141,11 @@ def main() -> None:
         "--graphics",
         type=Path,
         default=Path.home() / "Steam/steamapps/content/app_813780/depot_813784/resources/_common/drs/graphics",
+    )
+    parser.add_argument(
+        "--terrain",
+        type=Path,
+        default=Path.home() / "Steam/steamapps/content/app_813780/depot_813782/resources/_common/terrain/textures/2x",
     )
     parser.add_argument("--out", type=Path, default=root / "public/imported/aoe2")
     parser.add_argument("--atlas", help="worker mode: convert one atlas, format key:name:layer")
@@ -190,10 +226,16 @@ def main() -> None:
             }
         entities[key] = entity
 
+    source = dict(imported["source"])
+    hashes = dict(source.get("sha256", {}))
+    terrain = convert_terrain(imported.get("terrain", {}), args.terrain, args.out, hashes)
+    source["sha256"] = hashes
+
     manifest = {
         "schemaVersion": imported["schemaVersion"],
-        "source": imported["source"],
+        "source": source,
         "entities": entities,
+        "terrain": terrain,
         "skippedAtlases": sorted(skipped),
     }
     manifest_path = args.out / "manifest.json"

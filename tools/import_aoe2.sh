@@ -6,9 +6,10 @@ DEPOT_ROOT="${AOE2DE_DEPOT_ROOT:-$HOME/Steam/steamapps/content/app_813780}"
 DAT="$DEPOT_ROOT/depot_813781/resources/_common/dat/empires2_x2_p1.dat"
 SOUNDS="$DEPOT_ROOT/depot_813781/resources/_common/dat/sounds.json"
 WIDGETUI="$DEPOT_ROOT/depot_813782/widgetui"
+TERRAIN="$DEPOT_ROOT/depot_813782/resources/_common/terrain/textures/2x"
 GRAPHICS="$DEPOT_ROOT/depot_813784/resources/_common/drs/graphics"
 
-for required in "$DAT" "$SOUNDS" "$WIDGETUI" "$GRAPHICS"; do
+for required in "$DAT" "$SOUNDS" "$WIDGETUI" "$TERRAIN" "$GRAPHICS"; do
   if [ ! -e "$required" ]; then
     echo "Missing owned AoE2DE depot content: $required" >&2
     echo "Set AOE2DE_DEPOT_ROOT to app_813780; see tools/README.md." >&2
@@ -21,6 +22,6 @@ done
   --dat "$DAT" --graphics "$GRAPHICS"
 PYTHONPATH="$ROOT/.tools/openage-src" \
   "$ROOT/.tools/import-venv/bin/python" "$ROOT/tools/convert_sld.py" \
-  --graphics "$GRAPHICS"
+  --graphics "$GRAPHICS" --terrain "$TERRAIN"
 "$ROOT/.tools/import-venv/bin/python" "$ROOT/tools/import_ui.py" \
   --widgetui "$WIDGETUI" --sounds "$SOUNDS"

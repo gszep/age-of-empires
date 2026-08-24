@@ -90,7 +90,7 @@ camera.position.z = 10;
 let cameraCenter = { ...worldToIso(8, 9) };
 let zoom = 1;
 
-let ground = view.createGround(game);
+let ground = view.createGround(game, assets);
 scene.add(ground);
 let fog = view.createFog(game);
 scene.add(fog.mesh);
@@ -606,7 +606,7 @@ function disposeMesh(mesh: THREE.Mesh): void {
 function rebuildPresentation(): void {
   scene.remove(ground);
   disposeMesh(ground);
-  ground = view.createGround(game);
+  ground = view.createGround(game, assets);
   scene.add(ground);
 
   scene.remove(fog.mesh);

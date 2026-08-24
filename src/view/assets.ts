@@ -12,8 +12,18 @@ export interface ImportedEntity {
   annexes?: { unitId: number; misplacement: [number, number]; animations: Record<string, AnimationInfo>; atlases: Record<string, Atlas> }[];
 }
 
+/** One DAT terrain slot: a tiling texture spanning `dimensions` tiles. */
+export interface ImportedTerrain {
+  name: string;
+  texture: string;
+  image: string;
+  dimensions: [number, number];
+  minimapColor: [number, number, number];
+}
+
 export interface ContentAssets {
   entities: Record<string, ImportedEntity>;
+  terrain: Record<string, ImportedTerrain>;
   textures: Map<string, THREE.Texture>;
 }
 
@@ -46,7 +56,10 @@ async function fetchJson<T>(url: string): Promise<T | undefined> {
 }
 
 export async function loadContentAssets(): Promise<ContentAssets | undefined> {
-  const manifest = await fetchJson<{ entities: Record<string, ImportedEntity> }>(`${CONTENT_BASE}manifest.json`);
+  const manifest = await fetchJson<{
+    entities: Record<string, ImportedEntity>;
+    terrain?: Record<string, ImportedTerrain>;
+  }>(`${CONTENT_BASE}manifest.json`);
   if (!manifest) return undefined;
   const textures = new Map<string, THREE.Texture>();
   const loader = new THREE.TextureLoader();
@@ -65,8 +78,22 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     loadAtlases(entity.atlases);
     for (const annex of entity.annexes ?? []) loadAtlases(annex.atlases);
   }
+  const terrain = manifest.terrain ?? {};
+  for (const slot of Object.values(terrain)) {
+    jobs.push(loader.loadAsync(CONTENT_BASE + slot.image).then(texture => {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      // Terrain is a continuous tiling surface, not a sprite atlas: repeat it
+      // and filter smoothly so tile seams do not show at any zoom.
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.generateMipmaps = true;
+      textures.set(slot.image, texture);
+    }));
+  }
   await Promise.all(jobs);
-  return { entities: manifest.entities, textures };
+  return { entities: manifest.entities, terrain, textures };
 }
 
 export async function loadUiAssets(): Promise<UiAssets | undefined> {

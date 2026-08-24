@@ -154,5 +154,8 @@
     },
     "materialPrefixes": ["IconAction"],
     "textureDirectories": ["textures/ingame/staticons"]
+  },
+  "terrain": {
+    "ground": { "terrainId": 0 }
   }
 }

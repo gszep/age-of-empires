@@ -47,7 +47,9 @@ Batch artifacts are intentionally ignored under `.local/batches/phase6-16/`.
 
 The importer integration resolves every consumed DAT graphic/rule and widgetui source, hashes inputs, and regenerates byte-identically. Viewer smoke tests loaded imported atlases and WEST UI without application console errors; selection, gather orders, fog expansion, and browser replay were exercised through Chrome DevTools Protocol. Timing, resource conservation, hidden information, pathing, combat release, protocol validation, and replay determinism have focused tests.
 
-Known discrepancies are the unstable supplemental player-color/shadow layers, simple alternating grass tile colors rather than imported terrain blending, approximate tint-based team colors, missing fire/corpse delta overlays, and some mirror-AI matches that stalemate until the configured timeout.
+Known discrepancies are the unstable supplemental player-color/shadow layers, single-terrain ground without the multi-terrain blend masks, approximate tint-based team colors, missing fire/corpse delta overlays, and some mirror-AI matches that stalemate until the configured timeout.
+
+The ground samples the imported DAT terrain texture (slot 0, `Grass`/`g_grs`) at the authored `terrain_dimensions` tile span; `terrain/blends` and `terrain/masks` are not consumed yet, so terrain-to-terrain transitions are absent rather than approximated.
 
 ## Verification
 
