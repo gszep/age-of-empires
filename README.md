@@ -23,7 +23,8 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 - `H` selects and centers the town center; `.` cycles idle villagers.
 - Command-grid hotkeys are shown on buttons (`Q`, `W`, `S` as applicable).
 - `Esc` cancels placement or opens the menu; `F3` pauses; `F10` toggles the menu.
-- Select a villager to place houses/barracks, a town center to train villagers, or a barracks to train militia. Destroy the enemy town center to win.
+- Select a villager to place any building, a town center to train villagers, a barracks to train militia/spearmen, or an archery range to train archers. Destroy the enemy town center to win.
+- Gather food, wood, gold, and stone. Mills, lumber camps, and mining camps shorten the walk for the resources they accept; the town center takes all four. Farms keep food coming once the berries run out, and watch towers (stone) shoot on their own.
 - Load a headless `--replay` JSON from **F10 → Load replay…**; playback verifies periodic authoritative checksums.
 
 ## Commands
@@ -45,6 +46,7 @@ Imported Microsoft content is generated under ignored `public/imported/` and is 
 ## Architecture
 
 - `src/sim/` — authoritative fixed-tick rules, economy, construction, navigation, combat, visibility, commands, checksums, and example AI
+- `tools/sld_shadow.py` — standalone SLD shadow-layer decoder, used because the pinned openage decoder corrupts the heap on that layer
 - `src/protocol/` and `schemas/` — versioned observations/actions/results and JSON Schemas
 - `src/headless/` — JSONL/MCP/WebSocket strategies, match/replay runner, concurrent paired batches, and opt-in live-agent check
 - `src/view/` and `src/main.ts` — observation-driven WEST HUD, dimetric renderer, fog, minimap, interactions, and replay playback

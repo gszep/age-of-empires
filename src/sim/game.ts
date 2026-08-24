@@ -1,5 +1,5 @@
-import { FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isBuilding, isUnit } from './data';
-import type { AttackValue, GameRules } from './data';
+import { FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isBuilding, isMilitary, isUnit } from './data';
+import type { AttackValue, GameRules, NodeKind } from './data';
 import { buildNavGrid, findPath, isBlocked, separateUnits, tileOf, type NavGrid } from './nav';
 import { random01 } from './random';
 import { createVisibility, updateVisibility } from './visibility';
@@ -24,7 +24,7 @@ function addEntity(
   return entity;
 }
 
-function addNode(state: GameState, node: 'berries' | 'tree' | 'gold', position: Point): Entity {
+function addNode(state: GameState, node: NodeKind, position: Point): Entity {
   const rules = state.rules.nodes[node];
   return addEntity(state, 'resource', 0, position, { hp: 1, radius: rules.radius }, {
     resourceKind: rules.resource,
@@ -32,7 +32,7 @@ function addNode(state: GameState, node: 'berries' | 'tree' | 'gold', position: 
   });
 }
 
-function cluster(state: GameState, node: 'berries' | 'tree' | 'gold', center: Point, count: number): void {
+function cluster(state: GameState, node: NodeKind, center: Point, count: number): void {
   for (let i = 0; i < count; i++) {
     const angle = random01(state) * Math.PI * 2;
     const radius = 1 + random01(state) * 2.2;
@@ -64,6 +64,9 @@ export function createGame(seed = 42, rules: GameRules = FALLBACK_RULES): GameSt
     cluster(state, 'berries', mirror({ x: 10, y: 5 }), 6);
     cluster(state, 'tree', mirror({ x: 10, y: 13.5 }), 8);
     cluster(state, 'gold', mirror({ x: 4, y: 3.5 }), 4);
+    // Clear of the base build area: a cluster on top of it would reject every
+    // building placement there for good.
+    cluster(state, 'stone', mirror({ x: 13, y: 16.5 }), 4);
   }
   recalculatePopulation(state);
   updateVisibility(state);
@@ -86,12 +89,13 @@ function recalculatePopulation(state: GameState): void {
 function spend(state: GameState, player: PlayerId, kind: UnitKind | BuildingKind): CommandResult {
   const cost = isUnit(kind) ? state.rules.units[kind].cost : state.rules.buildings[kind].cost;
   const p = state.players[player];
-  if (p.food < cost.food || p.wood < cost.wood || p.gold < cost.gold) {
+  if (p.food < cost.food || p.wood < cost.wood || p.gold < cost.gold || p.stone < cost.stone) {
     return rejected('not enough resources');
   }
   p.food -= cost.food;
   p.wood -= cost.wood;
   p.gold -= cost.gold;
+  p.stone -= cost.stone;
   return { ok: true };
 }
 
@@ -116,8 +120,15 @@ export function placementLegal(state: GameState, building: BuildingKind, target:
   return { ok: true };
 }
 
+/** Resource nodes, and the owner's finished farms, can be gathered from. */
+function isGatherable(entity: Entity, gatherer: Entity): boolean {
+  if (entity.kind === 'resource') return true;
+  return entity.kind === 'farm' && entity.owner === gatherer.owner
+    && entity.buildProgress === undefined && (entity.amount ?? 0) > 0;
+}
+
 function assignOrder(state: GameState, entity: Entity, target: Point, targetEntity?: Entity): void {
-  if (targetEntity?.kind === 'resource' && entity.kind === 'villager') {
+  if (targetEntity && isGatherable(targetEntity, entity) && entity.kind === 'villager') {
     entity.order = { kind: 'gather', targetId: targetEntity.id };
   } else if (
     targetEntity && targetEntity.owner === entity.owner &&
@@ -264,6 +275,15 @@ function moveAlong(state: GameState, grid: NavGrid, entity: Entity, destination:
 const inRange = (entity: Entity, target: Entity, margin = 0.15): boolean =>
   distance(entity.position, target.position) <= entity.radius + target.radius + margin;
 
+/** Melee units close to contact; ranged ones stop at their weapon range. */
+function attackRange(state: GameState, entity: Entity): number {
+  if (isUnit(entity.kind)) return state.rules.units[entity.kind as UnitKind].range ?? 0;
+  return state.rules.buildings[entity.kind as BuildingKind].attack?.range ?? 0;
+}
+
+const inAttackRange = (state: GameState, entity: Entity, target: Entity): boolean =>
+  inRange(entity, target, 0.35 + attackRange(state, entity));
+
 const interactionRange = (target: Entity): number => target.radius + 1.6;
 
 function nearestNode(state: GameState, from: Point, resource: ResourceKind): Entity | undefined {
@@ -280,11 +300,20 @@ function nearestNode(state: GameState, from: Point, resource: ResourceKind): Ent
   return best;
 }
 
-function nearestDropSite(state: GameState, entity: Entity): Entity | undefined {
+/**
+ * Nearest completed building of the owner that accepts `resource`. Drop-site
+ * buildings are what make mills and camps worth placing: they shorten the walk
+ * for one resource each, while the town center still takes everything.
+ */
+function nearestDropSite(state: GameState, entity: Entity, resource?: ResourceKind): Entity | undefined {
+  const wanted = resource ?? entity.carrying?.kind;
   let best: Entity | undefined;
   let bestDistance = Infinity;
   for (const candidate of state.entities) {
-    if (candidate.dead || candidate.owner !== entity.owner || candidate.kind !== 'town-center' || candidate.buildProgress !== undefined) continue;
+    if (candidate.dead || candidate.owner !== entity.owner || candidate.buildProgress !== undefined) continue;
+    if (!isBuilding(candidate.kind)) continue;
+    const accepts = state.rules.buildings[candidate.kind as BuildingKind].accepts;
+    if (!wanted || !accepts.includes(wanted)) continue;
     const d = distance(entity.position, candidate.position);
     if (d < bestDistance || (d === bestDistance && best && candidate.id < best.id)) {
       best = candidate;
@@ -386,6 +415,8 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
     if (!entity.carrying || entity.carrying.kind !== resource) entity.carrying = { kind: resource, amount: 0 };
     entity.carrying.amount += 1;
   }
+  // A worked-out farm is consumed, as in AoE2 where it must be rebuilt.
+  if (node.kind === 'farm' && (node.amount ?? 0) <= 0) kill(state, node);
 }
 
 function updateBuilder(state: GameState, grid: NavGrid, entity: Entity, builderCounts: Map<number, number>): void {
@@ -407,11 +438,11 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
   const target = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
   if (!target || target.owner === entity.owner || target.hp <= 0) { becomeIdle(entity); return; }
   const rules = state.rules.units[entity.kind as UnitKind];
-  if (!inRange(entity, target, 0.35)) {
+  if (!inAttackRange(state, entity, target)) {
     // Leaving range cancels a started swing: no damage before release.
     entity.attackWindup = undefined;
     entity.activity = 'moving';
-    moveAlong(state, grid, entity, target.position, rules.speed, interactionRange(target));
+    moveAlong(state, grid, entity, target.position, rules.speed, interactionRange(target) + attackRange(state, entity));
     return;
   }
   clearPath(entity);
@@ -434,8 +465,8 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
 
 /** Idle military units acquire the nearest living enemy in line of sight. */
 function autoAcquire(state: GameState, entity: Entity): void {
-  if (entity.kind !== 'militia' || entity.order.kind !== 'idle') return;
-  const los = state.rules.units.militia.lineOfSight;
+  if (!isMilitary(entity.kind) || entity.order.kind !== 'idle') return;
+  const los = state.rules.units[entity.kind as UnitKind].lineOfSight;
   let best: Entity | undefined;
   let bestDistance = Infinity;
   for (const candidate of state.entities) {
@@ -449,6 +480,45 @@ function autoAcquire(state: GameState, entity: Entity): void {
   if (best) {
     entity.order = { kind: 'attack', targetId: best.id };
     entity.activity = 'moving';
+  }
+}
+
+/**
+ * Towers shoot the nearest enemy in range on the same windup/reload clock as
+ * units. They never move or lose their target to separation, so this is the
+ * attacker loop without the approach.
+ */
+function updateTower(state: GameState, entity: Entity): void {
+  const attack = state.rules.buildings[entity.kind as BuildingKind].attack;
+  if (!attack || entity.buildProgress !== undefined) return;
+  let target: Entity | undefined;
+  let bestDistance = Infinity;
+  for (const candidate of state.entities) {
+    if (candidate.dead || candidate.owner === 0 || candidate.owner === entity.owner) continue;
+    if (!isUnit(candidate.kind)) continue;
+    const d = distance(entity.position, candidate.position) - candidate.radius;
+    if (d <= entity.radius + attack.range && (d < bestDistance - 1e-9 || (Math.abs(d - bestDistance) <= 1e-9 && (target?.id ?? Infinity) > candidate.id))) {
+      target = candidate;
+      bestDistance = d;
+    }
+  }
+  if (!target) { entity.attackWindup = undefined; return; }
+  if (entity.attackCooldown !== undefined && entity.attackCooldown > 0) {
+    entity.attackCooldown -= 1;
+    return;
+  }
+  if (entity.attackWindup === undefined) {
+    entity.attackWindup = Math.max(1, Math.round(attack.releaseSeconds * TICKS_PER_SECOND));
+  }
+  entity.attackWindup -= 1;
+  if (entity.attackWindup <= 0) {
+    target.hp -= computeDamage(attack.attacks, armorsOf(state, target));
+    if (target.hp <= 0) kill(state, target);
+    entity.attackWindup = undefined;
+    entity.attackCooldown = Math.max(
+      1,
+      Math.round(attack.reloadSeconds * TICKS_PER_SECOND) - Math.max(1, Math.round(attack.releaseSeconds * TICKS_PER_SECOND)),
+    );
   }
 }
 
@@ -524,6 +594,7 @@ export function stepGame(state: GameState): void {
       movable.push(entity);
     } else if (isBuilding(entity.kind) && entity.buildProgress === undefined) {
       updateBuildingProduction(state, entity);
+      updateTower(state, entity);
     }
   }
   separateUnits(state, movable, grid);
@@ -539,6 +610,19 @@ export function stepGame(state: GameState): void {
     if (site.buildProgress >= 1) {
       site.buildProgress = undefined;
       site.hp = Math.min(site.maxHp, Math.round(site.hp));
+      const farmAmount = state.rules.buildings[site.kind as BuildingKind].farmAmount;
+      if (farmAmount !== undefined) {
+        // A finished farm becomes a food source its owner can work until spent.
+        site.resourceKind = 'food';
+        site.amount = farmAmount;
+        // Builders keep working it as gatherers instead of standing idle.
+        for (const builder of state.entities) {
+          if (builder.order.kind === 'build' && builder.order.targetId === site.id) {
+            builder.order = { kind: 'gather', targetId: site.id };
+            builder.activity = 'moving';
+          }
+        }
+      }
       for (const builder of state.entities) {
         if (builder.order.kind === 'build' && builder.order.targetId === site.id) becomeIdle(builder);
       }

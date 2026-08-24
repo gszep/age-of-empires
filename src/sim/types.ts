@@ -2,9 +2,13 @@ import type { GameRules } from './data';
 import type { PlayerVisibility } from './visibility';
 
 export type PlayerId = 1 | 2;
-export type ResourceKind = 'food' | 'wood' | 'gold';
-export type UnitKind = 'villager' | 'militia';
-export type BuildingKind = 'town-center' | 'barracks' | 'house';
+export type ResourceKind = 'food' | 'wood' | 'gold' | 'stone';
+export type UnitKind = 'villager' | 'militia' | 'spearman' | 'archer';
+export type BuildingKind =
+  | 'town-center' | 'barracks' | 'house'
+  | 'mill' | 'lumber-camp' | 'mining-camp' | 'farm'
+  | 'outpost' | 'watch-tower'
+  | 'archery-range' | 'blacksmith' | 'market';
 export type EntityKind = UnitKind | BuildingKind | 'resource';
 export type Activity = 'idle' | 'moving' | 'gathering' | 'carrying' | 'building' | 'attacking' | 'dying';
 
@@ -53,6 +57,7 @@ export interface PlayerState {
   food: number;
   wood: number;
   gold: number;
+  stone: number;
   population: number;
   populationCap: number;
 }

@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES, rulesFromManifest, type ContentManifest, type GameRules } from './data';
 import { applyCommand, createGame, placementLegal, stepGame } from './game';
-import type { Entity, GameState, ResourceKind } from './types';
+import type { BuildingKind, Entity, GameState, ResourceKind } from './types';
 
 const MANIFEST_PATH = 'public/imported/aoe2/manifest.json';
 const importedRules: GameRules | undefined = existsSync(MANIFEST_PATH)
@@ -194,13 +194,140 @@ describe('production and rally points', () => {
   });
 });
 
+/** Nearest legal spot to `near`, so tests do not hardcode map coordinates. */
+function freeSpot(state: GameState, kind: BuildingKind, near: { x: number; y: number }) {
+  for (let radius = 1; radius <= 12; radius += 0.5) {
+    for (let step = 0; step < 16; step++) {
+      const angle = step * Math.PI / 8;
+      const spot = { x: near.x + Math.cos(angle) * radius, y: near.y + Math.sin(angle) * radius };
+      if (placementLegal(state, kind, spot).ok) return spot;
+    }
+  }
+  throw new Error(`no legal ${kind} placement near ${near.x},${near.y}`);
+}
+
+describe('drop sites', () => {
+  const buildFor = (state: GameState, kind: 'mill' | 'lumber-camp' | 'mining-camp', near: { x: number; y: number }) => {
+    const villager = villagerOf(state);
+    const at = freeSpot(state, kind, near);
+    expect(applyCommand(state, { kind: 'build', player: 1, builderIds: [villager.id], building: kind, target: at }))
+      .toEqual({ ok: true });
+    const site = state.entities.find(e => e.kind === kind)!;
+    site.buildProgress = undefined; // finish instantly; construction timing is covered elsewhere
+    return site;
+  };
+
+  it('banks wood at a lumber camp instead of walking back to the town center', () => {
+    const state = createGame();
+    const tree = nodeOf(state, 'wood');
+    const camp = buildFor(state, 'lumber-camp', tree.position);
+    const villager = villagerOf(state);
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [villager.id],
+      target: tree.position, targetId: tree.id,
+    });
+    const before = state.players[1].wood;
+    // Long enough to fill a load and deliver it.
+    run(state, 3000);
+    expect(state.players[1].wood).toBeGreaterThan(before);
+    // The camp is nearer than the town center, so the villager stayed by the trees.
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    expect(Math.hypot(villager.position.x - camp.position.x, villager.position.y - camp.position.y))
+      .toBeLessThan(Math.hypot(villager.position.x - tc.position.x, villager.position.y - tc.position.y));
+  });
+
+  it('refuses a resource the building does not accept', () => {
+    const state = createGame();
+    const gold = nodeOf(state, 'gold');
+    buildFor(state, 'mill', gold.position);
+    const villager = villagerOf(state);
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [villager.id], target: gold.position, targetId: gold.id,
+    });
+    run(state, 4000);
+    // A mill takes only food, so the gold went to the town center and still banked.
+    expect(state.players[1].gold).toBeGreaterThan(FALLBACK_RULES.startingResources.gold);
+  });
+});
+
+describe('stone', () => {
+  it('is gathered, banked, and spent on a tower', () => {
+    const state = createGame();
+    const stone = nodeOf(state, 'stone');
+    expect(stone).toBeDefined();
+    expect(stone.resourceKind).toBe('stone');
+    const villager = villagerOf(state);
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [villager.id], target: stone.position, targetId: stone.id,
+    });
+    run(state, 6000);
+    expect(state.players[1].stone).toBeGreaterThan(0);
+
+    state.players[1].stone = 500;
+    state.players[1].wood = 500;
+    const before = state.players[1].stone;
+    expect(applyCommand(state, {
+      kind: 'build', player: 1, builderIds: [villager.id], building: 'watch-tower',
+      target: freeSpot(state, 'watch-tower', villager.position),
+    })).toEqual({ ok: true });
+    expect(state.players[1].stone).toBe(before - FALLBACK_RULES.buildings['watch-tower'].cost.stone);
+  });
+});
+
+describe('farms', () => {
+  it('become a food source when finished and vanish once worked out', () => {
+    const state = createGame();
+    const villager = villagerOf(state);
+    state.players[1].wood = 500;
+    expect(applyCommand(state, {
+      kind: 'build', player: 1, builderIds: [villager.id], building: 'farm', target: freeSpot(state, 'farm', villager.position),
+    })).toEqual({ ok: true });
+    const farm = state.entities.find(e => e.kind === 'farm')!;
+    expect(farm.buildProgress).toBeDefined();
+    // Stop the moment it completes: the builder switches straight to farming
+    // it, so waiting longer would already have eaten into the store.
+    for (let i = 0; i < 4000 && farm.buildProgress !== undefined; i++) stepGame(state);
+    expect(farm.buildProgress).toBeUndefined();
+    expect(farm.resourceKind).toBe('food');
+    expect(farm.amount).toBe(FALLBACK_RULES.buildings.farm.farmAmount);
+
+    // Drain it: the farm is consumed rather than lingering at zero.
+    farm.amount = 2;
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [villager.id], target: farm.position, targetId: farm.id,
+    });
+    run(state, 2000);
+    expect(farm.dead).toBe(true);
+  });
+});
+
+describe('towers', () => {
+  it('shoot an enemy in range without being ordered', () => {
+    const state = createGame();
+    state.players[1].stone = 500;
+    state.players[1].wood = 500;
+    const builder = villagerOf(state);
+    applyCommand(state, {
+      kind: 'build', player: 1, builderIds: [builder.id], building: 'watch-tower',
+      target: freeSpot(state, 'watch-tower', builder.position),
+    });
+    const tower = state.entities.find(e => e.kind === 'watch-tower')!;
+    tower.buildProgress = undefined;
+    const victim = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
+    victim.position = { x: tower.position.x + 1, y: tower.position.y };
+    const before = victim.hp;
+    run(state, 60);
+    expect(victim.hp).toBeLessThan(before);
+  });
+});
+
 describe('imported rules', () => {
   it.skipIf(!importedRules)('carry DAT-backed timings and costs', () => {
     expect(importedRules!.origin).toBe('imported');
     expect(importedRules!.units.villager.trainSeconds).toBe(25);
     expect(importedRules!.units.militia.trainSeconds).toBe(21);
-    expect(importedRules!.units.militia.cost).toEqual({ food: 50, wood: 0, gold: 20 });
-    expect(importedRules!.gatherRatePerSecond).toEqual({ food: 0.31, wood: 0.39, gold: 0.38 });
+    expect(importedRules!.units.militia.cost).toEqual({ food: 50, wood: 0, gold: 20, stone: 0 });
+    expect(importedRules!.gatherRatePerSecond).toEqual({ food: 0.31, wood: 0.39, gold: 0.38, stone: 0.36 });
     expect(importedRules!.buildings.house.buildSeconds).toBe(25);
     expect(importedRules!.buildings['town-center'].hp).toBe(2400);
     expect(importedRules!.nodes.gold.amount).toBe(800);

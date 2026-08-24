@@ -41,10 +41,11 @@
         "food": { "type": "integer" },
         "wood": { "type": "integer" },
         "gold": { "type": "integer" },
+        "stone": { "type": "integer" },
         "population": { "type": "integer" },
         "entities": { "type": "integer" }
       },
-      "required": ["food", "wood", "gold", "population", "entities"],
+      "required": ["food", "wood", "gold", "stone", "population", "entities"],
       "additionalProperties": false
     }
   }

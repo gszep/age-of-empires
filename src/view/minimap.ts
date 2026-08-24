@@ -5,6 +5,7 @@ const RESOURCE_COLORS: Record<string, string> = {
   food: '#c4506e',
   wood: '#1f5426',
   gold: '#e8c04a',
+  stone: '#9aa0a6',
 };
 
 /** AoE-style diamond minimap with fog, entity dots, and the camera diamond. */

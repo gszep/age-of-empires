@@ -1,5 +1,7 @@
 import * as THREE from 'three/webgpu';
 import type { ContentAssets, Atlas, AnimationInfo } from './assets';
+import { isBuilding } from '../sim/data';
+import { createTerrainPatch } from './world';
 import { worldToIso, isoDepth } from './iso';
 import type { Entity, GameState } from '../sim/types';
 
@@ -13,6 +15,9 @@ interface Piece {
 
 export interface EntityView {
   group: THREE.Group;
+  /** Farms draw as a terrain patch instead of a sprite. */
+  patch?: THREE.Mesh;
+  patchSlot?: string;
   shadow: Piece;
   body: Piece;
   annexes: Piece[];
@@ -51,6 +56,10 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
     }
   }
   const view: EntityView = { group, shadow, body, annexes, fallback: !imported, facing: entity.owner === 2 ? Math.PI : 0 };
+  if (entity.kind === 'farm') {
+    view.fallback = false;
+    return view;
+  }
   if (!imported) buildFallback(view, entity);
   return view;
 }
@@ -68,7 +77,10 @@ function buildFallback(view: EntityView, entity: Entity): void {
 
 export function entityKey(entity: Entity): string {
   if (entity.kind === 'resource') {
-    return entity.resourceKind === 'food' ? 'berries' : entity.resourceKind === 'gold' ? 'gold' : 'tree-oak';
+    if (entity.resourceKind === 'food') return 'berries';
+    if (entity.resourceKind === 'gold') return 'gold';
+    if (entity.resourceKind === 'stone') return 'stone';
+    return 'tree-oak';
   }
   return entity.kind;
 }
@@ -79,12 +91,12 @@ function chooseAnimation(state: GameState, entity: Entity): { key: string; name:
   if (kind === 'resource') {
     return { key: entityKey(entity), name: entity.dead ? 'death' : 'idle' };
   }
-  if (kind === 'town-center' || kind === 'barracks' || kind === 'house') {
+  if (isBuilding(kind)) {
     if (entity.dead) return { key: kind, name: 'death' };
     if (entity.buildProgress !== undefined) return { key: kind, name: 'construction' };
     return { key: kind, name: 'idle' };
   }
-  if (kind === 'militia') {
+  if (kind !== 'villager') {
     if (entity.dead) return { key: kind, name: 'death' };
     if (entity.activity === 'attacking') return { key: kind, name: 'attack' };
     if (entity.activity === 'moving') return { key: kind, name: 'walk' };
@@ -98,6 +110,7 @@ function chooseAnimation(state: GameState, entity: Entity): { key: string; name:
     if (resource === 'food') variant = 'villager-forager';
     else if (resource === 'wood') variant = 'villager-lumberjack';
     else if (resource === 'gold') variant = 'villager-goldminer';
+    else if (resource === 'stone') variant = 'villager-stonemason';
   }
   if (entity.dead) return { key: variant, name: 'death' };
   switch (entity.activity) {
@@ -174,6 +187,22 @@ function directionIndex(facing: number, directions: number): number {
   return ((index % directions) + directions) % directions;
 }
 
+/** Farms swap between the construction and grown terrain slots. */
+function updateFarmView(view: EntityView, assets: ContentAssets | undefined, entity: Entity): void {
+  const slot = entity.buildProgress !== undefined ? 'farm-construction' : 'farm';
+  if (view.patchSlot !== slot) {
+    if (view.patch) { view.group.remove(view.patch); view.patch.geometry.dispose(); }
+    view.patch = createTerrainPatch(assets, slot, entity.radius);
+    view.patchSlot = slot;
+    if (view.patch) view.group.add(view.patch);
+  }
+  if (!view.patch) return;
+  const iso = worldToIso(entity.position.x - entity.radius, entity.position.y - entity.radius);
+  view.patch.position.set(iso.x, iso.y, 0);
+  view.patch.renderOrder = 10 + isoDepth(entity.position.x, entity.position.y);
+  view.patch.visible = !entity.dead;
+}
+
 export function updateEntityView(
   view: EntityView,
   assets: ContentAssets | undefined,
@@ -182,6 +211,10 @@ export function updateEntityView(
   time: number,
 ): void {
   const depth = isoDepth(entity.position.x, entity.position.y);
+  if (entity.kind === 'farm') {
+    updateFarmView(view, assets, entity);
+    return;
+  }
   if (view.fallback || !assets) {
     const iso = worldToIso(entity.position.x, entity.position.y);
     view.body.mesh.position.set(iso.x, iso.y + view.body.mesh.scale.y / 2, 0);

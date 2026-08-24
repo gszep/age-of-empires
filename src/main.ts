@@ -3,11 +3,11 @@ import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
 import { observe } from './sim/observe';
 import { applyCommand, createGame, gameTimeSeconds, placementLegal, stepGame } from './sim/game';
-import { FALLBACK_RULES, TICK_SECONDS, rulesFromManifest, type ContentManifest, type GameRules } from './sim/data';
+import { FALLBACK_RULES, TICK_SECONDS, isBuilding, isUnit, rulesFromManifest, type ContentManifest, type Cost, type GameRules } from './sim/data';
 import { isTileVisible } from './sim/visibility';
 import { checksumState } from './sim/checksum';
 import type { MatchRecord } from './protocol/types';
-import type { BuildingKind, Entity, GameState, Point } from './sim/types';
+import type { BuildingKind, Entity, GameState, Point, UnitKind } from './sim/types';
 import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, TILE_W, TILE_H } from './view/iso';
@@ -164,21 +164,20 @@ function selectIdleVillager(): void {
 function runUiCommand(id: string): void {
   if (replay) return;
   const selection = ownSelected();
-  if (id === 'build-house' || id === 'build-barracks') {
-    buildMode = id === 'build-house' ? 'house' : 'barracks';
+  if (id.startsWith('build-')) {
+    buildMode = id.slice('build-'.length) as BuildingKind;
     return;
   }
   if (id === 'stop') {
     if (selection.length) applyCommand(game, { kind: 'stop', player: 1, entityIds: selection.map(e => e.id) });
     return;
   }
-  if (id === 'train-villager' || id === 'train-militia') {
-    const building = selection.find(e => e.kind === (id === 'train-villager' ? 'town-center' : 'barracks'));
+  if (id.startsWith('train-')) {
+    const unit = id.slice('train-'.length) as UnitKind;
+    const building = selection.find(e => isBuilding(e.kind) && e.buildProgress === undefined
+      && rules.units[unit]?.trainedAt === e.kind);
     if (!building) return;
-    const result = applyCommand(game, {
-      kind: 'train', player: 1, buildingId: building.id,
-      unit: id === 'train-villager' ? 'villager' : 'militia',
-    });
+    const result = applyCommand(game, { kind: 'train', player: 1, buildingId: building.id, unit });
     if (!result.ok) hud.showMessage(result.reason);
     return;
   }
@@ -260,7 +259,7 @@ addEventListener('pointerup', event => {
     const minY = Math.min(a.y, b.y, c.y, d.y);
     const maxY = Math.max(a.y, b.y, c.y, d.y);
     const units = game.entities.filter(e =>
-      !e.dead && e.owner === 1 && (e.kind === 'villager' || e.kind === 'militia') &&
+      !e.dead && e.owner === 1 && isUnit(e.kind) &&
       e.position.x >= minX && e.position.x <= maxX && e.position.y >= minY && e.position.y <= maxY,
     );
     if (units.length) selectedIds = units.map(e => e.id);
@@ -281,7 +280,7 @@ function contextOrder(point: Point, _clientX: number, _clientY: number): void {
   if (replay) return; // spectating: inputs must not perturb the command stream
   const selection = ownSelected();
   const target = pickEntity(point);
-  const units = selection.filter(e => e.kind === 'villager' || e.kind === 'militia');
+  const units = selection.filter(e => isUnit(e.kind));
   if (units.length) {
     const result = applyCommand(game, {
       kind: 'order', player: 1, entityIds: units.map(e => e.id),
@@ -355,48 +354,73 @@ function currentCommands(): CommandButton[] {
     return [{ id: 'cancel', label: 'Cancel placement', hotkey: 'escape', enabled: true, active: true }];
   }
   if (selection.some(e => e.kind === 'villager')) {
-    buttons.push({
-      id: 'build-house', label: 'Build House (25 wood)', hotkey: 'q', enabled: player.wood >= rules.buildings.house.cost.wood,
-      icon: hud.iconFor('Buildings', 34),
-    });
-    buttons.push({
-      id: 'build-barracks', label: 'Build Barracks (175 wood)', hotkey: 'w', enabled: player.wood >= rules.buildings.barracks.cost.wood,
-      icon: hud.iconFor('Buildings', 2),
-    });
+    for (const [index, kind] of buildableKinds().entries()) {
+      const building = rules.buildings[kind];
+      buttons.push({
+        id: `build-${kind}`,
+        label: `Build ${displayName(kind)} (${costLabel(building.cost)})`,
+        hotkey: BUILD_HOTKEYS[index],
+        enabled: affordable(building.cost),
+        icon: hud.iconFor('Buildings', assets?.entities[kind]?.iconId),
+      });
+    }
   }
-  if (selection.some(e => e.kind === 'villager' || e.kind === 'militia')) {
+  if (selection.some(e => isUnit(e.kind))) {
     buttons.push({ id: 'stop', label: 'Stop', hotkey: 's', enabled: true });
   }
-  const tc = selection.find(e => e.kind === 'town-center' && e.buildProgress === undefined);
-  if (tc) {
-    buttons.push({
-      id: 'train-villager', label: 'Train Villager (50 food)', hotkey: 'q',
-      enabled: !tc.training && player.food >= rules.units.villager.cost.food && player.population < player.populationCap,
-      icon: hud.iconFor('Units', 15),
-    });
-  }
-  const barracks = selection.find(e => e.kind === 'barracks' && e.buildProgress === undefined);
-  if (barracks) {
-    buttons.push({
-      id: 'train-militia', label: 'Train Militia (50 food, 20 gold)', hotkey: 'q',
-      enabled: !barracks.training && player.food >= rules.units.militia.cost.food && player.gold >= rules.units.militia.cost.gold && player.population < player.populationCap,
-      icon: hud.iconFor('Units', 8),
-    });
+  // Every completed production building offers the units the rules train there.
+  const producer = selection.find(e => isBuilding(e.kind) && e.buildProgress === undefined
+    && trainableAt(e.kind as BuildingKind).length > 0);
+  if (producer) {
+    for (const [index, kind] of trainableAt(producer.kind as BuildingKind).entries()) {
+      const unitRules = rules.units[kind];
+      buttons.push({
+        id: `train-${kind}`,
+        label: `Train ${displayName(kind)} (${costLabel(unitRules.cost)})`,
+        hotkey: TRAIN_HOTKEYS[index],
+        enabled: !producer.training && affordable(unitRules.cost)
+          && player.population < player.populationCap,
+        icon: hud.iconFor('Units', assets?.entities[kind]?.iconId),
+      });
+    }
   }
   return buttons;
+}
+
+const BUILD_HOTKEYS = ['q', 'w', 'e', 'r', 't', 'a', 's', 'd', 'f', 'g', 'z', 'x'];
+const TRAIN_HOTKEYS = ['q', 'w', 'e', 'r'];
+
+const buildableKinds = (): BuildingKind[] =>
+  (Object.keys(rules.buildings) as BuildingKind[]).filter(kind => rules.buildings[kind].buildable);
+
+const trainableAt = (building: BuildingKind): UnitKind[] =>
+  (Object.keys(rules.units) as UnitKind[]).filter(kind => rules.units[kind].trainedAt === building);
+
+function affordable(cost: Cost): boolean {
+  const player = game.players[1];
+  return player.food >= cost.food && player.wood >= cost.wood
+    && player.gold >= cost.gold && player.stone >= cost.stone;
+}
+
+function costLabel(cost: Cost): string {
+  const parts = (['food', 'wood', 'gold', 'stone'] as const)
+    .filter(resource => cost[resource] > 0)
+    .map(resource => `${cost[resource]} ${resource}`);
+  return parts.length ? parts.join(', ') : 'free';
+}
+
+function displayName(kind: string): string {
+  return kind.split('-').map(part => part[0].toUpperCase() + part.slice(1)).join(' ');
 }
 
 function selectionInfo(): SelectionInfo | undefined {
   const selection = ownSelected().length ? ownSelected() : game.entities.filter(e => selectedIds.includes(e.id) && !e.dead);
   const entity = selection[0];
   if (!entity) return undefined;
-  const names: Record<string, string> = {
-    villager: 'Villager', militia: 'Militia', 'town-center': 'Town Center',
-    barracks: 'Barracks', house: 'House', resource: 'Resource',
-  };
+  const names: Record<string, string> = { resource: 'Resource' };
   const name = entity.kind === 'resource'
     ? entity.resourceKind === 'food' ? 'Forage Bush' : entity.resourceKind === 'gold' ? 'Gold Mine' : 'Tree'
-    : names[entity.kind];
+    : names[entity.kind] ?? displayName(entity.kind);
   const details: string[] = [];
   if (selection.length > 1) details.push(`${selection.length} selected`);
   if (entity.amount !== undefined) details.push(`${Math.floor(entity.amount)} ${entity.resourceKind}`);
@@ -412,7 +436,7 @@ function selectionInfo(): SelectionInfo | undefined {
     };
   }
   const iconIndex = assets?.entities[view.entityKey(entity)]?.iconId;
-  const category = entity.kind === 'villager' || entity.kind === 'militia' ? 'Units' : 'Buildings';
+  const category = isUnit(entity.kind) ? 'Units' : 'Buildings';
   return {
     name,
     icon: entity.kind !== 'resource' ? hud.iconFor(category, iconIndex) : undefined,

@@ -3,7 +3,7 @@ import type { BuildingKind, EntityKind, ResourceKind, UnitKind } from './types';
 export const TICK_SECONDS = 0.05;
 export const TICKS_PER_SECOND = 20;
 
-export interface Cost { food: number; wood: number; gold: number }
+export interface Cost { food: number; wood: number; gold: number; stone: number }
 
 export interface AttackValue { class: number; amount: number }
 
@@ -21,6 +21,8 @@ export interface UnitRules {
   attackReloadSeconds: number;
   /** Seconds into the swing when damage lands (DAT frame delay x frame time). */
   attackReleaseSeconds: number;
+  /** Tiles a ranged unit may strike from; melee units leave this unset. */
+  range?: number;
 }
 
 export interface BuildingRules {
@@ -32,6 +34,17 @@ export interface BuildingRules {
   popSupport: number;
   buildable: boolean;
   armors: AttackValue[];
+  /** Resources villagers may deposit here; empty for buildings that take none. */
+  accepts: ResourceKind[];
+  /** Food a farm holds; undefined for everything else. */
+  farmAmount?: number;
+  /** Set for buildings that shoot: range in tiles plus the militia-style timing. */
+  attack?: {
+    range: number;
+    attacks: AttackValue[];
+    reloadSeconds: number;
+    releaseSeconds: number;
+  };
 }
 
 export interface ResourceNodeRules {
@@ -46,12 +59,14 @@ export interface GameRules {
   startingPopulationCap: number;
   units: Record<UnitKind, UnitRules>;
   buildings: Record<BuildingKind, BuildingRules>;
-  nodes: Record<'berries' | 'tree' | 'gold', ResourceNodeRules>;
+  nodes: Record<NodeKind, ResourceNodeRules>;
   gatherRatePerSecond: Record<ResourceKind, number>;
   carryCapacity: number;
 }
 
-const cost = (food = 0, wood = 0, gold = 0): Cost => ({ food, wood, gold });
+export type NodeKind = 'berries' | 'tree' | 'gold' | 'stone';
+
+const cost = (food = 0, wood = 0, gold = 0, stone = 0): Cost => ({ food, wood, gold, stone });
 
 /**
  * Open fallback rules for users without the owned game. Values approximate the
@@ -77,30 +92,92 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 1 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
     },
+    spearman: {
+      hp: 45, radius: 0.2, speed: 0.9, lineOfSight: 4, cost: cost(35, 25), trainSeconds: 22,
+      trainedAt: 'barracks', popCost: 1,
+      attacks: [{ class: 4, amount: 3 }, { class: 8, amount: 15 }, { class: 21, amount: 1 }],
+      armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
+      attackReloadSeconds: 3, attackReleaseSeconds: 0.5,
+    },
+    archer: {
+      hp: 30, radius: 0.2, speed: 0.96, lineOfSight: 6, cost: cost(0, 25, 45), trainSeconds: 35,
+      trainedAt: 'archery-range', popCost: 1,
+      attacks: [{ class: 3, amount: 4 }],
+      armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
+      attackReloadSeconds: 2, attackReleaseSeconds: 0.35,
+      range: 4,
+    },
   },
   buildings: {
     'town-center': {
       hp: 2400, radius: 2, lineOfSight: 8, cost: cost(0, 275), buildSeconds: 100,
-      popSupport: 5, buildable: false,
+      popSupport: 5, buildable: false, accepts: ['food', 'wood', 'gold', 'stone'],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 3 }, { class: 3, amount: 5 }],
     },
     barracks: {
       hp: 1200, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
-      popSupport: 0, buildable: true,
+      popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
     },
     house: {
       hp: 550, radius: 1, lineOfSight: 2, cost: cost(0, 25), buildSeconds: 25,
-      popSupport: 5, buildable: true,
+      popSupport: 5, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: -2 }, { class: 3, amount: 7 }],
+    },
+    mill: {
+      hp: 600, radius: 1, lineOfSight: 6, cost: cost(0, 100), buildSeconds: 35,
+      popSupport: 0, buildable: true, accepts: ['food'],
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+    },
+    'lumber-camp': {
+      hp: 600, radius: 1, lineOfSight: 6, cost: cost(0, 100), buildSeconds: 35,
+      popSupport: 0, buildable: true, accepts: ['wood'],
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+    },
+    'mining-camp': {
+      hp: 600, radius: 1, lineOfSight: 6, cost: cost(0, 100), buildSeconds: 35,
+      popSupport: 0, buildable: true, accepts: ['gold', 'stone'],
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+    },
+    farm: {
+      hp: 480, radius: 1.5, lineOfSight: 1, cost: cost(0, 60), buildSeconds: 15,
+      popSupport: 0, buildable: true, accepts: [], farmAmount: 175,
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
+    },
+    outpost: {
+      hp: 500, radius: 0.5, lineOfSight: 12, cost: cost(0, 25, 0, 5), buildSeconds: 15,
+      popSupport: 0, buildable: true, accepts: [],
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 3 }],
+    },
+    'watch-tower': {
+      hp: 850, radius: 0.5, lineOfSight: 8, cost: cost(0, 25, 0, 125), buildSeconds: 27,
+      popSupport: 0, buildable: true, accepts: [],
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 8 }],
+      attack: { range: 8, attacks: [{ class: 3, amount: 5 }], reloadSeconds: 2, releaseSeconds: 0.35 },
+    },
+    'archery-range': {
+      hp: 1500, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
+      popSupport: 0, buildable: true, accepts: [],
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+    },
+    blacksmith: {
+      hp: 1800, radius: 1.5, lineOfSight: 6, cost: cost(0, 150), buildSeconds: 40,
+      popSupport: 0, buildable: true, accepts: [],
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+    },
+    market: {
+      hp: 1800, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 60,
+      popSupport: 0, buildable: true, accepts: [],
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
     },
   },
   nodes: {
     berries: { resource: 'food', radius: 0.5, amount: 125 },
     tree: { resource: 'wood', radius: 0.5, amount: 100 },
     gold: { resource: 'gold', radius: 0.5, amount: 800 },
+    stone: { resource: 'stone', radius: 0.5, amount: 350 },
   },
-  gatherRatePerSecond: { food: 0.31, wood: 0.39, gold: 0.38 },
+  gatherRatePerSecond: { food: 0.31, wood: 0.39, gold: 0.38, stone: 0.36 },
   carryCapacity: 10,
 };
 
@@ -128,7 +205,7 @@ interface ManifestEntity {
 export interface ContentManifest { entities: Record<string, ManifestEntity> }
 
 const manifestCost = (entity: ManifestEntity): Cost =>
-  cost(entity.cost?.food ?? 0, entity.cost?.wood ?? 0, entity.cost?.gold ?? 0);
+  cost(entity.cost?.food ?? 0, entity.cost?.wood ?? 0, entity.cost?.gold ?? 0, entity.cost?.stone ?? 0);
 
 // Zero-amount entries stay: armor-class membership decides bonus damage.
 const attackValues = (values: AttackValue[] | undefined): AttackValue[] => values ?? [];
@@ -136,61 +213,109 @@ const attackValues = (values: AttackValue[] | undefined): AttackValue[] => value
 /** Build DAT-backed rules from the imported content manifest. */
 export function rulesFromManifest(manifest: ContentManifest): GameRules {
   const e = manifest.entities;
-  const unit = (key: string, trainedAt: BuildingKind): UnitRules => ({
-    hp: e[key].hitPoints,
-    radius: e[key].collision[0],
-    speed: e[key].speedTilesPerSecond ?? 0.8,
-    lineOfSight: e[key].lineOfSight,
-    cost: manifestCost(e[key]),
-    trainSeconds: e[key].train?.seconds ?? 25,
-    trainedAt,
-    popCost: e[key].populationCost ?? 1,
-    attacks: attackValues(e[key].combat?.attacks),
-    armors: attackValues(e[key].combat?.armors),
-    attackReloadSeconds: e[key].combat?.reloadSeconds ?? 2,
-    attackReleaseSeconds: Math.round(
-      (e[key].combat?.frameDelay ?? 10) * (e[key].animations?.attack?.frameSeconds ?? 0.05) * 100,
-    ) / 100,
-  });
-  const building = (key: string, buildable: boolean): BuildingRules => ({
-    hp: e[key].hitPoints,
-    radius: e[key].collision[0],
-    lineOfSight: e[key].lineOfSight,
-    cost: manifestCost(e[key]),
-    buildSeconds: e[key].build?.seconds ?? 25,
-    popSupport: e[key].popSupport ?? 0,
-    buildable,
-    armors: attackValues(e[key].combat?.armors),
-  });
-  const node = (key: string, resource: ResourceKind): ResourceNodeRules => ({
-    resource,
-    radius: e[key].collision[0],
-    amount: e[key].storage?.[resource] ?? FALLBACK_RULES.nodes.tree.amount,
-  });
+  // A manifest generated before an entity existed must not break the game: fall
+  // back to that entity's open-content rules and keep everything else imported.
+  const unit = (key: string, trainedAt: BuildingKind): UnitRules => {
+    const fallback = FALLBACK_RULES.units[key as UnitKind];
+    if (!e[key]) return { ...fallback, trainedAt };
+    return {
+      hp: e[key].hitPoints,
+      radius: e[key].collision[0],
+      speed: e[key].speedTilesPerSecond ?? 0.8,
+      lineOfSight: e[key].lineOfSight,
+      cost: manifestCost(e[key]),
+      trainSeconds: e[key].train?.seconds ?? 25,
+      trainedAt,
+      popCost: e[key].populationCost ?? 1,
+      attacks: attackValues(e[key].combat?.attacks),
+      armors: attackValues(e[key].combat?.armors),
+      attackReloadSeconds: e[key].combat?.reloadSeconds ?? 2,
+      attackReleaseSeconds: Math.round(
+        (e[key].combat?.frameDelay ?? 10) * (e[key].animations?.attack?.frameSeconds ?? 0.05) * 100,
+      ) / 100,
+      range: fallback?.range,
+    };
+  };
+  const building = (key: string, buildable: boolean): BuildingRules => {
+    const fallback = FALLBACK_RULES.buildings[key as BuildingKind];
+    if (!e[key]) return { ...fallback, buildable };
+    return {
+      hp: e[key].hitPoints,
+      radius: e[key].collision[0],
+      lineOfSight: e[key].lineOfSight,
+      cost: manifestCost(e[key]),
+      buildSeconds: e[key].build?.seconds ?? 25,
+      popSupport: e[key].popSupport ?? 0,
+      buildable,
+      armors: attackValues(e[key].combat?.armors),
+      // Which resources a drop site takes, what a farm holds, and whether a
+      // building shoots are gameplay roles, not DAT fields the importer reads.
+      accepts: fallback.accepts,
+      farmAmount: e[key].storage?.food ?? fallback.farmAmount,
+      attack: fallback.attack && {
+        ...fallback.attack,
+        attacks: attackValues(e[key].combat?.attacks).length
+          ? attackValues(e[key].combat?.attacks)
+          : fallback.attack.attacks,
+        reloadSeconds: e[key].combat?.reloadSeconds ?? fallback.attack.reloadSeconds,
+      },
+    };
+  };
+  const node = (key: string, resource: ResourceKind, fallbackKey: NodeKind): ResourceNodeRules => {
+    if (!e[key]) return FALLBACK_RULES.nodes[fallbackKey];
+    return {
+      resource,
+      radius: e[key].collision[0],
+      amount: e[key].storage?.[resource] ?? FALLBACK_RULES.nodes[fallbackKey].amount,
+    };
+  };
   return {
     origin: 'imported',
     startingResources: FALLBACK_RULES.startingResources,
     startingPopulationCap: 0,
-    units: { villager: unit('villager', 'town-center'), militia: unit('militia', 'barracks') },
+    units: {
+      villager: unit('villager', 'town-center'),
+      militia: unit('militia', 'barracks'),
+      spearman: unit('spearman', 'barracks'),
+      archer: { ...unit('archer', 'archery-range'), range: FALLBACK_RULES.units.archer.range },
+    },
     buildings: {
       'town-center': building('town-center', false),
       barracks: building('barracks', true),
       house: building('house', true),
+      mill: building('mill', true),
+      'lumber-camp': building('lumber-camp', true),
+      'mining-camp': building('mining-camp', true),
+      farm: building('farm', true),
+      outpost: building('outpost', true),
+      'watch-tower': building('watch-tower', true),
+      'archery-range': building('archery-range', true),
+      blacksmith: building('blacksmith', true),
+      market: building('market', true),
     },
     nodes: {
-      berries: node('berries', 'food'),
-      tree: node('tree-oak', 'wood'),
-      gold: node('gold', 'gold'),
+      berries: node('berries', 'food', 'berries'),
+      tree: node('tree-oak', 'wood', 'tree'),
+      gold: node('gold', 'gold', 'gold'),
+      stone: node('stone', 'stone', 'stone'),
     },
     gatherRatePerSecond: {
-      food: e['villager-forager'].gather?.ratePerSecond ?? 0.31,
-      wood: e['villager-lumberjack'].gather?.ratePerSecond ?? 0.39,
-      gold: e['villager-goldminer'].gather?.ratePerSecond ?? 0.38,
+      food: e['villager-forager']?.gather?.ratePerSecond ?? FALLBACK_RULES.gatherRatePerSecond.food,
+      wood: e['villager-lumberjack']?.gather?.ratePerSecond ?? FALLBACK_RULES.gatherRatePerSecond.wood,
+      gold: e['villager-goldminer']?.gather?.ratePerSecond ?? FALLBACK_RULES.gatherRatePerSecond.gold,
+      stone: e['villager-stonemason']?.gather?.ratePerSecond ?? FALLBACK_RULES.gatherRatePerSecond.stone,
     },
-    carryCapacity: e['villager-forager'].gather?.capacity ?? 10,
+    carryCapacity: e['villager-forager']?.gather?.capacity ?? FALLBACK_RULES.carryCapacity,
   };
 }
 
-export const isUnit = (kind: EntityKind): kind is UnitKind => kind === 'villager' || kind === 'militia';
-export const isBuilding = (kind: EntityKind): kind is BuildingKind =>
-  kind === 'town-center' || kind === 'barracks' || kind === 'house';
+const UNIT_KINDS = new Set<string>(['villager', 'militia', 'spearman', 'archer']);
+const BUILDING_KINDS = new Set<string>([
+  'town-center', 'barracks', 'house', 'mill', 'lumber-camp', 'mining-camp', 'farm',
+  'outpost', 'watch-tower', 'archery-range', 'blacksmith', 'market',
+]);
+
+export const isUnit = (kind: EntityKind): kind is UnitKind => UNIT_KINDS.has(kind);
+export const isBuilding = (kind: EntityKind): kind is BuildingKind => BUILDING_KINDS.has(kind);
+/** Units that fight on their own initiative; villagers only fight when told. */
+export const isMilitary = (kind: EntityKind): boolean => isUnit(kind) && kind !== 'villager';

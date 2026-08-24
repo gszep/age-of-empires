@@ -49,6 +49,47 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Me
   return mesh;
 }
 
+/**
+ * Farms are terrain in AoE2DE, not sprites: the DAT points at terrain slots
+ * (`Farm1`, `Farm Cnst1`) and there is no farm SLD to import. Draw one as its
+ * own patch of the isometric grid so it sits flat on the ground like the real
+ * game, tiled at the slot's authored span.
+ */
+export function createTerrainPatch(
+  assets: ContentAssets | undefined, slot: string, half: number,
+): THREE.Mesh | undefined {
+  const terrain = assets?.terrain?.[slot];
+  const texture = terrain && assets?.textures.get(terrain.image);
+  if (!terrain || !texture) return undefined;
+  const [spanX, spanY] = terrain.dimensions;
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const tiles = Math.max(1, Math.round(half * 2));
+  for (let y = 0; y < tiles; y++) {
+    for (let x = 0; x < tiles; x++) {
+      const corners = [
+        { p: worldToIso(x, y), u: x / spanX, v: y / spanY },
+        { p: worldToIso(x + 1, y), u: (x + 1) / spanX, v: y / spanY },
+        { p: worldToIso(x + 1, y + 1), u: (x + 1) / spanX, v: (y + 1) / spanY },
+        { p: worldToIso(x, y + 1), u: x / spanX, v: (y + 1) / spanY },
+      ];
+      for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]] as const) {
+        for (const index of [a, b, c]) {
+          positions.push(corners[index].p.x, corners[index].p.y, 0);
+          uvs.push(corners[index].u, corners[index].v);
+        }
+      }
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+    map: texture, transparent: true, depthTest: false, depthWrite: false,
+  }));
+  return mesh;
+}
+
 export interface FogLayer {
   mesh: THREE.Mesh;
   update(state: GameState): void;

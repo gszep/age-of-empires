@@ -30,6 +30,7 @@ export interface PlayerObservation {
   food: number;
   wood: number;
   gold: number;
+  stone: number;
   population: number;
   populationCap: number;
   entities: ObservedEntity[];
@@ -57,6 +58,7 @@ export interface PlayerSummary {
   food: number;
   wood: number;
   gold: number;
+  stone: number;
   population: number;
   entities: number;
 }

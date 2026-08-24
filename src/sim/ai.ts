@@ -1,7 +1,7 @@
 import type { Command, ResourceKind } from './types';
 import type { PlayerObservation } from '../protocol/types';
 
-interface Spotted { id: number; kind: string; owner: number; x: number; y: number; resource?: ResourceKind; training?: unknown; buildProgress?: number; order?: string }
+interface Spotted { id: number; kind: string; owner: number; x: number; y: number; resource?: ResourceKind; amount?: number; training?: unknown; buildProgress?: number; order?: string }
 
 const distance = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -10,7 +10,12 @@ const ASSIGNMENT: ResourceKind[] = ['food', 'wood', 'food', 'gold', 'wood', 'foo
 const HOUSE_SPOTS: { x: number; y: number }[] = [
   { x: -1, y: -4 }, { x: 2, y: -4 }, { x: -4, y: -2 }, { x: 5, y: -4 }, { x: -4, y: 1 },
 ];
-const BARRACKS_SPOT = { x: 1, y: 5 };
+const BARRACKS_SPOTS: { x: number; y: number }[] = [
+  { x: 1, y: 5 }, { x: -2, y: 5 }, { x: 4, y: 4 }, { x: 1, y: -6 }, { x: -5, y: -4 },
+];
+const FARM_SPOTS: { x: number; y: number }[] = [
+  { x: -3, y: 2 }, { x: -3, y: -1 }, { x: -1, y: 3 }, { x: 2, y: 3 }, { x: -6, y: 2 }, { x: -6, y: -1 },
+];
 
 /**
  * The example strategy: gather food/wood/gold, keep housing ahead of
@@ -36,8 +41,11 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   for (const [index, villager] of villagers.entries()) {
     if (villager.order !== 'idle') continue;
     const wanted = ASSIGNMENT[index % ASSIGNMENT.length];
+    // Farms are food sources too once complete, so they keep villagers fed
+    // after the berries run out.
     const node = known
-      .filter(e => e.kind === 'resource' && e.resource === wanted)
+      .filter(e => e.resource === wanted && (e.amount ?? 1) > 0
+        && (e.kind === 'resource' || (e.kind === 'farm' && e.owner === player && (e.buildProgress ?? 1) >= 1)))
       .sort((a, b) => distance(villager, a) - distance(villager, b) || a.id - b.id)[0];
     if (node) {
       commands.push({
@@ -58,7 +66,21 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'house', target: place(spot) });
   }
   if (!barracks && idleBuilder && observation.wood >= 175) {
-    commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'barracks', target: place(BARRACKS_SPOT) });
+    // Cycle candidate spots like houses do, so terrain under one spot cannot
+    // block the barracks -- and the whole military opening -- permanently.
+    const spot = BARRACKS_SPOTS[Math.floor(observation.time / 5) % BARRACKS_SPOTS.length];
+    commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'barracks', target: place(spot) });
+  }
+
+  // Farms keep the food supply alive once the berries are gone, which is what
+  // lets a match run past the opening rush instead of stalling on starvation.
+  const foodLeft = known.some(e => e.kind === 'resource' && e.resource === 'food' && (e.amount ?? 0) > 0);
+  const farms = mine.filter(e => e.kind === 'farm');
+  const farmsUnderway = farms.some(e => (e.buildProgress ?? 1) < 1);
+  if (!foodLeft && idleBuilder && !farmsUnderway && farms.length < FARM_SPOTS.length
+      && observation.wood >= 60) {
+    const spot = FARM_SPOTS[(farms.length + Math.floor(observation.time / 3)) % FARM_SPOTS.length];
+    commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'farm', target: place(spot) });
   }
 
   if (tc && !tc.training && villagers.length < 8 && observation.food >= 50 && headroom > 0) {

@@ -1,5 +1,6 @@
 import { TICK_SECONDS } from './data';
 import { isEntityVisible } from './visibility';
+import { isUnit } from './data';
 import type { Entity, GameState, PlayerId } from './types';
 import type { ObservedEntity, PlayerObservation, RememberedEntityObservation } from '../protocol/types';
 
@@ -62,6 +63,7 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
     food: self.food,
     wood: self.wood,
     gold: self.gold,
+    stone: self.stone,
     population: self.population,
     populationCap: self.populationCap,
     entities,
@@ -88,15 +90,15 @@ export function describeObservation(observation: PlayerObservation): string {
       .map(([kind, count]) => `${count} ${kind}`)
       .join(', ');
   };
-  const idle = mine.filter(e => e.order === 'idle' && (e.kind === 'villager' || e.kind === 'militia')).length;
+  const idle = mine.filter(e => e.order === 'idle' && isUnit(e.kind as never)).length;
   const parts = [
     `t=${observation.time.toFixed(1)}`,
     `p${observation.player}`,
-    `food=${observation.food} wood=${observation.wood} gold=${observation.gold} pop=${observation.population}/${observation.populationCap}`,
+    `food=${observation.food} wood=${observation.wood} gold=${observation.gold} stone=${observation.stone} pop=${observation.population}/${observation.populationCap}`,
     `own: ${countByKind(mine) || 'none'}${idle ? ` (${idle} idle)` : ''}`,
     `enemy seen: ${countByKind(enemies) || 'none'}`,
     `remembered: ${observation.memory.length}`,
-    `resource nodes: ${nodes.filter(e => e.resource === 'food').length} food, ${nodes.filter(e => e.resource === 'wood').length} wood, ${nodes.filter(e => e.resource === 'gold').length} gold`,
+    `resource nodes: ${nodes.filter(e => e.resource === 'food').length} food, ${nodes.filter(e => e.resource === 'wood').length} wood, ${nodes.filter(e => e.resource === 'gold').length} gold, ${nodes.filter(e => e.resource === 'stone').length} stone`,
   ];
   if (observation.winner) parts.push(observation.winner === observation.player ? 'result: victory' : 'result: defeat');
   return parts.join(' | ');

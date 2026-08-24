@@ -15,6 +15,28 @@
       }
     },
     {
+      "key": "spearman",
+      "unitId": 93,
+      "category": "unit",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "attack": { "slot": "attack" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "archer",
+      "unitId": 4,
+      "category": "unit",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "attack": { "slot": "attack" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
       "key": "villager",
       "unitId": 83,
       "category": "unit",
@@ -77,6 +99,19 @@
       }
     },
     {
+      "key": "villager-stonemason",
+      "unitId": 124,
+      "category": "unit-variant",
+      "task": { "actionType": 5, "unitId": 102 },
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "work": { "task": { "actionType": 5, "unitId": 102 }, "graphic": "proceeding" },
+        "carry": { "task": { "actionType": 5, "unitId": 102 }, "graphic": "carrying" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
       "key": "town-center",
       "unitId": 109,
       "category": "building",
@@ -117,8 +152,97 @@
       }
     },
     {
+      "key": "mill",
+      "unitId": 68,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "lumber-camp",
+      "unitId": 562,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "mining-camp",
+      "unitId": 584,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "outpost",
+      "unitId": 598,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "watch-tower",
+      "unitId": 79,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "archery-range",
+      "unitId": 87,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "blacksmith",
+      "unitId": 103,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "market",
+      "unitId": 84,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
       "key": "gold",
       "unitId": 66,
+      "civ": "gaia",
+      "category": "resource",
+      "animations": {
+        "idle": { "slot": "standing" }
+      }
+    },
+    {
+      "key": "stone",
+      "unitId": 102,
       "civ": "gaia",
       "category": "resource",
       "animations": {
@@ -156,6 +280,8 @@
     "textureDirectories": ["textures/ingame/staticons"]
   },
   "terrain": {
-    "ground": { "terrainId": 0 }
+    "ground": { "terrainId": 0 },
+    "farm": { "terrainId": 7 },
+    "farm-construction": { "terrainId": 29 }
   }
 }

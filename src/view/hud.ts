@@ -80,7 +80,7 @@ export class Hud {
     this.root.innerHTML = `
       <div id="topbar-strip" class="panel"></div>
       <div id="resource-panel" class="panel">
-        ${['wood', 'food', 'gold'].map(resource => `
+        ${['wood', 'food', 'gold', 'stone'].map(resource => `
           <div class="resource-slot" data-resource="${resource}">
             <span class="resource-icon" data-icon="${resource}"></span>
             <span class="resource-value" data-value="${resource}">0</span>
@@ -123,7 +123,8 @@ export class Hud {
     style('#selection-panel', 'CivWestSingleSelectionPanel');
     style('#map-panel', 'CivWestMapPanel');
     const resourceIcons: Record<string, string> = {
-      wood: 'ResourceWood', food: 'ResourceFood', gold: 'ResourceGold', population: 'Population',
+      wood: 'ResourceWood', food: 'ResourceFood', gold: 'ResourceGold', stone: 'ResourceStone',
+      population: 'Population',
     };
     for (const [key, material] of Object.entries(resourceIcons)) {
       const element = this.root.querySelector<HTMLElement>(`[data-icon="${key}"]`);
@@ -136,7 +137,7 @@ export class Hud {
     const menuButton = this.root.querySelector<HTMLElement>('[data-icon="menu"]')!;
     menuButton.style.backgroundImage = this.texture('MenuMenuNormal');
 
-    for (const resource of ['wood', 'food', 'gold', 'population']) {
+    for (const resource of ['wood', 'food', 'gold', 'stone', 'population']) {
       this.resourceValues[resource] = this.root.querySelector(`[data-value="${resource}"]`)!;
     }
     this.commandGrid = this.root.querySelector('#command-grid')!;
@@ -257,6 +258,7 @@ export class Hud {
     this.resourceValues.wood.textContent = String(p.wood);
     this.resourceValues.food.textContent = String(p.food);
     this.resourceValues.gold.textContent = String(p.gold);
+    this.resourceValues.stone.textContent = String(p.stone);
     this.resourceValues.population.textContent = `${p.population} / ${p.populationCap}`;
   }
 

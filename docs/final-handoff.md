@@ -49,7 +49,42 @@ The importer integration resolves every consumed DAT graphic/rule and widgetui s
 
 Known discrepancies are the unstable supplemental player-color/shadow layers, single-terrain ground without the multi-terrain blend masks, approximate tint-based team colors, missing fire/corpse delta overlays, and some mirror-AI matches that stalemate until the configured timeout.
 
-The ground samples the imported DAT terrain texture (slot 0, `Grass`/`g_grs`) at the authored `terrain_dimensions` tile span; `terrain/blends` and `terrain/masks` are not consumed yet, so terrain-to-terrain transitions are absent rather than approximated.
+The ground samples the imported DAT terrain texture (slot 0, `Grass`/`g_grs`) at the authored `terrain_dimensions` tile span; `terrain/blends` and `terrain/masks` are not consumed yet, so terrain-to-terrain transitions are absent rather than approximated. Farms are terrain too (slots 7 and 29, `Farm1`/`Farm Cnst1`): the DAT gives them no SLD, so they draw as their own patch of the isometric grid.
+
+### Blocked on the pinned openage decoder
+
+Three gaps share one cause and are worth recording together, because the fix for
+one is likely the fix for all three.
+
+- **The stable is not imported.** `b_west_stable_age2_x1.sld` raises
+  `UnboundLocalError: local variable 'offset_x1' referenced before assignment`
+  (sld.pyx:246) because a frame reaches the unimplemented outline branch before
+  any graphics header is read. It is the only sprite of the whole spec that
+  fails. The scout cavalry it trains is therefore also absent.
+- **Sprite outlines are absent.** SLD frames carry an outline layer (bit 2 of
+  `frame_type`; the barracks reports `0x1f`, so main + shadow + outline + damage
+  + playercolor). AoE2DE draws the thin dark contour around units and buildings
+  from it. openage's parser marks that branch `# TODO` and skips it.
+- **Player-colour masks are absent**, as recorded above.
+
+`tools/sld_shadow.py` already reads the container and the DXT4/BC4 blocks
+without openage and handles the outline layer correctly by skipping it via the
+layer length. Extending it to decode the BC1 main and mask layers would replace
+the pinned decoder outright, which would recover the stable, the outlines, and
+the player-colour masks in one step, and remove the last GPL dependency from the
+import path.
+
+### Audio is not importable yet
+
+AoE2DE keeps its audio in Wwise packs (`wwise/*.pck`), which none of the three
+pinned depots contain -- the installed game lists depots 813783 and 813787 that
+the documented setup never downloads. `tools/wwise_pck.py` reads the archive
+index, and every stream sampled from `Base.pck` and `Base.1.pck` is format tag
+`0x3041`, Wwise Vorbis. That variant strips the Vorbis setup header and relies
+on external codebooks, so ffmpeg reports `Unsupported codec with id 0` and no
+decoder available here can play one. Sound triggers are therefore unimplemented:
+the game has no audio to trigger, and `sounds.json` carries only Wwise event
+names, not samples.
 
 ## Verification
 

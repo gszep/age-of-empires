@@ -127,6 +127,7 @@ function summary(state: ReturnType<typeof createGame>, player: PlayerId) {
     food: state.players[player].food,
     wood: state.players[player].wood,
     gold: state.players[player].gold,
+    stone: state.players[player].stone,
     population: state.players[player].population,
     entities: state.entities.filter(e => e.owner === player).length,
   };
