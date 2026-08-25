@@ -84,7 +84,24 @@ index, and every stream sampled from `Base.pck` and `Base.1.pck` is format tag
 on external codebooks, so ffmpeg reports `Unsupported codec with id 0` and no
 decoder available here can play one. Sound triggers are therefore unimplemented:
 the game has no audio to trigger, and `sounds.json` carries only Wwise event
-names, not samples.
+names, not samples. `docs/ui-reference.md` reached the same conclusion from the
+widget side and names the same depot.
+
+What would unblock it, cheapest first:
+
+- **`vgmstream-cli`** decodes Wwise Vorbis directly and is permissively
+  licensed, so the importer could shell out to it per stream the way it already
+  shells out to openage. `ww2ogg` plus `revorb` is the classic alternative but
+  is GPL-ish, so it must stay an external tool and never be vendored here.
+- **Our own decoder.** The codebook reconstruction is documented, so this could
+  live in `tools/` and stay MIT, as `tools/sld_shadow.py` does for shadows. It
+  is a bigger job than that one and only worth starting if no packaged decoder
+  is acceptable.
+
+Either way the container half is done: `tools/wwise_pck.py` already extracts
+streams correctly, so only the codec step is missing. Note the audio is in the
+installed game, so no additional depot download is required to work on this --
+only `AOE2DE_DEPOT_ROOT`'s sibling install path.
 
 ## Verification
 
