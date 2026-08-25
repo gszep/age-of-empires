@@ -10,9 +10,9 @@ import type { MatchRecord } from './protocol/types';
 import type { BuildingKind, Entity, GameState, Point, UnitKind } from './sim/types';
 import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
-import { worldToIso, isoToWorld, TILE_W, TILE_H } from './view/iso';
+import { worldToIso, isoToWorld, snapPlacement, TILE_W, TILE_H } from './view/iso';
 import { createEntityView, updateEntityView, entityKey, type EntityView } from './view/sprites';
-import { createGround, createFog } from './view/world';
+import { createGround, createFog, createFootprint } from './view/world';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 
 /**
@@ -22,7 +22,7 @@ import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
  * already-ticked GameState can silently diverge live state from what a
  * deterministic replay would produce, so simulation edits force a full reload.
  */
-const view = { createGround, createFog, createEntityView, updateEntityView, entityKey, Hud };
+const view = { createGround, createFog, createFootprint, createEntityView, updateEntityView, entityKey, Hud };
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -110,14 +110,14 @@ const selectionRings = new THREE.Group();
 selectionRings.renderOrder = 900;
 scene.add(selectionRings);
 
-// Building placement ghost.
-const ghost = new THREE.Mesh(
-  new THREE.PlaneGeometry(1, 1),
-  new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.4, depthTest: false, depthWrite: false }),
-);
-ghost.visible = false;
-ghost.renderOrder = 6000;
-scene.add(ghost);
+/**
+ * Placement preview: the building's own art where it will stand, over the tile
+ * square it will occupy. Rebuilt whenever the chosen building changes, since
+ * footprint size and sprite both depend on it.
+ */
+let ghostKind: BuildingKind | undefined;
+let ghostFootprint: THREE.Mesh | undefined;
+let ghostView: EntityView | undefined;
 let pointerWorld: Point = { x: 16, y: 9 };
 
 let soundSequence = 0;
@@ -127,6 +127,29 @@ function playSound(alias: string): void {
   const source = files[soundSequence++ % files.length];
   const element = new Audio(`${audioAssets!.base}${source.file}`);
   void element.play().catch(() => { /* browser gesture/autoplay policy */ });
+}
+
+/** A stand-in entity so the preview reuses the normal building rendering. */
+function ghostEntity(kind: BuildingKind, at: Point): Entity {
+  return {
+    id: 0, kind, owner: 1, position: at,
+    hp: 1, maxHp: 1, radius: rules.buildings[kind].radius,
+    activity: 'idle', order: { kind: 'idle' },
+  };
+}
+
+function disposeGhost(): void {
+  if (ghostFootprint) {
+    scene.remove(ghostFootprint);
+    ghostFootprint.geometry.dispose();
+    (ghostFootprint.material as THREE.Material).dispose();
+    ghostFootprint = undefined;
+  }
+  if (ghostView) {
+    scene.remove(ghostView.group);
+    ghostView = undefined;
+  }
+  ghostKind = undefined;
 }
 
 function createHud(): Hud {
@@ -232,8 +255,10 @@ renderer.domElement.addEventListener('pointerdown', event => {
   if (event.button === 0) {
     if (buildMode && !replay) {
       const builder = ownSelected().find(e => e.kind === 'villager');
+      // Commit exactly where the preview showed it, not the raw cursor point.
+      const target = snapPlacement(point, rules.buildings[buildMode].radius);
       const result = builder
-        ? applyCommand(game, { kind: 'build', player: 1, builderIds: ownSelected().filter(e => e.kind === 'villager').map(e => e.id), building: buildMode, target: point })
+        ? applyCommand(game, { kind: 'build', player: 1, builderIds: ownSelected().filter(e => e.kind === 'villager').map(e => e.id), building: buildMode, target })
         : { ok: false as const, reason: 'Select a villager first' };
       if (!result.ok) hud.showMessage(result.reason);
       buildMode = undefined;
@@ -533,18 +558,51 @@ function syncScene(time: number): void {
     ring.scale.set(radius / 50, radius / 50 * (TILE_H / TILE_W), 1);
   }
 
-  // Placement ghost.
+  // Placement preview.
   if (buildMode) {
-    const half = rules.buildings[buildMode].radius;
-    const legal = placementLegal(game, buildMode, pointerWorld).ok;
-    const iso = worldToIso(pointerWorld.x, pointerWorld.y);
-    ghost.visible = true;
-    ghost.position.set(iso.x, iso.y, 0);
-    ghost.scale.set(half * 2 * TILE_W, half * 2 * TILE_H, 1);
-    (ghost.material as THREE.MeshBasicMaterial).color.set(legal ? 0x7fff9e : 0xff5f5f);
-  } else {
-    ghost.visible = false;
+    if (ghostKind !== buildMode) {
+      disposeGhost();
+      ghostKind = buildMode;
+      ghostFootprint = view.createFootprint(rules.buildings[buildMode].radius);
+      scene.add(ghostFootprint);
+      ghostView = view.createEntityView(assets, ghostEntity(buildMode, pointerWorld));
+      ghostView.group.renderOrder = 6000;
+      scene.add(ghostView.group);
+    }
+    const target = placementTarget();
+    const legal = placementLegal(game, buildMode, target).ok;
+    const tint = legal ? 0x7fff9e : 0xff5f5f;
+    const iso = worldToIso(target.x, target.y);
+    ghostFootprint!.visible = true;
+    ghostFootprint!.position.set(iso.x, iso.y, 0);
+    (ghostFootprint!.material as THREE.MeshBasicMaterial).color.set(tint);
+
+    // Draw the real building translucent and tinted, so its silhouette shows
+    // exactly what will appear and whether the spot is legal.
+    const preview = ghostEntity(buildMode, target);
+    view.updateEntityView(ghostView!, assets, game, preview, time);
+    ghostView!.group.visible = true;
+    for (const mesh of [ghostView!.body.mesh, ghostView!.shadow.mesh, ...ghostView!.annexes.map(a => a.mesh)]) {
+      const material = mesh.material as THREE.MeshBasicMaterial;
+      material.opacity = 0.55;
+      material.color.set(tint);
+      mesh.renderOrder = 6000;
+    }
+    if (ghostView!.patch) {
+      const material = ghostView!.patch.material as THREE.MeshBasicMaterial;
+      material.opacity = 0.55;
+      material.color.set(tint);
+      ghostView!.patch.renderOrder = 5950;
+    }
+  } else if (ghostKind) {
+    disposeGhost();
   }
+}
+
+/** Where the pending building would actually land, snapped to the tile grid. */
+function placementTarget(): Point {
+  if (!buildMode) return pointerWorld;
+  return snapPlacement(pointerWorld, rules.buildings[buildMode].radius);
 }
 
 function resize(): void {
@@ -667,6 +725,7 @@ function rebuildPresentation(): void {
 
   for (const entityView of views.values()) scene.remove(entityView.group);
   views.clear();
+  disposeGhost();
 
   const menuWasOpen = hud.menuOpen;
   hud.destroy();
@@ -694,6 +753,7 @@ if (import.meta.hot) {
       if (world) {
         view.createGround = world.createGround;
         view.createFog = world.createFog;
+        view.createFootprint = world.createFootprint;
       }
       if (sprites) {
         view.createEntityView = sprites.createEntityView;

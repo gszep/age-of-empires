@@ -23,3 +23,15 @@ export function isoToWorld(sx: number, sy: number): Point {
 
 /** Painter depth: larger draws later (in front). */
 export const isoDepth = (x: number, y: number): number => x + y;
+
+/**
+ * Snap a foundation centre to the tile grid, as AoE2 does: a building with an
+ * odd side length centres on a tile, an even one on a tile corner. Either way
+ * the footprint edges land on tile boundaries, so the preview matches the
+ * square `placementLegal` tests and the covered tiles are unambiguous.
+ */
+export function snapPlacement(point: Point, half: number): Point {
+  const odd = Math.round(half * 2) % 2 === 1;
+  const snap = (value: number) => odd ? Math.floor(value) + 0.5 : Math.round(value);
+  return { x: snap(point.x), y: snap(point.y) };
+}

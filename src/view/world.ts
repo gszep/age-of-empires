@@ -90,6 +90,32 @@ export function createTerrainPatch(
   return mesh;
 }
 
+/**
+ * Footprint outline for a building being placed, as the tile square it will
+ * actually occupy. In the dimetric projection that square reads as a diamond,
+ * so an axis-aligned quad would sit at the wrong angle to the grid and
+ * misreport which tiles are covered.
+ */
+export function createFootprint(half: number): THREE.Mesh {
+  const corners = [
+    worldToIso(-half, -half),
+    worldToIso(half, -half),
+    worldToIso(half, half),
+    worldToIso(-half, half),
+  ];
+  const positions: number[] = [];
+  for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]] as const) {
+    for (const index of [a, b, c]) positions.push(corners[index].x, corners[index].y, 0);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+    transparent: true, opacity: 0.35, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+  }));
+  mesh.renderOrder = 5900;
+  return mesh;
+}
+
 export interface FogLayer {
   mesh: THREE.Mesh;
   update(state: GameState): void;
