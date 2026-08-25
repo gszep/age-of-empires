@@ -9,3 +9,6 @@ __pycache__/
 .tools/
 .local/
 public/imported/
+
+# Scratch git worktrees
+.claude/worktrees/
