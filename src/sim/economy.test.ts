@@ -319,6 +319,64 @@ describe('towers', () => {
     run(state, 60);
     expect(victim.hp).toBeLessThan(before);
   });
+
+  it('lands damage when the arrow arrives, not when it is loosed', () => {
+    const state = createGame();
+    state.players[1].stone = 500;
+    state.players[1].wood = 500;
+    const builder = villagerOf(state);
+    applyCommand(state, {
+      kind: 'build', player: 1, builderIds: [builder.id], building: 'watch-tower',
+      target: freeSpot(state, 'watch-tower', builder.position),
+    });
+    const tower = state.entities.find(e => e.kind === 'watch-tower')!;
+    tower.buildProgress = undefined;
+    const victim = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
+    // Far enough that the arrow needs several ticks to cross.
+    const range = FALLBACK_RULES.buildings['watch-tower'].attack!.range;
+    victim.position = { x: tower.position.x + range - 0.5, y: tower.position.y };
+    const before = victim.hp;
+
+    // Step to the tick the tower looses its first arrow.
+    let fired = 0;
+    while (fired < 400 && state.projectiles.length === 0) { stepGame(state); fired++; }
+    expect(state.projectiles.length).toBe(1);
+    expect(victim.hp).toBe(before); // still in flight, nothing landed yet
+
+    const arrow = state.projectiles[0];
+    expect(arrow.owner).toBe(1);
+    expect(arrow.targetId).toBe(victim.id);
+    stepGame(state);
+    // It moved toward the target rather than teleporting.
+    expect(arrow.position.x).toBeGreaterThan(tower.position.x);
+    expect(arrow.position.x).toBeLessThan(victim.position.x);
+
+    while (state.projectiles.length > 0) stepGame(state);
+    expect(victim.hp).toBeLessThan(before);
+  });
+
+  it('spends an arrow whose target dies mid-flight', () => {
+    const state = createGame();
+    state.players[1].stone = 500;
+    state.players[1].wood = 500;
+    const builder = villagerOf(state);
+    applyCommand(state, {
+      kind: 'build', player: 1, builderIds: [builder.id], building: 'watch-tower',
+      target: freeSpot(state, 'watch-tower', builder.position),
+    });
+    const tower = state.entities.find(e => e.kind === 'watch-tower')!;
+    tower.buildProgress = undefined;
+    const victim = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
+    const range = FALLBACK_RULES.buildings['watch-tower'].attack!.range;
+    victim.position = { x: tower.position.x + range - 0.5, y: tower.position.y };
+    while (state.projectiles.length === 0) stepGame(state);
+
+    victim.hp = 0;
+    victim.dead = true;
+    stepGame(state);
+    // No target left to hit, so the arrow is dropped rather than retargeted.
+    expect(state.projectiles.length).toBe(0);
+  });
 });
 
 describe('imported rules', () => {

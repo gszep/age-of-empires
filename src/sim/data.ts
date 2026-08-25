@@ -23,6 +23,8 @@ export interface UnitRules {
   attackReleaseSeconds: number;
   /** Tiles a ranged unit may strike from; melee units leave this unset. */
   range?: number;
+  /** Arrow travel speed in tiles per second; set only for ranged attackers. */
+  projectileSpeed?: number;
 }
 
 export interface BuildingRules {
@@ -44,6 +46,7 @@ export interface BuildingRules {
     attacks: AttackValue[];
     reloadSeconds: number;
     releaseSeconds: number;
+    projectileSpeed: number;
   };
 }
 
@@ -105,7 +108,7 @@ export const FALLBACK_RULES: GameRules = {
       attacks: [{ class: 3, amount: 4 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.35,
-      range: 4,
+      range: 4, projectileSpeed: 7,
     },
   },
   buildings: {
@@ -153,7 +156,10 @@ export const FALLBACK_RULES: GameRules = {
       hp: 850, radius: 0.5, lineOfSight: 8, cost: cost(0, 25, 0, 125), buildSeconds: 27,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 8 }],
-      attack: { range: 8, attacks: [{ class: 3, amount: 5 }], reloadSeconds: 2, releaseSeconds: 0.35 },
+      attack: {
+        range: 8, attacks: [{ class: 3, amount: 5 }], reloadSeconds: 2, releaseSeconds: 0.35,
+        projectileSpeed: 7,
+      },
     },
     'archery-range': {
       hp: 1500, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
@@ -193,6 +199,9 @@ interface ManifestEntity {
   combat?: {
     reloadSeconds: number;
     frameDelay: number;
+    minimumRange?: number;
+    maximumRange?: number;
+    projectileUnitId?: number;
     attacks: AttackValue[];
     armors: AttackValue[];
   };
@@ -233,7 +242,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       attackReleaseSeconds: Math.round(
         (e[key].combat?.frameDelay ?? 10) * (e[key].animations?.attack?.frameSeconds ?? 0.05) * 100,
       ) / 100,
-      range: fallback?.range,
+      range: e[key].combat?.maximumRange || fallback?.range,
+      projectileSpeed: fallback?.projectileSpeed,
     };
   };
   const building = (key: string, buildable: boolean): BuildingRules => {
@@ -254,6 +264,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       farmAmount: e[key].storage?.food ?? fallback.farmAmount,
       attack: fallback.attack && {
         ...fallback.attack,
+        range: e[key].combat?.maximumRange || fallback.attack.range,
         attacks: attackValues(e[key].combat?.attacks).length
           ? attackValues(e[key].combat?.attacks)
           : fallback.attack.attacks,

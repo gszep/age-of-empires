@@ -3,7 +3,7 @@ import type { ContentAssets, Atlas, AnimationInfo } from './assets';
 import { isBuilding } from '../sim/data';
 import { createTerrainPatch } from './world';
 import { worldToIso, isoDepth } from './iso';
-import type { Entity, GameState } from '../sim/types';
+import type { Entity, GameState, Point } from '../sim/types';
 
 /** AoE2DE player colors (blue player 1, red player 2). */
 export const PLAYER_COLORS: Record<number, number> = { 0: 0xffffff, 1: 0x1a6cff, 2: 0xe02b2b };
@@ -134,8 +134,7 @@ function applyFrame(
   assets: ContentAssets,
   atlas: Atlas,
   frameIndex: number,
-  worldOffset: { x: number; y: number },
-  entity: Entity,
+  position: Point,
   tint: number,
 ): void {
   const mesh = piece.mesh;
@@ -165,7 +164,7 @@ function applyFrame(
     uv.needsUpdate = true;
   }
   mesh.scale.set(frame.w, frame.h, 1);
-  const iso = worldToIso(entity.position.x + worldOffset.x, entity.position.y + worldOffset.y);
+  const iso = worldToIso(position.x, position.y);
   // Anchor the hotspot at the entity ground position.
   mesh.position.set(iso.x + frame.w / 2 - frame.cx, iso.y - frame.h / 2 + frame.cy, 0);
 }
@@ -185,6 +184,36 @@ function directionIndex(facing: number, directions: number): number {
   const angle = Math.atan2(-screenX, screenDown) + Math.PI / 2;
   const index = Math.round(angle / (2 * Math.PI) * directions);
   return ((index % directions) + directions) % directions;
+}
+
+/**
+ * Arrows in flight. They are not entities in the simulation, so they render
+ * from their own state rather than through the entity path, but they reuse the
+ * atlas frame and direction machinery: `p_arrow_x1` carries 32 angles, so the
+ * shaft points along its actual heading.
+ */
+export function createProjectileView(): EntityView {
+  const group = new THREE.Group();
+  const shadow = makePiece();
+  const body = makePiece();
+  group.add(body.mesh);
+  return { group, shadow, body, annexes: [], fallback: false, facing: 0 };
+}
+
+export function updateProjectileView(
+  view: EntityView, assets: ContentAssets | undefined, position: Point, heading: number,
+): void {
+  const arrow = assets?.entities['arrow'];
+  const atlas = arrow?.atlases['idle'];
+  const animation = arrow?.animations['idle'];
+  if (!assets || !atlas || !animation) { view.body.mesh.visible = false; return; }
+  // Same indexing as animated entities: whole direction blocks laid end to end.
+  // The arrow holds its pose in flight, so it always takes each block's frame 0.
+  const framesPerDirection = Math.max(1, animation.frames);
+  const directionsInFile = Math.max(1, Math.floor(atlas.framesInFile / framesPerDirection));
+  const frameIndex = (directionIndex(heading, animation.directions) % directionsInFile) * framesPerDirection;
+  applyFrame(view.body, assets, atlas, frameIndex, position, 0xffffff);
+  view.body.mesh.renderOrder = 4000 + isoDepth(position.x, position.y);
 }
 
 /** Farms swap between the construction and grown terrain slots. */
@@ -282,14 +311,14 @@ export function updateEntityView(
   // shadow draws below every body so entities never occlude each other's.
   const shadowAtlas = imported?.atlases[`${choice.name}-shadow`];
   if (shadowAtlas && !entity.dead) {
-    applyFrame(view.shadow, assets, shadowAtlas, frameIndex, { x: 0, y: 0 }, entity, 0xffffff);
+    applyFrame(view.shadow, assets, shadowAtlas, frameIndex, entity.position, 0xffffff);
     view.shadow.mesh.renderOrder = 500 + depth;
     (view.shadow.mesh.material as THREE.MeshBasicMaterial).opacity = 0.55;
   } else {
     view.shadow.mesh.visible = false;
   }
 
-  applyFrame(view.body, assets, atlas, frameIndex, { x: 0, y: 0 }, entity, tint);
+  applyFrame(view.body, assets, atlas, frameIndex, entity.position, tint);
   view.body.mesh.renderOrder = 1000 + depth * 10;
   (view.body.mesh.material as THREE.MeshBasicMaterial).opacity =
     entity.buildProgress !== undefined ? 0.85 : 1;
@@ -304,7 +333,7 @@ export function updateEntityView(
     }
     // Annex art is anchored by its own frame hotspot; the DAT misplacement
     // is display-order metadata here, not an additional world offset.
-    applyFrame(piece, assets, annexAtlas, 0, { x: 0, y: 0 }, entity, 0xffffff);
+    applyFrame(piece, assets, annexAtlas, 0, entity.position, 0xffffff);
     piece.mesh.renderOrder = 1000 + isoDepth(entity.position.x, entity.position.y) * 10 + 1 + index;
   }
 }

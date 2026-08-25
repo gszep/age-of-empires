@@ -141,6 +141,10 @@ def extract_entity(
             "attacks": [{"class": a.class_, "amount": a.amount} for a in combat.attacks],
             "armors": [{"class": a.class_, "amount": a.amount} for a in combat.armours],
         }
+        # Ranged shooters name the projectile they launch; the arrow's own
+        # entry carries its travel speed and art.
+        if combat.projectile_unit_id is not None and combat.projectile_unit_id >= 0:
+            entity["combat"]["projectileUnitId"] = combat.projectile_unit_id
 
     if category == "unit-variant":
         task = find_task(unit, spec["task"])

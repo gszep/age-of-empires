@@ -11,7 +11,7 @@ import type { BuildingKind, Entity, GameState, Point, UnitKind } from './sim/typ
 import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, TILE_W, TILE_H } from './view/iso';
-import { createEntityView, updateEntityView, entityKey, type EntityView } from './view/sprites';
+import { createEntityView, createProjectileView, updateEntityView, updateProjectileView, entityKey, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint } from './view/world';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 
@@ -22,7 +22,11 @@ import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
  * already-ticked GameState can silently diverge live state from what a
  * deterministic replay would produce, so simulation edits force a full reload.
  */
-const view = { createGround, createFog, createFootprint, createEntityView, updateEntityView, entityKey, Hud };
+const view = {
+  createGround, createFog, createFootprint,
+  createEntityView, updateEntityView, createProjectileView, updateProjectileView,
+  entityKey, Hud,
+};
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -529,6 +533,25 @@ function syncScene(time: number): void {
       scene.add(entityView.group);
     }
   }
+  // Arrows in flight. They are simulation state, so they render from it
+  // directly rather than being faked on the view side.
+  for (const projectile of game.projectiles) {
+    if (!isTileVisible(game, 1, projectile.position.x, projectile.position.y)) continue;
+    const key = `p${projectile.id}`;
+    wanted.add(key);
+    const target = game.entities.find(e => e.id === projectile.targetId);
+    const heading = target
+      ? Math.atan2(target.position.y - projectile.position.y, target.position.x - projectile.position.x)
+      : 0;
+    let entityView = views.get(key);
+    if (!entityView) {
+      entityView = view.createProjectileView();
+      views.set(key, entityView);
+      scene.add(entityView.group);
+    }
+    view.updateProjectileView(entityView, assets, projectile.position, heading);
+  }
+
   for (const [key, entityView] of views) {
     if (!wanted.has(key)) {
       scene.remove(entityView.group);
@@ -758,6 +781,8 @@ if (import.meta.hot) {
       if (sprites) {
         view.createEntityView = sprites.createEntityView;
         view.updateEntityView = sprites.updateEntityView;
+        view.createProjectileView = sprites.createProjectileView;
+        view.updateProjectileView = sprites.updateProjectileView;
         view.entityKey = sprites.entityKey;
       }
       if (hudModule) view.Hud = hudModule.Hud;

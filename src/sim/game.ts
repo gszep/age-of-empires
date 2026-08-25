@@ -45,7 +45,7 @@ function cluster(state: GameState, node: NodeKind, center: Point, count: number)
 
 export function createGame(seed = 42, rules: GameRules = FALLBACK_RULES): GameState {
   const state: GameState = {
-    rules, seed: seed || 1, tick: 0, nextId: 1, width: 32, height: 18, entities: [],
+    rules, seed: seed || 1, tick: 0, nextId: 1, width: 32, height: 18, entities: [], projectiles: [],
     players: {
       1: { id: 1, ...rules.startingResources, population: 0, populationCap: 0 },
       2: { id: 2, ...rules.startingResources, population: 0, populationCap: 0 },
@@ -456,11 +456,57 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
   }
   entity.attackWindup -= 1;
   if (entity.attackWindup <= 0) {
-    target.hp -= computeDamage(rules.attacks, armorsOf(state, target));
-    if (target.hp <= 0) kill(state, target);
+    releaseAttack(state, entity, target, rules.attacks, rules.projectileSpeed);
     entity.attackWindup = undefined;
     entity.attackCooldown = Math.max(1, Math.round(rules.attackReloadSeconds * TICKS_PER_SECOND) - Math.max(1, Math.round(rules.attackReleaseSeconds * TICKS_PER_SECOND)));
   }
+}
+
+/**
+ * Melee lands immediately; a ranged shot launches an arrow that resolves on
+ * impact, so damage arrives when the projectile does.
+ */
+function releaseAttack(
+  state: GameState, shooter: Entity, target: Entity,
+  attacks: AttackValue[], projectileSpeed: number | undefined,
+): void {
+  if (!projectileSpeed) {
+    target.hp -= computeDamage(attacks, armorsOf(state, target));
+    if (target.hp <= 0) kill(state, target);
+    return;
+  }
+  state.projectiles.push({
+    id: state.nextId++,
+    owner: shooter.owner as PlayerId,
+    position: { ...shooter.position },
+    targetId: target.id,
+    attacks: attacks.map(a => ({ ...a })),
+    speed: projectileSpeed,
+  });
+}
+
+function updateProjectiles(state: GameState): void {
+  const remaining: typeof state.projectiles = [];
+  for (const projectile of state.projectiles) {
+    const target = state.entities.find(e => e.id === projectile.targetId && !e.dead);
+    // The target died or despawned first: the arrow is spent, not redirected.
+    if (!target) continue;
+    const dx = target.position.x - projectile.position.x;
+    const dy = target.position.y - projectile.position.y;
+    const gap = Math.hypot(dx, dy);
+    const step = projectile.speed * TICK_SECONDS;
+    if (gap <= step + target.radius) {
+      target.hp -= computeDamage(projectile.attacks, armorsOf(state, target));
+      if (target.hp <= 0) kill(state, target);
+      continue;
+    }
+    projectile.position = {
+      x: projectile.position.x + dx / gap * step,
+      y: projectile.position.y + dy / gap * step,
+    };
+    remaining.push(projectile);
+  }
+  state.projectiles = remaining;
 }
 
 /** Idle military units acquire the nearest living enemy in line of sight. */
@@ -512,8 +558,7 @@ function updateTower(state: GameState, entity: Entity): void {
   }
   entity.attackWindup -= 1;
   if (entity.attackWindup <= 0) {
-    target.hp -= computeDamage(attack.attacks, armorsOf(state, target));
-    if (target.hp <= 0) kill(state, target);
+    releaseAttack(state, entity, target, attack.attacks, attack.projectileSpeed);
     entity.attackWindup = undefined;
     entity.attackCooldown = Math.max(
       1,
@@ -598,6 +643,7 @@ export function stepGame(state: GameState): void {
     }
   }
   separateUnits(state, movable, grid);
+  updateProjectiles(state);
   for (const site of state.entities) {
     if (site.buildProgress === undefined) continue;
     const builders = builderCounts.get(site.id) ?? 0;

@@ -62,6 +62,21 @@ export interface PlayerState {
   populationCap: number;
 }
 
+/**
+ * An arrow in flight. Ranged attackers resolve damage on impact rather than on
+ * release, so a shot crosses the gap the way it does in AoE2 and a target that
+ * dies first simply takes the arrow into empty ground.
+ */
+export interface Projectile {
+  id: number;
+  owner: PlayerId;
+  position: Point;
+  targetId: number;
+  /** Fixed at launch, so the shot lands even if the shooter dies mid-flight. */
+  attacks: { class: number; amount: number }[];
+  speed: number; // tiles per second
+}
+
 export interface GameState {
   rules: GameRules;
   seed: number;
@@ -70,6 +85,7 @@ export interface GameState {
   width: number;
   height: number;
   entities: Entity[];
+  projectiles: Projectile[];
   players: Record<PlayerId, PlayerState>;
   visibility: Record<PlayerId, PlayerVisibility>;
   winner?: PlayerId;
