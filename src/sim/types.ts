@@ -77,6 +77,8 @@ export interface Projectile {
   /** Fixed at launch, so the shot lands even if the shooter dies mid-flight. */
   attacks: { class: number; amount: number }[];
   speed: number; // tiles per second
+  /** Height it left from, in tiles: a tower shoots from its top. */
+  launchHeight: number;
 }
 
 export interface GameState {

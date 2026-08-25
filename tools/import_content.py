@@ -145,6 +145,10 @@ def extract_entity(
         # entry carries its travel speed and art.
         if combat.projectile_unit_id is not None and combat.projectile_unit_id >= 0:
             entity["combat"]["projectileUnitId"] = combat.projectile_unit_id
+        # Where the shot leaves the shooter. The z component is what puts a
+        # tower's arrows at its top, so a close shot points down rather than up.
+        if combat.graphic_displacement:
+            entity["combat"]["launchOffset"] = [rounded(v) for v in combat.graphic_displacement]
 
     if category == "projectile" and unit.projectile is not None:
         # `projectile_arc` is a fraction of the shot's distance. Its sign varies

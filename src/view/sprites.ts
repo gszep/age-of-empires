@@ -28,6 +28,13 @@ export interface EntityView {
   lastPosition?: { x: number; y: number };
 }
 
+/**
+ * Screen pixels per tile of height. Calibrated against the DAT's own launch
+ * offsets: the archer's 1.5 puts its shot at 36px, exactly its sprite hotspot
+ * height, and the watch tower's 5 lands two thirds up its 184px tower.
+ */
+const HEIGHT_PIXELS = TILE_H / 2;
+
 const material = () => new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false });
 
 function makePiece(): Piece {
@@ -207,6 +214,7 @@ export function updateProjectileView(
   heading: number,
   progress: number,
   span: number,
+  launchHeight: number,
 ): void {
   const arrow = assets?.entities['arrow'];
   const atlas = arrow?.atlases['idle'];
@@ -219,14 +227,25 @@ export function updateProjectileView(
   // The frames within a direction are the shaft's pitch along the arc, from
   // steeply up through level to steeply down, so the frame tracks how far the
   // arrow has flown. Holding one frame is what made shots look rigid.
-  const pitch = Math.min(framesPerDirection - 1, Math.max(0, Math.floor(progress * framesPerDirection)));
-  applyFrame(view.body, assets, atlas, direction * framesPerDirection + pitch, position, 0xffffff);
-  // Lift it off the ground along the same arc, peaking mid-flight. Peak height
-  // is the DAT's arc fraction of the shot's span; the sign of that field varies
-  // between units in ways the import does not interpret, so use its magnitude.
+  // Trajectory: drop from the launch height to the ground over the flight,
+  // bulged by the DAT's arc fraction of the span. A tower shoots from its top,
+  // so a close shot is descending the whole way and never points up, while a
+  // long one still lobs. The sign of `arc` varies between units in ways the
+  // import does not interpret, so use its magnitude.
   const arc = Math.abs(arrow?.projectile?.arc ?? 0);
-  const height = arc * span * 4 * progress * (1 - progress);
-  view.body.mesh.position.y += height * TILE_H;
+  const bulge = 4 * arc * span;
+  const height = launchHeight * (1 - progress) + bulge * progress * (1 - progress);
+  // Pitch is the trajectory's slope in screen space, where the ground track is
+  // foreshortened by the projection but height is not.
+  const climbPerFlight = -launchHeight + bulge * (1 - 2 * progress);
+  const ground = worldToIso(Math.cos(heading) * span, Math.sin(heading) * span);
+  const groundScreen = Math.hypot(ground.x, ground.y);
+  const angle = Math.atan2(climbPerFlight * HEIGHT_PIXELS, Math.max(1e-6, groundScreen));
+  const normalized = Math.max(-1, Math.min(1, angle / (Math.PI / 2)));
+  const pitch = Math.round((1 - normalized) / 2 * (framesPerDirection - 1));
+
+  applyFrame(view.body, assets, atlas, direction * framesPerDirection + pitch, position, 0xffffff);
+  view.body.mesh.position.y += height * HEIGHT_PIXELS;
   view.body.mesh.renderOrder = 4000 + isoDepth(position.x, position.y);
 }
 

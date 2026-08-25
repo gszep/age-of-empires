@@ -560,7 +560,9 @@ function syncScene(time: number): void {
       views.set(key, entityView);
       scene.add(entityView.group);
     }
-    view.updateProjectileView(entityView, assets, projectile.position, heading, progress, span);
+    view.updateProjectileView(
+      entityView, assets, projectile.position, heading, progress, span, projectile.launchHeight,
+    );
   }
 
   for (const [key, entityView] of views) {

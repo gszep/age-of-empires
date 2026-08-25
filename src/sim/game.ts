@@ -456,7 +456,7 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
   }
   entity.attackWindup -= 1;
   if (entity.attackWindup <= 0) {
-    releaseAttack(state, entity, target, rules.attacks, rules.projectileSpeed);
+    releaseAttack(state, entity, target, rules.attacks, rules.projectileSpeed, rules.launchHeight);
     entity.attackWindup = undefined;
     entity.attackCooldown = Math.max(1, Math.round(rules.attackReloadSeconds * TICKS_PER_SECOND) - Math.max(1, Math.round(rules.attackReleaseSeconds * TICKS_PER_SECOND)));
   }
@@ -468,7 +468,7 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
  */
 function releaseAttack(
   state: GameState, shooter: Entity, target: Entity,
-  attacks: AttackValue[], projectileSpeed: number | undefined,
+  attacks: AttackValue[], projectileSpeed: number | undefined, launchHeight = 0,
 ): void {
   if (!projectileSpeed) {
     target.hp -= computeDamage(attacks, armorsOf(state, target));
@@ -483,6 +483,7 @@ function releaseAttack(
     targetId: target.id,
     attacks: attacks.map(a => ({ ...a })),
     speed: projectileSpeed,
+    launchHeight,
   });
 }
 
@@ -542,9 +543,13 @@ function updateTower(state: GameState, entity: Entity): void {
   let bestDistance = Infinity;
   for (const candidate of state.entities) {
     if (candidate.dead || candidate.owner === 0 || candidate.owner === entity.owner) continue;
-    if (!isUnit(candidate.kind)) continue;
+    // Buildings are valid targets too, but a unit in range is the live threat,
+    // so units outrank them however close the building is.
+    if (target && isUnit(target.kind) && !isUnit(candidate.kind)) continue;
+    const outranks = isUnit(candidate.kind) && target && !isUnit(target.kind);
     const d = distance(entity.position, candidate.position) - candidate.radius;
-    if (d <= entity.radius + attack.range && (d < bestDistance - 1e-9 || (Math.abs(d - bestDistance) <= 1e-9 && (target?.id ?? Infinity) > candidate.id))) {
+    if (d > entity.radius + attack.range) continue;
+    if (outranks || d < bestDistance - 1e-9 || (Math.abs(d - bestDistance) <= 1e-9 && (target?.id ?? Infinity) > candidate.id)) {
       target = candidate;
       bestDistance = d;
     }
@@ -559,7 +564,7 @@ function updateTower(state: GameState, entity: Entity): void {
   }
   entity.attackWindup -= 1;
   if (entity.attackWindup <= 0) {
-    releaseAttack(state, entity, target, attack.attacks, attack.projectileSpeed);
+    releaseAttack(state, entity, target, attack.attacks, attack.projectileSpeed, attack.launchHeight);
     entity.attackWindup = undefined;
     entity.attackCooldown = Math.max(
       1,

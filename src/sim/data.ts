@@ -25,6 +25,8 @@ export interface UnitRules {
   range?: number;
   /** Arrow travel speed in tiles per second; set only for ranged attackers. */
   projectileSpeed?: number;
+  /** Height the shot leaves from, in tiles (DAT graphic displacement z). */
+  launchHeight?: number;
 }
 
 export interface BuildingRules {
@@ -47,6 +49,7 @@ export interface BuildingRules {
     reloadSeconds: number;
     releaseSeconds: number;
     projectileSpeed: number;
+    launchHeight: number;
   };
 }
 
@@ -108,7 +111,7 @@ export const FALLBACK_RULES: GameRules = {
       attacks: [{ class: 3, amount: 4 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.35,
-      range: 4, projectileSpeed: 7,
+      range: 4, projectileSpeed: 7, launchHeight: 1.5,
     },
   },
   buildings: {
@@ -158,7 +161,7 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 8 }],
       attack: {
         range: 8, attacks: [{ class: 3, amount: 5 }], reloadSeconds: 2, releaseSeconds: 0.35,
-        projectileSpeed: 7,
+        projectileSpeed: 7, launchHeight: 5,
       },
     },
     'archery-range': {
@@ -202,6 +205,7 @@ interface ManifestEntity {
     minimumRange?: number;
     maximumRange?: number;
     projectileUnitId?: number;
+    launchOffset?: number[];
     attacks: AttackValue[];
     armors: AttackValue[];
   };
@@ -244,6 +248,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       ) / 100,
       range: e[key].combat?.maximumRange || fallback?.range,
       projectileSpeed: fallback?.projectileSpeed,
+      launchHeight: e[key].combat?.launchOffset?.[2] ?? fallback?.launchHeight,
     };
   };
   const building = (key: string, buildable: boolean): BuildingRules => {
@@ -265,6 +270,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       attack: fallback.attack && {
         ...fallback.attack,
         range: e[key].combat?.maximumRange || fallback.attack.range,
+        launchHeight: e[key].combat?.launchOffset?.[2] ?? fallback.attack.launchHeight,
         attacks: attackValues(e[key].combat?.attacks).length
           ? attackValues(e[key].combat?.attacks)
           : fallback.attack.attacks,

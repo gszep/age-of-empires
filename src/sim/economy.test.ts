@@ -417,6 +417,37 @@ describe('towers', () => {
     expect(victim.hp).toBeLessThan(before);
   });
 
+  it('shoots enemy buildings, but takes a unit over a building', () => {
+    const state = createGame();
+    state.players[1].stone = 500;
+    state.players[1].wood = 500;
+    const builder = villagerOf(state);
+    applyCommand(state, {
+      kind: 'build', player: 1, builderIds: [builder.id], building: 'watch-tower',
+      target: freeSpot(state, 'watch-tower', builder.position),
+    });
+    const tower = state.entities.find(e => e.kind === 'watch-tower')!;
+    tower.buildProgress = undefined;
+    // Park an enemy town center in range and keep every enemy unit away.
+    const enemyTc = state.entities.find(e => e.owner === 2 && e.kind === 'town-center')!;
+    enemyTc.position = { x: tower.position.x + 3, y: tower.position.y };
+    for (const unit of state.entities.filter(e => e.owner === 2 && e.kind === 'villager')) {
+      unit.position = { x: state.width - 1, y: 1 };
+    }
+    const beforeBuilding = enemyTc.hp;
+    run(state, 200);
+    expect(enemyTc.hp).toBeLessThan(beforeBuilding);
+
+    // Now bring a unit into range: it is the live threat and takes priority.
+    const victim = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
+    victim.position = { x: tower.position.x + 2, y: tower.position.y };
+    const buildingHp = enemyTc.hp;
+    const unitHp = victim.hp;
+    run(state, 200);
+    expect(victim.hp).toBeLessThan(unitHp);
+    expect(enemyTc.hp).toBe(buildingHp);
+  });
+
   it('spends an arrow whose target dies mid-flight', () => {
     const state = createGame();
     state.players[1].stone = 500;
