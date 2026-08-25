@@ -479,6 +479,7 @@ function releaseAttack(
     id: state.nextId++,
     owner: shooter.owner as PlayerId,
     position: { ...shooter.position },
+    origin: { ...shooter.position },
     targetId: target.id,
     attacks: attacks.map(a => ({ ...a })),
     speed: projectileSpeed,

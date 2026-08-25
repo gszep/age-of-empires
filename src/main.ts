@@ -543,13 +543,24 @@ function syncScene(time: number): void {
     const heading = target
       ? Math.atan2(target.position.y - projectile.position.y, target.position.x - projectile.position.x)
       : 0;
+    // Progress along the shot, measured against the launch point so a moving
+    // target still gives a sane 0..1 sweep.
+    const flown = Math.hypot(
+      projectile.position.x - projectile.origin.x,
+      projectile.position.y - projectile.origin.y,
+    );
+    const left = target
+      ? Math.hypot(target.position.x - projectile.position.x, target.position.y - projectile.position.y)
+      : 0;
+    const span = flown + left;
+    const progress = span > 1e-6 ? flown / span : 0;
     let entityView = views.get(key);
     if (!entityView) {
       entityView = view.createProjectileView();
       views.set(key, entityView);
       scene.add(entityView.group);
     }
-    view.updateProjectileView(entityView, assets, projectile.position, heading);
+    view.updateProjectileView(entityView, assets, projectile.position, heading, progress, span);
   }
 
   for (const [key, entityView] of views) {

@@ -71,6 +71,8 @@ export interface Projectile {
   id: number;
   owner: PlayerId;
   position: Point;
+  /** Launch point, so the renderer can tell how far through its flight it is. */
+  origin: Point;
   targetId: number;
   /** Fixed at launch, so the shot lands even if the shooter dies mid-flight. */
   attacks: { class: number; amount: number }[];

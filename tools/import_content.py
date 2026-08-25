@@ -146,6 +146,12 @@ def extract_entity(
         if combat.projectile_unit_id is not None and combat.projectile_unit_id >= 0:
             entity["combat"]["projectileUnitId"] = combat.projectile_unit_id
 
+    if category == "projectile" and unit.projectile is not None:
+        # `projectile_arc` is a fraction of the shot's distance. Its sign varies
+        # between units in ways this import does not interpret; the renderer
+        # uses the magnitude for the visual arc height.
+        entity["projectile"] = {"arc": rounded(unit.projectile.projectile_arc)}
+
     if category == "unit-variant":
         task = find_task(unit, spec["task"])
         resource_type = task.resource_out if task.resource_out >= 0 else task.resource_in

@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import type { ContentAssets, Atlas, AnimationInfo } from './assets';
 import { isBuilding } from '../sim/data';
 import { createTerrainPatch } from './world';
-import { worldToIso, isoDepth } from './iso';
+import { worldToIso, isoDepth, TILE_H } from './iso';
 import type { Entity, GameState, Point } from '../sim/types';
 
 /** AoE2DE player colors (blue player 1, red player 2). */
@@ -201,18 +201,32 @@ export function createProjectileView(): EntityView {
 }
 
 export function updateProjectileView(
-  view: EntityView, assets: ContentAssets | undefined, position: Point, heading: number,
+  view: EntityView,
+  assets: ContentAssets | undefined,
+  position: Point,
+  heading: number,
+  progress: number,
+  span: number,
 ): void {
   const arrow = assets?.entities['arrow'];
   const atlas = arrow?.atlases['idle'];
   const animation = arrow?.animations['idle'];
   if (!assets || !atlas || !animation) { view.body.mesh.visible = false; return; }
   // Same indexing as animated entities: whole direction blocks laid end to end.
-  // The arrow holds its pose in flight, so it always takes each block's frame 0.
   const framesPerDirection = Math.max(1, animation.frames);
   const directionsInFile = Math.max(1, Math.floor(atlas.framesInFile / framesPerDirection));
-  const frameIndex = (directionIndex(heading, animation.directions) % directionsInFile) * framesPerDirection;
-  applyFrame(view.body, assets, atlas, frameIndex, position, 0xffffff);
+  const direction = directionIndex(heading, animation.directions) % directionsInFile;
+  // The frames within a direction are the shaft's pitch along the arc, from
+  // steeply up through level to steeply down, so the frame tracks how far the
+  // arrow has flown. Holding one frame is what made shots look rigid.
+  const pitch = Math.min(framesPerDirection - 1, Math.max(0, Math.floor(progress * framesPerDirection)));
+  applyFrame(view.body, assets, atlas, direction * framesPerDirection + pitch, position, 0xffffff);
+  // Lift it off the ground along the same arc, peaking mid-flight. Peak height
+  // is the DAT's arc fraction of the shot's span; the sign of that field varies
+  // between units in ways the import does not interpret, so use its magnitude.
+  const arc = Math.abs(arrow?.projectile?.arc ?? 0);
+  const height = arc * span * 4 * progress * (1 - progress);
+  view.body.mesh.position.y += height * TILE_H;
   view.body.mesh.renderOrder = 4000 + isoDepth(position.x, position.y);
 }
 

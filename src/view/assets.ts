@@ -7,6 +7,8 @@ export type AnimationInfo = { frames: number; directions: number; frameSeconds: 
 export interface ImportedEntity {
   category: string;
   iconId?: number;
+  /** Projectiles only: arc height as a fraction of the shot's distance. */
+  projectile?: { arc: number };
   animations: Record<string, AnimationInfo>;
   atlases: Record<string, Atlas>;
   annexes?: { unitId: number; misplacement: [number, number]; animations: Record<string, AnimationInfo>; atlases: Record<string, Atlas> }[];
