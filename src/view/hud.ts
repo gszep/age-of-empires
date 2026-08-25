@@ -32,6 +32,7 @@ export interface HudCallbacks {
   onSelectIdleVillager(): void;
   onMenu(action: 'resume' | 'restart' | 'pause'): void;
   onReplayFile(record: unknown): void;
+  onSound(alias: string): void;
 }
 
 const REFERENCE_WIDTH = 3840;
@@ -153,6 +154,7 @@ export class Hud {
       if (command === 'idle-villager') this.callbacks.onSelectIdleVillager();
       else if (command) this.callbacks.onCommand(command);
       const menu = target.closest<HTMLElement>('[data-menu]')?.dataset.menu;
+      if (command || menu) this.callbacks.onSound('button_ui');
       if (menu === 'open') this.toggleMenu(true);
       else if (menu === 'resume') { this.toggleMenu(false); this.callbacks.onMenu('resume'); }
       else if (menu === 'pause') this.callbacks.onMenu('pause');

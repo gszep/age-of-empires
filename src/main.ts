@@ -9,7 +9,7 @@ import { checksumState } from './sim/checksum';
 import type { MatchRecord } from './protocol/types';
 import type { BuildingKind, Entity, GameState, Point, UnitKind } from './sim/types';
 import { clearSession, loadSession, saveSession } from './dev-session';
-import { loadContentAssets, loadUiAssets } from './view/assets';
+import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, TILE_W, TILE_H } from './view/iso';
 import { createEntityView, updateEntityView, entityKey, type EntityView } from './view/sprites';
 import { createGround, createFog } from './view/world';
@@ -33,7 +33,9 @@ renderer.domElement.classList.add('battlefield');
 app.appendChild(renderer.domElement);
 await renderer.init();
 
-let [assets, uiAssets] = await Promise.all([loadContentAssets(), loadUiAssets()]);
+let [assets, uiAssets, audioAssets] = await Promise.all([
+  loadContentAssets(), loadUiAssets(), loadAudioAssets(),
+]);
 let rules: GameRules = FALLBACK_RULES;
 try {
   const response = await fetch('/imported/aoe2/manifest.json');
@@ -118,6 +120,15 @@ ghost.renderOrder = 6000;
 scene.add(ghost);
 let pointerWorld: Point = { x: 16, y: 9 };
 
+let soundSequence = 0;
+function playSound(alias: string): void {
+  const files = audioAssets?.audio[alias]?.files;
+  if (!files?.length) return;
+  const source = files[soundSequence++ % files.length];
+  const element = new Audio(`${audioAssets!.base}${source.file}`);
+  void element.play().catch(() => { /* browser gesture/autoplay policy */ });
+}
+
 function createHud(): Hud {
   return new view.Hud(app, uiAssets, {
     onCommand: id => runUiCommand(id),
@@ -132,6 +143,7 @@ function createHud(): Hud {
       if (action === 'restart') restart();
     },
     onReplayFile: record => startReplay(record),
+    onSound: alias => playSound(alias),
   });
 }
 
@@ -673,9 +685,10 @@ if (import.meta.hot) {
     ['./view/world', './view/sprites', './view/hud', './view/assets'],
     async ([world, sprites, hudModule, assetsModule]) => {
       if (assetsModule) {
-        [assets, uiAssets] = await Promise.all([
+        [assets, uiAssets, audioAssets] = await Promise.all([
           assetsModule.loadContentAssets(),
           assetsModule.loadUiAssets(),
+          assetsModule.loadAudioAssets(),
         ]);
       }
       if (world) {

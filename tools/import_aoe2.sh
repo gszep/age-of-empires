@@ -8,6 +8,7 @@ SOUNDS="$DEPOT_ROOT/depot_813781/resources/_common/dat/sounds.json"
 WIDGETUI="$DEPOT_ROOT/depot_813782/widgetui"
 TERRAIN="$DEPOT_ROOT/depot_813782/resources/_common/terrain/textures/2x"
 GRAPHICS="$DEPOT_ROOT/depot_813784/resources/_common/drs/graphics"
+AUDIO_PACK="$DEPOT_ROOT/depot_813783/wwise/Base.pck"
 
 for required in "$DAT" "$SOUNDS" "$WIDGETUI" "$TERRAIN" "$GRAPHICS"; do
   if [ ! -e "$required" ]; then
@@ -25,3 +26,16 @@ PYTHONPATH="$ROOT/.tools/openage-src" \
   --graphics "$GRAPHICS" --terrain "$TERRAIN"
 "$ROOT/.tools/import-venv/bin/python" "$ROOT/tools/import_ui.py" \
   --widgetui "$WIDGETUI" --sounds "$SOUNDS"
+
+if [ -f "$AUDIO_PACK" ]; then
+  if ! command -v vgmstream-cli >/dev/null; then
+    echo "Owned Wwise audio found, but vgmstream-cli is missing." >&2
+    echo "Install vgmstream (macOS: brew install vgmstream), then rerun." >&2
+    exit 2
+  fi
+  "$ROOT/.tools/import-venv/bin/python" "$ROOT/tools/import_audio.py" \
+    --pack "$AUDIO_PACK"
+else
+  rm -rf "$ROOT/public/imported/aoe2/audio"
+  echo "Optional audio depot 813783 not found; continuing without audio." >&2
+fi

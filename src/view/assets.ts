@@ -42,8 +42,14 @@ export interface UiAssets {
   icons: Record<string, Record<string, string>>;
 }
 
+export interface AudioAssets {
+  base: string;
+  audio: Record<string, { event: string; files: { file: string; mediaId: number; seconds: number }[] }>;
+}
+
 const CONTENT_BASE = '/imported/aoe2/';
 const UI_BASE = '/imported/aoe2/ui/';
+const AUDIO_BASE = '/imported/aoe2/audio/';
 
 async function fetchJson<T>(url: string): Promise<T | undefined> {
   try {
@@ -112,6 +118,12 @@ export async function loadUiAssets(): Promise<UiAssets | undefined> {
   const manifest = await fetchJson<Omit<UiAssets, 'base'>>(`${UI_BASE}manifest.json`);
   if (!manifest) return undefined;
   return { base: UI_BASE, ...manifest };
+}
+
+export async function loadAudioAssets(): Promise<AudioAssets | undefined> {
+  const manifest = await fetchJson<Omit<AudioAssets, 'base'>>(`${AUDIO_BASE}manifest.json`);
+  if (!manifest) return undefined;
+  return { base: AUDIO_BASE, ...manifest };
 }
 
 /** CSS url for a material's converted texture, or undefined. */

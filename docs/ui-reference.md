@@ -82,7 +82,7 @@ button_gfx    → Play_Button_GFX
 
 It also names gameplay/UI events including errors, population warnings, technology completion, gather-point placement, notifications, chat, and under-attack alerts.
 
-The JSON does not explicitly assign hover audio; that behavior is likely a default in the closed widget runtime. Actual audio payloads are in sound depot `813783` (`Base.pck`/`Base.1.pck`, about 963 MiB installed), which has not yet been downloaded.
+The JSON does not explicitly assign hover audio; that behavior is likely a default in the closed widget runtime. Actual payloads are in sound depot `813783` (`Base.pck`/`Base.1.pck`, about 983 MiB installed). The importer now resolves consumed event names through the bank HIRC graph and decodes referenced media with external `vgmstream-cli`; `button_ui` is the first wired cue.
 
 ## What is not fully specified
 

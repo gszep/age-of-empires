@@ -27,7 +27,7 @@ Controls and hotkeys are listed in the root `README.md`. The essential loop is l
 
 ## Deliberately omitted
 
-The target does not include Feudal+ ages, other civilizations, technologies, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, trade, relics, gates/walls, or a genetic-algorithm framework. Mobile has no separate or simplified gameplay. Imported player-color/shadow supplemental SLD layers remain disabled because the pinned openage decoder crashes nondeterministically; tinting is the documented fallback.
+The target does not include Feudal+ ages, other civilizations, technologies, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, trade, relics, gates/walls, or a genetic-algorithm framework. Mobile has no separate or simplified gameplay. Shadow layers now use the local decoder; player-color masks and outlines remain unavailable, with tinting as the documented team-color fallback.
 
 ## Measurements and gate evidence
 
@@ -47,7 +47,7 @@ Batch artifacts are intentionally ignored under `.local/batches/phase6-16/`.
 
 The importer integration resolves every consumed DAT graphic/rule and widgetui source, hashes inputs, and regenerates byte-identically. Viewer smoke tests loaded imported atlases and WEST UI without application console errors; selection, gather orders, fog expansion, and browser replay were exercised through Chrome DevTools Protocol. Timing, resource conservation, hidden information, pathing, combat release, protocol validation, and replay determinism have focused tests.
 
-Known discrepancies are the unstable supplemental player-color/shadow layers, single-terrain ground without the multi-terrain blend masks, approximate tint-based team colors, missing fire/corpse delta overlays, and some mirror-AI matches that stalemate until the configured timeout.
+Known discrepancies are the missing player-color/outline layers, single-terrain ground without the multi-terrain blend masks, approximate tint-based team colors, missing fire/corpse delta overlays, and some mirror-AI matches that stalemate until the configured timeout.
 
 The ground samples the imported DAT terrain texture (slot 0, `Grass`/`g_grs`) at the authored `terrain_dimensions` tile span; `terrain/blends` and `terrain/masks` are not consumed yet, so terrain-to-terrain transitions are absent rather than approximated. Farms are terrain too (slots 7 and 29, `Farm1`/`Farm Cnst1`): the DAT gives them no SLD, so they draw as their own patch of the isometric grid.
 
@@ -74,34 +74,22 @@ the pinned decoder outright, which would recover the stable, the outlines, and
 the player-colour masks in one step, and remove the last GPL dependency from the
 import path.
 
-### Audio is not importable yet
+### Audio import is unblocked
 
-AoE2DE keeps its audio in Wwise packs (`wwise/*.pck`), which none of the three
-pinned depots contain -- the installed game lists depots 813783 and 813787 that
-the documented setup never downloads. `tools/wwise_pck.py` reads the archive
-index, and every stream sampled from `Base.pck` and `Base.1.pck` is format tag
-`0x3041`, Wwise Vorbis. That variant strips the Vorbis setup header and relies
-on external codebooks, so ffmpeg reports `Unsupported codec with id 0` and no
-decoder available here can play one. Sound triggers are therefore unimplemented:
-the game has no audio to trigger, and `sounds.json` carries only Wwise event
-names, not samples. `docs/ui-reference.md` reached the same conclusion from the
-widget side and names the same depot.
+Patch-matched sound depots 813783 and 813787 are now recorded and documented.
+`tools/wwise_pck.py` reads their AKPK indices, while `tools/import_audio.py`
+hashes the `sounds.json` event name with Wwise's lowercase FNV-1 ID, follows the
+HIRC Event → Play Action → container/sound graph, and extracts only referenced
+DIDX media. The externally installed, permissively licensed `vgmstream-cli`
+then decodes that media to deterministic browser-playable WAV without vendored
+decoder code.
 
-What would unblock it, cheapest first:
-
-- **`vgmstream-cli`** decodes Wwise Vorbis directly and is permissively
-  licensed, so the importer could shell out to it per stream the way it already
-  shells out to openage. `ww2ogg` plus `revorb` is the classic alternative but
-  is GPL-ish, so it must stay an external tool and never be vendored here.
-- **Our own decoder.** The codebook reconstruction is documented, so this could
-  live in `tools/` and stay MIT, as `tools/sld_shadow.py` does for shadows. It
-  is a bigger job than that one and only worth starting if no packaged decoder
-  is acceptable.
-
-Either way the container half is done: `tools/wwise_pck.py` already extracts
-streams correctly, so only the codec step is missing. Note the audio is in the
-installed game, so no additional depot download is required to work on this --
-only `AOE2DE_DEPOT_ROOT`'s sibling install path.
+The first consumed cue is the widget-authored `button_ui` alias:
+`Play_Button_UI` resolves in bank 232745270 to media 56802692 and decodes to a
+0.239456-second mono 22.05 kHz cue. It plays for HUD command/menu clicks in the
+owned-content mode; the open fallback remains silent. Integration tests verify
+the source resolution and byte-identical regeneration. Broader simulation
+sound triggers and localized unit acknowledgements are not wired yet.
 
 ## Verification
 
@@ -115,4 +103,4 @@ npm run test:live-agent   # opt-in; requires valid existing machine provider aut
 
 ## Smallest recommended next milestone
 
-Stabilize conversion of SLD player-color and shadow mask layers (or adopt a fixture-proven maintained decoder revision), then add imported terrain tiles/blending. This is the narrowest improvement to the largest remaining visual discrepancy without expanding gameplay scope.
+Extend the local SLD decoder to BC1 main/player-color/outline layers, then add imported terrain blend masks. This would recover the stable, accurate team colors and contours while removing the remaining openage dependency, without expanding gameplay scope.

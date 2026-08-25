@@ -2,6 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 import json
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -10,6 +11,7 @@ from PIL import Image
 
 from import_content import extract
 from import_ui import extract_ui
+from import_audio import import_audio, read_banks, resolve_event
 from convert_sld import convert, convert_terrain
 
 
@@ -22,6 +24,7 @@ SOUNDS = ROOT / "depot_813781/resources/_common/dat/sounds.json"
 GRAPHICS = ROOT / "depot_813784/resources/_common/drs/graphics"
 WIDGETUI = ROOT / "depot_813782/widgetui"
 TERRAIN = ROOT / "depot_813782/resources/_common/terrain/textures/2x"
+AUDIO_PACK = ROOT / "depot_813783/wwise/Base.pck"
 SPEC = json.loads(Path(__file__).with_name("import-spec.json").read_text())
 SOURCE = Path(__file__).with_name("aoe2-source.json")
 OPENAGE = Path(__file__).resolve().parents[1] / ".tools/openage-src"
@@ -170,6 +173,40 @@ class ContentImportIntegrationTest(unittest.TestCase):
             with Image.open(first) as image:
                 self.assertEqual(image.size, tuple(atlas["size"]))
                 self.assertEqual(image.mode, "RGBA")
+
+
+@unittest.skipUnless(
+    AUDIO_PACK.is_file() and shutil.which("vgmstream-cli"),
+    "owned sound depot and vgmstream are not installed",
+)
+class AudioImportIntegrationTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.banks = read_banks(AUDIO_PACK)
+
+    def test_widget_event_resolves_through_hirc_to_owned_media(self):
+        matches = [
+            (int(bank.name), media_id)
+            for bank in self.banks
+            for media_id in resolve_event(bank, "Play_Button_UI")
+        ]
+        self.assertEqual(matches, [(232745270, 56802692)])
+
+    def test_vgmstream_regenerates_byte_identical_browser_audio(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ui = root / "ui.json"
+            ui.write_text(json.dumps({"sounds": {"button_ui": "Play_Button_UI"}}))
+            first = import_audio(AUDIO_PACK, ui, root / "first")
+            second = import_audio(AUDIO_PACK, ui, root / "second")
+            self.assertEqual(first, second)
+            cue = first["audio"]["button_ui"]["files"][0]
+            self.assertEqual(cue["mediaId"], 56802692)
+            self.assertEqual(cue["seconds"], 0.239456)
+            self.assertEqual(
+                (root / "first" / cue["file"]).read_bytes(),
+                (root / "second" / cue["file"]).read_bytes(),
+            )
 
 
 @unittest.skipUnless(WIDGETUI.is_dir() and DAT.is_file(), "owned AoE2DE fixture is not installed")
