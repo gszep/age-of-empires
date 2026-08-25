@@ -168,6 +168,68 @@ describe('construction', () => {
   });
 });
 
+describe('spawn placement', () => {
+  const trainedFrom = (state: GameState, building: Entity, kind: 'villager' | 'archer') => {
+    const before = new Set(state.entities.map(e => e.id));
+    building.training = { kind, remainingTicks: 1 };
+    stepGame(state);
+    return state.entities.find(e => !before.has(e.id) && e.kind === kind)!;
+  };
+
+  it('leaves by the corner nearest the viewer when no rally point is set', () => {
+    const state = createGame();
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const unit = trainedFrom(state, tc, 'villager');
+    // Screen depth grows with x+y, so the default exit is past that corner.
+    expect(unit.position.x).toBeGreaterThan(tc.position.x);
+    expect(unit.position.y).toBeGreaterThan(tc.position.y);
+  });
+
+  it('leaves by the side facing the rally point', () => {
+    const state = createGame();
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    // Rally to the far side, opposite the default corner.
+    const rally = { x: tc.position.x - 6, y: tc.position.y - 6 };
+    expect(applyCommand(state, { kind: 'rally', player: 1, buildingId: tc.id, target: rally }))
+      .toEqual({ ok: true });
+    const unit = trainedFrom(state, tc, 'villager');
+    expect(unit.position.x).toBeLessThan(tc.position.x);
+    expect(unit.position.y).toBeLessThan(tc.position.y);
+  });
+
+  it('keeps units on the map when the building sits against the edge', () => {
+    const state = createGame();
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    // Corner of the map: the old fixed offset put the unit outside it.
+    const half = state.rules.buildings['town-center'].radius;
+    tc.position = { x: state.width - half, y: state.height - half };
+    const unit = trainedFrom(state, tc, 'villager');
+    expect(unit.position.x).toBeGreaterThanOrEqual(0);
+    expect(unit.position.x).toBeLessThanOrEqual(state.width);
+    expect(unit.position.y).toBeGreaterThanOrEqual(0);
+    expect(unit.position.y).toBeLessThanOrEqual(state.height);
+  });
+
+  it('never spawns a unit inside another building', () => {
+    const state = createGame();
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const villager = villagerOf(state);
+    state.players[1].wood = 500;
+    // Wall off the default exit corner with a house.
+    const spot = freeSpot(state, 'house', { x: tc.position.x + 2.5, y: tc.position.y + 2.5 });
+    applyCommand(state, { kind: 'build', player: 1, builderIds: [villager.id], building: 'house', target: spot });
+    const house = state.entities.find(e => e.kind === 'house')!;
+    house.buildProgress = undefined;
+
+    const unit = trainedFrom(state, tc, 'villager');
+    for (const building of state.entities.filter(e => e.kind === 'house' || e.kind === 'town-center')) {
+      const overlaps = Math.abs(unit.position.x - building.position.x) < building.radius + unit.radius
+        && Math.abs(unit.position.y - building.position.y) < building.radius + unit.radius;
+      expect(overlaps, `spawned inside ${building.kind}`).toBe(false);
+    }
+  });
+});
+
 describe('production and rally points', () => {
   it('sends trained villagers to a rallied resource through the public interface', () => {
     const state = createGame(5);

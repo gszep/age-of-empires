@@ -584,12 +584,56 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
   }
 }
 
+/** A spot clear of the map edge and of every building and resource footprint. */
+function spawnFree(state: GameState, point: Point, radius: number): boolean {
+  if (point.x - radius < 0 || point.x + radius > state.width) return false;
+  if (point.y - radius < 0 || point.y + radius > state.height) return false;
+  for (const entity of state.entities) {
+    if (entity.dead) continue;
+    if (!isBuilding(entity.kind) && entity.kind !== 'resource') continue;
+    if (footprintsOverlap(point, radius, entity.position, entity.radius)) return false;
+  }
+  return true;
+}
+
+/**
+ * Where a freshly trained unit appears. It leaves by the side facing its rally
+ * point, or by the screen-bottom corner when none is set, and sweeps outward
+ * from there for a clear spot: a building against the map edge would otherwise
+ * push its units off the map.
+ */
+function spawnPoint(state: GameState, building: Entity, unitRadius: number): Point {
+  // Screen depth grows with x+y, so (1,1) is the corner nearest the viewer.
+  let direction: Point = { x: 1, y: 1 };
+  if (building.rally) {
+    const dx = building.rally.target.x - building.position.x;
+    const dy = building.rally.target.y - building.position.y;
+    if (Math.abs(dx) + Math.abs(dy) > 1e-6) direction = { x: dx, y: dy };
+  }
+  const preferred = Math.atan2(direction.y, direction.x);
+  const base = building.radius + unitRadius + 0.2;
+  for (let ring = 0; ring < 10; ring++) {
+    const distance = base + ring * 0.5;
+    // Alternate to either side of the preferred heading, so the unit stays as
+    // close to the intended side as the surroundings allow.
+    for (let step = 0; step <= 16; step++) {
+      const offset = (step % 2 === 0 ? 1 : -1) * Math.ceil(step / 2) * (Math.PI / 8);
+      const angle = preferred + offset;
+      const point = {
+        x: building.position.x + Math.cos(angle) * distance,
+        y: building.position.y + Math.sin(angle) * distance,
+      };
+      if (spawnFree(state, point, unitRadius)) return point;
+    }
+  }
+  // Hemmed in on every side: place it on the building and let separation sort
+  // it out rather than dropping the unit the player paid for.
+  return { ...building.position };
+}
+
 function spawnTrainedUnit(state: GameState, building: Entity, kind: UnitKind): void {
   const rules = state.rules.units[kind];
-  const spawn = {
-    x: building.position.x,
-    y: building.position.y + building.radius + rules.radius + 0.2,
-  };
+  const spawn = spawnPoint(state, building, rules.radius);
   const unit = addEntity(state, kind, building.owner, spawn, rules);
   if (building.rally) {
     const target = building.rally.targetId
