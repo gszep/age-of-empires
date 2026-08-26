@@ -265,8 +265,10 @@ def pack_mask_atlas(frames: list[MaskFrame | None], limit: int) -> tuple[Any, di
             Image.frombytes("L", (frame.width, frame.height), bytes(frame.alpha)),
             (placement["x"], placement["y"]),
         )
-    # Black with the mask as alpha: the renderer tints and fades it per entity.
-    rgba = Image.merge("RGBA", [Image.new("L", image.size, 0)] * 3 + [image])
+    # White with the mask as alpha. The renderer multiplies its own colour
+    # through this, so the sheet has to stay neutral: baking a colour in here
+    # would multiply to that colour, and baking black would multiply to black.
+    rgba = Image.merge("RGBA", [Image.new("L", image.size, 255)] * 3 + [image])
     return rgba, {
         "size": [sheet_width, sheet_height],
         "framesInFile": len(placements),

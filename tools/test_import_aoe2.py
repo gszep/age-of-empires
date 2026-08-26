@@ -92,6 +92,24 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertLess(lit, frame.width * frame.height)
         self.assertEqual(max(frame.alpha), 255)
 
+    def test_mask_sheets_stay_neutral_for_tinting(self):
+        # The renderer multiplies its own colour through these sheets, so any
+        # colour baked in here multiplies the result: black would render black
+        # whatever colour the renderer asked for.
+        from convert_sld import convert_mask
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory) / "walk-playercolor.png"
+            atlas = convert_mask(
+                GRAPHICS / "u_vil_male_lumberjack_walkA_x1.sld", out, 30 * 16, "playercolor",
+            )
+            self.assertTrue(atlas)
+            with Image.open(out) as image:
+                pixels = list(image.convert("RGBA").getdata())  # noqa: PIL deprecation is fine on the pinned version
+            lit = [p for p in pixels if p[3] > 0]
+            self.assertTrue(lit)
+            for red, green, blue, _alpha in lit:
+                self.assertEqual((red, green, blue), (255, 255, 255))
+
     def test_mask_atlas_frames_track_the_main_layer(self):
         from convert_sld import convert_mask
         with tempfile.TemporaryDirectory() as directory:

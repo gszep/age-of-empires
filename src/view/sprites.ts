@@ -358,7 +358,8 @@ export function updateEntityView(
   // shadow draws below every body so entities never occlude each other's.
   const shadowAtlas = imported?.atlases[`${choice.name}-shadow`];
   if (shadowAtlas && !entity.dead) {
-    applyFrame(view.shadow, assets, shadowAtlas, frameIndex, entity.position, 0xffffff);
+    // Mask sheets are neutral white, so the shadow asks for black here.
+    applyFrame(view.shadow, assets, shadowAtlas, frameIndex, entity.position, 0x000000);
     view.shadow.mesh.renderOrder = 500 + depth;
     (view.shadow.mesh.material as THREE.MeshBasicMaterial).opacity = 0.55;
   } else {
