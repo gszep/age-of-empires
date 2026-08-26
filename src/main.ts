@@ -176,6 +176,22 @@ function createHud(): Hud {
 
 let hud = createHud();
 
+// Text-based debug protocol for the dev server's /__debug endpoint. Loaded
+// dynamically so none of it reaches a production bundle.
+if (import.meta.hot) {
+  const { installDebug } = await import('./dev-debug');
+  installDebug({
+    game: () => game,
+    cameraCenter: () => cameraCenter,
+    zoom: () => zoom,
+    selectedIds: () => selectedIds,
+    renderer,
+    scene,
+    camera,
+    views,
+  });
+}
+
 function restart(): void {
   replay = undefined;
   clearSession();
