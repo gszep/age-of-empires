@@ -99,6 +99,12 @@ function spend(state: GameState, player: PlayerId, kind: UnitKind | BuildingKind
   return { ok: true };
 }
 
+/** A completed building that shoots, so it can be given a target. */
+function canShoot(state: GameState, entity: Entity): boolean {
+  return isBuilding(entity.kind) && entity.buildProgress === undefined
+    && state.rules.buildings[entity.kind as BuildingKind].attack !== undefined;
+}
+
 /** Axis-aligned square-footprint overlap for placement legality. */
 function footprintsOverlap(a: Point, aHalf: number, b: Point, bHalf: number): boolean {
   return Math.abs(a.x - b.x) < aHalf + bHalf && Math.abs(a.y - b.y) < aHalf + bHalf;
@@ -157,11 +163,20 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     }
     let matched = 0;
     for (const entity of state.entities) {
-      if (entity.dead || !command.entityIds.includes(entity.id) || entity.owner !== command.player || !isUnit(entity.kind)) continue;
+      if (entity.dead || !command.entityIds.includes(entity.id) || entity.owner !== command.player) continue;
+      const defensive = canShoot(state, entity);
+      if (!isUnit(entity.kind) && !defensive) continue;
       matched++;
       if (command.kind === 'stop') {
         entity.order = { kind: 'idle' };
         entity.activity = 'idle';
+      } else if (defensive) {
+        // A tower cannot be sent anywhere, so only a hostile target means
+        // anything to it: pointing at the ground releases it back to
+        // picking its own targets.
+        entity.order = targetEntity && targetEntity.owner !== 0 && targetEntity.owner !== entity.owner
+          ? { kind: 'attack', targetId: targetEntity.id }
+          : { kind: 'idle' };
       } else {
         assignOrder(state, entity, command.target, targetEntity);
       }
@@ -541,7 +556,22 @@ function updateTower(state: GameState, entity: Entity): void {
   if (!attack || entity.buildProgress !== undefined) return;
   let target: Entity | undefined;
   let bestDistance = Infinity;
-  for (const candidate of state.entities) {
+
+  // An ordered target overrides the tower's own choice for as long as it lives
+  // and stays in range; once it does not, the tower goes back to defending
+  // itself rather than sitting idle on a target it can no longer reach.
+  if (entity.order.kind === 'attack') {
+    const ordered = state.entities.find(e => e.id === (entity.order as { targetId: number }).targetId && !e.dead);
+    const reachable = ordered
+      && distance(entity.position, ordered.position) - ordered.radius <= entity.radius + attack.range;
+    if (ordered && reachable) {
+      target = ordered;
+    } else if (!ordered) {
+      entity.order = { kind: 'idle' };
+    }
+  }
+
+  for (const candidate of target ? [] : state.entities) {
     if (candidate.dead || candidate.owner === 0 || candidate.owner === entity.owner) continue;
     // Buildings are valid targets too, but a unit in range is the live threat,
     // so units outrank them however close the building is.

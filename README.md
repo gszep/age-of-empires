@@ -18,7 +18,8 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 ### Controls
 
 - Left-click selects; drag-select chooses multiple units.
-- Right-click ground/resources/enemies issues context-sensitive move, gather, or attack orders; right-click with a building selected sets its rally point.
+- Right-click ground/resources/enemies issues context-sensitive move, gather, or attack orders; right-click with a production building selected sets its rally point.
+- Select a watch tower and right-click an enemy to make it concentrate fire there; right-click bare ground to release it back to choosing its own targets.
 - Move the camera with arrow keys or screen edges; mouse wheel zooms; click/drag the minimap to navigate.
 - `H` selects and centers the town center; `.` cycles idle villagers.
 - Command-grid hotkeys are shown on buttons (`Q`, `W`, `S` as applicable).

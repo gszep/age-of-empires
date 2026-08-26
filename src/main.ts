@@ -330,6 +330,18 @@ function contextOrder(point: Point, _clientX: number, _clientY: number): void {
     if (!result.ok) hud.showMessage(result.reason);
     return;
   }
+  // Defensive buildings take a target the same way units do.
+  const towers = selection.filter(e => rules.buildings[e.kind as BuildingKind]?.attack && e.buildProgress === undefined);
+  if (towers.length) {
+    const hostile = target && target.owner !== 0 && target.owner !== 1;
+    const result = applyCommand(game, {
+      kind: 'order', player: 1, entityIds: towers.map(e => e.id),
+      target: point, targetId: hostile ? target.id : undefined,
+    });
+    if (!result.ok) hud.showMessage(result.reason);
+    else hud.showMessage(hostile ? 'Target set' : 'Target cleared');
+    return;
+  }
   const building = selection.find(e => e.kind === 'town-center' || e.kind === 'barracks');
   if (building) {
     applyCommand(game, { kind: 'rally', player: 1, buildingId: building.id, target: point, targetId: target?.id });

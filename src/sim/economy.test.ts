@@ -448,6 +448,92 @@ describe('towers', () => {
     expect(enemyTc.hp).toBe(buildingHp);
   });
 
+  it('takes an ordered target over the one it would pick itself', () => {
+    const state = createGame();
+    state.players[1].stone = 500;
+    state.players[1].wood = 500;
+    const builder = villagerOf(state);
+    applyCommand(state, {
+      kind: 'build', player: 1, builderIds: [builder.id], building: 'watch-tower',
+      target: freeSpot(state, 'watch-tower', builder.position),
+    });
+    const tower = state.entities.find(e => e.kind === 'watch-tower')!;
+    tower.buildProgress = undefined;
+    const enemies = state.entities.filter(e => e.owner === 2 && e.kind === 'villager');
+    const near = enemies[0];
+    const far = enemies[1];
+    near.position = { x: tower.position.x + 1, y: tower.position.y };
+    far.position = { x: tower.position.x + 4, y: tower.position.y };
+
+    expect(applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [tower.id], target: far.position, targetId: far.id,
+    })).toEqual({ ok: true });
+    const nearHp = near.hp;
+    const farHp = far.hp;
+    run(state, 200);
+    // The nearer villager is the automatic choice; the order beats it.
+    expect(far.hp).toBeLessThan(farHp);
+    expect(near.hp).toBe(nearHp);
+  });
+
+  it('returns to picking its own target when the order is cleared', () => {
+    const state = createGame();
+    state.players[1].stone = 500;
+    state.players[1].wood = 500;
+    const builder = villagerOf(state);
+    applyCommand(state, {
+      kind: 'build', player: 1, builderIds: [builder.id], building: 'watch-tower',
+      target: freeSpot(state, 'watch-tower', builder.position),
+    });
+    const tower = state.entities.find(e => e.kind === 'watch-tower')!;
+    tower.buildProgress = undefined;
+    const enemies = state.entities.filter(e => e.owner === 2 && e.kind === 'villager');
+    const near = enemies[0];
+    const far = enemies[1];
+    near.position = { x: tower.position.x + 1, y: tower.position.y };
+    far.position = { x: tower.position.x + 4, y: tower.position.y };
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [tower.id], target: far.position, targetId: far.id,
+    });
+    run(state, 60);
+
+    // Right-clicking bare ground releases the tower back to its own judgement.
+    applyCommand(state, { kind: 'order', player: 1, entityIds: [tower.id], target: { x: 1, y: 1 } });
+    expect(tower.order.kind).toBe('idle');
+    const nearHp = near.hp;
+    run(state, 200);
+    expect(near.hp).toBeLessThan(nearHp);
+  });
+
+  it('drops an ordered target that dies and defends itself again', () => {
+    const state = createGame();
+    state.players[1].stone = 500;
+    state.players[1].wood = 500;
+    const builder = villagerOf(state);
+    applyCommand(state, {
+      kind: 'build', player: 1, builderIds: [builder.id], building: 'watch-tower',
+      target: freeSpot(state, 'watch-tower', builder.position),
+    });
+    const tower = state.entities.find(e => e.kind === 'watch-tower')!;
+    tower.buildProgress = undefined;
+    const enemies = state.entities.filter(e => e.owner === 2 && e.kind === 'villager');
+    const ordered = enemies[0];
+    const other = enemies[1];
+    ordered.position = { x: tower.position.x + 3, y: tower.position.y };
+    other.position = { x: tower.position.x + 2, y: tower.position.y };
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [tower.id], target: ordered.position, targetId: ordered.id,
+    });
+    run(state, 20);
+
+    ordered.hp = 0;
+    ordered.dead = true;
+    const otherHp = other.hp;
+    run(state, 200);
+    expect(tower.order.kind).toBe('idle');
+    expect(other.hp).toBeLessThan(otherHp);
+  });
+
   it('spends an arrow whose target dies mid-flight', () => {
     const state = createGame();
     state.players[1].stone = 500;
