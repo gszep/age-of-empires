@@ -21,7 +21,7 @@ Controls and hotkeys are listed in the root `README.md`. The essential loop is l
 - Fixed-tick deterministic 1v1 simulation with integer resources, gathering/drop-off/depletion, building placement/construction, population, production queues, and rally orders.
 - Deterministic tile A*, footprint obstruction, repathing/separation, DAT armor classes/minimum damage, discrete windup/release/cooldown, corpses, and defensive acquisition.
 - Authoritative explored/current visibility, filtered observations, and legal last-seen memory.
-- Patch-matched DAT rules and AoE2DE entity/widgetui assets through a byte-identical local import; open fallback remains playable.
+- Patch-matched DAT rules, palettes, and AoE2DE entity/widgetui assets through a byte-identical local import; open fallback remains playable.
 - WEST/Dark Age desktop composition with dimetric world, task animations, composite town center, fog, command/selection panels, minimap, menus, hotkeys, pointer interactions, and landscape scaling.
 - Versioned JSON public contracts; browser, built-in AI, JSONL subprocess, deadline subprocess, WebSocket, and MCP strategies share `applyCommand`.
 - Full-state FNV-1a periodic checksums, command-stream records, Node verification, and browser playback.
@@ -50,9 +50,38 @@ Batch artifacts are intentionally ignored under `.local/batches/phase6-16/`.
 
 The importer integration resolves every consumed DAT graphic/rule and widgetui source, hashes inputs, and regenerates byte-identically. Viewer smoke tests loaded imported atlases and WEST UI without application console errors; selection, gather orders, fog expansion, and browser replay were exercised through Chrome DevTools Protocol. Timing, resource conservation, hidden information, pathing, combat release, protocol validation, and replay determinism have focused tests.
 
-Known discrepancies are the missing outline layer, single-terrain ground without the multi-terrain blend masks, missing fire/corpse delta overlays, and some mirror-AI matches that stalemate until the configured timeout.
+Known discrepancies are the missing outline layer, single-terrain ground without the multi-terrain blend masks, missing fire/corpse delta overlays, the town center's grey annexes, and some mirror-AI matches that stalemate until the configured timeout.
 
 The ground samples the imported DAT terrain texture (slot 0, `Grass`/`g_grs`) at the authored `terrain_dimensions` tile span; `terrain/blends` and `terrain/masks` are not consumed yet, so terrain-to-terrain transitions are absent rather than approximated. Farms are terrain too (slots 7 and 29, `Farm1`/`Farm Cnst1`): the DAT gives them no SLD, so they draw as their own patch of the isometric grid.
+
+### Player colour comes from the game palette
+
+Player colour is a palette substitution, not a tint. Two measurements settled
+how:
+
+- The SLD player-colour layer is **coverage**. Its interior is a solid 255 and
+  only the BC4 block edges carry intermediate values, so it says *where* the
+  owner's colour goes, not how bright it is.
+- The **main graphics layer** carries the shade: under full coverage those
+  pixels are neutral greys (mean channel spread 1.8 on the barracks, 6.8 on the
+  militia) whose range tracks the rest of the sprite's shading.
+
+The ramp that grey indexes is the game palette's eight-shade block at the DAT's
+own `player_colours[i].player_color_base` — `original.pal` 16..23 for player
+one, `(0,0,82)` through `(205,250,255)`, the colours AoE2 has always drawn blue
+player colour with. The DAT's `minimap_color` for the same players resolves
+through that palette to pure blue, red, green, yellow, cyan, magenta, grey and
+orange in order, which is what confirms the ordering rather than assuming it.
+The 16x16 blends in `playercolor_*.pal` are DE's editable hue-to-target table
+and are **not** consumed: nothing a sprite carries indexes them.
+
+`convert_sld.py` therefore packs the player-colour sheet as the main layer's
+grey in RGB and the mask's coverage in alpha, and `import_content.py` emits each
+player's block plus the grey player's block as the shade axis. The renderer
+resolves the grey to a 256-texel ramp per player and samples it in a TSL node
+material, so one texture read gives both the shade and the coverage. A militia
+now renders 357 distinct blues from its own palette block where it previously
+drew one flat `#1a6cff`.
 
 ### The import pipeline is openage-free
 

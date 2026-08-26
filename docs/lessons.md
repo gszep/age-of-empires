@@ -24,6 +24,23 @@ keeps the record.
   timing, search the DAT and widgetui data first (see the field cheat-sheet in
   `AGENTS.md`); approximations are a last resort and get recorded in
   `docs/status.md`.
+- **Player colour is a palette block, not a tint.** The SLD player-colour layer
+  is *coverage* — its interior is a solid 255 and only the BC4 block edges hold
+  intermediate values — while the shading lives in the main layer, which paints
+  those pixels in greys. The ramp that grey indexes is the game palette's
+  8-shade block at the DAT's own `player_colours[i].player_color_base`
+  (`original.pal` 16..23 is the classic blue), *not* the 16x16 blends in
+  `playercolor_*.pal`, which are DE's editable hue-to-target table. Rule: a
+  layer's meaning is a measurement, not a name — histogram it before deciding
+  what it encodes.
+- **The debug pixel readback was lying, darkly.** Captures render into an
+  offscreen `RenderTarget`, which is linear by default, so the output transfer
+  the canvas applies was skipped and every colour came back as its linear
+  counterpart — grass reading `#384808` when the screen showed `#788838`. That
+  is a ~2.2 gamma of error in exactly the tool used to check colour work. Rule:
+  when a measured colour is off by roughly a power, suspect the measurement's
+  colour space before the art; the render target now takes
+  `renderer.outputColorSpace`.
 - **WebGPU does not render in Node.** The viewer uses `THREE.WebGPURenderer`;
   there is no plain-Node headless render path. Headless Chrome with SwiftShader
   does run the full game (slowly, ~4 fps) and is how automated visual checks

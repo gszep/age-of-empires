@@ -16,15 +16,14 @@ items land.
 
 ## A. Visual fidelity (no new gameplay, all source data already local)
 
-- [ ] **Player-colour palette ramps.** The flat tint washes out shading. The
-  authoritative ramps are `depot_813781/resources/_common/palettes/
-  playercolor_{blue,red,...}.pal` (JASC-PAL, 256 rows); the SLD player-colour
-  mask value is an index into the ramp, not a coverage alpha. Import the
-  consumed ramps through the pipeline (hash the sources, deterministic
-  output) and make the renderer map mask intensity through the player's ramp.
-  *Verify:* `{"type":"pixels","entity":<militia id>}` mean colour moves off
-  the flat saturated blue toward ramp values; screenshot side-by-side reads
-  as shaded cloth, not neon.
+- [x] **Player-colour palette ramps.** Done, but not where this item pointed:
+  the mask value *is* a coverage alpha (solid 255 inside, BC4 edge noise
+  outside) and the shade lives in the main layer's greys, while the ramp is the
+  game palette's 8-shade block at the DAT's `player_color_base` — not
+  `playercolor_*.pal`. The importer packs shade+coverage into the player-colour
+  sheet and emits each player's block; the renderer looks the grey up through
+  it. *Verified:* militia cloth renders 357 distinct palette blues (was one flat
+  `#1a6cff`), and the debug readback was fixed to report screen colours.
 - [ ] **Town-center (annex) player colour.** `src/view/sprites.ts` applies
   the colour mask only to the body piece; annex meshes get none, so the TC
   renders grey. Export annex playercolor masks (the importer already

@@ -1,22 +1,39 @@
 import * as THREE from 'three/webgpu';
+import { materialColor, materialOpacity, texture as textureNode, vec2 } from 'three/tsl';
 import type { ContentAssets, Atlas, AnimationInfo } from './assets';
 import { isBuilding } from '../sim/data';
 import { createTerrainPatch } from './world';
 import { worldToIso, isoDepth, TILE_H } from './iso';
 import type { Entity, GameState, Point } from '../sim/types';
 
-/** AoE2DE player colors (blue player 1, red player 2). */
+/** Open-content player colours, used until the game palette is imported. */
 export const PLAYER_COLORS: Record<number, number> = { 0: 0xffffff, 1: 0x1a6cff, 2: 0xe02b2b };
+
+/** The owner's colour as `#rrggbb`: the DAT's own minimap colour when imported. */
+export function playerColorHex(assets: ContentAssets | undefined, owner: number): string | undefined {
+  if (owner === 0) return undefined;
+  const minimap = assets?.playerColors?.players[String(owner)]?.minimapColor;
+  const color = minimap ? (minimap[0] << 16) | (minimap[1] << 8) | minimap[2] : PLAYER_COLORS[owner];
+  return color === undefined ? undefined : `#${color.toString(16).padStart(6, '0')}`;
+}
 
 interface Piece {
   mesh: THREE.Mesh;
   atlasKey?: string;
+  /**
+   * Set on a piece drawn through a player's palette ramp: the sheet is bound to
+   * the shader as a node rather than as `material.map`, so swapping animation
+   * atlases means swapping this node's texture.
+   */
+  mapNode?: { value: THREE.Texture };
 }
 
 export interface EntityView {
   group: THREE.Group;
   /** Player-colour mask drawn over the body. */
   color: Piece;
+  /** The owner's colour for reporting; the ramp shades it per pixel. */
+  playerColor?: string;
   /** Farms draw as a terrain patch instead of a sprite. */
   patch?: THREE.Mesh;
   patchSlot?: string;
@@ -45,6 +62,44 @@ function makePiece(): Piece {
   return { mesh };
 }
 
+/**
+ * A 1x1 stand-in so the shader has a bound texture before the first frame is
+ * applied. Nothing is drawn until `applyFrame` swaps in a real atlas.
+ */
+const placeholderTexture = (): THREE.DataTexture => {
+  const texture = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
+  texture.needsUpdate = true;
+  return texture;
+};
+
+/**
+ * The player-colour piece, drawn through the owner's imported palette ramp.
+ *
+ * AoE2 does not tint the cloth a flat colour: the main graphics layer paints it
+ * in greys and the game palette turns each grey into one of the player's eight
+ * shades. The importer packs that grey into the sheet's RGB and the mask's
+ * coverage into its alpha, so one texture read gives both the ramp index and
+ * how much of the pixel it covers.
+ *
+ * `material.color` still multiplies the result, which is what keeps the
+ * placement preview's legality tint working on this piece like on every other.
+ */
+function makeRampPiece(ramp: THREE.Texture): Piece {
+  const sheet = textureNode(placeholderTexture());
+  // The ramp holds one texel per grey the sheet can carry, so the shade is the
+  // lookup; the scale lands byte 0 and byte 255 on their own texel centres.
+  const steps = ramp.image.width as number;
+  const u = sheet.r.mul((steps - 1) / steps).add(0.5 / steps);
+  const nodeMaterial = new THREE.MeshBasicNodeMaterial({
+    transparent: true, depthWrite: false, depthTest: false,
+  });
+  nodeMaterial.colorNode = textureNode(ramp).sample(vec2(u, 0.5)).rgb.mul(materialColor);
+  nodeMaterial.opacityNode = sheet.a.mul(materialOpacity);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), nodeMaterial);
+  mesh.visible = false;
+  return { mesh, mapNode: sheet };
+}
+
 export function createEntityView(assets: ContentAssets | undefined, entity: Entity): EntityView {
   const group = new THREE.Group();
   // Added first so it draws under the body; renderOrder keeps it under every
@@ -54,7 +109,8 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
   group.add(shadow.mesh);
   const body = makePiece();
   group.add(body.mesh);
-  const color = makePiece();
+  const ramp = assets?.playerRamps.get(entity.owner);
+  const color = ramp ? makeRampPiece(ramp) : makePiece();
   group.add(color.mesh);
   const annexes: Piece[] = [];
   const key = entityKey(entity);
@@ -66,7 +122,11 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
       group.add(piece.mesh);
     }
   }
-  const view: EntityView = { group, shadow, body, color, annexes, fallback: !imported, facing: entity.owner === 2 ? Math.PI : 0 };
+  const view: EntityView = {
+    group, shadow, body, color, annexes, fallback: !imported,
+    facing: entity.owner === 2 ? Math.PI : 0,
+    playerColor: playerColorHex(assets, entity.owner),
+  };
   if (entity.kind === 'farm') {
     view.fallback = false;
     return view;
@@ -167,7 +227,12 @@ function applyFrame(
   if (!texture || !frame || frame.w === 0 || frame.h === 0) { mesh.visible = false; return; }
   mesh.visible = true;
   const meshMaterial = mesh.material as THREE.MeshBasicMaterial;
-  if (meshMaterial.map !== texture) { meshMaterial.map = texture; meshMaterial.needsUpdate = true; }
+  if (piece.mapNode) {
+    if (piece.mapNode.value !== texture) piece.mapNode.value = texture;
+  } else if (meshMaterial.map !== texture) {
+    meshMaterial.map = texture;
+    meshMaterial.needsUpdate = true;
+  }
   meshMaterial.color.set(tint);
   const [atlasWidth, atlasHeight] = atlas.size;
   // Half-texel inset: linear filtering samples across the frame edge, which
@@ -373,7 +438,10 @@ export function updateEntityView(
   // colour, laid over the body at the same frame and hotspot. Gaia has none.
   const colorAtlas = imported?.atlases[`${choice.name}-playercolor`];
   if (colorAtlas && entity.owner !== 0 && !entity.dead) {
-    applyFrame(view.color, assets, colorAtlas, frameIndex, entity.position, PLAYER_COLORS[entity.owner]);
+    // A ramp piece reads the colour from the palette, so it draws untinted;
+    // without imported ramps the sheet is multiplied by the flat player colour.
+    const colorTint = view.color.mapNode ? 0xffffff : PLAYER_COLORS[entity.owner];
+    applyFrame(view.color, assets, colorAtlas, frameIndex, entity.position, colorTint);
     view.color.mesh.renderOrder = 1000 + depth * 10 + 1;
     (view.color.mesh.material as THREE.MeshBasicMaterial).opacity =
       entity.buildProgress !== undefined ? 0.85 : 1;

@@ -367,6 +367,52 @@ def pack_mask_atlas(frames: list[MaskFrame | None], limit: int) -> tuple[Any, di
     }
 
 
+def luminance(red: int, green: int, blue: int) -> int:
+    """Rec. 601 luma, the shade a player-colour pixel is drawn at."""
+    return (red * 299 + green * 587 + blue * 114) // 1000
+
+
+def pack_playercolor_atlas(
+    masks: list[MaskFrame | None], colors: list[ColorFrame | None], limit: int
+) -> tuple[Any, dict[str, Any]]:
+    """Pack the first `limit` player-colour masks as shade + coverage.
+
+    The mask layer is coverage: its interior is a solid 255 and only the block
+    edges hold intermediate values. The shading of the cloth lives in the main
+    layer, which paints those pixels in greys, so the ramp index the renderer
+    needs is the main layer's luma there and the mask is its alpha. The mask
+    layer carries no geometry of its own - it covers the main layer's box - so
+    the two frames are the same size and index alike.
+    """
+    from PIL import Image
+
+    usable = [f if (f is not None and not f.empty) else None for f in masks[:limit]]
+    placements, sheet_width, sheet_height = _shelf_pack(usable)
+
+    shade = Image.new("L", (sheet_width, sheet_height), 0)
+    coverage = Image.new("L", (sheet_width, sheet_height), 0)
+    for index, (placement, frame) in enumerate(zip(placements, usable)):
+        if frame is None or placement["w"] == 0:
+            continue
+        color = colors[index] if index < len(colors) else None
+        if color is None or (color.width, color.height) != (frame.width, frame.height):
+            raise ValueError(f"frame {index}: player-colour mask does not match the main layer")
+        levels = bytes(
+            luminance(color.rgba[i * 4], color.rgba[i * 4 + 1], color.rgba[i * 4 + 2])
+            for i in range(frame.width * frame.height)
+        )
+        shade.paste(Image.frombytes("L", (frame.width, frame.height), levels),
+                    (placement["x"], placement["y"]))
+        coverage.paste(Image.frombytes("L", (frame.width, frame.height), bytes(frame.alpha)),
+                       (placement["x"], placement["y"]))
+    rgba = Image.merge("RGBA", [shade] * 3 + [coverage])
+    return rgba, {
+        "size": [sheet_width, sheet_height],
+        "framesInFile": len(placements),
+        "frames": placements,
+    }
+
+
 def pack_color_atlas(frames: list[ColorFrame | None], limit: int) -> tuple[Any, dict[str, Any]]:
     """Pack the first `limit` main-layer frames into one RGBA atlas."""
     from PIL import Image

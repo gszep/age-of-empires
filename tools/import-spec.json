@@ -1,7 +1,8 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "civIndex": 1,
   "gaiaIndex": 0,
+  "playerColors": ["blue", "red", "green", "yellow", "teal", "purple", "grey", "orange"],
   "entities": [
     {
       "key": "militia",

@@ -14,6 +14,22 @@ export interface ImportedEntity {
   annexes?: { unitId: number; misplacement: [number, number]; animations: Record<string, AnimationInfo>; atlases: Record<string, Atlas> }[];
 }
 
+/** One player's block of the game palette, found at the DAT's own colour base. */
+export interface PlayerColor {
+  name: string;
+  colorBase: number;
+  minimapColor: [number, number, number];
+  /** The eight shades AoE2 draws this player's colour with, darkest first. */
+  ramp: [number, number, number][];
+}
+
+export interface PlayerColors {
+  palette: string;
+  /** The grey each shade stands for, from the grey player's identity block. */
+  shadeLevels: number[];
+  players: Record<string, PlayerColor>;
+}
+
 /** One DAT terrain slot: a tiling texture spanning `dimensions` tiles. */
 export interface ImportedTerrain {
   name: string;
@@ -27,6 +43,9 @@ export interface ContentAssets {
   entities: Record<string, ImportedEntity>;
   terrain: Record<string, ImportedTerrain>;
   textures: Map<string, THREE.Texture>;
+  playerColors?: PlayerColors;
+  /** One 256-texel ramp per player, indexed by a sprite's own grey. */
+  playerRamps: Map<number, THREE.DataTexture>;
 }
 
 interface UiMaterial { type: string; blend?: string | null; texture?: string; color?: { r: number; g: number; b: number; a: number } }
@@ -63,10 +82,53 @@ async function fetchJson<T>(url: string): Promise<T | undefined> {
   }
 }
 
+export const RAMP_LEVELS = 256;
+
+/**
+ * A player's ramp resolved for every grey a sprite can carry.
+ *
+ * The player-colour art is painted in greys, and the palette holds only eight
+ * shades per player. `shadeLevels` says which grey each of those eight shades
+ * stands for - it is the grey player's own block, which is why that block is an
+ * identity ramp - so inverting it turns a sprite's grey into a position in this
+ * player's block. Positions between two shades interpolate, which keeps a
+ * smooth gradient without inventing a colour outside the player's own eight.
+ */
+export function rampLut(ramp: [number, number, number][], shadeLevels: number[]): Uint8Array {
+  const data = new Uint8Array(RAMP_LEVELS * 4);
+  const last = ramp.length - 1;
+  for (let grey = 0; grey < RAMP_LEVELS; grey++) {
+    let index = 0;
+    while (index < last - 1 && shadeLevels[index + 1] < grey) index++;
+    const span = shadeLevels[index + 1] - shadeLevels[index];
+    const fraction = Math.max(0, Math.min(1, span > 0 ? (grey - shadeLevels[index]) / span : 0));
+    for (let channel = 0; channel < 3; channel++) {
+      data[grey * 4 + channel] = Math.round(
+        ramp[index][channel] + (ramp[index + 1][channel] - ramp[index][channel]) * fraction,
+      );
+    }
+    data[grey * 4 + 3] = 255;
+  }
+  return data;
+}
+
+function rampTexture(color: PlayerColor, shadeLevels: number[]): THREE.DataTexture {
+  const texture = new THREE.DataTexture(rampLut(color.ramp, shadeLevels), RAMP_LEVELS, 1);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearFilter;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   const manifest = await fetchJson<{
     entities: Record<string, ImportedEntity>;
     terrain?: Record<string, ImportedTerrain>;
+    playerColors?: PlayerColors;
   }>(`${CONTENT_BASE}manifest.json`);
   if (!manifest) return undefined;
   const textures = new Map<string, THREE.Texture>();
@@ -84,6 +146,10 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
         texture.magFilter = THREE.LinearFilter;
         texture.minFilter = THREE.LinearFilter;
         texture.generateMipmaps = false;
+        // A player-colour sheet is not a picture: its RGB is the shade to look
+        // up in the player's ramp, so it must arrive as the byte the importer
+        // wrote rather than as an sRGB colour to be decoded.
+        if (atlas.image.endsWith('-playercolor.png')) texture.colorSpace = THREE.NoColorSpace;
         textures.set(atlas.image, texture);
       }));
     }
@@ -113,7 +179,12 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     }));
   }
   await Promise.all(jobs);
-  return { entities: manifest.entities, terrain, textures };
+  const playerColors = manifest.playerColors;
+  const playerRamps = new Map<number, THREE.DataTexture>();
+  for (const [player, color] of Object.entries(playerColors?.players ?? {})) {
+    playerRamps.set(Number(player), rampTexture(color, playerColors!.shadeLevels));
+  }
+  return { entities: manifest.entities, terrain, textures, playerColors, playerRamps };
 }
 
 export async function loadUiAssets(): Promise<UiAssets | undefined> {

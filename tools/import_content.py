@@ -32,6 +32,75 @@ def rounded(value: float) -> float:
     return round(value, 6)
 
 
+def read_jasc_pal(path: Path) -> list[tuple[int, int, int]]:
+    """The 256 RGB rows of a JASC-PAL palette file."""
+    lines = path.read_text(errors="replace").splitlines()
+    if lines[0].strip() != "JASC-PAL":
+        raise ValueError(f"{path.name}: not a JASC-PAL palette")
+    count = int(lines[2])
+    rows = []
+    for line in lines[3:3 + count]:
+        red, green, blue = (int(part) for part in line.split()[:3])
+        rows.append((red, green, blue))
+    if len(rows) != count:
+        raise ValueError(f"{path.name}: {len(rows)} rows, header says {count}")
+    return rows
+
+
+# The game palette carries one 8-shade block per player at the DAT's own
+# `player_colours[i].player_color_base`, dark through the player's hue to a
+# pale highlight - the eight shades AoE2 has always drawn player colour with.
+# The blocks in `playercolor_*.pal` are a different thing (DE's editable
+# hue-to-target blends) and are not what a sprite's shade indexes.
+PLAYER_SHADES = 8
+# The grey player's block is the identity ramp: its entries are neutral greys,
+# so it is exactly the shade a sprite's own grey stands for, and inverting it
+# turns that grey into a position in any other player's block.
+SHADE_AXIS = "grey"
+
+
+def player_colors(
+    dat: DatFile, palettes_dir: Path, names: list[str], hashes: dict[str, str]
+) -> dict[str, Any]:
+    """Each player's shade ramp and minimap colour, both straight from the DAT.
+
+    `names` orders the players, which the DAT confirms rather than states: its
+    `player_colours[i].minimap_color` indexes the game palette, and those
+    entries come out as pure blue, red, green, yellow, cyan, magenta, grey,
+    orange in exactly this order.
+    """
+    source = palettes_dir / "original.pal"
+    palette = read_jasc_pal(source)
+    hashes[f"palettes/{source.name}"] = sha256(source)
+
+    colors: dict[str, Any] = {}
+    for index, name in enumerate(names):
+        entry = dat.player_colours[index]
+        base = entry.player_color_base
+        colors[str(index + 1)] = {
+            "name": name,
+            "colorBase": base,
+            "minimapColor": list(palette[entry.minimap_color]),
+            "ramp": [list(shade) for shade in palette[base:base + PLAYER_SHADES]],
+        }
+
+    axis = colors[str(names.index(SHADE_AXIS) + 1)]["ramp"]
+    previous = -1
+    for red, green, blue in axis:
+        if not red == green == blue:
+            raise ValueError(f"the {SHADE_AXIS} player's block is not neutral: {(red, green, blue)}")
+        if red <= previous:
+            raise ValueError(f"the {SHADE_AXIS} player's block does not rise: {axis}")
+        previous = red
+    return {
+        "palette": source.name,
+        # What grey each shade stands for, so a sprite's own grey resolves to a
+        # position in every player's ramp.
+        "shadeLevels": [shade[0] for shade in axis],
+        "players": colors,
+    }
+
+
 def find_task(unit: Any, selector: dict[str, Any]) -> Any:
     for task in unit.bird.tasks or []:
         if task.action_type != selector["actionType"]:
@@ -231,7 +300,13 @@ def terrain_entry(dat: DatFile, terrain_id: int) -> dict[str, Any]:
     }
 
 
-def extract(dat_path: Path, graphics_dir: Path, spec: dict[str, Any], source: dict[str, Any]) -> dict[str, Any]:
+def extract(
+    dat_path: Path,
+    graphics_dir: Path,
+    palettes_dir: Path,
+    spec: dict[str, Any],
+    source: dict[str, Any],
+) -> dict[str, Any]:
     dat = DatFile.parse(dat_path)
     hashes: dict[str, str] = {"dat": sha256(dat_path)}
     entities: dict[str, Any] = {}
@@ -246,6 +321,7 @@ def extract(dat_path: Path, graphics_dir: Path, spec: dict[str, Any], source: di
     }
     return {
         "terrain": terrain,
+        "playerColors": player_colors(dat, palettes_dir, spec["playerColors"], hashes),
         "schemaVersion": spec["schemaVersion"],
         "source": {
             "game": "aoe2de",
@@ -265,6 +341,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dat", type=Path, default=content / "resources/_common/dat/empires2_x2_p1.dat")
     parser.add_argument("--graphics", type=Path, default=resources / "resources/_common/drs/graphics")
+    parser.add_argument("--palettes", type=Path, default=content / "resources/_common/palettes")
     parser.add_argument("--spec", type=Path, default=Path(__file__).with_name("import-spec.json"))
     parser.add_argument("--source", type=Path, default=Path(__file__).with_name("aoe2-source.json"))
     parser.add_argument("--out", type=Path, default=Path(".local/aoe2de/content.json"))
@@ -273,6 +350,7 @@ def main() -> None:
     result = extract(
         args.dat,
         args.graphics,
+        args.palettes,
         json.loads(args.spec.read_text()),
         json.loads(args.source.read_text()),
     )

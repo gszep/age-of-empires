@@ -9,19 +9,12 @@ are deleted, not ticked.
 
 ## Player colour fidelity
 
-Player colours land in the right areas on most buildings and team assignment is
-correct, but:
+Sprite cloth now shades through the imported palette block (see status.md), and
+team assignment is correct, but:
 
 - **The town center renders grey.** Its art is composited from annexes; check
   whether `convert_sld.py` produced `annex*-playercolor` atlases for it and
   whether `src/view/sprites.ts` applies colour masks to annex meshes at all.
-- **Colours are oversaturated and unshaded.** The renderer multiplies one flat
-  colour through the white mask, losing the shading the original bakes in.
-  AoE2DE selects per-pixel colours from a player-colour palette ramp; the mask
-  layer's 8-bit value indexes intensity. Fix path: modulate the flat colour by
-  the mask's grey level (already exported — check `pack_mask_atlas`) or import
-  the authoritative palette ramps from the depot's palette files and map mask
-  intensity through them. Compare against the installed game side by side.
 
 ## Tech tree completeness
 

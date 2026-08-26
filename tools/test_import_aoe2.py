@@ -1,7 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
 import json
-import os
 import shutil
 import sys
 import tempfile
@@ -9,19 +8,18 @@ import unittest
 
 from PIL import Image
 
+from depot import depot_root
 from import_content import extract
 from import_ui import extract_ui
 from import_audio import import_audio, read_banks, resolve_event
 from convert_sld import convert, convert_terrain
 
 
-ROOT = Path(os.environ.get(
-    "AOE2DE_DEPOT_ROOT",
-    Path.home() / "Steam/steamapps/content/app_813780",
-)).expanduser()
+ROOT = depot_root()
 DAT = ROOT / "depot_813781/resources/_common/dat/empires2_x2_p1.dat"
 SOUNDS = ROOT / "depot_813781/resources/_common/dat/sounds.json"
 GRAPHICS = ROOT / "depot_813784/resources/_common/drs/graphics"
+PALETTES = ROOT / "depot_813781/resources/_common/palettes"
 WIDGETUI = ROOT / "depot_813782/widgetui"
 TERRAIN = ROOT / "depot_813782/resources/_common/terrain/textures/2x"
 AUDIO_PACK = ROOT / "depot_813783/wwise/Base.pck"
@@ -31,7 +29,7 @@ SOURCE = Path(__file__).with_name("aoe2-source.json")
 
 @lru_cache(maxsize=1)
 def extracted_content():
-    return extract(DAT, GRAPHICS, SPEC, json.loads(SOURCE.read_text()))
+    return extract(DAT, GRAPHICS, PALETTES, SPEC, json.loads(SOURCE.read_text()))
 
 
 @unittest.skipUnless(DAT.is_file(), "owned AoE2DE fixture is not installed")
@@ -90,10 +88,28 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertLess(lit, frame.width * frame.height)
         self.assertEqual(max(frame.alpha), 255)
 
-    def test_mask_sheets_stay_neutral_for_tinting(self):
-        # The renderer multiplies its own colour through these sheets, so any
+    def test_shadow_sheets_stay_neutral_for_tinting(self):
+        # The renderer multiplies its own colour through this sheet, so any
         # colour baked in here multiplies the result: black would render black
         # whatever colour the renderer asked for.
+        from convert_sld import convert_mask
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory) / "walk-shadow.png"
+            atlas = convert_mask(
+                GRAPHICS / "u_vil_male_lumberjack_walkA_x1.sld", out, 30 * 16, "shadow",
+            )
+            self.assertTrue(atlas)
+            with Image.open(out) as image:
+                pixels = list(image.convert("RGBA").getdata())  # noqa: PIL deprecation is fine on the pinned version
+            lit = [p for p in pixels if p[3] > 0]
+            self.assertTrue(lit)
+            for red, green, blue, _alpha in lit:
+                self.assertEqual((red, green, blue), (255, 255, 255))
+
+    def test_player_colour_sheets_carry_the_shade_and_never_a_colour(self):
+        # RGB here is a ramp index, not a colour: the renderer reads it as a
+        # grey level and looks it up in the player's palette. A coloured pixel
+        # would silently shift the shade of every player.
         from convert_sld import convert_mask
         with tempfile.TemporaryDirectory() as directory:
             out = Path(directory) / "walk-playercolor.png"
@@ -106,7 +122,13 @@ class ContentImportIntegrationTest(unittest.TestCase):
             lit = [p for p in pixels if p[3] > 0]
             self.assertTrue(lit)
             for red, green, blue, _alpha in lit:
-                self.assertEqual((red, green, blue), (255, 255, 255))
+                self.assertEqual(red, green)
+                self.assertEqual(green, blue)
+            # Cloth is shaded art, so the sheet must span a range of levels
+            # rather than the flat 255 a coverage mask would give.
+            levels = {p[0] for p in lit}
+            self.assertGreater(len(levels), 16)
+            self.assertLess(min(levels), 128)
 
     def test_mask_atlas_frames_track_the_main_layer(self):
         from convert_sld import convert_mask
@@ -183,8 +205,32 @@ class ContentImportIntegrationTest(unittest.TestCase):
                     self.assertGreater(animation["frames"], 0, f"{key}/{state}")
                     self.assertEqual(len(hashes[animation["source"]]), 64, f"{key}/{state}")
 
+    def test_player_colour_ramps_come_from_the_dat_palette_blocks(self):
+        from import_content import read_jasc_pal
+        colors = self.result["playerColors"]
+        players = colors["players"]
+        self.assertEqual(len(players), 8)
+        blue, red, grey = players["1"], players["2"], players["7"]
+        # The DAT's own player_colours order is what puts blue first and red
+        # second, and its colour base is where each block starts.
+        self.assertEqual(blue["minimapColor"], [0, 0, 255])
+        self.assertEqual(red["minimapColor"], [255, 0, 0])
+        self.assertEqual(blue["colorBase"], 16)
+        self.assertEqual(red["colorBase"], 32)
+        palette = read_jasc_pal(PALETTES / "original.pal")
+        self.assertEqual(blue["ramp"], [list(c) for c in palette[16:24]])
+        self.assertEqual(blue["ramp"][0], [0, 0, 82])
+        self.assertEqual(blue["ramp"][-1], [205, 250, 255])
+        # The grey player's block is the shade axis: neutral and rising, so a
+        # sprite's own grey resolves to a position in every other block.
+        self.assertEqual([shade[0] for shade in grey["ramp"]], colors["shadeLevels"])
+        for shade in grey["ramp"]:
+            self.assertEqual(len(set(shade)), 1)
+        self.assertEqual(colors["shadeLevels"], sorted(set(colors["shadeLevels"])))
+        self.assertEqual(len(self.result["source"]["sha256"]["palettes/original.pal"]), 64)
+
     def test_regeneration_is_deterministic(self):
-        again = extract(DAT, GRAPHICS, SPEC, json.loads(SOURCE.read_text()))
+        again = extract(DAT, GRAPHICS, PALETTES, SPEC, json.loads(SOURCE.read_text()))
         self.assertEqual(
             json.dumps(self.result, sort_keys=True), json.dumps(again, sort_keys=True)
         )
