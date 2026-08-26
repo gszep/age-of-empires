@@ -78,6 +78,17 @@ curl -s localhost:5173/__debug -d '{"type":"pixels","rect":[0,0,400,300]}'
 curl -s "localhost:5173/__debug/screenshot?x=0&y=0&w=800&h=600" -o shot.png
 ```
 
+The same endpoint plays the match, so a state that only exists once someone
+acts — a trained unit, a rally flag, a corpse — can be reached without a
+human. Commands go through `applyCommand`, the public entry every strategy
+uses, so nothing here reaches a state a player could not:
+
+```bash
+curl -s localhost:5173/__debug -d '{"type":"command","command":{"kind":"train","player":1,"buildingId":1,"unit":"villager"}}'
+curl -s localhost:5173/__debug -d '{"type":"select","ids":[1]}'   # what the HUD shows
+curl -s localhost:5173/__debug -d '{"type":"look","entity":12}'   # centre the camera
+```
+
 `pixels` returns mean colour and a dominant-colour histogram read back from
 the actual canvas — use it to verify rendering changes (tints, masks,
 visibility) numerically instead of asking a human to look. Prefer it over

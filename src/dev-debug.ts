@@ -9,12 +9,15 @@
  * blank), so captures re-render the scene into an offscreen RenderTarget and
  * read that back through the renderer. Row order and channel order of that
  * readback differ between the WebGPU and WebGL2 backends, so both are
- * calibrated once with a probe render instead of being assumed.
+ * calibrated once with a probe render instead of being assumed, and the target
+ * is given the renderer's output colour space so the numbers are the ones on
+ * screen rather than their linear counterparts.
  */
 
 import * as THREE from 'three/webgpu';
 import { gameTimeSeconds } from './sim/game';
-import type { Entity, GameState, Point } from './sim/types';
+import type { CommandResult } from './sim/game';
+import type { Command, Entity, GameState, Point } from './sim/types';
 import { colorStats, type ColorStats } from './dev-debug-stats';
 import { worldToIso, TILE_W } from './view/iso';
 
@@ -23,20 +26,31 @@ export interface DebugContext {
   cameraCenter(): Point;
   zoom(): number;
   selectedIds(): number[];
+  /** Apply one public command, exactly as the UI and every strategy does. */
+  apply(command: Command): CommandResult;
+  select(ids: number[]): void;
+  lookAt(point: Point): void;
   renderer: THREE.WebGPURenderer;
   scene: THREE.Scene;
   camera: THREE.Camera;
-  views: Map<string, { animationState?: string; facing: number; color: { mesh?: { material?: unknown } } }>;
+  views: Map<string, {
+    animationState?: string;
+    facing: number;
+    playerColor?: string;
+    color: { mesh?: { visible?: boolean; material?: unknown } };
+  }>;
 }
 
 interface DebugQuery {
-  type: 'sim' | 'entities' | 'pixels';
+  type: 'sim' | 'entities' | 'pixels' | 'command' | 'select' | 'look';
   id?: number;
   owner?: number;
   kind?: string;
   entity?: number;
   rect?: [number, number, number, number];
   png?: boolean;
+  command?: Command;
+  ids?: number[];
 }
 
 export function installDebug(context: DebugContext): void {
@@ -69,6 +83,11 @@ export function installDebug(context: DebugContext): void {
     const canvas = context.renderer.domElement;
     const view = context.views.get(`e${entity.id}`);
     const material = view?.color.mesh?.material as { color?: { getHexString(): string } } | undefined;
+    // The player-colour piece shades the owner's hue through the imported
+    // palette ramp, so the hue is the view's, not a flat material colour.
+    const colorTint = view?.color.mesh?.visible
+      ? view.playerColor ?? (material?.color ? `#${material.color.getHexString()}` : undefined)
+      : undefined;
     return {
       id: entity.id,
       kind: entity.kind,
@@ -84,7 +103,7 @@ export function installDebug(context: DebugContext): void {
       rendered: view !== undefined,
       animation: view?.animationState,
       facing: view ? round(view.facing) : undefined,
-      colorTint: material?.color ? `#${material.color.getHexString()}` : undefined,
+      colorTint,
     };
   }
 
@@ -128,6 +147,10 @@ export function installDebug(context: DebugContext): void {
   ): Promise<Uint8Array> {
     const renderer = context.renderer;
     const target = new THREE.RenderTarget(targetWidth, targetHeight);
+    // A render target is linear by default, so the output transfer the canvas
+    // applies would be skipped and every colour read back darker than the one
+    // on screen. Ask for the renderer's own output space instead.
+    target.texture.colorSpace = renderer.outputColorSpace;
     const previous = renderer.getRenderTarget();
     renderer.setRenderTarget(target);
     renderer.render(scene, camera);
@@ -217,6 +240,28 @@ export function installDebug(context: DebugContext): void {
       }
       const stats: ColorStats = colorStats(data);
       return { rect: rect.map(Math.round), devicePixels: [w, h], ...stats };
+    }
+    // Reading the match is not enough to verify how it renders: a corpse, a
+    // rally flag, or a freshly trained unit only exists once someone plays.
+    // These go through the same public entry points the UI uses, so nothing
+    // here can reach a state a player could not.
+    if (query.type === 'command') {
+      if (!query.command) throw new Error('command query needs a `command`');
+      return context.apply(query.command);
+    }
+    if (query.type === 'select') {
+      const ids = query.ids ?? (query.entity !== undefined ? [query.entity] : []);
+      context.select(ids);
+      return { selected: context.selectedIds() };
+    }
+    if (query.type === 'look') {
+      const entity = query.entity !== undefined
+        ? game.entities.find(e => e.id === query.entity)
+        : undefined;
+      if (query.entity !== undefined && !entity) throw new Error(`no entity ${query.entity}`);
+      const point = entity ? entity.position : { x: query.rect?.[0] ?? 0, y: query.rect?.[1] ?? 0 };
+      context.lookAt(point);
+      return { center: { x: round(point.x), y: round(point.y) } };
     }
     throw new Error(`unknown debug query type: ${(query as { type: string }).type}`);
   }
