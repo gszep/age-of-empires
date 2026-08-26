@@ -1,13 +1,22 @@
 import * as THREE from 'three/webgpu';
 import { materialColor, materialOpacity, texture as textureNode, vec2 } from 'three/tsl';
 import type { ContentAssets, Atlas, AnimationInfo } from './assets';
-import { isBuilding } from '../sim/data';
+import { isBuilding, isUnit } from '../sim/data';
 import { createTerrainPatch } from './world';
 import { worldToIso, isoDepth, TILE_H } from './iso';
 import type { Entity, GameState, Point } from '../sim/types';
 
 /** Open-content player colours, used until the game palette is imported. */
 export const PLAYER_COLORS: Record<number, number> = { 0: 0xffffff, 1: 0x1a6cff, 2: 0xe02b2b };
+
+/**
+ * What the game draws an obscured unit's contour in. The DAT names it directly
+ * (`player_colours[i].unit_outline_color`), so nothing here is picked by eye.
+ */
+function outlineColorOf(assets: ContentAssets | undefined, owner: number): number | undefined {
+  const color = assets?.playerColors?.players[String(owner)]?.outlineColor;
+  return color ? (color[0] << 16) | (color[1] << 8) | color[2] : undefined;
+}
 
 /** The owner's colour as `#rrggbb`: the DAT's own minimap colour when imported. */
 export function playerColorHex(assets: ContentAssets | undefined, owner: number): string | undefined {
@@ -39,6 +48,9 @@ export interface EntityView {
   patchSlot?: string;
   shadow: Piece;
   body: Piece;
+  /** Contour drawn in the owner's colour while a building hides the unit. */
+  outline: Piece;
+  outlineColor?: number;
   annexes: Piece[];
   /** Player-colour mask over each annex, in the same order. */
   annexColors: Piece[];
@@ -114,6 +126,8 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
   const ramp = assets?.playerRamps.get(entity.owner);
   const color = ramp ? makeRampPiece(ramp) : makePiece();
   group.add(color.mesh);
+  const outline = makePiece();
+  group.add(outline.mesh);
   const annexes: Piece[] = [];
   const annexColors: Piece[] = [];
   const key = entityKey(entity);
@@ -132,9 +146,10 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
     }
   }
   const view: EntityView = {
-    group, shadow, body, color, annexes, annexColors, fallback: !imported,
+    group, shadow, body, color, outline, annexes, annexColors, fallback: !imported,
     facing: entity.owner === 2 ? Math.PI : 0,
     playerColor: playerColorHex(assets, entity.owner),
+    outlineColor: outlineColorOf(assets, entity.owner),
   };
   if (entity.kind === 'farm') {
     view.fallback = false;
@@ -294,7 +309,10 @@ export function createProjectileView(): EntityView {
   const shadow = makePiece();
   const body = makePiece();
   group.add(body.mesh);
-  return { group, shadow, body, color: makePiece(), annexes: [], annexColors: [], fallback: false, facing: 0 };
+  return {
+    group, shadow, body, color: makePiece(), outline: makePiece(),
+    annexes: [], annexColors: [], fallback: false, facing: 0,
+  };
 }
 
 export function updateProjectileView(
@@ -337,6 +355,60 @@ export function updateProjectileView(
   applyFrame(view.body, assets, atlas, direction * framesPerDirection + pitch, position, 0xffffff);
   view.body.mesh.position.y += height * HEIGHT_PIXELS;
   view.body.mesh.renderOrder = 4000 + isoDepth(position.x, position.y);
+}
+
+/**
+ * Show each unit's contour where something drawn in front of it hides it.
+ *
+ * A sprite occludes whatever sorts behind it, so the test is the one the
+ * renderer already makes: a piece with a greater isometric depth, covering the
+ * unit's own art. Buildings and trees are what stand tall enough to swallow a
+ * unit; other units do not hide each other in AoE2.
+ */
+const HIDDEN_FRACTION = 0.5;
+
+export function updateOcclusion(views: Map<string, EntityView>, state: GameState): void {
+  const occluders: { depth: number; x: number; y: number; width: number; height: number }[] = [];
+  for (const entity of state.entities) {
+    if (entity.dead) continue;
+    const tall = isBuilding(entity.kind) || (entity.kind === 'resource' && entity.resourceKind === 'wood');
+    if (!tall) continue;
+    const view = views.get(`e${entity.id}`);
+    if (!view) continue;
+    const depth = isoDepth(entity.position.x, entity.position.y);
+    // Annexes are the building's art too — the town center's roofs are all
+    // annex, and they are what a unit walks behind.
+    for (const piece of [view.body, ...view.annexes]) {
+      const mesh = piece.mesh;
+      if (!mesh.visible) continue;
+      occluders.push({
+        depth,
+        x: mesh.position.x, y: mesh.position.y,
+        width: mesh.scale.x, height: mesh.scale.y,
+      });
+    }
+  }
+  if (!occluders.length) return;
+  for (const entity of state.entities) {
+    if (entity.dead || !isUnit(entity.kind)) continue;
+    const view = views.get(`e${entity.id}`);
+    const mesh = view?.outline.mesh;
+    if (!view || !mesh || !view.body.mesh.visible) continue;
+    const depth = isoDepth(entity.position.x, entity.position.y);
+    const body = view.body.mesh;
+    const area = body.scale.x * body.scale.y;
+    // Most of the unit has to be behind the thing, not a sliver of it: a
+    // sprite's box includes its transparent margins, so brushing past a tree
+    // would otherwise light the contour up.
+    mesh.visible = area > 0 && occluders.some(o => {
+      const overlapX = Math.min(o.x + o.width / 2, body.position.x + body.scale.x / 2)
+        - Math.max(o.x - o.width / 2, body.position.x - body.scale.x / 2);
+      const overlapY = Math.min(o.y + o.height / 2, body.position.y + body.scale.y / 2)
+        - Math.max(o.y - o.height / 2, body.position.y - body.scale.y / 2);
+      return o.depth > depth && overlapX > 0 && overlapY > 0
+        && (overlapX * overlapY) / area >= HIDDEN_FRACTION;
+    });
+  }
 }
 
 /** Farms swap between the construction and grown terrain slots. */
@@ -459,6 +531,18 @@ export function updateEntityView(
   }
   (view.body.mesh.material as THREE.MeshBasicMaterial).opacity =
     entity.buildProgress !== undefined ? 0.85 : 1;
+
+  // The contour AoE2 shows through a building that hides a unit. It is
+  // positioned every frame but stays hidden until `updateOcclusion` finds
+  // something actually drawing in front of it.
+  const outlineAtlas = imported?.atlases[`${choice.name}-outline`];
+  if (outlineAtlas && view.outlineColor !== undefined && isUnit(entity.kind) && !entity.dead) {
+    applyFrame(view.outline, assets, outlineAtlas, frameIndex, entity.position, view.outlineColor);
+    // Above every body but under the fog, so a hidden unit reads through the
+    // building without reading through the dark.
+    view.outline.mesh.renderOrder = 4500 + depth;
+  }
+  view.outline.mesh.visible = false;
 
   const annexes = imported?.annexes ?? [];
   for (const [index, piece] of view.annexes.entries()) {

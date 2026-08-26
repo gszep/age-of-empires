@@ -30,7 +30,7 @@ Controls and hotkeys are listed in the root `README.md`. The essential loop is l
 
 ## Deliberately omitted
 
-The target does not include Feudal+ ages, other civilizations, technologies, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, trade, relics, gates/walls, or a genetic-algorithm framework. Mobile has no separate or simplified gameplay. All SLD layers convert through the local decoder; outline layers are readable but not exported or drawn.
+The target does not include Feudal+ ages, other civilizations, technologies, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, trade, relics, gates/walls, or a genetic-algorithm framework. Mobile has no separate or simplified gameplay. All SLD layers convert through the local decoder.
 
 ## Measurements and gate evidence
 
@@ -50,7 +50,7 @@ Batch artifacts are intentionally ignored under `.local/batches/phase6-16/`.
 
 The importer integration resolves every consumed DAT graphic/rule and widgetui source, hashes inputs, and regenerates byte-identically. Viewer smoke tests loaded imported atlases and WEST UI without application console errors; selection, gather orders, fog expansion, and browser replay were exercised through Chrome DevTools Protocol. Timing, resource conservation, hidden information, pathing, combat release, protocol validation, and replay determinism have focused tests.
 
-Known discrepancies are the missing outline layer, single-terrain ground without the multi-terrain blend masks, missing fire/corpse delta overlays, and some mirror-AI matches that stalemate until the configured timeout.
+Known discrepancies are single-terrain ground without the multi-terrain blend masks, missing fire/corpse delta overlays, and some mirror-AI matches that stalemate until the configured timeout.
 
 The ground samples the imported DAT terrain texture (slot 0, `Grass`/`g_grs`) at the authored `terrain_dimensions` tile span; `terrain/blends` and `terrain/masks` are not consumed yet, so terrain-to-terrain transitions are absent rather than approximated. Farms are terrain too (slots 7 and 29, `Farm1`/`Farm Cnst1`): the DAT gives them no SLD, so they draw as their own patch of the isometric grid.
 
@@ -88,6 +88,28 @@ in its annex pieces, which is why it used to render grey. Each annex now draws
 its own player-colour sheet through the same ramp, and a pixel sample over the
 building returns 3,258 player-blue pixels in 2,783 shades.
 
+### The outline layer is a contour, and it is for occlusion
+
+The SLD outline layer is not BC-compressed like the others. Its payload is a
+`u16` offset per 4x4 block row into a command stream, where a byte under `0x80`
+skips that many blocks and `0x80|n` draws `n` of them from two bytes each — the
+block's sixteen pixels, row by row, least significant bit first. Every row's
+commands cover exactly its blocks and consume exactly its bytes; the decoder
+raises otherwise, and all 78 consumed sources walk clean.
+
+What comes out is a one-pixel contour lying *inside* the sprite (98% of the
+barracks' lit pixels fall on opaque art, covering 18% of it), not a silhouette
+and not a halo. That is what AoE2 draws through a building standing in front of
+a unit, in the colour the DAT names in `player_colours[i].unit_outline_color` —
+pure blue for player one, pure red for player two. The renderer shows a unit's
+contour when a building or tree with a greater isometric depth covers at least
+half of its art — the same sorting the painter's-order draw already uses. That
+half is an approximation: a sprite's box includes its transparent margins, so
+the real game's per-pixel test is what this stands in for, and a unit merely
+brushing a tree's bounding box would otherwise light up. On a small sprite the
+contour is most of the silhouette (86% of a villager's lit pixels), so a hidden
+villager reads as a coloured shape, exactly as it does in the game.
+
 ### The import pipeline is openage-free
 
 `tools/sld_layers.py` decodes every consumed SLD layer — BC1 main graphics
@@ -103,8 +125,7 @@ the public documentation records as "unknown, always 0x10" is the frame-data
 start offset (14 in the stable), and per-layer 4-byte padding is relative to
 that start, not to the file. With both honoured, the stable's 90 frames walk
 cleanly to the file's final byte, so importing the stable (and the scout
-cavalry it trains) is now purely a content task — see `backlog.md`. Sprite
-outline layers are likewise readable but not yet exported or drawn.
+cavalry it trains) is now purely a content task — see `backlog.md`.
 
 ### Audio import is unblocked
 

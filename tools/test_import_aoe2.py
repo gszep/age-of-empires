@@ -142,6 +142,50 @@ class ContentImportIntegrationTest(unittest.TestCase):
                 self.assertEqual(image.mode, "RGBA")
                 self.assertEqual(list(image.size), atlas["size"])
 
+    def test_outline_layer_walks_its_own_command_rows(self):
+        # The outline layer is not BC-compressed: each block row is a command
+        # stream indexed by its own offset table. The decoder raises unless a
+        # row's commands cover exactly its blocks and consume exactly its
+        # bytes, so decoding every frame is the proof that the reading is
+        # right — there is no partial credit.
+        from sld_layers import decode_colors, decode_outlines
+        data = (GRAPHICS / "b_dark_barracks_age1_x1.sld").read_bytes()
+        outlines = decode_outlines(data)
+        colors = decode_colors(data)
+        self.assertTrue(outlines and all(f is not None and not f.empty for f in outlines))
+        drawn = inside = opaque = 0
+        for outline, color in zip(outlines, colors):
+            self.assertEqual((outline.width, outline.height), (color.width, color.height))
+            for index in range(outline.width * outline.height):
+                lit = bool(outline.alpha[index])
+                solid = bool(color.rgba[index * 4 + 3])
+                drawn += lit
+                opaque += solid
+                inside += lit and solid
+        # A contour, not a silhouette: it hugs the sprite's edges from inside.
+        self.assertGreater(inside / drawn, 0.95)
+        self.assertLess(drawn / opaque, 0.3)
+
+    def test_outline_atlas_is_a_tintable_contour(self):
+        from convert_sld import convert_mask
+        animation = self.result["entities"]["militia"]["animations"]["idle"]
+        expected = animation["frames"] * animation["directions"]
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory) / "idle-outline.png"
+            atlas = convert_mask(GRAPHICS / animation["source"], out, expected, "outline")
+            self.assertTrue(atlas)
+            # The renderer indexes the contour with the body's frame index, so
+            # the sheet holds an entry for every frame the animation plays.
+            self.assertEqual(atlas["framesInFile"], expected)
+            with Image.open(out) as image:
+                pixels = list(image.convert("RGBA").getdata())  # noqa: PIL deprecation is fine on the pinned version
+            lit = [p for p in pixels if p[3] > 0]
+            self.assertTrue(lit)
+            # Neutral white and fully opaque: the renderer multiplies the DAT's
+            # outline colour through it, and a contour has no coverage ramp.
+            for red, green, blue, alpha in lit:
+                self.assertEqual((red, green, blue, alpha), (255, 255, 255, 255))
+
     def test_ground_terrain_comes_from_the_dat(self):
         ground = self.result["terrain"]["ground"]
         # Grass is DAT terrain 0; its texture name and tile span drive the
@@ -217,6 +261,9 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(red["minimapColor"], [255, 0, 0])
         self.assertEqual(blue["colorBase"], 16)
         self.assertEqual(red["colorBase"], 32)
+        # The DAT names the contour colour too, so it is never picked by eye.
+        self.assertEqual(blue["outlineColor"], [0, 0, 255])
+        self.assertEqual(red["outlineColor"], [255, 0, 0])
         palette = read_jasc_pal(PALETTES / "original.pal")
         self.assertEqual(blue["ramp"], [list(c) for c in palette[16:24]])
         self.assertEqual(blue["ramp"][0], [0, 0, 82])

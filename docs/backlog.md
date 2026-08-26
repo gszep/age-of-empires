@@ -27,10 +27,12 @@ sounds, and under-attack alerts, each resolved through `sounds.json` events.
 
 ## Rendering
 
+- **The minimap still uses hand-picked player colours.** `src/view/minimap.ts`
+  reads `PLAYER_COLORS`, the open-content fallback, while the manifest now
+  carries the DAT's own `minimapColor` per player. The minimap has no
+  `ContentAssets` handle; plumbing one through is the whole job.
+
 - **Rally-point flags** are absent; rally points work but give no visual.
-- **Sprite outlines** (the thin dark contour) are not drawn; the local
-  decoder can read the outline layer, so the work is exporting it and
-  compositing it in the renderer.
 - **Terrain blends/masks** are not consumed; terrain-to-terrain transitions
   are absent (single-terrain maps hide this today).
 - **Fire/corpse delta overlays** on damaged/destroyed buildings are not

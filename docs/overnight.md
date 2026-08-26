@@ -30,11 +30,13 @@ items land.
   renderer drew none of it. Each annex now gets its own ramp piece.
   *Verified:* pixel sample over the TC returns 3,258 player-blue pixels in
   2,783 shades (was none), and `colorTint` is reported for it again.
-- [ ] **Sprite outlines.** Export the SLD outline layer (BC1, same command
-  walk — `tools/sld_layers.py` already skips it by length; decode it
-  instead) and draw the thin dark contour. *Verify:* import test asserts
-  outline atlases exist for militia; pixel sample along a unit's silhouette
-  darkens; screenshot inspection.
+- [x] **Sprite outlines.** The layer is not BC1 and not a dark contour: it is
+  its own per-block-row command stream (see status.md) holding the one-pixel
+  contour AoE2 shows *through* a building standing in front of a unit, in the
+  colour the DAT names in `unit_outline_color`. Exported as a tintable mask
+  and drawn on occlusion rather than always. *Verified:* import tests assert
+  the walk and the militia's outline atlas; a villager walked behind the town
+  center renders 198 pixels of the DAT's pure blue and none in the open.
 - [ ] **Rally-point flags.** Rally points work but draw nothing. Resolve the
   gather-point flag graphic from the DAT (search graphics for the flag used
   on gather-point placement; do not hand-draw), import it, render at the

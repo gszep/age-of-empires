@@ -40,25 +40,31 @@ def convert(source: Path, output: Path, expected_frames: int) -> dict[str, Any]:
     return {"image": output.name, **atlas}
 
 
+MASK_LAYERS = ("shadow", "playercolor", "outline")
+
+
 def convert_mask(source: Path, output: Path, expected_frames: int, layer: str) -> dict[str, Any]:
-    """Decode and pack one of an SLD's BC4 mask layers, `shadow` or `playercolor`.
+    """Decode and pack one of an SLD's mask layers: shadow, playercolor, outline.
 
     Uses tools/sld_layers.py rather than the openage decoder, whose BC4 path
     corrupts the heap on these layers. Pure Python, so a bad file raises here
     instead of taking the process down with it.
 
-    The two layers are packed differently because they mean different things.
-    A shadow sheet is neutral white with the mask as alpha: the renderer
-    multiplies black through it. A player-colour sheet keeps the coverage in
-    alpha but carries the main layer's grey in RGB, because that grey is the
-    shade the renderer looks up in the player's palette ramp.
+    Each layer is packed for what it means. Shadow and outline sheets are
+    neutral white with the mask as alpha: the renderer multiplies its own
+    colour through them, black for a shadow and the DAT's outline colour for a
+    contour. A player-colour sheet keeps the coverage in alpha but carries the
+    main layer's grey in RGB, because that grey is the shade the renderer looks
+    up in the player's palette ramp.
     """
     from sld_layers import (LAYER_PLAYERCOLOR, LAYER_SHADOW, decode_colors, decode_masks,
-                            pack_mask_atlas, pack_playercolor_atlas)
+                            decode_outlines, pack_mask_atlas, pack_playercolor_atlas)
 
     data = source.read_bytes()
-    wanted = LAYER_PLAYERCOLOR if layer == "playercolor" else LAYER_SHADOW
-    frames = decode_masks(data, wanted)
+    if layer == "outline":
+        frames = decode_outlines(data)
+    else:
+        frames = decode_masks(data, LAYER_PLAYERCOLOR if layer == "playercolor" else LAYER_SHADOW)
     playable = min(expected_frames, len(frames))
     if playable == 0 or not any(f is not None and not f.empty for f in frames[:playable]):
         return {}
@@ -151,7 +157,7 @@ def main() -> None:
     # A mask failure costs that entity one mask and is recorded, never fatal.
     mask_skipped: list[str] = []
     for job in jobs:
-        for layer in ("shadow", "playercolor"):
+        for layer in MASK_LAYERS:
             identifier = f"{job['key']}:{job['name']}:{layer}"
             try:
                 atlas = convert_mask(

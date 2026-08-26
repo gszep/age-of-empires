@@ -11,7 +11,7 @@ import type { BuildingKind, Entity, GameState, Point, UnitKind } from './sim/typ
 import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, TILE_W, TILE_H } from './view/iso';
-import { createEntityView, createProjectileView, updateEntityView, updateProjectileView, entityKey, type EntityView } from './view/sprites';
+import { createEntityView, createProjectileView, updateEntityView, updateProjectileView, updateOcclusion, entityKey, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint } from './view/world';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 
@@ -25,7 +25,7 @@ import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 const view = {
   createGround, createFog, createFootprint,
   createEntityView, updateEntityView, createProjectileView, updateProjectileView,
-  entityKey, Hud,
+  updateOcclusion, entityKey, Hud,
 };
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
@@ -603,6 +603,10 @@ function syncScene(time: number): void {
     }
   }
 
+  // Contours for units something else is drawing in front of, once every
+  // piece this frame has been placed.
+  view.updateOcclusion(views, game);
+
   // Selection rings from a reusable pool.
   while (ringPool.length < selectedIds.length) {
     const ring = new THREE.Mesh(
@@ -831,6 +835,7 @@ if (import.meta.hot) {
         view.updateEntityView = sprites.updateEntityView;
         view.createProjectileView = sprites.createProjectileView;
         view.updateProjectileView = sprites.updateProjectileView;
+        view.updateOcclusion = sprites.updateOcclusion;
         view.entityKey = sprites.entityKey;
       }
       if (hudModule) view.Hud = hudModule.Hud;

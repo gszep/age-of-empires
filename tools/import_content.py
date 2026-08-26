@@ -81,6 +81,8 @@ def player_colors(
             "name": name,
             "colorBase": base,
             "minimapColor": list(palette[entry.minimap_color]),
+            # What the game draws a unit's contour in when a building hides it.
+            "outlineColor": list(palette[entry.unit_outline_color]),
             "ramp": [list(shade) for shade in palette[base:base + PLAYER_SHADES]],
         }
 

@@ -224,6 +224,64 @@ def _decode_layer(
     return pixels
 
 
+# The outline layer is not a BC4 mask. Its payload is a per-block-row command
+# stream: a byte under 0x80 skips that many 4x4 blocks, 0x80|n draws n of them
+# from two bytes each, and those 16 bits are the block's pixels row by row,
+# least significant bit first. A `u16` offset per block row indexes into the
+# stream, after the same two header bytes the other masks carry. The walk is
+# exact - every row's commands cover the row's blocks and consume its bytes to
+# the byte - which is what proves the reading.
+OUTLINE_ROW = Struct("< H")
+
+
+def decode_outline_layer(payload: bytes, width: int, height: int) -> bytearray:
+    """Expand one frame's outline layer to `width * height` bytes, 0 or 255."""
+    pixels = bytearray(width * height)
+    blocks_x = (width + BLOCK - 1) // BLOCK
+    blocks_y = (height + BLOCK - 1) // BLOCK
+    table = MASK_HEADER.size
+    body_start = table + blocks_y * OUTLINE_ROW.size
+    body = payload[body_start:]
+    for row in range(blocks_y):
+        start = OUTLINE_ROW.unpack_from(payload, table + row * OUTLINE_ROW.size)[0]
+        end = (
+            OUTLINE_ROW.unpack_from(payload, table + (row + 1) * OUTLINE_ROW.size)[0]
+            if row + 1 < blocks_y else len(body)
+        )
+        cursor = start
+        column = 0
+        while cursor < end:
+            command = body[cursor]
+            cursor += 1
+            if command < 0x80:
+                column += command
+                continue
+            for _ in range(command & 0x7F):
+                if cursor + 2 > len(body):
+                    break
+                bits = body[cursor] | (body[cursor + 1] << 8)
+                cursor += 2
+                for bit in range(16):
+                    if not (bits >> bit) & 1:
+                        continue
+                    y = row * BLOCK + bit // BLOCK
+                    x = column * BLOCK + bit % BLOCK
+                    if y < height and x < width:
+                        pixels[y * width + x] = 255
+                column += 1
+        if column != blocks_x or cursor != end:
+            raise ValueError(
+                f"outline row {row}: covered {column} of {blocks_x} blocks, "
+                f"consumed {cursor - start} of {end - start} bytes"
+            )
+    return pixels
+
+
+def decode_outlines(data: bytes) -> list[MaskFrame | None]:
+    """Every frame's outline contour, or None where a frame carries none."""
+    return _decode_wanted(data, LAYER_OUTLINE, MaskFrame, 1, _decode_block)
+
+
 def decode_masks(data: bytes, wanted: int = LAYER_SHADOW) -> list[MaskFrame | None]:
     """Every frame's mask for `wanted`, or None where a frame carries none.
 
@@ -277,12 +335,24 @@ def _decode_wanted(
                 box = (x1, y1, x2, y2)
                 if mask == LAYER_MAIN:
                     main_box = box
-            elif mask in (LAYER_DAMAGE, LAYER_PLAYERCOLOR):
+            elif mask in (LAYER_DAMAGE, LAYER_PLAYERCOLOR, LAYER_OUTLINE):
                 flags, _unknown1 = MASK_HEADER.unpack_from(data, cursor)
-                cursor += MASK_HEADER.size
                 box = main_box
+                if mask != LAYER_OUTLINE:
+                    cursor += MASK_HEADER.size
 
-            if mask == wanted and box is not None:
+            if mask == wanted == LAYER_OUTLINE and box is not None:
+                if flags & FLAG_REUSE_PREVIOUS:
+                    # Never seen; the outline stream has no way to inherit
+                    # blocks, so a file that asks would decode wrong in silence.
+                    raise ValueError("outline layer asks to reuse the previous frame")
+                x1, y1, x2, y2 = box
+                width, height = x2 - x1, y2 - y1
+                found = factory(
+                    width, height, hotspot_x - x1, hotspot_y - y1,
+                    decode_outline_layer(data[cursor:start + length], width, height),
+                )
+            elif mask == wanted and box is not None:
                 x1, y1, x2, y2 = box
                 width, height = x2 - x1, y2 - y1
                 count = COMMAND_COUNT.unpack_from(data, cursor)[0]

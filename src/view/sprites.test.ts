@@ -4,7 +4,8 @@ import { applyCommand, createGame, stepGame } from '../sim/game';
 import type { GameState } from '../sim/types';
 import { RAMP_LEVELS, rampLut, type Atlas, type ContentAssets } from './assets';
 import {
-  PLAYER_COLORS, chooseAnimation, createEntityView, playerColorHex, treeIsFelled, updateEntityView,
+  PLAYER_COLORS, chooseAnimation, createEntityView, playerColorHex, treeIsFelled,
+  updateEntityView, updateOcclusion, type EntityView,
 } from './sprites';
 
 const run = (state: GameState, ticks: number) => {
@@ -100,7 +101,12 @@ function fakeAssets(): ContentAssets {
     playerColors: {
       palette: 'original.pal',
       shadeLevels,
-      players: { 1: { name: 'blue', colorBase: 16, minimapColor: [0, 0, 255], ramp } },
+      players: {
+        1: {
+          name: 'blue', colorBase: 16,
+          minimapColor: [0, 0, 255], outlineColor: [0, 0, 255], ramp,
+        },
+      },
     },
     playerRamps,
   };
@@ -200,6 +206,43 @@ describe('player colour through the imported ramp', () => {
     updateEntityView(view, assets, state, { ...tc, buildProgress: 0.5 }, 0);
     expect(view.annexes[0].mesh.visible).toBe(false);
     expect(view.annexColors[0].mesh.visible).toBe(false);
+  });
+
+  it('shows a unit its contour only while something taller hides it', () => {
+    const assets = fakeAssets();
+    const frames = [{ x: 0, y: 0, w: 4, h: 4, cx: 2, cy: 2 }];
+    const texture = new THREE.DataTexture(new Uint8Array(4 * 4 * 4), 4, 4);
+    texture.needsUpdate = true;
+    assets.textures.set('villager/idle-outline.png', texture);
+    assets.entities['villager'].atlases['idle-outline'] =
+      { image: 'villager/idle-outline.png', size: [4, 4], framesInFile: 1, frames };
+
+    const state = createGame();
+    const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const house = state.entities.find(e => e.kind === 'town-center')!;
+    const views = new Map<string, EntityView>();
+    for (const entity of [villager, house]) {
+      const view = createEntityView(assets, entity);
+      updateEntityView(view, assets, state, entity, 0);
+      views.set(`e${entity.id}`, view);
+    }
+    const villagerView = views.get(`e${villager.id}`)!;
+    expect(villagerView.outline.mesh.visible).toBe(false);
+
+    // Nothing covers it where it stands, and the town center sorts behind it.
+    updateOcclusion(views, state);
+    expect(villagerView.outline.mesh.visible).toBe(false);
+
+    // Put a wide occluder in front of the villager, sorting later.
+    const occluder = views.get(`e${house.id}`)!;
+    occluder.body.mesh.visible = true;
+    occluder.body.mesh.position.copy(villagerView.body.mesh.position);
+    occluder.body.mesh.scale.set(400, 400, 1);
+    house.position = { x: villager.position.x + 2, y: villager.position.y + 2 };
+    updateOcclusion(views, state);
+    expect(villagerView.outline.mesh.visible).toBe(true);
+    expect((villagerView.outline.mesh.material as THREE.MeshBasicMaterial).color.getHex())
+      .toBe(0x0000ff);
   });
 
   it('falls back to the flat player colour when no ramp was imported', () => {

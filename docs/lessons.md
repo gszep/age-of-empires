@@ -33,6 +33,14 @@ keeps the record.
   `playercolor_*.pal`, which are DE's editable hue-to-target table. Rule: a
   layer's meaning is a measurement, not a name — histogram it before deciding
   what it encodes.
+- **An exact walk is the proof a format was read right.** The SLD outline
+  layer looked like a filled silhouette full of block-shaped holes until the
+  invariant was checked: every block row's commands must cover exactly its
+  blocks and consume exactly its bytes. They did — on all 78 consumed sources
+  — which meant the reading was right and the "holes" were the sprite's
+  interior. It is a contour, not a silhouette. Rule: verify a decode against
+  an invariant the format itself enforces before trusting (or doubting) what
+  the pixels look like.
 - **The debug pixel readback was lying, darkly.** Captures render into an
   offscreen `RenderTarget`, which is linear by default, so the output transfer
   the canvas applies was skipped and every colour came back as its linear

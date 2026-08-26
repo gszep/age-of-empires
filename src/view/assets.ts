@@ -19,6 +19,8 @@ export interface PlayerColor {
   name: string;
   colorBase: number;
   minimapColor: [number, number, number];
+  /** What an obscured unit's contour is drawn in; a DAT field, not a choice. */
+  outlineColor: [number, number, number];
   /** The eight shades AoE2 draws this player's colour with, darkest first. */
   ramp: [number, number, number][];
 }
