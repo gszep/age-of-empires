@@ -92,11 +92,23 @@ export function entityKey(entity: Entity): string {
   return entity.kind;
 }
 
+/**
+ * Whether a tree has been cut into. The DAT models a tree as the standing
+ * trunk plus a `dying` graphic that is the felled trunk lying on the ground,
+ * not a corpse: AoE2 shows it from the first chop and leaves it there while the
+ * wood lasts, so the state is read from what the node has left.
+ */
+export function treeIsFelled(state: GameState, entity: Entity): boolean {
+  return entity.kind === 'resource' && entity.resourceKind === 'wood'
+    && (entity.amount ?? 0) < state.rules.nodes.tree.amount;
+}
+
 /** Choose the imported sprite source (entity variant) and animation name. */
-function chooseAnimation(state: GameState, entity: Entity): { key: string; name: string } {
+export function chooseAnimation(state: GameState, entity: Entity): { key: string; name: string } {
   const kind = entity.kind;
   if (kind === 'resource') {
-    return { key: entityKey(entity), name: entity.dead ? 'death' : 'idle' };
+    const felled = entity.dead || treeIsFelled(state, entity);
+    return { key: entityKey(entity), name: felled ? 'death' : 'idle' };
   }
   if (isBuilding(kind)) {
     if (entity.dead) return { key: kind, name: 'death' };
