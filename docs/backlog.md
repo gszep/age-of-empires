@@ -1,6 +1,8 @@
 # Backlog
 
-Known gaps, ordered roughly by player impact. Each entry names the evidence and
+Known gaps, ordered roughly by player impact. The curated, ordered work
+queue for autonomous runs — with per-item verification steps — is
+`overnight.md`; this file is the fuller inventory. Each entry names the evidence and
 the likely fix path so a fresh session can pick it up without re-deriving it.
 When a session finishes or abandons an item, update it here; completed items
 are deleted, not ticked.

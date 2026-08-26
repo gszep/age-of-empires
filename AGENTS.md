@@ -5,7 +5,8 @@ Open Empires Lab: a deterministic, agent-native AoE2-compatible RTS slice.
 `docs/status.md` delivered scope and known discrepancies.
 
 Start a work session by reading `docs/backlog.md` (what needs doing) and
-`docs/lessons.md` (hard-won operational facts). Before ending a session, write
+`docs/lessons.md` (hard-won operational facts). An autonomous run works
+through `docs/overnight.md` top to bottom, one verified item at a time. Before ending a session, write
 new lessons to `docs/lessons.md` and keep `docs/backlog.md` and
 `docs/status.md` truthful. These repo files are the project's memory — do not
 rely on any external memory system.
