@@ -100,6 +100,17 @@ describe('headless matches', () => {
     expect(record.commands).toEqual([]);
   }, 45_000);
 
+  it('reports a strategy that exits instead of crashing on its closed input', async () => {
+    // Writing to a dead subprocess raises EPIPE asynchronously; unhandled, it
+    // ends the process rather than the match.
+    await expect(
+      runMatch(
+        { version: 1, seed: 1, maxTimeSeconds: 1 },
+        { 1: subprocessStrategy('exit 0'), 2: { decide: () => [] } },
+      ),
+    ).rejects.toThrow(/subprocess/);
+  }, 30_000);
+
   it('fails clearly on malformed subprocess output', async () => {
     await expect(
       runMatch(

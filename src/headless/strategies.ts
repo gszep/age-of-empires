@@ -35,8 +35,12 @@ export function subprocessStrategy(command: string, options: SubprocessOptions |
   let child: ChildProcess | undefined;
   let lines: Interface | undefined;
   let queue: string[] = [];
-  let waiter: ((line: string) => void) | undefined;
+  let waiter: { resolve: (line: string) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> } | undefined;
   let exited: Error | undefined;
+
+  const note = (error: Error, overwrite: boolean) => {
+    if (overwrite || !exited) exited = error;
+  };
 
   const ensureStarted = () => {
     if (child) return;
@@ -44,12 +48,30 @@ export function subprocessStrategy(command: string, options: SubprocessOptions |
     child = spawned;
     lines = createInterface({ input: spawned.stdout! });
     lines.on('line', line => {
-      if (waiter) { const resolve = waiter; waiter = undefined; resolve(line); }
-      else queue.push(line);
+      if (waiter) {
+        const pending = waiter;
+        waiter = undefined;
+        clearTimeout(pending.timer);
+        pending.resolve(line);
+      } else queue.push(line);
     });
-    child.on('exit', code => {
-      exited = new Error(`strategy subprocess exited with code ${code}`);
+    // Its output ending is the point at which no answer is coming, and it
+    // arrives after every line the strategy did manage to write - so a
+    // strategy that printed rubbish and quit still fails on the rubbish.
+    // Waiting for the read timeout instead turned that into a stall.
+    lines.on('close', () => {
+      note(new Error('strategy subprocess closed its output'), false);
+      if (!waiter) return;
+      const pending = waiter;
+      waiter = undefined;
+      clearTimeout(pending.timer);
+      pending.reject(exited!);
     });
+    child.on('exit', code => note(new Error(`strategy subprocess exited with code ${code}`), true));
+    // A strategy that has already died turns the next write into an
+    // asynchronous EPIPE on its stdin, which takes the whole run down before
+    // anything has had a chance to say what actually went wrong.
+    spawned.stdin!.on('error', () => note(new Error('strategy subprocess closed its input'), false));
   };
 
   const nextLine = (waitMs: number): Promise<string> =>
@@ -60,7 +82,7 @@ export function subprocessStrategy(command: string, options: SubprocessOptions |
         () => { waiter = undefined; reject(new Error(`strategy did not answer within ${waitMs}ms`)); },
         waitMs,
       );
-      waiter = line => { clearTimeout(timer); resolve(line); };
+      waiter = { resolve, reject, timer };
     });
 
   const validated = (line: string, expectedTime: number): Command[] | undefined => {
