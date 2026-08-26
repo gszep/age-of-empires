@@ -3,6 +3,18 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEPOT_ROOT="${AOE2DE_DEPOT_ROOT:-$HOME/Steam/steamapps/content/app_813780}"
+if [ ! -d "$DEPOT_ROOT" ] && [ -z "${AOE2DE_DEPOT_ROOT:-}" ]; then
+  # Common SteamCMD/Steam client download locations, tried in order.
+  for candidate in \
+    "$HOME/.local/share/Steam/steamcmd/linux32/steamapps/content/app_813780" \
+    "$HOME/.local/share/Steam/steamapps/content/app_813780" \
+    "$HOME/.steam/steam/steamapps/content/app_813780"; do
+    if [ -d "$candidate" ]; then
+      DEPOT_ROOT="$candidate"
+      break
+    fi
+  done
+fi
 DAT="$DEPOT_ROOT/depot_813781/resources/_common/dat/empires2_x2_p1.dat"
 SOUNDS="$DEPOT_ROOT/depot_813781/resources/_common/dat/sounds.json"
 WIDGETUI="$DEPOT_ROOT/depot_813782/widgetui"

@@ -86,7 +86,22 @@ items land.
   holds across a research; Feudal buildings reject placement in Dark Age;
   existing tests updated deliberately, never deleted.
 
-## C. Stretch (large; only after A and B are clean)
+## C. Audio (depot 813783 and vgmstream-cli are installed locally)
+
+- [ ] **Selection and acknowledgement voices.** Resolve unit select/move/
+  attack acknowledgement events through `sounds.json` → the PCK/BNK HIRC
+  graph (`import_audio.py` already walks it for `button_ui`), import the
+  cues, and play them from the view on selection and orders. *Verify:*
+  import test resolves each consumed event to owned media byte-identically;
+  the aliases wired appear in the audio manifest.
+- [ ] **Alert and feedback cues.** Under-attack alert, construction
+  complete, training complete, resource-depleted, population-capped —
+  events named in `sounds.json`. Play from observation-driven view state,
+  never from inside the sim. *Verify:* headless-driven attack on the
+  player's building triggers the alert path in the view (unit-testable via
+  the HUD's sound hook); cues listed in the manifest.
+
+## D. Stretch (large; only after A–C are clean)
 
 - [ ] **Palisade walls and gates.** Wall-segment placement (drag lines),
   gate pathing. Big obstruction-map surface — keep nav tests green.
@@ -94,13 +109,3 @@ items land.
   water, shore tiles, and boat pathing — a subsystem, not an item. Scope a
   design note first; do not start it mid-run.
 
-## Blocked on a human
-
-- **Audio depot 813783 is not on this machine**, so no sound work is
-  possible locally (the click cue exists only where that depot was
-  imported). To unblock, run interactively (Steam Guard):
-  `steamcmd` → `login <account>` →
-  `download_depot 813780 813783 8547122694393480152`, then install
-  `vgmstream-cli` and rerun `npm run import:aoe2`. After that, wiring
-  selection/acknowledgement voices and alert cues through `sounds.json`
-  events becomes a checklist item.

@@ -42,7 +42,8 @@ npm run test:import
 ```
 
 Also run the relevant live/headless integration test for changed boundaries.
-Commit only when all gates pass. Keep model-provider tests opt-in.
+Commit only when all gates pass, and always push after committing. Keep
+model-provider tests opt-in.
 
 ## Facts you cannot infer from the code
 
