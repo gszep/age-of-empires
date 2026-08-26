@@ -10,7 +10,7 @@ public/imported/ browser-ready local atlases/manifests
 
 No Steam credentials, Steam configuration, DAT files, SLD files, or converted Microsoft assets belong in this repository.
 
-See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matched SteamCMD downloads and source paths on macOS, Linux, and Windows/WSL2. `npm run import:aoe2` reads `AOE2DE_DEPOT_ROOT`, defaulting to `~/Steam/steamapps/content/app_813780`.
+See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matched SteamCMD downloads and source paths on macOS, Linux, and Windows/WSL2. `tools/depot.py` resolves the depot root — `AOE2DE_DEPOT_ROOT` first, then the usual SteamCMD/Steam download locations — for both `npm run import:aoe2` and the integration tests.
 
 ## Pipeline
 
@@ -23,9 +23,11 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    `genieutils-py`, resolving graphic IDs from semantic slots/task fields and
    hashing every source file into `.local/aoe2de/content.json`.
 3. `convert_sld.py` converts every referenced SLD with the local
-   `sld_layers.py` decoder — BC1 main layer plus BC4 shadow and player-colour
-   masks — producing `public/imported/aoe2/<key>/<state>.png` plus the
-   combined manifest.
+   `sld_layers.py` decoder — BC1 main layer, BC4 shadow and player-colour
+   masks, and the outline layer's own command stream — producing
+   `public/imported/aoe2/<key>/<state>.png` plus the combined manifest. The
+   player-colour sheet carries the main layer's grey in RGB and the mask's
+   coverage in alpha, because that grey indexes the player's palette block.
 4. `import_ui.py` extracts the WEST widget-UI subset (resource/command/map/
    bottom/menu panels, materials, entity + action + stat icons, click-sound
    aliases from `sounds.json`) into `public/imported/aoe2/ui/`, converting DDS
@@ -76,7 +78,10 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | villager tasks (gather/build) | `unit.bird.tasks[*]` — `.action_type`, `.class_id`, `.unit_id`, `.resource_in/_out`; rates on `unit.bird.work_rate`; drop-offs in `unit.bird.drop_sites` |
 | carried resources | `unit.resource_storages`, `unit.resource_capacity` |
 | building construction / annexes | `unit.building.construction_graphic_id`, `unit.building.annexes` |
+| corpse / rubble / stump | `unit.dead_unit_id` — the unit whose `standing_graphic` is the decay art |
+| player colour and contour | `dat.player_colours[i].player_color_base` (start of the eight-shade block in `original.pal`), `.minimap_color`, `.unit_outline_color` |
 | graphic playback | `graphic.file_name`, `.frame_count`, `.angle_count`, `.frame_duration`, `.mirroring_mode` |
+| a graphic with no unit behind it | `dat.graphics[*].name` — the gather-point flag is `WaypointFlag <Civ>` |
 
 When a needed field is missing here, `dir()` the object once in a scratch
 script and extend this table — do not trial-and-error attribute names.

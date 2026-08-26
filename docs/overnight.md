@@ -37,11 +37,13 @@ items land.
   and drawn on occlusion rather than always. *Verified:* import tests assert
   the walk and the militia's outline atlas; a villager walked behind the town
   center renders 198 pixels of the DAT's pure blue and none in the open.
-- [ ] **Rally-point flags.** Rally points work but draw nothing. Resolve the
-  gather-point flag graphic from the DAT (search graphics for the flag used
-  on gather-point placement; do not hand-draw), import it, render at the
-  rally target while a production building is selected. *Verify:* entities
-  query shows the flag view; screenshot with a rally point set.
+- [x] **Rally-point flags.** No unit in the DAT points at the waypoint flag, so
+  the importer resolves it by its own graphic name (`WaypointFlag Britons`, 90
+  frames) through a new `effects` section of the spec, and fails if the name
+  matches anything but one graphic. Drawn over every sprite at the rally target
+  while its building is selected, player colour and all. *Verified:* the
+  entities query reports the rally point, and a screenshot with the town center
+  selected shows the British flag flying at it.
 - [ ] **Corpse decay and tree stumps.** Dead-unit chains (`dying_graphic` →
   corpse/decay, felled tree → stump) are recorded but not imported. Import
   and render them so bodies and stumps persist briefly. *Verify:* kill a

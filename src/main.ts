@@ -11,7 +11,7 @@ import type { BuildingKind, Entity, GameState, Point, UnitKind } from './sim/typ
 import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, TILE_W, TILE_H } from './view/iso';
-import { createEntityView, createProjectileView, updateEntityView, updateProjectileView, updateOcclusion, entityKey, type EntityView } from './view/sprites';
+import { createEntityView, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint } from './view/world';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 
@@ -25,7 +25,7 @@ import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 const view = {
   createGround, createFog, createFootprint,
   createEntityView, updateEntityView, createProjectileView, updateProjectileView,
-  updateOcclusion, entityKey, Hud,
+  createFlagView, updateFlagView, updateOcclusion, entityKey, Hud,
 };
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
@@ -564,6 +564,22 @@ function syncScene(time: number): void {
       scene.add(entityView.group);
     }
   }
+  // Gather-point flags: AoE2 shows one where a selected building sends what it
+  // trains, and only while that building is selected.
+  for (const entity of game.entities) {
+    if (entity.dead || !entity.rally || entity.owner !== 1) continue;
+    if (!selectedIds.includes(entity.id)) continue;
+    const key = `f${entity.id}`;
+    wanted.add(key);
+    let flagView = views.get(key);
+    if (!flagView) {
+      flagView = view.createFlagView(assets, entity.owner);
+      views.set(key, flagView);
+      scene.add(flagView.group);
+    }
+    view.updateFlagView(flagView, assets, entity.owner, entity.rally.target, time);
+  }
+
   // Arrows in flight. They are simulation state, so they render from it
   // directly rather than being faked on the view side.
   for (const projectile of game.projectiles) {
@@ -835,6 +851,8 @@ if (import.meta.hot) {
         view.updateEntityView = sprites.updateEntityView;
         view.createProjectileView = sprites.createProjectileView;
         view.updateProjectileView = sprites.updateProjectileView;
+        view.createFlagView = sprites.createFlagView;
+        view.updateFlagView = sprites.updateFlagView;
         view.updateOcclusion = sprites.updateOcclusion;
         view.entityKey = sprites.entityKey;
       }

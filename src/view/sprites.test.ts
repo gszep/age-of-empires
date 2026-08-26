@@ -4,8 +4,8 @@ import { applyCommand, createGame, stepGame } from '../sim/game';
 import type { GameState } from '../sim/types';
 import { RAMP_LEVELS, rampLut, type Atlas, type ContentAssets } from './assets';
 import {
-  PLAYER_COLORS, chooseAnimation, createEntityView, playerColorHex, treeIsFelled,
-  updateEntityView, updateOcclusion, type EntityView,
+  PLAYER_COLORS, chooseAnimation, createEntityView, createFlagView, playerColorHex, treeIsFelled,
+  updateEntityView, updateFlagView, updateOcclusion, type EntityView,
 } from './sprites';
 
 const run = (state: GameState, ticks: number) => {
@@ -139,6 +139,54 @@ function annexedAssets(): ContentAssets {
   };
   return assets;
 }
+
+describe('the gather-point flag', () => {
+  function flagAssets(): ContentAssets {
+    const assets = fakeAssets();
+    const frames = [
+      { x: 0, y: 0, w: 4, h: 4, cx: 2, cy: 2 },
+      { x: 4, y: 0, w: 4, h: 4, cx: 2, cy: 2 },
+    ];
+    for (const image of ['rally-flag/idle.png', 'rally-flag/idle-playercolor.png']) {
+      const texture = new THREE.DataTexture(new Uint8Array(8 * 4 * 4), 8, 4);
+      texture.needsUpdate = true;
+      assets.textures.set(image, texture);
+    }
+    const atlas = (image: string): Atlas => ({ image, size: [8, 4], framesInFile: 2, frames });
+    assets.entities['rally-flag'] = {
+      category: 'effect',
+      animations: { idle: { frames: 2, directions: 1, frameSeconds: 0.1, mirroringMode: 0 } },
+      atlases: {
+        idle: atlas('rally-flag/idle.png'),
+        'idle-playercolor': atlas('rally-flag/idle-playercolor.png'),
+      },
+    };
+    return assets;
+  }
+
+  it('waves the owner\'s flag where the rally point is', () => {
+    const assets = flagAssets();
+    const view = createFlagView(assets, 1);
+    updateFlagView(view, assets, 1, { x: 4, y: 6 }, 0);
+    expect(view.group.visible).toBe(true);
+    expect(view.body.mesh.visible).toBe(true);
+    // Player colour on the cloth, through the same ramp a unit gets.
+    expect(view.color.mapNode?.value).toBe(assets.textures.get('rally-flag/idle-playercolor.png'));
+    // Over every sprite: a building between the camera and the flag must not
+    // swallow the marker.
+    expect(view.body.mesh.renderOrder).toBeGreaterThan(4000);
+    const first = view.body.mesh.geometry.getAttribute('uv').getX(0);
+    updateFlagView(view, assets, 1, { x: 4, y: 6 }, 0.15);
+    expect(view.body.mesh.geometry.getAttribute('uv').getX(0)).not.toBe(first);
+  });
+
+  it('draws nothing without the imported flag', () => {
+    const assets = fakeAssets();
+    const view = createFlagView(assets, 1);
+    updateFlagView(view, assets, 1, { x: 4, y: 6 }, 0);
+    expect(view.group.visible).toBe(false);
+  });
+});
 
 describe('player colour through the imported ramp', () => {
   it('resolves a sprite grey to a shade of the player block', () => {

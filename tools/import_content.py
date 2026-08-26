@@ -285,6 +285,25 @@ def extract_entity(
     return entity
 
 
+def effect_entry(
+    dat: DatFile, graphics_dir: Path, spec: dict[str, Any], hashes: dict[str, str]
+) -> dict[str, Any]:
+    """Art the engine draws itself, with no unit behind it to resolve it from.
+
+    The gather-point flag is one: nothing in the DAT's unit table points at it,
+    so the graphic is found by its own name — and a name that matches more than
+    one graphic, or none, is an error rather than a silent first hit.
+    """
+    matches = [index for index, graphic in enumerate(dat.graphics)
+               if graphic is not None and graphic.name == spec["graphic"]]
+    if len(matches) != 1:
+        raise ValueError(f"graphic {spec['graphic']!r} matched {len(matches)} entries")
+    return {
+        "category": "effect",
+        "animations": {"idle": animation_entry(dat, graphics_dir, matches[0], hashes)},
+    }
+
+
 def terrain_entry(dat: DatFile, terrain_id: int) -> dict[str, Any]:
     """Texture name, tile span, and minimap color for one DAT terrain slot."""
     terrain = dat.terrain_block.terrains[terrain_id]
@@ -317,6 +336,8 @@ def extract(
         entities[entity_spec["key"]] = extract_entity(
             dat, dat.civs[civ_index].units, entity_spec, graphics_dir, hashes
         )
+    for effect_spec in spec.get("effects", []):
+        entities[effect_spec["key"]] = effect_entry(dat, graphics_dir, effect_spec, hashes)
     terrain = {
         key: terrain_entry(dat, slot["terrainId"])
         for key, slot in spec.get("terrain", {}).items()

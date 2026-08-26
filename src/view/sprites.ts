@@ -299,6 +299,65 @@ function directionIndex(facing: number, directions: number): number {
 }
 
 /**
+ * The gather-point flag. Like an arrow it is not simulation state, so it draws
+ * from the order it marks rather than through the entity path — but it is the
+ * owner's flag, so it gets the same player-colour ramp a unit does.
+ */
+export function createFlagView(assets: ContentAssets | undefined, owner: number): EntityView {
+  const group = new THREE.Group();
+  const shadow = makePiece();
+  group.add(shadow.mesh);
+  const body = makePiece();
+  group.add(body.mesh);
+  const ramp = assets?.playerRamps.get(owner);
+  const color = ramp ? makeRampPiece(ramp) : makePiece();
+  group.add(color.mesh);
+  return {
+    group, shadow, body, color, outline: makePiece(), annexes: [], annexColors: [],
+    fallback: false, facing: 0, playerColor: playerColorHex(assets, owner),
+  };
+}
+
+/** The flag waves on its own clock; it marks a place, not a moment. */
+export function updateFlagView(
+  view: EntityView, assets: ContentAssets | undefined,
+  owner: number, position: Point, time: number,
+): void {
+  const flag = assets?.entities['rally-flag'];
+  const atlas = flag?.atlases['idle'];
+  const animation = flag?.animations['idle'];
+  if (!assets || !atlas || !animation) {
+    view.group.visible = false;
+    return;
+  }
+  view.group.visible = true;
+  const seconds = animation.frameSeconds > 0 ? animation.frameSeconds : 0.05;
+  const frame = Math.floor(time / seconds) % Math.max(1, atlas.framesInFile);
+  const depth = isoDepth(position.x, position.y);
+  const shadowAtlas = flag?.atlases['idle-shadow'];
+  if (shadowAtlas) {
+    applyFrame(view.shadow, assets, shadowAtlas, frame, position, 0x000000);
+    view.shadow.mesh.renderOrder = 500 + depth;
+    (view.shadow.mesh.material as THREE.MeshBasicMaterial).opacity = 0.55;
+  }
+  // Over every sprite: the flag marks a point on the map, and a building
+  // between the camera and that point must not swallow it.
+  applyFrame(view.body, assets, atlas, frame, position, 0xffffff);
+  view.body.mesh.renderOrder = 4600 + depth;
+  const colorAtlas = flag?.atlases['idle-playercolor'];
+  if (colorAtlas && owner !== 0) {
+    applyFrame(
+      view.color, assets, colorAtlas, frame, position,
+      view.color.mapNode ? 0xffffff : PLAYER_COLORS[owner],
+    );
+    view.color.mesh.renderOrder = 4601 + depth;
+    (view.color.mesh.material as THREE.MeshBasicMaterial).opacity = 1;
+  } else {
+    view.color.mesh.visible = false;
+  }
+}
+
+/**
  * Arrows in flight. They are not entities in the simulation, so they render
  * from their own state rather than through the entity path, but they reuse the
  * atlas frame and direction machinery: `p_arrow_x1` carries 32 angles, so the

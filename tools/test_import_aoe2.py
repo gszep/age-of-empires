@@ -32,6 +32,12 @@ def extracted_content():
     return extract(DAT, GRAPHICS, PALETTES, SPEC, json.loads(SOURCE.read_text()))
 
 
+@lru_cache(maxsize=1)
+def _dat():
+    from genieutils.datfile import DatFile
+    return DatFile.parse(DAT)
+
+
 @unittest.skipUnless(DAT.is_file(), "owned AoE2DE fixture is not installed")
 class ContentImportIntegrationTest(unittest.TestCase):
     @classmethod
@@ -185,6 +191,21 @@ class ContentImportIntegrationTest(unittest.TestCase):
             # outline colour through it, and a contour has no coverage ramp.
             for red, green, blue, alpha in lit:
                 self.assertEqual((red, green, blue, alpha), (255, 255, 255, 255))
+
+    def test_gather_point_flag_resolves_by_its_own_graphic_name(self):
+        # Nothing in the unit table points at the waypoint flag, so it is found
+        # by name — and the name has to match exactly one graphic, or the
+        # import fails rather than picking a first hit.
+        from import_content import effect_entry
+        flag = self.result["entities"]["rally-flag"]
+        self.assertEqual(flag["category"], "effect")
+        idle = flag["animations"]["idle"]
+        self.assertEqual(idle["source"], "b_misc_waypoint_flag_britons_x1.sld")
+        self.assertEqual(idle["frames"], 90)
+        self.assertEqual(idle["directions"], 1)
+        self.assertEqual(len(self.result["source"]["sha256"][idle["source"]]), 64)
+        with self.assertRaises(ValueError):
+            effect_entry(_dat(), GRAPHICS, {"key": "x", "graphic": "no such graphic"}, {})
 
     def test_ground_terrain_comes_from_the_dat(self):
         ground = self.result["terrain"]["ground"]

@@ -49,13 +49,17 @@ A normal `steamapps/common/AoE2DE` installation is not interchangeable with this
 
 ## 2. Point the importer at `app_813780`
 
-The default is:
+`tools/depot.py` looks for the tree in the usual places, in order, and both the
+import script and the integration tests resolve it the same way:
 
 ```text
 ~/Steam/steamapps/content/app_813780
+~/.local/share/Steam/steamcmd/linux32/steamapps/content/app_813780
+~/.local/share/Steam/steamapps/content/app_813780
+~/.steam/steam/steamapps/content/app_813780
 ```
 
-For any other location, set `AOE2DE_DEPOT_ROOT` to the directory that directly contains `depot_813781`, `depot_813782`, and `depot_813784`.
+For any other location, set `AOE2DE_DEPOT_ROOT` to the directory that directly contains `depot_813781`, `depot_813782`, and `depot_813784`. Without a tree in any of these, `npm run test:import` skips its integration tests rather than failing — so check the run reports tests, not skips.
 
 ### macOS
 

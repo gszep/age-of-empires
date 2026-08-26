@@ -3,6 +3,9 @@
   "civIndex": 1,
   "gaiaIndex": 0,
   "playerColors": ["blue", "red", "green", "yellow", "teal", "purple", "grey", "orange"],
+  "effects": [
+    { "key": "rally-flag", "graphic": "WaypointFlag Britons" }
+  ],
   "entities": [
     {
       "key": "militia",

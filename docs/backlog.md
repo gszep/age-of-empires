@@ -32,7 +32,6 @@ sounds, and under-attack alerts, each resolved through `sounds.json` events.
   carries the DAT's own `minimapColor` per player. The minimap has no
   `ContentAssets` handle; plumbing one through is the whole job.
 
-- **Rally-point flags** are absent; rally points work but give no visual.
 - **Terrain blends/masks** are not consumed; terrain-to-terrain transitions
   are absent (single-terrain maps hide this today).
 - **Fire/corpse delta overlays** on damaged/destroyed buildings are not

@@ -88,6 +88,12 @@ in its annex pieces, which is why it used to render grey. Each annex now draws
 its own player-colour sheet through the same ramp, and a pixel sample over the
 building returns 3,258 player-blue pixels in 2,783 shades.
 
+Art the engine draws itself has no unit to resolve it from, so `import-spec.json`
+gained an `effects` section that finds a graphic by its own name and refuses a
+name matching anything but exactly one. The gather-point flag is the first:
+`WaypointFlag Britons`, 90 frames, drawn at a selected building's rally point in
+the owner's colour.
+
 ### The outline layer is a contour, and it is for occlusion
 
 The SLD outline layer is not BC-compressed like the others. Its payload is a

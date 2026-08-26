@@ -101,6 +101,7 @@ export function installDebug(context: DebugContext): void {
       maxHp: entity.maxHp,
       activity: entity.activity,
       order: entity.order.kind,
+      rally: entity.rally && { x: round(entity.rally.target.x), y: round(entity.rally.target.y) },
       selected: context.selectedIds().includes(entity.id),
       screen: { x: Math.round(screen.x), y: Math.round(screen.y) },
       onScreen: screen.x >= 0 && screen.x < canvas.clientWidth && screen.y >= 0 && screen.y < canvas.clientHeight,
