@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Decode the shadow layer of an SLD sprite to 8-bit coverage masks.
+"""Decode the BC4 mask layers of an SLD sprite to 8-bit coverage masks.
 
 The pinned openage decoder corrupts the heap on this layer (reproducible
 `malloc.c` assertion failure; the same defect is on current upstream, so there
@@ -48,7 +48,7 @@ BLOCK = 4
 
 
 @dataclass
-class ShadowFrame:
+class MaskFrame:
     """One frame's shadow coverage: `width * height` bytes, 0 = no shadow."""
 
     width: int
@@ -95,7 +95,7 @@ def _decode_layer(
     command_offset: int,
     command_count: int,
     reuse_previous: bool,
-    previous: ShadowFrame | None,
+    previous: MaskFrame | None,
     previous_offset: tuple[int, int],
     layer_offset: tuple[int, int],
 ) -> bytearray:
@@ -159,14 +159,17 @@ def _decode_layer(
     return alpha
 
 
-def decode_shadows(data: bytes) -> list[ShadowFrame | None]:
-    """Every frame's shadow mask, or None where a frame carries no shadow."""
+def decode_masks(data: bytes, wanted: int = LAYER_SHADOW) -> list[MaskFrame | None]:
+    """Every frame's mask for `wanted`, or None where a frame carries none.
+
+    `wanted` must be a BC4 layer: LAYER_SHADOW or LAYER_PLAYERCOLOR.
+    """
     signature, _version, frame_count, _u1, _u2, _u3 = FILE_HEADER.unpack_from(data, 0)
     if signature != b"SLDX":
         raise ValueError(f"not an SLD file: {signature!r}")
 
-    frames: list[ShadowFrame | None] = []
-    previous: ShadowFrame | None = None
+    frames: list[MaskFrame | None] = []
+    previous: MaskFrame | None = None
     previous_offset = (0, 0)
     offset = FILE_HEADER.size
 
@@ -175,38 +178,52 @@ def decode_shadows(data: bytes) -> list[ShadowFrame | None]:
             FRAME_HEADER.unpack_from(data, offset)
         offset += FRAME_HEADER.size
 
-        shadow: ShadowFrame | None = None
+        found: MaskFrame | None = None
+        # The mask layers carry no geometry of their own; they cover the main
+        # layer, so its box has to be read first and carried across.
+        main_box = (0, 0, 0, 0)
         for mask in (LAYER_MAIN, LAYER_SHADOW, LAYER_OUTLINE, LAYER_DAMAGE, LAYER_PLAYERCOLOR):
             if not frame_type & mask:
                 continue
             start = offset
             length = LAYER_LENGTH.unpack_from(data, offset)[0]
             cursor = offset + LAYER_LENGTH.size
+            box: tuple[int, int, int, int] | None = None
+            flags = 0
 
             if mask in (LAYER_MAIN, LAYER_SHADOW):
-                x1, y1, x2, y2, flag1, _unknown1 = GRAPHICS_HEADER.unpack_from(data, cursor)
+                x1, y1, x2, y2, flags, _unknown1 = GRAPHICS_HEADER.unpack_from(data, cursor)
                 cursor += GRAPHICS_HEADER.size
-                if mask == LAYER_SHADOW:
-                    width, height = x2 - x1, y2 - y1
-                    count = COMMAND_COUNT.unpack_from(data, cursor)[0]
-                    alpha = _decode_layer(
-                        data, width, height, cursor, count,
-                        bool(flag1 & FLAG_REUSE_PREVIOUS), previous, previous_offset, (x1, y1),
-                    )
-                    shadow = ShadowFrame(width, height, hotspot_x - x1, hotspot_y - y1, alpha)
-                    previous_offset = (x1, y1)
+                box = (x1, y1, x2, y2)
+                if mask == LAYER_MAIN:
+                    main_box = box
+            elif mask in (LAYER_DAMAGE, LAYER_PLAYERCOLOR):
+                flags, _unknown1 = MASK_HEADER.unpack_from(data, cursor)
+                cursor += MASK_HEADER.size
+                box = main_box
+
+            if mask == wanted and box is not None:
+                x1, y1, x2, y2 = box
+                width, height = x2 - x1, y2 - y1
+                count = COMMAND_COUNT.unpack_from(data, cursor)[0]
+                alpha = _decode_layer(
+                    data, width, height, cursor, count,
+                    bool(flags & FLAG_REUSE_PREVIOUS), previous, previous_offset, (x1, y1),
+                )
+                found = MaskFrame(width, height, hotspot_x - x1, hotspot_y - y1, alpha)
+                previous_offset = (x1, y1)
 
             # Remaining layer kinds are skipped wholesale via the length field.
             offset = start + length
             offset += (BLOCK - offset) % BLOCK
 
-        frames.append(shadow)
-        if shadow is not None:
-            previous = shadow
+        frames.append(found)
+        if found is not None:
+            previous = found
     return frames
 
 
-def pack_shadow_atlas(frames: list[ShadowFrame | None], limit: int) -> tuple[Any, dict[str, Any]]:
+def pack_mask_atlas(frames: list[MaskFrame | None], limit: int) -> tuple[Any, dict[str, Any]]:
     """Pack the first `limit` masks into one greyscale-alpha atlas.
 
     Frame order matches the main layer, so the renderer reuses the frame index
@@ -257,7 +274,7 @@ def pack_shadow_atlas(frames: list[ShadowFrame | None], limit: int) -> tuple[Any
     }
 
 
-def shadow_summary(frames: list[ShadowFrame | None]) -> dict[str, Any]:
+def mask_summary(frames: list[MaskFrame | None]) -> dict[str, Any]:
     present = [f for f in frames if f is not None and not f.empty]
     return {
         "frames": len(frames),

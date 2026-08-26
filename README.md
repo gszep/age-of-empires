@@ -47,7 +47,7 @@ Imported Microsoft content is generated under ignored `public/imported/` and is 
 ## Architecture
 
 - `src/sim/` — authoritative fixed-tick rules, economy, construction, navigation, combat, visibility, commands, checksums, and example AI
-- `tools/sld_shadow.py` — standalone SLD shadow-layer decoder, used because the pinned openage decoder corrupts the heap on that layer
+- `tools/sld_layers.py` — standalone SLD decoder for the BC4 shadow and player-colour mask layers, used because the pinned openage decoder corrupts the heap on them
 - `src/protocol/` and `schemas/` — versioned observations/actions/results and JSON Schemas
 - `src/headless/` — JSONL/MCP/WebSocket strategies, match/replay runner, concurrent paired batches, and opt-in live-agent check
 - `src/view/` and `src/main.ts` — observation-driven WEST HUD, dimetric renderer, fog, minimap, interactions, and replay playback

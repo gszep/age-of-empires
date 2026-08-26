@@ -47,8 +47,8 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # the drawn blocks must consume the layer's remaining bytes exactly.
         # Both invariants failing silently is what a mis-parsed container looks
         # like, so assert them rather than just eyeballing the output.
-        from sld_shadow import (COMMAND_COUNT, FILE_HEADER, FRAME_HEADER, GRAPHICS_HEADER,
-                                LAYER_LENGTH, LAYER_MAIN, LAYER_SHADOW, decode_shadows)
+        from sld_layers import (COMMAND_COUNT, FILE_HEADER, FRAME_HEADER, GRAPHICS_HEADER,
+                                LAYER_LENGTH, LAYER_MAIN, LAYER_SHADOW, decode_masks)
         source = GRAPHICS / "b_dark_barracks_age1_x1.sld"
         data = source.read_bytes()
         offset = FILE_HEADER.size
@@ -74,15 +74,29 @@ class ContentImportIntegrationTest(unittest.TestCase):
             offset += (4 - offset) % 4
         self.assertEqual(checked, 2)
 
-        frame = decode_shadows(data)[0]
+        frame = decode_masks(data)[0]
         self.assertEqual((frame.width, frame.height), (316, 212))
         self.assertTrue(any(frame.alpha))
 
-    def test_shadow_atlas_frames_track_the_main_layer(self):
-        from convert_sld import convert_shadow
+    def test_playercolor_layer_marks_the_owner_cloth(self):
+        from sld_layers import LAYER_PLAYERCOLOR, decode_masks
+        source = GRAPHICS / "u_vil_male_lumberjack_walkA_x1.sld"
+        frames = decode_masks(source.read_bytes(), LAYER_PLAYERCOLOR)
+        marked = [f for f in frames if f is not None and not f.empty]
+        # Every walk frame carries the mask, and it covers part of the sprite
+        # rather than all or none of it.
+        self.assertEqual(len(marked), len(frames))
+        frame = marked[0]
+        lit = sum(1 for v in frame.alpha if v)
+        self.assertGreater(lit, 0)
+        self.assertLess(lit, frame.width * frame.height)
+        self.assertEqual(max(frame.alpha), 255)
+
+    def test_mask_atlas_frames_track_the_main_layer(self):
+        from convert_sld import convert_mask
         with tempfile.TemporaryDirectory() as directory:
             out = Path(directory) / "walk-shadow.png"
-            atlas = convert_shadow(GRAPHICS / "u_vil_male_lumberjack_walkA_x1.sld", out, 30 * 16)
+            atlas = convert_mask(GRAPHICS / "u_vil_male_lumberjack_walkA_x1.sld", out, 30 * 16, "shadow")
             # The renderer indexes shadow frames with the body's frame index.
             self.assertEqual(atlas["framesInFile"], 30 * 16)
             self.assertTrue(out.is_file())

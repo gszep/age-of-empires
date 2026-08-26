@@ -27,7 +27,7 @@ Controls and hotkeys are listed in the root `README.md`. The essential loop is l
 
 ## Deliberately omitted
 
-The target does not include Feudal+ ages, other civilizations, technologies, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, trade, relics, gates/walls, or a genetic-algorithm framework. Mobile has no separate or simplified gameplay. Shadow layers now use the local decoder; player-color masks and outlines remain unavailable, with tinting as the documented team-color fallback.
+The target does not include Feudal+ ages, other civilizations, technologies, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, trade, relics, gates/walls, or a genetic-algorithm framework. Mobile has no separate or simplified gameplay. Shadow and player-colour masks now use the local decoder; outlines remain unavailable.
 
 ## Measurements and gate evidence
 
@@ -47,14 +47,14 @@ Batch artifacts are intentionally ignored under `.local/batches/phase6-16/`.
 
 The importer integration resolves every consumed DAT graphic/rule and widgetui source, hashes inputs, and regenerates byte-identically. Viewer smoke tests loaded imported atlases and WEST UI without application console errors; selection, gather orders, fog expansion, and browser replay were exercised through Chrome DevTools Protocol. Timing, resource conservation, hidden information, pathing, combat release, protocol validation, and replay determinism have focused tests.
 
-Known discrepancies are the missing player-color/outline layers, single-terrain ground without the multi-terrain blend masks, approximate tint-based team colors, missing fire/corpse delta overlays, and some mirror-AI matches that stalemate until the configured timeout.
+Known discrepancies are the missing outline layer, single-terrain ground without the multi-terrain blend masks, missing fire/corpse delta overlays, and some mirror-AI matches that stalemate until the configured timeout.
 
 The ground samples the imported DAT terrain texture (slot 0, `Grass`/`g_grs`) at the authored `terrain_dimensions` tile span; `terrain/blends` and `terrain/masks` are not consumed yet, so terrain-to-terrain transitions are absent rather than approximated. Farms are terrain too (slots 7 and 29, `Farm1`/`Farm Cnst1`): the DAT gives them no SLD, so they draw as their own patch of the isometric grid.
 
 ### Blocked on the pinned openage decoder
 
-Three gaps share one cause and are worth recording together, because the fix for
-one is likely the fix for all three.
+Two gaps share one cause and are worth recording together, because the fix for
+one is likely the fix for both.
 
 - **The stable is not imported.** `b_west_stable_age2_x1.sld` raises
   `UnboundLocalError: local variable 'offset_x1' referenced before assignment`
@@ -65,14 +65,13 @@ one is likely the fix for all three.
   `frame_type`; the barracks reports `0x1f`, so main + shadow + outline + damage
   + playercolor). AoE2DE draws the thin dark contour around units and buildings
   from it. openage's parser marks that branch `# TODO` and skips it.
-- **Player-colour masks are absent**, as recorded above.
 
-`tools/sld_shadow.py` already reads the container and the DXT4/BC4 blocks
-without openage and handles the outline layer correctly by skipping it via the
-layer length. Extending it to decode the BC1 main and mask layers would replace
-the pinned decoder outright, which would recover the stable, the outlines, and
-the player-colour masks in one step, and remove the last GPL dependency from the
-import path.
+`tools/sld_layers.py` already reads the container and the DXT4/BC4 blocks
+without openage, and handles the outline layer correctly by skipping it via the
+layer length. It now supplies both the shadow and the player-colour masks.
+Extending it to the BC1 main layer would replace the pinned decoder outright,
+recovering the stable and the outlines and removing the last GPL dependency
+from the import path.
 
 ### Audio import is unblocked
 
@@ -103,4 +102,4 @@ npm run test:live-agent   # opt-in; requires valid existing machine provider aut
 
 ## Smallest recommended next milestone
 
-Extend the local SLD decoder to BC1 main/player-color/outline layers, then add imported terrain blend masks. This would recover the stable, accurate team colors and contours while removing the remaining openage dependency, without expanding gameplay scope.
+Extend the local SLD decoder to the BC1 main and outline layers, then add imported terrain blend masks. This would recover the stable and the sprite contours while removing the remaining openage dependency, without expanding gameplay scope.

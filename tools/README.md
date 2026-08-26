@@ -23,7 +23,7 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    `genieutils-py`, resolving graphic IDs from semantic slots/task fields and
    hashing every source file into `.local/aoe2de/content.json`.
 3. `convert_sld.py` converts every referenced SLD main layer with pinned
-   openage code and its shadow layer with `sld_shadow.py`, producing
+   openage code and its shadow layer with `sld_layers.py`, producing
    `public/imported/aoe2/<key>/<state>.png` plus the combined manifest.
 4. `import_ui.py` extracts the WEST widget-UI subset (resource/command/map/
    bottom/menu panels, materials, entity + action + stat icons, click-sound

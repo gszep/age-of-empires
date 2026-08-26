@@ -52,20 +52,21 @@ def convert(source: Path, output: Path, expected_frames: int, layer: int = 0) ->
     }
 
 
-def convert_shadow(source: Path, output: Path, expected_frames: int) -> dict[str, Any]:
-    """Decode and pack an SLD's shadow layer.
+def convert_mask(source: Path, output: Path, expected_frames: int, layer: str) -> dict[str, Any]:
+    """Decode and pack one of an SLD's BC4 mask layers, `shadow` or `playercolor`.
 
-    Uses tools/sld_shadow.py rather than the openage decoder, whose BC4 path
-    corrupts the heap on this layer. Pure Python, so a bad file raises here
+    Uses tools/sld_layers.py rather than the openage decoder, whose BC4 path
+    corrupts the heap on these layers. Pure Python, so a bad file raises here
     instead of taking the process down with it.
     """
-    from sld_shadow import decode_shadows, pack_shadow_atlas
+    from sld_layers import LAYER_PLAYERCOLOR, LAYER_SHADOW, decode_masks, pack_mask_atlas
 
-    frames = decode_shadows(source.read_bytes())
+    wanted = LAYER_PLAYERCOLOR if layer == "playercolor" else LAYER_SHADOW
+    frames = decode_masks(source.read_bytes(), wanted)
     playable = min(expected_frames, len(frames))
     if playable == 0 or not any(f is not None and not f.empty for f in frames[:playable]):
         return {}
-    image, atlas = pack_shadow_atlas(frames, playable)
+    image, atlas = pack_mask_atlas(frames, playable)
     output.parent.mkdir(parents=True, exist_ok=True)
     image.save(output, optimize=True)
     return atlas
@@ -231,28 +232,30 @@ def main() -> None:
             atlases.setdefault(job["key"], {})[job["name"]] = atlas
         print(identifier)
 
-    # Shadow layers decode in-process: tools/sld_shadow.py is pure Python, so
+    # Mask layers decode in-process: tools/sld_layers.py is pure Python, so
     # unlike the native main-layer decoder it cannot take the run down. A
-    # failure costs that entity its shadow and is recorded, never fatal.
-    shadow_skipped: list[str] = []
+    # failure costs that entity one mask and is recorded, never fatal.
+    mask_skipped: list[str] = []
     for job in jobs:
         if job["layer"] != 0:
             continue
-        identifier = f"{job['key']}:{job['name']}:shadow"
-        try:
-            atlas = convert_shadow(
-                args.graphics / job["source"],
-                args.out / job["key"] / f"{job['name']}-shadow.png",
-                job["expected"],
-            )
-        except Exception as error:  # noqa: BLE001 - one bad layer must not stop the import
-            shadow_skipped.append(identifier)
-            print(f"skipped {identifier}: {error}")
-            continue
-        if atlas:
-            atlas["image"] = f"{job['key']}/{job['name']}-shadow.png"
-            atlases.setdefault(job["key"], {})[f"{job['name']}-shadow"] = atlas
-        print(identifier)
+        for layer in ("shadow", "playercolor"):
+            identifier = f"{job['key']}:{job['name']}:{layer}"
+            try:
+                atlas = convert_mask(
+                    args.graphics / job["source"],
+                    args.out / job["key"] / f"{job['name']}-{layer}.png",
+                    job["expected"],
+                    layer,
+                )
+            except Exception as error:  # noqa: BLE001 - one bad layer must not stop the import
+                mask_skipped.append(identifier)
+                print(f"skipped {identifier}: {error}")
+                continue
+            if atlas:
+                atlas["image"] = f"{job['key']}/{job['name']}-{layer}.png"
+                atlases.setdefault(job["key"], {})[f"{job['name']}-{layer}"] = atlas
+            print(identifier)
 
     entities: dict[str, Any] = {}
     for key, entity in imported["entities"].items():
@@ -279,7 +282,7 @@ def main() -> None:
         "entities": entities,
         "terrain": terrain,
         "skippedAtlases": sorted(skipped),
-        "skippedShadows": sorted(shadow_skipped),
+        "skippedMasks": sorted(mask_skipped),
     }
     manifest_path = args.out / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n")

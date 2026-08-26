@@ -15,6 +15,8 @@ interface Piece {
 
 export interface EntityView {
   group: THREE.Group;
+  /** Player-colour mask drawn over the body. */
+  color: Piece;
   /** Farms draw as a terrain patch instead of a sprite. */
   patch?: THREE.Mesh;
   patchSlot?: string;
@@ -52,6 +54,8 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
   group.add(shadow.mesh);
   const body = makePiece();
   group.add(body.mesh);
+  const color = makePiece();
+  group.add(color.mesh);
   const annexes: Piece[] = [];
   const key = entityKey(entity);
   const imported = assets?.entities[key];
@@ -62,7 +66,7 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
       group.add(piece.mesh);
     }
   }
-  const view: EntityView = { group, shadow, body, annexes, fallback: !imported, facing: entity.owner === 2 ? Math.PI : 0 };
+  const view: EntityView = { group, shadow, body, color, annexes, fallback: !imported, facing: entity.owner === 2 ? Math.PI : 0 };
   if (entity.kind === 'farm') {
     view.fallback = false;
     return view;
@@ -216,7 +220,7 @@ export function createProjectileView(): EntityView {
   const shadow = makePiece();
   const body = makePiece();
   group.add(body.mesh);
-  return { group, shadow, body, annexes: [], fallback: false, facing: 0 };
+  return { group, shadow, body, color: makePiece(), annexes: [], fallback: false, facing: 0 };
 }
 
 export function updateProjectileView(
@@ -346,11 +350,9 @@ export function updateEntityView(
     frameIndex = direction * framesPerDirection + frameInDirection;
   }
 
-  // Player-color masks are unavailable (decoder evidence in tools/README.md);
-  // approximate ownership with a light tint on units.
-  const tint = entity.owner !== 0 && (entity.kind === 'villager' || entity.kind === 'militia')
-    ? (entity.owner === 1 ? 0xcdd8ff : 0xffcdc4)
-    : 0xffffff;
+  // The imported player-colour mask carries ownership, so the body itself is
+  // drawn untinted.
+  const tint = 0xffffff;
 
   // Imported shadow layer, anchored by its own hotspot like the body. Every
   // shadow draws below every body so entities never occlude each other's.
@@ -365,6 +367,18 @@ export function updateEntityView(
 
   applyFrame(view.body, assets, atlas, frameIndex, entity.position, tint);
   view.body.mesh.renderOrder = 1000 + depth * 10;
+
+  // Player colour: the DAT's mask layer marks the cloth that takes the owner's
+  // colour, laid over the body at the same frame and hotspot. Gaia has none.
+  const colorAtlas = imported?.atlases[`${choice.name}-playercolor`];
+  if (colorAtlas && entity.owner !== 0 && !entity.dead) {
+    applyFrame(view.color, assets, colorAtlas, frameIndex, entity.position, PLAYER_COLORS[entity.owner]);
+    view.color.mesh.renderOrder = 1000 + depth * 10 + 1;
+    (view.color.mesh.material as THREE.MeshBasicMaterial).opacity =
+      entity.buildProgress !== undefined ? 0.85 : 1;
+  } else {
+    view.color.mesh.visible = false;
+  }
   (view.body.mesh.material as THREE.MeshBasicMaterial).opacity =
     entity.buildProgress !== undefined ? 0.85 : 1;
 

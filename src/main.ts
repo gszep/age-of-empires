@@ -630,7 +630,7 @@ function syncScene(time: number): void {
     const preview = ghostEntity(buildMode, target);
     view.updateEntityView(ghostView!, assets, game, preview, time);
     ghostView!.group.visible = true;
-    for (const mesh of [ghostView!.body.mesh, ghostView!.shadow.mesh, ...ghostView!.annexes.map(a => a.mesh)]) {
+    for (const mesh of [ghostView!.body.mesh, ghostView!.shadow.mesh, ghostView!.color.mesh, ...ghostView!.annexes.map(a => a.mesh)]) {
       const material = mesh.material as THREE.MeshBasicMaterial;
       material.opacity = 0.55;
       material.color.set(tint);
