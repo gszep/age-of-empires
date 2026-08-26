@@ -33,9 +33,18 @@ sounds, and under-attack alerts, each resolved through `sounds.json` events.
   `ContentAssets` handle; plumbing one through is the whole job.
 
 - **Terrain blends/masks** are not consumed; terrain-to-terrain transitions
-  are absent (single-terrain maps hide this today).
-- **Fire/corpse delta overlays** on damaged/destroyed buildings are not
-  imported.
+  are absent (single-terrain maps hide this today). The blocker is a mapping,
+  not the pipeline: nothing in the owned files says which `terrain/blends/`
+  file a terrain's `blend_type` selects, nor how a 512x512 blend is indexed
+  against a tile. See the note in `overnight.md` for what was measured.
+- **Fire delta overlays** on damaged buildings are not imported.
+- **Building rubble is one spec line away, and would not show.** Every
+  building's `dead_unit_id` names its rubble art (`b_*_rubble_x1`), which the
+  importer's `dead` slot already knows how to reach — but a building's death
+  graphic runs 8.3 s while `kill()` gives every corpse a 3 s window, so the
+  building vanishes mid-collapse and the rubble would never draw. Adding the
+  spec line means making the corpse window follow the death animation's length
+  first, which is a simulation change (and a checksum change).
 
 ## Simulation
 

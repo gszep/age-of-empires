@@ -52,7 +52,7 @@ The importer integration resolves every consumed DAT graphic/rule and widgetui s
 
 Known discrepancies are single-terrain ground without the multi-terrain blend masks, missing fire/corpse delta overlays, and some mirror-AI matches that stalemate until the configured timeout.
 
-The ground samples the imported DAT terrain texture (slot 0, `Grass`/`g_grs`) at the authored `terrain_dimensions` tile span; `terrain/blends` and `terrain/masks` are not consumed yet, so terrain-to-terrain transitions are absent rather than approximated. Farms are terrain too (slots 7 and 29, `Farm1`/`Farm Cnst1`): the DAT gives them no SLD, so they draw as their own patch of the isometric grid.
+The ground samples the imported DAT terrain texture (slot 0, `Grass`/`g_grs`) at the authored `terrain_dimensions` tile span; `terrain/blends` and `terrain/masks` are not consumed, so terrain-to-terrain transitions are absent rather than approximated. The DAT gives each terrain a `blend_type` (grass 0, both farm slots 1) and a `blend_priority`, but nothing in the owned files maps a `blend_type` to one of the ten files in `terrain/blends/`, nor says how a 512x512 blend is indexed against a tile — its shapes are irregular parcels that straddle every even split. `overlay_mask_name` (grass -> `masks/grass.png`) is a noise texture, and the `terrain_unit_masked_density` field beside it suggests it drives decorative scatter rather than the ground's appearance. Farms are terrain too (slots 7 and 29, `Farm1`/`Farm Cnst1`): the DAT gives them no SLD, so they draw as their own patch of the isometric grid.
 
 ### Player colour comes from the game palette
 
@@ -93,6 +93,15 @@ gained an `effects` section that finds a graphic by its own name and refuses a
 name matching anything but exactly one. The gather-point flag is the first:
 `WaypointFlag Britons`, 90 frames, drawn at a selected building's rally point in
 the owner's colour.
+
+A death leaves what the DAT says it leaves: `unit.dead_unit_id` names a unit
+whose standing graphic is the art left behind — `u_*_decayA_x1` for each unit
+and villager task variant, `n_tree_stump_generic_x1` for a spent tree or berry
+bush. The renderer plays the dying graphic once and then holds that art. Both
+last only as long as the simulation's three-second corpse window, where AoE2
+keeps a stump for the rest of the match. Buildings are left out of the chain on
+purpose: their death graphic is longer than that window, so rubble would never
+be reached (see `backlog.md`).
 
 ### The outline layer is a contour, and it is for occlusion
 

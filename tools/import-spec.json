@@ -15,7 +15,8 @@
         "idle": { "slot": "standing" },
         "walk": { "slot": "walking" },
         "attack": { "slot": "attack" },
-        "death": { "slot": "dying" }
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
       }
     },
     {
@@ -26,7 +27,8 @@
         "idle": { "slot": "standing" },
         "walk": { "slot": "walking" },
         "attack": { "slot": "attack" },
-        "death": { "slot": "dying" }
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
       }
     },
     {
@@ -37,7 +39,8 @@
         "idle": { "slot": "standing" },
         "walk": { "slot": "walking" },
         "attack": { "slot": "attack" },
-        "death": { "slot": "dying" }
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
       }
     },
     {
@@ -48,7 +51,8 @@
         "idle": { "slot": "standing" },
         "walk": { "slot": "walking" },
         "attack": { "slot": "attack" },
-        "death": { "slot": "dying" }
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
       }
     },
     {
@@ -60,7 +64,8 @@
         "idle": { "slot": "standing" },
         "walk": { "slot": "walking" },
         "work": { "task": { "actionType": 101 }, "graphic": "proceeding" },
-        "death": { "slot": "dying" }
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
       }
     },
     {
@@ -73,7 +78,8 @@
         "walk": { "slot": "walking" },
         "work": { "task": { "actionType": 5, "classId": 7 }, "graphic": "proceeding" },
         "carry": { "task": { "actionType": 5, "classId": 7 }, "graphic": "carrying" },
-        "death": { "slot": "dying" }
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
       }
     },
     {
@@ -86,7 +92,8 @@
         "walk": { "slot": "walking" },
         "work": { "task": { "actionType": 110, "classId": 15 }, "graphic": "working" },
         "carry": { "task": { "actionType": 110, "classId": 15 }, "graphic": "carrying" },
-        "death": { "slot": "dying" }
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
       }
     },
     {
@@ -99,7 +106,8 @@
         "walk": { "slot": "walking" },
         "work": { "task": { "actionType": 5, "unitId": 66 }, "graphic": "proceeding" },
         "carry": { "task": { "actionType": 5, "unitId": 66 }, "graphic": "carrying" },
-        "death": { "slot": "dying" }
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
       }
     },
     {
@@ -112,7 +120,8 @@
         "walk": { "slot": "walking" },
         "work": { "task": { "actionType": 5, "unitId": 102 }, "graphic": "proceeding" },
         "carry": { "task": { "actionType": 5, "unitId": 102 }, "graphic": "carrying" },
-        "death": { "slot": "dying" }
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
       }
     },
     {
@@ -152,7 +161,8 @@
       "civ": "gaia",
       "category": "resource",
       "animations": {
-        "idle": { "slot": "standing" }
+        "idle": { "slot": "standing" },
+        "decay": { "slot": "dead" }
       }
     },
     {
@@ -268,7 +278,8 @@
       "category": "resource",
       "animations": {
         "idle": { "slot": "standing" },
-        "death": { "slot": "dying" }
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
       }
     }
   ],

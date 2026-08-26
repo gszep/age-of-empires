@@ -57,6 +57,8 @@ export interface EntityView {
   fallback: boolean;
   animationState?: string;
   animationStartedAt?: number;
+  /** When this entity was first seen dead, so the corpse chain can advance. */
+  diedAt?: number;
   facing: number; // radians, world space
   lastPosition?: { x: number; y: number };
 }
@@ -520,6 +522,17 @@ export function updateEntityView(
 
   const choice = chooseAnimation(state, entity);
   const imported = assets.entities[choice.key] ?? assets.entities[entityKey(entity)];
+  // What is left behind is a chain in the DAT: the dying graphic plays once,
+  // then the dead unit's own art lies there — a corpse rotting, a felled tree
+  // reduced to its stump. Switch when the first has played out.
+  if (entity.dead) {
+    view.diedAt ??= time;
+    const dying = imported?.animations['death'];
+    const played = dying ? dying.frames * dying.frameSeconds : 0;
+    if (imported?.atlases['decay'] && time - view.diedAt >= played) choice.name = 'decay';
+  } else {
+    view.diedAt = undefined;
+  }
   let animation: AnimationInfo | undefined = imported?.animations[choice.name];
   let atlas: Atlas | undefined = imported?.atlases[choice.name];
   if (!animation || !atlas) {
@@ -550,7 +563,10 @@ export function updateEntityView(
     const direction = directionIndex(view.facing, animation.directions) % directionsInFile;
     const frameSeconds = animation.frameSeconds > 0 ? animation.frameSeconds : 0.1;
     let frameInDirection = Math.floor(elapsed / frameSeconds);
-    if (choice.name === 'death') frameInDirection = Math.min(frameInDirection, framesPerDirection - 1);
+    // Neither a death nor a corpse loops: both hold their last frame.
+    if (choice.name === 'death' || choice.name === 'decay') {
+      frameInDirection = Math.min(frameInDirection, framesPerDirection - 1);
+    }
     else frameInDirection %= framesPerDirection;
     frameIndex = direction * framesPerDirection + frameInDirection;
   }

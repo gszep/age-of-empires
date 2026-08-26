@@ -44,16 +44,28 @@ items land.
   while its building is selected, player colour and all. *Verified:* the
   entities query reports the rally point, and a screenshot with the town center
   selected shows the British flag flying at it.
-- [ ] **Corpse decay and tree stumps.** Dead-unit chains (`dying_graphic` →
-  corpse/decay, felled tree → stump) are recorded but not imported. Import
-  and render them so bodies and stumps persist briefly. *Verify:* kill a
-  unit headlessly, entity query shows the corpse state rendering; tree
-  depletes to a stump.
-- [ ] **Terrain blend edges.** `depot_813782/resources/_common/terrain/
-  {blends,masks}` are local and unconsumed; farm patches currently sit on
-  hard edges against grass. Consume the blend masks for the terrain pairs in
-  use. *Verify:* pixel samples across a farm/grass boundary show a gradient,
-  not a step; import regenerates byte-identically.
+- [x] **Corpse decay and tree stumps.** The DAT models what a death leaves
+  behind as its own unit at `dead_unit_id`, and its standing graphic is the
+  art: `u_*_decayA_x1` per unit and task variant, `n_tree_stump_generic_x1`
+  for a spent tree or berry bush. Imported through a new `dead` slot; the
+  renderer switches from the dying graphic to it once that graphic has played
+  out. *Verified:* an entity query (which now reports corpses) shows a killed
+  villager move from `villager/death` to `villager/decay`, and a spent tree to
+  `tree-oak/decay`.
+- [ ] **Terrain blend edges. Blocked on evidence, not effort.** What the owned
+  files do say: the DAT gives each terrain a `blend_type` (grass 0, both farm
+  slots 1) and a `blend_priority` (grass 111, Farm1 186, Farm Cnst1 180), and
+  `terrain/blends/` holds ten 8-bit masks — `farmland.png` the only farm-named
+  one. What they do not say is which file a `blend_type` selects, or how a
+  512x512 mask is indexed against a tile: its shapes are irregular parcels that
+  straddle any 2x2 or 4x4 split, so it is neither one plot nor an atlas of edge
+  tiles. `masks/` is a different thing again — `overlay_mask_name` (grass ->
+  `masks/grass.png`) is noise, and the neighbouring `terrain_unit_masked_density`
+  field suggests it drives decorative scatter rather than the ground's look.
+  Picking a blend file by its name and an anchoring by eye would invent a
+  visual, which is what the download-first rule exists to prevent. Needs either
+  a mapping found in the owned data or a side-by-side against the installed
+  game.
 
 ## B. Tech tree toward a faithful Dark→Feudal slice
 

@@ -50,6 +50,8 @@ interface DebugQuery {
   entity?: number;
   rect?: [number, number, number, number];
   png?: boolean;
+  /** Include corpses, which are otherwise filtered out like the UI filters them. */
+  dead?: boolean;
   command?: Command;
   ids?: number[];
 }
@@ -100,6 +102,7 @@ export function installDebug(context: DebugContext): void {
       hp: entity.hp,
       maxHp: entity.maxHp,
       activity: entity.activity,
+      dead: entity.dead,
       order: entity.order.kind,
       rally: entity.rally && { x: round(entity.rally.target.x), y: round(entity.rally.target.y) },
       selected: context.selectedIds().includes(entity.id),
@@ -220,7 +223,7 @@ export function installDebug(context: DebugContext): void {
       };
     }
     if (query.type === 'entities') {
-      const matches = game.entities.filter(entity => !entity.dead
+      const matches = game.entities.filter(entity => (query.dead === true || !entity.dead)
         && (query.id === undefined || entity.id === query.id)
         && (query.owner === undefined || entity.owner === query.owner)
         && (query.kind === undefined || entity.kind === query.kind));

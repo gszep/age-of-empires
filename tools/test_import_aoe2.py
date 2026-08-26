@@ -192,6 +192,31 @@ class ContentImportIntegrationTest(unittest.TestCase):
             for red, green, blue, alpha in lit:
                 self.assertEqual((red, green, blue, alpha), (255, 255, 255, 255))
 
+    def test_every_death_resolves_what_it_leaves_behind(self):
+        # The DAT models a corpse or a stump as its own unit, reached through
+        # `dead_unit_id`; the decay art is that unit's standing graphic.
+        entities = self.result["entities"]
+        militia = entities["militia"]["animations"]["decay"]
+        self.assertEqual(militia["source"], "u_inf_militia_decayA_x1.sld")
+        self.assertEqual(militia["frames"], 30)
+        self.assertEqual(militia["directions"], 16)
+        # A depleted tree leaves the generic stump, one frame per variation.
+        stump = entities["tree-oak"]["animations"]["decay"]
+        self.assertEqual(stump["source"], "n_tree_stump_generic_x1.sld")
+        self.assertEqual(stump["frames"], 1)
+        self.assertEqual(entities["berries"]["animations"]["decay"]["source"], stump["source"])
+        # The chain is per task variant, not one corpse for every villager.
+        self.assertEqual(
+            entities["villager-lumberjack"]["animations"]["decay"]["source"],
+            "u_vil_male_lumberjack_decayA_x1.sld",
+        )
+        # A unit with nothing to leave behind must say so rather than resolve
+        # to graphic -1 and fail later, mid-conversion.
+        from import_content import resolve_graphic_id
+        units = _dat().civs[SPEC["civIndex"]].units
+        with self.assertRaises(ValueError):
+            resolve_graphic_id(units[504], {"slot": "dead"}, units)  # the arrow
+
     def test_gather_point_flag_resolves_by_its_own_graphic_name(self):
         # Nothing in the unit table points at the waypoint flag, so it is found
         # by name — and the name has to match exactly one graphic, or the

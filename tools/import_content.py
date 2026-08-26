@@ -115,11 +115,17 @@ def find_task(unit: Any, selector: dict[str, Any]) -> Any:
     raise ValueError(f"unit {unit.id}: no task matches {selector}")
 
 
-def resolve_graphic_id(unit: Any, animation: dict[str, Any]) -> int:
+def resolve_graphic_id(unit: Any, animation: dict[str, Any], civ_units: Any) -> int:
     if "slot" in animation:
         slot = animation["slot"]
         if slot == "standing":
             return unit.standing_graphic[0]
+        if slot == "dead":
+            # What is left behind: the DAT models a corpse, a stump, or a pile
+            # of rubble as its own unit, and its standing graphic is that art.
+            if unit.dead_unit_id is None or unit.dead_unit_id < 0:
+                raise ValueError(f"unit {unit.id} leaves nothing behind")
+            return civ_units[unit.dead_unit_id].standing_graphic[0]
         if slot == "walking":
             return unit.dead_fish.walking_graphic
         if slot == "attack":
@@ -257,7 +263,7 @@ def extract_entity(
                 entity["popSupport"] = int(s.amount)
 
     entity["animations"] = {
-        name: animation_entry(dat, graphics_dir, resolve_graphic_id(unit, animation), hashes)
+        name: animation_entry(dat, graphics_dir, resolve_graphic_id(unit, animation, civ_units), hashes)
         for name, animation in spec["animations"].items()
     }
 

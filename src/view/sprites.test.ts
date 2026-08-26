@@ -140,6 +140,76 @@ function annexedAssets(): ContentAssets {
   return assets;
 }
 
+describe('what a death leaves behind', () => {
+  /** A villager and an oak with the DAT's death-then-decay chain. */
+  function corpseAssets(): ContentAssets {
+    const assets = fakeAssets();
+    const frames = [{ x: 0, y: 0, w: 4, h: 4, cx: 2, cy: 2 }];
+    const atlas = (image: string): Atlas => ({ image, size: [4, 4], framesInFile: 1, frames });
+    for (const image of ['villager/death.png', 'villager/decay.png',
+                         'tree-oak/idle.png', 'tree-oak/death.png', 'tree-oak/decay.png']) {
+      const texture = new THREE.DataTexture(new Uint8Array(4 * 4 * 4), 4, 4);
+      texture.needsUpdate = true;
+      assets.textures.set(image, texture);
+    }
+    const still = { frames: 1, directions: 1, frameSeconds: 0, mirroringMode: 0 };
+    Object.assign(assets.entities['villager'].animations, {
+      death: { frames: 1, directions: 1, frameSeconds: 1.5, mirroringMode: 0 },
+      decay: { frames: 1, directions: 1, frameSeconds: 1, mirroringMode: 0 },
+    });
+    Object.assign(assets.entities['villager'].atlases, {
+      death: atlas('villager/death.png'), decay: atlas('villager/decay.png'),
+    });
+    assets.entities['tree-oak'] = {
+      category: 'resource',
+      animations: { idle: still, death: still, decay: still },
+      atlases: {
+        idle: atlas('tree-oak/idle.png'),
+        death: atlas('tree-oak/death.png'),
+        decay: atlas('tree-oak/decay.png'),
+      },
+    };
+    return assets;
+  }
+
+  it('holds the corpse once the dying graphic has played', () => {
+    const assets = corpseAssets();
+    const state = createGame();
+    const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    villager.dead = true;
+    villager.activity = 'dying';
+    const view = createEntityView(assets, villager);
+
+    updateEntityView(view, assets, state, villager, 10);
+    expect(view.animationState).toBe('villager/death');
+    // Still dying half a second in: the chain waits for the graphic to finish.
+    updateEntityView(view, assets, state, villager, 10.5);
+    expect(view.animationState).toBe('villager/death');
+    updateEntityView(view, assets, state, villager, 11.6);
+    expect(view.animationState).toBe('villager/decay');
+    // A corpse carries no player colour and casts no shadow.
+    expect(view.color.mesh.visible).toBe(false);
+    expect(view.shadow.mesh.visible).toBe(false);
+  });
+
+  it('leaves a stump where a tree ran out', () => {
+    const assets = corpseAssets();
+    const state = createGame();
+    const tree = treeOf(state);
+    // Felled but not spent: still the trunk on the ground.
+    tree.amount = 1;
+    const view = createEntityView(assets, tree);
+    updateEntityView(view, assets, state, tree, 0);
+    expect(view.animationState).toBe('tree-oak/death');
+
+    tree.amount = 0;
+    tree.dead = true;
+    // The felled trunk has no animation to play out, so the stump is immediate.
+    updateEntityView(view, assets, state, tree, 1);
+    expect(view.animationState).toBe('tree-oak/decay');
+  });
+});
+
 describe('the gather-point flag', () => {
   function flagAssets(): ContentAssets {
     const assets = fakeAssets();
