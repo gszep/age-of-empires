@@ -40,6 +40,8 @@ export interface EntityView {
   shadow: Piece;
   body: Piece;
   annexes: Piece[];
+  /** Player-colour mask over each annex, in the same order. */
+  annexColors: Piece[];
   fallback: boolean;
   animationState?: string;
   animationStartedAt?: number;
@@ -113,6 +115,7 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
   const color = ramp ? makeRampPiece(ramp) : makePiece();
   group.add(color.mesh);
   const annexes: Piece[] = [];
+  const annexColors: Piece[] = [];
   const key = entityKey(entity);
   const imported = assets?.entities[key];
   if (imported?.annexes) {
@@ -120,10 +123,16 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
       const piece = makePiece();
       annexes.push(piece);
       group.add(piece.mesh);
+      // The town center's own art carries no player-colour layer at all: its
+      // colour lives entirely in the annex pieces, so each needs the same
+      // treatment as a body.
+      const annexColor = ramp ? makeRampPiece(ramp) : makePiece();
+      annexColors.push(annexColor);
+      group.add(annexColor.mesh);
     }
   }
   const view: EntityView = {
-    group, shadow, body, color, annexes, fallback: !imported,
+    group, shadow, body, color, annexes, annexColors, fallback: !imported,
     facing: entity.owner === 2 ? Math.PI : 0,
     playerColor: playerColorHex(assets, entity.owner),
   };
@@ -285,7 +294,7 @@ export function createProjectileView(): EntityView {
   const shadow = makePiece();
   const body = makePiece();
   group.add(body.mesh);
-  return { group, shadow, body, color: makePiece(), annexes: [], fallback: false, facing: 0 };
+  return { group, shadow, body, color: makePiece(), annexes: [], annexColors: [], fallback: false, facing: 0 };
 }
 
 export function updateProjectileView(
@@ -455,13 +464,27 @@ export function updateEntityView(
   for (const [index, piece] of view.annexes.entries()) {
     const annex = annexes[index];
     const annexAtlas = annex?.atlases[`annex${index}-idle`];
+    const colorPiece = view.annexColors[index];
     if (!annex || !annexAtlas || entity.buildProgress !== undefined || entity.dead) {
       piece.mesh.visible = false;
+      if (colorPiece) colorPiece.mesh.visible = false;
       continue;
     }
     // Annex art is anchored by its own frame hotspot; the DAT misplacement
     // is display-order metadata here, not an additional world offset.
+    const order = 1000 + depth * 10 + 1 + index * 2;
     applyFrame(piece, assets, annexAtlas, 0, entity.position, 0xffffff);
-    piece.mesh.renderOrder = 1000 + isoDepth(entity.position.x, entity.position.y) * 10 + 1 + index;
+    piece.mesh.renderOrder = order;
+    const annexColorAtlas = annex.atlases[`annex${index}-idle-playercolor`];
+    if (colorPiece && annexColorAtlas && entity.owner !== 0) {
+      applyFrame(
+        colorPiece, assets, annexColorAtlas, 0, entity.position,
+        colorPiece.mapNode ? 0xffffff : PLAYER_COLORS[entity.owner],
+      );
+      colorPiece.mesh.renderOrder = order + 1;
+      (colorPiece.mesh.material as THREE.MeshBasicMaterial).opacity = 1;
+    } else if (colorPiece) {
+      colorPiece.mesh.visible = false;
+    }
   }
 }

@@ -106,6 +106,34 @@ function fakeAssets(): ContentAssets {
   };
 }
 
+/** The town center's shape: a body with no colour layer, colour only on annexes. */
+function annexedAssets(): ContentAssets {
+  const assets = fakeAssets();
+  const frames = [{ x: 0, y: 0, w: 4, h: 4, cx: 2, cy: 2 }];
+  const atlas = (image: string): Atlas => ({ image, size: [4, 4], framesInFile: 1, frames });
+  for (const image of ['tc/idle.png', 'tc/annex0-idle.png', 'tc/annex0-idle-playercolor.png']) {
+    const texture = new THREE.DataTexture(new Uint8Array(4 * 4 * 4), 4, 4);
+    texture.needsUpdate = true;
+    assets.textures.set(image, texture);
+  }
+  const idle = { frames: 1, directions: 1, frameSeconds: 0.1, mirroringMode: 0 };
+  assets.entities['town-center'] = {
+    category: 'building',
+    animations: { idle },
+    atlases: { idle: atlas('tc/idle.png') },
+    annexes: [{
+      unitId: 618,
+      misplacement: [1, -1],
+      animations: { 'annex0-idle': idle },
+      atlases: {
+        'annex0-idle': atlas('tc/annex0-idle.png'),
+        'annex0-idle-playercolor': atlas('tc/annex0-idle-playercolor.png'),
+      },
+    }],
+  };
+  return assets;
+}
+
 describe('player colour through the imported ramp', () => {
   it('resolves a sprite grey to a shade of the player block', () => {
     // The grey player's block is an identity ramp; inverting it is what makes
@@ -144,6 +172,34 @@ describe('player colour through the imported ramp', () => {
     expect(material.colorNode).toBeDefined();
     // White: the ramp decides the colour, so any tint here would multiply it.
     expect(material.color.getHexString()).toBe('ffffff');
+  });
+
+  it('colours the annexes a building keeps its player colour in', () => {
+    // The town center's own art carries no player-colour layer, so a renderer
+    // that only masks the body draws it grey.
+    const assets = annexedAssets();
+    const state = createGame();
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const view = createEntityView(assets, tc);
+    updateEntityView(view, assets, state, tc, 0);
+
+    expect(view.color.mesh.visible).toBe(false);
+    expect(view.annexColors).toHaveLength(1);
+    expect(view.annexColors[0].mesh.visible).toBe(true);
+    expect(view.annexColors[0].mapNode?.value)
+      .toBe(assets.textures.get('tc/annex0-idle-playercolor.png'));
+    // Over its own annex, and under the next annex in the display order.
+    expect(view.annexColors[0].mesh.renderOrder).toBe(view.annexes[0].mesh.renderOrder + 1);
+  });
+
+  it('hides annex colour while a building is still going up', () => {
+    const assets = annexedAssets();
+    const state = createGame();
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const view = createEntityView(assets, tc);
+    updateEntityView(view, assets, state, { ...tc, buildProgress: 0.5 }, 0);
+    expect(view.annexes[0].mesh.visible).toBe(false);
+    expect(view.annexColors[0].mesh.visible).toBe(false);
   });
 
   it('falls back to the flat player colour when no ramp was imported', () => {

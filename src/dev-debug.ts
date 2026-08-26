@@ -38,6 +38,7 @@ export interface DebugContext {
     facing: number;
     playerColor?: string;
     color: { mesh?: { visible?: boolean; material?: unknown } };
+    annexColors?: { mesh?: { visible?: boolean } }[];
   }>;
 }
 
@@ -83,10 +84,13 @@ export function installDebug(context: DebugContext): void {
     const canvas = context.renderer.domElement;
     const view = context.views.get(`e${entity.id}`);
     const material = view?.color.mesh?.material as { color?: { getHexString(): string } } | undefined;
-    // The player-colour piece shades the owner's hue through the imported
-    // palette ramp, so the hue is the view's, not a flat material colour.
-    const colorTint = view?.color.mesh?.visible
-      ? view.playerColor ?? (material?.color ? `#${material.color.getHexString()}` : undefined)
+    // The player-colour pieces shade the owner's hue through the imported
+    // palette ramp, so the hue is the view's, not a flat material colour. The
+    // town center carries none on its body: its colour is all in the annexes.
+    const colored = view?.color.mesh?.visible
+      || view?.annexColors?.some(piece => piece.mesh?.visible);
+    const colorTint = colored
+      ? view!.playerColor ?? (material?.color ? `#${material.color.getHexString()}` : undefined)
       : undefined;
     return {
       id: entity.id,

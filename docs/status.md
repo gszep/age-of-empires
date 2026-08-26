@@ -50,7 +50,7 @@ Batch artifacts are intentionally ignored under `.local/batches/phase6-16/`.
 
 The importer integration resolves every consumed DAT graphic/rule and widgetui source, hashes inputs, and regenerates byte-identically. Viewer smoke tests loaded imported atlases and WEST UI without application console errors; selection, gather orders, fog expansion, and browser replay were exercised through Chrome DevTools Protocol. Timing, resource conservation, hidden information, pathing, combat release, protocol validation, and replay determinism have focused tests.
 
-Known discrepancies are the missing outline layer, single-terrain ground without the multi-terrain blend masks, missing fire/corpse delta overlays, the town center's grey annexes, and some mirror-AI matches that stalemate until the configured timeout.
+Known discrepancies are the missing outline layer, single-terrain ground without the multi-terrain blend masks, missing fire/corpse delta overlays, and some mirror-AI matches that stalemate until the configured timeout.
 
 The ground samples the imported DAT terrain texture (slot 0, `Grass`/`g_grs`) at the authored `terrain_dimensions` tile span; `terrain/blends` and `terrain/masks` are not consumed yet, so terrain-to-terrain transitions are absent rather than approximated. Farms are terrain too (slots 7 and 29, `Farm1`/`Farm Cnst1`): the DAT gives them no SLD, so they draw as their own patch of the isometric grid.
 
@@ -82,6 +82,11 @@ resolves the grey to a 256-texel ramp per player and samples it in a TSL node
 material, so one texture read gives both the shade and the coverage. A militia
 now renders 357 distinct blues from its own palette block where it previously
 drew one flat `#1a6cff`.
+
+The town center's own art carries no player-colour layer: its colour is entirely
+in its annex pieces, which is why it used to render grey. Each annex now draws
+its own player-colour sheet through the same ramp, and a pixel sample over the
+building returns 3,258 player-blue pixels in 2,783 shades.
 
 ### The import pipeline is openage-free
 

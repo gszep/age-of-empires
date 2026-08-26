@@ -7,15 +7,6 @@ the likely fix path so a fresh session can pick it up without re-deriving it.
 When a session finishes or abandons an item, update it here; completed items
 are deleted, not ticked.
 
-## Player colour fidelity
-
-Sprite cloth now shades through the imported palette block (see status.md), and
-team assignment is correct, but:
-
-- **The town center renders grey.** Its art is composited from annexes; check
-  whether `convert_sld.py` produced `annex*-playercolor` atlases for it and
-  whether `src/view/sprites.ts` applies colour masks to annex meshes at all.
-
 ## Tech tree completeness
 
 The overnight tech-tree run added buildings faster than the units they train:

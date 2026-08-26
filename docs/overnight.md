@@ -24,12 +24,12 @@ items land.
   sheet and emits each player's block; the renderer looks the grey up through
   it. *Verified:* militia cloth renders 357 distinct palette blues (was one flat
   `#1a6cff`), and the debug readback was fixed to report screen colours.
-- [ ] **Town-center (annex) player colour.** `src/view/sprites.ts` applies
-  the colour mask only to the body piece; annex meshes get none, so the TC
-  renders grey. Export annex playercolor masks (the importer already
-  converts `annex*-playercolor` atlases — check they exist for the TC) and
-  composite them like the body's. *Verify:* entity pixel sample over the TC
-  contains the player ramp colours; `colorTint` reported for annexes.
+- [x] **Town-center (annex) player colour.** The importer already produced
+  `annex0/annex2-idle-playercolor`; the TC's *body* art carries no
+  player-colour layer at all, so its colour is entirely in the annexes and the
+  renderer drew none of it. Each annex now gets its own ramp piece.
+  *Verified:* pixel sample over the TC returns 3,258 player-blue pixels in
+  2,783 shades (was none), and `colorTint` is reported for it again.
 - [ ] **Sprite outlines.** Export the SLD outline layer (BC1, same command
   walk — `tools/sld_layers.py` already skips it by length; decode it
   instead) and draw the thin dark contour. *Verify:* import test asserts
