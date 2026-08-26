@@ -53,4 +53,4 @@ Imported Microsoft content is generated under ignored `public/imported/` and is 
 - `src/view/` and `src/main.ts` — observation-driven WEST HUD, dimetric renderer, fog, minimap, interactions, and replay playback
 - `tools/` — deterministic local DAT/SLD/widgetui import pipeline
 - `deploy/` — legally isolated open-content Cloud Run deployment and operations notes
-- `docs/final-handoff.md` — delivered scope, measurements, discrepancies, and verification evidence
+- `docs/status.md` — delivered scope, measurements, discrepancies, and verification evidence

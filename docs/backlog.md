@@ -1,0 +1,54 @@
+# Backlog
+
+Known gaps, ordered roughly by player impact. Each entry names the evidence and
+the likely fix path so a fresh session can pick it up without re-deriving it.
+When a session finishes or abandons an item, update it here; completed items
+are deleted, not ticked.
+
+## Player colour fidelity
+
+Player colours land in the right areas on most buildings and team assignment is
+correct, but:
+
+- **The town center renders grey.** Its art is composited from annexes; check
+  whether `convert_sld.py` produced `annex*-playercolor` atlases for it and
+  whether `src/view/sprites.ts` applies colour masks to annex meshes at all.
+- **Colours are oversaturated and unshaded.** The renderer multiplies one flat
+  colour through the white mask, losing the shading the original bakes in.
+  AoE2DE selects per-pixel colours from a player-colour palette ramp; the mask
+  layer's 8-bit value indexes intensity. Fix path: modulate the flat colour by
+  the mask's grey level (already exported — check `pack_mask_atlas`) or import
+  the authoritative palette ramps from the depot's palette files and map mask
+  intensity through them. Compare against the installed game side by side.
+
+## Tech tree completeness
+
+The overnight tech-tree run added buildings faster than the units they train:
+
+- **Market trains nothing** — no trade cart. Audit every production building:
+  each must train the units the DAT assigns it, or be recorded here.
+- **Stable is not imported** — its SLD crashes the pinned openage decoder, so
+  scout cavalry is also absent. Unblocks when the local decoder handles the
+  main layer (see status.md).
+
+## Audio
+
+Only the `button_ui` click cue is wired. The Wwise pipeline
+(`import_audio.py` + `vgmstream-cli`) is proven; remaining work is coverage:
+unit selection/acknowledgement voices, training/construction cues, combat
+sounds, and under-attack alerts, each resolved through `sounds.json` events.
+
+## Rendering
+
+- **Rally-point flags** are absent; rally points work but give no visual.
+- **Sprite outlines** (the thin dark contour) are not drawn; the SLD outline
+  layer is decodable locally once the BC1/main-layer work lands.
+- **Terrain blends/masks** are not consumed; terrain-to-terrain transitions
+  are absent (single-terrain maps hide this today).
+- **Fire/corpse delta overlays** on damaged/destroyed buildings are not
+  imported.
+
+## Simulation
+
+- **Mirror-AI stalemates**: some built-in-vs-built-in matches stall to the
+  timeout; the example AI never breaks a defensive equilibrium.

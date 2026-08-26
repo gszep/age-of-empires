@@ -42,9 +42,9 @@ the owned fixture, including determinism checks.
 - Forager and gold-miner work animations use the task `proceeding` graphic; the
   DAT `working` graphic is `-1` and the attack graphic is a placeholder file
   named `None` in this build.
-- Main and shadow SLD layers are converted. The local shadow decoder avoids
-  pinned-openage crashes, but player-color masks and outline layers remain
-  unavailable; the viewer approximates player color by tinting. Each main
+- Main, shadow, and player-color SLD layers are converted; outline layers are
+  not drawn yet. The local `sld_layers.py` decoder handles the BC4 mask layers
+  because the pinned openage decoder corrupts the heap on them. Each main
   atlas still converts in an isolated subprocess because openage degrades
   within one long-lived process.
 - Building destruction graphics are converted without their fire-overlay delta
@@ -57,6 +57,29 @@ the owned fixture, including determinism checks.
 - The shipped `materials.json` has a few dangling texture refs (for example
   `AgeupCastleAge`, referenced by `resourcepanel.json`); these are kept as
   `unresolvedTexture` evidence instead of substituting art.
+
+## genieutils DAT cheat-sheet
+
+Field names in `genieutils-py` are non-obvious and guessing them costs a
+failed run each time. The ones this importer consumes (`unit` is an entry of
+`dat.civs[n].units`):
+
+| What you want | Where it lives |
+|---|---|
+| id, name, HP, LOS, icon | `unit.id`, `.name`, `.hit_points`, `.line_of_sight`, `.icon_id` |
+| footprint / clearance | `unit.collision_size_x/_y`, `unit.clearance_size` |
+| movement speed, walk graphic | `unit.speed`; `unit.dead_fish.walking_graphic` |
+| idle / death graphics | `unit.standing_graphic`, `unit.dying_graphic` |
+| cost and train time/location | `unit.creatable.resource_costs`; `unit.creatable.train_locations[0].unit_id/.train_time` |
+| combat (attacks, armor, range, projectile) | `unit.type_50.*` — `.attacks`, `.attack_graphic`, `.projectile_unit_id`, `.graphic_displacement` (launch offset, z = height) |
+| projectile arc | `unit.projectile.projectile_arc` (fraction of shot distance, sign varies) |
+| villager tasks (gather/build) | `unit.bird.tasks[*]` — `.action_type`, `.class_id`, `.unit_id`, `.resource_in/_out`; rates on `unit.bird.work_rate`; drop-offs in `unit.bird.drop_sites` |
+| carried resources | `unit.resource_storages`, `unit.resource_capacity` |
+| building construction / annexes | `unit.building.construction_graphic_id`, `unit.building.annexes` |
+| graphic playback | `graphic.file_name`, `.frame_count`, `.angle_count`, `.frame_duration`, `.mirroring_mode` |
+
+When a needed field is missing here, `dir()` the object once in a scratch
+script and extend this table — do not trial-and-error attribute names.
 
 ## Library notes
 

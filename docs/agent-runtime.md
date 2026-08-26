@@ -2,6 +2,12 @@
 
 These are first-class project-owned layers, not features delegated to the renderer or a generic RTS engine.
 
+**Status:** the observation/command contracts, JSONL/deadline/WebSocket/MCP
+strategy adapters, timing modes, replay records, and paired headless batches
+are implemented (see `status.md`). The search coordinator, capability
+sandboxing, and evolutionary machinery described below are design intent, not
+built.
+
 ## Product boundary
 
 ```text

@@ -139,6 +139,25 @@ npm run dev
 
 The first import bootstraps a pinned Python/openage toolchain under `.tools/` and can take several minutes. Successful output appears under `public/imported/aoe2/`; the browser detects it automatically. Re-running `npm run import:aoe2` against identical depot inputs regenerates byte-identical output.
 
+## Remote QA over Tailscale
+
+The dev server stays bound to loopback and is published privately to the
+tailnet with [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve):
+
+```bash
+npm run dev -- --host 127.0.0.1 --port 5173
+tailscale serve --bg --https=5173 5173
+tailscale serve status
+```
+
+Then open `https://calcifer.tail6e864b.ts.net:5173/` from a tailnet device.
+calcifer's default HTTPS route already proxies another service on port 8787 —
+never run `tailscale serve reset`, which would remove it, and never use
+`tailscale funnel` for this. Tailscale Serve proxies WebSocket upgrades, so
+Vite HMR works; if it does not, set `hmr: { protocol: 'wss', clientPort: 5173 }`
+and add the tailnet hostname to `allowedHosts` in `vite.config.ts` (never
+`allowedHosts: true`).
+
 ## Troubleshooting
 
 - **`Missing owned AoE2DE depot content`**: `AOE2DE_DEPOT_ROOT` points one level too high/low, or one depot has not finished downloading.

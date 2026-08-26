@@ -1,4 +1,7 @@
-# Dark Age skirmish handoff
+# Project status
+
+Delivered scope, measurements, compatibility evidence, and known
+discrepancies. Gaps that represent work to do live in `backlog.md`.
 
 ## Run and play
 
@@ -100,6 +103,3 @@ npm run batch -- --matches 16 --concurrency 16 --seed-start 100 --max-time 1800 
 npm run test:live-agent   # opt-in; requires valid existing machine provider auth
 ```
 
-## Smallest recommended next milestone
-
-Extend the local SLD decoder to the BC1 main and outline layers, then add imported terrain blend masks. This would recover the stable and the sprite contours while removing the remaining openage dependency, without expanding gameplay scope.

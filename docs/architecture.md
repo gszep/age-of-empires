@@ -62,17 +62,11 @@ Before changing language, try in order:
 5. move isolated kernels to WASM;
 6. move the full core to Rust only if the simpler interventions are insufficient.
 
-## Current horizontal slice
+## Current state
 
-The first slice deliberately includes the whole product loop at low fidelity:
-
-- seeded 1v1 map;
-- economy and resource gathering;
-- villagers, militia, town centers, houses, and barracks;
-- movement, training, building, attacks, destruction, and victory;
-- example opponent AI using the same public command path as the player;
-- touch selection and command controls;
-- fullscreen/landscape request on mobile;
-- deterministic fixed-step tests.
-
-It deliberately omits pathfinding, collision, construction time, resource drop-off, fog of war, projectiles, civilization data, and batch execution. These should be deepened one vertical mechanic at a time; desktop/laptop is the canonical play target and mobile is only a remote verification surface.
+The slice has grown well past the first horizontal cut: deterministic
+pathfinding, obstruction, DAT-backed combat, fog of war, projectiles,
+construction, drop-sites, the Dark Age building set, replay verification, and
+concurrent headless batches are all in. `docs/status.md` is the accurate
+inventory; `docs/backlog.md` lists the known gaps. Desktop/laptop remains the
+canonical play target and mobile a remote verification surface only.
