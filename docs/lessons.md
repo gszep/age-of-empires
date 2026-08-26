@@ -35,10 +35,16 @@ keeps the record.
   were spent probing the DAT schema. Rule: consult the cheat-sheet in
   `AGENTS.md`, and when a field is missing from it, `dir()` the object once and
   extend the cheat-sheet instead of trial-and-erroring.
-- **The pinned openage decoder is unsound on this data.** It corrupts the heap
-  on BC4 mask layers (reproducible on upstream) and crashes on the stable's
-  outline branch. The clean-room decoder in `tools/sld_layers.py` exists
-  because of this; extend it rather than reaching back into openage.
+- **All SLD decoding is local.** `tools/sld_layers.py` handles every layer
+  (verified byte-identical to the openage decoder it replaced, which corrupted
+  the heap on masks and crashed on the stable); extend it rather than adding a
+  decoder dependency.
+- **Distrust "always" in reverse-engineered specs.** The SLD header field
+  documented as "unknown, always 0x10" is really the frame-data start offset,
+  and layer padding aligns to it — the stable uses 14 and crashed every
+  decoder that hardcoded 16. When a file breaks a format assumption, treat the
+  file as the specification: a clean walk that ends exactly at the last byte
+  is the proof.
 
 ## Process
 

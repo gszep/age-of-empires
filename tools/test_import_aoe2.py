@@ -27,8 +27,6 @@ TERRAIN = ROOT / "depot_813782/resources/_common/terrain/textures/2x"
 AUDIO_PACK = ROOT / "depot_813783/wwise/Base.pck"
 SPEC = json.loads(Path(__file__).with_name("import-spec.json").read_text())
 SOURCE = Path(__file__).with_name("aoe2-source.json")
-OPENAGE = Path(__file__).resolve().parents[1] / ".tools/openage-src"
-sys.path.insert(0, str(OPENAGE))
 
 
 @lru_cache(maxsize=1)
@@ -191,7 +189,16 @@ class ContentImportIntegrationTest(unittest.TestCase):
             json.dumps(self.result, sort_keys=True), json.dumps(again, sort_keys=True)
         )
 
-    @unittest.skipUnless((OPENAGE / "openage/convert/value_object/read/media/sld.pyx").is_file(), "openage is not bootstrapped")
+    def test_decodes_the_sld_whose_outline_layer_crashed_openage(self):
+        # b_west_stable_age2_x1.sld reaches its outline branch before any
+        # graphics header and crashed the previously used decoder, which is
+        # why the stable is still absent from the spec (docs/backlog.md).
+        from sld_layers import decode_colors
+        frames = decode_colors((GRAPHICS / "b_west_stable_age2_x1.sld").read_bytes())
+        drawn = [f for f in frames if f is not None and not f.empty]
+        self.assertTrue(drawn)
+        self.assertGreater(drawn[0].width, 0)
+
     def test_converts_sld_to_playable_byte_identical_atlas(self):
         animation = self.result["entities"]["berries"]["animations"]["idle"]
         expected = animation["frames"] * animation["directions"]

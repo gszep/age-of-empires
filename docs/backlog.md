@@ -27,9 +27,10 @@ The overnight tech-tree run added buildings faster than the units they train:
 
 - **Market trains nothing** — no trade cart. Audit every production building:
   each must train the units the DAT assigns it, or be recorded here.
-- **Stable is not imported** — its SLD crashes the pinned openage decoder, so
-  scout cavalry is also absent. Unblocks when the local decoder handles the
-  main layer (see status.md).
+- **Stable is not imported** — the local decoder now reads its SLD (the
+  crash that excluded it is fixed, see status.md), so what remains is
+  content work: spec entries plus sim rules for the stable and the scout
+  cavalry it trains.
 
 ## Audio
 
@@ -41,8 +42,9 @@ sounds, and under-attack alerts, each resolved through `sounds.json` events.
 ## Rendering
 
 - **Rally-point flags** are absent; rally points work but give no visual.
-- **Sprite outlines** (the thin dark contour) are not drawn; the SLD outline
-  layer is decodable locally once the BC1/main-layer work lands.
+- **Sprite outlines** (the thin dark contour) are not drawn; the local
+  decoder can read the outline layer, so the work is exporting it and
+  compositing it in the renderer.
 - **Terrain blends/masks** are not consumed; terrain-to-terrain transitions
   are absent (single-terrain maps hide this today).
 - **Fire/corpse delta overlays** on damaged/destroyed buildings are not

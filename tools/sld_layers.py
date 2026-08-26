@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Decode the BC4 mask layers of an SLD sprite to 8-bit coverage masks.
+"""Decode SLD sprite layers: the BC1 main graphics and the BC4 masks.
 
-The pinned openage decoder corrupts the heap on this layer (reproducible
-`malloc.c` assertion failure; the same defect is on current upstream, so there
-is no revision to move to), which is why only the main layer was imported. The
-container and DXT4/BC4 block formats are publicly documented, so this reads
-them directly instead: no openage code is involved, and a failure here cannot
-take down the main-layer conversion.
+The pinned openage decoder corrupts the heap on the BC4 mask layers
+(reproducible `malloc.c` assertion failure; the same defect is on current
+upstream, so there is no revision to move to) and crashes outright on some
+main layers (the stable). The container and DXT1/DXT4 block formats are
+publicly documented, so this reads them directly instead: no openage code is
+involved, and this module fully replaces it in the import path.
 
 Layout, per the format documentation:
   file header    "< 4s 4H I"   signature, version, frame count, ...
@@ -15,7 +15,8 @@ Layout, per the format documentation:
                                itself, then padded to a 4-byte boundary
   graphics layer "< 4H 2B"     bounding box in the canvas, flags
 Pixels follow as a command array of (skip, draw) counts over a row-major grid
-of 4x4 blocks, then that many 8-byte BC4 blocks.
+of 4x4 blocks, then that many 8-byte blocks: BC1 (RGB565 pair + 2-bit indices)
+for the main layer, BC4 (byte pair + 3-bit indices) for the masks.
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ LAYER_LENGTH = Struct("< I")
 GRAPHICS_HEADER = Struct("< 4H 2B")
 MASK_HEADER = Struct("< 2B")
 COMMAND_COUNT = Struct("< H")
+BC1_BLOCK = Struct("< 2H I")
 
 # frame_type bits. The format documentation tabulates these most-significant
 # first, but its own worked example (0x17 = main, shadow, outline, playercolor)
@@ -49,7 +51,7 @@ BLOCK = 4
 
 @dataclass
 class MaskFrame:
-    """One frame's shadow coverage: `width * height` bytes, 0 = no shadow."""
+    """One frame's mask coverage: `width * height` bytes, 0 = not covered."""
 
     width: int
     height: int
@@ -59,9 +61,36 @@ class MaskFrame:
     hotspot_y: int
     alpha: bytearray
 
+    channels = 1
+
+    @property
+    def pixels(self) -> bytearray:
+        return self.alpha
+
     @property
     def empty(self) -> bool:
         return self.width == 0 or self.height == 0 or not any(self.alpha)
+
+
+@dataclass
+class ColorFrame:
+    """One frame of the main graphics layer: `width * height` RGBA bytes."""
+
+    width: int
+    height: int
+    hotspot_x: int
+    hotspot_y: int
+    rgba: bytearray
+
+    channels = 4
+
+    @property
+    def pixels(self) -> bytearray:
+        return self.rgba
+
+    @property
+    def empty(self) -> bool:
+        return self.width == 0 or self.height == 0 or not any(self.rgba[3::4])
 
 
 def _bc4_lookup(color0: int, color1: int) -> list[int]:
@@ -88,6 +117,36 @@ def _decode_block(data: bytes, offset: int) -> list[int]:
     return values
 
 
+def _rgb565(value: int) -> tuple[int, int, int]:
+    """Expand one R5G6B5 colour to 8-bit channels by shifting."""
+    return ((value >> 11) << 3, ((value >> 5) & 0x3F) << 2, (value & 0x1F) << 3)
+
+
+def _bc1_lookup(color0: int, color1: int) -> list[tuple[int, int, int, int]]:
+    """The 4 RGBA values a BC1 block's 2-bit indices select."""
+    a = _rgb565(color0)
+    b = _rgb565(color1)
+    table = [(*a, 255), (*b, 255)]
+    if color0 > color1:
+        table.append((*((2 * x + y + 1) // 3 for x, y in zip(a, b)), 255))
+        table.append((*((x + 2 * y + 1) // 3 for x, y in zip(a, b)), 255))
+    else:
+        table.append((*((x + y + 1) // 2 for x, y in zip(a, b)), 255))
+        table.append((0, 0, 0, 0))
+    return table
+
+
+def _decode_bc1_block(data: bytes, offset: int) -> list[int]:
+    """Expand one 8-byte BC1 block to 16 RGBA pixels (64 bytes), row-major."""
+    color0, color1, indices = BC1_BLOCK.unpack_from(data, offset)
+    table = _bc1_lookup(color0, color1)
+    values: list[int] = []
+    for _ in range(16):
+        values.extend(table[indices & 0b11])
+        indices >>= 2
+    return values
+
+
 def _decode_layer(
     data: bytes,
     width: int,
@@ -95,11 +154,13 @@ def _decode_layer(
     command_offset: int,
     command_count: int,
     reuse_previous: bool,
-    previous: MaskFrame | None,
+    previous: MaskFrame | ColorFrame | None,
     previous_offset: tuple[int, int],
     layer_offset: tuple[int, int],
+    channels: int = 1,
+    decode_block: Any = _decode_block,
 ) -> bytearray:
-    alpha = bytearray(width * height)
+    pixels = bytearray(width * height * channels)
     blocks_x = (width + BLOCK - 1) // BLOCK
     blocks_y = (height + BLOCK - 1) // BLOCK
     total_blocks = blocks_x * blocks_y
@@ -112,9 +173,10 @@ def _decode_layer(
             y = origin_y + row
             if y >= height:
                 break
-            start = y * width + origin_x
-            span = min(BLOCK, width - origin_x)
-            alpha[start:start + span] = bytes(values[row * BLOCK:row * BLOCK + span])
+            start = (y * width + origin_x) * channels
+            span = min(BLOCK, width - origin_x) * channels
+            source = row * BLOCK * channels
+            pixels[start:start + span] = bytes(values[source:source + span])
 
     def inherit(index: int) -> None:
         """Copy a skipped block from the previous frame, which may sit at a
@@ -135,7 +197,10 @@ def _decode_layer(
                 sx = src_x + column
                 if x >= width or not (0 <= sx < previous.width):
                     continue
-                alpha[y * width + x] = previous.alpha[sy * previous.width + sx]
+                destination = (y * width + x) * channels
+                source = (sy * previous.width + sx) * channels
+                pixels[destination:destination + channels] = \
+                    previous.pixels[source:source + channels]
 
     index = 0
     cursor = block_data
@@ -153,10 +218,10 @@ def _decode_layer(
         for _ in range(draw):
             if index >= total_blocks or cursor + 8 > len(data):
                 break
-            put(index, _decode_block(data, cursor))
+            put(index, decode_block(data, cursor))
             cursor += 8
             index += 1
-    return alpha
+    return pixels
 
 
 def decode_masks(data: bytes, wanted: int = LAYER_SHADOW) -> list[MaskFrame | None]:
@@ -164,21 +229,36 @@ def decode_masks(data: bytes, wanted: int = LAYER_SHADOW) -> list[MaskFrame | No
 
     `wanted` must be a BC4 layer: LAYER_SHADOW or LAYER_PLAYERCOLOR.
     """
-    signature, _version, frame_count, _u1, _u2, _u3 = FILE_HEADER.unpack_from(data, 0)
+    return _decode_wanted(data, wanted, MaskFrame, 1, _decode_block)
+
+
+def decode_colors(data: bytes) -> list[ColorFrame | None]:
+    """Every frame's BC1 main graphics layer as RGBA."""
+    return _decode_wanted(data, LAYER_MAIN, ColorFrame, 4, _decode_bc1_block)
+
+
+def _decode_wanted(
+    data: bytes, wanted: int, factory: Any, channels: int, decode_block: Any
+) -> list[Any]:
+    signature, _version, frame_count, _u1, frame_start, _u3 = FILE_HEADER.unpack_from(data, 0)
     if signature != b"SLDX":
         raise ValueError(f"not an SLD file: {signature!r}")
 
-    frames: list[MaskFrame | None] = []
-    previous: MaskFrame | None = None
+    frames: list[Any] = []
+    previous: MaskFrame | ColorFrame | None = None
     previous_offset = (0, 0)
-    offset = FILE_HEADER.size
+    # The field the format documentation records as "unknown, always 0x10" is
+    # where the frame data starts: 16 in almost every file, but 14 in
+    # b_west_stable_age2_x1.sld. Decoders that hardcode 16 read that file two
+    # bytes out of phase, which is why the previously used one crashed on it.
+    offset = frame_start
 
     for _ in range(frame_count):
         _cw, _ch, hotspot_x, hotspot_y, frame_type, _unknown, _index = \
             FRAME_HEADER.unpack_from(data, offset)
         offset += FRAME_HEADER.size
 
-        found: MaskFrame | None = None
+        found: MaskFrame | ColorFrame | None = None
         # The mask layers carry no geometry of their own; they cover the main
         # layer, so its box has to be read first and carried across.
         main_box = (0, 0, 0, 0)
@@ -206,16 +286,20 @@ def decode_masks(data: bytes, wanted: int = LAYER_SHADOW) -> list[MaskFrame | No
                 x1, y1, x2, y2 = box
                 width, height = x2 - x1, y2 - y1
                 count = COMMAND_COUNT.unpack_from(data, cursor)[0]
-                alpha = _decode_layer(
+                pixels = _decode_layer(
                     data, width, height, cursor, count,
                     bool(flags & FLAG_REUSE_PREVIOUS), previous, previous_offset, (x1, y1),
+                    channels, decode_block,
                 )
-                found = MaskFrame(width, height, hotspot_x - x1, hotspot_y - y1, alpha)
+                found = factory(width, height, hotspot_x - x1, hotspot_y - y1, pixels)
                 previous_offset = (x1, y1)
 
-            # Remaining layer kinds are skipped wholesale via the length field.
+            # Remaining layer kinds are skipped wholesale via the length
+            # field. The 4-byte padding is relative to the frame data start:
+            # equivalent to absolute alignment when frames start at 16, but
+            # not in the stable, whose frames start at 14.
             offset = start + length
-            offset += (BLOCK - offset) % BLOCK
+            offset += (BLOCK - (offset - frame_start)) % BLOCK
 
         frames.append(found)
         if found is not None:
@@ -223,19 +307,14 @@ def decode_masks(data: bytes, wanted: int = LAYER_SHADOW) -> list[MaskFrame | No
     return frames
 
 
-def pack_mask_atlas(frames: list[MaskFrame | None], limit: int) -> tuple[Any, dict[str, Any]]:
-    """Pack the first `limit` masks into one greyscale-alpha atlas.
-
-    Frame order matches the main layer, so the renderer reuses the frame index
-    it already computed. Absent masks keep a zero-sized entry to hold position.
-    """
-    from PIL import Image
-
-    usable = [f if (f is not None and not f.empty) else None for f in frames[:limit]]
+def _shelf_pack(
+    usable: list[MaskFrame | ColorFrame | None],
+) -> tuple[list[dict[str, int]], int, int]:
+    """Shelf packing in rows about as wide as the widest frame allows, keeping
+    the sheet roughly square without a bin-packing dependency. Absent frames
+    keep a zero-sized entry to hold their position in the sequence."""
     boxes = [(f.width, f.height) if f else (0, 0) for f in usable]
     widest = max((w for w, _ in boxes), default=1)
-    # Shelf packing in rows about as wide as the widest frame allows, keeping
-    # the sheet roughly square without a bin-packing dependency.
     columns = max(1, int(len(usable) ** 0.5))
     sheet_width = max(1, widest * columns)
 
@@ -255,7 +334,19 @@ def pack_mask_atlas(frames: list[MaskFrame | None], limit: int) -> tuple[Any, di
         })
         x += width
         row_height = max(row_height, height)
-    sheet_height = max(1, y + row_height)
+    return placements, sheet_width, max(1, y + row_height)
+
+
+def pack_mask_atlas(frames: list[MaskFrame | None], limit: int) -> tuple[Any, dict[str, Any]]:
+    """Pack the first `limit` masks into one greyscale-alpha atlas.
+
+    Frame order matches the main layer, so the renderer reuses the frame index
+    it already computed.
+    """
+    from PIL import Image
+
+    usable = [f if (f is not None and not f.empty) else None for f in frames[:limit]]
+    placements, sheet_width, sheet_height = _shelf_pack(usable)
 
     image = Image.new("L", (sheet_width, sheet_height), 0)
     for placement, frame in zip(placements, usable):
@@ -270,6 +361,28 @@ def pack_mask_atlas(frames: list[MaskFrame | None], limit: int) -> tuple[Any, di
     # would multiply to that colour, and baking black would multiply to black.
     rgba = Image.merge("RGBA", [Image.new("L", image.size, 255)] * 3 + [image])
     return rgba, {
+        "size": [sheet_width, sheet_height],
+        "framesInFile": len(placements),
+        "frames": placements,
+    }
+
+
+def pack_color_atlas(frames: list[ColorFrame | None], limit: int) -> tuple[Any, dict[str, Any]]:
+    """Pack the first `limit` main-layer frames into one RGBA atlas."""
+    from PIL import Image
+
+    usable = [f if (f is not None and not f.empty) else None for f in frames[:limit]]
+    placements, sheet_width, sheet_height = _shelf_pack(usable)
+
+    image = Image.new("RGBA", (sheet_width, sheet_height), (0, 0, 0, 0))
+    for placement, frame in zip(placements, usable):
+        if frame is None or placement["w"] == 0:
+            continue
+        image.paste(
+            Image.frombytes("RGBA", (frame.width, frame.height), bytes(frame.rgba)),
+            (placement["x"], placement["y"]),
+        )
+    return image, {
         "size": [sheet_width, sheet_height],
         "framesInFile": len(placements),
         "frames": placements,

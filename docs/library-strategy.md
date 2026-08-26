@@ -12,7 +12,7 @@ The project should not build commodity infrastructure from scratch, but it also 
 | Concern | Choice | Reason |
 |---|---|---|
 | AoE DAT import | `genieutils-py` 0.1.2 as an external Python tool | Successfully parsed our patch-matched `VER 8.9` DAT, avoids writing a binary parser; LGPL remains isolated from the MIT runtime |
-| AoE SLD conversion | openage converter as an external tool | Strongest maintained format implementation; outputs PNG atlas and hotspot metadata; GPL tool remains outside runtime |
+| AoE SLD conversion | own `tools/sld_layers.py`, written from the public format documentation | The pinned openage decoder corrupted the heap on mask layers and crashed on the stable; the replacement was verified byte-identical over all imported frames before the swap, and removes the last GPL tool from the import path |
 | Rendering | Three.js `WebGPURenderer` with WebGL 2 fallback | Already proven in the browser; supports the desired WebGPU path and keeps rendering separate |
 | Schemas | JSON Schema plus Ajv when generated content is introduced | Standard, language-neutral contracts for Python importer, TypeScript runtime, agents, and future SDKs |
 | Testing | Vitest now; add `fast-check` for invariant/property testing | Mature TypeScript test workflow and reproducible generative tests |

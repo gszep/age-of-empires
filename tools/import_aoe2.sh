@@ -21,8 +21,7 @@ done
 "$ROOT/tools/bootstrap.sh"
 "$ROOT/.tools/import-venv/bin/python" "$ROOT/tools/import_content.py" \
   --dat "$DAT" --graphics "$GRAPHICS"
-PYTHONPATH="$ROOT/.tools/openage-src" \
-  "$ROOT/.tools/import-venv/bin/python" "$ROOT/tools/convert_sld.py" \
+"$ROOT/.tools/import-venv/bin/python" "$ROOT/tools/convert_sld.py" \
   --graphics "$GRAPHICS" --terrain "$TERRAIN"
 "$ROOT/.tools/import-venv/bin/python" "$ROOT/tools/import_ui.py" \
   --widgetui "$WIDGETUI" --sounds "$SOUNDS"

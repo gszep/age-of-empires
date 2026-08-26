@@ -30,7 +30,7 @@ Controls and hotkeys are listed in the root `README.md`. The essential loop is l
 
 ## Deliberately omitted
 
-The target does not include Feudal+ ages, other civilizations, technologies, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, trade, relics, gates/walls, or a genetic-algorithm framework. Mobile has no separate or simplified gameplay. Shadow and player-colour masks now use the local decoder; outlines remain unavailable.
+The target does not include Feudal+ ages, other civilizations, technologies, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, trade, relics, gates/walls, or a genetic-algorithm framework. Mobile has no separate or simplified gameplay. All SLD layers convert through the local decoder; outline layers are readable but not exported or drawn.
 
 ## Measurements and gate evidence
 
@@ -54,27 +54,23 @@ Known discrepancies are the missing outline layer, single-terrain ground without
 
 The ground samples the imported DAT terrain texture (slot 0, `Grass`/`g_grs`) at the authored `terrain_dimensions` tile span; `terrain/blends` and `terrain/masks` are not consumed yet, so terrain-to-terrain transitions are absent rather than approximated. Farms are terrain too (slots 7 and 29, `Farm1`/`Farm Cnst1`): the DAT gives them no SLD, so they draw as their own patch of the isometric grid.
 
-### Blocked on the pinned openage decoder
+### The import pipeline is openage-free
 
-Two gaps share one cause and are worth recording together, because the fix for
-one is likely the fix for both.
+`tools/sld_layers.py` decodes every consumed SLD layer — BC1 main graphics
+plus the BC4 shadow and player-colour masks — and was verified byte-identical
+to the previously used openage decoder across all 29,783 imported frames
+before the swap. The openage checkout, its C++/Cython build, and the
+per-atlas subprocess isolation that guarded against its crashes are gone;
+`tools/requirements.txt` is down to genieutils-py and Pillow.
 
-- **The stable is not imported.** `b_west_stable_age2_x1.sld` raises
-  `UnboundLocalError: local variable 'offset_x1' referenced before assignment`
-  (sld.pyx:246) because a frame reaches the unimplemented outline branch before
-  any graphics header is read. It is the only sprite of the whole spec that
-  fails. The scout cavalry it trains is therefore also absent.
-- **Sprite outlines are absent.** SLD frames carry an outline layer (bit 2 of
-  `frame_type`; the barracks reports `0x1f`, so main + shadow + outline + damage
-  + playercolor). AoE2DE draws the thin dark contour around units and buildings
-  from it. openage's parser marks that branch `# TODO` and skips it.
-
-`tools/sld_layers.py` already reads the container and the DXT4/BC4 blocks
-without openage, and handles the outline layer correctly by skipping it via the
-layer length. It now supplies both the shadow and the player-colour masks.
-Extending it to the BC1 main layer would replace the pinned decoder outright,
-recovering the stable and the outlines and removing the last GPL dependency
-from the import path.
+Two format facts discovered on the way, both violated by
+`b_west_stable_age2_x1.sld` (the file that crashed openage): the header field
+the public documentation records as "unknown, always 0x10" is the frame-data
+start offset (14 in the stable), and per-layer 4-byte padding is relative to
+that start, not to the file. With both honoured, the stable's 90 frames walk
+cleanly to the file's final byte, so importing the stable (and the scout
+cavalry it trains) is now purely a content task — see `backlog.md`. Sprite
+outline layers are likewise readable but not yet exported or drawn.
 
 ### Audio import is unblocked
 
