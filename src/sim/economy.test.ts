@@ -1468,3 +1468,64 @@ describe('imported rules', () => {
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 });
+
+describe('gather points', () => {
+  /** A finished building of `kind`, dropped on the first spot that will take it. */
+  const plant = (state: GameState, kind: BuildingKind): Entity => {
+    const rules = state.rules.buildings[kind];
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    for (let ring = 4; ring < 20; ring += 1) {
+      for (const [dx, dy] of [[ring, 0], [0, ring], [-ring, 0], [0, -ring], [ring, ring], [-ring, -ring]]) {
+        const target = { x: Math.round(tc.position.x + dx) + 0.5, y: Math.round(tc.position.y + dy) + 0.5 };
+        if (!placementLegal(state, kind, target).ok) continue;
+        const entity: Entity = {
+          id: state.nextId++, kind, owner: 1, position: target,
+          hp: rules.hp, maxHp: rules.hp, radius: rules.radius,
+          activity: 'idle', order: { kind: 'idle' },
+        };
+        state.entities.push(entity);
+        return entity;
+      }
+    }
+    throw new Error(`nowhere to put a ${kind}`);
+  };
+
+  it('takes a gather point at every building that trains something', () => {
+    // Issue #8: the flag used to be the town center's alone. Anything that
+    // trains takes one, and the unit it trains walks to it.
+    const state = createGame(11);
+    state.players[1].age = 2;
+    Object.assign(state.players[1], { food: 5000, wood: 5000, gold: 5000, stone: 5000, populationCap: 200 });
+    // The cap is recomputed from what is standing, so it takes houses.
+    for (let i = 0; i < 6; i++) plant(state, 'house');
+    stepGame(state);
+    const producers: [BuildingKind, string][] = [
+      ['town-center', 'villager'], ['barracks', 'militia'], ['archery-range', 'archer'],
+      ['stable', 'scout-cavalry'], ['siege-workshop', 'battering-ram'],
+      ['monastery', 'monk'], ['castle', 'longbowman'],
+    ];
+    for (const [kind, trains] of producers) {
+      const building = kind === 'town-center'
+        ? state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!
+        : plant(state, kind);
+      const flag = { x: building.position.x + 3, y: building.position.y + 3 };
+      const rally = applyCommand(state, { kind: 'rally', player: 1, buildingId: building.id, target: flag });
+      expect(rally.ok, `${kind} refused a gather point: ${rally.ok ? '' : rally.reason}`).toBe(true);
+      expect(building.rally?.target).toEqual(flag);
+
+      const before = new Set(state.entities.map(e => e.id));
+      const train = applyCommand(state, { kind: 'train', player: 1, buildingId: building.id, unit: trains as never });
+      expect(train.ok, `${kind} refused to train a ${trains}: ${train.ok ? '' : train.reason}`).toBe(true);
+      let trained: Entity | undefined;
+      for (let i = 0; i < 4000 && !trained; i++) {
+        stepGame(state);
+        trained = state.entities.find(e => !before.has(e.id) && e.kind === trains && !e.dead);
+      }
+      expect(trained, `${kind} never produced a ${trains}`).toBeDefined();
+      // It leaves for the flag rather than standing at the door.
+      expect(trained!.order.kind, `${trains} from the ${kind} ignored the flag`).toBe('move');
+      expect(Math.hypot(trained!.order.target!.x - flag.x, trained!.order.target!.y - flag.y))
+        .toBeLessThan(1.5);
+    }
+  });
+});

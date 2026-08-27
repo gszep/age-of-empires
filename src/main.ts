@@ -531,18 +531,23 @@ function contextOrder(point: Point, _clientX: number, _clientY: number): void {
     }
     return;
   }
-  // Defensive buildings take a target the same way units do.
-  const towers = selection.filter(e => rules.buildings[e.kind as BuildingKind]?.attack && e.buildProgress === undefined);
+  // Defensive buildings take a target the same way units do — but a castle
+  // both shoots and trains, and in AoE2 a right-click on the ground with one
+  // selected plants its gather point. So the shot is what a click on somebody
+  // hostile means, and everything else is the flag (issue #8).
+  const hostile = target !== undefined && isHostile(target);
+  const towers = selection.filter(e => rules.buildings[e.kind as BuildingKind]?.attack
+    && e.buildProgress === undefined
+    && (hostile || trainableAt(e.kind as BuildingKind).length === 0));
   if (towers.length) {
-    const hostile = target && isHostile(target);
     const result = applyCommand(game, {
       kind: 'order', player: 1, entityIds: towers.map(e => e.id),
-      target: point, targetId: hostile ? target.id : undefined,
+      target: point, targetId: hostile ? target!.id : undefined,
     });
     if (!result.ok) reject(result.reason);
     else {
       hud.showMessage(hostile ? 'Target set' : 'Target cleared');
-      if (hostile) orderFlash = { entityId: target.id, startedAt: gameTimeSeconds(game) };
+      if (hostile) orderFlash = { entityId: target!.id, startedAt: gameTimeSeconds(game) };
     }
     return;
   }
