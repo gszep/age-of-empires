@@ -1,7 +1,9 @@
-import type * as THREE from 'three/webgpu';
+import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 import { worldToIso } from './iso';
-import { createSelectionOutline, insetConvex, updateSelectionOutline } from './world';
+import { createFootprint, createGround, createSelectionOutline, createTerrainPatch, insetConvex, updateSelectionOutline } from './world';
+import { createGame } from '../sim/game';
+import type { ContentAssets } from './assets';
 
 /** Perpendicular distance from a point to the infinite line through a and b. */
 const lineDistance = (
@@ -59,5 +61,67 @@ describe('updateSelectionOutline', () => {
     updateSelectionOutline(mesh, { x: 1.6, y: 1.6 });
     updateSelectionOutline(mesh, { x: 2, y: 0.5 });
     expectCorner(mesh, 0, { x: -2, y: -0.5 });
+  });
+});
+
+
+/**
+ * Everything that lies flat on the ground is wound the same way, and it is the
+ * wrong way round: `worldToIso` negates y, so a tile quad listed
+ * north-east-south-west comes out clockwise and is back-facing under the
+ * default `FrontSide`. The ground and the footprint set `DoubleSide` and draw;
+ * the farm's terrain patch did not, and every farm was invisible (issue #2)
+ * with nothing logged and no test failing. This asserts the whole class.
+ */
+describe('meshes that lie on the ground', () => {
+  /** Signed area of the first triangle; negative is clockwise in scene space. */
+  const winding = (mesh: THREE.Mesh): number => {
+    const position = mesh.geometry.getAttribute('position');
+    const [ax, ay] = [position.getX(0), position.getY(0)];
+    const [bx, by] = [position.getX(1), position.getY(1)];
+    const [cx, cy] = [position.getX(2), position.getY(2)];
+    return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+  };
+
+  const groundAssets = (): ContentAssets => {
+    const textures = new Map<string, THREE.Texture>();
+    const slot = (name: string, image: string, id: number) => {
+      const texture = new THREE.DataTexture(new Uint8Array(4 * 4 * 4), 4, 4);
+      texture.needsUpdate = true;
+      textures.set(image, texture);
+      return { name, terrainId: id, texture: name, image, dimensions: [6, 6] as [number, number],
+        minimapColor: [160, 159, 158] as [number, number, number] };
+    };
+    return {
+      entities: {},
+      terrain: {
+        ground: slot('Grass', 'terrain/g_grs.png', 0),
+        farm: slot('Farm1', 'terrain/g_fm1.png', 7),
+      },
+      textures,
+      playerRamps: new Map(),
+    } as unknown as ContentAssets;
+  };
+
+  it('never leaves a clockwise ground quad on the culled side', () => {
+    const assets = groundAssets();
+    const meshes: [string, THREE.Mesh][] = [
+      ['ground', createGround(createGame(11), assets)],
+      ['farm patch', createTerrainPatch(assets, 'farm', 1.5)!],
+      ['footprint', createFootprint(1.5)],
+    ];
+    for (const [name, mesh] of meshes) {
+      expect(mesh, `${name} was not built`).toBeDefined();
+      if (winding(mesh) >= 0) continue; // counter-clockwise: FrontSide is fine
+      const material = mesh.material as THREE.Material;
+      expect(material.side, `${name} is wound clockwise and would be culled`)
+        .not.toBe(THREE.FrontSide);
+    }
+  });
+
+  it('is wound clockwise at all, so the check above is not vacuous', () => {
+    // If the projection ever stops flipping y this test fails first, and the
+    // one above becomes a check of nothing rather than silently passing.
+    expect(winding(createFootprint(1.5))).toBeLessThan(0);
   });
 });

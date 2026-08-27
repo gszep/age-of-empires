@@ -85,7 +85,11 @@ export function createTerrainPatch(
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+    // Double-sided like the ground: `worldToIso` winds a tile quad clockwise,
+    // so a ground-lying mesh left on the default FrontSide is back-face culled
+    // and simply never appears (issue #2 -- every farm was invisible).
     map: texture, transparent: true, depthTest: false, depthWrite: false,
+    side: THREE.DoubleSide,
   }));
   return mesh;
 }
