@@ -259,8 +259,16 @@ The first consumed cue is the widget-authored `button_ui` alias:
 `Play_Button_UI` resolves in bank 232745270 to media 56802692 and decodes to a
 0.239456-second mono 22.05 kHz cue. It plays for HUD command/menu clicks in the
 owned-content mode; the open fallback remains silent. Integration tests verify
-the source resolution and byte-identical regeneration. Alert and feedback cues — under attack, construction, resource depletion — are
-not wired yet.
+the source resolution and byte-identical regeneration. Ten feedback cues are wired from `sounds.json`: under attack for a unit and for
+the town, population capped, farm depleted, gather point set, error, age up,
+technology researched, victory and defeat. `src/view/cues.ts` raises them by
+diffing observed state — hit points, researched technologies, population,
+farms, the winner — so the simulation stays unaware of sound, and the watcher is
+testable in Node without a browser. An attack alert stays quiet for ten seconds
+after sounding, so a sustained fight is a warning rather than a siren, and the
+first poll only records the world so a match resumed from a snapshot does not
+alert for everything already damaged. `sounds.json` names no
+construction-complete cue, so there is none rather than an approximation.
 
 ## Verification
 

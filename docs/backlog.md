@@ -9,10 +9,11 @@ are deleted, not ticked.
 
 ## Audio
 
-Unit selection and training voices are wired (see status.md). Remaining
-coverage: construction and completion cues, combat sounds, and the alert set
-(`Play_Under_Attack`, `Play_Population_Capped`, `Play_Farm_Depleted`,
-`Play_Gatherpoint_Set`) which `sounds.json` does name.
+Unit selection and training voices and the ten feedback cues are wired (see
+status.md). Remaining coverage: combat sounds (each attack graphic has its own
+DAT sound id), building construction and completion, and the ambient loops
+terrain slots name in `wwise_sound_id`. `sounds.json` names no
+construction-complete cue, so that one has no owned source to draw on.
 
 ## Rendering
 

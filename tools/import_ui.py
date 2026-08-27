@@ -163,7 +163,10 @@ def extract_ui(
     }
 
     used_materials: set[str] = set()
-    used_sounds: set[str] = set()
+    # Cues the game plays for itself rather than for a widget click: alerts and
+    # feedback the view raises from what it observes. `sounds.json` names them,
+    # so the spec only has to list which ones the slice consumes.
+    used_sounds: set[str] = set(spec.get("ui", {}).get("cues", []))
     layouts: dict[str, Any] = {}
     for panel in ui_spec["panels"]:
         panel_path = widgetui / f"{panel}.json"
@@ -257,6 +260,7 @@ def extract_ui(
         "missingMaterials": missing,
         "icons": icon_entries,
         "sounds": {alias: sounds[alias] for alias in sorted(used_sounds) if alias in sounds},
+        "missingCues": sorted(alias for alias in spec.get("ui", {}).get("cues", []) if alias not in sounds),
         "source": {"sha256": hashes},
     }
 

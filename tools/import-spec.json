@@ -409,6 +409,10 @@
       "StatIcons": "all",
       "MenuIcons": "all"
     },
+    "cues": [
+      "under_attack", "under_attack_town", "pop_capped", "farm_depleted",
+      "gatherpoint_set", "error", "age_up", "tech_researched", "victory", "defeat"
+    ],
     "materialPrefixes": ["IconAction"],
     "textureDirectories": ["textures/ingame/staticons"]
   },

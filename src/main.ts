@@ -13,6 +13,7 @@ import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets'
 import { worldToIso, isoToWorld, snapPlacement, TILE_W, TILE_H } from './view/iso';
 import { createEntityView, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint } from './view/world';
+import { createCueWatcher, pollCues } from './view/cues';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 
 /**
@@ -23,6 +24,7 @@ import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
  * deterministic replay would produce, so simulation edits force a full reload.
  */
 const view = {
+  pollCues,
   createGround, createFog, createFootprint,
   createEntityView, updateEntityView, createProjectileView, updateProjectileView,
   createFlagView, updateFlagView, updateOcclusion, entityKey, Hud,
@@ -171,6 +173,12 @@ function disposeGhost(): void {
   ghostKind = undefined;
 }
 
+/** A rejected command, reported and sounded the way the game does. */
+function reject(reason: string): void {
+  hud.showMessage(reason);
+  playSound('error');
+}
+
 function createHud(): Hud {
   return new view.Hud(app, uiAssets, {
     onCommand: id => runUiCommand(id),
@@ -251,7 +259,7 @@ function runUiCommand(id: string): void {
       && rules.units[unit]?.trainedAt === e.kind);
     if (!building) return;
     const result = applyCommand(game, { kind: 'train', player: 1, buildingId: building.id, unit });
-    if (!result.ok) hud.showMessage(result.reason);
+    if (!result.ok) reject(result.reason);
     return;
   }
   if (id.startsWith('research-')) {
@@ -260,7 +268,7 @@ function runUiCommand(id: string): void {
     const building = selection.find(e => e.kind === at && e.buildProgress === undefined);
     if (!building) return;
     const result = applyCommand(game, { kind: 'research', player: 1, buildingId: building.id, tech });
-    if (!result.ok) hud.showMessage(result.reason);
+    if (!result.ok) reject(result.reason);
     return;
   }
   if (id === 'cancel') buildMode = undefined;
@@ -307,7 +315,7 @@ renderer.domElement.addEventListener('pointerdown', event => {
       const result = builder
         ? applyCommand(game, { kind: 'build', player: 1, builderIds: ownSelected().filter(e => e.kind === 'villager').map(e => e.id), building: buildMode, target })
         : { ok: false as const, reason: 'Select a villager first' };
-      if (!result.ok) hud.showMessage(result.reason);
+      if (!result.ok) reject(result.reason);
       buildMode = undefined;
       return;
     }
@@ -371,7 +379,7 @@ function contextOrder(point: Point, _clientX: number, _clientY: number): void {
       kind: 'order', player: 1, entityIds: units.map(e => e.id),
       target: point, targetId: target && target.id !== units[0].id ? target.id : undefined,
     });
-    if (!result.ok) hud.showMessage(result.reason);
+    if (!result.ok) reject(result.reason);
     else acknowledge();
     return;
   }
@@ -383,7 +391,7 @@ function contextOrder(point: Point, _clientX: number, _clientY: number): void {
       kind: 'order', player: 1, entityIds: towers.map(e => e.id),
       target: point, targetId: hostile ? target.id : undefined,
     });
-    if (!result.ok) hud.showMessage(result.reason);
+    if (!result.ok) reject(result.reason);
     else hud.showMessage(hostile ? 'Target set' : 'Target cleared');
     return;
   }
@@ -391,6 +399,7 @@ function contextOrder(point: Point, _clientX: number, _clientY: number): void {
   if (building) {
     applyCommand(game, { kind: 'rally', player: 1, buildingId: building.id, target: point, targetId: target?.id });
     hud.showMessage('Rally point set');
+    playSound('gatherpoint_set');
   }
 }
 
@@ -398,6 +407,7 @@ function contextOrder(point: Point, _clientX: number, _clientY: number): void {
  * Units this player has that were not there a frame ago. Owned units are
  * always visible, so a new id is one that finished training.
  */
+const cueWatcher = createCueWatcher();
 let knownOwnUnits = new Set<number>();
 function announceTrained(): void {
   const current = new Set<number>();
@@ -691,6 +701,9 @@ function syncScene(time: number): void {
   }
 
   announceTrained();
+  // Alerts and feedback, read out of what the view can already see. The
+  // simulation never raises them: it does not know about sound.
+  for (const cue of view.pollCues(cueWatcher, game, 1, gameTimeSeconds(game))) playSound(cue);
 
   // Contours for units something else is drawing in front of, once every
   // piece this frame has been placed.
@@ -935,6 +948,7 @@ if (import.meta.hot) {
         view.updateOcclusion = sprites.updateOcclusion;
         view.entityKey = sprites.entityKey;
       }
+      if (sprites) view.pollCues = (await import('./view/cues')).pollCues;
       if (hudModule) view.Hud = hudModule.Hud;
       rebuildPresentation();
       const swapped = [

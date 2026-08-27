@@ -136,12 +136,19 @@ items land.
   everything); fifteen aliases are in the audio manifest, and a simulation
   test checks every trainable unit has the `<kind>-select` alias the view
   asks for.
-- [ ] **Alert and feedback cues.** Under-attack alert, construction
-  complete, training complete, resource-depleted, population-capped —
-  events named in `sounds.json`. Play from observation-driven view state,
-  never from inside the sim. *Verify:* headless-driven attack on the
-  player's building triggers the alert path in the view (unit-testable via
-  the HUD's sound hook); cues listed in the manifest.
+- [x] **Alert and feedback cues.** Ten cues from `sounds.json` — under attack
+  (unit and town), population capped, farm depleted, gather point set, error,
+  age up, technology researched, victory, defeat — imported through the same
+  pipeline. `src/view/cues.ts` reads them out of observed state and answers
+  with alias names; the simulation never raises them, because it does not know
+  about sound. *Verified:* nine tests drive the watcher over real matches —
+  wounding a building raises the town alert once and not again for ten
+  seconds, wounding a unit raises the other one, somebody else's losses raise
+  neither, and a resumed match says nothing on its first look. A guard test
+  checks every cue the watcher can name is in the audio manifest.
+  *Not covered:* `sounds.json` names no construction-complete cue, so that one
+  is absent rather than approximated; a trained unit is announced by its own
+  voice instead (see the item above).
 
 ## D. Stretch (large; only after A–C are clean)
 
