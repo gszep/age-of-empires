@@ -136,6 +136,14 @@ keeps the record.
   a sentinel file and poll that. If a `-f` pattern is genuinely the only
   handle, exclude the watcher (`pgrep -f pat | grep -v $$`) and prove the
   loop terminates before leaving it running.
+- **The debug bridge answers from whichever page replies first.** A speed
+  measurement taken against the shared dev server came back negative, then
+  zero: a browser tab somebody else had left open on 5173 was answering some of
+  the queries from its own match, thousands of ticks along. Rule: a script that
+  measures rather than observes starts its own Vite server on its own port and
+  opens the only page attached to it — and passes `root` and `configFile`
+  explicitly, because `createServer` takes the working directory as the project
+  otherwise and serves a 404.
 - **A leaked waiter is invisible until somebody looks.** None of the sixteen
   produced output, failed, or slowed anything down; they were found only
   because a human noticed the process list. Rule: a run that starts background

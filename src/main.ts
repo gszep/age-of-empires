@@ -54,6 +54,15 @@ if (restored) console.info(`[dev] resumed match at tick ${restored.tick}; menu r
 let selectedIds: number[] = [];
 let buildMode: BuildingKind | undefined;
 let paused = false;
+/**
+ * How many game seconds pass per real second. The simulation's tick length is
+ * fixed — determinism depends on it — so speed multiplies how much time the
+ * frame loop hands the accumulator, and the game runs the same ticks, sooner.
+ * One is real time; ten is the fast-forward a QA pass wants. Nothing slower,
+ * because there is nothing to see in it.
+ */
+const MAX_GAME_SPEED = 10;
+let gameSpeed = 1;
 let aiClock = 0;
 
 interface ReplayState {
@@ -483,6 +492,21 @@ addEventListener('keydown', event => {
     return;
   }
   if (key === 'F3') { paused = !paused; event.preventDefault(); return; }
+  // AoE2's own speed keys. `=` and `_` come along because `+` and `-` are the
+  // shifted faces of those keys on most layouts, and the numpad sends the
+  // signs directly. Ctrl and Cmd are left alone: that is the browser's zoom.
+  if (!event.ctrlKey && !event.metaKey && ['+', '=', '-', '_'].includes(key)) {
+    const faster = key === '+' || key === '=';
+    const next = Math.max(1, Math.min(MAX_GAME_SPEED, gameSpeed + (faster ? 1 : -1)));
+    if (next !== gameSpeed) {
+      gameSpeed = next;
+      hud.showMessage(`Speed ${gameSpeed}x`);
+    } else {
+      hud.showMessage(faster ? `Speed ${gameSpeed}x (fastest)` : 'Speed 1x (real time)');
+    }
+    event.preventDefault();
+    return;
+  }
   if (key === 'F10') { hud.toggleMenu(); event.preventDefault(); return; }
   if (key === '.') { selectIdleVillager(); return; }
   if (key === 'h' || key === 'H') {
@@ -899,7 +923,10 @@ renderer.setAnimationLoop(now => {
   }
 
   if (!paused && !game.winner) {
-    accumulator += elapsed;
+    // `elapsed` is already capped at 0.1s, so a frame runs at most
+    // `MAX_GAME_SPEED / TICK_SECONDS` ticks: a machine that cannot keep up
+    // falls behind real time rather than spiralling.
+    accumulator += elapsed * gameSpeed;
     while (accumulator >= TICK_SECONDS) {
       if (replay) {
         if (game.tick >= replay.lastTick) { accumulator = 0; break; }
