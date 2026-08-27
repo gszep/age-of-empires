@@ -179,6 +179,15 @@ keeps the record.
   see a late-game rendering change, construct the state through the simulation's
   public entry points and hand it to the page as a snapshot — do not add a cheat
   to the debug protocol, and do not play twenty minutes to get there.
+- **A reasonable-sounding refinement re-created the bug it was fixing.**
+  Carcasses were made clickable, and picking was then biased toward living
+  units because a click near a villager is "probably meant for the villager".
+  Villagers eating a carcass stand right on it, so every test click landed on a
+  villager and the carcass was as unclickable as before. It was caught only
+  because the check drove a real mouse at the thing the bug report described.
+  Rule: verify a fix by performing the user's action, not by asserting the
+  condition you just wrote; and be suspicious of a tie-break added on intuition
+  when the existing rule (nearest wins) already covered every other case.
 - **Ask the panel what it is showing, not a screenshot.** The build menu, the
   train buttons and the research button were all checked by reading
   `.command-button` titles out of the DOM — text that says "Build Castle (650
