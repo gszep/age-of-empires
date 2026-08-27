@@ -16,6 +16,8 @@
     "stone": { "type": "integer", "minimum": 0 },
     "population": { "type": "integer", "minimum": 0 },
     "populationCap": { "type": "integer", "minimum": 0 },
+    "age": { "type": "integer", "minimum": 0 },
+    "researched": { "type": "array", "items": { "type": "string" } },
     "memory": {
       "type": "array",
       "items": {
@@ -84,6 +86,6 @@
       }
     }
   },
-  "required": ["version", "time", "player", "mapWidth", "mapHeight", "food", "wood", "gold", "stone", "population", "populationCap", "entities", "memory", "explored"],
+  "required": ["version", "time", "player", "mapWidth", "mapHeight", "food", "wood", "gold", "stone", "population", "populationCap", "age", "researched", "entities", "memory", "explored"],
   "additionalProperties": false
 }

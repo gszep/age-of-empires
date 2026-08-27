@@ -273,6 +273,8 @@ def extract_entity(
             if s.type == POPULATION_TYPE and s.flag == 4 and s.amount > 0:
                 entity["popSupport"] = int(s.amount)
 
+    entity["age"] = available_age(dat, unit.id)
+
     entity["animations"] = {
         name: animation_entry(dat, graphics_dir, resolve_graphic_id(unit, animation, civ_units), hashes)
         for name, animation in spec["animations"].items()
@@ -321,6 +323,83 @@ def effect_entry(
     }
 
 
+# Effect command kinds this import understands, from the DAT's own tables.
+EFFECT_ENABLE = 2          # a = unit, b = 1 makes it available
+EFFECT_ATTRIBUTE_ADD = 4   # a = unit, b = class, c = attribute, d = amount
+ATTRIBUTE_HIT_POINTS = 0
+ATTRIBUTE_ARMOR = 8        # d packs the armour class in the high byte
+
+# Age techs, in order. The DAT's own names are one age behind — tech 101 is
+# called "Middle Age" and its effect is "Feudal Age" — so the effect name is
+# what identifies an age, exactly as a graphic's file name identifies a unit.
+AGE_TECHS = (104, 101, 102, 103)
+
+
+def enabling_tech(dat: DatFile, unit_id: int) -> Any:
+    """The "(make avail)" tech that turns a unit on, or None if it starts on."""
+    for tech in dat.techs:
+        if tech.effect_id is None or not 0 <= tech.effect_id < len(dat.effects):
+            continue
+        for command in dat.effects[tech.effect_id].effect_commands:
+            if command.type == EFFECT_ENABLE and command.a == unit_id and command.b == 1:
+                return tech
+    return None
+
+
+def available_age(dat: DatFile, unit_id: int) -> int:
+    """Which age a unit becomes available in, read from what gates it."""
+    tech = enabling_tech(dat, unit_id)
+    if tech is None:
+        return 0
+    for required in tech.required_techs:
+        if required in AGE_TECHS:
+            return AGE_TECHS.index(required)
+    return 0
+
+
+def technology_entry(dat: DatFile, spec: dict[str, Any], hashes: dict[str, str]) -> dict[str, Any]:
+    """One researchable technology: what it costs, where, and what it changes."""
+    tech = dat.techs[spec["techId"]]
+    effect = dat.effects[tech.effect_id]
+    if effect.name != spec["effect"]:
+        raise ValueError(f"tech {spec['techId']} effect is {effect.name!r}, not {spec['effect']!r}")
+    location = next(l for l in tech.research_locations if l.location_id >= 0)
+    entry: dict[str, Any] = {
+        "techId": spec["techId"],
+        "name": effect.name,
+        "cost": {RESOURCE_NAMES[c.type]: int(c.amount) for c in tech.resource_costs
+                 if c.flag and c.type in RESOURCE_NAMES},
+        "researchSeconds": location.research_time,
+        "researchedAt": location.location_id,
+        "requiresAge": next(
+            (AGE_TECHS.index(r) for r in tech.required_techs if r in AGE_TECHS), 0
+        ),
+    }
+    if tech.icon_id is not None and tech.icon_id >= 0:
+        entry["iconId"] = tech.icon_id
+    if spec["techId"] in AGE_TECHS:
+        entry["grantsAge"] = AGE_TECHS.index(spec["techId"])
+
+    # Flat modifiers, read off the effect rather than transcribed. The spec
+    # names which of our entities the class-wide change lands on.
+    modifiers: dict[str, dict[str, Any]] = {}
+    for command in dat.effects[tech.effect_id].effect_commands:
+        if command.type != EFFECT_ATTRIBUTE_ADD:
+            continue
+        for key in spec.get("appliesTo", []):
+            target = modifiers.setdefault(key, {"unit": key})
+            if command.c == ATTRIBUTE_HIT_POINTS:
+                target["hitPoints"] = int(command.d)
+            elif command.c == ATTRIBUTE_ARMOR:
+                packed = int(command.d)
+                target.setdefault("armors", []).append(
+                    {"class": packed >> 8, "amount": packed & 0xFF}
+                )
+    if modifiers:
+        entry["effects"] = [modifiers[key] for key in spec.get("appliesTo", []) if key in modifiers]
+    return entry
+
+
 def terrain_entry(dat: DatFile, terrain_id: int) -> dict[str, Any]:
     """Texture name, tile span, and minimap color for one DAT terrain slot."""
     terrain = dat.terrain_block.terrains[terrain_id]
@@ -355,12 +434,17 @@ def extract(
         )
     for effect_spec in spec.get("effects", []):
         entities[effect_spec["key"]] = effect_entry(dat, graphics_dir, effect_spec, hashes)
+    technologies = {
+        tech_spec["key"]: technology_entry(dat, tech_spec, hashes)
+        for tech_spec in spec.get("technologies", [])
+    }
     terrain = {
         key: terrain_entry(dat, slot["terrainId"])
         for key, slot in spec.get("terrain", {}).items()
     }
     return {
         "terrain": terrain,
+        "technologies": technologies,
         "playerColors": player_colors(dat, palettes_dir, spec["playerColors"], hashes),
         "schemaVersion": spec["schemaVersion"],
         "source": {

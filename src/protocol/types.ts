@@ -33,6 +33,10 @@ export interface PlayerObservation {
   stone: number;
   population: number;
   populationCap: number;
+  /** 0 is the Dark Age; a completed age technology moves it on. */
+  age: number;
+  /** Technology keys this player has finished researching. */
+  researched: string[];
   entities: ObservedEntity[];
   /** Last-seen snapshots of entities not currently visible. */
   memory: RememberedEntityObservation[];

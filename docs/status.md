@@ -30,7 +30,7 @@ Controls and hotkeys are listed in the root `README.md`. The essential loop is l
 
 ## Deliberately omitted
 
-The target does not include Feudal+ ages, other civilizations, technologies, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, relics, gates/walls, or a genetic-algorithm framework. Mobile has no separate or simplified gameplay. All SLD layers convert through the local decoder.
+The target does not include Castle+ ages, other civilizations, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, relics, gates/walls, or a genetic-algorithm framework. Of the technology tree only Loom and the Feudal Age are researchable. Mobile has no separate or simplified gameplay. All SLD layers convert through the local decoder.
 
 ## Measurements and gate evidence
 
@@ -112,6 +112,32 @@ that never moved with the ids, so unit 7 is called XBOWM and draws
 
 What is left out is age-gated or another civilisation's, which is the omitted
 scope above — except the herdables, which are their own item.
+
+### Ages and technologies
+
+A building researches one technology at a time. Cost, research time, the
+building it happens at, and what it changes all come from the DAT rather than
+from a table here:
+
+- **Loom** — 50 gold, 25 seconds at the town center. Its +15 hit points and
+  +1 melee / +2 pierce armour are decoded from the effect's own commands
+  (attribute 0 and the packed armour attribute 8), and the hit points reach the
+  villagers already standing on the map, as in AoE2.
+- **Feudal Age** — 500 food, 130 seconds at the town center. This is tech 101,
+  which the DAT calls "Middle Age" while its effect is called "Feudal Age" —
+  the same name-versus-data trap as the units, so the effect name is what the
+  importer asserts.
+
+Which age a thing belongs to is not a list here either: the importer finds the
+"(make avail)" technology that enables each unit and reads the age technology in
+its requirements. That makes market, blacksmith, archery range, stable, watch
+tower, archer, skirmisher, spearman, scout cavalry and trade cart all Feudal,
+and barracks, house, mill, camps, outpost, farm, militia and villagers Dark —
+which is exactly DE's tech tree for this slice. Placement and training refuse
+anything past the player's age, and the command grid hides it.
+
+The built-in AI never ages up: it builds and trains only Dark Age things, so its
+matches (and the batch measurements above) are unaffected by the gate.
 
 ### Food on the hoof
 

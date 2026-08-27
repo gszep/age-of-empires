@@ -24,6 +24,7 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 - `H` selects and centers the town center; `.` cycles idle villagers.
 - Command-grid hotkeys are shown on buttons (`Q`, `W`, `S` as applicable).
 - `Esc` cancels placement or opens the menu; `F3` pauses; `F10` toggles the menu.
+- Select the town center to research Loom (villagers survive more) and the Feudal Age. Markets, blacksmiths, archery ranges, stables, watch towers and everything they train are Feudal, as in the original; the command grid only offers what the age allows.
 - Select a villager to place any building, a town center to train villagers, a barracks to train militia/spearmen, an archery range to train archers and skirmishers, a stable to train scout cavalry, or a market to train trade carts. Destroy the enemy town center to win.
 - Right-click a trade cart onto the opponent's market to open a trade route: it loads there and banks gold each time it reaches your own market, and a longer road pays more.
 - Sheep by the town center join whoever walks up to them and follow along; a villager sent onto one turns it into food. Deer run, and a boar charges whoever wounds it — send more than one villager.

@@ -217,6 +217,37 @@ class ContentImportIntegrationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             resolve_graphic_id(units[504], {"slot": "dead"}, units)  # the arrow
 
+    def test_ages_and_technologies_come_from_what_gates_them(self):
+        # The DAT's tech names are a age behind: tech 101 is called "Middle
+        # Age" and its effect is "Feudal Age". The effect name is the identity,
+        # the same way a graphic's file name is a unit's.
+        techs = self.result["technologies"]
+        feudal = techs["feudal-age"]
+        self.assertEqual(feudal["techId"], 101)
+        self.assertEqual(feudal["name"], "Feudal Age")
+        self.assertEqual(feudal["cost"], {"food": 500})
+        self.assertEqual(feudal["researchSeconds"], 130)
+        self.assertEqual(feudal["researchedAt"], 109)
+        self.assertEqual(feudal["grantsAge"], 1)
+
+        loom = techs["loom"]
+        self.assertEqual(loom["cost"], {"gold": 50})
+        self.assertEqual(loom["researchSeconds"], 25)
+        # Read off the effect commands, not transcribed: +15 hit points, +1
+        # melee armour, +2 pierce.
+        self.assertEqual(loom["effects"], [{
+            "unit": "villager", "hitPoints": 15,
+            "armors": [{"class": 4, "amount": 1}, {"class": 3, "amount": 2}],
+        }])
+
+        # Which age a thing belongs to is read from the tech that turns it on.
+        ages = {key: entity.get("age") for key, entity in self.result["entities"].items()}
+        for key in ("militia", "villager", "barracks", "house", "mill", "outpost"):
+            self.assertEqual(ages[key], 0, key)
+        for key in ("market", "blacksmith", "archery-range", "stable", "watch-tower",
+                    "archer", "skirmisher", "spearman", "scout-cavalry", "trade-cart"):
+            self.assertEqual(ages[key], 1, key)
+
     def test_skirmisher_is_identified_by_its_art_not_its_name(self):
         # The DAT calls unit 7 "XBOWM" and unit 24 "CARCH": AoK names that never
         # moved with the ids. The graphics say which is which.

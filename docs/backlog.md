@@ -42,6 +42,12 @@ sounds, and under-attack alerts, each resolved through `sounds.json` events.
   rate per resource and one global capacity, so hunting banks at the forager's
   0.31 into 10. Per-task rates would need `gatherRatePerSecond` to become
   per-variant, which touches every gatherer.
+- **The built-in AI never leaves the Dark Age.** It has no notion of research,
+  so it never takes Loom or the Feudal Age, and everything Feudal — the market,
+  the archery range, the stable, and every unit they train — is out of its
+  reach. Its matches are Dark Age militia wars.
+- **Technology icons are not imported.** `import_ui.py` takes Buildings, Units,
+  StatIcons and MenuIcons; research buttons therefore show text only.
 - **The built-in AI ignores sheep, deer and boar.** It picks gather targets by
   `kind === 'resource'`, which animals are not, so the whole Dark Age food
   opening is invisible to it. Its matches still run on berries and farms.

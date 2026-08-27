@@ -38,9 +38,13 @@ export interface UnitRules {
   herdRange?: number;
   /** Animals: how far one bolts from anything that is not gaia. */
   fleeRange?: number;
+  /** The age this becomes available in; 0 is the Dark Age. */
+  age?: number;
 }
 
 export interface BuildingRules {
+  /** The age this becomes available in; 0 is the Dark Age. */
+  age?: number;
   hp: number;
   radius: number; // half footprint edge in tiles
   lineOfSight: number;
@@ -79,9 +83,27 @@ export interface GameRules {
   nodes: Record<NodeKind, ResourceNodeRules>;
   gatherRatePerSecond: Record<ResourceKind, number>;
   carryCapacity: number;
+  technologies: Record<TechKey, TechRules>;
 }
 
 export type NodeKind = 'berries' | 'tree' | 'gold' | 'stone';
+export type TechKey = 'loom' | 'feudal-age';
+
+/** One researchable technology, as the DAT records it. */
+export interface TechRules {
+  techId: number;
+  name: string;
+  cost: Cost;
+  researchSeconds: number;
+  researchedAt: BuildingKind;
+  requiresAge: number;
+  /** Age techs move the player on; everything else changes rules. */
+  grantsAge?: number;
+  /** Flat additions to a unit kind, read off the DAT's effect commands. */
+  effects: { unit: UnitKind; hitPoints?: number; armors?: AttackValue[] }[];
+}
+
+export const AGE_NAMES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'];
 
 const cost = (food = 0, wood = 0, gold = 0, stone = 0): Cost => ({ food, wood, gold, stone });
 
@@ -110,6 +132,7 @@ export const FALLBACK_RULES: GameRules = {
       attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
     },
     spearman: {
+      age: 1,
       hp: 45, radius: 0.2, speed: 0.9, lineOfSight: 4, cost: cost(35, 25), trainSeconds: 22,
       trainedAt: 'barracks', popCost: 1,
       attacks: [{ class: 4, amount: 3 }, { class: 8, amount: 15 }, { class: 21, amount: 1 }],
@@ -141,6 +164,7 @@ export const FALLBACK_RULES: GameRules = {
       foodAmount: 340,
     },
     skirmisher: {
+      age: 1,
       hp: 30, radius: 0.2, speed: 0.96, lineOfSight: 6, cost: cost(25, 35), trainSeconds: 26,
       trainedAt: 'archery-range', popCost: 1,
       attacks: [{ class: 27, amount: 3 }, { class: 15, amount: 3 }, { class: 3, amount: 2 }, { class: 35, amount: 2 }],
@@ -149,6 +173,7 @@ export const FALLBACK_RULES: GameRules = {
       range: 4, minRange: 1, projectileSpeed: 7, launchHeight: 1.5,
     },
     'scout-cavalry': {
+      age: 1,
       hp: 45, radius: 0.25, speed: 1.2, lineOfSight: 4, cost: cost(80), trainSeconds: 30,
       trainedAt: 'stable', popCost: 1,
       attacks: [{ class: 25, amount: 6 }, { class: 4, amount: 3 }, { class: 39, amount: -3 }],
@@ -156,6 +181,7 @@ export const FALLBACK_RULES: GameRules = {
       attackReloadSeconds: 2, attackReleaseSeconds: 0.4,
     },
     'trade-cart': {
+      age: 1,
       hp: 70, radius: 0.25, speed: 1.25, lineOfSight: 7, cost: cost(0, 100, 50), trainSeconds: 51,
       trainedAt: 'market', popCost: 1,
       attacks: [],
@@ -164,6 +190,7 @@ export const FALLBACK_RULES: GameRules = {
       tradeRatePerSecond: 0.2875, tradeCapacity: 100,
     },
     archer: {
+      age: 1,
       hp: 30, radius: 0.2, speed: 0.96, lineOfSight: 6, cost: cost(0, 25, 45), trainSeconds: 35,
       trainedAt: 'archery-range', popCost: 1,
       attacks: [{ class: 3, amount: 4 }],
@@ -214,6 +241,7 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 3 }],
     },
     'watch-tower': {
+      age: 1,
       hp: 850, radius: 0.5, lineOfSight: 8, cost: cost(0, 25, 0, 125), buildSeconds: 27,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 8 }],
@@ -223,21 +251,25 @@ export const FALLBACK_RULES: GameRules = {
       },
     },
     'archery-range': {
+      age: 1,
       hp: 1500, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
     },
     blacksmith: {
+      age: 1,
       hp: 1800, radius: 1.5, lineOfSight: 6, cost: cost(0, 150), buildSeconds: 40,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
     },
     market: {
+      age: 1,
       hp: 1800, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 60,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
     },
     stable: {
+      age: 1,
       hp: 1500, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
@@ -251,6 +283,20 @@ export const FALLBACK_RULES: GameRules = {
   },
   gatherRatePerSecond: { food: 0.31, wood: 0.39, gold: 0.38, stone: 0.36 },
   carryCapacity: 10,
+  technologies: {
+    loom: {
+      techId: 22, name: 'Loom', cost: cost(0, 0, 50), researchSeconds: 25,
+      researchedAt: 'town-center', requiresAge: 0,
+      effects: [{
+        unit: 'villager', hitPoints: 15,
+        armors: [{ class: 4, amount: 1 }, { class: 3, amount: 2 }],
+      }],
+    },
+    'feudal-age': {
+      techId: 101, name: 'Feudal Age', cost: cost(500), researchSeconds: 130,
+      researchedAt: 'town-center', requiresAge: 0, grantsAge: 1, effects: [],
+    },
+  },
 };
 
 interface ManifestEntity {
@@ -274,12 +320,28 @@ interface ManifestEntity {
   };
   gather?: { resource: ResourceKind; ratePerSecond: number; capacity: number };
   trade?: { ratePerSecond: number; capacity: number; buildingId: number };
+  age?: number;
+  id?: number;
   storage?: Partial<Record<ResourceKind, number>>;
   popSupport?: number;
   animations?: Record<string, { frameSeconds: number }>;
 }
 
-export interface ContentManifest { entities: Record<string, ManifestEntity> }
+interface ManifestTech {
+  techId: number;
+  name: string;
+  cost?: Partial<Record<ResourceKind, number>>;
+  researchSeconds: number;
+  researchedAt: number;
+  requiresAge: number;
+  grantsAge?: number;
+  effects?: { unit: string; hitPoints?: number; armors?: AttackValue[] }[];
+}
+
+export interface ContentManifest {
+  entities: Record<string, ManifestEntity>;
+  technologies?: Record<string, ManifestTech>;
+}
 
 const manifestCost = (entity: ManifestEntity): Cost =>
   cost(entity.cost?.food ?? 0, entity.cost?.wood ?? 0, entity.cost?.gold ?? 0, entity.cost?.stone ?? 0);
@@ -310,6 +372,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       attackReleaseSeconds: Math.round(
         (e[key].combat?.frameDelay ?? 10) * (e[key].animations?.attack?.frameSeconds ?? 0.05) * 100,
       ) / 100,
+      age: e[key].age ?? fallback?.age,
       range: e[key].combat?.maximumRange || fallback?.range,
       minRange: e[key].combat?.minimumRange || fallback?.minRange,
       projectileSpeed: fallback?.projectileSpeed,
@@ -331,6 +394,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     const fallback = FALLBACK_RULES.buildings[key as BuildingKind];
     if (!e[key]) return { ...fallback, buildable };
     return {
+      age: e[key].age ?? fallback.age,
       hp: e[key].hitPoints,
       radius: e[key].collision[0],
       lineOfSight: e[key].lineOfSight,
@@ -415,7 +479,43 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       stone: e['villager-stonemason']?.gather?.ratePerSecond ?? FALLBACK_RULES.gatherRatePerSecond.stone,
     },
     carryCapacity: e['villager-forager']?.gather?.capacity ?? FALLBACK_RULES.carryCapacity,
+    technologies: technologies(manifest, e),
   };
+}
+
+/**
+ * The DAT names a technology's research building by unit id, so the imported
+ * entity ids are what turn it back into one of our building kinds.
+ */
+function technologies(
+  manifest: ContentManifest, e: Record<string, ManifestEntity>,
+): Record<TechKey, TechRules> {
+  const kindOf = new Map<number, BuildingKind>();
+  for (const [key, entity] of Object.entries(e)) {
+    if (entity.id !== undefined && key in FALLBACK_RULES.buildings) {
+      kindOf.set(entity.id, key as BuildingKind);
+    }
+  }
+  const result = { ...FALLBACK_RULES.technologies };
+  for (const [key, tech] of Object.entries(manifest.technologies ?? {})) {
+    const fallback = FALLBACK_RULES.technologies[key as TechKey];
+    if (!fallback) continue;
+    result[key as TechKey] = {
+      techId: tech.techId,
+      name: tech.name,
+      cost: cost(tech.cost?.food ?? 0, tech.cost?.wood ?? 0, tech.cost?.gold ?? 0, tech.cost?.stone ?? 0),
+      researchSeconds: tech.researchSeconds,
+      researchedAt: kindOf.get(tech.researchedAt) ?? fallback.researchedAt,
+      requiresAge: tech.requiresAge,
+      grantsAge: tech.grantsAge,
+      effects: (tech.effects ?? []).map(effect => ({
+        unit: effect.unit as UnitKind,
+        hitPoints: effect.hitPoints,
+        armors: effect.armors,
+      })),
+    };
+  }
+  return result;
 }
 
 const UNIT_KINDS = new Set<string>([

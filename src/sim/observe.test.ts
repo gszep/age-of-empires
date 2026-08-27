@@ -21,6 +21,9 @@ describe('the public contract', () => {
       expect(observation, `building ${kind}`).toContain(`"${kind}"`);
     }
     const command = JSON.stringify(schema('command'));
+    for (const key of Object.keys(FALLBACK_RULES.technologies)) {
+      expect(command, `researchable ${key}`).toContain(`"${key}"`);
+    }
     for (const kind of Object.keys(FALLBACK_RULES.units)) {
       // Gaia's animals are nobody's to train.
       if (isAnimal(kind as never)) continue;

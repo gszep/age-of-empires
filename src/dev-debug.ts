@@ -218,6 +218,7 @@ export function installDebug(context: DebugContext): void {
         players: Object.fromEntries(Object.entries(game.players).map(([id, player]) => [id, {
           food: player.food, wood: player.wood, gold: player.gold, stone: player.stone,
           population: player.population, populationCap: player.populationCap,
+          age: player.age, researched: player.researched,
         }])),
         entities: counts,
         projectiles: game.projectiles.length,

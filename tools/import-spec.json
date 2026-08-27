@@ -6,6 +6,10 @@
   "effects": [
     { "key": "rally-flag", "graphic": "WaypointFlag Britons" }
   ],
+  "technologies": [
+    { "key": "loom", "techId": 22, "effect": "Loom", "appliesTo": ["villager"] },
+    { "key": "feudal-age", "techId": 101, "effect": "Feudal Age" }
+  ],
   "entities": [
     {
       "key": "militia",

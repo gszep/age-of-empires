@@ -3,7 +3,7 @@ import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
 import { observe } from './sim/observe';
 import { applyCommand, createGame, gameTimeSeconds, placementLegal, stepGame } from './sim/game';
-import { FALLBACK_RULES, TICK_SECONDS, isBuilding, isUnit, rulesFromManifest, type ContentManifest, type Cost, type GameRules } from './sim/data';
+import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, rulesFromManifest, type ContentManifest, type Cost, type GameRules, type TechKey } from './sim/data';
 import { isTileVisible } from './sim/visibility';
 import { checksumState } from './sim/checksum';
 import type { MatchRecord } from './protocol/types';
@@ -239,6 +239,15 @@ function runUiCommand(id: string): void {
     if (!result.ok) hud.showMessage(result.reason);
     return;
   }
+  if (id.startsWith('research-')) {
+    const tech = id.slice('research-'.length);
+    const at = rules.technologies[tech as TechKey]?.researchedAt;
+    const building = selection.find(e => e.kind === at && e.buildProgress === undefined);
+    if (!building) return;
+    const result = applyCommand(game, { kind: 'research', player: 1, buildingId: building.id, tech });
+    if (!result.ok) hud.showMessage(result.reason);
+    return;
+  }
   if (id === 'cancel') buildMode = undefined;
 }
 
@@ -456,6 +465,19 @@ function currentCommands(): CommandButton[] {
       });
     }
   }
+  // Technologies the selected building researches, in the DAT's own order.
+  const player1 = game.players[1];
+  for (const [key, tech] of Object.entries(rules.technologies) as [TechKey, typeof rules.technologies[TechKey]][]) {
+    const building = selection.find(e => e.kind === tech.researchedAt && e.buildProgress === undefined);
+    if (!building) continue;
+    if (player1.researched.includes(key)) continue;
+    if (player1.age < tech.requiresAge) continue;
+    buttons.push({
+      id: `research-${key}`,
+      label: `Research ${tech.name} (${costLabel(tech.cost)})`,
+      enabled: !building.researching && affordable(tech.cost),
+    });
+  }
   return buttons;
 }
 
@@ -463,10 +485,13 @@ const BUILD_HOTKEYS = ['q', 'w', 'e', 'r', 't', 'a', 's', 'd', 'f', 'g', 'z', 'x
 const TRAIN_HOTKEYS = ['q', 'w', 'e', 'r'];
 
 const buildableKinds = (): BuildingKind[] =>
-  (Object.keys(rules.buildings) as BuildingKind[]).filter(kind => rules.buildings[kind].buildable);
+  (Object.keys(rules.buildings) as BuildingKind[]).filter(kind =>
+    rules.buildings[kind].buildable && (rules.buildings[kind].age ?? 0) <= game.players[1].age);
 
 const trainableAt = (building: BuildingKind): UnitKind[] =>
-  (Object.keys(rules.units) as UnitKind[]).filter(kind => rules.units[kind].trainedAt === building);
+  (Object.keys(rules.units) as UnitKind[]).filter(kind =>
+    rules.units[kind].trainedAt === building && (rules.units[kind].age ?? 0) <= game.players[1].age
+    && !isAnimal(kind));
 
 function affordable(cost: Cost): boolean {
   const player = game.players[1];
@@ -495,11 +520,19 @@ function selectionInfo(): SelectionInfo | undefined {
     : names[entity.kind] ?? displayName(entity.kind);
   const details: string[] = [];
   if (selection.length > 1) details.push(`${selection.length} selected`);
+  if (entity.kind === 'town-center' && entity.owner === 1) details.push(AGE_NAMES[game.players[1].age]);
   if (entity.amount !== undefined) details.push(`${Math.floor(entity.amount)} ${entity.resourceKind}`);
   if (entity.carrying) details.push(`Carrying ${entity.carrying.amount} ${entity.carrying.kind}`);
   let progress: SelectionInfo['progress'];
   if (entity.buildProgress !== undefined) {
     progress = { label: 'Building', fraction: entity.buildProgress };
+  } else if (entity.researching) {
+    const tech = rules.technologies[entity.researching.tech as TechKey];
+    const total = tech.researchSeconds / TICK_SECONDS;
+    progress = {
+      label: `Researching ${tech.name}`,
+      fraction: 1 - entity.researching.remainingTicks / total,
+    };
   } else if (entity.training) {
     const total = rules.units[entity.training.kind].trainSeconds / TICK_SECONDS;
     progress = {
@@ -724,11 +757,17 @@ let previous = performance.now();
 let accumulator = 0;
 let hudClock = 0;
 let ended = false;
+let shownAge = game.players[1].age;
 
 renderer.setAnimationLoop(now => {
   const elapsed = Math.min(0.1, (now - previous) / 1000);
   previous = now;
   panCamera(elapsed);
+
+  if (game.players[1].age !== shownAge) {
+    shownAge = game.players[1].age;
+    hud.showMessage(`Advancing to the ${AGE_NAMES[shownAge]}`);
+  }
 
   if (!paused && !game.winner) {
     accumulator += elapsed;

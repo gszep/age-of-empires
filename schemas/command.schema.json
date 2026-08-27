@@ -29,6 +29,17 @@
     {
       "type": "object",
       "properties": {
+        "kind": { "const": "research" },
+        "player": { "enum": [1, 2] },
+        "buildingId": { "type": "integer" },
+        "tech": { "enum": ["loom", "feudal-age"] }
+      },
+      "required": ["kind", "player", "buildingId", "tech"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
         "kind": { "const": "build" },
         "player": { "enum": [1, 2] },
         "builderIds": { "type": "array", "items": { "type": "integer" }, "minItems": 1 },

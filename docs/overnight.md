@@ -108,13 +108,19 @@ items land.
   and in the live match a claimed sheep renders with a player-blue collar
   through the palette ramp while `villager-hunter/work` turns `sheep/idle` into
   `sheep/death` then `sheep/decay` and banks 10 food.
-- [ ] **Technologies + Feudal age-up.** The sim has no tech system. Smallest
-  faithful slice: research queue at a building, cost/time from the DAT,
-  effects applied to rules (start with Loom, then Feudal Age gating the
-  Feudal buildings we already ship — market, blacksmith, range, stable,
-  watch tower become age-locked as in DE). *Verify:* replay determinism
-  holds across a research; Feudal buildings reject placement in Dark Age;
-  existing tests updated deliberately, never deleted.
+- [x] **Technologies + Feudal age-up.** A building researches one technology at
+  a time; cost, research time, building and effects all come from the DAT.
+  Loom (50 gold, 25s at the town center) reads its +15 hit points and +1/+2
+  armour off the effect commands and heals the villagers already standing
+  there. The Feudal Age (500 food, 130s) is tech 101 — which the DAT calls
+  "Middle Age" while its *effect* is called "Feudal Age", the same name-versus-
+  data trap as the units. Which age a thing belongs to is read from the tech
+  that turns it on, so the gate is the DAT's: market, blacksmith, archery
+  range, stable, watch tower, archer, skirmisher, spearman, scout cavalry and
+  trade cart are all Feudal. *Verified:* a determinism test replays a research
+  to an identical checksum; a gate test refuses each Feudal building by name in
+  the Dark Age and lets it through after; and the live match walked the whole
+  loom → herd → age-up → market chain.
 
 ## C. Audio (depot 813783 and vgmstream-cli are installed locally)
 

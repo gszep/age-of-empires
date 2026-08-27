@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES, rulesFromManifest, type ContentManifest, type GameRules } from './data';
+import { checksumState } from './checksum';
 import { applyCommand, createGame, placementLegal, stepGame } from './game';
 import type { BuildingKind, Entity, GameState, ResourceKind } from './types';
 
@@ -11,6 +12,16 @@ const importedRules: GameRules | undefined = existsSync(MANIFEST_PATH)
 
 const run = (state: GameState, ticks: number) => {
   for (let i = 0; i < ticks; i++) stepGame(state);
+};
+
+/**
+ * Skip the age-up. Markets, towers, stables and ranges are Feudal in the DAT,
+ * so tests about what they do rather than about when they unlock start there;
+ * `feudal age > gates` covers the gate itself.
+ */
+const inFeudal = (state: GameState) => {
+  state.players[1].age = 1;
+  state.players[2].age = 1;
 };
 
 const villagerOf = (state: GameState) =>
@@ -315,6 +326,7 @@ describe('drop sites', () => {
 describe('stone', () => {
   it('is gathered, banked, and spent on a tower', () => {
     const state = createGame();
+    inFeudal(state);
     const stone = nodeOf(state, 'stone');
     expect(stone).toBeDefined();
     expect(stone.resourceKind).toBe('stone');
@@ -366,6 +378,7 @@ describe('farms', () => {
 describe('towers', () => {
   it('shoot an enemy in range without being ordered', () => {
     const state = createGame();
+    inFeudal(state);
     state.players[1].stone = 500;
     state.players[1].wood = 500;
     const builder = villagerOf(state);
@@ -384,6 +397,7 @@ describe('towers', () => {
 
   it('lands damage when the arrow arrives, not when it is loosed', () => {
     const state = createGame();
+    inFeudal(state);
     state.players[1].stone = 500;
     state.players[1].wood = 500;
     const builder = villagerOf(state);
@@ -419,6 +433,7 @@ describe('towers', () => {
 
   it('shoots enemy buildings, but takes a unit over a building', () => {
     const state = createGame();
+    inFeudal(state);
     state.players[1].stone = 500;
     state.players[1].wood = 500;
     const builder = villagerOf(state);
@@ -450,6 +465,7 @@ describe('towers', () => {
 
   it('takes an ordered target over the one it would pick itself', () => {
     const state = createGame();
+    inFeudal(state);
     state.players[1].stone = 500;
     state.players[1].wood = 500;
     const builder = villagerOf(state);
@@ -478,6 +494,7 @@ describe('towers', () => {
 
   it('returns to picking its own target when the order is cleared', () => {
     const state = createGame();
+    inFeudal(state);
     state.players[1].stone = 500;
     state.players[1].wood = 500;
     const builder = villagerOf(state);
@@ -507,6 +524,7 @@ describe('towers', () => {
 
   it('drops an ordered target that dies and defends itself again', () => {
     const state = createGame();
+    inFeudal(state);
     state.players[1].stone = 500;
     state.players[1].wood = 500;
     const builder = villagerOf(state);
@@ -536,6 +554,7 @@ describe('towers', () => {
 
   it('spends an arrow whose target dies mid-flight', () => {
     const state = createGame();
+    inFeudal(state);
     state.players[1].stone = 500;
     state.players[1].wood = 500;
     const builder = villagerOf(state);
@@ -555,6 +574,97 @@ describe('towers', () => {
     stepGame(state);
     // No target left to hit, so the arrow is dropped rather than retargeted.
     expect(state.projectiles.length).toBe(0);
+  });
+});
+
+describe('technologies', () => {
+  const townCenter = (state: GameState) =>
+    state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+
+  it('researches Loom at its DAT cost and heals the villagers already standing there', () => {
+    const state = createGame(41);
+    const loom = state.rules.technologies.loom;
+    expect(loom.researchedAt).toBe('town-center');
+    expect(loom.cost).toEqual({ food: 0, wood: 0, gold: 50, stone: 0 });
+
+    const villager = villagerOf(state);
+    const before = { hp: villager.hp, maxHp: villager.maxHp };
+    state.players[1].gold = 100;
+    const tc = townCenter(state);
+    expect(applyCommand(state, { kind: 'research', player: 1, buildingId: tc.id, tech: 'loom' }).ok).toBe(true);
+    expect(state.players[1].gold).toBe(50);
+    // Nothing changes until it finishes.
+    run(state, 10);
+    expect(villager.maxHp).toBe(before.maxHp);
+    expect(state.players[1].researched).toEqual([]);
+
+    run(state, loom.researchSeconds * 20);
+    expect(state.players[1].researched).toEqual(['loom']);
+    expect(villager.maxHp).toBe(before.maxHp + 15);
+    expect(villager.hp).toBe(before.hp + 15);
+    // And the armour it grants reaches units trained afterwards.
+    expect(applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' }).ok).toBe(true);
+    for (let i = 0; i < 2000 && state.entities.filter(e => e.kind === 'villager' && e.owner === 1).length < 4; i++) {
+      stepGame(state);
+    }
+    const fresh = state.entities.filter(e => e.owner === 1 && e.kind === 'villager').at(-1)!;
+    expect(fresh.maxHp).toBe(before.maxHp + 15);
+
+    // One research per player, and one at a time.
+    expect(applyCommand(state, { kind: 'research', player: 1, buildingId: tc.id, tech: 'loom' }).ok).toBe(false);
+  });
+
+  it('gates the Feudal age behind its own research, and everything behind the age', () => {
+    const state = createGame(42);
+    expect(state.players[1].age).toBe(0);
+    const builders = state.entities.filter(e => e.owner === 1 && e.kind === 'villager').map(e => e.id);
+    state.players[1].wood = 1000;
+    state.players[1].food = 1000;
+
+    // Feudal buildings and units are refused in the Dark Age, by name.
+    for (const building of ['market', 'blacksmith', 'archery-range', 'stable', 'watch-tower'] as const) {
+      const result = applyCommand(state, {
+        kind: 'build', player: 1, builderIds: builders, building, target: { x: 12, y: 12 },
+      });
+      expect(result.ok, building).toBe(false);
+      if (!result.ok) expect(result.reason).toContain('later age');
+    }
+    // What is Dark Age in the DAT still goes up.
+    expect(applyCommand(state, {
+      kind: 'build', player: 1, builderIds: builders, building: 'house', target: freeSpot(state, 'house', { x: 8, y: 12 }),
+    }).ok).toBe(true);
+
+    const tc = townCenter(state);
+    const feudal = state.rules.technologies['feudal-age'];
+    expect(feudal.cost.food).toBe(500);
+    expect(applyCommand(state, { kind: 'research', player: 1, buildingId: tc.id, tech: 'feudal-age' }).ok).toBe(true);
+    run(state, feudal.researchSeconds * 20);
+    expect(state.players[1].age).toBe(1);
+
+    // And now the same building goes up, for this player only.
+    expect(applyCommand(state, {
+      kind: 'build', player: 1, builderIds: builders, building: 'market',
+      target: freeSpot(state, 'market', { x: 12, y: 12 }),
+    }).ok).toBe(true);
+    const theirs = applyCommand(state, {
+      kind: 'build', player: 2,
+      builderIds: state.entities.filter(e => e.owner === 2 && e.kind === 'villager').map(e => e.id),
+      building: 'market', target: freeSpot(state, 'market', { x: 22, y: 12 }),
+    });
+    expect(theirs.ok).toBe(false);
+    if (!theirs.ok) expect(theirs.reason).toContain('later age');
+  });
+
+  it('replays identically across a research', () => {
+    const play = () => {
+      const state = createGame(43);
+      state.players[1].gold = 200;
+      const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+      applyCommand(state, { kind: 'research', player: 1, buildingId: tc.id, tech: 'loom' });
+      run(state, 900);
+      return checksumState(state);
+    };
+    expect(play()).toBe(play());
   });
 });
 
@@ -658,6 +768,7 @@ describe('herding and hunting', () => {
 describe('the archery range', () => {
   it('trains the skirmisher as well as the archer', () => {
     const state = createGame(23);
+    inFeudal(state);
     const trainedHere = (Object.keys(state.rules.units) as (keyof typeof state.rules.units)[])
       .filter(kind => state.rules.units[kind].trainedAt === 'archery-range')
       .sort();
@@ -695,6 +806,7 @@ describe('the archery range', () => {
 describe('the stable', () => {
   it('builds and trains the scout it is for', () => {
     const state = createGame(21);
+    inFeudal(state);
     state.players[1].wood = 1000;
     state.players[1].food = 1000;
     const builders = state.entities.filter(e => e.owner === 1 && e.kind === 'villager').map(e => e.id);
@@ -724,6 +836,7 @@ describe('the stable', () => {
 describe('trade', () => {
   /** Both sides get a finished market; a route needs two ends. */
   function markets(state: GameState): { home: Entity; away: Entity } {
+    inFeudal(state);
     for (const player of [1, 2] as const) {
       state.players[player].wood = 1000;
       state.players[player].gold = 1000;

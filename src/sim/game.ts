@@ -1,5 +1,5 @@
 import { FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isAnimal, isBuilding, isMilitary, isUnit } from './data';
-import type { AttackValue, GameRules, NodeKind } from './data';
+import type { AttackValue, Cost, GameRules, NodeKind, TechKey, UnitRules } from './data';
 import { buildNavGrid, findPath, isBlocked, separateUnits, tileOf, type NavGrid } from './nav';
 import { random01 } from './random';
 import { createVisibility, updateVisibility } from './visibility';
@@ -56,8 +56,8 @@ export function createGame(seed = 42, rules: GameRules = FALLBACK_RULES): GameSt
   const state: GameState = {
     rules, seed: seed || 1, tick: 0, nextId: 1, width: 32, height: 18, entities: [], projectiles: [],
     players: {
-      1: { id: 1, ...rules.startingResources, population: 0, populationCap: 0 },
-      2: { id: 2, ...rules.startingResources, population: 0, populationCap: 0 },
+      1: { id: 1, ...rules.startingResources, age: 0, researched: [], population: 0, populationCap: 0 },
+      2: { id: 2, ...rules.startingResources, age: 0, researched: [], population: 0, populationCap: 0 },
     },
     visibility: undefined as never,
   };
@@ -104,8 +104,7 @@ function recalculatePopulation(state: GameState): void {
   }
 }
 
-function spend(state: GameState, player: PlayerId, kind: UnitKind | BuildingKind): CommandResult {
-  const cost = isUnit(kind) ? state.rules.units[kind].cost : state.rules.buildings[kind].cost;
+function spendCost(state: GameState, player: PlayerId, cost: Cost): CommandResult {
   const p = state.players[player];
   if (p.food < cost.food || p.wood < cost.wood || p.gold < cost.gold || p.stone < cost.stone) {
     return rejected('not enough resources');
@@ -115,6 +114,32 @@ function spend(state: GameState, player: PlayerId, kind: UnitKind | BuildingKind
   p.gold -= cost.gold;
   p.stone -= cost.stone;
   return { ok: true };
+}
+
+function spend(state: GameState, player: PlayerId, kind: UnitKind | BuildingKind): CommandResult {
+  return spendCost(state, player, isUnit(kind) ? state.rules.units[kind].cost : state.rules.buildings[kind].cost);
+}
+
+/** What a player has researched, applied to one unit kind's rules. */
+export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: UnitKind): UnitRules {
+  const base = state.rules.units[kind];
+  if (owner === 0) return base;
+  const researched = state.players[owner as PlayerId].researched;
+  if (!researched.length) return base;
+  let rules = base;
+  for (const key of researched) {
+    for (const effect of state.rules.technologies[key as TechKey]?.effects ?? []) {
+      if (effect.unit !== kind) continue;
+      if (rules === base) rules = { ...base, armors: base.armors.map(a => ({ ...a })) };
+      if (effect.hitPoints) rules.hp += effect.hitPoints;
+      for (const bonus of effect.armors ?? []) {
+        const existing = rules.armors.find(a => a.class === bonus.class);
+        if (existing) existing.amount += bonus.amount;
+        else rules.armors.push({ ...bonus });
+      }
+    }
+  }
+  return rules;
 }
 
 /** A completed building that shoots, so it can be given a target. */
@@ -231,10 +256,31 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     const unitRules = state.rules.units[command.unit];
     if (unitRules.trainedAt !== building.kind) return rejected(`${building.kind} cannot train ${command.unit}`);
     const player = state.players[command.player];
+    if ((unitRules.age ?? 0) > player.age) return rejected(`${command.unit} needs a later age`);
     if (player.population + unitRules.popCost > player.populationCap) return rejected('population cap reached');
     const paid = spend(state, command.player, command.unit);
     if (!paid.ok) return paid;
     building.training = { kind: command.unit, remainingTicks: Math.round(unitRules.trainSeconds * TICKS_PER_SECOND) };
+    return { ok: true };
+  }
+
+  if (command.kind === 'research') {
+    const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
+    if (!building) return rejected(`building ${command.buildingId} is not owned`);
+    if (building.buildProgress !== undefined) return rejected('building is under construction');
+    if (building.researching) return rejected('building is already researching');
+    const tech = state.rules.technologies[command.tech as TechKey];
+    if (!tech) return rejected(`unknown technology ${command.tech}`);
+    if (tech.researchedAt !== building.kind) return rejected(`${building.kind} cannot research ${command.tech}`);
+    const player = state.players[command.player];
+    if (player.researched.includes(command.tech)) return rejected(`${command.tech} is already researched`);
+    if (player.age < tech.requiresAge) return rejected(`${command.tech} needs a later age`);
+    const paid = spendCost(state, command.player, tech.cost);
+    if (!paid.ok) return paid;
+    building.researching = {
+      tech: command.tech,
+      remainingTicks: Math.round(tech.researchSeconds * TICKS_PER_SECOND),
+    };
     return { ok: true };
   }
 
@@ -247,6 +293,9 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
 
   const rules = state.rules.buildings[command.building];
   if (!rules.buildable) return rejected(`${command.building} cannot be built`);
+  if ((rules.age ?? 0) > state.players[command.player].age) {
+    return rejected(`${command.building} needs a later age`);
+  }
   const builders = state.entities.filter(
     e => !e.dead && command.builderIds.includes(e.id) && e.owner === command.player && e.kind === 'villager',
   );
@@ -419,7 +468,7 @@ export function computeDamage(attacks: AttackValue[], armors: AttackValue[]): nu
 }
 
 function armorsOf(state: GameState, entity: Entity): AttackValue[] {
-  if (isUnit(entity.kind)) return state.rules.units[entity.kind as UnitKind].armors;
+  if (isUnit(entity.kind)) return unitRulesFor(state, entity.owner, entity.kind as UnitKind).armors;
   if (isBuilding(entity.kind)) return state.rules.buildings[entity.kind as BuildingKind].armors;
   return [];
 }
@@ -844,7 +893,7 @@ function spawnPoint(state: GameState, building: Entity, unitRadius: number): Poi
 }
 
 function spawnTrainedUnit(state: GameState, building: Entity, kind: UnitKind): void {
-  const rules = state.rules.units[kind];
+  const rules = unitRulesFor(state, building.owner, kind);
   const spawn = spawnPoint(state, building, rules.radius);
   const unit = addEntity(state, kind, building.owner, spawn, rules);
   if (building.rally) {
@@ -853,6 +902,37 @@ function spawnTrainedUnit(state: GameState, building: Entity, kind: UnitKind): v
       : undefined;
     assignOrder(state, unit, building.rally.target, target);
   }
+}
+
+/**
+ * A finished technology moves the player on. An age is a number the rules read
+ * for what may be built and trained; anything else is a flat change to a unit
+ * kind, which existing units feel too — AoE2's Loom heals the villagers you
+ * already have.
+ */
+function completeResearch(state: GameState, owner: PlayerId, key: string): void {
+  const tech = state.rules.technologies[key as TechKey];
+  const player = state.players[owner];
+  if (!tech || player.researched.includes(key)) return;
+  player.researched.push(key);
+  if (tech.grantsAge !== undefined) player.age = Math.max(player.age, tech.grantsAge);
+  for (const effect of tech.effects) {
+    if (!effect.hitPoints) continue;
+    for (const entity of state.entities) {
+      if (entity.dead || entity.owner !== owner || entity.kind !== effect.unit) continue;
+      entity.maxHp += effect.hitPoints;
+      entity.hp += effect.hitPoints;
+    }
+  }
+}
+
+function updateBuildingResearch(state: GameState, entity: Entity): void {
+  if (!entity.researching) return;
+  entity.researching.remainingTicks -= 1;
+  if (entity.researching.remainingTicks > 0) return;
+  const key = entity.researching.tech;
+  entity.researching = undefined;
+  completeResearch(state, entity.owner as PlayerId, key);
 }
 
 function updateBuildingProduction(state: GameState, entity: Entity): void {
@@ -955,6 +1035,7 @@ export function stepGame(state: GameState): void {
       movable.push(entity);
     } else if (isBuilding(entity.kind) && entity.buildProgress === undefined) {
       updateBuildingProduction(state, entity);
+      updateBuildingResearch(state, entity);
       updateTower(state, entity);
     }
   }

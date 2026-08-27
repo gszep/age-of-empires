@@ -48,6 +48,7 @@ export interface Entity {
   /** Buildings. */
   buildProgress?: number; // 0..1; undefined once complete
   training?: { kind: UnitKind; remainingTicks: number };
+  researching?: { tech: string; remainingTicks: number };
   rally?: { target: Point; targetId?: number };
   attackCooldown?: number; // ticks until a new swing may start
   attackWindup?: number; // ticks until the started swing releases damage
@@ -62,6 +63,10 @@ export interface Entity {
 
 export interface PlayerState {
   id: PlayerId;
+  /** 0 is the Dark Age; a completed age technology moves it on. */
+  age: number;
+  /** Technology keys already researched, in the order they completed. */
+  researched: string[];
   food: number;
   wood: number;
   gold: number;
@@ -108,4 +113,5 @@ export type Command =
   | { kind: 'train'; player: PlayerId; buildingId: number; unit: UnitKind }
   | { kind: 'build'; player: PlayerId; builderIds: number[]; building: BuildingKind; target: Point }
   | { kind: 'rally'; player: PlayerId; buildingId: number; target: Point; targetId?: number }
-  | { kind: 'stop'; player: PlayerId; entityIds: number[] };
+  | { kind: 'stop'; player: PlayerId; entityIds: number[] }
+  | { kind: 'research'; player: PlayerId; buildingId: number; tech: string };
