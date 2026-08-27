@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES, isAnimal, isBuilding, isUnit } from './data';
 import { createGame, applyCommand, stepGame } from './game';
 import { describeObservation, observe } from './observe';
+import { isTileExplored, isTileVisible } from './visibility';
 import { validateObservation, explain } from '../protocol/validate';
+import type { Entity } from './types';
 
 describe('the public contract', () => {
   const schema = (name: string) =>
@@ -116,6 +118,38 @@ describe('player observations', () => {
     scout.position = { x: 17, y: 9 };
     stepGame(state);
     expect(observe(state, 1).memory.some(e => e.id === enemyHouse.id)).toBe(false);
+  });
+
+  it('gives a building its line of sight only once it is finished', () => {
+    // Issue #1: a foundation is a claim on the ground, not a watchtower. The
+    // DAT has one `line_of_sight` per unit and no construction-time variant,
+    // so the rule is checked here rather than imported.
+    const state = createGame(11);
+    const rules = state.rules.buildings.house;
+    const far = { x: 60, y: 60 };
+    for (const entity of state.entities.filter(e => e.owner === 1)) {
+      expect(
+        Math.hypot(entity.position.x - far.x, entity.position.y - far.y),
+        `${entity.kind} stands too near the test site`,
+      ).toBeGreaterThan(rules.lineOfSight + 12);
+    }
+    const foundation: Entity = {
+      id: state.nextId++, kind: 'house', owner: 1, position: far,
+      hp: 1, maxHp: rules.hp, radius: rules.radius,
+      activity: 'idle', order: { kind: 'idle' }, buildProgress: 0.1,
+    };
+    state.entities.push(foundation);
+    stepGame(state);
+    const edge = { x: far.x + rules.lineOfSight - 1, y: far.y };
+    expect(isTileVisible(state, 1, edge.x, edge.y)).toBe(false);
+    expect(isTileExplored(state, 1, edge.x, edge.y)).toBe(false);
+
+    // Finished, it sees what its rules say it sees.
+    foundation.buildProgress = undefined;
+    foundation.hp = rules.hp;
+    stepGame(state);
+    expect(isTileVisible(state, 1, edge.x, edge.y)).toBe(true);
+    expect(isTileVisible(state, 1, far.x + rules.lineOfSight + 3, far.y)).toBe(false);
   });
 
   it('hides unexplored gaia resources until scouted', () => {

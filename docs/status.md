@@ -104,6 +104,16 @@ speed (Fast) is sometimes called "normal". Every duration the DAT states — a
 seconds, so the multiplier is the only thing standing between that data and the
 pace a player feels.
 
+**A foundation's line of sight** is the sixth. The DAT carries one
+`line_of_sight` per unit and no construction-time variant — `unit.building`
+holds the construction graphic, sound, foundation terrain and rubble, and
+nothing about sight — so the owned data does not distinguish a foundation from
+a finished building either way. A building under construction is given no line
+of sight here, on the playtest report in issue #1 and because the alternative
+makes throwing down foundations a free scouting tool, which DE's own community
+reports as an exploit. It is a rule chosen against observed behaviour, not an
+imported number.
+
 Four Castle Age behaviours are approximations, because the owned files carry the
 numbers but not the rules that use them:
 

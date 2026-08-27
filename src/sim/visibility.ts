@@ -36,7 +36,13 @@ export function createVisibility(state: GameState): Record<PlayerId, PlayerVisib
 
 export function lineOfSightOf(state: GameState, entity: Entity): number {
   if (isUnit(entity.kind)) return state.rules.units[entity.kind as UnitKind].lineOfSight;
-  if (isBuilding(entity.kind)) return state.rules.buildings[entity.kind].lineOfSight;
+  // A foundation is a claim on the ground, not a garrison: it sees nothing
+  // until it is finished. The DAT carries one `line_of_sight` per unit and no
+  // construction-time variant, so this rule is the reference's observed
+  // behaviour rather than an imported number -- see docs/status.md.
+  if (isBuilding(entity.kind)) {
+    return entity.buildProgress === undefined ? state.rules.buildings[entity.kind].lineOfSight : 0;
+  }
   return 0;
 }
 
