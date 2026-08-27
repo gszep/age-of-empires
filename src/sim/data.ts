@@ -1,4 +1,4 @@
-import type { AnimalKind, BuildingKind, EntityKind, ResourceKind, UnitKind } from './types';
+import type { AnimalKind, BuildingKind, Entity, EntityKind, ResourceKind, UnitKind } from './types';
 
 export const TICK_SECONDS = 0.05;
 export const TICKS_PER_SECOND = 20;
@@ -46,6 +46,14 @@ export interface UnitRules {
   /** Trade carts: goods earned per second on the road, and the most they hold. */
   tradeRatePerSecond?: number;
   tradeCapacity?: number;
+  /**
+   * The DAT's `fog_visibility`: 1 keeps the thing drawn once its tile goes
+   * dark. Everything gaia puts on the map -- resources, sheep, deer, boar --
+   * is 1; everything a player trains or builds is 0, which is why an enemy
+   * soldier vanishes with the light instead of standing there in a neutral
+   * pose.
+   */
+  fogVisibility?: number;
   /** Animals: the food their carcass holds. */
   foodAmount?: number;
   /** Animals: how close a player's unit must come to claim a herdable. */
@@ -98,6 +106,8 @@ export interface ResourceNodeRules {
   resource: ResourceKind;
   radius: number;
   amount: number;
+  /** As `UnitRules.fogVisibility`: gaia's nodes are all 1. */
+  fogVisibility?: number;
 }
 
 export interface GameRules {
@@ -113,6 +123,27 @@ export interface GameRules {
 }
 
 export type NodeKind = 'berries' | 'tree' | 'gold' | 'stone';
+
+/** Which node rules a placed resource is playing by; its kind is not kept. */
+const NODE_OF_RESOURCE: Record<ResourceKind, NodeKind> = {
+  food: 'berries', wood: 'tree', gold: 'gold', stone: 'stone',
+};
+
+/**
+ * Does this keep being drawn once its tile goes dark? The DAT answers for
+ * everything gaia places -- resources, sheep, deer and boar are all
+ * `fog_visibility` 1, and every unit a player trains is 0. Buildings are 0
+ * too and are still remembered: that ghost is the engine's own last-seen
+ * memory of the map, which no DAT field states.
+ */
+export function lingersInFog(rules: GameRules, entity: Entity): boolean {
+  if (isBuilding(entity.kind)) return true;
+  if (entity.kind === 'resource') {
+    return entity.resourceKind !== undefined
+      && rules.nodes[NODE_OF_RESOURCE[entity.resourceKind]]?.fogVisibility === 1;
+  }
+  return rules.units[entity.kind as UnitKind]?.fogVisibility === 1;
+}
 export type TechKey = 'loom' | 'feudal-age' | 'castle-age';
 
 /** One researchable technology, as the DAT records it. */
@@ -174,6 +205,7 @@ export const FALLBACK_RULES: GameRules = {
       attacks: [], armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 0, attackReleaseSeconds: 0,
       foodAmount: 100, herdRange: 2.5,
+      fogVisibility: 1,
     },
     deer: {
       hp: 5, radius: 0.3, speed: 0.737, lineOfSight: 2, cost: cost(), trainSeconds: 0,
@@ -181,6 +213,7 @@ export const FALLBACK_RULES: GameRules = {
       attacks: [], armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 0, attackReleaseSeconds: 0,
       foodAmount: 140,
+      fogVisibility: 1,
       startle: { range: 1, distance: 1.5, restSeconds: [14, 20] },
     },
     boar: {
@@ -190,6 +223,7 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }, { class: 24, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0,
       foodAmount: 340,
+      fogVisibility: 1,
     },
     skirmisher: {
       age: 1,
@@ -397,10 +431,10 @@ export const FALLBACK_RULES: GameRules = {
     },
   },
   nodes: {
-    berries: { resource: 'food', radius: 0.5, amount: 125 },
-    tree: { resource: 'wood', radius: 0.5, amount: 100 },
-    gold: { resource: 'gold', radius: 0.5, amount: 800 },
-    stone: { resource: 'stone', radius: 0.5, amount: 350 },
+    berries: { resource: 'food', radius: 0.5, amount: 125, fogVisibility: 1 },
+    tree: { resource: 'wood', radius: 0.5, amount: 100, fogVisibility: 1 },
+    gold: { resource: 'gold', radius: 0.5, amount: 800, fogVisibility: 1 },
+    stone: { resource: 'stone', radius: 0.5, amount: 350, fogVisibility: 1 },
   },
   gatherRatePerSecond: { food: 0.31, wood: 0.39, gold: 0.38, stone: 0.36 },
   carryCapacity: 10,
@@ -451,6 +485,8 @@ interface ManifestEntity {
   trade?: { ratePerSecond: number; capacity: number; buildingId: number };
   age?: number;
   id?: number;
+  /** The DAT's `fog_visibility`; 1 keeps it drawn once its tile goes dark. */
+  fogVisibility?: number;
   storage?: Partial<Record<ResourceKind, number>>;
   popSupport?: number;
   animations?: Record<string, { frameSeconds: number }>;
@@ -509,6 +545,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       blastRadius: e[key].combat?.blastRadius ?? fallback?.blastRadius,
       heal: e[key].heal ?? fallback?.heal,
       convert: e[key].convert ?? fallback?.convert,
+      fogVisibility: e[key].fogVisibility ?? fallback?.fogVisibility,
     };
   };
   /** Gaia's animals: their own rules plus the food the DAT stores on them. */
@@ -565,6 +602,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       resource,
       radius: e[key].collision[0],
       amount: e[key].storage?.[resource] ?? FALLBACK_RULES.nodes[fallbackKey].amount,
+      fogVisibility: e[key].fogVisibility ?? FALLBACK_RULES.nodes[fallbackKey].fogVisibility,
     };
   };
   return {

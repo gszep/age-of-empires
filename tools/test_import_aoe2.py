@@ -370,6 +370,19 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(cart["animations"]["carry"]["source"], "u_trade_cart_west_walkA_x1.sld")
         self.assertNotIn("combat", cart)
 
+    def test_fog_visibility_separates_what_gaia_placed_from_what_a_player_owns(self):
+        # This one field decides whether a thing keeps being drawn once its
+        # tile goes dark, and it splits cleanly: everything gaia puts on the
+        # map is 1, everything a player trains or builds is 0. A unit left at
+        # the wrong value stands frozen in the fog with nothing failing, so
+        # the split is asserted rather than trusted.
+        entities = self.result["entities"]
+        for key in ("berries", "gold", "stone", "tree-oak", "sheep", "deer", "boar"):
+            self.assertEqual(entities[key]["fogVisibility"], 1, key)
+        for key in ("villager", "militia", "archer", "scout-cavalry",
+                    "town-center", "barracks", "house", "castle"):
+            self.assertEqual(entities[key]["fogVisibility"], 0, key)
+
     def test_gather_point_flag_resolves_by_its_own_graphic_name(self):
         # Nothing in the unit table points at the waypoint flag, so it is found
         # by name — and the name has to match exactly one graphic, or the

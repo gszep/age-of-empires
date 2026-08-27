@@ -152,6 +152,29 @@ describe('player observations', () => {
     expect(isTileVisible(state, 1, far.x + rules.lineOfSight + 3, far.y)).toBe(false);
   });
 
+  it('lets an enemy unit walk out of sight rather than leaving it standing there', () => {
+    // Issue #4. The DAT decides this: in the gaia civ every resource and every
+    // huntable is `fog_visibility` 1, and every unit a player trains is 0.
+    const state = createGame(11);
+    const scout = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const enemy = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
+    const sheep = state.entities.find(e => e.kind === 'sheep')!;
+    enemy.position = { x: 40, y: 40 };
+    sheep.position = { x: 41, y: 40 };
+    scout.position = { x: 40, y: 41 };
+    stepGame(state);
+    expect(observe(state, 1).entities.some(e => e.id === enemy.id)).toBe(true);
+    expect(observe(state, 1).entities.some(e => e.id === sheep.id)).toBe(true);
+
+    // Look away. The sheep is still where it was found; the villager is not.
+    scout.position = { x: 5, y: 9 };
+    stepGame(state);
+    const fogged = observe(state, 1);
+    expect(fogged.entities.some(e => e.id === enemy.id)).toBe(false);
+    expect(fogged.memory.some(e => e.id === enemy.id)).toBe(false);
+    expect(fogged.memory.some(e => e.id === sheep.id)).toBe(true);
+  });
+
   it('hides unexplored gaia resources until scouted', () => {
     const state = createGame(11);
     const observation = observe(state, 1);

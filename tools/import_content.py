@@ -217,6 +217,12 @@ def extract_entity(
         # resources, whose box can exceed the collision box — a barracks
         # collides at 1.5 half-tiles but outlines at 1.6).
         "selection": selection_of(unit),
+        # Whether the thing keeps being drawn once its tile goes dark. Gaia's
+        # resources and its huntables/herdables are 1; every player unit and
+        # building is 0. This is the field that decides a unit does not linger
+        # in the fog -- buildings are remembered by the engine's separate
+        # last-seen memory, which no DAT field states.
+        "fogVisibility": int(unit.fog_visibility),
     }
     # What is left behind is its own unit in the DAT with its own obstruction:
     # a carcass stops being a body in the way and marks a flat box on the

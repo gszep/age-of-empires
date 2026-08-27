@@ -3,7 +3,7 @@
  * tiles recomputed from line of sight, and last-seen memory of non-owned
  * entities. Observations and the viewer read only this state.
  */
-import { isBuilding, isUnit } from './data';
+import { isBuilding, isUnit, lingersInFog } from './data';
 import type { Entity, GameState, PlayerId, UnitKind } from './types';
 
 export interface RememberedEntity {
@@ -91,10 +91,14 @@ export function updateVisibility(state: GameState): void {
       }
     }
 
-    // Refresh or create memory for visible non-owned entities.
+    // Refresh or create memory for visible non-owned entities that the fog
+    // keeps. A soldier walking into the dark is gone, not frozen in a neutral
+    // pose where he was last seen (issue #4); a wood, a gold pile and a sheep
+    // stay where you found them.
     for (const entity of state.entities) {
       if (entity.owner === player) continue;
       if (entity.dead) continue;
+      if (!lingersInFog(state.rules, entity)) continue;
       if (isEntityVisible(state, player, entity)) remember(state, player, entity);
     }
     // Forget remembered entities whose last position is seen empty.

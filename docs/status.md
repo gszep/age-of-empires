@@ -239,6 +239,22 @@ anything past the player's age, and the command grid hides it.
 The built-in AI never ages up: it builds and trains only Dark Age things, so its
 matches (and the batch measurements above) are unaffected by the gate.
 
+### What the fog keeps
+
+The DAT decides who lingers in the dark. In the gaia civilisation every
+resource and every animal carries `fog_visibility` 1 — berries, gold, stone,
+the oak, the sheep, the deer, the boar — while every unit and building a player
+owns carries 0. So a wood or a gold pile you have found stays on your map at
+the state you left it, and an enemy soldier who walks into the fog is simply
+gone rather than standing there in a neutral pose (issue #4). The field is
+imported per entity and asserted in `test_import_aoe2.py`, because a unit left
+at the wrong value stands frozen with nothing failing.
+
+Buildings are the exception the DAT does not state: they are 0 like every other
+player-owned thing, and are still remembered as last-seen ghosts. That memory
+is the engine's own record of the map rather than a unit flag, and it is where
+the `buildProgress` and hit points a returning scout sees come from.
+
 ### Food on the hoof
 
 Gaia's animals are units, not resource nodes: they walk, they can be killed, and
