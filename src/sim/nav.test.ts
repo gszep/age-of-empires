@@ -159,6 +159,36 @@ describe('navigation compatibility suite', () => {
     expect(mine.position.x).toBeLessThan(15);
   });
 
+  it('finds the shortest way it can, and the same one twice', () => {
+    // The open list is a heap; a heap that sifts wrongly still returns a path,
+    // just not the best one. Octile distance is what an optimal 8-connected
+    // search costs on open ground, so measuring the path against it is what
+    // catches that — and a second identical run is what the replay depends on.
+    const state = arena();
+    state.entities = state.entities.filter(e => e.kind !== 'house' && e.kind !== 'barracks');
+    const grid = buildNavGrid(state);
+    const from = { x: 10.5, y: 10.5 };
+    const to = { x: 70.5, y: 40.5 };
+    const path = findPath(grid, from, to)!;
+    expect(path).toBeDefined();
+
+    const cost = (steps: Point[]) => {
+      let total = 0;
+      let at = from;
+      for (const step of steps) {
+        total += Math.abs(step.x - at.x) === 0 || Math.abs(step.y - at.y) === 0 ? 1 : Math.SQRT2;
+        at = step;
+      }
+      return total;
+    };
+    const dx = Math.abs(to.x - from.x);
+    const dy = Math.abs(to.y - from.y);
+    const octile = Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);
+    // Open ground: nothing to walk round, so the walk is the straight cost.
+    expect(cost(path)).toBeCloseTo(octile, 6);
+    expect(findPath(grid, from, to)).toEqual(path);
+  });
+
   it('crossing groups: two opposing groups pass and settle without stacking', () => {
     const state = arena();
     const left = [0, 1, 2].map(i => unit(state, { x: 10, y: 14 + i * 0.5 }));

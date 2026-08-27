@@ -303,6 +303,33 @@ and the match never starts.
 forests and its relics, and the extra resources between the players, are not
 generated.
 
+## What the pathfinder costs
+
+Three things made the 120x120 board stall, and all three were invisible at
+32x18.
+
+A one-tile resource placed anywhere but the middle of a tile straddles four
+tiles of the obstruction map. Every tree, mine and bush did, so 276 resources
+blocked 836 tiles and a forest was a wall with holes in it rather than
+something to walk through. The map generator now snaps everything it places to
+the tile it stands on: the same 280 resources block 312 tiles.
+
+The A* open list was a plain array scanned end to end for its minimum, which
+the comment called "small maps" and meant it — the search was quadratic in the
+size of its own frontier. It is now a binary heap ordered by the same total
+order (f, then h, then tile index), so the node it pops is exactly the one the
+scan would have found. Three seeds run to twelve thousand ticks give
+byte-identical checksums before and after, which is the proof that this changed
+no path, only what one costs.
+
+Worst single tick across a full match, seed 102: **104.9ms before, 9.1ms
+after**, against a tick budget of 50ms. The median was never the problem.
+
+The third was the example AI siting its lumber camp on whichever side of the
+tree a rotating list of bearings happened to reach first. A camp on the far
+side leaves the walk exactly as long as it was, and the wood it cost is wood
+not spent on a barracks; camps now go between the resource and home.
+
 ## Carrying on after the work runs out
 
 When a villager's node is spent it looks for more of the same, and what counts

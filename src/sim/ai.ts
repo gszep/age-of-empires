@@ -32,11 +32,15 @@ const CAMP_COST_WOOD = 100;
 /** How far a resource may be from a drop site before one is worth building. */
 const CAMP_RANGE = 8;
 const CAMPS_PER_RESOURCE = 3;
-/** Bearings to try around a node, cycled so a blocked spot is retried elsewhere. */
-const CAMP_SPOTS: { x: number; y: number }[] = [
-  { x: 3, y: 0 }, { x: -3, y: 0 }, { x: 0, y: 3 }, { x: 0, y: -3 },
-  { x: 2.5, y: 2.5 }, { x: -2.5, y: -2.5 }, { x: 2.5, y: -2.5 }, { x: -2.5, y: 2.5 },
-];
+/**
+ * Where a camp goes: between the resource and home, which is where a player
+ * puts one and the only side of the node that shortens anything. A camp on the
+ * far side is a hundred wood that leaves the walk exactly as long as it was.
+ * The candidates fan out from that line, and the radius steps out, so a
+ * blocked spot is retried nearby rather than behind the trees.
+ */
+const CAMP_FAN = [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4];
+const CAMP_RADII = [2.5, 3.5, 4.5];
 const BANKS: Record<string, ResourceKind[]> = {
   'town-center': ['food', 'wood', 'gold', 'stone'],
   'lumber-camp': ['wood'],
@@ -128,14 +132,21 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     if (observation.wood < CAMP_COST_WOOD || !idleBuilder || !tc) continue;
     const built = mine.filter(e => e.kind === camp.building);
     if (built.length >= CAMPS_PER_RESOURCE) continue;
+    // One of each until the barracks is up. Three camps and a mill is four
+    // hundred wood, and a player who keeps buying them never saves the
+    // hundred and seventy-five that starts an army.
+    if (!barracks && built.length >= 1) continue;
     // One at a time: a second would be sited against the same node anyway.
     if (built.some(e => (e.buildProgress ?? 1) < 1)) continue;
     const at = supply(camp.resource);
     if (!at || at.walk <= CAMP_RANGE) continue;
-    const spot = CAMP_SPOTS[Math.floor(observation.time / 3) % CAMP_SPOTS.length];
+    const step = Math.floor(observation.time / 3);
+    const home = Math.atan2(tc.y - at.node.y, tc.x - at.node.x);
+    const bearing = home + CAMP_FAN[step % CAMP_FAN.length];
+    const reach = CAMP_RADII[Math.floor(step / CAMP_FAN.length) % CAMP_RADII.length];
     commands.push({
       kind: 'build', player, builderIds: [idleBuilder.id], building: camp.building,
-      target: { x: at.node.x + spot.x, y: at.node.y + spot.y },
+      target: { x: at.node.x + Math.cos(bearing) * reach, y: at.node.y + Math.sin(bearing) * reach },
     });
   }
 

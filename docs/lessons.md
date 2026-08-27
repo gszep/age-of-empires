@@ -129,6 +129,24 @@ keeps the record.
   is nothing, idle is the correct answer. Reaching further is a decision, and
   decisions belong to whoever is playing.
 
+- **A one-tile footprint has to be on a tile.** Resources were placed at the
+  fractional positions the generator computed, so each blocked the four tiles
+  it straddled instead of the one it stood on, and a forest became nearly
+  solid. Rule: anything a tile grid will read must be snapped to that grid when
+  it is placed, not rounded when it is read.
+- **"Small maps" is a comment with an expiry date.** The pathfinder scanned its
+  whole open list for the minimum — fine at 576 tiles, quadratic in the
+  frontier at 14,400, and worth a hundred-millisecond tick when one villager
+  looked for a way into a wood. Rule: when a data-structure choice is justified
+  by the size of something, say so in the comment (this one did) and re-read
+  those comments the day that size changes.
+- **A performance fix should prove it changed nothing else.** Swapping the open
+  list for a heap could quietly have changed which equal-cost path a unit
+  takes, which a deterministic simulation cannot afford. Keeping the same total
+  order (f, then h, then tile index — the tile makes it total) meant the pop
+  sequence was unchanged, and running three seeds to twelve thousand ticks for
+  byte-identical checksums is what turned that from an argument into evidence.
+
 ## Process
 
 - **Complete one playable behaviour end to end** (from the working style

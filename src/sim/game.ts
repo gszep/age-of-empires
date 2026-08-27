@@ -88,6 +88,15 @@ function addAnimal(state: GameState, kind: AnimalKind, position: Point): Entity 
 
 const TAU = Math.PI * 2;
 
+/**
+ * The middle of the tile a point falls in. Everything the map generator places
+ * is one tile across, and a one-tile footprint centred anywhere else straddles
+ * four tiles of the obstruction map instead of filling one — which turned a
+ * forest into a wall with a few holes in it and made the pathfinder work
+ * through the whole map to find its way to a tree.
+ */
+const onTile = (at: Point): Point => ({ x: Math.floor(at.x) + 0.5, y: Math.floor(at.y) + 0.5 });
+
 /** A point inside the map, clear of every footprint already placed. */
 function freeSpot(state: GameState, at: Point): boolean {
   return at.x >= 1 && at.y >= 1 && at.x <= state.width - 1 && at.y <= state.height - 1
@@ -109,7 +118,7 @@ function placeGroup(state: GameState, group: StartGroup, mirror: (p: Point) => P
       x: START.x + Math.cos(angle) * distance,
       y: START.y + Math.sin(angle) * distance,
     };
-    if (!freeSpot(state, centre)) continue;
+    if (!freeSpot(state, onTile(centre))) continue;
     let placed = 0;
     for (let i = 0; i < group.count; i++) {
       for (let tries = 0; tries < 16; tries++) {
@@ -117,8 +126,8 @@ function placeGroup(state: GameState, group: StartGroup, mirror: (p: Point) => P
         // Square-rooted radius spreads the group evenly over its disc rather
         // than piling it at the middle.
         const radius = Math.sqrt(random01(state)) * group.spread;
-        const at = { x: centre.x + Math.cos(spin) * radius, y: centre.y + Math.sin(spin) * radius };
-        const other = mirror(at);
+        const at = onTile({ x: centre.x + Math.cos(spin) * radius, y: centre.y + Math.sin(spin) * radius });
+        const other = onTile(mirror(at));
         if (!freeSpot(state, at) || !freeSpot(state, other)) continue;
         const kind = group.kind;
         if (kind === 'sheep' || kind === 'deer' || kind === 'boar') {

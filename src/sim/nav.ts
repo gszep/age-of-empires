@@ -106,6 +106,65 @@ export function nearestFreeTile(grid: NavGrid, target: Point): { x: number; y: n
 const SQRT2 = Math.SQRT2;
 
 /**
+ * Minimum-first binary heap of (tile, f, h), ordered by f then h then tile.
+ * The tile index makes the order total, so the minimum is unique and the pop
+ * sequence is fixed — which is what a deterministic simulation needs from its
+ * pathfinder, and what a heap keyed on f alone would not give.
+ */
+class Heap {
+  private nodes: number[] = [];
+  private f: number[] = [];
+  private h: number[] = [];
+
+  get size(): number { return this.nodes.length; }
+
+  private before(a: number, b: number): boolean {
+    if (this.f[a] < this.f[b] - 1e-9) return true;
+    if (this.f[a] > this.f[b] + 1e-9) return false;
+    if (this.h[a] < this.h[b] - 1e-9) return true;
+    if (this.h[a] > this.h[b] + 1e-9) return false;
+    return this.nodes[a] < this.nodes[b];
+  }
+
+  private swap(a: number, b: number): void {
+    [this.nodes[a], this.nodes[b]] = [this.nodes[b], this.nodes[a]];
+    [this.f[a], this.f[b]] = [this.f[b], this.f[a]];
+    [this.h[a], this.h[b]] = [this.h[b], this.h[a]];
+  }
+
+  push(node: number, f: number, h: number): void {
+    this.nodes.push(node);
+    this.f.push(f);
+    this.h.push(h);
+    for (let at = this.nodes.length - 1; at > 0;) {
+      const parent = (at - 1) >> 1;
+      if (!this.before(at, parent)) break;
+      this.swap(at, parent);
+      at = parent;
+    }
+  }
+
+  pop(): number {
+    const top = this.nodes[0];
+    const last = this.nodes.length - 1;
+    this.swap(0, last);
+    this.nodes.pop();
+    this.f.pop();
+    this.h.pop();
+    for (let at = 0;;) {
+      const left = at * 2 + 1;
+      if (left >= this.nodes.length) break;
+      const right = left + 1;
+      const child = right < this.nodes.length && this.before(right, left) ? right : left;
+      if (!this.before(child, at)) break;
+      this.swap(at, child);
+      at = child;
+    }
+    return top;
+  }
+}
+
+/**
  * 8-connected A* from a start tile to a goal tile. Diagonal moves may not cut
  * blocked corners. Ties break on f, then h, then tile index, so equal-cost
  * paths are stable across runs and platforms.
@@ -139,29 +198,22 @@ export function findPath(grid: NavGrid, from: Point, to: Point): Point[] | undef
     return Math.max(dx, dy) + (SQRT2 - 1) * Math.min(dx, dy);
   };
 
-  // Small maps: an array-backed open list with linear extraction keeps the
-  // implementation minimal and fully deterministic.
-  const open: number[] = [startIndex];
+  // The open list is a binary heap ordered by the same total order the search
+  // has always used: f, then h, then tile index. No two entries compare equal
+  // unless they are the same tile, so the node it pops is exactly the one a
+  // linear scan of the whole list would have found — which is what this used
+  // to do, and what made the search quadratic in the size of its own frontier.
+  // On a 32x18 board nobody could tell; on 120x120 one villager looking for a
+  // way into a wood could cost a whole tick.
+  const open = new Heap();
   gScore[startIndex] = 0;
+  open.push(startIndex, heuristic(startIndex), heuristic(startIndex));
   // The best the search actually reached, in case the goal is walled off.
   let closest = startIndex;
   let closestH = heuristic(startIndex);
 
-  while (open.length) {
-    let bestPosition = 0;
-    let bestF = Infinity;
-    let bestH = Infinity;
-    for (let i = 0; i < open.length; i++) {
-      const node = open[i];
-      const f = gScore[node] + heuristic(node);
-      const h = heuristic(node);
-      if (f < bestF - 1e-9 || (Math.abs(f - bestF) <= 1e-9 && (h < bestH - 1e-9 || (Math.abs(h - bestH) <= 1e-9 && node < open[bestPosition])))) {
-        bestF = f;
-        bestH = h;
-        bestPosition = i;
-      }
-    }
-    const current = open.splice(bestPosition, 1)[0];
+  while (open.size) {
+    const current = open.pop();
     if (current === goalIndex) break;
     if (closed[current]) continue;
     closed[current] = 1;
@@ -186,7 +238,8 @@ export function findPath(grid: NavGrid, from: Point, to: Point): Point[] | undef
         if (cost < gScore[neighbor] - 1e-9) {
           gScore[neighbor] = cost;
           parent[neighbor] = current;
-          open.push(neighbor);
+          const h = heuristic(neighbor);
+          open.push(neighbor, cost + h, h);
         }
       }
     }
