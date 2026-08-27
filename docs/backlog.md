@@ -48,12 +48,6 @@ construction-complete cue, so that one has no owned source to draw on.
   and a monk behind a building simply has no contour. The invariant is the
   decoder working as intended; what these two layers encode differently has not
   been measured.
-- **A spent forage bush shows a tree stump.** Playtest report: exhausted
-  bushes briefly draw the generic stump before vanishing. The `dead` import
-  slot routes bushes through `n_tree_stump_generic_x1`; verify against the
-  bush's own `dead_unit_id` and the reference (a depleted bush should leave
-  nothing), and stop sharing the tree's decay art if the DAT does not
-  actually assign it.
 - **A corpse re-seen through fog replays its death.** Playtest report, now
   half fixed: the decay *stage* is right, because it is derived from the food
   left rather than from a clock, and the remaining food is right too. What
@@ -85,6 +79,15 @@ terrain blends above.
   built-in AI never builds one (it never leaves the Dark Age, below). Fixing
   the AI's Feudal gap, or an allied player slot, is what makes trade
   observable in a real match.
+- **Ageing up changes how a building looks but not how tough it is.** The
+  DAT's age technologies replace each building with the next age's unit, and
+  those units carry more hit points as well as different art: a barracks goes
+  1200 -> 1500 in the Feudal Age, a house 550 -> 750, a mill 600 -> 800. The
+  art is imported and drawn (issue #13); the hit points are not applied,
+  because doing so is a simulation change and belongs with the technology
+  effects rather than with the renderer. Each age's variant also has its own
+  rubble unit (`Barracks Age2 (Rubble)` and friends), so a razed Feudal
+  barracks still leaves the Dark Age rubble.
 - **No unit upgrade or economic technology is researchable.** Loom, the Feudal
   Age and the Castle Age are; the blacksmith's armour and attack lines, the
   university, the monastery's own technologies, and every unit upgrade
@@ -164,12 +167,12 @@ terrain blends above.
 
 ## Debug tooling
 
-- **Geometric questions still need eyes for the axis, not the frame.** The
-  protocol grew this session: `entities` reports `amount`/`resourceKind` and the
-  `frame` actually drawn, and `sim` reports `selected` and `flashTarget`. Those
-  settled the carcass decay question (frame 5 of 30 at 82 food, 28 at 6) and the
-  order-flash rule without a screenshot. What is still missing is which axis a
-  piece believes it is on, so "is this gate lying the way I dragged it" is read
-  out of the frame index by hand. Reporting the wall/gate orientation tag
-  alongside the frame would finish the job. Keep screenshots for what genuinely
-  needs looking at; grow the protocol whenever a screenshot loop repeats.
+- **The protocol now answers geometry as well as state.** `entities` reports
+  `amount`/`resourceKind`, the `frame` actually drawn, and a `shape` tag for
+  walls and gates (`run-x`, `run-y`, `joint`, `post`, `gate-x`, `gate-y`);
+  `sim` reports `selected` and `flashTarget`. Those settled the carcass decay
+  question, the order-flash rule and the palisade orientation without a
+  screenshot. Keep screenshots for what genuinely needs looking at — the
+  palisade's frame-to-meaning mapping did, and compositing the arrangement
+  offline was what settled it. Grow the protocol whenever a screenshot loop
+  repeats.

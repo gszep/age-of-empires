@@ -142,6 +142,78 @@ function annexedAssets(): ContentAssets {
   return assets;
 }
 
+describe('what a building wears in each age', () => {
+  /** A barracks with Dark and Castle art but nothing for the Feudal Age. */
+  function agedAssets(present: string[]): ContentAssets {
+    const assets = fakeAssets();
+    const frames = [{ x: 0, y: 0, w: 4, h: 4, cx: 2, cy: 2 }];
+    const atlas = (image: string): Atlas => ({ image, size: [4, 4], framesInFile: 1, frames });
+    const still = { frames: 1, directions: 1, frameSeconds: 0, mirroringMode: 0 };
+    const animations: Record<string, typeof still> = {};
+    const atlases: Record<string, Atlas> = {};
+    for (const name of present) {
+      const image = `barracks/${name}.png`;
+      const texture = new THREE.DataTexture(new Uint8Array(4 * 4 * 4), 4, 4);
+      texture.needsUpdate = true;
+      assets.textures.set(image, texture);
+      animations[name] = still;
+      atlases[name] = atlas(image);
+    }
+    assets.entities['barracks'] = { category: 'building', animations, atlases };
+    return assets;
+  }
+
+  const barracksOf = (state: GameState): Entity => {
+    const rules = state.rules.buildings.barracks;
+    const entity: Entity = {
+      id: state.nextId++, kind: 'barracks', owner: 1, position: { x: 30.5, y: 30.5 },
+      hp: rules.hp, maxHp: rules.hp, radius: rules.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(entity);
+    return entity;
+  };
+
+  it('names the age its owner has reached', () => {
+    // Ageing up in AoE2 replaces the building with the next age's unit, so
+    // what it draws is a question about the owner's age (issue #13).
+    const state = createGame(70);
+    const barracks = barracksOf(state);
+    state.players[1].age = 0;
+    expect(chooseAnimation(state, barracks).name).toBe('idle');
+    state.players[1].age = 1;
+    expect(chooseAnimation(state, barracks).name).toBe('idle-feudal');
+    state.players[1].age = 2;
+    expect(chooseAnimation(state, barracks).name).toBe('idle-castle');
+    state.players[1].age = 3;
+    expect(chooseAnimation(state, barracks).name).toBe('idle-imperial');
+  });
+
+  it('falls back through the older ages, not straight to the base art', () => {
+    // Not every building is restyled in every age — a market first exists in
+    // the Feudal Age and changes only in the Castle — so a missing variant has
+    // to drop to the newest one that exists, and only then to `idle`.
+    const state = createGame(71);
+    const barracks = barracksOf(state);
+
+    const sparse = agedAssets(['idle', 'idle-castle']);
+    state.players[1].age = 1;
+    const a = createEntityView(sparse, barracks);
+    updateEntityView(a, sparse, state, barracks, 0);
+    expect(a.animationState).toBe('barracks/idle');
+    state.players[1].age = 2;
+    updateEntityView(a, sparse, state, barracks, 1);
+    expect(a.animationState).toBe('barracks/idle-castle');
+
+    // Feudal art but no Castle art: the Castle Age keeps wearing the Feudal.
+    const older = agedAssets(['idle', 'idle-feudal']);
+    state.players[1].age = 2;
+    const b = createEntityView(older, barracks);
+    updateEntityView(b, older, state, barracks, 0);
+    expect(b.animationState).toBe('barracks/idle-feudal');
+  });
+});
+
 describe('what a death leaves behind', () => {
   /** A villager and an oak with the DAT's death-then-decay chain. */
   function corpseAssets(): ContentAssets {

@@ -300,6 +300,39 @@ export function gateIsOpen(state: GameState, entity: Entity): boolean {
     && Math.abs(other.position.y - entity.position.y) <= GATE_OPEN_RANGE);
 }
 
+/**
+ * Ages in the order the DAT's own upgrade technologies grant them, so index 1
+ * is the Feudal Age. Ageing up in AoE2 replaces the building with the next
+ * age's unit -- the barracks becomes "Barracks Age2", the town center grows
+ * its Feudal roof -- so what a building draws is a question about its owner's
+ * age (issue #13).
+ */
+const AGE_NAMES = ['dark', 'feudal', 'castle', 'imperial'] as const;
+
+/** The idle animation name for the age this building's owner has reached. */
+export function ageIdle(state: GameState, entity: Entity): string {
+  const age = entity.owner === 0 ? 0 : state.players[entity.owner]?.age ?? 0;
+  const index = Math.max(0, Math.min(age, AGE_NAMES.length - 1));
+  return index === 0 ? 'idle' : `idle-${AGE_NAMES[index]}`;
+}
+
+/**
+ * The names to try for an age-varying idle, newest first, ending at plain
+ * `idle`. Not every building changes in every age -- a market first exists in
+ * the Feudal Age and is restyled only in the Castle -- so a Feudal market has
+ * to fall back to its base art rather than to nothing, and a Castle-age one
+ * that had a Feudal variant must not skip past it to the base.
+ */
+export function ageIdleChain(state: GameState, entity: Entity): string[] {
+  const age = entity.owner === 0 ? 0 : state.players[entity.owner]?.age ?? 0;
+  const names: string[] = [];
+  for (let index = Math.min(age, AGE_NAMES.length - 1); index > 0; index--) {
+    names.push(`idle-${AGE_NAMES[index]}`);
+  }
+  names.push('idle');
+  return names;
+}
+
 /** Choose the imported sprite source (entity variant) and animation name. */
 export function chooseAnimation(state: GameState, entity: Entity): { key: string; name: string } {
   const kind = entity.kind;
@@ -314,7 +347,7 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
     if (entity.dead) return { key, name: 'death' };
     if (entity.buildProgress !== undefined) return { key, name: 'construction' };
     if (kind === 'palisade-gate' && gateIsOpen(state, entity)) return { key, name: 'open' };
-    return { key, name: 'idle' };
+    return { key, name: ageIdle(state, entity) };
   }
   if (kind !== 'villager') {
     if (entity.dead) return { key: kind, name: 'death' };
@@ -682,6 +715,19 @@ export function updateEntityView(
   }
   let animation: AnimationInfo | undefined = imported?.animations[choice.name];
   let atlas: Atlas | undefined = imported?.atlases[choice.name];
+  // An age's idle falls back through the older ages before the base art, so a
+  // building the DAT restyles only at the Castle Age keeps its Dark Age
+  // picture through the Feudal one instead of losing it (issue #13).
+  if ((!animation || !atlas) && choice.name.startsWith('idle-')) {
+    for (const name of ageIdleChain(state, entity)) {
+      if (imported?.animations[name] && imported?.atlases[name]) {
+        choice.name = name;
+        animation = imported.animations[name];
+        atlas = imported.atlases[name];
+        break;
+      }
+    }
+  }
   if (!animation || !atlas) {
     // Idle is the right stand-in for a missing walk or attack. It is the wrong
     // one for something that has died: a worked-out forage bush has no death
@@ -780,9 +826,13 @@ export function updateEntityView(
   view.outline.mesh.visible = false;
 
   const annexes = imported?.annexes ?? [];
+  // The town center's four annex pieces are upgraded by the same age
+  // technology as the building itself, so each follows the same chain.
+  const annexAge = isBuilding(entity.kind) ? ageIdleChain(state, entity) : ['idle'];
   for (const [index, piece] of view.annexes.entries()) {
     const annex = annexes[index];
-    const annexAtlas = annex?.atlases[`annex${index}-idle`];
+    const annexName = annexAge.find(name => annex?.atlases[`annex${index}-${name}`]) ?? 'idle';
+    const annexAtlas = annex?.atlases[`annex${index}-${annexName}`];
     const colorPiece = view.annexColors[index];
     if (!annex || !annexAtlas || entity.buildProgress !== undefined || entity.dead) {
       piece.mesh.visible = false;
@@ -794,7 +844,8 @@ export function updateEntityView(
     const order = 1000 + depth * 10 + 1 + index * 2;
     applyFrame(piece, assets, annexAtlas, 0, entity.position, 0xffffff);
     piece.mesh.renderOrder = order;
-    const annexColorAtlas = annex.atlases[`annex${index}-idle-playercolor`];
+    const annexColorAtlas = annex.atlases[`annex${index}-${annexName}-playercolor`]
+      ?? annex.atlases[`annex${index}-idle-playercolor`];
     if (colorPiece && annexColorAtlas && entity.owner !== 0) {
       applyFrame(
         colorPiece, assets, annexColorAtlas, 0, entity.position,

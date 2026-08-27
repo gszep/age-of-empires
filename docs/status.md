@@ -512,6 +512,29 @@ wherever it is sent, and the example AI still tasks villagers onto nodes it
 remembers through fog — that is a decision it makes, not something the unit
 does on its own.
 
+## A building wears its age
+
+Ageing up in AoE2 does not restyle a building, it replaces it: the Feudal Age
+technology (101) carries `upgrade unit` commands turning the barracks (12) into
+"Barracks Age2" (498), the house into HOUS2, the mill into MILL2, and the town
+center and each of its four annex pieces into their Feudal selves. Tech 102 and
+103 do the same for the Castle and Imperial Ages. Reading those commands is how
+each age's art is found — no unit id for a variant is written down anywhere in
+this repository (issue #13).
+
+The importer therefore gives every building an `idle-feudal`, `idle-castle` and
+`idle-imperial` wherever the DAT names one, annexes included, and the renderer
+picks the newest one at or below the owner's age. Not every building changes in
+every age — a market first exists in the Feudal Age and is restyled only in the
+Castle — so the lookup walks down the ages before falling back to the base art,
+rather than dropping straight to it and losing an age the content does have.
+
+What is *not* taken from those units is their hit points, which also rise with
+the age (barracks 1200 to 1500, house 550 to 750, mill 600 to 800). That is a
+simulation change and belongs with the technology effects; it is recorded in
+`backlog.md`. Each age's variant likewise has its own rubble unit, so a razed
+Feudal barracks still leaves the Dark Age rubble.
+
 ## The DAT's axes are mirrored against this projection
 
 `worldToIso` sends +x down-**right** on screen; AoE2 sends its own +x

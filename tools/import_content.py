@@ -383,6 +383,19 @@ def extract_entity(
         for name, animation in spec["animations"].items()
     }
 
+    # Ageing up replaces the building with the next age's unit, so the art for
+    # each age is that unit's standing graphic (issue #13). The hit points the
+    # variants also carry are a simulation change and are not read here; see
+    # docs/backlog.md.
+    if category == "building":
+        for age, variant_id in age_variants(dat, unit.id).items():
+            variant = civ_units[variant_id]
+            if variant is None or variant.standing_graphic[0] < 0:
+                continue
+            entity["animations"][f"idle-{age}"] = animation_entry(
+                dat, graphics_dir, variant.standing_graphic[0], hashes
+            )
+
     if spec.get("includeAnnexes") and unit.building is not None:
         annexes = []
         for annex in unit.building.annexes:
@@ -398,7 +411,19 @@ def extract_entity(
                     "animations": {
                         "idle": animation_entry(
                             dat, graphics_dir, annex_unit.standing_graphic[0], hashes
-                        )
+                        ),
+                        # The annex ids on a town center are the same in every
+                        # age; it is the annex units themselves the age
+                        # technology upgrades, so each is followed separately.
+                        **{
+                            f"idle-{age}": animation_entry(
+                                dat, graphics_dir,
+                                civ_units[variant_id].standing_graphic[0], hashes,
+                            )
+                            for age, variant_id in age_variants(dat, annex.unit_id).items()
+                            if civ_units[variant_id] is not None
+                            and civ_units[variant_id].standing_graphic[0] >= 0
+                        },
                     },
                 }
             )
@@ -428,7 +453,14 @@ def effect_entry(
 
 # Effect command kinds this import understands, from the DAT's own tables.
 EFFECT_ENABLE = 2          # a = unit, b = 1 makes it available
+EFFECT_UPGRADE_UNIT = 3    # a = unit, b = what it becomes
 EFFECT_ATTRIBUTE_ADD = 4   # a = unit, b = class, c = attribute, d = amount
+
+# The age each of these technologies grants, by the name this project uses for
+# it. Ageing up in AoE2 replaces a building with the next age's unit, which is
+# where the taller mill and the stone barracks come from; the DAT states every
+# swap as an `upgrade unit` command on the age technology itself.
+AGE_UPGRADE_TECHS = {"feudal": 101, "castle": 102, "imperial": 103}
 ATTRIBUTE_HIT_POINTS = 0
 ATTRIBUTE_ARMOR = 8        # d packs the armour class in the high byte
 
@@ -447,6 +479,27 @@ def enabling_tech(dat: DatFile, unit_id: int) -> Any:
             if command.type == EFFECT_ENABLE and command.a == unit_id and command.b == 1:
                 return tech
     return None
+
+
+def age_variants(dat: DatFile, unit_id: int) -> dict[str, int]:
+    """What this unit becomes in each later age, as the age technology says.
+
+    A building is not restyled in AoE2, it is replaced: the Feudal Age
+    technology carries `upgrade unit` commands turning the barracks (12) into
+    "Barracks Age2" (498), the house into HOUS2, and the town center and each
+    of its four annex pieces into their Feudal selves. Reading those commands
+    is how the age art is found; nothing here lists a unit id by hand.
+    """
+    found: dict[str, int] = {}
+    for age, tech_id in AGE_UPGRADE_TECHS.items():
+        tech = dat.techs[tech_id]
+        if tech.effect_id is None or not 0 <= tech.effect_id < len(dat.effects):
+            continue
+        for command in dat.effects[tech.effect_id].effect_commands:
+            if command.type == EFFECT_UPGRADE_UNIT and int(command.a) == unit_id:
+                found[age] = int(command.b)
+                break
+    return found
 
 
 def available_age(dat: DatFile, unit_id: int) -> int:

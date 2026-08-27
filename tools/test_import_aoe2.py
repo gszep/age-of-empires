@@ -371,6 +371,41 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(cart["animations"]["carry"]["source"], "u_trade_cart_west_walkA_x1.sld")
         self.assertNotIn("combat", cart)
 
+    def test_each_age_brings_the_building_the_dat_upgrades_it_into(self):
+        # Ageing up in AoE2 replaces a building rather than restyling it: the
+        # Feudal Age technology carries `upgrade unit` commands turning the
+        # barracks (12) into "Barracks Age2" (498) and the town center into
+        # RTWC2, and each of the town center's four annex pieces separately.
+        # The art for each age is read from those commands, so nothing here is
+        # a hand-written unit id (issue #13).
+        from import_content import age_variants
+        dat = _dat()
+        entities = self.result["entities"]
+        self.assertEqual(age_variants(dat, 12), {"feudal": 498, "castle": 132, "imperial": 20})
+
+        checked = 0
+        for key, entity in entities.items():
+            if entity["category"] != "building":
+                continue
+            spec = next(e for e in SPEC["entities"] if e["key"] == key)
+            for age in age_variants(dat, spec["unitId"]):
+                self.assertIn(f"idle-{age}", entity["animations"], f"{key} {age}")
+                checked += 1
+        self.assertGreater(checked, 12)
+
+        # The Dark Age barracks is timber and the Feudal one is not the same
+        # source file; a variant resolving back to the base art would look
+        # like no change at all in a played match.
+        barracks = entities["barracks"]["animations"]
+        self.assertNotEqual(barracks["idle"]["source"], barracks["idle-feudal"]["source"])
+        self.assertNotEqual(barracks["idle-feudal"]["source"], barracks["idle-castle"]["source"])
+
+        # The town center's annexes age with it.
+        annex = entities["town-center"]["annexes"][0]["animations"]
+        for age in ("feudal", "castle", "imperial"):
+            self.assertIn(f"idle-{age}", annex)
+        self.assertNotEqual(annex["idle"]["source"], annex["idle-feudal"]["source"])
+
     def test_only_something_that_can_die_leaves_anything_behind(self):
         # A forage bush names STUMP (415) in `dead_unit_id`, exactly as the oak
         # does, but it has zero hit points and no dying graphic — it cannot
