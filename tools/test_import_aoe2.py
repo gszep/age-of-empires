@@ -444,6 +444,43 @@ class AudioImportIntegrationTest(unittest.TestCase):
         ]
         self.assertEqual(matches, [(232745270, 56802692)])
 
+    def test_unit_voices_narrow_to_the_imported_civilisation(self):
+        # A unit's voice event covers every civilisation through one switch
+        # container, so playing it whole would import forty languages. The
+        # militia's selection voice is three files for the Britons — exactly
+        # the three the DAT lists for civ 1 (bvmms1..3.wav).
+        from import_audio import resolve_event_id
+        militia_select = -1993334441
+        everyone = [m for bank in self.banks for m in resolve_event_id(bank, militia_select)]
+        britons = [m for bank in self.banks for m in resolve_event_id(bank, militia_select, "Britons")]
+        self.assertGreater(len(everyone), 100)
+        self.assertEqual(len(britons), 3)
+        self.assertTrue(set(britons) <= set(everyone))
+        # An unknown switch narrows to nothing rather than falling back to all
+        # of them, which would be a silent forty-language import.
+        self.assertEqual([m for bank in self.banks
+                          for m in resolve_event_id(bank, militia_select, "NoSuchCiv")], [])
+
+    def test_every_consumed_cue_resolves_to_owned_media(self):
+        # Each alias the game plays has to reach real embedded media: a unit
+        # voice that silently resolved to nothing would be a quiet game, not a
+        # failed import.
+        from import_audio import consumed_cues, resolve_event_id
+        ui = Path("public/imported/aoe2/ui/manifest.json")
+        content = Path(".local/aoe2de/content.json")
+        if not (ui.is_file() and content.is_file()):
+            self.skipTest("run the importer first")
+        cues = consumed_cues(ui, content)
+        self.assertGreater(len(cues), 10)
+        for cue in cues:
+            media = [m for bank in self.banks for m in resolve_event_id(bank, cue["id"], cue["switch"])]
+            self.assertTrue(media, cue["alias"])
+        # Every unit the slice trains speaks when it is picked.
+        aliases = {cue["alias"] for cue in cues}
+        for key in ("villager", "militia", "spearman", "archer", "skirmisher",
+                    "scout-cavalry", "trade-cart"):
+            self.assertIn(f"{key}-select", aliases)
+
     def test_vgmstream_regenerates_byte_identical_browser_audio(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

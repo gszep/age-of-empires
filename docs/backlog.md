@@ -9,10 +9,10 @@ are deleted, not ticked.
 
 ## Audio
 
-Only the `button_ui` click cue is wired. The Wwise pipeline
-(`import_audio.py` + `vgmstream-cli`) is proven; remaining work is coverage:
-unit selection/acknowledgement voices, training/construction cues, combat
-sounds, and under-attack alerts, each resolved through `sounds.json` events.
+Unit selection and training voices are wired (see status.md). Remaining
+coverage: construction and completion cues, combat sounds, and the alert set
+(`Play_Under_Attack`, `Play_Population_Capped`, `Play_Farm_Depleted`,
+`Play_Gatherpoint_Set`) which `sounds.json` does name.
 
 ## Rendering
 

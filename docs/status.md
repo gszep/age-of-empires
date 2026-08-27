@@ -238,12 +238,29 @@ DIDX media. The externally installed, permissively licensed `vgmstream-cli`
 then decodes that media to deterministic browser-playable WAV without vendored
 decoder code.
 
+Unit voices come from the DAT rather than from `sounds.json`, which holds only
+UI events. Each unit carries `wwise_selection_sound_id` and
+`wwise_train_sound_id` — already-hashed Wwise ids — so the resolver accepts an
+id as well as a name. Those events cover every civilisation through a single
+switch container keyed on `Civilization`, whose switch table is
+`(switch id, count, children...)` records after a variable-length parameter
+block; it is found by locating the group id and accepting only a walk where
+every child is a real object. Narrowed to `Britons`, the militia's selection
+voice is three files — exactly the three the DAT lists for civ 1 (`bvmms1..3`)
+— where the unnarrowed event reaches 178. A switch value with no branch plays
+nothing rather than everything, because the failure mode to guard is a silent
+forty-language import.
+
+Fifteen aliases are imported: a select and a train voice for each trainable
+unit, plus the widget click. The view answers a selection and an order with the
+same voice, which is what AoE2 does and what the DAT stores.
+
 The first consumed cue is the widget-authored `button_ui` alias:
 `Play_Button_UI` resolves in bank 232745270 to media 56802692 and decodes to a
 0.239456-second mono 22.05 kHz cue. It plays for HUD command/menu clicks in the
 owned-content mode; the open fallback remains silent. Integration tests verify
-the source resolution and byte-identical regeneration. Broader simulation
-sound triggers and localized unit acknowledgements are not wired yet.
+the source resolution and byte-identical regeneration. Alert and feedback cues — under attack, construction, resource depletion — are
+not wired yet.
 
 ## Verification
 

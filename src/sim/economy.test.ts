@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { FALLBACK_RULES, rulesFromManifest, type ContentManifest, type GameRules } from './data';
+import { FALLBACK_RULES, isAnimal, rulesFromManifest, type ContentManifest, type GameRules } from './data';
 import { checksumState } from './checksum';
 import { applyCommand, createGame, placementLegal, stepGame } from './game';
 import type { BuildingKind, Entity, GameState, ResourceKind } from './types';
@@ -8,6 +8,10 @@ import type { BuildingKind, Entity, GameState, ResourceKind } from './types';
 const MANIFEST_PATH = 'public/imported/aoe2/manifest.json';
 const importedRules: GameRules | undefined = existsSync(MANIFEST_PATH)
   ? rulesFromManifest(JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as ContentManifest)
+  : undefined;
+const AUDIO_PATH = 'public/imported/aoe2/audio/manifest.json';
+const importedAudio: { audio: Record<string, unknown> } | undefined = existsSync(AUDIO_PATH)
+  ? JSON.parse(readFileSync(AUDIO_PATH, 'utf8')) as { audio: Record<string, unknown> }
   : undefined;
 
 const run = (state: GameState, ticks: number) => {
@@ -975,6 +979,15 @@ describe('imported rules', () => {
     expect(cart.tradeRatePerSecond).toBe(0.2875);
     expect(cart.tradeCapacity).toBe(100);
     expect(cart.attacks).toEqual([]);
+  });
+
+  it.skipIf(!importedAudio)('gives every trainable unit a voice the view can name', () => {
+    // The view asks for `<kind>-select`; a renamed alias would go quiet with
+    // nothing to say so.
+    for (const kind of Object.keys(FALLBACK_RULES.units)) {
+      if (isAnimal(kind as never)) continue;
+      expect(Object.keys(importedAudio!.audio), kind).toContain(`${kind}-select`);
+    }
   });
 
   it.skipIf(!importedRules)('replays identically under imported rules', () => {

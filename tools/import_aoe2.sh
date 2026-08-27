@@ -36,7 +36,7 @@ if [ -f "$AUDIO_PACK" ]; then
     exit 2
   fi
   "$ROOT/.tools/import-venv/bin/python" "$ROOT/tools/import_audio.py" \
-    --pack "$AUDIO_PACK"
+    --pack "$AUDIO_PACK" --content "$ROOT/.local/aoe2de/content.json"
 else
   rm -rf "$ROOT/public/imported/aoe2/audio"
   echo "Optional audio depot 813783 not found; continuing without audio." >&2

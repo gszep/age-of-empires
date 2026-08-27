@@ -39,9 +39,12 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    aliases from `sounds.json`) into `public/imported/aoe2/ui/`, converting DDS
    through Pillow and copying PNG byte-identically.
 5. When sound depot 813783 and `vgmstream-cli` are available,
-   `import_audio.py` follows consumed event names through the owned PCK/BNK
-   HIRC graph, extracts only referenced DIDX media, and writes deterministic
-   browser-playable WAV cues under `public/imported/aoe2/audio/`.
+   `import_audio.py` follows consumed cues through the owned PCK/BNK HIRC
+   graph, extracts only referenced DIDX media, and writes deterministic
+   browser-playable WAV cues under `public/imported/aoe2/audio/`. Widget cues
+   arrive as event names to hash; unit voices arrive as the Wwise ids the DAT
+   already holds, narrowed to the imported civilisation's branch of the
+   `Civilization` switch container.
 
 `npm run test:import` runs the integration suite (`test_import_aoe2.py`) against
 the owned fixture, including determinism checks.

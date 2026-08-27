@@ -133,6 +133,21 @@ function playSound(alias: string): void {
   void element.play().catch(() => { /* browser gesture/autoplay policy */ });
 }
 
+/**
+ * A unit's own voice, from the DAT's Wwise ids. AoE2 answers both a selection
+ * and an order with the same voice set, and the DAT carries one voice set for
+ * the unit, so this plays for both.
+ */
+function playUnitSound(kind: string, cue: 'select' | 'train'): void {
+  playSound(`${kind}-${cue}`);
+}
+
+/** One voice for a selection or an order, from the first owned unit in it. */
+function acknowledge(): void {
+  const unit = ownSelected().find(e => isUnit(e.kind));
+  if (unit) playUnitSound(unit.kind, 'select');
+}
+
 /** A stand-in entity so the preview reuses the normal building rendering. */
 function ghostEntity(kind: BuildingKind, at: Point): Entity {
   return {
@@ -343,6 +358,7 @@ addEventListener('pointerup', event => {
     }
   }
   dragStart = undefined;
+  acknowledge();
 });
 
 function contextOrder(point: Point, _clientX: number, _clientY: number): void {
@@ -356,6 +372,7 @@ function contextOrder(point: Point, _clientX: number, _clientY: number): void {
       target: point, targetId: target && target.id !== units[0].id ? target.id : undefined,
     });
     if (!result.ok) hud.showMessage(result.reason);
+    else acknowledge();
     return;
   }
   // Defensive buildings take a target the same way units do.
@@ -375,6 +392,21 @@ function contextOrder(point: Point, _clientX: number, _clientY: number): void {
     applyCommand(game, { kind: 'rally', player: 1, buildingId: building.id, target: point, targetId: target?.id });
     hud.showMessage('Rally point set');
   }
+}
+
+/**
+ * Units this player has that were not there a frame ago. Owned units are
+ * always visible, so a new id is one that finished training.
+ */
+let knownOwnUnits = new Set<number>();
+function announceTrained(): void {
+  const current = new Set<number>();
+  for (const entity of game.entities) {
+    if (entity.dead || entity.owner !== 1 || !isUnit(entity.kind)) continue;
+    current.add(entity.id);
+    if (knownOwnUnits.size && !knownOwnUnits.has(entity.id)) playUnitSound(entity.kind, 'train');
+  }
+  knownOwnUnits = current;
 }
 
 // Keyboard: camera, hotkeys, menu.
@@ -657,6 +689,8 @@ function syncScene(time: number): void {
       views.delete(key);
     }
   }
+
+  announceTrained();
 
   // Contours for units something else is drawing in front of, once every
   // piece this frame has been placed.

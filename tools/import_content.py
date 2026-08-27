@@ -275,6 +275,16 @@ def extract_entity(
 
     entity["age"] = available_age(dat, unit.id)
 
+    # The DAT names a unit's voices by Wwise id directly, so the audio import
+    # resolves them without a name to hash.
+    sounds = {
+        name: getattr(unit, f"wwise_{field}_sound_id")
+        for name, field in (("select", "selection"), ("train", "train"))
+        if name in spec.get("sounds", []) and getattr(unit, f"wwise_{field}_sound_id")
+    }
+    if sounds:
+        entity["sounds"] = sounds
+
     entity["animations"] = {
         name: animation_entry(dat, graphics_dir, resolve_graphic_id(unit, animation, civ_units), hashes)
         for name, animation in spec["animations"].items()
@@ -444,6 +454,7 @@ def extract(
     }
     return {
         "terrain": terrain,
+        "audio": spec.get("audio", {}),
         "technologies": technologies,
         "playerColors": player_colors(dat, palettes_dir, spec["playerColors"], hashes),
         "schemaVersion": spec["schemaVersion"],

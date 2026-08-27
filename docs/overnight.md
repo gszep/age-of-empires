@@ -124,12 +124,18 @@ items land.
 
 ## C. Audio (depot 813783 and vgmstream-cli are installed locally)
 
-- [ ] **Selection and acknowledgement voices.** Resolve unit select/move/
-  attack acknowledgement events through `sounds.json` → the PCK/BNK HIRC
-  graph (`import_audio.py` already walks it for `button_ui`), import the
-  cues, and play them from the view on selection and orders. *Verify:*
-  import test resolves each consumed event to owned media byte-identically;
-  the aliases wired appear in the audio manifest.
+- [x] **Selection and acknowledgement voices.** Not through `sounds.json`,
+  which holds only UI events: a unit's voice is a Wwise id the DAT already
+  carries (`wwise_selection_sound_id`, `wwise_train_sound_id`), so the
+  resolver takes an id as well as a name. Those events cover every
+  civilisation through one switch container on `Civilization`; its switch
+  table is decoded so only the imported civ's branch is taken — the militia's
+  three Britons files, exactly the three the DAT lists for civ 1. *Verified:*
+  an import test resolves every consumed cue to owned media and asserts the
+  narrowing (178 → 3, and nothing at all for an unknown civ rather than
+  everything); fifteen aliases are in the audio manifest, and a simulation
+  test checks every trainable unit has the `<kind>-select` alias the view
+  asks for.
 - [ ] **Alert and feedback cues.** Under-attack alert, construction
   complete, training complete, resource-depleted, population-capped —
   events named in `sounds.json`. Play from observation-driven view state,

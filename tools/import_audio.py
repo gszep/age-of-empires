@@ -103,9 +103,74 @@ def _object_references(payload: bytes, objects: dict[int, tuple[int, bytes]]) ->
     return references
 
 
-def resolve_event(bank: Bank, event_name: str) -> list[int]:
-    event_id = wwise_id(event_name)
-    event = bank.objects.get(event_id)
+SWITCH_CONTAINER = 6
+
+
+def switch_branch(
+    bank: Bank, payload: bytes, group: str, switch: str,
+) -> list[int] | None:
+    """The children a switch container plays for one value of one switch.
+
+    A unit's voice event covers every civilisation through a switch on
+    `Civilization`, so playing it whole would import forty languages. The
+    container's switch table is `(switch id, count, children...)` records; the
+    fields before it are variable-length node parameters, so the table is found
+    by looking for the group id and accepting only a walk where every child is
+    a real object and the records end where the count says they do.
+    """
+    group_id = wwise_id(group)
+    switch_id = wwise_id(switch)
+    for start in range(len(payload) - 12):
+        if unpack_from("<I", payload, start)[0] != group_id:
+            continue
+        cursor = start + 4 + 4 + 1  # group, default switch, continuous flag
+        if cursor + 4 > len(payload):
+            continue
+        count = unpack_from("<I", payload, cursor)[0]
+        cursor += 4
+        if count > 256 or cursor + count * 4 + 4 > len(payload):
+            continue
+        children = [unpack_from("<I", payload, cursor + i * 4)[0] for i in range(count)]
+        if not children or not all(child in bank.objects for child in children):
+            continue
+        cursor += count * 4
+        groups = unpack_from("<I", payload, cursor)[0]
+        cursor += 4
+        if groups > 256:
+            continue
+        found: list[int] | None = None
+        for _ in range(groups):
+            if cursor + 8 > len(payload):
+                return None
+            value = unpack_from("<I", payload, cursor)[0]
+            items_count = unpack_from("<I", payload, cursor + 4)[0]
+            if items_count > 256 or cursor + 8 + items_count * 4 > len(payload):
+                return None
+            items = [unpack_from("<I", payload, cursor + 8 + i * 4)[0] for i in range(items_count)]
+            if not all(item in bank.objects for item in items):
+                return None
+            if value == switch_id:
+                found = items
+            cursor += 8 + items_count * 4
+        # The table parsed: an absent branch means this container plays nothing
+        # for that switch, not that every branch should play. Falling through
+        # would import every civilisation's voices in silence.
+        return found if found is not None else []
+    return None
+
+
+def resolve_event(bank: Bank, event_name: str, switch: str | None = None) -> list[int]:
+    return resolve_event_id(bank, wwise_id(event_name), switch)
+
+
+def resolve_event_id(bank: Bank, event_id: int, switch: str | None = None) -> list[int]:
+    """Every embedded medium one event plays.
+
+    Widget cues arrive as a name to hash; unit voices arrive as the DAT's own
+    `wwise_*_sound_id`, which is already the hashed id (as a signed integer).
+    `switch` narrows a civilisation switch container to one branch.
+    """
+    event = bank.objects.get(event_id & 0xFFFFFFFF)
     if not event or event[0] != 4:
         return []
     payload = event[1]
@@ -125,6 +190,12 @@ def resolve_event(bank: Bank, event_name: str) -> list[int]:
             if media_id in bank.media and media_id not in media_ids:
                 media_ids.append(media_id)
             return
+        if object_type == SWITCH_CONTAINER and switch is not None:
+            branch = switch_branch(bank, object_payload, "Civilization", switch)
+            if branch is not None:
+                for reference in branch:
+                    descend(reference, visited)
+                return
         # Random/sequence and switch containers ultimately reference sounds.
         if object_type in (5, 6):
             for reference in _object_references(object_payload, bank.objects):
@@ -144,11 +215,39 @@ def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def import_audio(pack: Path, ui_manifest: Path, out: Path, decoder: str = "vgmstream-cli") -> dict[str, Any]:
+def consumed_cues(ui_manifest: Path, content: Path | None) -> list[dict[str, Any]]:
+    """Every cue the game plays, as (alias, how to find it in the banks).
+
+    Widget clicks name a Wwise event; a unit's voices are Wwise ids the DAT
+    already holds, narrowed to the imported civilisation's branch of the
+    switch container they all share.
+    """
+    cues: list[dict[str, Any]] = []
+    for alias, event in sorted(json.loads(ui_manifest.read_text()).get("sounds", {}).items()):
+        cues.append({"alias": alias, "event": event, "id": wwise_id(event), "switch": None})
+    if content is None or not content.is_file():
+        return cues
+    imported = json.loads(content.read_text())
+    switch = imported.get("audio", {}).get("switch")
+    for key, entity in sorted(imported.get("entities", {}).items()):
+        for name, event_id in sorted(entity.get("sounds", {}).items()):
+            cues.append({
+                "alias": f"{key}-{name}",
+                "event": f"{entity.get('internalName', key)} {name}",
+                "id": event_id,
+                "switch": switch,
+            })
+    return cues
+
+
+def import_audio(
+    pack: Path, ui_manifest: Path, out: Path, decoder: str = "vgmstream-cli",
+    content: Path | None = None,
+) -> dict[str, Any]:
     executable = shutil.which(decoder)
     if not executable:
         raise FileNotFoundError(f"{decoder} is required (macOS: brew install vgmstream)")
-    aliases: dict[str, str] = json.loads(ui_manifest.read_text()).get("sounds", {})
+    cues = consumed_cues(ui_manifest, content)
     banks = read_banks(pack)
     out.mkdir(parents=True, exist_ok=True)
     for old in out.glob("*.wav"):
@@ -158,8 +257,12 @@ def import_audio(pack: Path, ui_manifest: Path, out: Path, decoder: str = "vgmst
     source_hashes: dict[str, str] = {}
     with tempfile.TemporaryDirectory(prefix="aoe2-audio-") as temporary:
         temp = Path(temporary)
-        for alias, event_name in sorted(aliases.items()):
-            matches = [(bank, media_id) for bank in banks for media_id in resolve_event(bank, event_name)]
+        for cue in cues:
+            alias, event_name = cue["alias"], cue["event"]
+            matches = [
+                (bank, media_id) for bank in banks
+                for media_id in resolve_event_id(bank, cue["id"], cue["switch"])
+            ]
             if not matches:
                 raise ValueError(f"Wwise event {event_name!r} did not resolve to embedded media")
             files = []
@@ -208,8 +311,9 @@ def main() -> None:
     parser.add_argument("--ui-manifest", type=Path, default=Path("public/imported/aoe2/ui/manifest.json"))
     parser.add_argument("--out", type=Path, default=Path("public/imported/aoe2/audio"))
     parser.add_argument("--decoder", default="vgmstream-cli")
+    parser.add_argument("--content", type=Path, default=Path(".local/aoe2de/content.json"))
     args = parser.parse_args()
-    import_audio(args.pack, args.ui_manifest, args.out, args.decoder)
+    import_audio(args.pack, args.ui_manifest, args.out, args.decoder, args.content)
     print(args.out / "manifest.json")
 
 

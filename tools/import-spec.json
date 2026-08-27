@@ -6,6 +6,7 @@
   "effects": [
     { "key": "rally-flag", "graphic": "WaypointFlag Britons" }
   ],
+  "audio": { "switch": "Britons" },
   "technologies": [
     { "key": "loom", "techId": 22, "effect": "Loom", "appliesTo": ["villager"] },
     { "key": "feudal-age", "techId": 101, "effect": "Feudal Age" }
@@ -13,6 +14,7 @@
   "entities": [
     {
       "key": "militia",
+      "sounds": ["select", "train"],
       "unitId": 74,
       "category": "unit",
       "animations": {
@@ -25,6 +27,7 @@
     },
     {
       "key": "spearman",
+      "sounds": ["select", "train"],
       "unitId": 93,
       "category": "unit",
       "animations": {
@@ -37,6 +40,7 @@
     },
     {
       "key": "archer",
+      "sounds": ["select", "train"],
       "unitId": 4,
       "category": "unit",
       "animations": {
@@ -49,6 +53,7 @@
     },
     {
       "key": "skirmisher",
+      "sounds": ["select", "train"],
       "unitId": 7,
       "category": "unit",
       "animations": {
@@ -61,6 +66,7 @@
     },
     {
       "key": "villager",
+      "sounds": ["select", "train"],
       "unitId": 83,
       "category": "unit",
       "animations": {
@@ -142,6 +148,7 @@
     },
     {
       "key": "trade-cart",
+      "sounds": ["select", "train"],
       "unitId": 128,
       "category": "unit",
       "trade": { "task": { "actionType": 111, "unitId": 84 } },
@@ -307,6 +314,7 @@
     },
     {
       "key": "scout-cavalry",
+      "sounds": ["select", "train"],
       "unitId": 448,
       "category": "unit",
       "animations": {
