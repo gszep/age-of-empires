@@ -327,6 +327,8 @@ function runUiCommand(id: string): void {
     if (!result.ok) reject(result.reason);
     return;
   }
+  if (id === 'page-economic') { buildPage = 'economic'; return; }
+  if (id === 'page-military') { buildPage = 'military'; return; }
   if (id === 'cancel') buildMode = undefined;
 }
 
@@ -500,7 +502,10 @@ function contextOrder(point: Point, _clientX: number, _clientY: number): void {
     }
     return;
   }
-  const building = selection.find(e => e.kind === 'town-center' || e.kind === 'barracks');
+  // Any building that trains something takes a gather point, which is the
+  // rule rather than the two buildings that happened to train units first.
+  const building = selection.find(e => isBuilding(e.kind) && e.buildProgress === undefined
+    && trainableAt(e.kind as BuildingKind).length > 0);
   if (building) {
     applyCommand(game, { kind: 'rally', player: 1, buildingId: building.id, target: point, targetId: target?.id });
     hud.showMessage('Rally point set');
@@ -607,6 +612,14 @@ function currentCommands(): CommandButton[] {
         icon: hud.iconFor('Buildings', assets?.entities[kind]?.iconId),
       });
     }
+    // The other page of the build menu, as AoE2 splits it.
+    const other = buildPage === 'economic' ? 'military' : 'economic';
+    buttons.push({
+      id: `page-${other}`,
+      label: `${displayName(other)} buildings`,
+      hotkey: BUILD_PAGE_HOTKEY,
+      enabled: true,
+    });
   }
   if (selection.some(e => isUnit(e.kind))) {
     buttons.push({ id: 'stop', label: 'Stop', hotkey: 's', enabled: true });
@@ -643,12 +656,27 @@ function currentCommands(): CommandButton[] {
   return buttons;
 }
 
-const BUILD_HOTKEYS = ['q', 'w', 'e', 'r', 't', 'a', 's', 'd', 'f', 'g', 'z', 'x'];
-const TRAIN_HOTKEYS = ['q', 'w', 'e', 'r'];
+const BUILD_HOTKEYS = ['q', 'w', 'e', 'r', 't', 'a', 'd', 'f', 'g', 'z', 'x', 'c'];
+const BUILD_PAGE_HOTKEY = 'v';
+const TRAIN_HOTKEYS = ['q', 'w', 'e', 'r', 't'];
+
+/**
+ * AoE2 splits the villager's build menu into an economic and a military page,
+ * which is what keeps it inside the command panel's fifteen slots — seventeen
+ * buildings do not fit. The split is the reference game's own; the DAT's
+ * `interface_kind` is a different grouping and does not state it (see
+ * `docs/status.md`).
+ */
+const MILITARY_BUILDINGS = new Set<BuildingKind>([
+  'barracks', 'archery-range', 'stable', 'blacksmith', 'monastery', 'siege-workshop',
+  'castle', 'outpost', 'watch-tower', 'palisade-wall', 'palisade-gate',
+]);
+let buildPage: 'economic' | 'military' = 'economic';
 
 const buildableKinds = (): BuildingKind[] =>
   (Object.keys(rules.buildings) as BuildingKind[]).filter(kind =>
-    rules.buildings[kind].buildable && (rules.buildings[kind].age ?? 0) <= game.players[1].age);
+    rules.buildings[kind].buildable && (rules.buildings[kind].age ?? 0) <= game.players[1].age
+    && MILITARY_BUILDINGS.has(kind) === (buildPage === 'military'));
 
 const trainableAt = (building: BuildingKind): UnitKind[] =>
   (Object.keys(rules.units) as UnitKind[]).filter(kind =>
@@ -810,6 +838,9 @@ function syncScene(time: number): void {
     }
     view.updateProjectileView(
       entityView, assets, projectile.position, heading, progress, span, projectile.launchHeight,
+      // The stone is the only shot in flight that carries a blast, so what it
+      // does on landing is also what says which art to draw it with.
+      projectile.blastRadius ? 'mangonel-stone' : 'arrow',
     );
   }
 

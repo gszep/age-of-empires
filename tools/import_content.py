@@ -243,6 +243,9 @@ def extract_entity(
         # tower's arrows at its top, so a close shot points down rather than up.
         if combat.graphic_displacement:
             entity["combat"]["launchOffset"] = [rounded(v) for v in combat.graphic_displacement]
+        # A mangonel's stone hurts what it lands beside, not only what it hit.
+        if combat.blast_width and combat.blast_width > 0:
+            entity["combat"]["blastRadius"] = rounded(combat.blast_width)
 
     if category == "projectile" and unit.projectile is not None:
         # `projectile_arc` is a fraction of the shot's distance. Its sign varies
@@ -259,6 +262,26 @@ def extract_entity(
             "ratePerSecond": rounded(unit.bird.work_rate),
             "capacity": int(unit.resource_capacity),
             "buildingId": task.unit_id,
+        }
+
+    if "heal" in spec:
+        # A monk mends what it stands beside. The rate is the unit's work rate;
+        # the task's own range is how close it has to come.
+        task = find_task(unit, spec["heal"]["task"])
+        entity["heal"] = {
+            "hitPointsPerSecond": rounded(unit.bird.work_rate),
+            "range": rounded(task.work_range),
+        }
+
+    if "convert" in spec:
+        # Conversion is a wait, not a blow: the DAT gives the earliest second it
+        # can succeed and the second by which it must. The range is the unit's
+        # own maximum, which is what a monk reaches with.
+        task = find_task(unit, spec["convert"]["task"])
+        entity["convert"] = {
+            "minSeconds": rounded(task.work_value_1),
+            "maxSeconds": rounded(task.work_value_2),
+            "range": rounded(unit.type_50.max_range),
         }
 
     if category == "unit-variant":

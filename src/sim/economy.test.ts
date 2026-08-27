@@ -1076,7 +1076,7 @@ describe('the archery range', () => {
     const trainedHere = (Object.keys(state.rules.units) as (keyof typeof state.rules.units)[])
       .filter(kind => state.rules.units[kind].trainedAt === 'archery-range')
       .sort();
-    expect(trainedHere).toEqual(['archer', 'skirmisher']);
+    expect(trainedHere).toEqual(['archer', 'cavalry-archer', 'skirmisher']);
     expect(state.rules.units.skirmisher.cost).toEqual({ food: 25, wood: 35, gold: 0, stone: 0 });
   });
 

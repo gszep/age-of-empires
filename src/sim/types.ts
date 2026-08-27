@@ -5,7 +5,9 @@ export type PlayerId = 1 | 2;
 export type ResourceKind = 'food' | 'wood' | 'gold' | 'stone';
 export type UnitKind =
   | 'villager' | 'militia' | 'spearman' | 'archer' | 'skirmisher'
-  | 'scout-cavalry' | 'trade-cart' | AnimalKind;
+  | 'scout-cavalry' | 'trade-cart'
+  | 'knight' | 'cavalry-archer' | 'longbowman' | 'battering-ram' | 'mangonel' | 'monk'
+  | AnimalKind;
 /** Gaia's food on the hoof: herded, or hunted where it stands. */
 export type AnimalKind = 'sheep' | 'deer' | 'boar';
 export type BuildingKind =
@@ -13,9 +15,13 @@ export type BuildingKind =
   | 'mill' | 'lumber-camp' | 'mining-camp' | 'farm'
   | 'outpost' | 'watch-tower'
   | 'archery-range' | 'blacksmith' | 'market' | 'stable'
+  | 'monastery' | 'siege-workshop' | 'castle'
   | 'palisade-wall' | 'palisade-gate';
 export type EntityKind = UnitKind | BuildingKind | 'resource';
-export type Activity = 'idle' | 'moving' | 'gathering' | 'carrying' | 'building' | 'attacking' | 'dying';
+export type Activity =
+  | 'idle' | 'moving' | 'gathering' | 'carrying' | 'building' | 'attacking' | 'dying'
+  /** A monk's two works: mending its own side, and preaching at somebody else's. */
+  | 'healing' | 'converting';
 
 export interface Point { x: number; y: number }
 
@@ -26,7 +32,11 @@ export type Order =
   | { kind: 'build'; targetId: number }
   | { kind: 'attack'; targetId: number }
   /** A trade cart shuttling to the market with this id and back to its own. */
-  | { kind: 'trade'; targetId: number };
+  | { kind: 'trade'; targetId: number }
+  /** A monk restoring a wounded ally's hit points. */
+  | { kind: 'heal'; targetId: number }
+  /** A monk working on somebody else's unit until it changes sides. */
+  | { kind: 'convert'; targetId: number };
 
 export interface Entity {
   id: number;
@@ -56,6 +66,9 @@ export interface Entity {
   rally?: { target: Point; targetId?: number };
   attackCooldown?: number; // ticks until a new swing may start
   attackWindup?: number; // ticks until the started swing releases damage
+  /** Monks: ticks spent working on the current conversion target. Reset the
+   * moment the monk stops, so a broken-off attempt is not banked. */
+  convertTicks?: number;
   /** Corpse state: plays the death animation, then despawns. */
   dead?: boolean;
   decayTicks?: number;
@@ -96,6 +109,8 @@ export interface Projectile {
   speed: number; // tiles per second
   /** Height it left from, in tiles: a tower shoots from its top. */
   launchHeight: number;
+  /** Tiles around the impact that also take the hit, for a siege shot. */
+  blastRadius?: number;
 }
 
 export interface GameState {

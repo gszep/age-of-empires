@@ -330,12 +330,30 @@ function isHuntable(state: GameState, entity: Entity): boolean {
 }
 
 function assignOrder(state: GameState, entity: Entity, target: Point, targetEntity?: Entity): void {
+  const unitRules = isUnit(entity.kind) ? state.rules.units[entity.kind as UnitKind] : undefined;
+  // A unit with no attack is never given one by a right-click: a monk sent at
+  // a boar would otherwise stand over it forever, swinging nothing.
+  const armed = !unitRules || unitRules.attacks.some(attack => attack.amount > 0);
   if (entity.kind === 'trade-cart' && targetEntity && isTradePartner(state, entity, targetEntity)) {
     entity.order = { kind: 'trade', targetId: targetEntity.id };
     entity.carrying = undefined;
   } else if (targetEntity && isGatherable(state, targetEntity, entity) && entity.kind === 'villager') {
     entity.order = { kind: 'gather', targetId: targetEntity.id };
-  } else if (targetEntity && isHuntable(state, targetEntity)) {
+  } else if (
+    unitRules?.heal && targetEntity && targetEntity.id !== entity.id
+    && targetEntity.owner === entity.owner && isUnit(targetEntity.kind)
+    && targetEntity.hp < targetEntity.maxHp
+  ) {
+    entity.order = { kind: 'heal', targetId: targetEntity.id };
+  } else if (
+    // Conversion reaches somebody else's soldiers only. Buildings need
+    // Redemption, which is not researchable here.
+    unitRules?.convert && targetEntity && isUnit(targetEntity.kind)
+    && targetEntity.owner !== 0 && targetEntity.owner !== entity.owner
+  ) {
+    entity.order = { kind: 'convert', targetId: targetEntity.id };
+    entity.convertTicks = undefined;
+  } else if (targetEntity && isHuntable(state, targetEntity) && armed) {
     // Gaia owns it, so the usual "somebody else's" test never fires; hunting
     // is what an order onto a live deer or boar means.
     entity.order = { kind: 'attack', targetId: targetEntity.id };
@@ -344,7 +362,7 @@ function assignOrder(state: GameState, entity: Entity, target: Point, targetEnti
     isBuilding(targetEntity.kind) && targetEntity.buildProgress !== undefined && entity.kind === 'villager'
   ) {
     entity.order = { kind: 'build', targetId: targetEntity.id };
-  } else if (targetEntity && targetEntity.owner !== 0 && targetEntity.owner !== entity.owner) {
+  } else if (targetEntity && targetEntity.owner !== 0 && targetEntity.owner !== entity.owner && armed) {
     entity.order = { kind: 'attack', targetId: targetEntity.id };
   } else {
     entity.order = { kind: 'move', target: { ...target } };
@@ -967,10 +985,81 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
   }
   entity.attackWindup -= 1;
   if (entity.attackWindup <= 0) {
-    releaseAttack(state, entity, target, rules.attacks, rules.projectileSpeed, rules.launchHeight);
+    releaseAttack(state, entity, target, rules.attacks, rules.projectileSpeed, rules.launchHeight, rules.blastRadius);
     entity.attackWindup = undefined;
     entity.attackCooldown = Math.max(1, Math.round(rules.attackReloadSeconds * TICKS_PER_SECOND) - Math.max(1, Math.round(rules.attackReleaseSeconds * TICKS_PER_SECOND)));
   }
+}
+
+/**
+ * A monk mends a wounded ally. The DAT's heal task has no reach of its own
+ * (`work_range` is 0), so the monk has to come alongside exactly as a gatherer
+ * comes to a bush, and the rate is the unit's work rate in hit points a second.
+ */
+function updateHealer(state: GameState, grid: NavGrid, entity: Entity): void {
+  if (entity.order.kind !== 'heal') return;
+  const rules = state.rules.units[entity.kind as UnitKind];
+  const heal = rules.heal;
+  const target = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
+  if (!heal || !target || target.owner !== entity.owner || target.hp >= target.maxHp) {
+    becomeIdle(entity);
+    return;
+  }
+  if (!inRange(entity, target, heal.range + target.radius)) {
+    entity.activity = 'moving';
+    moveAlong(state, grid, entity, target.position, rules.speed, interactionRange(target) + heal.range);
+    return;
+  }
+  clearPath(entity);
+  entity.activity = 'healing';
+  entity.gatherProgress = (entity.gatherProgress ?? 0) + heal.hitPointsPerSecond * TICK_SECONDS;
+  const whole = Math.floor(entity.gatherProgress);
+  if (whole >= 1) {
+    entity.gatherProgress -= whole;
+    target.hp = Math.min(target.maxHp, target.hp + whole);
+  }
+}
+
+/**
+ * A monk works on somebody else's soldier until it changes sides. The DAT
+ * gives the window rather than the odds — the earliest second a conversion may
+ * succeed and the second by which it must — so the roll is spread uniformly
+ * across it: at `minSeconds` nothing has happened yet, at `maxSeconds` the
+ * chance is 1. The real game's per-second roll is not in the owned files
+ * (recorded in `docs/status.md`); this keeps both ends the DAT states.
+ */
+function updateConverter(state: GameState, grid: NavGrid, entity: Entity): void {
+  if (entity.order.kind !== 'convert') return;
+  const rules = state.rules.units[entity.kind as UnitKind];
+  const convert = rules.convert;
+  const target = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
+  if (!convert || !target || target.owner === 0 || target.owner === entity.owner) {
+    entity.convertTicks = undefined;
+    becomeIdle(entity);
+    return;
+  }
+  if (!inRange(entity, target, convert.range)) {
+    // Breaking off loses the work: a monk cannot bank half a conversion,
+    // which is what makes running out of a monk's reach an escape.
+    entity.convertTicks = undefined;
+    entity.activity = 'moving';
+    moveAlong(state, grid, entity, target.position, rules.speed, interactionRange(target) + convert.range);
+    return;
+  }
+  clearPath(entity);
+  entity.activity = 'converting';
+  entity.convertTicks = (entity.convertTicks ?? 0) + 1;
+  const seconds = entity.convertTicks * TICK_SECONDS;
+  if (seconds < convert.minSeconds) return;
+  const ticksLeft = Math.max(1, Math.round((convert.maxSeconds - seconds) / TICK_SECONDS) + 1);
+  if (random01(state) >= 1 / ticksLeft) return;
+  target.owner = entity.owner;
+  becomeIdle(target);
+  clearPath(target);
+  target.convertTicks = undefined;
+  recalculatePopulation(state);
+  entity.convertTicks = undefined;
+  becomeIdle(entity);
 }
 
 /**
@@ -980,6 +1069,7 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
 function releaseAttack(
   state: GameState, shooter: Entity, target: Entity,
   attacks: AttackValue[], projectileSpeed: number | undefined, launchHeight = 0,
+  blastRadius?: number,
 ): void {
   if (!projectileSpeed) {
     target.hp -= computeDamage(attacks, armorsOf(state, target));
@@ -1002,7 +1092,27 @@ function releaseAttack(
     attacks: attacks.map(a => ({ ...a })),
     speed: projectileSpeed,
     launchHeight,
+    ...(blastRadius ? { blastRadius } : {}),
   });
+}
+
+/**
+ * A siege shot hurts what it lands beside. AoE2's mangonel is no respecter of
+ * sides — its own army takes the same stone — which is what makes one a
+ * decision rather than free damage. The DAT gives the radius; the falloff its
+ * `blast_attack_level` implies is not in the owned files, so everything inside
+ * takes the full hit (recorded in `docs/status.md`).
+ */
+function applyBlast(
+  state: GameState, at: Point, radius: number, attacks: AttackValue[], directHitId: number,
+): void {
+  for (const other of [...state.entities]) {
+    if (other.dead || other.id === directHitId || other.kind === 'resource') continue;
+    if (isBuilding(other.kind)) continue; // a stone lands among soldiers, not through walls
+    if (distance(other.position, at) - other.radius > radius) continue;
+    other.hp -= computeDamage(attacks, armorsOf(state, other));
+    if (other.hp <= 0) kill(state, other);
+  }
 }
 
 function updateProjectiles(state: GameState): void {
@@ -1016,8 +1126,12 @@ function updateProjectiles(state: GameState): void {
     const gap = Math.hypot(dx, dy);
     const step = projectile.speed * TICK_SECONDS;
     if (gap <= step + target.radius) {
+      const at = { ...target.position };
       target.hp -= computeDamage(projectile.attacks, armorsOf(state, target));
       if (target.hp <= 0) kill(state, target);
+      if (projectile.blastRadius) {
+        applyBlast(state, at, projectile.blastRadius, projectile.attacks, target.id);
+      }
       continue;
     }
     projectile.position = {
@@ -1118,6 +1232,8 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
     case 'trade': return updateTrader(state, grid, entity);
     case 'build': return updateBuilder(state, grid, entity, builderCounts);
     case 'attack': return updateAttacker(state, grid, entity);
+    case 'heal': return updateHealer(state, grid, entity);
+    case 'convert': return updateConverter(state, grid, entity);
     default:
       entity.activity = 'idle';
       if (state.tick % 10 === 0) autoAcquire(state, entity);
@@ -1229,6 +1345,12 @@ function updateBuildingProduction(state: GameState, entity: Entity): void {
   recalculatePopulation(state);
 }
 
+/** Whether the rules train any unit at this kind of building. */
+function trainsAnything(state: GameState, kind: Entity['kind']): boolean {
+  if (!isBuilding(kind)) return false;
+  return Object.values(state.rules.units).some(rules => rules.trainedAt === kind);
+}
+
 function isDefeated(state: GameState, player: PlayerId): boolean {
   let townCenter = false;
   let unit = false;
@@ -1237,8 +1359,9 @@ function isDefeated(state: GameState, player: PlayerId): boolean {
     if (entity.dead || entity.owner !== player || isAnimal(entity.kind)) continue;
     if (entity.kind === 'town-center') townCenter = true;
     if (isUnit(entity.kind)) unit = true;
-    if ((entity.kind === 'barracks' || entity.kind === 'town-center')
-      && entity.buildProgress === undefined) production = true;
+    // "Can still produce" is asked of the rules, not of a list of building
+    // names: a player left with only a stable or a castle is not beaten.
+    if (entity.buildProgress === undefined && trainsAnything(state, entity.kind)) production = true;
   }
   // Domination: no units and nothing that can produce them (approximation of
   // AoE2 conquest, which requires razing everything).

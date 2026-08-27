@@ -29,6 +29,14 @@ export interface UnitRules {
   projectileSpeed?: number;
   /** Height the shot leaves from, in tiles (DAT graphic displacement z). */
   launchHeight?: number;
+  /** Tiles around the point of impact that also take the hit: a mangonel's
+   * stone hurts what it lands beside, not only what it was aimed at. */
+  blastRadius?: number;
+  /** Monks: hit points restored a second, and how close they must come. */
+  heal?: { hitPointsPerSecond: number; range: number };
+  /** Monks: the DAT's window for a conversion — the earliest second it can
+   * succeed and the second by which it must — and the reach it works at. */
+  convert?: { minSeconds: number; maxSeconds: number; range: number };
   /** Trade carts: goods earned per second on the road, and the most they hold. */
   tradeRatePerSecond?: number;
   tradeCapacity?: number;
@@ -92,7 +100,7 @@ export interface GameRules {
 }
 
 export type NodeKind = 'berries' | 'tree' | 'gold' | 'stone';
-export type TechKey = 'loom' | 'feudal-age';
+export type TechKey = 'loom' | 'feudal-age' | 'castle-age';
 
 /** One researchable technology, as the DAT records it. */
 export interface TechRules {
@@ -203,6 +211,64 @@ export const FALLBACK_RULES: GameRules = {
       attackReloadSeconds: 2, attackReleaseSeconds: 0.35,
       range: 4, projectileSpeed: 7, launchHeight: 1.5,
     },
+    knight: {
+      age: 2,
+      hp: 100, radius: 0.25, speed: 1.35, lineOfSight: 4, cost: cost(60, 0, 75), trainSeconds: 30,
+      trainedAt: 'stable', popCost: 1,
+      attacks: [{ class: 4, amount: 10 }, { class: 39, amount: -3 }],
+      armors: [{ class: 4, amount: 2 }, { class: 8, amount: 0 }, { class: 3, amount: 2 }, { class: 31, amount: 0 }],
+      attackReloadSeconds: 1.8, attackReleaseSeconds: 0.67,
+    },
+    'cavalry-archer': {
+      age: 2,
+      hp: 50, radius: 0.25, speed: 1.4, lineOfSight: 5, cost: cost(0, 40, 60), trainSeconds: 37,
+      trainedAt: 'archery-range', popCost: 1,
+      attacks: [{ class: 27, amount: 2 }, { class: 3, amount: 6 }, { class: 39, amount: -3 }],
+      armors: [{ class: 28, amount: 0 }, { class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 0 }, { class: 31, amount: 0 }],
+      attackReloadSeconds: 2, attackReleaseSeconds: 0.91,
+      range: 4, projectileSpeed: 7, launchHeight: 2,
+    },
+    // The British unique unit: the castle's own, and the reason to build one.
+    longbowman: {
+      age: 2,
+      hp: 35, radius: 0.2, speed: 0.96, lineOfSight: 7, cost: cost(0, 35, 40), trainSeconds: 18,
+      trainedAt: 'castle', popCost: 1,
+      attacks: [{ class: 27, amount: 2 }, { class: 3, amount: 6 }],
+      armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 0 }, { class: 19, amount: 0 }, { class: 31, amount: 0 }],
+      attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
+      range: 5, projectileSpeed: 7, launchHeight: 1.65,
+    },
+    // Siege: slow, fragile against soldiers, and murderous against walls. The
+    // ram's 150 against buildings and its -3 pierce armour are both the DAT's.
+    'battering-ram': {
+      age: 2,
+      hp: 175, radius: 0.45, speed: 0.6, lineOfSight: 3, cost: cost(0, 160, 75), trainSeconds: 36,
+      trainedAt: 'siege-workshop', popCost: 1,
+      attacks: [{ class: 11, amount: 150 }, { class: 4, amount: 2 }, { class: 20, amount: 40 }],
+      armors: [{ class: 4, amount: -3 }, { class: 3, amount: 180 }, { class: 17, amount: 0 }, { class: 20, amount: 0 }, { class: 31, amount: 0 }],
+      attackReloadSeconds: 5, attackReleaseSeconds: 0.5,
+    },
+    mangonel: {
+      age: 2,
+      hp: 50, radius: 0.5, speed: 0.6, lineOfSight: 9, cost: cost(0, 160, 135), trainSeconds: 46,
+      trainedAt: 'siege-workshop', popCost: 1,
+      attacks: [{ class: 11, amount: 35 }, { class: 4, amount: 40 }, { class: 20, amount: 12 }, { class: 37, amount: 40 }],
+      armors: [{ class: 4, amount: 0 }, { class: 3, amount: 6 }, { class: 20, amount: 0 }, { class: 31, amount: 0 }],
+      attackReloadSeconds: 6, attackReleaseSeconds: 0.5,
+      range: 7, minRange: 3, projectileSpeed: 3.5, launchHeight: 1.8, blastRadius: 1,
+    },
+    // No attack at all: a monk's work is mending its own side and preaching at
+    // somebody else's.
+    monk: {
+      age: 2,
+      hp: 30, radius: 0.2, speed: 0.7, lineOfSight: 11, cost: cost(0, 0, 100), trainSeconds: 51,
+      trainedAt: 'monastery', popCost: 1,
+      attacks: [],
+      armors: [{ class: 25, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }, { class: 31, amount: 0 }],
+      attackReloadSeconds: 1.6, attackReleaseSeconds: 0,
+      heal: { hitPointsPerSecond: 1.25, range: 0 },
+      convert: { minSeconds: 5, maxSeconds: 9, range: 9 },
+    },
   },
   buildings: {
     'town-center': {
@@ -290,6 +356,30 @@ export const FALLBACK_RULES: GameRules = {
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
     },
+    monastery: {
+      age: 2,
+      hp: 2100, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 40,
+      popSupport: 0, buildable: true, accepts: [],
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+    },
+    'siege-workshop': {
+      age: 2,
+      hp: 1500, radius: 2, lineOfSight: 6, cost: cost(0, 200), buildSeconds: 40,
+      popSupport: 0, buildable: true, accepts: [],
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+    },
+    // Stone, slow to raise, and the only building besides the town center that
+    // both shoots and houses people: the DAT gives it 20 population support.
+    castle: {
+      age: 2,
+      hp: 4800, radius: 2, lineOfSight: 11, cost: cost(0, 0, 0, 650), buildSeconds: 200,
+      popSupport: 20, buildable: true, accepts: [],
+      armors: [{ class: 26, amount: 0 }, { class: 21, amount: 0 }, { class: 11, amount: 8 }, { class: 4, amount: 8 }, { class: 3, amount: 11 }, { class: 31, amount: 8 }],
+      attack: {
+        range: 8, attacks: [{ class: 27, amount: 2 }, { class: 3, amount: 11 }],
+        reloadSeconds: 2, releaseSeconds: 0.35, projectileSpeed: 7, launchHeight: 4,
+      },
+    },
   },
   nodes: {
     berries: { resource: 'food', radius: 0.5, amount: 125 },
@@ -312,6 +402,10 @@ export const FALLBACK_RULES: GameRules = {
       techId: 101, name: 'Feudal Age', cost: cost(500), researchSeconds: 130,
       researchedAt: 'town-center', requiresAge: 0, grantsAge: 1, effects: [],
     },
+    'castle-age': {
+      techId: 102, name: 'Castle Age', cost: cost(800, 0, 200), researchSeconds: 160,
+      researchedAt: 'town-center', requiresAge: 1, grantsAge: 2, effects: [],
+    },
   },
 };
 
@@ -331,9 +425,12 @@ interface ManifestEntity {
     maximumRange?: number;
     projectileUnitId?: number;
     launchOffset?: number[];
+    blastRadius?: number;
     attacks: AttackValue[];
     armors: AttackValue[];
   };
+  heal?: { hitPointsPerSecond: number; range: number };
+  convert?: { minSeconds: number; maxSeconds: number; range: number };
   gather?: { resource: ResourceKind; ratePerSecond: number; capacity: number };
   trade?: { ratePerSecond: number; capacity: number; buildingId: number };
   age?: number;
@@ -393,6 +490,9 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       minRange: e[key].combat?.minimumRange || fallback?.minRange,
       projectileSpeed: fallback?.projectileSpeed,
       launchHeight: e[key].combat?.launchOffset?.[2] ?? fallback?.launchHeight,
+      blastRadius: e[key].combat?.blastRadius ?? fallback?.blastRadius,
+      heal: e[key].heal ?? fallback?.heal,
+      convert: e[key].convert ?? fallback?.convert,
     };
   };
   /** Gaia's animals: their own rules plus the food the DAT stores on them. */
@@ -460,6 +560,21 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
         projectileSpeed: FALLBACK_RULES.units.skirmisher.projectileSpeed,
       },
       'scout-cavalry': unit('scout-cavalry', 'stable'),
+      knight: unit('knight', 'stable'),
+      'cavalry-archer': {
+        ...unit('cavalry-archer', 'archery-range'),
+        projectileSpeed: FALLBACK_RULES.units['cavalry-archer'].projectileSpeed,
+      },
+      longbowman: {
+        ...unit('longbowman', 'castle'),
+        projectileSpeed: FALLBACK_RULES.units.longbowman.projectileSpeed,
+      },
+      'battering-ram': unit('battering-ram', 'siege-workshop'),
+      mangonel: {
+        ...unit('mangonel', 'siege-workshop'),
+        projectileSpeed: FALLBACK_RULES.units.mangonel.projectileSpeed,
+      },
+      monk: unit('monk', 'monastery'),
       sheep: animal('sheep'),
       deer: animal('deer'),
       boar: animal('boar'),
@@ -485,6 +600,9 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       blacksmith: building('blacksmith', true),
       market: building('market', true),
       stable: building('stable', true),
+      monastery: building('monastery', true),
+      'siege-workshop': building('siege-workshop', true),
+      castle: building('castle', true),
       'palisade-wall': building('palisade-wall', true),
       'palisade-gate': building('palisade-gate', true),
     },
@@ -542,11 +660,13 @@ function technologies(
 
 const UNIT_KINDS = new Set<string>([
   'villager', 'militia', 'spearman', 'archer', 'skirmisher', 'scout-cavalry', 'trade-cart',
+  'knight', 'cavalry-archer', 'longbowman', 'battering-ram', 'mangonel', 'monk',
   'sheep', 'deer', 'boar',
 ]);
 const BUILDING_KINDS = new Set<string>([
   'town-center', 'barracks', 'house', 'mill', 'lumber-camp', 'mining-camp', 'farm',
   'outpost', 'watch-tower', 'archery-range', 'blacksmith', 'market', 'stable',
+  'monastery', 'siege-workshop', 'castle',
   'palisade-wall', 'palisade-gate',
 ]);
 
@@ -555,6 +675,11 @@ export const isBuilding = (kind: EntityKind): kind is BuildingKind => BUILDING_K
 const ANIMAL_KINDS = new Set<string>(['sheep', 'deer', 'boar']);
 export const isAnimal = (kind: EntityKind): kind is AnimalKind => ANIMAL_KINDS.has(kind);
 
-/** Units that fight on their own initiative; workers only fight when told. */
+/**
+ * Units that fight on their own initiative; workers only fight when told. A
+ * monk is excluded by having no attack at all rather than by name — it would
+ * otherwise walk at the nearest enemy it could never hurt.
+ */
 export const isMilitary = (kind: EntityKind): boolean =>
-  isUnit(kind) && kind !== 'villager' && kind !== 'trade-cart' && !isAnimal(kind);
+  isUnit(kind) && kind !== 'villager' && kind !== 'trade-cart' && !isAnimal(kind)
+  && FALLBACK_RULES.units[kind as UnitKind].attacks.some(attack => attack.amount > 0);

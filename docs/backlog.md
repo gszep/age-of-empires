@@ -39,6 +39,13 @@ construction-complete cue, so that one has no owned source to draw on.
   file a terrain's `blend_type` selects, nor how a 512x512 blend is indexed
   against a tile. See the note in `overnight.md` for what was measured.
 - **Fire delta overlays** on damaged buildings are not imported.
+- **The monk draws no occlusion contour.** Its idle and attack outline layers
+  are the only consumed sources that fail `tools/sld_layers.py`'s walk
+  invariant (`outline row 13: covered 0 of 7 blocks, consumed 11 of 11 bytes`,
+  and an empty buffer on attack), so both are in the manifest's `skippedMasks`
+  and a monk behind a building simply has no contour. The invariant is the
+  decoder working as intended; what these two layers encode differently has not
+  been measured.
 - **A spent forage bush shows a tree stump.** Playtest report: exhausted
   bushes briefly draw the generic stump before vanishing. The `dead` import
   slot routes bushes through `n_tree_stump_generic_x1`; verify against the
@@ -78,19 +85,34 @@ terrain blends above.
   built-in AI never builds one (it never leaves the Dark Age, below). Fixing
   the AI's Feudal gap, or an allied player slot, is what makes trade
   observable in a real match.
-- **Only Loom and the Feudal Age are researchable.** The tech system reads
-  everything from the DAT, so the next slice is breadth: the blacksmith's
-  Feudal researches and the other Feudal-age technologies of the buildings
-  we already ship, each gated and effect-applied the way Loom is.
+- **No unit upgrade or economic technology is researchable.** Loom, the Feudal
+  Age and the Castle Age are; the blacksmith's armour and attack lines, the
+  university, the monastery's own technologies, and every unit upgrade
+  (man-at-arms, crossbowman, pikeman, light cavalry, elite skirmisher) are not.
+  The tech system reads cost, time, building and effect from the DAT already —
+  the work is breadth, plus upgrades needing a rule that replaces one unit kind
+  with another rather than adding flat modifiers the way Loom does.
+- **The university and the Imperial Age are not built.** The university is a
+  Castle Age building that trains nothing, so it was left out until there are
+  technologies for it to research; the Imperial Age (tech 103) and everything
+  above the Castle Age is out of scope for now.
+- **A monk carries no relic, and a monastery holds none.** Relics are named in
+  the omitted scope; a monk that could pick one up would need the relic entity,
+  the carry state, and the gold trickle.
+- **A castle trains only the British longbowman.** The importer reads civ 1, so
+  the castle's other trainable units (trebuchet — Imperial — and petard) and
+  every other civilisation's unique unit are absent.
 - **Hunting pays the forager's wage.** The DAT gives the hunter villager its
   own work rate (0.41 a second) and carry capacity (35); the simulation has one
   rate per resource and one global capacity, so hunting banks at the forager's
   0.31 into 10. Per-task rates would need `gatherRatePerSecond` to become
   per-variant, which touches every gatherer.
 - **The built-in AI never leaves the Dark Age.** It has no notion of research,
-  so it never takes Loom or the Feudal Age, and everything Feudal — the market,
-  the archery range, the stable, and every unit they train — is out of its
-  reach. Its matches are Dark Age militia wars.
+  so it never takes Loom, the Feudal Age or the Castle Age, and everything above
+  the Dark Age — the market, the archery range, the stable, the monastery, the
+  siege workshop, the castle, and every unit they train — is out of its reach.
+  Its matches are Dark Age militia wars. This is now the single biggest gap
+  between what the simulation supports and what a played match shows.
 - **Technology icons are not imported.** `import_ui.py` takes Buildings, Units,
   StatIcons and MenuIcons; research buttons therefore show text only.
 - **The built-in AI ignores sheep, deer and boar.** It picks gather targets by

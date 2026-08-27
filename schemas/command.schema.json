@@ -21,7 +21,7 @@
         "kind": { "const": "train" },
         "player": { "enum": [1, 2] },
         "buildingId": { "type": "integer" },
-        "unit": { "enum": ["villager", "militia", "spearman", "archer", "skirmisher", "scout-cavalry", "trade-cart"] }
+        "unit": { "enum": ["villager", "militia", "spearman", "archer", "skirmisher", "scout-cavalry", "trade-cart", "knight", "cavalry-archer", "longbowman", "battering-ram", "mangonel", "monk"] }
       },
       "required": ["kind", "player", "buildingId", "unit"],
       "additionalProperties": false
@@ -32,7 +32,7 @@
         "kind": { "const": "research" },
         "player": { "enum": [1, 2] },
         "buildingId": { "type": "integer" },
-        "tech": { "enum": ["loom", "feudal-age"] }
+        "tech": { "enum": ["loom", "feudal-age", "castle-age"] }
       },
       "required": ["kind", "player", "buildingId", "tech"],
       "additionalProperties": false
@@ -43,7 +43,7 @@
         "kind": { "const": "build" },
         "player": { "enum": [1, 2] },
         "builderIds": { "type": "array", "items": { "type": "integer" }, "minItems": 1 },
-        "building": { "enum": ["barracks", "house", "mill", "lumber-camp", "mining-camp", "farm", "outpost", "watch-tower", "archery-range", "blacksmith", "market", "stable", "palisade-wall", "palisade-gate"] },
+        "building": { "enum": ["barracks", "house", "mill", "lumber-camp", "mining-camp", "farm", "outpost", "watch-tower", "archery-range", "blacksmith", "market", "stable", "monastery", "siege-workshop", "castle", "palisade-wall", "palisade-gate"] },
         "target": { "$ref": "#/definitions/point" },
         "orientation": { "enum": ["x", "y"] }
       },

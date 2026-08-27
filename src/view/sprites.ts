@@ -456,8 +456,10 @@ export function updateProjectileView(
   progress: number,
   span: number,
   launchHeight: number,
+  /** Which shot this is: an arrow unless a siege engine threw it. */
+  projectileKey = 'arrow',
 ): void {
-  const arrow = assets?.entities['arrow'];
+  const arrow = assets?.entities[projectileKey] ?? assets?.entities['arrow'];
   const atlas = arrow?.atlases['idle'];
   const animation = arrow?.animations['idle'];
   if (!assets || !atlas || !animation) { view.body.mesh.visible = false; return; }

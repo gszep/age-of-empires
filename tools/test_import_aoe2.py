@@ -247,6 +247,40 @@ class ContentImportIntegrationTest(unittest.TestCase):
         for key in ("market", "blacksmith", "archery-range", "stable", "watch-tower",
                     "archer", "skirmisher", "spearman", "scout-cavalry", "trade-cart"):
             self.assertEqual(ages[key], 1, key)
+        for key in ("monastery", "siege-workshop", "castle",
+                    "knight", "cavalry-archer", "longbowman", "mangonel", "monk"):
+            self.assertEqual(ages[key], 2, key)
+        # The ram has no enabling tech of its own: the siege workshop it is
+        # trained at is what puts it in the Castle Age.
+        self.assertEqual(ages["battering-ram"], 0)
+        self.assertEqual(self.result["entities"]["battering-ram"]["train"]["buildingId"], 49)
+
+    def test_castle_age_carries_its_price_and_what_it_opens(self):
+        castle_age = self.result["technologies"]["castle-age"]
+        self.assertEqual(castle_age["techId"], 102)
+        self.assertEqual(castle_age["name"], "Castle Age")
+        self.assertEqual(castle_age["cost"], {"food": 800, "gold": 200})
+        self.assertEqual(castle_age["researchSeconds"], 160)
+        self.assertEqual(castle_age["researchedAt"], 109)
+        self.assertEqual(castle_age["requiresAge"], 1)
+        self.assertEqual(castle_age["grantsAge"], 2)
+
+        entities = self.result["entities"]
+        # The castle is the British unique unit's home, and holds people.
+        self.assertEqual(entities["castle"]["cost"], {"stone": 650, "wood": 0})
+        self.assertEqual(entities["castle"]["popSupport"], 20)
+        self.assertEqual(entities["longbowman"]["train"]["buildingId"], entities["castle"]["id"])
+        # A monk's two works, as the DAT states them rather than as we guess.
+        self.assertEqual(entities["monk"]["heal"], {"hitPointsPerSecond": 1.25, "range": 0.0})
+        self.assertEqual(
+            entities["monk"]["convert"], {"minSeconds": 5.0, "maxSeconds": 9.0, "range": 9.0}
+        )
+        # A monk carries no attack at all, which is what keeps it out of the
+        # units that pick their own fights.
+        self.assertNotIn("combat", entities["monk"])
+        # The mangonel's stone lands with a blast; an archer's arrow does not.
+        self.assertEqual(entities["mangonel"]["combat"]["blastRadius"], 1.0)
+        self.assertNotIn("blastRadius", entities["archer"]["combat"])
 
     def test_skirmisher_is_identified_by_its_art_not_its_name(self):
         # The DAT calls unit 7 "XBOWM" and unit 24 "CARCH": AoK names that never

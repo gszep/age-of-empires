@@ -1,4 +1,5 @@
-import type { Command, ResourceKind } from './types';
+import type { Command, EntityKind, ResourceKind } from './types';
+import { isBuilding } from './data';
 import type { PlayerObservation } from '../protocol/types';
 
 interface Spotted { id: number; kind: string; owner: number; x: number; y: number; resource?: ResourceKind; amount?: number; training?: unknown; buildProgress?: number; order?: string }
@@ -220,9 +221,11 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     // only heading was the mirror of its own town center had nowhere to go
     // once that town center fell, and stood in the ruins until the clock ran
     // out with the enemy barracks still up.
+    // Buildings only: a negative list of unit names silently gained every
+    // Castle Age unit the moment they existed, and sent the army marching at
+    // whichever monk it last saw instead of at something that stays put.
     const enemyBuilding = known
-      .filter(e => e.owner !== 0 && e.owner !== player && e.kind !== 'resource'
-        && e.kind !== 'villager' && e.kind !== 'militia')
+      .filter(e => e.owner !== 0 && e.owner !== player && isBuilding(e.kind as EntityKind))
       .sort((a, b) => distance(idleMilitia[0], a) - distance(idleMilitia[0], b) || a.id - b.id)[0];
     // March toward the mirrored base position until the enemy town center is seen.
     const target = enemyTc

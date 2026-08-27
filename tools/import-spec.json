@@ -9,7 +9,8 @@
   "audio": { "switch": "Britons" },
   "technologies": [
     { "key": "loom", "techId": 22, "effect": "Loom", "appliesTo": ["villager"] },
-    { "key": "feudal-age", "techId": 101, "effect": "Feudal Age" }
+    { "key": "feudal-age", "techId": 101, "effect": "Feudal Age" },
+    { "key": "castle-age", "techId": 102, "effect": "Castle Age" }
   ],
   "entities": [
     {
@@ -424,6 +425,124 @@
         "idle": { "slot": "standing" },
         "death": { "slot": "dying" },
         "decay": { "slot": "dead" }
+      }
+    },
+    {
+      "key": "monastery",
+      "unitId": 104,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "siege-workshop",
+      "unitId": 49,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "castle",
+      "unitId": 82,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
+      "key": "knight",
+      "sounds": ["select", "train"],
+      "unitId": 38,
+      "category": "unit",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "attack": { "slot": "attack" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
+      "key": "cavalry-archer",
+      "sounds": ["select", "train"],
+      "unitId": 39,
+      "category": "unit",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "attack": { "slot": "attack" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
+      "key": "longbowman",
+      "sounds": ["select", "train"],
+      "unitId": 8,
+      "category": "unit",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "attack": { "slot": "attack" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
+      "key": "battering-ram",
+      "sounds": ["select", "train"],
+      "unitId": 35,
+      "category": "unit",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "attack": { "slot": "attack" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
+      "key": "mangonel",
+      "sounds": ["select", "train"],
+      "unitId": 280,
+      "category": "unit",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "attack": { "slot": "attack" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
+      "key": "monk",
+      "sounds": ["select", "train"],
+      "unitId": 125,
+      "category": "unit",
+      "convert": { "task": { "actionType": 104, "classId": -1, "unitId": -1 } },
+      "heal": { "task": { "actionType": 105 } },
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "attack": { "slot": "attack" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
+      "key": "mangonel-stone",
+      "unitId": 656,
+      "category": "projectile",
+      "animations": {
+        "idle": { "slot": "standing" }
       }
     }
   ],

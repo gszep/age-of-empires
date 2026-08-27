@@ -24,6 +24,7 @@ Controls and hotkeys are listed in the root `README.md`. The essential loop is l
 - Patch-matched DAT rules, palettes, and AoE2DE entity/widgetui assets through a byte-identical local import; open fallback remains playable.
 - WEST/Dark Age desktop composition with dimetric world, task animations, composite town center, fog, command/selection panels, minimap, menus, hotkeys, pointer interactions, and landscape scaling.
 - Selection markers follow the DAT's obstruction shape: a round outline under units (obstruction type 5), the `outline_size` box drawn on the ground under buildings and resources — the box the DAT draws slightly larger than the collision box, and a gate's spanning its whole four-tile run. The clicked target of an order blinks its own marker; the flash's cadence and colour are approximated (0.2 s on/off for 1.2 s, in the marker colour) because no owned file states them — the DAT's `unit_selection_color_1/2` hold the unused palette index 0, and widgetui defines no such widget, so the behaviour lives in the closed runtime.
+- The Castle Age and what it opens: monastery, siege workshop and castle, and the knight, cavalry archer, longbowman, battering ram, mangonel and monk, each gated by the age the DAT's own enabling technology names. A monk heals and converts, a mangonel's stone lands with a blast, and a castle shoots and supports twenty population.
 - Versioned JSON public contracts; browser, built-in AI, JSONL subprocess, deadline subprocess, WebSocket, and MCP strategies share `applyCommand`.
 - Full-state FNV-1a periodic checksums, command-stream records, Node verification, and browser playback.
 - Process-isolated paired batches with configurable concurrency, Wilson 95% intervals, strategy hashes, per-match results, and replay records.
@@ -31,7 +32,7 @@ Controls and hotkeys are listed in the root `README.md`. The essential loop is l
 
 ## Deliberately omitted
 
-The target does not include Castle+ ages, other civilizations, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, relics, or a genetic-algorithm framework. Palisade walls and gates are built; stone walls and their gates are not. Of the technology tree only Loom and the Feudal Age are researchable. Mobile has no separate or simplified gameplay. All SLD layers convert through the local decoder.
+The target does not include the Imperial Age, other civilizations, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, relics, or a genetic-algorithm framework. Palisade walls and gates are built; stone walls and their gates are not. Of the technology tree only Loom, the Feudal Age and the Castle Age are researchable — no unit upgrade, blacksmith or university technology is. Mobile has no separate or simplified gameplay. All SLD layers convert through the local decoder.
 
 ## Measurements and gate evidence
 
@@ -67,6 +68,31 @@ Batch artifacts are intentionally ignored under `.local/batches/`.
 The importer integration resolves every consumed DAT graphic/rule and widgetui source, hashes inputs, and regenerates byte-identically. Viewer smoke tests loaded imported atlases and WEST UI without application console errors; selection, gather orders, fog expansion, and browser replay were exercised through Chrome DevTools Protocol. Timing, resource conservation, hidden information, pathing, combat release, protocol validation, and replay determinism have focused tests.
 
 Known discrepancies are single-terrain ground without the multi-terrain blend masks and missing fire delta overlays on damaged buildings.
+
+Four Castle Age behaviours are approximations, because the owned files carry the
+numbers but not the rules that use them:
+
+- **A conversion's odds.** The DAT gives the monk's window — the earliest second
+  a conversion may succeed (5) and the second by which it must (9) — but not the
+  roll between them. The simulation spreads it uniformly across that window, so
+  both ends are the DAT's and only the shape between them is chosen. Breaking
+  off loses the progress.
+- **Blast falloff.** `blast_width` (1 tile for the mangonel) is imported and
+  everything inside it takes the full hit, including the shooter's own side, as
+  in AoE2. What the neighbouring `blast_attack_level` implies about damage
+  falling off with distance is not stated in the owned data, so there is none.
+  Blast does not reach buildings.
+- **The villager's build menu is split into an economic and a military page.**
+  Seventeen buildings do not fit AoE2's fifteen-slot command panel, and the
+  original splits them the same way; the DAT's `interface_kind` is a different
+  grouping (it puts the blacksmith and monastery with the mills) and does not
+  state this split, so the page each building sits on follows the reference
+  game's UI rather than an owned file.
+- **A monk shows no contour when something stands in front of it.** Its idle and
+  attack outline layers are the only two of the consumed sources that fail the
+  decoder's own walk invariant (`covered 0 of 7 blocks, consumed 11 of 11
+  bytes`), so they are recorded in the manifest's `skippedMasks` and the monk
+  simply draws without the occlusion contour every other unit gets.
 
 The ground samples the imported DAT terrain texture (slot 0, `Grass`/`g_grs`) at the authored `terrain_dimensions` tile span; `terrain/blends` and `terrain/masks` are not consumed, so terrain-to-terrain transitions are absent rather than approximated. The DAT gives each terrain a `blend_type` (grass 0, both farm slots 1) and a `blend_priority`, but nothing in the owned files maps a `blend_type` to one of the ten files in `terrain/blends/`, nor says how a 512x512 blend is indexed against a tile — its shapes are irregular parcels that straddle every even split. `overlay_mask_name` (grass -> `masks/grass.png`) is a noise texture, and the `terrain_unit_masked_density` field beside it suggests it drives decorative scatter rather than the ground's appearance. Farms are terrain too (slots 7 and 29, `Farm1`/`Farm Cnst1`): the DAT gives them no SLD, so they draw as their own patch of the isometric grid.
 
@@ -121,8 +147,11 @@ that never moved with the ids, so unit 7 is called XBOWM and draws
 |---|---|---|
 | Town center | villager | herdables (sheep, goat, turkey…) |
 | Barracks | militia, spearman | man-at-arms and above, eagle scout, civ uniques |
-| Archery range | archer, skirmisher | crossbowman, elite skirmisher, cavalry archer, hand cannoneer |
-| Stable | scout cavalry | knight line, camels, civ uniques |
+| Archery range | archer, skirmisher, cavalry archer | crossbowman, elite skirmisher, hand cannoneer |
+| Stable | scout cavalry, knight | camels, light cavalry, civ uniques |
+| Siege workshop | battering ram, mangonel | scorpion, siege tower, and the upgrades of both |
+| Monastery | monk | relics, and every monastery technology |
+| Castle | longbowman (the British unique) | trebuchet, petard, other civs' uniques |
 | Market | trade cart | trade cog (water) |
 | Mill, lumber camp, mining camp, house, outpost, watch tower, blacksmith | nothing | nothing |
 
@@ -143,13 +172,23 @@ from a table here:
   which the DAT calls "Middle Age" while its effect is called "Feudal Age" —
   the same name-versus-data trap as the units, so the effect name is what the
   importer asserts.
+- **Castle Age** — 800 food and 200 gold, 160 seconds at the town center, and
+  it requires the Feudal Age. Tech 102, whose DAT name is "Feudal Age" and
+  whose effect is "Castle Age": the same shift again.
+
+Unit upgrades (man-at-arms, crossbowman, pikeman, light cavalry, elite
+skirmisher) are deliberately not researchable yet, so the Castle Age adds what
+it opens rather than what it improves.
 
 Which age a thing belongs to is not a list here either: the importer finds the
 "(make avail)" technology that enables each unit and reads the age technology in
 its requirements. That makes market, blacksmith, archery range, stable, watch
-tower, archer, skirmisher, spearman, scout cavalry and trade cart all Feudal,
-and barracks, house, mill, camps, outpost, farm, militia and villagers Dark —
-which is exactly DE's tech tree for this slice. Placement and training refuse
+tower, archer, skirmisher, spearman, scout cavalry and trade cart all Feudal;
+monastery, siege workshop, castle, knight, cavalry archer, longbowman, mangonel
+and monk all Castle; and barracks, house, mill, camps, outpost, farm, militia
+and villagers Dark — which is exactly DE's tech tree for this slice. The
+battering ram has no enabling technology of its own and imports as Dark Age; the
+siege workshop it is trained at is what puts it in the Castle Age. Placement and training refuse
 anything past the player's age, and the command grid hides it.
 
 The built-in AI never ages up: it builds and trains only Dark Age things, so its
