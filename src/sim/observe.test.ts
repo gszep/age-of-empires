@@ -121,8 +121,12 @@ describe('player observations', () => {
   it('hides unexplored gaia resources until scouted', () => {
     const state = createGame(11);
     const observation = observe(state, 1);
+    // Far enough that no line of sight the player owns reaches it — the town
+    // center sees eight tiles and the scout four, from nine tiles out.
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
     const farNodes = state.entities.filter(
-      e => e.kind === 'resource' && e.position.x > 18,
+      e => e.kind === 'resource'
+        && Math.hypot(e.position.x - tc.position.x, e.position.y - tc.position.y) > 30,
     );
     expect(farNodes.length).toBeGreaterThan(0);
     for (const node of farNodes) {

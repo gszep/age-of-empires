@@ -31,10 +31,34 @@ const inFeudal = (state: GameState) => {
 const villagerOf = (state: GameState) =>
   state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
 
-const nodeOf = (state: GameState, resource: ResourceKind) =>
-  state.entities
+/**
+ * The node a player would actually work: the nearest one to whoever is asking,
+ * or to their town center. Picking the leftmost on the map used to mean the
+ * same thing; on a full-size board it means the other player's, fifty tiles
+ * away and guarded.
+ */
+const nodeOf = (state: GameState, resource: ResourceKind, from?: Entity) => {
+  const origin = from ?? state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+  return state.entities
     .filter(e => e.kind === 'resource' && e.resourceKind === resource)
-    .sort((a, b) => a.position.x - b.position.x)[0];
+    .sort((a, b) => distanceBetween(origin, a) - distanceBetween(origin, b) || a.id - b.id)[0];
+};
+
+const distanceBetween = (a: Entity, b: Entity) =>
+  Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y);
+
+/**
+ * Send both players' scouts to opposite corners. The opening hands each player
+ * one, and a scout fights on its own initiative — a test about what a tower
+ * chooses to shoot needs the tower to be the only thing shooting.
+ */
+const parkScouts = (state: GameState) => {
+  for (const scout of state.entities.filter(e => e.kind === 'scout-cavalry')) {
+    scout.position = scout.owner === 1
+      ? { x: 1, y: state.height - 1 }
+      : { x: state.width - 1, y: 1 };
+  }
+};
 
 function totalOf(state: GameState, resource: ResourceKind): number {
   const banked = state.players[1][resource] + state.players[2][resource];
@@ -104,9 +128,14 @@ describe('gathering', () => {
       wood: totalOf(state, 'wood'),
       gold: totalOf(state, 'gold'),
     };
+    // Each villager works what is near it. Sending them all to one player's
+    // half sends the other player's across the map into an enemy scout, and a
+    // villager killed carrying four food takes the four with it — which is
+    // AoE2's rule, and not what this test is measuring.
+    parkScouts(state);
     const villagers = state.entities.filter(e => e.kind === 'villager');
     for (const [i, villager] of villagers.entries()) {
-      const node = nodeOf(state, (['food', 'wood', 'gold'] as const)[i % 3])!;
+      const node = nodeOf(state, (['food', 'wood', 'gold'] as const)[i % 3], villager)!;
       applyCommand(state, { kind: 'order', player: villager.owner as 1 | 2, entityIds: [villager.id], target: node.position, targetId: node.id });
     }
     run(state, 20 * 300);
@@ -260,14 +289,17 @@ describe('production and rally points', () => {
   it('holds a finished unit at the population cap instead of losing it', () => {
     const state = createGame(5);
     const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    // Whatever the opening hands out — three villagers and a scout, as the map
+    // script says — the cap is filled to exactly that.
+    const opening = state.players[1].population;
     applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' });
-    state.players[1].populationCap = 3; // fill the cap while training
+    state.players[1].populationCap = opening; // fill the cap while training
     run(state, Math.round(state.rules.units.villager.trainSeconds * 20) + 50);
-    expect(state.players[1].population).toBe(3);
+    expect(state.players[1].population).toBe(opening);
     expect(tc.training).toBeDefined();
-    state.players[1].populationCap = 5;
+    state.players[1].populationCap = opening + 2;
     run(state, 2);
-    expect(state.players[1].population).toBe(4);
+    expect(state.players[1].population).toBe(opening + 1);
   });
 });
 
@@ -392,6 +424,7 @@ describe('towers', () => {
     });
     const tower = state.entities.find(e => e.kind === 'watch-tower')!;
     tower.buildProgress = undefined;
+    parkScouts(state);
     const victim = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
     victim.position = { x: tower.position.x + 1, y: tower.position.y };
     const before = victim.hp;
@@ -411,6 +444,7 @@ describe('towers', () => {
     });
     const tower = state.entities.find(e => e.kind === 'watch-tower')!;
     tower.buildProgress = undefined;
+    parkScouts(state);
     const victim = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
     // Far enough that the arrow needs several ticks to cross.
     const range = FALLBACK_RULES.buildings['watch-tower'].attack!.range;
@@ -447,6 +481,7 @@ describe('towers', () => {
     });
     const tower = state.entities.find(e => e.kind === 'watch-tower')!;
     tower.buildProgress = undefined;
+    parkScouts(state);
     // Park an enemy town center in range and keep every enemy unit away.
     const enemyTc = state.entities.find(e => e.owner === 2 && e.kind === 'town-center')!;
     enemyTc.position = { x: tower.position.x + 3, y: tower.position.y };
@@ -479,6 +514,7 @@ describe('towers', () => {
     });
     const tower = state.entities.find(e => e.kind === 'watch-tower')!;
     tower.buildProgress = undefined;
+    parkScouts(state);
     const enemies = state.entities.filter(e => e.owner === 2 && e.kind === 'villager');
     const near = enemies[0];
     const far = enemies[1];
@@ -508,6 +544,7 @@ describe('towers', () => {
     });
     const tower = state.entities.find(e => e.kind === 'watch-tower')!;
     tower.buildProgress = undefined;
+    parkScouts(state);
     const enemies = state.entities.filter(e => e.owner === 2 && e.kind === 'villager');
     const near = enemies[0];
     const far = enemies[1];
@@ -538,6 +575,7 @@ describe('towers', () => {
     });
     const tower = state.entities.find(e => e.kind === 'watch-tower')!;
     tower.buildProgress = undefined;
+    parkScouts(state);
     const enemies = state.entities.filter(e => e.owner === 2 && e.kind === 'villager');
     const ordered = enemies[0];
     const other = enemies[1];
@@ -568,6 +606,7 @@ describe('towers', () => {
     });
     const tower = state.entities.find(e => e.kind === 'watch-tower')!;
     tower.buildProgress = undefined;
+    parkScouts(state);
     const victim = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
     const range = FALLBACK_RULES.buildings['watch-tower'].attack!.range;
     victim.position = { x: tower.position.x + range - 0.5, y: tower.position.y };

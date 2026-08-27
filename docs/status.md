@@ -271,6 +271,38 @@ first poll only records the world so a match resumed from a snapshot does not
 alert for everything already damaged. `sounds.json` names no
 construction-complete cue, so there is none rather than an approximation.
 
+## The map
+
+The board is 120x120 tiles, square, which is AoE2's "tiny" — the size two
+players get. The game's own string table is where that number comes from: each
+size's key encodes its tile dimension, `MAPSIZE_TINY` being 25120 next to
+`MAPSIZE_SMALL` 25144 and `MAPSIZE_NORMAL` 25200.
+
+The opening is laid out from `land_resources.inc`, the include every
+Arabia-family random-map script pulls in for its player start. Its
+`min/max_distance_to_players` become distance bands and its
+`group_placement_radius` the spread, so each player gets six berries at 10-12
+tiles, gold at 12-16, 18-26 and 25-35, stone at 14-18 and 20-26, four sheep at
+10-12 and two more groups further out, four deer, two boar, and two forest
+clumps of 55 trees — `PLAYER_FOREST_BASE_COUNT` times `PLAYER_FOREST_CLUMPS` at
+their smallest. That is about 10,600 wood a side where the old board had 800.
+
+Both halves are generated together, each object placed at its bearing and at
+its mirror at once, so the two starts are exact reflections and neither can
+land on the other. An object that finds nowhere to stand is dropped rather than
+stacked: the script's count is what is asked for, not a promise the ground can
+hold it.
+
+Each player also starts with the scout the script gives them
+(`create_object SCOUT`, one at 7-9 tiles). On a board this size it is not a
+flourish. A town center sees eight tiles and the nearest berries are ten away,
+so without something to ride out and look there is nothing known to gather from
+and the match never starts.
+
+*Not covered:* the middle of the map is empty grass. The script's neutral
+forests and its relics, and the extra resources between the players, are not
+generated.
+
 ## Palisade walls
 
 The palisade is one 1x1 building placed a tile at a time but dragged as a line:

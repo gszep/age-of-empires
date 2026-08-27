@@ -9,11 +9,51 @@ const RESOURCE_COLORS: Record<string, string> = {
 };
 
 /** AoE-style diamond minimap with fog, entity dots, and the camera diamond. */
+/** Fog shades, as RGB triples so the per-tile buffer can be written directly. */
+const UNEXPLORED = [0x00, 0x00, 0x00] as const;
+const IN_SIGHT = [0x6f, 0x8f, 0x4a] as const;
+const REMEMBERED = [0x3c, 0x4d, 0x2c] as const;
+
 export class Minimap {
   private context: CanvasRenderingContext2D;
 
+  /**
+   * Terrain and fog, one pixel per tile on an axis-aligned buffer. Drawing a
+   * diamond path per tile is what the minimap used to do, and on a full-size
+   * map that is fourteen thousand paths several times a second — measured at
+   * half the frame rate of everything else in the game put together. The
+   * isometric mapping is linear, so the whole buffer can be laid down in one
+   * `drawImage` under the matrix that reproduces it exactly.
+   */
+  private tiles?: { canvas: HTMLCanvasElement; image: ImageData };
+
   constructor(private canvas: HTMLCanvasElement, private player: PlayerId = 1) {
     this.context = canvas.getContext('2d')!;
+  }
+
+  private terrain(state: GameState): HTMLCanvasElement {
+    if (this.tiles?.image.width !== state.width || this.tiles.image.height !== state.height) {
+      const canvas = document.createElement('canvas');
+      canvas.width = state.width;
+      canvas.height = state.height;
+      this.tiles = {
+        canvas,
+        image: canvas.getContext('2d')!.createImageData(state.width, state.height),
+      };
+    }
+    const visibility = state.visibility[this.player];
+    const pixels = this.tiles.image.data;
+    for (let index = 0; index < state.width * state.height; index++) {
+      const shade = visibility.explored[index] !== 1 ? UNEXPLORED
+        : visibility.visible[index] === 1 ? IN_SIGHT : REMEMBERED;
+      const at = index * 4;
+      pixels[at] = shade[0];
+      pixels[at + 1] = shade[1];
+      pixels[at + 2] = shade[2];
+      pixels[at + 3] = 255;
+    }
+    this.tiles.canvas.getContext('2d')!.putImageData(this.tiles.image, 0, 0);
+    return this.tiles.canvas;
   }
 
   private toCanvas(state: GameState, x: number, y: number): { x: number; y: number } {
@@ -42,26 +82,15 @@ export class Minimap {
     const visibility = state.visibility[this.player];
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Terrain and fog per tile.
-    for (let y = 0; y < state.height; y++) {
-      for (let x = 0; x < state.width; x++) {
-        const index = y * state.width + x;
-        const explored = visibility.explored[index] === 1;
-        const visible = visibility.visible[index] === 1;
-        ctx.fillStyle = !explored ? '#000000' : visible ? '#6f8f4a' : '#3c4d2c';
-        const a = this.toCanvas(state, x, y);
-        const b = this.toCanvas(state, x + 1, y);
-        const c = this.toCanvas(state, x + 1, y + 1);
-        const d = this.toCanvas(state, x, y + 1);
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.lineTo(c.x, c.y);
-        ctx.lineTo(d.x, d.y);
-        ctx.closePath();
-        ctx.fill();
-      }
-    }
+    // Terrain and fog, as one image under the same mapping `toCanvas` applies:
+    // (x, y) -> (w/2 + (x - y) * scaleX, (x + y) * scaleY), which is linear and
+    // so is exactly a canvas transform.
+    const scaleX = this.canvas.width / (state.width + state.height);
+    const scaleY = this.canvas.height / (state.width + state.height);
+    ctx.save();
+    ctx.setTransform(scaleX, scaleY, -scaleX, scaleY, this.canvas.width / 2, 0);
+    ctx.drawImage(this.terrain(state), 0, 0);
+    ctx.restore();
 
     // Entities: live visible ones plus remembered snapshots.
     const drawDot = (x: number, y: number, color: string, size: number) => {

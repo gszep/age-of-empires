@@ -23,11 +23,14 @@ describe('simulation', () => {
   it('trains a villager from a town center in the data-backed time', () => {
     const state = createGame();
     const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    // Counted against whatever the opening hands out, which the map script
+    // decides: three villagers and a scout today.
+    const opening = state.players[1].population;
     expect(applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' })).toEqual({ ok: true });
     run(state, 499); // villager trainSeconds = 25s -> 500 ticks
-    expect(state.players[1].population).toBe(3);
+    expect(state.players[1].population).toBe(opening);
     run(state, 1);
-    expect(state.players[1].population).toBe(4);
+    expect(state.players[1].population).toBe(opening + 1);
   });
 
   it('walks into range, winds up, and releases discrete armor-based hits', () => {

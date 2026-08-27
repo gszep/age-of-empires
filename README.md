@@ -17,6 +17,11 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 
 ### Controls
 
+- The map is 120x120 tiles, AoE2's "tiny", with each player's opening laid out
+  at the distances the original's own random-map include uses: berries and
+  sheep at ten tiles, gold and stone further out, and two forests of fifty-odd
+  trees apiece. You start with a scout, and you will need it — the town center
+  sees eight tiles and your food is ten away.
 - Left-click selects; drag-select chooses multiple units.
 - Right-click ground/resources/enemies issues context-sensitive move, gather, or attack orders; right-click with a production building selected sets its rally point.
 - Select a watch tower and right-click an enemy to make it concentrate fire there; right-click bare ground to release it back to choosing its own targets.

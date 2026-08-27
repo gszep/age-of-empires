@@ -18,6 +18,33 @@ const FARM_SPOTS: { x: number; y: number }[] = [
 ];
 
 /**
+ * Drop sites, and which resource each one banks. On a full-size map the
+ * nearest trees are twenty tiles out, and a villager that walks that twice for
+ * ten wood is not an economy — it is a queue. AoE2's answer is a camp by the
+ * resource, and it is the difference between the two.
+ */
+const CAMPS: { resource: ResourceKind; building: 'lumber-camp' | 'mining-camp' | 'mill' }[] = [
+  { resource: 'wood', building: 'lumber-camp' },
+  { resource: 'gold', building: 'mining-camp' },
+  { resource: 'food', building: 'mill' },
+];
+const CAMP_COST_WOOD = 100;
+/** How far a resource may be from a drop site before one is worth building. */
+const CAMP_RANGE = 8;
+const CAMPS_PER_RESOURCE = 3;
+/** Bearings to try around a node, cycled so a blocked spot is retried elsewhere. */
+const CAMP_SPOTS: { x: number; y: number }[] = [
+  { x: 3, y: 0 }, { x: -3, y: 0 }, { x: 0, y: 3 }, { x: 0, y: -3 },
+  { x: 2.5, y: 2.5 }, { x: -2.5, y: -2.5 }, { x: 2.5, y: -2.5 }, { x: -2.5, y: 2.5 },
+];
+const BANKS: Record<string, ResourceKind[]> = {
+  'town-center': ['food', 'wood', 'gold', 'stone'],
+  'lumber-camp': ['wood'],
+  'mining-camp': ['gold', 'stone'],
+  mill: ['food'],
+};
+
+/**
  * The example strategy: gather food/wood/gold, keep housing ahead of
  * population, build a barracks, train villagers and militia, and attack with
  * groups of three. It sees only its canonical observation and acts only
@@ -55,9 +82,63 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     }
   }
 
+  // The scout's job, and the reason the map hands one out: a town center sees
+  // eight tiles and the nearest berries are ten away, so until somebody rides
+  // out there is nothing known to gather. It walks a widening ring around the
+  // base, taking its next heading from the clock so no state has to be kept
+  // between decisions and two runs of the same match scout identically.
+  for (const scout of mine.filter(e => e.kind === 'scout-cavalry' && e.order === 'idle')) {
+    const leg = Math.floor(observation.time / 12);
+    // A turn of about 137 degrees a leg never repeats a heading soon, and the
+    // radius steps out and starts again, so the ring is covered rather than
+    // one spoke walked over and over.
+    const bearing = leg * 2.4;
+    const radius = 12 + (leg % 6) * 9;
+    const home = tc ?? scout;
+    commands.push({
+      kind: 'order', player, entityIds: [scout.id],
+      target: {
+        x: Math.max(1, Math.min(observation.mapWidth - 1, home.x + Math.cos(bearing) * radius)),
+        y: Math.max(1, Math.min(observation.mapHeight - 1, home.y + Math.sin(bearing) * radius)),
+      },
+    });
+  }
+
   const idleBuilder = villagers.find(e => e.order === 'idle') ?? villagers[0];
   const housesUnderway = mine.some(e => e.kind === 'house' && (e.buildProgress ?? 1) < 1);
   const headroom = observation.populationCap - observation.population;
+  // Economy before barracks: the starting wood is exactly enough for either a
+  // barracks or a camp and a house, and on a map where the trees are twenty
+  // tiles out, spending it all on the barracks buys one militia and then a
+  // wood queue that never clears.
+  // A drop site beside whatever is being gathered furthest from home.
+  /** The nearest known node of a resource, and how far it is from a drop site. */
+  const supply = (resource: ResourceKind) => {
+    const node = known
+      .filter(e => e.kind === 'resource' && e.resource === resource && (e.amount ?? 0) > 0)
+      .sort((a, b) => distance(tc ?? a, a) - distance(tc ?? b, b) || a.id - b.id)[0];
+    if (!node) return undefined;
+    const walk = mine
+      .filter(e => (BANKS[e.kind] ?? []).includes(resource) && (e.buildProgress ?? 1) >= 1)
+      .reduce((best, site) => Math.min(best, distance(site, node)), Infinity);
+    return { node, walk };
+  };
+
+  for (const camp of CAMPS) {
+    if (observation.wood < CAMP_COST_WOOD || !idleBuilder || !tc) continue;
+    const built = mine.filter(e => e.kind === camp.building);
+    if (built.length >= CAMPS_PER_RESOURCE) continue;
+    // One at a time: a second would be sited against the same node anyway.
+    if (built.some(e => (e.buildProgress ?? 1) < 1)) continue;
+    const at = supply(camp.resource);
+    if (!at || at.walk <= CAMP_RANGE) continue;
+    const spot = CAMP_SPOTS[Math.floor(observation.time / 3) % CAMP_SPOTS.length];
+    commands.push({
+      kind: 'build', player, builderIds: [idleBuilder.id], building: camp.building,
+      target: { x: at.node.x + spot.x, y: at.node.y + spot.y },
+    });
+  }
+
   if (idleBuilder && headroom <= 1 && !housesUnderway && observation.wood >= 25) {
     // Cycle deterministically through candidate spots so a blocked placement
     // is retried elsewhere on the next decision.
@@ -65,7 +146,12 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     const spot = HOUSE_SPOTS[attempt % HOUSE_SPOTS.length];
     commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'house', target: place(spot) });
   }
-  if (!barracks && idleBuilder && observation.wood >= 175) {
+  // Not until the wood is banked somewhere near the trees. The starting wood
+  // buys either a barracks or an economy, and a barracks bought first is one
+  // militia followed by a wood queue that never clears — the town center is
+  // twenty tiles from the nearest forest on a full-size map.
+  const woodIsHandy = (supply('wood')?.walk ?? Infinity) <= CAMP_RANGE;
+  if (!barracks && idleBuilder && observation.wood >= 175 && woodIsHandy) {
     // Cycle candidate spots like houses do, so terrain under one spot cannot
     // block the barracks -- and the whole military opening -- permanently.
     const spot = BARRACKS_SPOTS[Math.floor(observation.time / 5) % BARRACKS_SPOTS.length];

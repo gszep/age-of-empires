@@ -104,6 +104,22 @@ keeps the record.
   player built — the grid marks them apart — and let a walker squeeze out of
   scenery but never through somebody's wall.
 
+- **Measure which layer is slow before rewriting any of them.** The 120x120
+  map halved the browser frame rate, and the obvious suspects were the fog mesh
+  and the nav grid. Disabling one loop at a time found it in the minimap, which
+  stroked a diamond path per tile — fourteen thousand paths, several times a
+  second. Replacing that with one pixel per tile and a single `drawImage` under
+  the matrix that reproduces the isometric mapping (it is linear, so a canvas
+  transform is exact) left the big map running faster than the small one had.
+  Rule: an experiment that switches one suspect off costs a minute and is worth
+  more than any amount of reasoning about which layer "must" be the cost.
+- **Making the board realistic exposes what the players were not doing.** On a
+  32x18 map the trees were five tiles from the town center, so an AI with no
+  drop-site logic and no scouting looked fine. At AoE2's own distances it spent
+  its entire starting wood on a barracks and then queued villagers behind
+  fifty-second round trips. Rule: distances are a gameplay rule like any other,
+  and a strategy tuned against toy distances is not tuned at all.
+
 ## Process
 
 - **Complete one playable behaviour end to end** (from the working style

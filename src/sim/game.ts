@@ -32,18 +32,52 @@ function addNode(state: GameState, node: NodeKind, position: Point): Entity {
   });
 }
 
-function cluster(state: GameState, node: NodeKind, center: Point, count: number): void {
-  for (let i = 0; i < count; i++) {
-    const angle = random01(state) * Math.PI * 2;
-    const radius = 1 + random01(state) * 2.2;
-    addNode(state, node, {
-      x: Math.min(state.width - 0.6, Math.max(0.6, center.x + Math.cos(angle) * radius)),
-      y: Math.min(state.height - 0.6, Math.max(0.6, center.y + Math.sin(angle) * radius)),
-    });
-  }
+/**
+ * AoE2's "tiny", square. The game's own string table encodes each map size's
+ * tile dimension in its key: `MAPSIZE_TINY` is 25120, `MAPSIZE_SMALL` 25144,
+ * `MAPSIZE_NORMAL` 25200. Tiny is what two players get, and it is the smallest
+ * board the original's opening resources are laid out for.
+ */
+export const MAP_TILES = 120;
+
+/** Where a player's town center stands. The other player's mirrors across x. */
+const START = { x: 30, y: 60 };
+
+/**
+ * One group of starting resources, read out of `land_resources.inc` — the
+ * include every Arabia-family script pulls in for its player openings.
+ * `near`/`far` are the script's `min/max_distance_to_players` in tiles, and
+ * `spread` its `group_placement_radius`; `groups` repeats the group at its own
+ * bearing, as `number_of_groups` does.
+ */
+interface StartGroup {
+  kind: NodeKind | AnimalKind;
+  count: number;
+  groups?: number;
+  near: number;
+  far: number;
+  spread: number;
 }
 
-/** One of gaia's animals, carrying the food its carcass is worth. */
+const OPENING: StartGroup[] = [
+  { kind: 'berries', count: 6, near: 10, far: 12, spread: 3 },
+  { kind: 'gold', count: 7, near: 12, far: 16, spread: 3 },
+  { kind: 'gold', count: 4, near: 18, far: 26, spread: 3 },
+  { kind: 'gold', count: 4, near: 25, far: 35, spread: 3 },
+  { kind: 'stone', count: 5, near: 14, far: 18, spread: 2 },
+  { kind: 'stone', count: 4, near: 20, far: 26, spread: 2 },
+  { kind: 'sheep', count: 4, near: 10, far: 12, spread: 3 },
+  { kind: 'sheep', count: 2, groups: 2, near: 14, far: 30, spread: 3 },
+  { kind: 'deer', count: 4, near: 14, far: 30, spread: 3 },
+  { kind: 'boar', count: 1, near: 16, far: 22, spread: 1 },
+  { kind: 'boar', count: 1, near: 16, far: 22, spread: 1 },
+  // Wood is the one the script sizes by the map rather than by the group:
+  // `PLAYER_FOREST_TILES` is `PLAYER_FOREST_BASE_COUNT` (55 at its smallest)
+  // times `PLAYER_FOREST_CLUMPS` (2 when forests are few), kept off the start
+  // area by `PLAYER_FOREST_AVOIDANCE`.
+  { kind: 'tree', count: 55, groups: 2, near: 14, far: 26, spread: 7 },
+];
+
 function addAnimal(state: GameState, kind: AnimalKind, position: Point): Entity {
   const rules = state.rules.units[kind];
   return addEntity(state, kind, 0, position, rules, {
@@ -52,9 +86,60 @@ function addAnimal(state: GameState, kind: AnimalKind, position: Point): Entity 
   });
 }
 
+const TAU = Math.PI * 2;
+
+/** A point inside the map, clear of every footprint already placed. */
+function freeSpot(state: GameState, at: Point): boolean {
+  return at.x >= 1 && at.y >= 1 && at.x <= state.width - 1 && at.y <= state.height - 1
+    && spawnFree(state, at, 0.5);
+}
+
+/**
+ * Scatter one group around a bearing from each player's start, placing both
+ * players' copies together so the two halves are exact mirrors of each other
+ * and neither can land on the other. A member that finds nowhere to stand is
+ * dropped rather than stacked; the count is what the script asks for, not a
+ * promise the ground can hold it.
+ */
+function placeGroup(state: GameState, group: StartGroup, mirror: (p: Point) => Point): void {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const angle = random01(state) * TAU;
+    const distance = group.near + random01(state) * (group.far - group.near);
+    const centre = {
+      x: START.x + Math.cos(angle) * distance,
+      y: START.y + Math.sin(angle) * distance,
+    };
+    if (!freeSpot(state, centre)) continue;
+    let placed = 0;
+    for (let i = 0; i < group.count; i++) {
+      for (let tries = 0; tries < 16; tries++) {
+        const spin = random01(state) * TAU;
+        // Square-rooted radius spreads the group evenly over its disc rather
+        // than piling it at the middle.
+        const radius = Math.sqrt(random01(state)) * group.spread;
+        const at = { x: centre.x + Math.cos(spin) * radius, y: centre.y + Math.sin(spin) * radius };
+        const other = mirror(at);
+        if (!freeSpot(state, at) || !freeSpot(state, other)) continue;
+        const kind = group.kind;
+        if (kind === 'sheep' || kind === 'deer' || kind === 'boar') {
+          addAnimal(state, kind, at);
+          addAnimal(state, kind, other);
+        } else {
+          addNode(state, kind, at);
+          addNode(state, kind, other);
+        }
+        placed++;
+        break;
+      }
+    }
+    if (placed) return;
+  }
+}
+
 export function createGame(seed = 42, rules: GameRules = FALLBACK_RULES): GameState {
   const state: GameState = {
-    rules, seed: seed || 1, tick: 0, nextId: 1, width: 32, height: 18, entities: [], projectiles: [],
+    rules, seed: seed || 1, tick: 0, nextId: 1, width: MAP_TILES, height: MAP_TILES,
+    entities: [], projectiles: [],
     players: {
       1: { id: 1, ...rules.startingResources, age: 0, researched: [], population: 0, populationCap: 0 },
       2: { id: 2, ...rules.startingResources, age: 0, researched: [], population: 0, populationCap: 0 },
@@ -62,30 +147,24 @@ export function createGame(seed = 42, rules: GameRules = FALLBACK_RULES): GameSt
     visibility: undefined as never,
   };
   state.visibility = createVisibility(state);
+  const mirror = (point: Point): Point => ({ x: state.width - point.x, y: point.y });
+
   for (const player of [1, 2] as PlayerId[]) {
-    const mirror = (point: Point): Point => player === 1 ? point : { x: state.width - point.x, y: point.y };
-    const tcRules = rules.buildings['town-center'];
-    addEntity(state, 'town-center', player, mirror({ x: 5, y: 9 }), tcRules);
-    const villagerRules = rules.units.villager;
+    const at = (point: Point) => player === 1 ? point : mirror(point);
+    addEntity(state, 'town-center', player, at(START), rules.buildings['town-center']);
     for (const dy of [-1, 0, 1]) {
-      addEntity(state, 'villager', player, mirror({ x: 7.8, y: 9 + dy }), villagerRules);
+      addEntity(state, 'villager', player, at({ x: START.x + 2.8, y: START.y + dy }), rules.units.villager);
     }
-    cluster(state, 'berries', mirror({ x: 10, y: 5 }), 6);
-    cluster(state, 'tree', mirror({ x: 10, y: 13.5 }), 8);
-    cluster(state, 'gold', mirror({ x: 4, y: 3.5 }), 4);
-    // Clear of the base build area: a cluster on top of it would reject every
-    // building placement there for good.
-    cluster(state, 'stone', mirror({ x: 13, y: 16.5 }), 4);
-    // AoE2's opening food: four sheep by the town center to herd, a pair of
-    // deer to hunt, and a boar that fights back.
-    for (const [index, offset] of [{ x: 2, y: -2.5 }, { x: 3, y: -1.5 }, { x: 2.4, y: -3.4 }, { x: 3.4, y: -2.6 }].entries()) {
-      addAnimal(state, 'sheep', mirror({ x: 5 + offset.x + index * 0.05, y: 9 + offset.y }));
-    }
-    for (const offset of [{ x: 7, y: 3.5 }, { x: 7.8, y: 4.2 }]) {
-      addAnimal(state, 'deer', mirror({ x: 5 + offset.x, y: 9 + offset.y }));
-    }
-    addAnimal(state, 'boar', mirror({ x: 5 + 4.5, y: 9 + 5.5 }));
+    // `create_object SCOUT`, one per player at 7-9 tiles. On a board this size
+    // it is not a luxury: a town center sees eight tiles and the nearest food
+    // the script places is ten away, so without something to ride out and look
+    // there is nothing known to gather from and the game never starts.
+    addEntity(state, 'scout-cavalry', player, at({ x: START.x + 8, y: START.y }), rules.units['scout-cavalry']);
   }
+  for (const group of OPENING) {
+    for (let repeat = 0; repeat < (group.groups ?? 1); repeat++) placeGroup(state, group, mirror);
+  }
+
   recalculatePopulation(state);
   updateVisibility(state);
   return state;

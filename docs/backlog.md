@@ -68,5 +68,11 @@ terrain blends above.
   through — but the two rules are not the same rule, and making them one means
   giving the simulation a gate state the checksum can see.
 - **The example AI is a Dark Age militia rush and nothing else.** It no longer
-  stalemates — all 16 of the paired batch decide — but it gathers, houses,
-  builds a barracks and attacks in threes, and that is the whole repertoire.
+  stalemates — all 16 of the paired batch decide — and it now scouts, sites
+  lumber camps, mining camps and mills against the resources it finds, and
+  holds the barracks until the wood is banked nearby. Beyond that it gathers,
+  houses and attacks in threes, and that is the whole repertoire.
+- **The middle of the map is empty.** Player openings come from
+  `land_resources.inc`; the neutral forests, relics and contested resources the
+  scripts put between the players do not, so a 120x120 board is two furnished
+  corners and a lot of grass.
