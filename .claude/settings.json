@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostCompact\",\"additionalContext\":\"Context was just compacted. Before resuming work: re-read the Process section of docs/lessons.md and the genieutils cheat-sheet in tools/README.md, and list any background jobs or waiters this session started that may still be running (see the wait/hygiene rules in AGENTS.md).\"}}'"
+          }
+        ]
+      }
+    ]
+  }
+}

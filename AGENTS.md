@@ -63,7 +63,9 @@ model-provider tests opt-in.
   `tools/aoe2-source.json`; setup guide in `docs/owned-assets-setup.md`.
 - **DAT field navigation:** see the genieutils cheat-sheet in
   `tools/README.md` before touching `import_content.py` — do not guess
-  attribute names.
+  attribute names. When the sheet lacks a field, ask the DAT itself:
+  `.tools/import-venv/bin/python tools/datq.py fields|get|grep <expr>`,
+  then extend the sheet.
 
 ## Visual debug protocol
 
@@ -106,6 +108,19 @@ screenshots; use the PNG endpoint only when geometry genuinely needs eyes.
 - Add tests for timing, state transitions, hidden information, replay
   determinism, protocol compatibility, and prior regressions — and for any
   convention that can fail silently. Do not test trivial getters or constants.
+- Never wait on a job with `pgrep -f`/`pkill -f` — the pattern matches the
+  waiting shell's own command line, so the loop never ends (sixteen ran all
+  night once). Start the job with a handle (`run_in_background`, or
+  `job & echo $! > .local/job.pid`) and wait on the handle:
+  `tools/wait_for.sh pid|file|gone <target> [timeout]`. A run that started
+  background work ends with a hygiene pass — list what it left running, kill
+  the litter, and name what deliberately survives.
+- In interactive sessions, verify lightly but always: before handing a change
+  over, run the tests that touch the changed code (the full gate still runs
+  at commit time), and first ask what the reference implementation actually
+  does — read the owned data, and search the internet when the owned files
+  do not answer. If still blocked on missing information, report it to the
+  human, who may provide it manually, rather than approximating.
 - Prefer narrow maintained libraries over custom commodity infrastructure,
   fixture-tested before adoption (`docs/library-strategy.md`).
 - Keep documentation concise and current; delete superseded prose.

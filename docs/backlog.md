@@ -15,6 +15,17 @@ DAT sound id), building construction and completion, and the ambient loops
 terrain slots name in `wwise_sound_id`. `sounds.json` names no
 construction-complete cue, so that one has no owned source to draw on.
 
+- **The under-attack alert nags during a sustained attack.** Playtest report:
+  while a building is being attacked, the alert cue fires again every few
+  seconds. It should announce a *newly* attacked target and then hold its
+  tongue for a non-irritating interval; check what interval the reference
+  uses and whether the cue watcher's rearm window resets on every hit rather
+  than per target.
+- **In-game music is missing.** Only voices and feedback cues play. Find the
+  music tracks in the owned audio depot (Wwise music events / ambient
+  containers) and wire a playlist; if the events are not resolvable through
+  the owned metadata, record that here instead of approximating.
+
 ## Rendering
 
 - **The minimap still uses hand-picked player colours.** `src/view/minimap.ts`
@@ -28,6 +39,17 @@ construction-complete cue, so that one has no owned source to draw on.
   file a terrain's `blend_type` selects, nor how a 512x512 blend is indexed
   against a tile. See the note in `overnight.md` for what was measured.
 - **Fire delta overlays** on damaged buildings are not imported.
+- **A spent forage bush shows a tree stump.** Playtest report: exhausted
+  bushes briefly draw the generic stump before vanishing. The `dead` import
+  slot routes bushes through `n_tree_stump_generic_x1`; verify against the
+  bush's own `dead_unit_id` and the reference (a depleted bush should leave
+  nothing), and stop sharing the tree's decay art if the DAT does not
+  actually assign it.
+- **A corpse re-seen through fog looks freshly killed.** Playtest report: a
+  hunted animal's carcass left in fog and revisited restarts as if just
+  killed. The last-seen memory (or the renderer's decay clock) is not
+  carrying the corpse's age; re-sighting should show the current decay state
+  and remaining food, not replay the death.
 - **Building rubble is one spec line away, and would not show.** Every
   building's `dead_unit_id` names its rubble art (`b_*_rubble_x1`), which the
   importer's `dead` slot already knows how to reach — but a building's death
@@ -47,6 +69,19 @@ terrain blends above.
 
 ## Simulation
 
+- **Carcasses cannot be selected.** Playtest report: there is no way to click
+  a hunted animal's carcass to see how much food remains on it. It carries
+  sim state a player is entitled to inspect; make it selectable with the
+  remaining-resource readout the HUD already shows for bushes and trees.
+- **Trade is unverifiable in normal play.** The cart's loop is proven by
+  tests, but a human cannot check it: trading needs a foreign market and the
+  built-in AI never builds one (it never leaves the Dark Age, below). Fixing
+  the AI's Feudal gap, or an allied player slot, is what makes trade
+  observable in a real match.
+- **Only Loom and the Feudal Age are researchable.** The tech system reads
+  everything from the DAT, so the next slice is breadth: the blacksmith's
+  Feudal researches and the other Feudal-age technologies of the buildings
+  we already ship, each gated and effect-applied the way Loom is.
 - **Hunting pays the forager's wage.** The DAT gives the hunter villager its
   own work rate (0.41 a second) and carry capacity (35); the simulation has one
   rate per resource and one global capacity, so hunting banks at the forager's
@@ -76,3 +111,15 @@ terrain blends above.
   `land_resources.inc`; the neutral forests, relics and contested resources the
   scripts put between the players do not, so a 120x120 board is two furnished
   corners and a lot of grass.
+
+## Debug tooling
+
+- **Geometric questions still need eyes; orientation metadata could answer
+  them in text.** Which way a wall segment joins, which axis a gate lies
+  along, whether a frame is the intended variant — today these are settled by
+  screenshots, the slowest loop we have. The alternative: have the renderer
+  report an orientation/variant tag per placed sprite (the delta or frame
+  index it chose and the axis it believes it is on) through the entities
+  debug query, so the palisade-gate class of question is answered by reading
+  a field instead of a picture. Keep screenshots for what genuinely needs
+  looking at; grow the protocol whenever a screenshot loop repeats.

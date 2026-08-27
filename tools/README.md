@@ -92,8 +92,10 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | graphic playback | `graphic.file_name`, `.frame_count`, `.angle_count`, `.frame_duration`, `.mirroring_mode` |
 | a graphic with no unit behind it | `dat.graphics[*].name` — the gather-point flag is `WaypointFlag <Civ>` |
 
-When a needed field is missing here, `dir()` the object once in a scratch
-script and extend this table — do not trial-and-error attribute names.
+When a needed field is missing here, look it up once —
+`.tools/import-venv/bin/python tools/datq.py fields 'dat.civs[1].units[128]'`
+(or `grep <term> <expr>`, which also searches this table) — and extend this
+table. Do not trial-and-error attribute names.
 
 `unit.name` is not an identity: they are AoK leftovers that never moved with
 the ids (unit 74 "SPRMN" is the militia; unit 7 "XBOWM" is the skirmisher).

@@ -14,6 +14,12 @@ Use the debug protocol (`AGENTS.md` → Visual debug protocol) and
 `docs/lessons.md` and keep `docs/backlog.md` and `docs/status.md` truthful as
 items land.
 
+Wait on long jobs by handle, never by pattern — `tools/wait_for.sh` against a
+PID or sentinel file, not `pgrep -f`. End every run with a hygiene pass:
+enumerate the processes the run started (background tasks, dev servers,
+headless browsers, waiters), kill the litter, and state what is deliberately
+left running.
+
 ## A. Visual fidelity (no new gameplay, all source data already local)
 
 - [x] **Player-colour palette ramps.** Done, but not where this item pointed:

@@ -201,6 +201,17 @@ keeps the record.
   opens the only page attached to it — and passes `root` and `configFile`
   explicitly, because `createServer` takes the working directory as the project
   otherwise and serves a 404.
+- **A lesson takes hold in proportion to how structural it is.** Comparing two
+  post mortems: every lesson that became something the process walks through —
+  the checklist with embedded verification, the quality gate, commit-and-push,
+  the debug protocol — held for fifteen hours and across a compaction. Every
+  lesson that stayed prose describing one incident recurred: "don't guess DAT
+  names" was violated eight more times, and the pkill self-match was rewritten
+  as pgrep sixteen times. Prose is read at hour zero and must be remembered at
+  the moment of temptation at hour five. Rule: when a lesson recurs, stop
+  re-recording it and convert it into structure — a tool that makes the right
+  way easier than the wrong way (`tools/wait_for.sh`, `tools/datq.py`), a
+  checklist line, or a hook.
 - **A leaked waiter is invisible until somebody looks.** None of the sixteen
   produced output, failed, or slowed anything down; they were found only
   because a human noticed the process list. Rule: a run that starts background
