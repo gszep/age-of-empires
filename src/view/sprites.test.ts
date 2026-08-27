@@ -4,8 +4,8 @@ import { applyCommand, createGame, stepGame } from '../sim/game';
 import type { Entity, GameState } from '../sim/types';
 import { RAMP_LEVELS, rampLut, type Atlas, type ContentAssets } from './assets';
 import {
-  PLAYER_COLORS, chooseAnimation, createEntityView, createFlagView, playerColorHex, treeIsFelled,
-  updateEntityView, updateFlagView, updateOcclusion, wallShape, type EntityView,
+  PLAYER_COLORS, chooseAnimation, createEntityView, createFlagView, decayFraction, playerColorHex,
+  treeIsFelled, updateEntityView, updateFlagView, updateOcclusion, wallShape, type EntityView,
 } from './sprites';
 
 const run = (state: GameState, ticks: number) => {
@@ -207,6 +207,59 @@ describe('what a death leaves behind', () => {
     // The felled trunk has no animation to play out, so the stump is immediate.
     updateEntityView(view, assets, state, tree, 1);
     expect(view.animationState).toBe('tree-oak/decay');
+  });
+});
+
+describe('how far gone a carcass looks', () => {
+  const carcassOf = (state: ReturnType<typeof createGame>) => {
+    const animal = state.entities.find(e => e.kind === 'sheep')!;
+    animal.dead = true;
+    animal.hp = 0;
+    return animal;
+  };
+
+  it('spends the decay art across the food rather than the clock', () => {
+    const state = createGame(71);
+    const sheep = carcassOf(state);
+    const total = state.rules.units.sheep.foodAmount!;
+
+    // Freshly killed and untouched: the first frame, a whole body. This is the
+    // report the change answers — it used to reach the last frame, which is
+    // 7% of the sprite's pixels, half a minute after the kill.
+    sheep.amount = total;
+    expect(decayFraction(state, sheep)).toBe(0);
+    // Half eaten, half rotted.
+    sheep.amount = total / 2;
+    expect(decayFraction(state, sheep)).toBeCloseTo(0.5, 6);
+    // The last of the food is the last of the carcass.
+    sheep.amount = 0;
+    expect(decayFraction(state, sheep)).toBe(1);
+  });
+
+  it('leaves a corpse with nothing on it to rot on the clock', () => {
+    const state = createGame(72);
+    // A living animal is not decaying at all, whatever its food.
+    const sheep = state.entities.find(e => e.kind === 'sheep')!;
+    expect(decayFraction(state, sheep)).toBeUndefined();
+    // Nor is a soldier's corpse, which carries no food to measure against.
+    const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    villager.dead = true;
+    expect(decayFraction(state, villager)).toBeUndefined();
+  });
+
+  it('never asks for a frame outside the sheet, however the food lands', () => {
+    const state = createGame(73);
+    const sheep = carcassOf(state);
+    const total = state.rules.units.sheep.foodAmount!;
+    // Over-full and negative both clamp: a frame index off the end of the
+    // atlas draws whatever happens to be packed next to it.
+    for (const amount of [total * 2, -5, 0.0001, total - 0.0001]) {
+      sheep.amount = amount;
+      const fraction = decayFraction(state, sheep)!;
+      expect(fraction).toBeGreaterThanOrEqual(0);
+      expect(fraction).toBeLessThanOrEqual(1);
+      expect(Math.min(29, Math.floor(fraction * 30))).toBeLessThan(30);
+    }
   });
 });
 

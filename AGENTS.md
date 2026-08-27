@@ -75,6 +75,9 @@ Chrome), the dev server exposes a text-based window into the live match:
 ```bash
 curl -s localhost:5173/__debug -d '{"type":"sim"}'                # tick, resources, entity counts
 curl -s localhost:5173/__debug -d '{"type":"entities","owner":2}' # positions, activity, screen boxes, frames
+# `entities` also reports `amount`/`resourceKind` (what is left on a node or a
+# carcass) and `frame` (the sprite index actually drawn) — a variant question
+# is a field to read rather than a screenshot to squint at.
 curl -s localhost:5173/__debug -d '{"type":"entities","dead":true}'  # corpses too
 curl -s localhost:5173/__debug -d '{"type":"pixels","entity":12}' # real rendered colours under an entity
 curl -s localhost:5173/__debug -d '{"type":"pixels","rect":[0,0,400,300]}'

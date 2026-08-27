@@ -59,6 +59,11 @@ export interface EntityView {
   fallback: boolean;
   animationState?: string;
   animationStartedAt?: number;
+  /** The frame of that animation actually drawn this tick. Reported through
+   * the debug protocol, so which variant a sprite chose — a wall's joint, a
+   * carcass's stage of rot — is a field to read rather than a picture to
+   * squint at. */
+  frameIndex?: number;
   /** When this entity was first seen dead, so the corpse chain can advance. */
   diedAt?: number;
   facing: number; // radians, world space
@@ -182,6 +187,30 @@ export function entityKey(entity: Entity): string {
     return 'tree-oak';
   }
   return entity.kind;
+}
+
+/**
+ * How far through its rot a carcass should look, from the food left on it.
+ *
+ * The DAT's decay graphic is thirty frames at a second each — a half-minute
+ * dissolve, measured from a whole body at frame 0 down to 7% of its pixels at
+ * frame 29. AoE2 spends that half minute because its carcasses rot on a clock
+ * and lose the food with it. Ours keep every last unit of food until somebody
+ * eats it, so running the art on its own clock reached the last frame while a
+ * boar still held three hundred food, and a carcass nobody had touched looked
+ * like a stain a player would never think to click.
+ *
+ * Spending the thirty stages across the food instead keeps both true: the
+ * corpse lasts exactly as long as it is worth something, and how eaten it looks
+ * is how eaten it is. Returns undefined for anything the food does not drive —
+ * a soldier's corpse still rots on the clock.
+ */
+export function decayFraction(state: GameState, entity: Entity): number | undefined {
+  if (!entity.dead || !isAnimal(entity.kind)) return undefined;
+  const total = state.rules.units[entity.kind].foodAmount ?? 0;
+  if (total <= 0) return undefined;
+  const left = Math.max(0, Math.min(total, entity.amount ?? 0));
+  return 1 - left / total;
 }
 
 /**
@@ -638,7 +667,12 @@ export function updateEntityView(
     const directionsInFile = Math.max(1, Math.floor(atlas.framesInFile / framesPerDirection));
     const direction = directionIndex(view.facing, animation.directions) % directionsInFile;
     const frameSeconds = animation.frameSeconds > 0 ? animation.frameSeconds : 0.1;
-    let frameInDirection = Math.floor(elapsed / frameSeconds);
+    // A carcass rots by how much of it has been eaten rather than by the
+    // clock, so it is still recognisable while it is still worth gathering.
+    const eaten = choice.name === 'decay' ? decayFraction(state, entity) : undefined;
+    let frameInDirection = eaten !== undefined
+      ? Math.floor(eaten * framesPerDirection)
+      : Math.floor(elapsed / frameSeconds);
     // Neither a death nor a corpse loops: both hold their last frame.
     if (choice.name === 'death' || choice.name === 'decay') {
       frameInDirection = Math.min(frameInDirection, framesPerDirection - 1);
@@ -664,6 +698,7 @@ export function updateEntityView(
   }
 
   applyFrame(view.body, assets, atlas, frameIndex, entity.position, tint);
+  view.frameIndex = frameIndex;
   view.body.mesh.renderOrder = 1000 + depth * 10;
 
   // Player colour: the DAT's mask layer marks the cloth that takes the owner's

@@ -160,12 +160,11 @@ terrain blends above.
 
 ## Debug tooling
 
-- **Geometric questions still need eyes; orientation metadata could answer
-  them in text.** Which way a wall segment joins, which axis a gate lies
-  along, whether a frame is the intended variant — today these are settled by
-  screenshots, the slowest loop we have. The alternative: have the renderer
-  report an orientation/variant tag per placed sprite (the delta or frame
-  index it chose and the axis it believes it is on) through the entities
-  debug query, so the palisade-gate class of question is answered by reading
-  a field instead of a picture. Keep screenshots for what genuinely needs
-  looking at; grow the protocol whenever a screenshot loop repeats.
+- **Geometric questions still need eyes for the axis, not the frame.** The
+  entities query now reports `frame` — the sprite index actually drawn — which
+  settled the carcass decay question numerically (frame 5 of 30 at 82 food,
+  frame 28 at 6) without a screenshot. What it still does not say is which axis
+  a piece believes it is on, so "is this gate lying the way I dragged it" is
+  read out of the frame index by hand. Reporting the wall/gate orientation tag
+  alongside the frame would finish the job. Keep screenshots for what genuinely
+  needs looking at; grow the protocol whenever a screenshot loop repeats.

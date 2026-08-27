@@ -35,6 +35,7 @@ export interface DebugContext {
   camera: THREE.Camera;
   views: Map<string, {
     animationState?: string;
+    frameIndex?: number;
     facing: number;
     playerColor?: string;
     color: { mesh?: { visible?: boolean; material?: unknown } };
@@ -102,6 +103,11 @@ export function installDebug(context: DebugContext): void {
       hp: entity.hp,
       maxHp: entity.maxHp,
       activity: entity.activity,
+      // What is left on it: a node's remaining wood or gold, a farm's food, or
+      // the food still on a carcass — the state a "is this worth going to"
+      // question is actually asking about.
+      amount: entity.amount,
+      resourceKind: entity.resourceKind,
       dead: entity.dead,
       buildProgress: entity.buildProgress,
       order: entity.order.kind,
@@ -111,6 +117,7 @@ export function installDebug(context: DebugContext): void {
       onScreen: screen.x >= 0 && screen.x < canvas.clientWidth && screen.y >= 0 && screen.y < canvas.clientHeight,
       rendered: view !== undefined,
       animation: view?.animationState,
+      frame: view?.frameIndex,
       facing: view ? round(view.facing) : undefined,
       colorTint,
     };
