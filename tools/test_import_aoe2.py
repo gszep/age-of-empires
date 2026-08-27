@@ -201,10 +201,11 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(militia["frames"], 30)
         self.assertEqual(militia["directions"], 16)
         # A depleted tree leaves the generic stump, one frame per variation.
+        # The bush names the same unit and never reaches it — see
+        # test_only_something_that_can_die_leaves_anything_behind.
         stump = entities["tree-oak"]["animations"]["decay"]
         self.assertEqual(stump["source"], "n_tree_stump_generic_x1.sld")
         self.assertEqual(stump["frames"], 1)
-        self.assertEqual(entities["berries"]["animations"]["decay"]["source"], stump["source"])
         # The chain is per task variant, not one corpse for every villager.
         self.assertEqual(
             entities["villager-lumberjack"]["animations"]["decay"]["source"],
@@ -369,6 +370,29 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # A laden cart has its own art, named by the trade task itself.
         self.assertEqual(cart["animations"]["carry"]["source"], "u_trade_cart_west_walkA_x1.sld")
         self.assertNotIn("combat", cart)
+
+    def test_only_something_that_can_die_leaves_anything_behind(self):
+        # A forage bush names STUMP (415) in `dead_unit_id`, exactly as the oak
+        # does, but it has zero hit points and no dying graphic — it cannot
+        # die, so the engine never reaches that unit and a worked-out bush
+        # leaves nothing (issue #12). Asking for the slot is a spec error.
+        entities = self.result["entities"]
+        self.assertNotIn("decay", entities["berries"]["animations"])
+        self.assertIn("decay", entities["tree-oak"]["animations"])
+        dat = _dat()
+        for key, entity in entities.items():
+            if "decay" not in entity["animations"]:
+                continue
+            spec = next(e for e in SPEC["entities"] if e["key"] == key)
+            civ = 0 if spec.get("civ") == "gaia" else SPEC["civIndex"]
+            unit = dat.civs[civ].units[spec["unitId"]]
+            self.assertGreaterEqual(unit.dying_graphic, 0, key)
+
+        # And the importer refuses rather than quietly handing over the stump.
+        from import_content import resolve_graphic_id
+        bush = dat.civs[0].units[59]
+        with self.assertRaises(ValueError):
+            resolve_graphic_id(bush, {"slot": "dead"}, dat.civs[0].units, dat)
 
     def test_fog_visibility_separates_what_gaia_placed_from_what_a_player_owns(self):
         # This one field decides whether a thing keeps being drawn once its

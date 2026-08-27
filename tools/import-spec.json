@@ -298,8 +298,7 @@
       "civ": "gaia",
       "category": "resource",
       "animations": {
-        "idle": { "slot": "standing" },
-        "decay": { "slot": "dead" }
+        "idle": { "slot": "standing" }
       }
     },
     {

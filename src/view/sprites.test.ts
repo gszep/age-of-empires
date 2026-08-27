@@ -192,6 +192,32 @@ describe('what a death leaves behind', () => {
     expect(view.shadow.mesh.visible).toBe(false);
   });
 
+  it('leaves nothing at all where a bush ran out', () => {
+    // Issue #12: a spent bush briefly drew the generic tree stump, because the
+    // spec asked for its `dead_unit_id` (415, STUMP -- the same unit the oak
+    // names) and the importer handed it over. The DAT says the bush never gets
+    // there: zero hit points and no dying graphic, so it cannot die. With no
+    // death and no decay art the right picture is no picture, not the living
+    // bush the idle fallback would otherwise draw.
+    const assets = corpseAssets();
+    const state = createGame();
+    const bush = state.entities.find(e => e.kind === 'resource' && e.resourceKind === 'food')!;
+    assets.entities['berries'] = {
+      category: 'resource',
+      animations: { idle: { frames: 1, directions: 1, frameSeconds: 0, mirroringMode: 0 } },
+      atlases: { idle: assets.entities['tree-oak'].atlases['idle'] },
+    };
+    const view = createEntityView(assets, bush);
+    updateEntityView(view, assets, state, bush, 0);
+    expect(view.animationState).toBe('berries/idle');
+    expect(view.body.mesh.visible).toBe(true);
+
+    bush.amount = 0;
+    bush.dead = true;
+    updateEntityView(view, assets, state, bush, 1);
+    expect(view.body.mesh.visible).toBe(false);
+  });
+
   it('leaves a stump where a tree ran out', () => {
     const assets = corpseAssets();
     const state = createGame();

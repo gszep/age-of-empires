@@ -134,6 +134,17 @@ def resolve_graphic_id(unit: Any, animation: dict[str, Any], civ_units: Any, dat
             # of rubble as its own unit, and its standing graphic is that art.
             if unit.dead_unit_id is None or unit.dead_unit_id < 0:
                 raise ValueError(f"unit {unit.id} leaves nothing behind")
+            # ...but only for something that can die. A forage bush has zero
+            # hit points and no dying graphic, so the engine never reaches the
+            # `dead_unit_id` it nominally shares with the oak (both name STUMP,
+            # 415) -- an exhausted bush is removed, it does not leave a tree
+            # stump. Asking for the slot anyway is a spec error, not a silent
+            # fallback (issue #12).
+            if unit.dying_graphic is None or unit.dying_graphic < 0:
+                raise ValueError(
+                    f"unit {unit.id} has no dying graphic, so it never reaches "
+                    f"its dead unit {unit.dead_unit_id}"
+                )
             return civ_units[unit.dead_unit_id].standing_graphic[0]
         if slot == "walking":
             return unit.dead_fish.walking_graphic

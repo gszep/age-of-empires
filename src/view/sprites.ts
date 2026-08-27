@@ -660,6 +660,11 @@ export function updateEntityView(
   let animation: AnimationInfo | undefined = imported?.animations[choice.name];
   let atlas: Atlas | undefined = imported?.atlases[choice.name];
   if (!animation || !atlas) {
+    // Idle is the right stand-in for a missing walk or attack. It is the wrong
+    // one for something that has died: a worked-out forage bush has no death
+    // and leaves nothing (the DAT gives it no dying graphic at all), and
+    // drawing its living self there is worse than drawing nothing (issue #12).
+    if (entity.dead) { view.body.mesh.visible = false; return; }
     animation = imported?.animations['idle'];
     atlas = imported?.atlases['idle'];
   }

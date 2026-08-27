@@ -1523,9 +1523,10 @@ describe('gather points', () => {
       }
       expect(trained, `${kind} never produced a ${trains}`).toBeDefined();
       // It leaves for the flag rather than standing at the door.
-      expect(trained!.order.kind, `${trains} from the ${kind} ignored the flag`).toBe('move');
-      expect(Math.hypot(trained!.order.target!.x - flag.x, trained!.order.target!.y - flag.y))
-        .toBeLessThan(1.5);
+      const order = trained!.order;
+      expect(order.kind, `${trains} from the ${kind} ignored the flag`).toBe('move');
+      const walking = order as Extract<typeof order, { kind: 'move' }>;
+      expect(Math.hypot(walking.target.x - flag.x, walking.target.y - flag.y)).toBeLessThan(1.5);
     }
   });
 });

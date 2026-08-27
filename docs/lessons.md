@@ -264,6 +264,16 @@ keeps the record.
   re-recording it and convert it into structure — a tool that makes the right
   way easier than the wrong way (`tools/wait_for.sh`, `tools/datq.py`), a
   checklist line, or a hook.
+- **Piping a gate step to `tail` throws its exit status away.** The quality
+  gate was being run as `npm test | tail -5 && npm run build | tail -2 && npm
+  run test:import | tail -3`, and `&&` sees the status of `tail`, which is
+  always 0. A `tsc` error therefore sailed through a green-looking gate and
+  into a commit, and was found two items later by a run that happened not to
+  pipe. Rule: never let a pipe stand between a check and the `&&` that trusts
+  it — the gate now lives in `.local/gate.sh`, which reads `PIPESTATUS` and
+  stops on the first failure. A convenience that can silently invert a check
+  is worth converting into a tool, per the lesson below.
+
 - **A leaked waiter is invisible until somebody looks.** None of the sixteen
   produced output, failed, or slowed anything down; they were found only
   because a human noticed the process list. Rule: a run that starts background
