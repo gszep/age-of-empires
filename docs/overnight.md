@@ -179,4 +179,13 @@ items land.
 - [ ] **Water: shoreline terrain, dock, fishing ship.** Requires map-gen
   water, shore tiles, and boat pathing — a subsystem, not an item. Scope a
   design note first; do not start it mid-run.
+  *Scoped, not started, as the item asks:* `docs/water-design.md` reads the
+  water terrain slots, the three terrain-restriction rows involved, and the
+  dock, fishing ship and fish out of the owned DAT, and stages the work as
+  W1–W5 with acceptance criteria. Two things it found are worth knowing before
+  anyone starts: land units already have the shallows exception authored
+  (restriction 7 crosses Beach and Shallows and refuses open water), and the
+  only real unknown is the shore seam, which is the same blend-mask mapping
+  that blocks A6 — the note recommends a one-tile beach ring rather than
+  waiting on it.
 

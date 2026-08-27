@@ -36,6 +36,15 @@ construction-complete cue, so that one has no owned source to draw on.
   spec line means making the corpse window follow the death animation's length
   first, which is a simulation change (and a checksum change).
 
+## Water
+
+Not started, and deliberately: it changes the board rather than adding to it.
+`docs/water-design.md` is the scope — the DAT's water terrain slots, the
+terrain-restriction rows that decide who floats and who wades, and the dock
+(unit 45), fishing ship (unit 13) and fish, staged as W1–W5. The one open
+question is the shore seam, which is the blend-mask mapping that also blocks
+terrain blends above.
+
 ## Simulation
 
 - **Hunting pays the forager's wage.** The DAT gives the hunter villager its
