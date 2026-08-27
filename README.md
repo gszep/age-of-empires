@@ -1,6 +1,6 @@
 # Open Empires Lab
 
-A deterministic, agent-native 1v1 Dark Age RTS slice with an authoritative TypeScript simulation, imported AoE2DE content, an AoE2DE-style desktop viewer, and reproducible headless evaluation.
+A deterministic, agent-native 1v1 Dark-through-Castle-Age RTS slice with an authoritative TypeScript simulation, imported AoE2DE content, an AoE2DE-style desktop viewer, and reproducible headless evaluation.
 
 ## Play
 
@@ -29,7 +29,7 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 - Select a watch tower and right-click an enemy to make it concentrate fire there; right-click bare ground to release it back to choosing its own targets.
 - Move the camera with arrow keys or screen edges; mouse wheel zooms; click/drag the minimap to navigate.
 - `H` selects and centers the town center; `.` cycles idle villagers.
-- Command-grid hotkeys are shown on buttons (`Q`, `W`, `S` as applicable).
+- Command-grid hotkeys are shown on buttons (`Q`, `W`, `E`… across the grid, `S` to stop). `V` turns the villager's build menu between its economic and military pages.
 - `Esc` cancels placement or opens the menu; `F3` pauses; `F10` toggles the menu.
 - `+` and `-` step the game speed through the original's own four settings —
   Slow, Normal, Fast and Extra Fast — and then two fast-forward steps past them
@@ -45,7 +45,7 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 - A monk right-clicked onto a wounded ally heals it, and onto an enemy soldier converts it to your side — it takes between five and nine seconds, and walking out of the monk's reach loses all of that work. A mangonel's stone hurts everything it lands beside, your own soldiers included, so keep them clear.
 - Right-click a trade cart onto the opponent's market to open a trade route: it loads there and banks gold each time it reaches your own market, and a longer road pays more.
 - Sheep join whoever walks up to them and then stand where they are: select them
-  and walk them home like any other unit — a villager sent onto one works it with a shepherd's crook. Villagers hunt with a bow, so game that is walking away still gets shot: a deer startles only when something comes within a tile, hops a short way, and then grazes for a quarter of a minute. A boar charges whoever wounds it, arrow or not, so send more than one villager. Click a carcass to see how much food is left on it.
+  and walk them home like any other unit — a villager sent onto one works it with a shepherd's crook. Villagers hunt with a bow, so game that is walking away still gets shot: a deer startles only when something comes within a tile, hops a short way, and then grazes for a quarter of a minute. A boar charges whoever wounds it, arrow or not, so send more than one villager. Click a carcass to see how much food is left on it, and right-click any villager onto it to help eat it.
 - Gather food, wood, gold, and stone. Mills, lumber camps, and mining camps shorten the walk for the resources they accept; the town center takes all four. Farms keep food coming once the berries run out, and watch towers (stone) shoot on their own.
 - Units answer selections and orders in their own voice, and the game raises the original's alerts: under attack, population capped, a farm run out, a technology or an age landing.
 - Load a headless `--replay` JSON from **F10 → Load replay…**; playback verifies periodic authoritative checksums.

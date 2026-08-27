@@ -23,7 +23,7 @@ Controls and hotkeys are listed in the root `README.md`. The essential loop is l
 - Authoritative explored/current visibility, filtered observations, and legal last-seen memory.
 - Patch-matched DAT rules, palettes, and AoE2DE entity/widgetui assets through a byte-identical local import; open fallback remains playable.
 - WEST/Dark Age desktop composition with dimetric world, task animations, composite town center, fog, command/selection panels, minimap, menus, hotkeys, pointer interactions, and landscape scaling.
-- Hunting is the DAT's hunter, not the plain villager: unit 122 (`VMHUN`) carries a three-tile reach and projectile 509 where the base villager (83) has neither, so a villager sent at game looses an arrow and draws the bow while doing it. That reach is also why a hunt now ends — a hunter no longer has to touch a moving deer. Working a herdable draws the shepherd instead (unit 592, `VMSHE`, task class 58, the DAT's own 0.33 a second), crook and all. Both projectile 509 and the tower's 504 draw `p_arrow_x1`, so the arrow already imported serves both.
+- Hunting is the DAT's hunter, not the plain villager: unit 122 (`VMHUN`) carries a three-tile reach and projectile 509 where the base villager (83) has neither, so a villager sent at game looses an arrow and draws the bow while doing it. That reach is also why a hunt now ends — a hunter no longer has to touch a moving deer. Working a herdable draws the shepherd instead (unit 592, `VMSHE`, task class 58), crook and all. Both projectile 509 and the tower's 504 draw `p_arrow_x1`, so the arrow already imported serves both.
 - A deer is startled rather than chased off. The reference startles one from a single tile, moves it about a tile and a half, and then leaves it alone for 14 to 20 seconds; the trigger matches the DAT exactly, where a deer's `search_radius` is 1.0 against the sheep's and boar's 4.0. The hop distance and the rest are the community reference's numbers ([AoE wiki](https://ageofempires.fandom.com/wiki/Deer)), not the owned files', and are recorded here as such. What this replaces was a hand-picked five-tile flee re-issued four times a second, which walked a deer away from its hunters for as long as they followed and let one be caught only against an obstacle.
 - A carcass rots by how much of it has been eaten, not by the clock. The DAT's decay graphic is thirty frames at a second each, measured from a whole body at frame 0 to 7% of its pixels at frame 29; AoE2 spends that half minute because its carcasses lose food to time, while ours keep every unit of food until somebody gathers it. Running the art on its own clock therefore reached the last frame while a boar still held three hundred food. The thirty stages are now spent across the food instead, so the corpse lasts exactly as long as it is worth something and how eaten it looks is how eaten it is (verified in the running game: frame 5 of 30 at 82 food, frame 28 at 6, then gone).
 - A hunted animal's carcass is selectable for as long as there is food on it (issue 14): it takes the flat marker of the DAT's own corpse unit rather than the live animal's ring, shows the food remaining, and carries no health bar — `BOARX_D` has no hit points and obstructs nothing where `BOARX` obstructs like a unit. A corpse with nothing left, and a soldier's corpse, stay unclickable: in the DAT only huntables and herdables store food, and here only a carcass keeps an `amount`.
@@ -233,22 +233,27 @@ matches (and the batch measurements above) are unaffected by the gate.
 
 Gaia's animals are units, not resource nodes: they walk, they can be killed, and
 they carry the food the DAT stores on them — 100 for a sheep, 140 for a deer,
-340 for a boar. Four sheep stand by each town center, with two deer and a boar
-out on the map.
+340 for a boar. Four sheep stand by each town center and four more further
+out, with four deer and two boar on the map.
 
-A herdable joins whoever comes closest and follows them, unless units of both
-players are within range, in which case it stays gaia's — AoE2's rule. Working
-one turns it into a carcass on the spot, which is what the game does too. Deer
-bolt from anything that is not gaia; a boar answers a wound by charging whoever
-made it, which is what makes luring one a decision. A carcass outlives the
-three-second corpse window for as long as there is food on it, and the villager
-that killed it switches to carrying the meat home under the DAT's own hunter
-art (unit 122, `u_vil_male_hunter_*`).
+A herdable joins whoever comes closest, unless units of both players are within
+range, in which case it stays gaia's — AoE2's rule — and then stands where it
+is, ordered about by hand from then on (the reason is in `backlog.md`). Working
+one turns it into a carcass on the spot, which is what the game does too. A
+deer is startled from a tile away, hops a tile and a half and then grazes for
+14-20 seconds; a boar answers a wound by charging whoever made it, arrow or
+not, which is what makes luring one a decision. A carcass outlives the
+three-second corpse window for as long as there is food on it, and any villager
+may be sent to one. A villager working game draws the DAT's hunter (unit 122,
+`u_vil_male_hunter_*`) and shoots with its bow; one working a herdable draws
+the shepherd (592, `u_vil_male_shepherd_*`).
 
-Two knowing simplifications: hunting banks at the forager's rate and carry
-capacity rather than the hunter's own DAT numbers (0.41 a second into 35, where
-the simulation has one rate per resource and one capacity), and the built-in AI
-does not herd or hunt at all. Both are recorded in `backlog.md`.
+Two knowing simplifications: hunting and herding both bank at the forager's
+rate and carry capacity rather than the hunter's or shepherd's own DAT numbers
+(0.41 a second into 35, and 0.33 a second, where the simulation has one rate
+per resource and one capacity) — the hunter and shepherd variants are art, not
+rates — and the built-in AI does not herd or hunt at all. Both are recorded in
+`backlog.md`.
 
 ### Trade pays what the road costs
 
@@ -274,8 +279,10 @@ A death leaves what the DAT says it leaves: `unit.dead_unit_id` names a unit
 whose standing graphic is the art left behind — `u_*_decayA_x1` for each unit
 and villager task variant, `n_tree_stump_generic_x1` for a spent tree or berry
 bush. The renderer plays the dying graphic once and then holds that art. Both
-last only as long as the simulation's three-second corpse window, where AoE2
-keeps a stump for the rest of the match. Buildings are left out of the chain on
+last only as long as the simulation's three-second corpse window — except an
+animal's carcass, which stays while it still holds food and rots through the
+thirty decay frames as that food is eaten — where AoE2 keeps a stump for the
+rest of the match. Buildings are left out of the chain on
 purpose: their death graphic is longer than that window, so rubble would never
 be reached (see `backlog.md`).
 

@@ -2,7 +2,7 @@
 
 ## Decision
 
-Start with one deterministic **TypeScript simulation core** used directly by both the browser and, next, a Node batch runner. Use Three.js's `WebGPURenderer` with its WebGL 2 fallback strictly as a view. Do not add Rust, WebAssembly, an ECS framework, a network service, or GPU compute until measurements justify them.
+Start with one deterministic **TypeScript simulation core** used directly by both the browser and the Node match/batch runner. Use Three.js's `WebGPURenderer` with its WebGL 2 fallback strictly as a view. Do not add Rust, WebAssembly, an ECS framework, a network service, or GPU compute until measurements justify them.
 
 This supersedes the initial research report's Rust-first recommendation for the prototype phase.
 
@@ -66,7 +66,8 @@ Before changing language, try in order:
 
 The slice has grown well past the first horizontal cut: deterministic
 pathfinding, obstruction, DAT-backed combat, fog of war, projectiles,
-construction, drop-sites, the Dark Age building set, replay verification, and
-concurrent headless batches are all in. `docs/status.md` is the accurate
+construction, drop-sites, the Dark, Feudal and Castle Age building sets, ages
+and technologies, monks and siege, replay verification, and concurrent headless
+batches are all in. `docs/status.md` is the accurate
 inventory; `docs/backlog.md` lists the known gaps. Desktop/laptop remains the
 canonical play target and mobile a remote verification surface only.

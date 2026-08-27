@@ -129,12 +129,15 @@ determinism tests still pass with the new window.
 ### N7. The under-attack alert nags
 
 Playtest report: while a building is under sustained attack the cue fires every
-few seconds. It should announce a *newly* attacked target and then hold its
-tongue. Check whether the watcher's rearm window resets per hit rather than per
-target, and what interval the reference uses.
+few seconds. The obvious hypothesis is wrong and was checked — `cues.ts` writes
+`alertedAt` only when the cue fires, so nothing resets it per hit. The defect is
+that `ALERT_INTERVAL` is one global ten-second throttle rather than one per
+newly attacked target, which also means a second building attacked inside that
+window is silently ignored. That second half is the worse bug.
 
-*Verify:* a cues test drives a sustained attack and asserts one alert, not a
-stream.
+*Verify:* a cues test drives a sustained attack on one building and asserts one
+alert rather than a stream, and a second test attacks a *different* building
+inside the window and asserts it is still announced.
 
 ### N8. Blacksmith and university technologies
 

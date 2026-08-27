@@ -1433,10 +1433,11 @@ function isDefeated(state: GameState, player: PlayerId): boolean {
 /**
  * Gaia's animals decide for themselves once a tick.
  *
- * A herdable walks over to whoever came closest and then follows them, which is
- * how a scout brings sheep home; two players' units in range and it stays where
- * it is, as in AoE2. A deer bolts from anything that is not gaia. A boar does
- * neither — its answer is in `releaseAttack`.
+ * A herdable joins whoever came closest and then stands where it is, ordered
+ * about by hand from then on; two players' units in range and it stays gaia's,
+ * as in AoE2. A deer is startled only from close by, hops a short way and then
+ * grazes through a cooldown — the numbers are the rules', not this comment's.
+ * A boar does neither: its answer to being wounded is in `applyDamage`.
  */
 const ANIMAL_INTERVAL = 5; // ticks; a quarter second is quick enough to herd by
 
