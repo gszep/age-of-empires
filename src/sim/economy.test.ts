@@ -558,6 +558,35 @@ describe('towers', () => {
   });
 });
 
+describe('the stable', () => {
+  it('builds and trains the scout it is for', () => {
+    const state = createGame(21);
+    state.players[1].wood = 1000;
+    state.players[1].food = 1000;
+    const builders = state.entities.filter(e => e.owner === 1 && e.kind === 'villager').map(e => e.id);
+    let target: { x: number; y: number } | undefined;
+    for (let step = 0; step < 12 && !target; step += 0.5) {
+      for (const y of [9, 10, 8, 11]) {
+        if (placementLegal(state, 'stable', { x: 8.5 + step, y }).ok) { target = { x: 8.5 + step, y }; break; }
+      }
+    }
+    expect(target).toBeDefined();
+    expect(applyCommand(state, { kind: 'build', player: 1, builderIds: builders, building: 'stable', target: target! }).ok).toBe(true);
+    const stable = () => state.entities.find(e => e.kind === 'stable' && e.buildProgress === undefined);
+    for (let i = 0; i < 4000 && !stable(); i++) stepGame(state);
+    expect(stable()).toBeDefined();
+
+    expect(applyCommand(state, { kind: 'train', player: 1, buildingId: stable()!.id, unit: 'scout-cavalry' }).ok).toBe(true);
+    const scout = () => state.entities.find(e => e.kind === 'scout-cavalry' && !e.dead);
+    for (let i = 0; i < 2000 && !scout(); i++) stepGame(state);
+    expect(scout()).toBeDefined();
+    // A scout is cavalry, not a worker: it defends itself.
+    expect(state.rules.units['scout-cavalry'].attacks.some(a => a.amount > 0)).toBe(true);
+    // Nothing else trains there, and the scout is trained nowhere else.
+    expect(applyCommand(state, { kind: 'train', player: 1, buildingId: stable()!.id, unit: 'militia' }).ok).toBe(false);
+  });
+});
+
 describe('trade', () => {
   /** Both sides get a finished market; a route needs two ends. */
   function markets(state: GameState): { home: Entity; away: Entity } {
@@ -682,6 +711,11 @@ describe('imported rules', () => {
     expect(importedRules!.nodes.gold.amount).toBe(800);
     // The trade cart's rate and capacity are its own DAT fields, not a
     // hand-picked gold-per-tile constant.
+    const scout = importedRules!.units['scout-cavalry'];
+    expect(scout.trainedAt).toBe('stable');
+    expect(scout.trainSeconds).toBe(30);
+    expect(scout.cost).toEqual({ food: 80, wood: 0, gold: 0, stone: 0 });
+    expect(importedRules!.buildings.stable.cost).toEqual({ food: 0, wood: 175, gold: 0, stone: 0 });
     const cart = importedRules!.units['trade-cart'];
     expect(cart.trainedAt).toBe('market');
     expect(cart.trainSeconds).toBe(51);

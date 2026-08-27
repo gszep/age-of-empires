@@ -81,11 +81,12 @@ items land.
   cart's own market, and ending the order rather than walking on the spot when
   the far market is walled off. In the live match a cart trained at the market
   renders in player colour, swaps to its laden art on the way home, and pays.
-- [ ] **Stable and scout cavalry.** Unblocked: the local decoder reads
-  `b_west_stable_age2_x1.sld` (see status.md). Add spec entries + sim rules
-  for stable (unit 101) and scout cavalry (448). *Verify:* import test
-  resolves the stable's atlases; headless match builds a stable and trains a
-  scout; smoke screenshot.
+- [x] **Stable and scout cavalry.** Stable (unit 101, 175 wood, 50s) and scout
+  cavalry (448, 80 food, 30s, and the only thing the stable trains in this
+  slice) imported from the DAT, including `b_west_stable_age2_x1.sld` — the
+  file that used to crash the decoder. *Verified:* an import test resolves both
+  and names that source; a simulation test builds the stable, trains a scout,
+  and checks the stable trains nothing else.
 - [ ] **Archery-range audit — skirmisher.** The range trains archers only;
   DE's Feudal range also trains skirmishers. Resolve the skirmisher unit in
   the DAT (DE ids differ from legacy — use the cheat-sheet, don't guess),

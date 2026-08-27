@@ -7,15 +7,6 @@ the likely fix path so a fresh session can pick it up without re-deriving it.
 When a session finishes or abandons an item, update it here; completed items
 are deleted, not ticked.
 
-## Tech tree completeness
-
-The overnight tech-tree run added buildings faster than the units they train:
-
-- **Stable is not imported** — the local decoder now reads its SLD (the
-  crash that excluded it is fixed, see status.md), so what remains is
-  content work: spec entries plus sim rules for the stable and the scout
-  cavalry it trains.
-
 ## Audio
 
 Only the `button_ui` click cue is wired. The Wwise pipeline

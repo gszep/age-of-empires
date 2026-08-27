@@ -3,12 +3,13 @@ import type { PlayerVisibility } from './visibility';
 
 export type PlayerId = 1 | 2;
 export type ResourceKind = 'food' | 'wood' | 'gold' | 'stone';
-export type UnitKind = 'villager' | 'militia' | 'spearman' | 'archer' | 'trade-cart';
+export type UnitKind =
+  | 'villager' | 'militia' | 'spearman' | 'archer' | 'scout-cavalry' | 'trade-cart';
 export type BuildingKind =
   | 'town-center' | 'barracks' | 'house'
   | 'mill' | 'lumber-camp' | 'mining-camp' | 'farm'
   | 'outpost' | 'watch-tower'
-  | 'archery-range' | 'blacksmith' | 'market';
+  | 'archery-range' | 'blacksmith' | 'market' | 'stable';
 export type EntityKind = UnitKind | BuildingKind | 'resource';
 export type Activity = 'idle' | 'moving' | 'gathering' | 'carrying' | 'building' | 'attacking' | 'dying';
 

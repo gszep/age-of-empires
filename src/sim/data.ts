@@ -108,6 +108,13 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 3, attackReleaseSeconds: 0.5,
     },
+    'scout-cavalry': {
+      hp: 45, radius: 0.25, speed: 1.2, lineOfSight: 4, cost: cost(80), trainSeconds: 30,
+      trainedAt: 'stable', popCost: 1,
+      attacks: [{ class: 25, amount: 6 }, { class: 4, amount: 3 }, { class: 39, amount: -3 }],
+      armors: [{ class: 4, amount: 0 }, { class: 8, amount: 0 }, { class: 3, amount: 2 }, { class: 31, amount: 0 }],
+      attackReloadSeconds: 2, attackReleaseSeconds: 0.4,
+    },
     'trade-cart': {
       hp: 70, radius: 0.25, speed: 1.25, lineOfSight: 7, cost: cost(0, 100, 50), trainSeconds: 51,
       trainedAt: 'market', popCost: 1,
@@ -187,6 +194,11 @@ export const FALLBACK_RULES: GameRules = {
     },
     market: {
       hp: 1800, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 60,
+      popSupport: 0, buildable: true, accepts: [],
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+    },
+    stable: {
+      hp: 1500, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
     },
@@ -307,6 +319,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       militia: unit('militia', 'barracks'),
       spearman: unit('spearman', 'barracks'),
       archer: { ...unit('archer', 'archery-range'), range: FALLBACK_RULES.units.archer.range },
+      'scout-cavalry': unit('scout-cavalry', 'stable'),
       'trade-cart': {
         ...unit('trade-cart', 'market'),
         tradeRatePerSecond: e['trade-cart']?.trade?.ratePerSecond
@@ -328,6 +341,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       'archery-range': building('archery-range', true),
       blacksmith: building('blacksmith', true),
       market: building('market', true),
+      stable: building('stable', true),
     },
     nodes: {
       berries: node('berries', 'food', 'berries'),
@@ -345,10 +359,12 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
   };
 }
 
-const UNIT_KINDS = new Set<string>(['villager', 'militia', 'spearman', 'archer', 'trade-cart']);
+const UNIT_KINDS = new Set<string>([
+  'villager', 'militia', 'spearman', 'archer', 'scout-cavalry', 'trade-cart',
+]);
 const BUILDING_KINDS = new Set<string>([
   'town-center', 'barracks', 'house', 'mill', 'lumber-camp', 'mining-camp', 'farm',
-  'outpost', 'watch-tower', 'archery-range', 'blacksmith', 'market',
+  'outpost', 'watch-tower', 'archery-range', 'blacksmith', 'market', 'stable',
 ]);
 
 export const isUnit = (kind: EntityKind): kind is UnitKind => UNIT_KINDS.has(kind);

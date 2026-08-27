@@ -217,6 +217,20 @@ class ContentImportIntegrationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             resolve_graphic_id(units[504], {"slot": "dead"}, units)  # the arrow
 
+    def test_stable_and_its_scout_resolve_including_the_sld_that_crashed_openage(self):
+        entities = self.result["entities"]
+        stable = entities["stable"]
+        self.assertEqual(stable["id"], 101)
+        self.assertEqual(stable["cost"], {"wood": 175})
+        self.assertEqual(stable["build"]["seconds"], 50)
+        # The file the previously used decoder died on, now just another source.
+        self.assertEqual(stable["animations"]["idle"]["source"], "b_west_stable_age2_x1.sld")
+        scout = entities["scout-cavalry"]
+        self.assertEqual(scout["id"], 448)
+        self.assertEqual(scout["cost"], {"food": 80})
+        self.assertEqual(scout["train"], {"buildingId": stable["id"], "seconds": 30})
+        self.assertEqual(scout["animations"]["idle"]["source"], "u_cav_scout_idleA_x1.sld")
+
     def test_trade_cart_carries_its_own_route_rules(self):
         cart = self.result["entities"]["trade-cart"]
         self.assertEqual(cart["id"], 128)

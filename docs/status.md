@@ -159,8 +159,8 @@ Two format facts discovered on the way, both violated by
 the public documentation records as "unknown, always 0x10" is the frame-data
 start offset (14 in the stable), and per-layer 4-byte padding is relative to
 that start, not to the file. With both honoured, the stable's 90 frames walk
-cleanly to the file's final byte, so importing the stable (and the scout
-cavalry it trains) is now purely a content task — see `backlog.md`.
+cleanly to the file's final byte; the stable and the scout cavalry it trains
+are imported from it.
 
 ### Audio import is unblocked
 
