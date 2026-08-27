@@ -271,8 +271,23 @@
       "animations": {
         "idle": { "slot": "standing" },
         "walk": { "slot": "walking" },
+        "attack": { "slot": "attack" },
         "work": { "task": { "actionType": 110, "classId": 9 }, "graphic": "working" },
         "carry": { "task": { "actionType": 110, "classId": 9 }, "graphic": "carrying" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
+      "key": "villager-shepherd",
+      "unitId": 592,
+      "category": "unit-variant",
+      "task": { "actionType": 110, "classId": 58 },
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "work": { "task": { "actionType": 110, "classId": 58 }, "graphic": "working" },
+        "carry": { "task": { "actionType": 110, "classId": 58 }, "graphic": "carrying" },
         "death": { "slot": "dying" },
         "decay": { "slot": "dead" }
       }

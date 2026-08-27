@@ -69,6 +69,9 @@ export interface Entity {
   /** Monks: ticks spent working on the current conversion target. Reset the
    * moment the monk stops, so a broken-off attempt is not banked. */
   convertTicks?: number;
+  /** Deer: ticks left before something can startle it again, so a hop is
+   * followed by grazing rather than by another hop. */
+  fleeCooldown?: number;
   /** Corpse state: plays the death animation, then despawns. */
   dead?: boolean;
   decayTicks?: number;
@@ -104,6 +107,8 @@ export interface Projectile {
   /** Launch point, so the renderer can tell how far through its flight it is. */
   origin: Point;
   targetId: number;
+  /** Who loosed it, so a wounded animal knows whom to charge. */
+  shooterId: number;
   /** Fixed at launch, so the shot lands even if the shooter dies mid-flight. */
   attacks: { class: number; amount: number }[];
   speed: number; // tiles per second

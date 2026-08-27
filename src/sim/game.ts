@@ -588,13 +588,41 @@ const inRange = (entity: Entity, target: Entity, margin = 0.15): boolean =>
   distance(entity.position, target.position) <= entity.radius + target.radius + margin;
 
 /** Melee units close to contact; ranged ones stop at their weapon range. */
-function attackRange(state: GameState, entity: Entity): number {
-  if (isUnit(entity.kind)) return state.rules.units[entity.kind as UnitKind].range ?? 0;
-  return state.rules.buildings[entity.kind as BuildingKind].attack?.range ?? 0;
+/**
+ * How a unit fights this particular target. A villager swings a tool at
+ * anything that can hit back and looses an arrow at game: the DAT keeps the
+ * hunter as its own unit with a three-tile reach and a projectile the plain
+ * villager has neither of, which is the whole reason a hunt catches a deer
+ * that is walking away.
+ */
+function attackProfile(
+  state: GameState, entity: Entity, target: Entity | undefined,
+): { range: number; projectileSpeed?: number; launchHeight?: number; releaseSeconds?: number } {
+  if (!isUnit(entity.kind)) {
+    const attack = state.rules.buildings[entity.kind as BuildingKind].attack;
+    return {
+      range: attack?.range ?? 0,
+      projectileSpeed: attack?.projectileSpeed,
+      launchHeight: attack?.launchHeight,
+      releaseSeconds: attack?.releaseSeconds,
+    };
+  }
+  const rules = state.rules.units[entity.kind as UnitKind];
+  if (rules.hunt && target && isAnimal(target.kind)) return { ...rules.hunt };
+  return {
+    range: rules.range ?? 0,
+    projectileSpeed: rules.projectileSpeed,
+    launchHeight: rules.launchHeight,
+    releaseSeconds: rules.attackReleaseSeconds,
+  };
+}
+
+function attackRange(state: GameState, entity: Entity, target?: Entity): number {
+  return attackProfile(state, entity, target).range;
 }
 
 const inAttackRange = (state: GameState, entity: Entity, target: Entity): boolean =>
-  inRange(entity, target, 0.35 + attackRange(state, entity));
+  inRange(entity, target, 0.35 + attackRange(state, entity, target));
 
 /** Nearer than a shooter's minimum range, where its shot has nowhere to go. */
 function tooClose(state: GameState, entity: Entity, target: Entity): boolean {
@@ -982,7 +1010,7 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
     // Leaving range cancels a started swing: no damage before release.
     entity.attackWindup = undefined;
     entity.activity = 'moving';
-    moveAlong(state, grid, entity, target.position, rules.speed, interactionRange(target) + attackRange(state, entity));
+    moveAlong(state, grid, entity, target.position, rules.speed, interactionRange(target) + attackRange(state, entity, target));
     return;
   }
   clearPath(entity);
@@ -991,14 +1019,20 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
     entity.attackCooldown -= 1;
     return;
   }
+  // The bow a villager hunts with has its own reach, arrow and swing time.
+  const profile = attackProfile(state, entity, target);
+  const releaseSeconds = profile.releaseSeconds ?? rules.attackReleaseSeconds;
   if (entity.attackWindup === undefined) {
-    entity.attackWindup = Math.max(1, Math.round(rules.attackReleaseSeconds * TICKS_PER_SECOND));
+    entity.attackWindup = Math.max(1, Math.round(releaseSeconds * TICKS_PER_SECOND));
   }
   entity.attackWindup -= 1;
   if (entity.attackWindup <= 0) {
-    releaseAttack(state, entity, target, rules.attacks, rules.projectileSpeed, rules.launchHeight, rules.blastRadius);
+    releaseAttack(
+      state, entity, target, rules.attacks,
+      profile.projectileSpeed, profile.launchHeight, rules.blastRadius,
+    );
     entity.attackWindup = undefined;
-    entity.attackCooldown = Math.max(1, Math.round(rules.attackReloadSeconds * TICKS_PER_SECOND) - Math.max(1, Math.round(rules.attackReleaseSeconds * TICKS_PER_SECOND)));
+    entity.attackCooldown = Math.max(1, Math.round(rules.attackReloadSeconds * TICKS_PER_SECOND) - Math.max(1, Math.round(releaseSeconds * TICKS_PER_SECOND)));
   }
 }
 
@@ -1077,21 +1111,35 @@ function updateConverter(state: GameState, grid: NavGrid, entity: Entity): void 
  * Melee lands immediately; a ranged shot launches an arrow that resolves on
  * impact, so damage arrives when the projectile does.
  */
+function applyDamage(
+  state: GameState, target: Entity, attacks: AttackValue[], attackerId: number,
+): void {
+  target.hp -= computeDamage(attacks, armorsOf(state, target));
+  if (target.hp <= 0) {
+    kill(state, target);
+    return;
+  }
+  // A wounded boar turns on whoever wounded it, which is what makes luring one
+  // a decision rather than a formality. It hangs off taking damage rather than
+  // off the swing that dealt it: villagers hunt with a bow, so the blow that
+  // angers a boar usually arrives as an arrow.
+  if (isAnimal(target.kind) && state.rules.units[target.kind].attacks.some(a => a.amount > 0)
+    && target.order.kind !== 'attack') {
+    const attacker = state.entities.find(e => e.id === attackerId && !e.dead);
+    if (attacker && attacker.owner !== target.owner) {
+      target.order = { kind: 'attack', targetId: attackerId };
+      target.activity = 'moving';
+    }
+  }
+}
+
 function releaseAttack(
   state: GameState, shooter: Entity, target: Entity,
   attacks: AttackValue[], projectileSpeed: number | undefined, launchHeight = 0,
   blastRadius?: number,
 ): void {
   if (!projectileSpeed) {
-    target.hp -= computeDamage(attacks, armorsOf(state, target));
-    if (target.hp <= 0) kill(state, target);
-    // A wounded boar turns on whoever wounded it, which is what makes luring
-    // one a decision rather than a formality.
-    else if (isAnimal(target.kind) && state.rules.units[target.kind].attacks.some(a => a.amount > 0)
-      && target.order.kind !== 'attack') {
-      target.order = { kind: 'attack', targetId: shooter.id };
-      target.activity = 'moving';
-    }
+    applyDamage(state, target, attacks, shooter.id);
     return;
   }
   state.projectiles.push({
@@ -1100,6 +1148,7 @@ function releaseAttack(
     position: { ...shooter.position },
     origin: { ...shooter.position },
     targetId: target.id,
+    shooterId: shooter.id,
     attacks: attacks.map(a => ({ ...a })),
     speed: projectileSpeed,
     launchHeight,
@@ -1138,8 +1187,7 @@ function updateProjectiles(state: GameState): void {
     const step = projectile.speed * TICK_SECONDS;
     if (gap <= step + target.radius) {
       const at = { ...target.position };
-      target.hp -= computeDamage(projectile.attacks, armorsOf(state, target));
-      if (target.hp <= 0) kill(state, target);
+      applyDamage(state, target, projectile.attacks, projectile.shooterId);
       if (projectile.blastRadius) {
         applyBlast(state, at, projectile.blastRadius, projectile.attacks, target.id);
       }
@@ -1425,17 +1473,29 @@ function updateAnimals(state: GameState): void {
       }
       continue;
     }
-    if (rules.fleeRange === undefined || !nearest || nearestDistance > rules.fleeRange) continue;
+    // A startled deer hops a short way and then grazes again for a quarter of
+    // a minute. Running for as long as anything stands near it — which is what
+    // this did — meant a deer walked away from its hunters indefinitely and
+    // was only ever caught against an obstacle.
+    const startle = rules.startle;
+    if (!startle) continue;
+    if (animal.fleeCooldown !== undefined && animal.fleeCooldown > 0) {
+      animal.fleeCooldown -= ANIMAL_INTERVAL;
+      continue;
+    }
+    if (!nearest || nearestDistance > startle.range) continue;
     const dx = animal.position.x - nearest.position.x;
     const dy = animal.position.y - nearest.position.y;
     const away = Math.max(1e-6, Math.hypot(dx, dy));
     animal.order = {
       kind: 'move',
       target: {
-        x: Math.min(state.width - 0.6, Math.max(0.6, animal.position.x + dx / away * rules.fleeRange)),
-        y: Math.min(state.height - 0.6, Math.max(0.6, animal.position.y + dy / away * rules.fleeRange)),
+        x: Math.min(state.width - 0.6, Math.max(0.6, animal.position.x + dx / away * startle.distance)),
+        y: Math.min(state.height - 0.6, Math.max(0.6, animal.position.y + dy / away * startle.distance)),
       },
     };
+    const [least, most] = startle.restSeconds;
+    animal.fleeCooldown = Math.round((least + random01(state) * (most - least)) * TICKS_PER_SECOND);
   }
 }
 

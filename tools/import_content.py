@@ -318,6 +318,13 @@ def extract_entity(
         if drop_sites:
             entity["dropSites"] = drop_sites
 
+    if category == "animal" and unit.bird is not None:
+        # How close something has to come before the animal reacts. The deer's
+        # 1.0 is exactly the one tile the reference startles it at; the sheep's
+        # 4.0 is the reach of a different behaviour, so which animals flee is a
+        # rule (see `docs/status.md`), not this number.
+        entity["searchRadius"] = rounded(unit.bird.search_radius)
+
     if category in ("resource", "animal"):
         storage = {
             RESOURCE_NAMES[s.type]: int(s.amount)

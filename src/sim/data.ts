@@ -37,6 +37,12 @@ export interface UnitRules {
   /** Monks: the DAT's window for a conversion — the earliest second it can
    * succeed and the second by which it must — and the reach it works at. */
   convert?: { minSeconds: number; maxSeconds: number; range: number };
+  /**
+   * Villagers: the bow they hunt with. The DAT keeps the hunter as its own
+   * unit (122, `VMHUN`) with a reach and a projectile the plain villager has
+   * neither of — which is how a hunter hits a deer that is walking away.
+   */
+  hunt?: { range: number; projectileSpeed: number; launchHeight: number; releaseSeconds: number };
   /** Trade carts: goods earned per second on the road, and the most they hold. */
   tradeRatePerSecond?: number;
   tradeCapacity?: number;
@@ -44,8 +50,15 @@ export interface UnitRules {
   foodAmount?: number;
   /** Animals: how close a player's unit must come to claim a herdable. */
   herdRange?: number;
-  /** Animals: how far one bolts from anything that is not gaia. */
-  fleeRange?: number;
+  /**
+   * Deer: what startles one and what it does about it. AoE2 does not send a
+   * deer running across the map — it hops a short way and then grazes again
+   * for a quarter of a minute, which is what lets a hunter walk up to it and
+   * what makes pushing deer toward a town center a thing a player can do. The
+   * trigger is the DAT's own `search_radius` (1 tile for a deer); the hop and
+   * the wait are the reference's, recorded in `docs/status.md`.
+   */
+  startle?: { range: number; distance: number; restSeconds: [number, number] };
   /** The age this becomes available in; 0 is the Dark Age. */
   age?: number;
 }
@@ -136,6 +149,7 @@ export const FALLBACK_RULES: GameRules = {
       attacks: [{ class: 11, amount: 3 }, { class: 4, amount: 3 }, { class: 13, amount: 6 }],
       armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
+      hunt: { range: 3, projectileSpeed: 7, launchHeight: 1.5, releaseSeconds: 0.5 },
     },
     militia: {
       hp: 40, radius: 0.2, speed: 0.9, lineOfSight: 4, cost: cost(50, 0, 20), trainSeconds: 21,
@@ -166,7 +180,8 @@ export const FALLBACK_RULES: GameRules = {
       trainedAt: 'town-center', popCost: 0,
       attacks: [], armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 0, attackReleaseSeconds: 0,
-      foodAmount: 140, fleeRange: 5,
+      foodAmount: 140,
+      startle: { range: 1, distance: 1.5, restSeconds: [14, 20] },
     },
     boar: {
       hp: 75, radius: 0.5, speed: 0.8, lineOfSight: 4, cost: cost(), trainSeconds: 0,
@@ -431,6 +446,7 @@ interface ManifestEntity {
   };
   heal?: { hitPointsPerSecond: number; range: number };
   convert?: { minSeconds: number; maxSeconds: number; range: number };
+  searchRadius?: number;
   gather?: { resource: ResourceKind; ratePerSecond: number; capacity: number };
   trade?: { ratePerSecond: number; capacity: number; buildingId: number };
   age?: number;
@@ -503,7 +519,12 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       popCost: 0,
       foodAmount: e[key]?.storage?.food ?? fallback.foodAmount,
       herdRange: fallback.herdRange,
-      fleeRange: fallback.fleeRange,
+      // Which animals startle is a rule; how close you have to come is the
+      // DAT's `search_radius` for that animal.
+      startle: fallback.startle && {
+        ...fallback.startle,
+        range: e[key]?.searchRadius ?? fallback.startle.range,
+      },
     };
   };
   const building = (key: string, buildable: boolean): BuildingRules => {
@@ -551,7 +572,23 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     startingResources: FALLBACK_RULES.startingResources,
     startingPopulationCap: 0,
     units: {
-      villager: unit('villager', 'town-center'),
+      // A villager hunting is the DAT's hunter unit: its reach and its arrow
+      // ride along on the plain villager, used only against animals.
+      villager: {
+        ...unit('villager', 'town-center'),
+        hunt: e['villager-hunter']?.combat?.maximumRange
+          ? {
+            range: e['villager-hunter'].combat!.maximumRange!,
+            projectileSpeed: FALLBACK_RULES.units.villager.hunt!.projectileSpeed,
+            launchHeight: e['villager-hunter'].combat!.launchOffset?.[2]
+              ?? FALLBACK_RULES.units.villager.hunt!.launchHeight,
+            releaseSeconds: Math.round(
+              (e['villager-hunter'].combat!.frameDelay ?? 10)
+              * (e['villager-hunter'].animations?.attack?.frameSeconds ?? 0.05) * 100,
+            ) / 100,
+          }
+          : FALLBACK_RULES.units.villager.hunt,
+      },
       militia: unit('militia', 'barracks'),
       spearman: unit('spearman', 'barracks'),
       archer: { ...unit('archer', 'archery-range'), range: FALLBACK_RULES.units.archer.range },

@@ -306,16 +306,16 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
   let variant = 'villager';
   if (entity.order.kind === 'build') variant = 'villager-builder';
   else if (entity.order.kind === 'gather' || entity.carrying) {
-    // Working an animal is hunting, not foraging: the DAT gives that task its
-    // own villager and its own art.
-    if (gatherTarget(state, entity) && isAnimal(gatherTarget(state, entity)!.kind)) {
-      variant = 'villager-hunter';
-    } else {
-    const resource = entity.carrying?.kind ?? gatherTargetResource(state, entity);
-    if (resource === 'food') variant = 'villager-forager';
-    else if (resource === 'wood') variant = 'villager-lumberjack';
-    else if (resource === 'gold') variant = 'villager-goldminer';
-    else if (resource === 'stone') variant = 'villager-stonemason';
+    // Working an animal is not foraging, and the DAT splits it in two: the
+    // shepherd's crook (unit 592, task class 58) is for a herdable standing
+    // still, the hunter's bow (122) for game that has to be brought down.
+    variant = animalVariant(state, entity) ?? variant;
+    if (variant === 'villager') {
+      const resource = entity.carrying?.kind ?? gatherTargetResource(state, entity);
+      if (resource === 'food') variant = 'villager-forager';
+      else if (resource === 'wood') variant = 'villager-lumberjack';
+      else if (resource === 'gold') variant = 'villager-goldminer';
+      else if (resource === 'stone') variant = 'villager-stonemason';
     }
   }
   if (entity.dead) return { key: variant, name: 'death' };
@@ -323,10 +323,31 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
     case 'gathering': return { key: variant, name: 'work' };
     case 'building': return { key: variant, name: 'work' };
     case 'carrying': return { key: variant, name: 'carry' };
-    case 'attacking': return { key: 'villager', name: 'attack' };
+    // A villager shooting at game draws the bow it is actually using; against
+    // anything that can hit back it swings the tool in its hands.
+    case 'attacking': return { key: huntingTarget(state, entity) ? 'villager-hunter' : 'villager', name: 'attack' };
     case 'moving': return { key: variant, name: 'walk' };
     default: return { key: variant, name: 'idle' };
   }
+}
+
+/** The villager variant an animal task calls for, or undefined for anything else. */
+function animalVariant(state: GameState, entity: Entity): string | undefined {
+  const target = gatherTarget(state, entity);
+  if (!target || !isAnimal(target.kind)) return undefined;
+  // A herdable is walked home and milked where it stands; everything else on
+  // four legs is hunted. The rules already draw that line for gathering.
+  return state.rules.units[target.kind].herdRange !== undefined
+    ? 'villager-shepherd'
+    : 'villager-hunter';
+}
+
+/** Whether what this unit is attacking is game rather than an enemy. */
+function huntingTarget(state: GameState, entity: Entity): boolean {
+  const order = entity.order;
+  if (order.kind !== 'attack') return false;
+  const target = state.entities.find(e => e.id === order.targetId);
+  return !!target && isAnimal(target.kind);
 }
 
 function gatherTarget(state: GameState, entity: Entity): Entity | undefined {
