@@ -558,6 +558,103 @@ describe('towers', () => {
   });
 });
 
+describe('herding and hunting', () => {
+  const animalOf = (state: GameState, kind: string) =>
+    state.entities.find(e => e.kind === kind && !e.dead)!;
+
+  it('walks a sheep over to whoever came closest, and not while both are near', () => {
+    const state = createGame(31);
+    const sheep = animalOf(state, 'sheep');
+    expect(sheep.owner).toBe(0);
+    const mine = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const theirs = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
+
+    // Two players in range: nobody's sheep.
+    mine.position = { x: sheep.position.x + 1, y: sheep.position.y };
+    theirs.position = { x: sheep.position.x - 1, y: sheep.position.y };
+    run(state, 20);
+    expect(sheep.owner).toBe(0);
+
+    // Alone with it, it changes hands.
+    theirs.position = { x: 25, y: 9 };
+    run(state, 20);
+    expect(sheep.owner).toBe(1);
+  });
+
+  it('turns a claimed sheep into food a villager banks', () => {
+    const state = createGame(32);
+    const sheep = animalOf(state, 'sheep');
+    const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    villager.position = { x: sheep.position.x + 0.8, y: sheep.position.y };
+    run(state, 20);
+    expect(sheep.owner).toBe(1);
+    const food = state.rules.units.sheep.foodAmount!;
+    expect(sheep.amount).toBe(food);
+
+    const banked = state.players[1].food;
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [villager.id], target: sheep.position, targetId: sheep.id,
+    });
+    expect(villager.order.kind).toBe('gather');
+    // Long enough to fill a carry and walk it to the town center.
+    run(state, 1500);
+    // Working it kills it, as in AoE2, and the carcass outlives the corpse
+    // window for as long as there is food on it.
+    expect(sheep.dead).toBe(true);
+    expect(sheep.amount).toBeLessThan(food);
+    expect(state.players[1].food).toBeGreaterThan(banked);
+  });
+
+  it('sends a deer running from anything that is not gaia', () => {
+    const state = createGame(33);
+    const deer = animalOf(state, 'deer');
+    const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    villager.position = { x: deer.position.x + 1.5, y: deer.position.y };
+    const gap = () => Math.hypot(deer.position.x - villager.position.x, deer.position.y - villager.position.y);
+    const before = gap();
+    run(state, 60);
+    expect(gap()).toBeGreaterThan(before);
+    expect(deer.owner).toBe(0);
+  });
+
+  it('makes a boar fight back, then feeds the hunters that killed it', () => {
+    const state = createGame(34);
+    const boar = animalOf(state, 'boar');
+    // A boar is not a one-villager job in AoE2 either.
+    const hunters = state.entities.filter(e => e.owner === 1 && e.kind === 'villager');
+    for (const [index, hunter] of hunters.entries()) {
+      hunter.position = { x: boar.position.x + 1 + index * 0.4, y: boar.position.y };
+    }
+    const before = hunters.map(h => h.hp);
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: hunters.map(h => h.id),
+      target: boar.position, targetId: boar.id,
+    });
+    // Hunting is what an order onto a live boar means.
+    expect(hunters[0].order.kind).toBe('attack');
+
+    for (let i = 0; i < 600 && hunters.every((h, n) => h.hp === before[n]); i++) stepGame(state);
+    // It answers the first wound rather than standing there being eaten.
+    expect(hunters.some((h, n) => h.hp < before[n])).toBe(true);
+    expect(boar.order.kind).toBe('attack');
+
+    // A boar out-fights three villagers in AoE2 too — this is about the chain
+    // from wound to carcass to food, not about who wins the brawl, so finish
+    // it off rather than staging a rescue.
+    for (const [index, hunter] of hunters.entries()) hunter.hp = before[index];
+    boar.hp = 1;
+    for (let i = 0; i < 2000 && boar.hp > 0; i++) stepGame(state);
+    expect(boar.hp).toBeLessThanOrEqual(0);
+    expect(boar.dead).toBe(true);
+    // Its carcass is still there, and it is worth what the DAT says.
+    expect(boar.amount).toBe(state.rules.units.boar.foodAmount);
+
+    const banked = state.players[1].food;
+    for (let i = 0; i < 4000 && state.players[1].food === banked; i++) stepGame(state);
+    expect(state.players[1].food).toBeGreaterThan(banked);
+  });
+});
+
 describe('the archery range', () => {
   it('trains the skirmisher as well as the archer', () => {
     const state = createGame(23);

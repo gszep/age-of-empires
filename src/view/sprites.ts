@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { materialColor, materialOpacity, texture as textureNode, vec2 } from 'three/tsl';
 import type { ContentAssets, Atlas, AnimationInfo } from './assets';
-import { isBuilding, isUnit } from '../sim/data';
+import { isAnimal, isBuilding, isUnit } from '../sim/data';
 import { createTerrainPatch } from './world';
 import { worldToIso, isoDepth, TILE_H } from './iso';
 import type { Entity, GameState, Point } from '../sim/types';
@@ -39,6 +39,8 @@ interface Piece {
 
 export interface EntityView {
   group: THREE.Group;
+  /** Who owned the entity when the view was built; a herdable changes hands. */
+  owner: number;
   /** Player-colour mask drawn over the body. */
   color: Piece;
   /** The owner's colour for reporting; the ramp shades it per pixel. */
@@ -148,7 +150,7 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
     }
   }
   const view: EntityView = {
-    group, shadow, body, color, outline, annexes, annexColors, fallback: !imported,
+    group, owner: entity.owner, shadow, body, color, outline, annexes, annexColors, fallback: !imported,
     facing: entity.owner === 2 ? Math.PI : 0,
     playerColor: playerColorHex(assets, entity.owner),
     outlineColor: outlineColorOf(assets, entity.owner),
@@ -218,11 +220,17 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
   let variant = 'villager';
   if (entity.order.kind === 'build') variant = 'villager-builder';
   else if (entity.order.kind === 'gather' || entity.carrying) {
+    // Working an animal is hunting, not foraging: the DAT gives that task its
+    // own villager and its own art.
+    if (gatherTarget(state, entity) && isAnimal(gatherTarget(state, entity)!.kind)) {
+      variant = 'villager-hunter';
+    } else {
     const resource = entity.carrying?.kind ?? gatherTargetResource(state, entity);
     if (resource === 'food') variant = 'villager-forager';
     else if (resource === 'wood') variant = 'villager-lumberjack';
     else if (resource === 'gold') variant = 'villager-goldminer';
     else if (resource === 'stone') variant = 'villager-stonemason';
+    }
   }
   if (entity.dead) return { key: variant, name: 'death' };
   switch (entity.activity) {
@@ -235,10 +243,14 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
   }
 }
 
-function gatherTargetResource(state: GameState, entity: Entity) {
+function gatherTarget(state: GameState, entity: Entity): Entity | undefined {
   if (entity.order.kind !== 'gather') return undefined;
   const targetId = entity.order.targetId;
-  return state.entities.find(e => e.id === targetId)?.resourceKind;
+  return state.entities.find(e => e.id === targetId);
+}
+
+function gatherTargetResource(state: GameState, entity: Entity) {
+  return gatherTarget(state, entity)?.resourceKind;
 }
 
 function applyFrame(
@@ -318,7 +330,7 @@ export function createFlagView(assets: ContentAssets | undefined, owner: number)
   const color = ramp ? makeRampPiece(ramp) : makePiece();
   group.add(color.mesh);
   return {
-    group, shadow, body, color, outline: makePiece(), annexes: [], annexColors: [],
+    group, owner, shadow, body, color, outline: makePiece(), annexes: [], annexColors: [],
     fallback: false, facing: 0, playerColor: playerColorHex(assets, owner),
   };
 }
@@ -374,7 +386,7 @@ export function createProjectileView(): EntityView {
   const body = makePiece();
   group.add(body.mesh);
   return {
-    group, shadow, body, color: makePiece(), outline: makePiece(),
+    group, owner: 0, shadow, body, color: makePiece(), outline: makePiece(),
     annexes: [], annexColors: [], fallback: false, facing: 0,
   };
 }

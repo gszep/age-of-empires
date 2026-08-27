@@ -537,6 +537,12 @@ function syncScene(time: number): void {
     const key = `e${entity.id}`;
     wanted.add(key);
     let entityView = views.get(key);
+    // A herdable changes hands, and its player colour is bound into the view's
+    // material when the view is built: a captured sheep needs a new one.
+    if (entityView && entityView.owner !== entity.owner) {
+      scene.remove(entityView.group);
+      entityView = undefined;
+    }
     if (!entityView) {
       entityView = view.createEntityView(assets, entity);
       views.set(key, entityView);

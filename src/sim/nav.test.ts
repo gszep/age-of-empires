@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES } from './data';
 import { applyCommand, createGame, stepGame } from './game';
-import { buildNavGrid, findPath, isBlocked } from './nav';
+import { buildNavGrid, findPath, isBlocked, type NavGrid } from './nav';
 import { observe } from './observe';
 import type { Entity, GameState, Point } from './types';
 
@@ -183,5 +183,30 @@ describe('combat golden values', () => {
     run(state, 20);
     expect(defender.order.kind).toBe('attack');
     expect((defender.order as { targetId: number }).targetId).toBe(intruder.id);
+  });
+});
+
+describe('unreachable goals', () => {
+  it('walks as close as the grid allows instead of refusing to move', () => {
+    // A goal sealed off by obstruction used to return no path at all, which
+    // callers read as "arrived" — a unit that believes it has arrived
+    // somewhere it never left walks on the spot for the rest of the match.
+    const grid: NavGrid = { width: 8, height: 8, blocked: new Uint8Array(64) };
+    for (let y = 0; y < 8; y++) grid.blocked[y * 8 + 4] = 1; // a wall down the middle
+    const path = findPath(grid, { x: 1.5, y: 1.5 }, { x: 6.5, y: 1.5 });
+    expect(path).toBeDefined();
+    expect(path!.length).toBeGreaterThan(0);
+    const last = path![path!.length - 1];
+    // Right up against the wall, on our side of it.
+    expect(last.x).toBeLessThan(4);
+    expect(last.x).toBeGreaterThanOrEqual(3);
+  });
+
+  it('still refuses when the walker has nowhere at all to step', () => {
+    const grid: NavGrid = { width: 5, height: 5, blocked: new Uint8Array(25) };
+    for (let y = 0; y < 5; y++) {
+      for (let x = 0; x < 5; x++) grid.blocked[y * 5 + x] = x === 2 && y === 2 ? 0 : 1;
+    }
+    expect(findPath(grid, { x: 2.5, y: 2.5 }, { x: 0.5, y: 0.5 })).toBeUndefined();
   });
 });

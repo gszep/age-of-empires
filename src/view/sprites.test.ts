@@ -363,6 +363,17 @@ describe('player colour through the imported ramp', () => {
       .toBe(0x0000ff);
   });
 
+  it('records the owner so a view can be rebuilt when a sheep changes hands', () => {
+    // The ramp is bound into the material when the view is built, so a
+    // captured animal needs a new view rather than a repaint.
+    const assets = fakeAssets();
+    const state = createGame();
+    const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    expect(createEntityView(assets, villager).owner).toBe(1);
+    expect(createEntityView(assets, { ...villager, owner: 0 }).owner).toBe(0);
+    expect(createEntityView(assets, { ...villager, owner: 0 }).color.mapNode).toBeUndefined();
+  });
+
   it('falls back to the flat player colour when no ramp was imported', () => {
     const assets = { ...fakeAssets(), playerRamps: new Map<number, THREE.DataTexture>() };
     const state = createGame();

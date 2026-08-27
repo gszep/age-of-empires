@@ -1,4 +1,4 @@
-import type { BuildingKind, EntityKind, ResourceKind, UnitKind } from './types';
+import type { AnimalKind, BuildingKind, EntityKind, ResourceKind, UnitKind } from './types';
 
 export const TICK_SECONDS = 0.05;
 export const TICKS_PER_SECOND = 20;
@@ -32,6 +32,12 @@ export interface UnitRules {
   /** Trade carts: goods earned per second on the road, and the most they hold. */
   tradeRatePerSecond?: number;
   tradeCapacity?: number;
+  /** Animals: the food their carcass holds. */
+  foodAmount?: number;
+  /** Animals: how close a player's unit must come to claim a herdable. */
+  herdRange?: number;
+  /** Animals: how far one bolts from anything that is not gaia. */
+  fleeRange?: number;
 }
 
 export interface BuildingRules {
@@ -109,6 +115,30 @@ export const FALLBACK_RULES: GameRules = {
       attacks: [{ class: 4, amount: 3 }, { class: 8, amount: 15 }, { class: 21, amount: 1 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 3, attackReleaseSeconds: 0.5,
+    },
+    // AoE2's herdables walk to whoever comes closest; its huntables bolt or
+    // bite. Their food is what the DAT stores on the animal.
+    sheep: {
+      hp: 7, radius: 0.3, speed: 0.7, lineOfSight: 3, cost: cost(), trainSeconds: 0,
+      trainedAt: 'town-center', popCost: 0,
+      attacks: [], armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }],
+      attackReloadSeconds: 0, attackReleaseSeconds: 0,
+      foodAmount: 100, herdRange: 2.5,
+    },
+    deer: {
+      hp: 5, radius: 0.3, speed: 0.737, lineOfSight: 2, cost: cost(), trainSeconds: 0,
+      trainedAt: 'town-center', popCost: 0,
+      attacks: [], armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }],
+      attackReloadSeconds: 0, attackReleaseSeconds: 0,
+      foodAmount: 140, fleeRange: 5,
+    },
+    boar: {
+      hp: 75, radius: 0.5, speed: 0.8, lineOfSight: 4, cost: cost(), trainSeconds: 0,
+      trainedAt: 'town-center', popCost: 0,
+      attacks: [{ class: 4, amount: 7 }, { class: 29, amount: 4 }, { class: 8, amount: 3 }, { class: 30, amount: 8 }],
+      armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }, { class: 24, amount: 0 }],
+      attackReloadSeconds: 2, attackReleaseSeconds: 0,
+      foodAmount: 340,
     },
     skirmisher: {
       hp: 30, radius: 0.2, speed: 0.96, lineOfSight: 6, cost: cost(25, 35), trainSeconds: 26,
@@ -286,6 +316,17 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       launchHeight: e[key].combat?.launchOffset?.[2] ?? fallback?.launchHeight,
     };
   };
+  /** Gaia's animals: their own rules plus the food the DAT stores on them. */
+  const animal = (key: AnimalKind): UnitRules => {
+    const fallback = FALLBACK_RULES.units[key];
+    return {
+      ...unit(key, fallback.trainedAt),
+      popCost: 0,
+      foodAmount: e[key]?.storage?.food ?? fallback.foodAmount,
+      herdRange: fallback.herdRange,
+      fleeRange: fallback.fleeRange,
+    };
+  };
   const building = (key: string, buildable: boolean): BuildingRules => {
     const fallback = FALLBACK_RULES.buildings[key as BuildingKind];
     if (!e[key]) return { ...fallback, buildable };
@@ -335,6 +376,9 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
         projectileSpeed: FALLBACK_RULES.units.skirmisher.projectileSpeed,
       },
       'scout-cavalry': unit('scout-cavalry', 'stable'),
+      sheep: animal('sheep'),
+      deer: animal('deer'),
+      boar: animal('boar'),
       'trade-cart': {
         ...unit('trade-cart', 'market'),
         tradeRatePerSecond: e['trade-cart']?.trade?.ratePerSecond
@@ -376,6 +420,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
 
 const UNIT_KINDS = new Set<string>([
   'villager', 'militia', 'spearman', 'archer', 'skirmisher', 'scout-cavalry', 'trade-cart',
+  'sheep', 'deer', 'boar',
 ]);
 const BUILDING_KINDS = new Set<string>([
   'town-center', 'barracks', 'house', 'mill', 'lumber-camp', 'mining-camp', 'farm',
@@ -384,6 +429,9 @@ const BUILDING_KINDS = new Set<string>([
 
 export const isUnit = (kind: EntityKind): kind is UnitKind => UNIT_KINDS.has(kind);
 export const isBuilding = (kind: EntityKind): kind is BuildingKind => BUILDING_KINDS.has(kind);
+const ANIMAL_KINDS = new Set<string>(['sheep', 'deer', 'boar']);
+export const isAnimal = (kind: EntityKind): kind is AnimalKind => ANIMAL_KINDS.has(kind);
+
 /** Units that fight on their own initiative; workers only fight when told. */
 export const isMilitary = (kind: EntityKind): boolean =>
-  isUnit(kind) && kind !== 'villager' && kind !== 'trade-cart';
+  isUnit(kind) && kind !== 'villager' && kind !== 'trade-cart' && !isAnimal(kind);

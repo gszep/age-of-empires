@@ -26,6 +26,7 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 - `Esc` cancels placement or opens the menu; `F3` pauses; `F10` toggles the menu.
 - Select a villager to place any building, a town center to train villagers, a barracks to train militia/spearmen, an archery range to train archers and skirmishers, a stable to train scout cavalry, or a market to train trade carts. Destroy the enemy town center to win.
 - Right-click a trade cart onto the opponent's market to open a trade route: it loads there and banks gold each time it reaches your own market, and a longer road pays more.
+- Sheep by the town center join whoever walks up to them and follow along; a villager sent onto one turns it into food. Deer run, and a boar charges whoever wounds it — send more than one villager.
 - Gather food, wood, gold, and stone. Mills, lumber camps, and mining camps shorten the walk for the resources they accept; the town center takes all four. Farms keep food coming once the berries run out, and watch towers (stone) shoot on their own.
 - Load a headless `--replay` JSON from **F10 → Load replay…**; playback verifies periodic authoritative checksums.
 

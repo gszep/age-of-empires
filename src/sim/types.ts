@@ -5,7 +5,9 @@ export type PlayerId = 1 | 2;
 export type ResourceKind = 'food' | 'wood' | 'gold' | 'stone';
 export type UnitKind =
   | 'villager' | 'militia' | 'spearman' | 'archer' | 'skirmisher'
-  | 'scout-cavalry' | 'trade-cart';
+  | 'scout-cavalry' | 'trade-cart' | AnimalKind;
+/** Gaia's food on the hoof: herded, or hunted where it stands. */
+export type AnimalKind = 'sheep' | 'deer' | 'boar';
 export type BuildingKind =
   | 'town-center' | 'barracks' | 'house'
   | 'mill' | 'lumber-camp' | 'mining-camp' | 'farm'

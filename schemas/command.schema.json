@@ -21,7 +21,7 @@
         "kind": { "const": "train" },
         "player": { "enum": [1, 2] },
         "buildingId": { "type": "integer" },
-        "unit": { "enum": ["villager", "militia", "spearman", "archer"] }
+        "unit": { "enum": ["villager", "militia", "spearman", "archer", "skirmisher", "scout-cavalry", "trade-cart"] }
       },
       "required": ["kind", "player", "buildingId", "unit"],
       "additionalProperties": false
@@ -32,7 +32,7 @@
         "kind": { "const": "build" },
         "player": { "enum": [1, 2] },
         "builderIds": { "type": "array", "items": { "type": "integer" }, "minItems": 1 },
-        "building": { "enum": ["barracks", "house", "mill", "lumber-camp", "mining-camp", "farm", "outpost", "watch-tower", "archery-range", "blacksmith", "market"] },
+        "building": { "enum": ["barracks", "house", "mill", "lumber-camp", "mining-camp", "farm", "outpost", "watch-tower", "archery-range", "blacksmith", "market", "stable"] },
         "target": { "$ref": "#/definitions/point" }
       },
       "required": ["kind", "player", "builderIds", "building", "target"],

@@ -113,6 +113,27 @@ that never moved with the ids, so unit 7 is called XBOWM and draws
 What is left out is age-gated or another civilisation's, which is the omitted
 scope above — except the herdables, which are their own item.
 
+### Food on the hoof
+
+Gaia's animals are units, not resource nodes: they walk, they can be killed, and
+they carry the food the DAT stores on them — 100 for a sheep, 140 for a deer,
+340 for a boar. Four sheep stand by each town center, with two deer and a boar
+out on the map.
+
+A herdable joins whoever comes closest and follows them, unless units of both
+players are within range, in which case it stays gaia's — AoE2's rule. Working
+one turns it into a carcass on the spot, which is what the game does too. Deer
+bolt from anything that is not gaia; a boar answers a wound by charging whoever
+made it, which is what makes luring one a decision. A carcass outlives the
+three-second corpse window for as long as there is food on it, and the villager
+that killed it switches to carrying the meat home under the DAT's own hunter
+art (unit 122, `u_vil_male_hunter_*`).
+
+Two knowing simplifications: hunting banks at the forager's rate and carry
+capacity rather than the hunter's own DAT numbers (0.41 a second into 35, where
+the simulation has one rate per resource and one capacity), and the built-in AI
+does not herd or hunt at all. Both are recorded in `backlog.md`.
+
 ### Trade pays what the road costs
 
 The market trains the DAT's trade cart (unit 128, 100 wood + 50 gold, 51s), and

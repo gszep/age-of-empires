@@ -37,13 +37,13 @@ sounds, and under-attack alerts, each resolved through `sounds.json` events.
 
 ## Simulation
 
-- **A unit ordered somewhere unreachable walks on the spot.** `findPath`
-  answers a blocked goal with `nearestFreeTile`, which can land inside a pocket
-  the walker cannot reach — a market placed at (19, 9) on the default map seals
-  one — and `moveAlong` then reports "arrived" every tick. `updateTrader` now
-  ends the order when that happens, but `updateGatherer`, `updateBuilder` and
-  `updateAttacker` still ignore the same signal, so a villager sent to a walled
-  resource freezes in `moving` for good. The fix is either a reachable-tile
-  search in `nav.ts` or handling the give-up return at every call site.
+- **Hunting pays the forager's wage.** The DAT gives the hunter villager its
+  own work rate (0.41 a second) and carry capacity (35); the simulation has one
+  rate per resource and one global capacity, so hunting banks at the forager's
+  0.31 into 10. Per-task rates would need `gatherRatePerSecond` to become
+  per-variant, which touches every gatherer.
+- **The built-in AI ignores sheep, deer and boar.** It picks gather targets by
+  `kind === 'resource'`, which animals are not, so the whole Dark Age food
+  opening is invisible to it. Its matches still run on berries and farms.
 - **Mirror-AI stalemates**: some built-in-vs-built-in matches stall to the
   timeout; the example AI never breaks a defensive equilibrium.

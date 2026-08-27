@@ -1,10 +1,10 @@
-import { FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isBuilding, isMilitary, isUnit } from './data';
+import { FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isAnimal, isBuilding, isMilitary, isUnit } from './data';
 import type { AttackValue, GameRules, NodeKind } from './data';
 import { buildNavGrid, findPath, isBlocked, separateUnits, tileOf, type NavGrid } from './nav';
 import { random01 } from './random';
 import { createVisibility, updateVisibility } from './visibility';
 import type {
-  BuildingKind, Command, Entity, GameState, PlayerId, Point, ResourceKind, UnitKind,
+  AnimalKind, BuildingKind, Command, Entity, GameState, PlayerId, Point, ResourceKind, UnitKind,
 } from './types';
 
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -43,6 +43,15 @@ function cluster(state: GameState, node: NodeKind, center: Point, count: number)
   }
 }
 
+/** One of gaia's animals, carrying the food its carcass is worth. */
+function addAnimal(state: GameState, kind: AnimalKind, position: Point): Entity {
+  const rules = state.rules.units[kind];
+  return addEntity(state, kind, 0, position, rules, {
+    resourceKind: 'food',
+    amount: rules.foodAmount ?? 0,
+  });
+}
+
 export function createGame(seed = 42, rules: GameRules = FALLBACK_RULES): GameState {
   const state: GameState = {
     rules, seed: seed || 1, tick: 0, nextId: 1, width: 32, height: 18, entities: [], projectiles: [],
@@ -67,6 +76,15 @@ export function createGame(seed = 42, rules: GameRules = FALLBACK_RULES): GameSt
     // Clear of the base build area: a cluster on top of it would reject every
     // building placement there for good.
     cluster(state, 'stone', mirror({ x: 13, y: 16.5 }), 4);
+    // AoE2's opening food: four sheep by the town center to herd, a pair of
+    // deer to hunt, and a boar that fights back.
+    for (const [index, offset] of [{ x: 2, y: -2.5 }, { x: 3, y: -1.5 }, { x: 2.4, y: -3.4 }, { x: 3.4, y: -2.6 }].entries()) {
+      addAnimal(state, 'sheep', mirror({ x: 5 + offset.x + index * 0.05, y: 9 + offset.y }));
+    }
+    for (const offset of [{ x: 7, y: 3.5 }, { x: 7.8, y: 4.2 }]) {
+      addAnimal(state, 'deer', mirror({ x: 5 + offset.x, y: 9 + offset.y }));
+    }
+    addAnimal(state, 'boar', mirror({ x: 5 + 4.5, y: 9 + 5.5 }));
   }
   recalculatePopulation(state);
   updateVisibility(state);
@@ -127,18 +145,36 @@ export function placementLegal(state: GameState, building: BuildingKind, target:
 }
 
 /** Resource nodes, and the owner's finished farms, can be gathered from. */
-function isGatherable(entity: Entity, gatherer: Entity): boolean {
+function isGatherable(state: GameState, entity: Entity, gatherer: Entity): boolean {
   if (entity.kind === 'resource') return true;
+  if (isAnimal(entity.kind)) {
+    // A carcass is food for whoever reaches it. A live herdable is food only
+    // for the player it has walked over to; a live deer or boar has to be
+    // hunted down first.
+    if ((entity.amount ?? 0) <= 0) return false;
+    if (entity.dead) return true;
+    return state.rules.units[entity.kind].herdRange !== undefined && entity.owner === gatherer.owner;
+  }
   return entity.kind === 'farm' && entity.owner === gatherer.owner
     && entity.buildProgress === undefined && (entity.amount ?? 0) > 0;
+}
+
+/** A live animal a hunter has to kill before there is anything to carry. */
+function isHuntable(state: GameState, entity: Entity): boolean {
+  return isAnimal(entity.kind) && !entity.dead && (entity.amount ?? 0) > 0
+    && state.rules.units[entity.kind].herdRange === undefined;
 }
 
 function assignOrder(state: GameState, entity: Entity, target: Point, targetEntity?: Entity): void {
   if (entity.kind === 'trade-cart' && targetEntity && isTradePartner(state, entity, targetEntity)) {
     entity.order = { kind: 'trade', targetId: targetEntity.id };
     entity.carrying = undefined;
-  } else if (targetEntity && isGatherable(targetEntity, entity) && entity.kind === 'villager') {
+  } else if (targetEntity && isGatherable(state, targetEntity, entity) && entity.kind === 'villager') {
     entity.order = { kind: 'gather', targetId: targetEntity.id };
+  } else if (targetEntity && isHuntable(state, targetEntity)) {
+    // Gaia owns it, so the usual "somebody else's" test never fires; hunting
+    // is what an order onto a live deer or boar means.
+    entity.order = { kind: 'attack', targetId: targetEntity.id };
   } else if (
     targetEntity && targetEntity.owner === entity.owner &&
     isBuilding(targetEntity.kind) && targetEntity.buildProgress !== undefined && entity.kind === 'villager'
@@ -269,13 +305,27 @@ function moveAlong(state: GameState, grid: NavGrid, entity: Entity, destination:
     entity.path = findPath(grid, entity.position, destination);
     entity.pathGoal = { ...destination };
     entity.stuckTicks = 0;
-    if (!entity.path) return true; // unreachable: give up where we stand
+    if (!entity.path) {
+      // No path at all now means the walker is boxed in on its own tile —
+      // the final approach and the separation nudge both move in continuous
+      // space, so a unit can end up inside a tree cluster it cannot step out
+      // of. It goes straight at its destination until it is out again, which
+      // is how it got in.
+      clearPath(entity);
+      return moveToward(entity, destination, speed);
+    }
   }
   const before = { ...entity.position };
   while (entity.path.length && distance(entity.position, entity.path[0]) <= 0.12) entity.path.shift();
   if (!entity.path.length) {
     const tile = tileOf(destination);
-    const arrivedExactly = !isBlocked(grid, tile.x, tile.y)
+    // The grid took us as far as it can. Either the destination is walkable
+    // and we step onto it, or it is a footprint and the caller's own range
+    // check stops us at its edge — but if we are still far from it, the grid
+    // ran out early (a pocket) and the rest of the gap closes directly, which
+    // is how the walker got in there in the first place.
+    const far = distance(entity.position, destination) > Math.max(directRange, 1.5);
+    const arrivedExactly = !isBlocked(grid, tile.x, tile.y) || far
       ? moveToward(entity, destination, speed)
       : true;
     if (arrivedExactly) clearPath(entity);
@@ -403,7 +453,8 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
     return;
   }
 
-  let node = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId && (e.amount ?? 0) > 0);
+  let node = state.entities.find(e => e.id === (entity.order as { targetId: number }).targetId
+    && (e.amount ?? 0) > 0 && (!e.dead || isAnimal(e.kind)));
   if (!node) {
     const wanted = carrying?.kind ?? undefined;
     node = wanted ? nearestNode(state, entity.position, wanted) : undefined;
@@ -429,6 +480,10 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
     return;
   }
   clearPath(entity);
+
+  // AoE2 turns a herdable into a carcass the moment a villager works it: the
+  // sheep stops walking about and the food comes off the body.
+  if (isAnimal(node.kind) && !node.dead) kill(state, node);
 
   entity.activity = 'gathering';
   const resource = node.resourceKind!;
@@ -543,8 +598,19 @@ function updateBuilder(state: GameState, grid: NavGrid, entity: Entity, builderC
 
 function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'attack') return;
-  const target = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
-  if (!target || target.owner === entity.owner || target.hp <= 0) { becomeIdle(entity); return; }
+  const targetId = (entity.order as { targetId: number }).targetId;
+  const target = state.entities.find(e => !e.dead && e.id === targetId);
+  if (!target || target.owner === entity.owner || target.hp <= 0) {
+    // A hunter carries home what it just killed rather than standing over it.
+    const carcass = state.entities.find(e => e.id === targetId);
+    if (entity.kind === 'villager' && carcass && isGatherable(state, carcass, entity)) {
+      entity.order = { kind: 'gather', targetId };
+      entity.activity = 'moving';
+      return;
+    }
+    becomeIdle(entity);
+    return;
+  }
   const rules = state.rules.units[entity.kind as UnitKind];
   if (tooClose(state, entity, target)) {
     // Inside its minimum range a skirmisher cannot bring its javelin to bear.
@@ -590,6 +656,13 @@ function releaseAttack(
   if (!projectileSpeed) {
     target.hp -= computeDamage(attacks, armorsOf(state, target));
     if (target.hp <= 0) kill(state, target);
+    // A wounded boar turns on whoever wounded it, which is what makes luring
+    // one a decision rather than a formality.
+    else if (isAnimal(target.kind) && state.rules.units[target.kind].attacks.some(a => a.amount > 0)
+      && target.order.kind !== 'attack') {
+      target.order = { kind: 'attack', targetId: shooter.id };
+      target.activity = 'moving';
+    }
     return;
   }
   state.projectiles.push({
@@ -798,7 +871,7 @@ function updateBuildingProduction(state: GameState, entity: Entity): void {
 }
 
 function isDefeated(state: GameState, player: PlayerId): boolean {
-  const alive = state.entities.filter(e => !e.dead && e.owner === player);
+  const alive = state.entities.filter(e => !e.dead && e.owner === player && !isAnimal(e.kind));
   if (!alive.some(e => e.kind === 'town-center')) return true;
   // Domination: no units and nothing that can produce them (approximation of
   // AoE2 conquest, which requires razing everything).
@@ -806,9 +879,69 @@ function isDefeated(state: GameState, player: PlayerId): boolean {
     !alive.some(e => (e.kind === 'barracks' || e.kind === 'town-center') && e.buildProgress === undefined);
 }
 
+/**
+ * Gaia's animals decide for themselves once a tick.
+ *
+ * A herdable walks over to whoever came closest and then follows them, which is
+ * how a scout brings sheep home; two players' units in range and it stays where
+ * it is, as in AoE2. A deer bolts from anything that is not gaia. A boar does
+ * neither — its answer is in `releaseAttack`.
+ */
+const ANIMAL_INTERVAL = 5; // ticks; a quarter second is quick enough to herd by
+
+function updateAnimals(state: GameState): void {
+  if (state.tick % ANIMAL_INTERVAL !== 0) return;
+  const animals: Entity[] = [];
+  const units: Entity[] = [];
+  for (const entity of state.entities) {
+    if (entity.dead || !isUnit(entity.kind)) continue;
+    if (isAnimal(entity.kind)) animals.push(entity);
+    else if (entity.owner !== 0) units.push(entity);
+  }
+  if (!animals.length || !units.length) return;
+  for (const animal of animals) {
+    if (animal.order.kind === 'attack') continue;
+    const rules = state.rules.units[animal.kind as AnimalKind];
+    let nearest: Entity | undefined;
+    let nearestDistance = Infinity;
+    let claimant: PlayerId | 0 = 0;
+    let contested = false;
+    for (const other of units) {
+      const d = distance(other.position, animal.position);
+      if (d < nearestDistance) { nearest = other; nearestDistance = d; }
+      if (rules.herdRange !== undefined && d <= rules.herdRange) {
+        if (claimant && other.owner !== claimant) contested = true;
+        claimant = other.owner as PlayerId;
+      }
+    }
+    if (rules.herdRange !== undefined) {
+      if (!contested && claimant && animal.owner !== claimant) animal.owner = claimant;
+      // Follow the owner about, at walking pace and not on top of them.
+      if (animal.owner !== 0 && nearest && nearest.owner === animal.owner) {
+        animal.order = nearestDistance > 1.6
+          ? { kind: 'move', target: { ...nearest.position } }
+          : { kind: 'idle' };
+      }
+      continue;
+    }
+    if (rules.fleeRange === undefined || !nearest || nearestDistance > rules.fleeRange) continue;
+    const dx = animal.position.x - nearest.position.x;
+    const dy = animal.position.y - nearest.position.y;
+    const away = Math.max(1e-6, Math.hypot(dx, dy));
+    animal.order = {
+      kind: 'move',
+      target: {
+        x: Math.min(state.width - 0.6, Math.max(0.6, animal.position.x + dx / away * rules.fleeRange)),
+        y: Math.min(state.height - 0.6, Math.max(0.6, animal.position.y + dy / away * rules.fleeRange)),
+      },
+    };
+  }
+}
+
 export function stepGame(state: GameState): void {
   if (state.winner) return;
   state.tick += 1;
+  updateAnimals(state);
   const grid = buildNavGrid(state);
   const builderCounts = new Map<number, number>();
   const movable: Entity[] = [];
@@ -867,8 +1000,14 @@ export function stepGame(state: GameState): void {
       if (!entity.dead && (entity.hp <= 0 || (entity.kind === 'resource' && (entity.amount ?? 0) <= 0))) kill(state, entity);
     }
   }
-  const expired = state.entities.some(e => e.dead && (e.decayTicks ?? 0) <= 0);
-  if (expired) state.entities = state.entities.filter(e => !e.dead || (e.decayTicks ?? 0) > 0);
+  // A carcass outlasts the corpse window while it still has food on it: that is
+  // what a hunted deer is for.
+  const expired = state.entities.some(e => e.dead && (e.decayTicks ?? 0) <= 0 && (e.amount ?? 0) <= 0);
+  if (expired) {
+    state.entities = state.entities.filter(
+      e => !e.dead || (e.decayTicks ?? 0) > 0 || (e.amount ?? 0) > 0,
+    );
+  }
   if (newlyDead || expired) recalculatePopulation(state);
 
   if (newlyDead) {

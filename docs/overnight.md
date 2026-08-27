@@ -97,11 +97,17 @@ items land.
   *Verified:* the archery range's trainable list is exactly archer and
   skirmisher, and a simulation test shows the minimum range biting and then
   releasing.
-- [ ] **Herdables and hunting.** TC-area sheep and map deer/boar are core
-  Dark Age food. Gaia units with capture-on-proximity (sheep), hunt
-  behaviour (deer flee, boar retaliates), villager hunter task variant
-  (VMHUN art already in the DAT). *Verify:* headless script captures a
-  sheep and food income flows; boar fights back before dying.
+- [x] **Herdables and hunting.** Four sheep by each town center, two deer and a
+  boar out on the map, all gaia units carrying the food the DAT stores on them
+  (100, 140, 340). A sheep walks over to whoever comes closest — and stays put
+  while two players are near it — then follows them; working it turns it into a
+  carcass, as in AoE2. Deer bolt from anything that is not gaia; a wounded boar
+  turns on whoever wounded it. A carcass outlives the corpse window while it
+  still has food on it, and the villager that made it carries the meat home as
+  the DAT's hunter (unit 122). *Verified:* simulation tests for each behaviour,
+  and in the live match a claimed sheep renders with a player-blue collar
+  through the palette ramp while `villager-hunter/work` turns `sheep/idle` into
+  `sheep/death` then `sheep/decay` and banks 10 food.
 - [ ] **Technologies + Feudal age-up.** The sim has no tech system. Smallest
   faithful slice: research queue at a building, cost/time from the DAT,
   effects applied to rules (start with Loom, then Feudal Age gating the

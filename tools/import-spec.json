@@ -181,6 +181,57 @@
       }
     },
     {
+      "key": "sheep",
+      "unitId": 594,
+      "civ": "gaia",
+      "category": "animal",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
+      "key": "deer",
+      "unitId": 65,
+      "civ": "gaia",
+      "category": "animal",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
+      "key": "boar",
+      "unitId": 48,
+      "civ": "gaia",
+      "category": "animal",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "attack": { "slot": "attack" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
+      "key": "villager-hunter",
+      "unitId": 122,
+      "category": "unit-variant",
+      "task": { "actionType": 110, "classId": 9 },
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "work": { "task": { "actionType": 110, "classId": 9 }, "graphic": "working" },
+        "carry": { "task": { "actionType": 110, "classId": 9 }, "graphic": "carrying" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
       "key": "berries",
       "unitId": 59,
       "civ": "gaia",

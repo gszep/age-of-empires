@@ -1,7 +1,37 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { FALLBACK_RULES, isAnimal } from './data';
 import { createGame, applyCommand, stepGame } from './game';
 import { describeObservation, observe } from './observe';
 import { validateObservation, explain } from '../protocol/validate';
+
+describe('the public contract', () => {
+  const schema = (name: string) =>
+    JSON.parse(readFileSync(`schemas/${name}.schema.json`, 'utf8')) as Record<string, never>;
+
+  it('names every kind the rules know', () => {
+    // The schemas are a versioned public contract, and a kind added to the
+    // rules without being added here fails only once something of that kind
+    // reaches an observation — which for a building is long after the change.
+    const observation = JSON.stringify(schema('observation'));
+    for (const kind of Object.keys(FALLBACK_RULES.units)) {
+      expect(observation, `unit ${kind}`).toContain(`"${kind}"`);
+    }
+    for (const kind of Object.keys(FALLBACK_RULES.buildings)) {
+      expect(observation, `building ${kind}`).toContain(`"${kind}"`);
+    }
+    const command = JSON.stringify(schema('command'));
+    for (const kind of Object.keys(FALLBACK_RULES.units)) {
+      // Gaia's animals are nobody's to train.
+      if (isAnimal(kind as never)) continue;
+      expect(command, `trainable ${kind}`).toContain(`"${kind}"`);
+    }
+    for (const [kind, rules] of Object.entries(FALLBACK_RULES.buildings)) {
+      if (!rules.buildable) continue;
+      expect(command, `buildable ${kind}`).toContain(`"${kind}"`);
+    }
+  });
+});
 
 describe('player observations', () => {
   it('never reveals enemy entities beyond every own line of sight', () => {

@@ -261,7 +261,7 @@ def extract_entity(
         if drop_sites:
             entity["dropSites"] = drop_sites
 
-    if category == "resource":
+    if category in ("resource", "animal"):
         storage = {
             RESOURCE_NAMES[s.type]: int(s.amount)
             for s in unit.resource_storages

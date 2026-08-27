@@ -73,6 +73,12 @@ const SQRT2 = Math.SQRT2;
  * 8-connected A* from a start tile to a goal tile. Diagonal moves may not cut
  * blocked corners. Ties break on f, then h, then tile index, so equal-cost
  * paths are stable across runs and platforms.
+ *
+ * A goal that cannot be reached — a market sealed in by trees, a villager that
+ * hunted its way into a wood line — returns the path to the reachable tile
+ * closest to it rather than nothing. Returning nothing made the caller report
+ * "arrived", and a unit that believes it has arrived somewhere it never left
+ * walks on the spot for the rest of the match.
  */
 export function findPath(grid: NavGrid, from: Point, to: Point): Point[] | undefined {
   const startTile = tileOf(from);
@@ -101,6 +107,9 @@ export function findPath(grid: NavGrid, from: Point, to: Point): Point[] | undef
   // implementation minimal and fully deterministic.
   const open: number[] = [startIndex];
   gScore[startIndex] = 0;
+  // The best the search actually reached, in case the goal is walled off.
+  let closest = startIndex;
+  let closestH = heuristic(startIndex);
 
   while (open.length) {
     let bestPosition = 0;
@@ -120,6 +129,11 @@ export function findPath(grid: NavGrid, from: Point, to: Point): Point[] | undef
     if (current === goalIndex) break;
     if (closed[current]) continue;
     closed[current] = 1;
+    const currentH = heuristic(current);
+    if (currentH < closestH - 1e-9 || (Math.abs(currentH - closestH) <= 1e-9 && current < closest)) {
+      closest = current;
+      closestH = currentH;
+    }
     const cx = current % grid.width;
     const cy = Math.floor(current / grid.width);
     for (let dy = -1; dy <= 1; dy++) {
@@ -142,9 +156,10 @@ export function findPath(grid: NavGrid, from: Point, to: Point): Point[] | undef
     }
   }
 
-  if (parent[goalIndex] === -1 && goalIndex !== startIndex) return undefined;
+  const reached = parent[goalIndex] !== -1 || goalIndex === startIndex ? goalIndex : closest;
+  if (reached === startIndex) return undefined;
   const tiles: number[] = [];
-  for (let node = goalIndex; node !== -1; node = parent[node]) tiles.push(node);
+  for (let node = reached; node !== -1; node = parent[node]) tiles.push(node);
   tiles.reverse();
   const waypoints = tiles.map(node => ({
     x: (node % grid.width) + 0.5,
