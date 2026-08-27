@@ -147,6 +147,20 @@ keeps the record.
   sequence was unchanged, and running three seeds to twelve thousand ticks for
   byte-identical checksums is what turned that from an argument into evidence.
 
+- **Scattering objects over a disc is not how the original makes a forest.**
+  55 trees spread through a radius-7 circle is 36% density: sparse enough to
+  walk through, which is not a wood. The script uses `create_terrain` with
+  `number_of_tiles`, filling a contiguous area and putting a tree on every tile
+  of it — so the shape is grown, not sampled. Rule: read what the script asks
+  the *engine* to do, not just the numbers it passes; "tiles" and "objects" are
+  different instructions.
+- **Making terrain impassable creates a class of unreachable targets.** Once a
+  wood was solid, every tree inside it was a target nothing could stand next
+  to, and villagers sent at one re-pathed across the whole wood every tick to
+  learn that again. Rule: when an obstacle becomes real, the code that picks
+  targets has to learn the same thing — and a cheap approximation of "can
+  anything stand here" (four grid lookups) beats discovering it by pathfinding.
+
 ## Process
 
 - **Complete one playable behaviour end to end** (from the working style

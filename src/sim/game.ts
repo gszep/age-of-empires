@@ -1,6 +1,6 @@
 import { FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isAnimal, isBuilding, isMilitary, isUnit } from './data';
 import type { AttackValue, Cost, GameRules, NodeKind, TechKey, UnitRules } from './data';
-import { buildNavGrid, findPath, halfExtent, isBlocked, isWalled, separateUnits, tileOf, type NavGrid } from './nav';
+import { buildNavGrid, findPath, halfExtent, isBlocked, separateUnits, tileOf, type NavGrid } from './nav';
 import { random01 } from './random';
 import { createVisibility, isEntityVisible, updateVisibility } from './visibility';
 import type {
@@ -57,6 +57,8 @@ interface StartGroup {
   near: number;
   far: number;
   spread: number;
+  /** Fill contiguous tiles rather than scatter over a disc; see `growClump`. */
+  solid?: boolean;
 }
 
 const OPENING: StartGroup[] = [
@@ -74,8 +76,9 @@ const OPENING: StartGroup[] = [
   // Wood is the one the script sizes by the map rather than by the group:
   // `PLAYER_FOREST_TILES` is `PLAYER_FOREST_BASE_COUNT` (55 at its smallest)
   // times `PLAYER_FOREST_CLUMPS` (2 when forests are few), kept off the start
-  // area by `PLAYER_FOREST_AVOIDANCE`.
-  { kind: 'tree', count: 55, groups: 2, near: 14, far: 26, spread: 7 },
+  // area by `PLAYER_FOREST_AVOIDANCE`. It is a terrain clump in the script, not
+  // scattered objects, which is why woods in AoE2 are solid.
+  { kind: 'tree', count: 55, groups: 2, near: 14, far: 26, spread: 7, solid: true },
 ];
 
 function addAnimal(state: GameState, kind: AnimalKind, position: Point): Entity {
@@ -104,6 +107,33 @@ function freeSpot(state: GameState, at: Point): boolean {
 }
 
 /**
+ * A forest: `count` contiguous tiles grown outward from a seed, one free
+ * neighbour at a time. The script builds one with `create_terrain`, which
+ * fills every tile of the area it covers, and forest terrain carries a tree on
+ * each — which is why woods in AoE2 are something to walk round rather than
+ * through, and why they can be walled with. A ragged edge comes free from
+ * taking the next tile out of the frontier at random.
+ */
+function growClump(
+  state: GameState, kind: NodeKind, seed: Point, count: number, mirror: (p: Point) => Point,
+): number {
+  const frontier: Point[] = [seed];
+  let filled = 0;
+  while (filled < count && frontier.length) {
+    const at = frontier.splice(Math.floor(random01(state) * frontier.length), 1)[0];
+    const other = mirror(at);
+    if (!freeSpot(state, at) || !freeSpot(state, other)) continue;
+    addNode(state, kind, at);
+    addNode(state, kind, other);
+    filled++;
+    for (const step of [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]) {
+      frontier.push({ x: at.x + step.x, y: at.y + step.y });
+    }
+  }
+  return filled;
+}
+
+/**
  * Scatter one group around a bearing from each player's start, placing both
  * players' copies together so the two halves are exact mirrors of each other
  * and neither can land on the other. A member that finds nowhere to stand is
@@ -119,6 +149,10 @@ function placeGroup(state: GameState, group: StartGroup, mirror: (p: Point) => P
       y: START.y + Math.sin(angle) * distance,
     };
     if (!freeSpot(state, onTile(centre))) continue;
+    if (group.solid) {
+      if (growClump(state, group.kind as NodeKind, onTile(centre), group.count, mirror)) return;
+      continue;
+    }
     let placed = 0;
     for (let i = 0; i < group.count; i++) {
       for (let tries = 0; tries < 16; tries++) {
@@ -450,13 +484,13 @@ function clearPath(entity: Entity): void {
  * tile) is reached.
  */
 /**
- * A step straight at the destination, off the grid's path. A walker that has
- * ended up standing inside a footprint — the final approach and the separation
- * nudge both move in continuous space — must be able to step out again, and one
- * that hunted its way into a pocket of woodland has to be able to squeeze back
- * out of it. What it may not do is walk through something somebody built: there
- * it stops where it stands, and reporting arrival is how the caller learns to
- * give up rather than walking on the spot forever.
+ * A step straight at the destination, off the grid's path. A walker standing
+ * inside a footprint — the final approach and the separation nudge both move in
+ * continuous space — must be able to step out again, so a tile it is already on
+ * never stops it. Stepping *into* one is what it may not do: a wood is not
+ * something to walk through, and neither is a wall. There it stops where it
+ * stands, and reporting arrival is how the caller learns to give up rather than
+ * walking on the spot forever.
  */
 function moveDirect(grid: NavGrid, entity: Entity, destination: Point, speed: number): boolean {
   const from = tileOf(entity.position);
@@ -464,7 +498,7 @@ function moveDirect(grid: NavGrid, entity: Entity, destination: Point, speed: nu
   const arrived = moveToward(entity, destination, speed);
   const to = tileOf(entity.position);
   if ((to.x !== from.x || to.y !== from.y)
-    && isWalled(grid, to.x, to.y) && !isBlocked(grid, from.x, from.y)) {
+    && isBlocked(grid, to.x, to.y) && !isBlocked(grid, from.x, from.y)) {
     entity.position = before;
     return true;
   }
@@ -554,6 +588,21 @@ function autoContinueRange(state: GameState, entity: Entity): number {
 }
 
 /**
+ * Whether anything can stand next to a node to work it. A wood is a solid
+ * clump of tiles, so the trees inside it are nobody's to cut until the ones
+ * around them come down — and a villager sent at one walks to the edge, finds
+ * it cannot get closer, and gives up. Asking the grid first is four lookups
+ * against a pathfind over the whole wood.
+ */
+function hasElbowRoom(grid: NavGrid, node: Entity): boolean {
+  const x = Math.floor(node.position.x);
+  const y = Math.floor(node.position.y);
+  if (!isBlocked(grid, x, y)) return true;
+  return !isBlocked(grid, x + 1, y) || !isBlocked(grid, x - 1, y)
+    || !isBlocked(grid, x, y + 1) || !isBlocked(grid, x, y - 1);
+}
+
+/**
  * What to work next when the current node is spent: the nearest thing of the
  * same kind first — another sheep after a sheep, the next tree in the wood —
  * and only then anything else yielding the same resource. Nothing the owner
@@ -562,7 +611,8 @@ function autoContinueRange(state: GameState, entity: Entity): number {
  * be told, which is the honest answer and what AoE2 does.
  */
 function nextToWork(
-  state: GameState, entity: Entity, resource: ResourceKind, was: Entity['kind'] | undefined,
+  state: GameState, grid: NavGrid, entity: Entity, resource: ResourceKind,
+  was: Entity['kind'] | undefined,
 ): Entity | undefined {
   const range = autoContinueRange(state, entity);
   const owner = entity.owner as PlayerId;
@@ -575,6 +625,7 @@ function nextToWork(
     const d = distance(entity.position, candidate.position);
     if (d > range) continue;
     if (!isEntityVisible(state, owner, candidate)) continue;
+    if (!hasElbowRoom(grid, candidate)) continue;
     // Same kind first, then distance. Adding a whole range to everything else
     // orders the two groups without a second pass, and ids break exact ties so
     // two runs of the same match choose the same thing.
@@ -672,7 +723,7 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
     // What it was working, so it can look for another of the same first.
     const was = state.entities.find(e => e.id === targetId)?.kind;
     const wanted = carrying?.kind ?? undefined;
-    node = wanted ? nextToWork(state, entity, wanted, was) : undefined;
+    node = wanted ? nextToWork(state, grid, entity, wanted, was) : undefined;
     if (node) entity.order = { kind: 'gather', targetId: node.id };
     else if (carrying && carrying.amount > 0) {
       // Nothing left to gather: bank what is carried, then idle.
@@ -691,7 +742,18 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
 
   if (!inRange(entity, node, 0.3)) {
     entity.activity = carrying && carrying.amount > 0 ? 'carrying' : 'moving';
-    moveAlong(state, grid, entity, node.position, speed, interactionRange(node));
+    // Walked as far as the ground allows and still out of reach: the tree is
+    // inside a wood, or the node is behind a wall. Take the nearest thing it
+    // can actually stand next to instead of shuffling at the edge forever, and
+    // stop if there is nothing.
+    if (moveAlong(state, grid, entity, node.position, speed, interactionRange(node))) {
+      const reachable = nextToWork(state, grid, entity, node.resourceKind!, node.kind);
+      if (reachable && reachable.id !== node.id) {
+        entity.order = { kind: 'gather', targetId: reachable.id };
+      } else {
+        becomeIdle(entity);
+      }
+    }
     return;
   }
   clearPath(entity);

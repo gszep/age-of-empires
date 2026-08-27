@@ -291,7 +291,23 @@ Both halves are generated together, each object placed at its bearing and at
 its mirror at once, so the two starts are exact reflections and neither can
 land on the other. An object that finds nowhere to stand is dropped rather than
 stacked: the script's count is what is asked for, not a promise the ground can
-hold it.
+hold it. Everything sits in the middle of a tile, because a one-tile footprint
+centred anywhere else straddles four tiles of the obstruction map.
+
+Wood is the exception to "scatter over a disc". The script builds a forest with
+`create_terrain`, which fills a contiguous area and puts a tree on every tile of
+it, so a clump here is grown outward from a seed one free neighbour at a time
+until it has its 55 tiles. The result is a wood in the AoE2 sense: seed 7's is
+9x11 with no clear line through it in any row, crossing it costs 1.66 times the
+straight line, and a path never once steps on a tree.
+
+That is only true if nothing can walk into it, so a walker off the grid's path
+may leave a blocked tile it is standing on but may not enter one — the escape a
+unit needs to get out of a wood it was nudged into, without being a way in. And
+a tree inside a wood is nobody's to cut: what a villager may work has to have a
+free tile beside it to stand on, which is four grid lookups rather than a
+pathfind across the whole wood, and it is why villagers eat a forest from the
+edge inward.
 
 Each player also starts with the scout the script gives them
 (`create_object SCOUT`, one at 7-9 tiles). On a board this size it is not a
@@ -313,6 +329,13 @@ tiles of the obstruction map. Every tree, mine and bush did, so 276 resources
 blocked 836 tiles and a forest was a wall with holes in it rather than
 something to walk through. The map generator now snaps everything it places to
 the tile it stands on: the same 280 resources block 312 tiles.
+
+A tree inside a solid wood cannot be reached, and a villager sent at one used
+to walk to the edge and shuffle there forever, re-pathing across the whole wood
+every tick. Targets now need a free tile beside them, and a worker that gets as
+close as the ground allows and is still out of reach takes the nearest thing it
+can actually stand next to. Skipping that check cost the 99th-percentile tick
+9.5ms; with it, 1.7ms.
 
 The A* open list was a plain array scanned end to end for its minimum, which
 the comment called "small maps" and meant it — the search was quadratic in the

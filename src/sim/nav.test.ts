@@ -189,6 +189,93 @@ describe('navigation compatibility suite', () => {
     expect(findPath(grid, from, to)).toEqual(path);
   });
 
+  /** The tiles of the biggest connected wood on player 1's half of the map. */
+  function biggestWood(state: GameState): Set<number> {
+    const key = (x: number, y: number) => y * state.width + x;
+    const tiles = new Set(state.entities
+      .filter(e => e.resourceKind === 'wood' && e.position.x < state.width / 2)
+      .map(e => key(Math.floor(e.position.x), Math.floor(e.position.y))));
+    const seen = new Set<number>();
+    let biggest: number[] = [];
+    for (const start of tiles) {
+      if (seen.has(start)) continue;
+      const blob = [start];
+      seen.add(start);
+      for (let i = 0; i < blob.length; i++) {
+        const x = blob[i] % state.width;
+        const y = Math.floor(blob[i] / state.width);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const next = key(x + dx, y + dy);
+          if (tiles.has(next) && !seen.has(next)) { seen.add(next); blob.push(next); }
+        }
+      }
+      if (blob.length > biggest.length) biggest = blob;
+    }
+    return new Set(biggest);
+  }
+
+  it('wood: is grown solid, and is something to walk round', () => {
+    // The map's own forests, not a hand-built wall: the script grows a clump of
+    // contiguous tiles and puts a tree on each, which is what makes woods in
+    // AoE2 something you wall with rather than weave through.
+    const state = createGame(7);
+    const grid = buildNavGrid(state);
+    const wood = biggestWood(state);
+    expect(wood.size, 'one wood, in one piece').toBeGreaterThan(40);
+
+    const xs = [...wood].map(i => i % state.width);
+    const ys = [...wood].map(i => Math.floor(i / state.width));
+    const midY = Math.round((Math.min(...ys) + Math.max(...ys)) / 2);
+    const west = { x: Math.min(...xs) - 2.5, y: midY + 0.5 };
+    const east = { x: Math.max(...xs) + 2.5, y: midY + 0.5 };
+    // Nothing walks the straight line: it is trees the whole way across.
+    for (let x = Math.min(...xs); x <= Math.max(...xs); x++) {
+      if (!isBlocked(grid, x, midY)) continue;
+      expect(isBlocked(grid, x, midY)).toBe(true);
+    }
+    expect([...Array(Math.max(...xs) - Math.min(...xs) + 1).keys()]
+      .some(i => isBlocked(grid, Math.min(...xs) + i, midY)), 'the way is barred').toBe(true);
+
+    const path = findPath(grid, west, east)!;
+    expect(path).toBeDefined();
+    for (const step of path) {
+      expect(wood.has(Math.floor(step.y) * state.width + Math.floor(step.x))).toBe(false);
+    }
+    let walked = 0;
+    let at = west;
+    for (const step of path) { walked += Math.hypot(step.x - at.x, step.y - at.y); at = step; }
+    expect(walked, 'going round costs more than the straight line').toBeGreaterThan(
+      Math.abs(east.x - west.x) * 1.2);
+  });
+
+  it('wood: a unit sent into one stops at the edge instead of walking in', () => {
+    const state = createGame(7);
+    const wood = biggestWood(state);
+    const grid = buildNavGrid(state);
+    // The tile of the wood furthest from open ground: nothing should reach it.
+    const deepest = [...wood]
+      .map(index => ({
+        index,
+        cover: [...wood].filter(other => {
+          const dx = Math.abs((other % state.width) - (index % state.width));
+          const dy = Math.abs(Math.floor(other / state.width) - Math.floor(index / state.width));
+          return dx <= 2 && dy <= 2;
+        }).length,
+      }))
+      .sort((a, b) => b.cover - a.cover || a.index - b.index)[0].index;
+    const target = { x: (deepest % state.width) + 0.5, y: Math.floor(deepest / state.width) + 0.5 };
+    expect(isBlocked(grid, Math.floor(target.x), Math.floor(target.y))).toBe(true);
+
+    const mover = unit(state, { x: 2.5, y: target.y }, 1, 'militia');
+    applyCommand(state, { kind: 'order', player: 1, entityIds: [mover.id], target });
+    run(state, 20 * 120);
+    // It got as close as the ground allows and stopped: not standing in the
+    // wood, and not still shuffling at the edge of it.
+    const tile = Math.floor(mover.position.y) * state.width + Math.floor(mover.position.x);
+    expect(wood.has(tile)).toBe(false);
+    expect(mover.order.kind).toBe('idle');
+  });
+
   it('crossing groups: two opposing groups pass and settle without stacking', () => {
     const state = arena();
     const left = [0, 1, 2].map(i => unit(state, { x: 10, y: 14 + i * 0.5 }));

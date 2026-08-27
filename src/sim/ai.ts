@@ -161,7 +161,12 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   // buys either a barracks or an economy, and a barracks bought first is one
   // militia followed by a wood queue that never clears — the town center is
   // twenty tiles from the nearest forest on a full-size map.
-  const woodIsHandy = (supply('wood')?.walk ?? Infinity) <= CAMP_RANGE;
+  // Either the trees are near a drop site already, or a camp has been built to
+  // make them so. Asking only about the nearest tree to the town center meant
+  // that a player whose camp served a different wood never built a barracks at
+  // all, sitting on two hundred and forty wood for half an hour.
+  const woodIsHandy = mine.some(e => e.kind === 'lumber-camp' && (e.buildProgress ?? 1) >= 1)
+    || (supply('wood')?.walk ?? Infinity) <= CAMP_RANGE;
   if (!barracks && idleBuilder && observation.wood >= 175 && woodIsHandy) {
     // Cycle candidate spots like houses do, so terrain under one spot cannot
     // block the barracks -- and the whole military opening -- permanently.
