@@ -115,11 +115,20 @@ def find_task(unit: Any, selector: dict[str, Any]) -> Any:
     raise ValueError(f"unit {unit.id}: no task matches {selector}")
 
 
-def resolve_graphic_id(unit: Any, animation: dict[str, Any], civ_units: Any) -> int:
+def resolve_graphic_id(unit: Any, animation: dict[str, Any], civ_units: Any, dat: Any = None) -> int:
     if "slot" in animation:
         slot = animation["slot"]
         if slot == "standing":
             return unit.standing_graphic[0]
+        if slot == "base":
+            # A wall is composed: the DAT's standing graphic is the animated
+            # flag, drawn over a base graphic named in its first delta. The
+            # base is what carries the connection shapes.
+            deltas = dat.graphics[unit.standing_graphic[0]].deltas or []
+            base = next((d.graphic_id for d in deltas if d.graphic_id >= 0), -1)
+            if base < 0:
+                raise ValueError(f"unit {unit.id}: standing graphic has no base delta")
+            return base
         if slot == "dead":
             # What is left behind: the DAT models a corpse, a stump, or a pile
             # of rubble as its own unit, and its standing graphic is that art.
@@ -286,7 +295,7 @@ def extract_entity(
         entity["sounds"] = sounds
 
     entity["animations"] = {
-        name: animation_entry(dat, graphics_dir, resolve_graphic_id(unit, animation, civ_units), hashes)
+        name: animation_entry(dat, graphics_dir, resolve_graphic_id(unit, animation, civ_units, dat), hashes)
         for name, animation in spec["animations"].items()
     }
 

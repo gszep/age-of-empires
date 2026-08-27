@@ -71,7 +71,10 @@ export default defineConfig({
   plugins: [gameDebug()],
   // Worktrees under .claude/ carry a full copy of the suite; collecting them
   // doubles every run and reports stale branches as if they were this tree.
-  test: { exclude: [...configDefaults.exclude, '.claude/**'] },
+  // A whole simulated match runs in a few seconds here, but the 5s default
+  // leaves no room for a machine that is also rendering one in a browser; the
+  // suite has flaked on wall time alone rather than on anything it measured.
+  test: { exclude: [...configDefaults.exclude, '.claude/**'], testTimeout: 30_000 },
   // Public deployments must never package locally converted Microsoft assets.
   // The viewer automatically uses its open fallback when this directory is absent.
   publicDir: process.env.OPEN_CONTENT_ONLY === '1' ? false : 'public',

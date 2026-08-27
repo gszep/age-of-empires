@@ -271,6 +271,30 @@ first poll only records the world so a match resumed from a snapshot does not
 alert for everything already damaged. `sounds.json` names no
 construction-complete cue, so there is none rather than an approximation.
 
+## Palisade walls
+
+The palisade is one 1x1 building placed a tile at a time but dragged as a line:
+`wallLine` walks the longer axis whole, so a diagonal drag becomes a staircase
+of joined segments rather than a row of posts with gaps between them, and the
+preview tints every tile in the line by whether it could stand there.
+
+The DAT gives the palisade a single base graphic (`b_dark_wall_palisade_x1`,
+graphic 587) with five deltas, and AoE2 picks between them by what a segment is
+joined to. Which delta is which was measured rather than guessed: compositing
+each one as a run along +x and along +y showed frame 1 tiles seamlessly along
++x and frame 0 along +y; frame 4 is the lone stake bundle; frame 3 fills every
+corner, T and cross; and frame 2 carries iron bracing — it is the gate section,
+so a plain wall never draws it.
+
+A dragged line of foundations would otherwise leave nine untouched, because each
+`build` command retasks the same builders to the newest site. On finishing a
+segment a builder carries on to a touching unfinished foundation of the same
+kind, which is what AoE2 does with a wall drag and harmless everywhere else.
+
+*Not covered:* gates. The palisade gate is four unit pairs in the DAT (789/790,
+793/794, 797/798, 801/802) and needs an obstruction map that is passable for
+one player and not the others; see `docs/backlog.md`.
+
 ## Verification
 
 ```bash

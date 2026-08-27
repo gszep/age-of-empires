@@ -769,6 +769,49 @@ describe('herding and hunting', () => {
   });
 });
 
+describe('palisade walls', () => {
+  it('builds the whole dragged line, not only the segment tasked last', () => {
+    // A wall is placed a tile at a time but dragged as one line, so the
+    // builders have to carry on down it. Left to the raw command each new
+    // foundation would steal them from the last and nine would never rise.
+    const state = createGame(71);
+    state.players[1].wood = 200;
+    const builders = state.entities.filter(e => e.owner === 1 && e.kind === 'villager').map(e => e.id);
+    const half = state.rules.buildings['palisade-wall'].radius;
+
+    let line: { x: number; y: number }[] = [];
+    for (let y = 4.5; y < 20 && line.length < 6; y++) {
+      for (let x = 4.5; x < 22 && line.length < 6; x++) {
+        const run: { x: number; y: number }[] = [];
+        for (let i = 0; i < 6; i++) {
+          const tile = { x: x + i, y };
+          if (!placementLegal(state, 'palisade-wall', tile).ok) break;
+          run.push(tile);
+        }
+        if (run.length === 6) line = run;
+      }
+    }
+    expect(line, 'a clear six-tile run to wall').toHaveLength(6);
+    expect(half).toBe(0.5);
+
+    for (const target of line) {
+      expect(applyCommand(state, {
+        kind: 'build', player: 1, builderIds: builders, building: 'palisade-wall', target,
+      }).ok, `${target.x},${target.y}`).toBe(true);
+    }
+    const segments = () => state.entities.filter(e => e.kind === 'palisade-wall' && !e.dead);
+    expect(segments()).toHaveLength(6);
+
+    for (let i = 0; i < 6000 && segments().some(e => e.buildProgress !== undefined); i++) {
+      stepGame(state);
+    }
+    expect(segments().filter(e => e.buildProgress === undefined)).toHaveLength(6);
+    // And once the line is up the builders stop rather than wandering off to
+    // somebody else's foundations.
+    expect(state.entities.filter(e => builders.includes(e.id)).every(e => e.order.kind === 'idle')).toBe(true);
+  });
+});
+
 describe('the archery range', () => {
   it('trains the skirmisher as well as the archer', () => {
     const state = createGame(23);

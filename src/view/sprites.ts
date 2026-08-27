@@ -195,6 +195,38 @@ export function treeIsFelled(state: GameState, entity: Entity): boolean {
     && (entity.amount ?? 0) < state.rules.nodes.tree.amount;
 }
 
+/**
+ * Which frame of the palisade's base graphic a segment draws.
+ *
+ * The DAT gives the palisade one base graphic with five deltas and AoE2 picks
+ * between them by what the segment is joined to. Compositing the deltas offline
+ * along each axis (see docs/lessons.md) showed which is which: frame 1 tiles
+ * seamlessly along +x, frame 0 along +y, frame 4 is the lone stake bundle and
+ * frame 3 fills every corner, T and cross. Frame 2 carries iron bracing and is
+ * the gate section, so a plain wall never draws it.
+ */
+export const WALL_RUN_X = 1;
+export const WALL_RUN_Y = 0;
+export const WALL_JOINT = 3;
+export const WALL_POST = 4;
+
+export function wallShape(state: GameState, entity: Entity): number {
+  let alongX = false;
+  let alongY = false;
+  for (const offset of [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]) {
+    const joined = state.entities.some(other => !other.dead && other.owner === entity.owner
+      && other.kind === entity.kind
+      && Math.abs(other.position.x - (entity.position.x + offset.x)) < 0.01
+      && Math.abs(other.position.y - (entity.position.y + offset.y)) < 0.01);
+    if (!joined) continue;
+    if (offset.x !== 0) alongX = true; else alongY = true;
+  }
+  if (alongX && alongY) return WALL_JOINT;
+  if (alongX) return WALL_RUN_X;
+  if (alongY) return WALL_RUN_Y;
+  return WALL_POST;
+}
+
 /** Choose the imported sprite source (entity variant) and animation name. */
 export function chooseAnimation(state: GameState, entity: Entity): { key: string; name: string } {
   const kind = entity.kind;
@@ -564,7 +596,9 @@ export function updateEntityView(
   const elapsed = time - (view.animationStartedAt ?? time);
 
   let frameIndex: number;
-  if (entity.kind === 'resource' || (entity.kind === 'house' && choice.name === 'idle')) {
+  if (entity.kind === 'palisade-wall' && choice.name === 'idle') {
+    frameIndex = Math.min(atlas.framesInFile - 1, wallShape(state, entity));
+  } else if (entity.kind === 'resource' || (entity.kind === 'house' && choice.name === 'idle')) {
     // Angle count encodes art variations for scenery; pick one by id.
     frameIndex = entity.id % atlas.framesInFile;
   } else if (choice.name === 'construction') {

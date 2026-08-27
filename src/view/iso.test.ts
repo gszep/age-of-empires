@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES, rulesFromManifest, type ContentManifest } from '../sim/data';
 import type { BuildingKind } from '../sim/types';
-import { isoToWorld, snapPlacement, worldToIso } from './iso';
+import { isoToWorld, snapPlacement, wallLine, worldToIso } from './iso';
 
 const MANIFEST_PATH = 'public/imported/aoe2/manifest.json';
 const importedRules = existsSync(MANIFEST_PATH)
@@ -48,5 +48,29 @@ describe('placement snapping', () => {
       expect(Math.abs(snapped.x - 10.4)).toBeLessThanOrEqual(0.5);
       expect(Math.abs(snapped.y - 6.6)).toBeLessThanOrEqual(0.5);
     }
+  });
+});
+
+describe('wall lines', () => {
+  it('walks the longer axis whole so a drag joins up', () => {
+    const across = wallLine({ x: 4.2, y: 6.1 }, { x: 8.4, y: 6.3 }, 0.5);
+    expect(across.map(p => p.x)).toEqual([4.5, 5.5, 6.5, 7.5, 8.5]);
+    expect(across.every(p => p.y === across[0].y)).toBe(true);
+
+    // A diagonal becomes a staircase: every tile touches the next, so the
+    // wall is a wall rather than a row of posts with gaps between them.
+    const diagonal = wallLine({ x: 4.2, y: 6.1 }, { x: 7.4, y: 9.3 }, 0.5);
+    expect(diagonal.length).toBeGreaterThan(3);
+    for (let i = 1; i < diagonal.length; i++) {
+      const step = Math.abs(diagonal[i].x - diagonal[i - 1].x)
+        + Math.abs(diagonal[i].y - diagonal[i - 1].y);
+      expect(step).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('never asks for the same tile twice, or for none at all', () => {
+    const shallow = wallLine({ x: 4.2, y: 6.1 }, { x: 9.4, y: 6.9 }, 0.5);
+    expect(new Set(shallow.map(p => `${p.x},${p.y}`)).size).toBe(shallow.length);
+    expect(wallLine({ x: 4.2, y: 6.1 }, { x: 4.3, y: 6.2 }, 0.5)).toHaveLength(1);
   });
 });

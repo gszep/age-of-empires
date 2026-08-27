@@ -1,11 +1,11 @@
 import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 import { applyCommand, createGame, stepGame } from '../sim/game';
-import type { GameState } from '../sim/types';
+import type { Entity, GameState } from '../sim/types';
 import { RAMP_LEVELS, rampLut, type Atlas, type ContentAssets } from './assets';
 import {
   PLAYER_COLORS, chooseAnimation, createEntityView, createFlagView, playerColorHex, treeIsFelled,
-  updateEntityView, updateFlagView, updateOcclusion, type EntityView,
+  updateEntityView, updateFlagView, updateOcclusion, wallShape, type EntityView,
 } from './sprites';
 
 const run = (state: GameState, ticks: number) => {
@@ -207,6 +207,64 @@ describe('what a death leaves behind', () => {
     // The felled trunk has no animation to play out, so the stump is immediate.
     updateEntityView(view, assets, state, tree, 1);
     expect(view.animationState).toBe('tree-oak/decay');
+  });
+});
+
+describe('wall connection shapes', () => {
+  const wallAt = (state: GameState, x: number, y: number) => {
+    const rules = state.rules.buildings['palisade-wall'];
+    const entity: Entity = {
+      id: state.nextId++, kind: 'palisade-wall', owner: 1, position: { x, y },
+      hp: rules.hp, maxHp: rules.hp, radius: rules.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(entity);
+    return entity;
+  };
+
+  it('draws a lone post, a straight run, and a corner differently', () => {
+    const state = createGame(61);
+    const alone = wallAt(state, 20.5, 4.5);
+    const post = wallShape(state, alone);
+
+    const state2 = createGame(61);
+    const middle = wallAt(state2, 20.5, 4.5);
+    wallAt(state2, 21.5, 4.5);
+    wallAt(state2, 19.5, 4.5);
+    const straight = wallShape(state2, middle);
+
+    const state3 = createGame(61);
+    const bend = wallAt(state3, 20.5, 4.5);
+    wallAt(state3, 21.5, 4.5);
+    wallAt(state3, 20.5, 5.5);
+    const corner = wallShape(state3, bend);
+
+    for (const shape of [post, straight, corner]) {
+      expect(shape).toBeGreaterThanOrEqual(0);
+      expect(shape).toBeLessThan(5);
+    }
+    expect(new Set([post, straight, corner]).size).toBe(3);
+  });
+
+  it('reads the two axes as different runs, and joins only its own walls', () => {
+    const east = createGame(62);
+    const alongX = wallAt(east, 20.5, 4.5);
+    wallAt(east, 21.5, 4.5);
+    wallAt(east, 19.5, 4.5);
+
+    const south = createGame(62);
+    const alongY = wallAt(south, 20.5, 4.5);
+    wallAt(south, 20.5, 5.5);
+    wallAt(south, 20.5, 3.5);
+    expect(wallShape(east, alongX)).not.toBe(wallShape(south, alongY));
+
+    // A neighbour belonging to somebody else is a wall to walk round, not to
+    // join: AoE2 does not connect a palisade to an enemy's.
+    const mixed = createGame(63);
+    const mine = wallAt(mixed, 20.5, 4.5);
+    const theirs = wallAt(mixed, 21.5, 4.5);
+    theirs.owner = 2;
+    expect(wallShape(mixed, mine)).toBe(wallShape(createGame(63), wallAt(createGame(63), 20.5, 4.5)));
   });
 });
 

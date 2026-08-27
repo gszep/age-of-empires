@@ -268,6 +268,11 @@ export const FALLBACK_RULES: GameRules = {
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
     },
+    'palisade-wall': {
+      hp: 150, radius: 0.5, lineOfSight: 2, cost: cost(0, 3), buildSeconds: 7,
+      popSupport: 0, buildable: true, accepts: [],
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 2 }],
+    },
     stable: {
       age: 1,
       hp: 1500, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
@@ -465,6 +470,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       blacksmith: building('blacksmith', true),
       market: building('market', true),
       stable: building('stable', true),
+      'palisade-wall': building('palisade-wall', true),
     },
     nodes: {
       berries: node('berries', 'food', 'berries'),

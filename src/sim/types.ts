@@ -12,7 +12,7 @@ export type BuildingKind =
   | 'town-center' | 'barracks' | 'house'
   | 'mill' | 'lumber-camp' | 'mining-camp' | 'farm'
   | 'outpost' | 'watch-tower'
-  | 'archery-range' | 'blacksmith' | 'market' | 'stable';
+  | 'archery-range' | 'blacksmith' | 'market' | 'stable' | 'palisade-wall';
 export type EntityKind = UnitKind | BuildingKind | 'resource';
 export type Activity = 'idle' | 'moving' | 'gathering' | 'carrying' | 'building' | 'attacking' | 'dying';
 

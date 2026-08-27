@@ -10,7 +10,7 @@ import type { MatchRecord } from './protocol/types';
 import type { BuildingKind, Entity, GameState, Point, UnitKind } from './sim/types';
 import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
-import { worldToIso, isoToWorld, snapPlacement, TILE_W, TILE_H } from './view/iso';
+import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
 import { createEntityView, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint } from './view/world';
 import { createCueWatcher, pollCues } from './view/cues';
@@ -305,17 +305,32 @@ app.appendChild(selectionBox);
 let dragStart: { x: number; y: number } | undefined;
 
 renderer.domElement.addEventListener('contextmenu', event => event.preventDefault());
+/** A building placed one tile at a time along a dragged line, as AoE2 walls are. */
+const isWall = (kind: BuildingKind): boolean => kind === 'palisade-wall';
+let wallStart: Point | undefined;
+
+function placeBuilding(kind: BuildingKind, targets: Point[]): void {
+  const builders = ownSelected().filter(e => e.kind === 'villager').map(e => e.id);
+  if (!builders.length) { reject('Select a villager first'); return; }
+  let failure: string | undefined;
+  for (const target of targets) {
+    const result = applyCommand(game, { kind: 'build', player: 1, builderIds: builders, building: kind, target });
+    if (!result.ok) failure ??= result.reason;
+  }
+  if (failure) reject(failure);
+}
+
 renderer.domElement.addEventListener('pointerdown', event => {
   const point = screenToWorld(event.clientX, event.clientY);
   if (event.button === 0) {
+    if (buildMode && isWall(buildMode) && !replay) {
+      // A wall is dragged: the first press only anchors the line.
+      wallStart = snapPlacement(point, rules.buildings[buildMode].radius);
+      return;
+    }
     if (buildMode && !replay) {
-      const builder = ownSelected().find(e => e.kind === 'villager');
       // Commit exactly where the preview showed it, not the raw cursor point.
-      const target = snapPlacement(point, rules.buildings[buildMode].radius);
-      const result = builder
-        ? applyCommand(game, { kind: 'build', player: 1, builderIds: ownSelected().filter(e => e.kind === 'villager').map(e => e.id), building: buildMode, target })
-        : { ok: false as const, reason: 'Select a villager first' };
-      if (!result.ok) reject(result.reason);
+      placeBuilding(buildMode, [snapPlacement(point, rules.buildings[buildMode].radius)]);
       buildMode = undefined;
       return;
     }
@@ -338,6 +353,13 @@ addEventListener('pointermove', event => {
   selectionBox.style.height = `${Math.abs(event.clientY - dragStart.y)}px`;
 });
 addEventListener('pointerup', event => {
+  if (event.button === 0 && wallStart && buildMode) {
+    const end = screenToWorld(event.clientX, event.clientY);
+    placeBuilding(buildMode, wallLine(wallStart, end, rules.buildings[buildMode].radius));
+    wallStart = undefined;
+    buildMode = undefined;
+    return;
+  }
   if (event.button !== 0 || !dragStart) return;
   selectionBox.style.display = 'none';
   const wasDrag = Math.abs(event.clientX - dragStart.x) + Math.abs(event.clientY - dragStart.y) > 8;
@@ -425,7 +447,7 @@ addEventListener('keydown', event => {
   const key = event.key;
   if (key.startsWith('Arrow')) { heldKeys.add(key); event.preventDefault(); return; }
   if (key === 'Escape') {
-    if (buildMode) buildMode = undefined;
+    if (buildMode) { buildMode = undefined; wallStart = undefined; }
     else if (hud.menuOpen) hud.toggleMenu(false);
     else hud.toggleMenu(true);
     return;
@@ -773,6 +795,33 @@ function syncScene(time: number): void {
     }
   } else if (ghostKind) {
     disposeGhost();
+  }
+  updateWallPreview();
+}
+
+/**
+ * The tiles a wall drag would fill, each tinted by whether it could stand
+ * there. A single ghost would say nothing about the length of the line.
+ */
+const wallGhosts: THREE.Mesh[] = [];
+function updateWallPreview(): void {
+  const tiles = buildMode && wallStart && isWall(buildMode)
+    ? wallLine(wallStart, pointerWorld, rules.buildings[buildMode].radius)
+    : [];
+  while (wallGhosts.length < tiles.length) {
+    const mesh = view.createFootprint(rules.buildings['palisade-wall'].radius);
+    mesh.renderOrder = 5900;
+    wallGhosts.push(mesh);
+    scene.add(mesh);
+  }
+  for (const [index, mesh] of wallGhosts.entries()) {
+    const tile = tiles[index];
+    mesh.visible = tile !== undefined;
+    if (!tile) continue;
+    const iso = worldToIso(tile.x, tile.y);
+    mesh.position.set(iso.x, iso.y, 0);
+    const legal = placementLegal(game, buildMode!, tile).ok;
+    (mesh.material as THREE.MeshBasicMaterial).color.set(legal ? 0x7fff9e : 0xff5f5f);
   }
 }
 

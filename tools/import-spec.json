@@ -182,6 +182,16 @@
       }
     },
     {
+      "key": "palisade-wall",
+      "unitId": 72,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "base" },
+        "construction": { "slot": "construction" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
       "key": "house",
       "unitId": 70,
       "category": "building",

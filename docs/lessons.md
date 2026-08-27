@@ -77,6 +77,13 @@ keeps the record.
   file as the specification: a clean walk that ends exactly at the last byte
   is the proof.
 
+- **Composite the sprite offline before mapping frames to meaning.** The
+  palisade's five deltas carry no labels; guessing a connection table produced
+  a fence that looked like separate stake bundles. Rendering each frame as a
+  run along each axis answered it in one picture — the frame that tiles
+  seamlessly *is* that axis's run. Rule: when art has to be indexed by game
+  state, prove the index by drawing the arrangement, not by reading numbers.
+
 ## Process
 
 - **Complete one playable behaviour end to end** (from the working style

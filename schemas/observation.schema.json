@@ -24,7 +24,7 @@
         "type": "object",
         "properties": {
           "id": { "type": "integer" },
-          "kind": { "enum": ["villager", "militia", "spearman", "archer", "skirmisher", "scout-cavalry", "trade-cart", "sheep", "deer", "boar", "town-center", "barracks", "house", "mill", "lumber-camp", "mining-camp", "farm", "outpost", "watch-tower", "archery-range", "blacksmith", "market", "stable", "resource"] },
+          "kind": { "enum": ["villager", "militia", "spearman", "archer", "skirmisher", "scout-cavalry", "trade-cart", "sheep", "deer", "boar", "town-center", "barracks", "house", "mill", "lumber-camp", "mining-camp", "farm", "outpost", "watch-tower", "archery-range", "blacksmith", "market", "stable", "palisade-wall", "resource"] },
           "owner": { "enum": [0, 1, 2] },
           "x": { "type": "number" },
           "y": { "type": "number" },
@@ -50,7 +50,7 @@
         "properties": {
           "id": { "type": "integer" },
           "kind": {
-            "enum": ["villager", "militia", "spearman", "archer", "skirmisher", "scout-cavalry", "trade-cart", "sheep", "deer", "boar", "town-center", "barracks", "house", "mill", "lumber-camp", "mining-camp", "farm", "outpost", "watch-tower", "archery-range", "blacksmith", "market", "stable", "resource"]
+            "enum": ["villager", "militia", "spearman", "archer", "skirmisher", "scout-cavalry", "trade-cart", "sheep", "deer", "boar", "town-center", "barracks", "house", "mill", "lumber-camp", "mining-camp", "farm", "outpost", "watch-tower", "archery-range", "blacksmith", "market", "stable", "palisade-wall", "resource"]
           },
           "owner": { "enum": [0, 1, 2] },
           "x": { "type": "number" },

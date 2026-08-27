@@ -43,7 +43,7 @@
         "kind": { "const": "build" },
         "player": { "enum": [1, 2] },
         "builderIds": { "type": "array", "items": { "type": "integer" }, "minItems": 1 },
-        "building": { "enum": ["barracks", "house", "mill", "lumber-camp", "mining-camp", "farm", "outpost", "watch-tower", "archery-range", "blacksmith", "market", "stable"] },
+        "building": { "enum": ["barracks", "house", "mill", "lumber-camp", "mining-camp", "farm", "outpost", "watch-tower", "archery-range", "blacksmith", "market", "stable", "palisade-wall"] },
         "target": { "$ref": "#/definitions/point" }
       },
       "required": ["kind", "player", "builderIds", "building", "target"],

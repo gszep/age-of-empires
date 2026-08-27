@@ -25,6 +25,28 @@ export function isoToWorld(sx: number, sy: number): Point {
 export const isoDepth = (x: number, y: number): number => x + y;
 
 /**
+ * The tiles a wall drag covers, as AoE2 lays them: the longer axis is walked
+ * whole so a diagonal drag becomes a staircase of joined segments rather than a
+ * diagonal line with gaps nothing can stand in. Repeats from the snapping are
+ * dropped, so each tile is built once.
+ */
+export function wallLine(from: Point, to: Point, half: number): Point[] {
+  const start = snapPlacement(from, half);
+  const end = snapPlacement(to, half);
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const steps = Math.max(Math.abs(dx), Math.abs(dy));
+  if (steps < 1) return [start];
+  const line: Point[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    line.push(snapPlacement({ x: start.x + dx * t, y: start.y + dy * t }, half));
+  }
+  return line.filter((point, index) =>
+    line.findIndex(other => other.x === point.x && other.y === point.y) === index);
+}
+
+/**
  * Snap a foundation centre to the tile grid, as AoE2 does: a building with an
  * odd side length centres on a tile, an even one on a tile corner. Either way
  * the footprint edges land on tile boundaries, so the preview matches the

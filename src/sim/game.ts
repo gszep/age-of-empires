@@ -631,6 +631,28 @@ function updateTrader(state: GameState, grid: NavGrid, entity: Entity): void {
   entity.carrying = undefined;
 }
 
+/**
+ * The next foundation a builder carries on to once its own is finished: one of
+ * the same kind touching the one just built. A wall is placed a tile at a time
+ * but dragged as a line, and AoE2 builds the whole line rather than leaving
+ * nine foundations behind the one segment somebody happened to task last.
+ */
+function adjacentSite(state: GameState, site: Entity): Entity | undefined {
+  let best: Entity | undefined;
+  let bestDistance = Infinity;
+  for (const candidate of state.entities) {
+    if (candidate.dead || candidate.id === site.id) continue;
+    if (candidate.kind !== site.kind || candidate.owner !== site.owner) continue;
+    if (candidate.buildProgress === undefined) continue;
+    const reach = (candidate.radius + site.radius) * 2.1;
+    const gap = distance(candidate.position, site.position);
+    if (gap > reach || gap >= bestDistance) continue;
+    best = candidate;
+    bestDistance = gap;
+  }
+  return best;
+}
+
 function updateBuilder(state: GameState, grid: NavGrid, entity: Entity, builderCounts: Map<number, number>): void {
   if (entity.order.kind !== 'build') return;
   const site = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
@@ -1067,7 +1089,11 @@ export function stepGame(state: GameState): void {
         }
       }
       for (const builder of state.entities) {
-        if (builder.order.kind === 'build' && builder.order.targetId === site.id) becomeIdle(builder);
+        if (builder.order.kind === 'build' && builder.order.targetId === site.id) {
+          const next = adjacentSite(state, site);
+          if (next) { builder.order = { kind: 'build', targetId: next.id }; builder.activity = 'moving'; }
+          else becomeIdle(builder);
+        }
       }
       recalculatePopulation(state);
     }
