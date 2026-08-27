@@ -49,6 +49,15 @@ keeps the record.
   when a measured colour is off by roughly a power, suspect the measurement's
   colour space before the art; the render target now takes
   `renderer.outputColorSpace`.
+- **A Group's renderOrder silently outranks every child's.** Three sorts by
+  groupOrder before renderOrder, and a Group's own renderOrder becomes its
+  children's groupOrder. Selection markers sat in a Group at 900 while sprites
+  live in groups at 0, so a marker mesh's carefully chosen 950 never competed
+  with a body's 1000+ — markers painted over every building, and nothing
+  errored. Rule: renderOrder values only order objects whose enclosing groups
+  tie; put layered meshes in groups with default renderOrder and express the
+  layer on the mesh, and verify layering with a pixel probe at a point where
+  the wrong order shows a colour the right order hides.
 - **WebGPU does not render in Node.** The viewer uses `THREE.WebGPURenderer`;
   there is no plain-Node headless render path. Headless Chrome with SwiftShader
   does run the full game (slowly, ~4 fps) and is how automated visual checks
