@@ -31,11 +31,15 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 - `H` selects and centers the town center; `.` cycles idle villagers.
 - Command-grid hotkeys are shown on buttons (`Q`, `W`, `S` as applicable).
 - `Esc` cancels placement or opens the menu; `F3` pauses; `F10` toggles the menu.
-- `+` and `-` set the game speed, from real time up to ten times, as in the
-  original. The simulation's tick length does not change — the speed only
-  decides how many of the same ticks a second holds — so a match run fast
-  plays out exactly as it would at normal speed, and replays and checksums
-  are unaffected. Also handy for watching a whole match go by.
+- `+` and `-` step the game speed through the original's own four settings —
+  Slow, Normal, Fast and Extra Fast — and then two fast-forward steps past them
+  for watching a whole match go by. The game starts at **Normal**, which is the
+  setting the reference's own hotkey names call "Default": every duration in the
+  data is quoted in game seconds, and Normal runs 1.5 of them a second, so a
+  25-second villager arrives in about 17 real seconds. The simulation's tick
+  length does not change — the speed only decides how many of the same ticks a
+  second holds — so a match run fast plays out exactly as it would at any other
+  speed, and replays and checksums are unaffected.
 - Select the town center to research Loom (villagers survive more), the Feudal Age, and then the Castle Age. Markets, blacksmiths, archery ranges, stables, watch towers and everything they train are Feudal; monasteries, siege workshops, castles and everything they train are Castle, as in the original. The command grid only offers what the age allows.
 - Select a villager to place any building — the build menu has an economic and a military page, as in the original. Select a town center to train villagers, a barracks for militia and spearmen, an archery range for archers, skirmishers and cavalry archers, a stable for scout cavalry and knights, a market for trade carts, a siege workshop for battering rams and mangonels, a monastery for monks, or a castle for longbowmen (the British unique unit). Destroy the enemy town center to win.
 - A monk right-clicked onto a wounded ally heals it, and onto an enemy soldier converts it to your side — it takes between five and nine seconds, and walking out of the monk's reach loses all of that work. A mangonel's stone hurts everything it lands beside, your own soldiers included, so keep them clear.

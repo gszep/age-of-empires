@@ -154,10 +154,13 @@ terrain blends above.
 
 ## Interface
 
-- **Game speed does not survive a reload.** `+` and `-` set 1x to 10x and it
-  resets to 1x on refresh, because the speed is a view preference and the saved
-  session holds game state. Persisting it means deciding where a view
-  preference lives.
+- **Game speed does not survive a reload.** `+` and `-` step the original's
+  four settings plus two fast-forward steps, and it resets to Normal on refresh,
+  because the speed is a view preference and the saved session holds game state.
+  Persisting it means deciding where a view preference lives. There is also no
+  options screen to set it from — the reference has a Game Speed dropdown on
+  both the options screen and the lobby (`GameSpeedDropdown`,
+  `GameSpeedDropDown`), and neither exists here.
 
 ## Debug tooling
 

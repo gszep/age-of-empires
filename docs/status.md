@@ -51,9 +51,13 @@ changed underneath it.
   clear line through, and crossing one costs 1.66x the straight line while
   never stepping on a tree.
 - Browser, headless Chrome on SwiftShader at 1280x800: about **16 ticks a
-  second at 1x** speed and **170 at 10x** — the ratio is the meaningful part
-  (the speed control scales as it should); the absolute rate is software
-  rendering and is not a claim about a desktop GPU.
+  second at Slow** and **170 at the 10x fast-forward** — the ratio is the
+  meaningful part (the speed control scales as it should); the absolute rate is
+  software rendering and is not a claim about a desktop GPU. Measured again
+  after the default moved to Normal: **25.3 ticks/s at the default against 17.5
+  at Slow, a ratio of 1.45** where the setting asks for 1.50 — the shortfall is
+  the same software-rendering ceiling (Slow itself only reaches 0.87 of its own
+  target), not the multiplier.
 - Browser file replay reported `Replay verified: 1 checksums match` for a
   six-second imported-rules record.
 - 844x390 landscape Chrome smoke retained the complete top bar, world, command
@@ -68,6 +72,24 @@ Batch artifacts are intentionally ignored under `.local/batches/`.
 The importer integration resolves every consumed DAT graphic/rule and widgetui source, hashes inputs, and regenerates byte-identically. Viewer smoke tests loaded imported atlases and WEST UI without application console errors; selection, gather orders, fog expansion, and browser replay were exercised through Chrome DevTools Protocol. Timing, resource conservation, hidden information, pathing, combat release, protocol validation, and replay determinism have focused tests.
 
 Known discrepancies are single-terrain ground without the multi-terrain blend masks and missing fire delta overlays on damaged buildings.
+
+**Game speed** is the fifth. The owned files settle how many settings there are
+and which one is the default, but not what they multiply by. `stringreference.json`
+maps `IDS_SLOW_SPEED`/`IDS_NORMAL_SPEED`/`IDS_FAST_SPEED` to strings 13101-13103
+("Slow", "Normal", "Fast"), and the hotkey strings 20033-20036 name four —
+"Set Speed to Slow", **"Set Speed to Default"**, "Set Speed to Fast", "Set Speed
+to Extra Fast". That the second setting is the one the game calls *Default* is
+owned evidence, and it is why the match no longer starts at 1x, which is the
+Slow setting and the reason play felt sluggish. The multipliers are engine
+constants in code this project does not read, so the four values used —
+1.0 / 1.5 / 1.7 / 2.0 — come from community references
+([Steam](https://steamcommunity.com/app/813780/discussions/0/624417180895682149/),
+[AoEZone](https://aoezone.net/threads/definitive-edition-game-speed.156338/)),
+which agree on the set while disagreeing on whether the standard tournament
+speed (Fast) is sometimes called "normal". Every duration the DAT states — a
+25-second villager, a 130-second Feudal Age, 0.31 food a second — is in game
+seconds, so the multiplier is the only thing standing between that data and the
+pace a player feels.
 
 Four Castle Age behaviours are approximations, because the owned files carry the
 numbers but not the rules that use them:

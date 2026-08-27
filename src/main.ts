@@ -58,11 +58,32 @@ let paused = false;
  * How many game seconds pass per real second. The simulation's tick length is
  * fixed — determinism depends on it — so speed multiplies how much time the
  * frame loop hands the accumulator, and the game runs the same ticks, sooner.
- * One is real time; ten is the fast-forward a QA pass wants. Nothing slower,
- * because there is nothing to see in it.
+ * Every DAT duration — a 25-second villager, a 130-second Feudal Age, a
+ * villager's 0.31 food a second — is quoted in game seconds, so the multiplier
+ * is the whole difference between the reference's pace and a slideshow.
+ *
+ * The reference ships four: `key-value-strings-utf8.txt` names them Slow,
+ * Default, Fast and Extra Fast (20033..20036), and the lobby dropdown lists the
+ * first three as Slow/Normal/Fast (13101..13103). The multipliers themselves
+ * are engine constants in code we do not read, so the four values below come
+ * from the community references recorded in `docs/status.md`; what the owned
+ * files do settle is that there are four, and that the *second* is the
+ * default — which is why the game no longer starts at 1x, the Slow setting.
  */
-const MAX_GAME_SPEED = 10;
-let gameSpeed = 1;
+const GAME_SPEEDS: { label: string; multiplier: number }[] = [
+  { label: 'Slow', multiplier: 1 },
+  { label: 'Normal', multiplier: 1.5 },
+  { label: 'Fast', multiplier: 1.7 },
+  { label: 'Extra Fast', multiplier: 2 },
+  // Past the original's own settings: fast-forward, for watching a match out
+  // or for an automated pass. Not a claim about AoE2.
+  { label: 'Fast-forward 5x', multiplier: 5 },
+  { label: 'Fast-forward 10x', multiplier: 10 },
+];
+/** "Set Speed to Default" is the reference's own name for the second setting. */
+const DEFAULT_SPEED = 1;
+let speedIndex = DEFAULT_SPEED;
+const gameSpeed = (): number => GAME_SPEEDS[speedIndex].multiplier;
 let aiClock = 0;
 
 interface ReplayState {
@@ -546,12 +567,15 @@ addEventListener('keydown', event => {
   // signs directly. Ctrl and Cmd are left alone: that is the browser's zoom.
   if (!event.ctrlKey && !event.metaKey && ['+', '=', '-', '_'].includes(key)) {
     const faster = key === '+' || key === '=';
-    const next = Math.max(1, Math.min(MAX_GAME_SPEED, gameSpeed + (faster ? 1 : -1)));
-    if (next !== gameSpeed) {
-      gameSpeed = next;
-      hud.showMessage(`Speed ${gameSpeed}x`);
+    const next = Math.max(0, Math.min(GAME_SPEEDS.length - 1, speedIndex + (faster ? 1 : -1)));
+    const setting = GAME_SPEEDS[next];
+    if (next !== speedIndex) {
+      speedIndex = next;
+      hud.showMessage(`Game speed: ${setting.label}`);
     } else {
-      hud.showMessage(faster ? `Speed ${gameSpeed}x (fastest)` : 'Speed 1x (real time)');
+      hud.showMessage(faster
+        ? `Game speed: ${setting.label} (fastest)`
+        : `Game speed: ${setting.label} (slowest)`);
     }
     event.preventDefault();
     return;
@@ -1025,10 +1049,10 @@ renderer.setAnimationLoop(now => {
   }
 
   if (!paused && !game.winner) {
-    // `elapsed` is already capped at 0.1s, so a frame runs at most
-    // `MAX_GAME_SPEED / TICK_SECONDS` ticks: a machine that cannot keep up
-    // falls behind real time rather than spiralling.
-    accumulator += elapsed * gameSpeed;
+    // `elapsed` is already capped at 0.1s, so a frame runs at most the fastest
+    // setting's multiplier over `TICK_SECONDS` ticks: a machine that cannot
+    // keep up falls behind real time rather than spiralling.
+    accumulator += elapsed * gameSpeed();
     while (accumulator >= TICK_SECONDS) {
       if (replay) {
         if (game.tick >= replay.lastTick) { accumulator = 0; break; }
