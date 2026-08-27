@@ -30,7 +30,7 @@ Controls and hotkeys are listed in the root `README.md`. The essential loop is l
 
 ## Deliberately omitted
 
-The target does not include Feudal+ ages, other civilizations, technologies, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, trade, relics, gates/walls, or a genetic-algorithm framework. Mobile has no separate or simplified gameplay. All SLD layers convert through the local decoder.
+The target does not include Feudal+ ages, other civilizations, technologies, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, relics, gates/walls, or a genetic-algorithm framework. Mobile has no separate or simplified gameplay. All SLD layers convert through the local decoder.
 
 ## Measurements and gate evidence
 
@@ -93,6 +93,26 @@ gained an `effects` section that finds a graphic by its own name and refuses a
 name matching anything but exactly one. The gather-point flag is the first:
 `WaypointFlag Britons`, 90 frames, drawn at a selected building's rally point in
 the owner's colour.
+
+### Trade pays what the road costs
+
+The market trains the DAT's trade cart (unit 128, 100 wood + 50 gold, 51s), and
+a cart ordered onto a foreign market shuttles: it loads there and banks gold on
+reaching its own market. How much is the cart's own data rather than a constant
+from outside it — `bird.work_rate` (0.2875 per second) for every second spent
+travelling since its last delivery, capped at `resource_capacity` (100). A
+longer route is worth more, as in AoE2. The engine's own coefficient (the
+community's 0.46 gold per tile) is not in the owned files, so it is not used;
+this is a documented substitution, not a match.
+
+The remainder rides on to the next run, the way a villager's gather progress
+does: flooring it away left a short route paying nothing at all rather than
+paying a little.
+
+AoE2 pays a cart at both ends of the route and ours pays only on arriving home,
+which halves the delivery frequency at the same gold per second of travel. A
+route the cart cannot walk — a market sealed in by trees, which the default map
+can produce — ends the order rather than leaving the cart walking on the spot.
 
 A death leaves what the DAT says it leaves: `unit.dead_unit_id` names a unit
 whose standing graphic is the art left behind — `u_*_decayA_x1` for each unit

@@ -125,6 +125,19 @@
       }
     },
     {
+      "key": "trade-cart",
+      "unitId": 128,
+      "category": "unit",
+      "trade": { "task": { "actionType": 111, "unitId": 84 } },
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "carry": { "task": { "actionType": 111, "unitId": 84 }, "graphic": "carrying" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
       "key": "town-center",
       "unitId": 109,
       "category": "building",

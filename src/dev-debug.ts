@@ -103,6 +103,7 @@ export function installDebug(context: DebugContext): void {
       maxHp: entity.maxHp,
       activity: entity.activity,
       dead: entity.dead,
+      buildProgress: entity.buildProgress,
       order: entity.order.kind,
       rally: entity.rally && { x: round(entity.rally.target.x), y: round(entity.rally.target.y) },
       selected: context.selectedIds().includes(entity.id),

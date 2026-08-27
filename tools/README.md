@@ -86,6 +86,10 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 When a needed field is missing here, `dir()` the object once in a scratch
 script and extend this table — do not trial-and-error attribute names.
 
+`unit.name` is not an identity: they are AoK leftovers that never moved with
+the ids (unit 74 "SPRMN" is the militia; unit 7 "XBOWM" is the skirmisher).
+Identify a unit by the file name of its graphics and by its numbers.
+
 ## Library notes
 
 1. `genieutils-py` 0.1.2 parsed the downloaded `VER 8.9` DAT;

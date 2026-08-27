@@ -134,7 +134,10 @@ function isGatherable(entity: Entity, gatherer: Entity): boolean {
 }
 
 function assignOrder(state: GameState, entity: Entity, target: Point, targetEntity?: Entity): void {
-  if (targetEntity && isGatherable(targetEntity, entity) && entity.kind === 'villager') {
+  if (entity.kind === 'trade-cart' && targetEntity && isTradePartner(state, entity, targetEntity)) {
+    entity.order = { kind: 'trade', targetId: targetEntity.id };
+    entity.carrying = undefined;
+  } else if (targetEntity && isGatherable(targetEntity, entity) && entity.kind === 'villager') {
     entity.order = { kind: 'gather', targetId: targetEntity.id };
   } else if (
     targetEntity && targetEntity.owner === entity.owner &&
@@ -434,6 +437,89 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   if (node.kind === 'farm' && (node.amount ?? 0) <= 0) kill(state, node);
 }
 
+/**
+ * A market a cart may trade with: a finished market belonging to somebody else.
+ * Trading with your own market earns nothing in AoE2, and the route needs a
+ * counterparty, so this is what makes an order a trade order rather than a walk.
+ */
+function isTradePartner(state: GameState, cart: Entity, target: Entity): boolean {
+  return target.kind === 'market' && !target.dead
+    && target.buildProgress === undefined && target.owner !== cart.owner && target.owner !== 0;
+}
+
+/** The cart's own nearest finished market: where a loaded cart unloads. */
+function homeMarket(state: GameState, entity: Entity): Entity | undefined {
+  let best: Entity | undefined;
+  let bestDistance = Infinity;
+  for (const candidate of state.entities) {
+    if (candidate.dead || candidate.kind !== 'market') continue;
+    if (candidate.owner !== entity.owner || candidate.buildProgress !== undefined) continue;
+    const d = distance(entity.position, candidate.position);
+    if (d < bestDistance || (d === bestDistance && best && candidate.id < best.id)) {
+      best = candidate;
+      bestDistance = d;
+    }
+  }
+  return best;
+}
+
+/**
+ * A trade cart shuttling between its own market and a foreign one.
+ *
+ * The gold is what the road pays: the cart earns at its DAT work rate for every
+ * second it spends on the road, up to what it can hold, so a longer route is
+ * worth more exactly as it is in AoE2. It loads at the far market and banks
+ * whole gold at its own. The remainder rides on to the next run, the same way a
+ * villager's gather progress does - flooring it away would leave a short route
+ * paying nothing at all rather than paying a little.
+ */
+function updateTrader(state: GameState, grid: NavGrid, entity: Entity): void {
+  if (entity.order.kind !== 'trade') return;
+  const rules = state.rules.units['trade-cart'];
+  const rate = rules.tradeRatePerSecond ?? 0;
+  const capacity = rules.tradeCapacity ?? 0;
+  const goods = () => Math.min(capacity, Math.floor(entity.gatherProgress ?? 0));
+  const travel = () => {
+    entity.gatherProgress = Math.min(capacity + 1, (entity.gatherProgress ?? 0) + rate * TICK_SECONDS);
+  };
+
+  if (!entity.carrying) {
+    const far = state.entities.find(e => e.id === (entity.order as { targetId: number }).targetId);
+    if (!far || !isTradePartner(state, entity, far)) { becomeIdle(entity); return; }
+    entity.activity = 'moving';
+    if (!inRange(entity, far, 0.3)) {
+      travel();
+      // `moveAlong` reports true for arrived *or* unreachable, and a market
+      // walled in by trees is a real map outcome. Stopping short of one has to
+      // end the order, or the cart walks on the spot for the rest of the match.
+      if (moveAlong(state, grid, entity, far.position, rules.speed, interactionRange(far))) {
+        becomeIdle(entity);
+      }
+      return;
+    }
+    clearPath(entity);
+    entity.carrying = { kind: 'gold', amount: goods() };
+    return;
+  }
+
+  const home = homeMarket(state, entity);
+  if (!home) { becomeIdle(entity); return; }
+  entity.activity = 'carrying';
+  if (!inRange(entity, home, 0.3)) {
+    travel();
+    entity.carrying.amount = goods();
+    if (moveAlong(state, grid, entity, home.position, rules.speed, interactionRange(home))) {
+      becomeIdle(entity);
+    }
+    return;
+  }
+  clearPath(entity);
+  const delivered = goods();
+  state.players[entity.owner as PlayerId].gold += delivered;
+  entity.gatherProgress = (entity.gatherProgress ?? 0) - delivered;
+  entity.carrying = undefined;
+}
+
 function updateBuilder(state: GameState, grid: NavGrid, entity: Entity, builderCounts: Map<number, number>): void {
   if (entity.order.kind !== 'build') return;
   const site = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
@@ -612,6 +698,7 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
       return;
     }
     case 'gather': return updateGatherer(state, grid, entity);
+    case 'trade': return updateTrader(state, grid, entity);
     case 'build': return updateBuilder(state, grid, entity, builderCounts);
     case 'attack': return updateAttacker(state, grid, entity);
     default:

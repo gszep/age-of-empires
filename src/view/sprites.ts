@@ -208,7 +208,10 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
   if (kind !== 'villager') {
     if (entity.dead) return { key: kind, name: 'death' };
     if (entity.activity === 'attacking') return { key: kind, name: 'attack' };
-    if (entity.activity === 'moving') return { key: kind, name: 'walk' };
+    // A laden trade cart has its own art: the DAT gives the trade task a
+    // carrying graphic, which is the full cart on the road.
+    if (entity.carrying) return { key: kind, name: 'carry' };
+    if (entity.activity === 'moving' || entity.activity === 'carrying') return { key: kind, name: 'walk' };
     return { key: kind, name: 'idle' };
   }
   // Villager task variants follow the DAT task units.

@@ -69,13 +69,18 @@ items land.
 
 ## B. Tech tree toward a faithful Dark→Feudal slice
 
-- [ ] **Trade cart at the market (the reported gap).** DAT: unit 128 TCART,
-  trains at 84 (market), 100 wood + 50 gold, 51s. Trade gold accrues by
-  cart round-trips between own market and an allied/enemy-distance market;
-  for the 1v1 slice, use distance-based gold per DE's formula against the
-  opposing market. Complete the loop end to end: train button, unit,
-  routing, gold income. *Verify:* headless match script trains a cart and
-  gold increases on arrival; unit renders with player colour.
+- [x] **Trade cart at the market (the reported gap).** Unit 128 TCART imported
+  with its idle/walk/laden/death/decay art, trained at the market for
+  100 wood + 50 gold in 51s. The route's economics are the cart's own DAT
+  fields rather than the community's gold-per-tile constant, which is not in
+  the owned data: it earns at `bird.work_rate` (0.2875/s) for every second on
+  the road since its last delivery, capped at `resource_capacity` (100), loads
+  at a foreign market and banks whole gold at its own, the remainder riding on
+  to the next run. *Verified:* simulation tests build both markets, train a
+  cart, and watch gold rise only on the return leg — refusing a route onto the
+  cart's own market, and ending the order rather than walking on the spot when
+  the far market is walled off. In the live match a cart trained at the market
+  renders in player colour, swaps to its laden art on the way home, and pays.
 - [ ] **Stable and scout cavalry.** Unblocked: the local decoder reads
   `b_west_stable_age2_x1.sld` (see status.md). Add spec entries + sim rules
   for stable (unit 101) and scout cavalry (448). *Verify:* import test

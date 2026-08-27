@@ -27,6 +27,9 @@ export interface UnitRules {
   projectileSpeed?: number;
   /** Height the shot leaves from, in tiles (DAT graphic displacement z). */
   launchHeight?: number;
+  /** Trade carts: goods earned per second on the road, and the most they hold. */
+  tradeRatePerSecond?: number;
+  tradeCapacity?: number;
 }
 
 export interface BuildingRules {
@@ -104,6 +107,14 @@ export const FALLBACK_RULES: GameRules = {
       attacks: [{ class: 4, amount: 3 }, { class: 8, amount: 15 }, { class: 21, amount: 1 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 3, attackReleaseSeconds: 0.5,
+    },
+    'trade-cart': {
+      hp: 70, radius: 0.25, speed: 1.25, lineOfSight: 7, cost: cost(0, 100, 50), trainSeconds: 51,
+      trainedAt: 'market', popCost: 1,
+      attacks: [],
+      armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }],
+      attackReloadSeconds: 0, attackReleaseSeconds: 0,
+      tradeRatePerSecond: 0.2875, tradeCapacity: 100,
     },
     archer: {
       hp: 30, radius: 0.2, speed: 0.96, lineOfSight: 6, cost: cost(0, 25, 45), trainSeconds: 35,
@@ -210,6 +221,7 @@ interface ManifestEntity {
     armors: AttackValue[];
   };
   gather?: { resource: ResourceKind; ratePerSecond: number; capacity: number };
+  trade?: { ratePerSecond: number; capacity: number; buildingId: number };
   storage?: Partial<Record<ResourceKind, number>>;
   popSupport?: number;
   animations?: Record<string, { frameSeconds: number }>;
@@ -295,6 +307,13 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       militia: unit('militia', 'barracks'),
       spearman: unit('spearman', 'barracks'),
       archer: { ...unit('archer', 'archery-range'), range: FALLBACK_RULES.units.archer.range },
+      'trade-cart': {
+        ...unit('trade-cart', 'market'),
+        tradeRatePerSecond: e['trade-cart']?.trade?.ratePerSecond
+          ?? FALLBACK_RULES.units['trade-cart'].tradeRatePerSecond,
+        tradeCapacity: e['trade-cart']?.trade?.capacity
+          ?? FALLBACK_RULES.units['trade-cart'].tradeCapacity,
+      },
     },
     buildings: {
       'town-center': building('town-center', false),
@@ -326,7 +345,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
   };
 }
 
-const UNIT_KINDS = new Set<string>(['villager', 'militia', 'spearman', 'archer']);
+const UNIT_KINDS = new Set<string>(['villager', 'militia', 'spearman', 'archer', 'trade-cart']);
 const BUILDING_KINDS = new Set<string>([
   'town-center', 'barracks', 'house', 'mill', 'lumber-camp', 'mining-camp', 'farm',
   'outpost', 'watch-tower', 'archery-range', 'blacksmith', 'market',
@@ -334,5 +353,6 @@ const BUILDING_KINDS = new Set<string>([
 
 export const isUnit = (kind: EntityKind): kind is UnitKind => UNIT_KINDS.has(kind);
 export const isBuilding = (kind: EntityKind): kind is BuildingKind => BUILDING_KINDS.has(kind);
-/** Units that fight on their own initiative; villagers only fight when told. */
-export const isMilitary = (kind: EntityKind): boolean => isUnit(kind) && kind !== 'villager';
+/** Units that fight on their own initiative; workers only fight when told. */
+export const isMilitary = (kind: EntityKind): boolean =>
+  isUnit(kind) && kind !== 'villager' && kind !== 'trade-cart';

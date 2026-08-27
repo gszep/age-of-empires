@@ -217,6 +217,20 @@ class ContentImportIntegrationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             resolve_graphic_id(units[504], {"slot": "dead"}, units)  # the arrow
 
+    def test_trade_cart_carries_its_own_route_rules(self):
+        cart = self.result["entities"]["trade-cart"]
+        self.assertEqual(cart["id"], 128)
+        self.assertEqual(cart["cost"], {"wood": 100, "gold": 50})
+        self.assertEqual(cart["train"], {"buildingId": 84, "seconds": 51})
+        # The route's economics come from the unit, not from a constant: its
+        # work rate is what the road pays per second and its capacity the cap.
+        self.assertEqual(cart["trade"], {
+            "ratePerSecond": 0.2875, "capacity": 100, "buildingId": 84,
+        })
+        # A laden cart has its own art, named by the trade task itself.
+        self.assertEqual(cart["animations"]["carry"]["source"], "u_trade_cart_west_walkA_x1.sld")
+        self.assertNotIn("combat", cart)
+
     def test_gather_point_flag_resolves_by_its_own_graphic_name(self):
         # Nothing in the unit table points at the waypoint flag, so it is found
         # by name — and the name has to match exactly one graphic, or the

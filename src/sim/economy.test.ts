@@ -558,6 +558,118 @@ describe('towers', () => {
   });
 });
 
+describe('trade', () => {
+  /** Both sides get a finished market; a route needs two ends. */
+  function markets(state: GameState): { home: Entity; away: Entity } {
+    for (const player of [1, 2] as const) {
+      state.players[player].wood = 1000;
+      state.players[player].gold = 1000;
+      const builders = state.entities
+        .filter(e => e.owner === player && e.kind === 'villager')
+        .map(e => e.id);
+      // Where the map allows it, out from the town center towards the middle;
+      // the resource clusters move with the seed, so the spot cannot be fixed.
+      let target: { x: number; y: number } | undefined;
+      for (let step = 0; step < 12 && !target; step += 0.5) {
+        for (const y of [9, 10, 8, 11]) {
+          const x = player === 1 ? 8.5 + step : 23.5 - step;
+          if (placementLegal(state, 'market', { x, y }).ok) { target = { x, y }; break; }
+        }
+      }
+      expect(target).toBeDefined();
+      const result = applyCommand(state, { kind: 'build', player, builderIds: builders, building: 'market', target: target! });
+      expect(result.ok).toBe(true);
+    }
+    const finished = () => state.entities.filter(e => e.kind === 'market' && e.buildProgress === undefined);
+    for (let i = 0; i < 6000 && finished().length < 2; i++) stepGame(state);
+    const built = finished();
+    expect(built).toHaveLength(2);
+    return { home: built.find(e => e.owner === 1)!, away: built.find(e => e.owner === 2)! };
+  }
+
+  it('pays gold for a run between two markets, and only between two', () => {
+    const state = createGame(11);
+    const { home, away } = markets(state);
+    expect(applyCommand(state, { kind: 'train', player: 1, buildingId: home.id, unit: 'trade-cart' }).ok).toBe(true);
+    const cart = () => state.entities.find(e => e.kind === 'trade-cart' && !e.dead);
+    for (let i = 0; i < 2000 && !cart(); i++) stepGame(state);
+    expect(cart()).toBeDefined();
+
+    // Its own market is no trade route: AoE2 pays for reaching somebody else's.
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [cart()!.id], target: home.position, targetId: home.id,
+    });
+    expect(cart()!.order.kind).not.toBe('trade');
+
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [cart()!.id], target: away.position, targetId: away.id,
+    });
+    expect(cart()!.order.kind).toBe('trade');
+
+    const before = state.players[1].gold;
+    // Out to the far market: loaded, but nothing banked yet.
+    for (let i = 0; i < 2000 && !cart()!.carrying; i++) stepGame(state);
+    expect(cart()!.carrying?.kind).toBe('gold');
+    expect(state.players[1].gold).toBe(before);
+
+    // And back again, which is when the run pays.
+    for (let i = 0; i < 2000 && state.players[1].gold === before; i++) stepGame(state);
+    expect(state.players[1].gold).toBeGreaterThan(before);
+    expect(cart()!.carrying).toBeUndefined();
+    // The road pays by the second travelled, so a run is worth what it costs
+    // in time, never more than the cart holds.
+    const rules = state.rules.units['trade-cart'];
+    expect(state.players[1].gold - before).toBeLessThanOrEqual(rules.tradeCapacity!);
+    expect(cart()!.order.kind).toBe('trade');
+  });
+
+  it('gives up rather than walking on the spot when the route is walled off', () => {
+    // A market can be sealed in by trees; `moveAlong` reports arrived and
+    // unreachable the same way, so a cart that ignored it walked forever.
+    const state = createGame(13);
+    const { home, away } = markets(state);
+    applyCommand(state, { kind: 'train', player: 1, buildingId: home.id, unit: 'trade-cart' });
+    const cart = () => state.entities.find(e => e.kind === 'trade-cart' && !e.dead)!;
+    for (let i = 0; i < 2000 && !state.entities.some(e => e.kind === 'trade-cart'); i++) stepGame(state);
+    // Wall the far market off completely by blocking the cart's own grid: the
+    // simplest stand-in is to put it where nothing can reach.
+    away.position = { x: 0.5, y: 0.5 };
+    const trees = state.entities.filter(e => e.kind === 'resource' && e.resourceKind === 'wood');
+    for (const [index, tree] of trees.slice(0, 6).entries()) {
+      tree.position = { x: index < 3 ? 2.5 : 0.5 + index - 3, y: index < 3 ? index - 0 + 0.5 : 2.5 };
+    }
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [cart().id], target: away.position, targetId: away.id,
+    });
+    expect(cart().order.kind).toBe('trade');
+    run(state, 200);
+    const resting = { ...cart().position };
+    run(state, 200);
+    // Either it found a way in, or it stopped: what it must not do is claim to
+    // be moving while standing still.
+    if (cart().order.kind === 'trade') {
+      expect(cart().position).not.toEqual(resting);
+    } else {
+      expect(cart().activity).toBe('idle');
+    }
+  });
+
+  it('sends the cart home again rather than stranding it when the far market falls', () => {
+    const state = createGame(12);
+    const { home, away } = markets(state);
+    applyCommand(state, { kind: 'train', player: 1, buildingId: home.id, unit: 'trade-cart' });
+    const cart = () => state.entities.find(e => e.kind === 'trade-cart' && !e.dead)!;
+    for (let i = 0; i < 2000 && !state.entities.some(e => e.kind === 'trade-cart'); i++) stepGame(state);
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [cart().id], target: away.position, targetId: away.id,
+    });
+    run(state, 40);
+    away.hp = 0;
+    run(state, 40);
+    expect(cart().order.kind).toBe('idle');
+  });
+});
+
 describe('imported rules', () => {
   it.skipIf(!importedRules)('carry DAT-backed timings and costs', () => {
     expect(importedRules!.origin).toBe('imported');
@@ -568,6 +680,15 @@ describe('imported rules', () => {
     expect(importedRules!.buildings.house.buildSeconds).toBe(25);
     expect(importedRules!.buildings['town-center'].hp).toBe(2400);
     expect(importedRules!.nodes.gold.amount).toBe(800);
+    // The trade cart's rate and capacity are its own DAT fields, not a
+    // hand-picked gold-per-tile constant.
+    const cart = importedRules!.units['trade-cart'];
+    expect(cart.trainedAt).toBe('market');
+    expect(cart.trainSeconds).toBe(51);
+    expect(cart.cost).toEqual({ food: 0, wood: 100, gold: 50, stone: 0 });
+    expect(cart.tradeRatePerSecond).toBe(0.2875);
+    expect(cart.tradeCapacity).toBe(100);
+    expect(cart.attacks).toEqual([]);
   });
 
   it.skipIf(!importedRules)('replays identically under imported rules', () => {

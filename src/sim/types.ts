@@ -3,7 +3,7 @@ import type { PlayerVisibility } from './visibility';
 
 export type PlayerId = 1 | 2;
 export type ResourceKind = 'food' | 'wood' | 'gold' | 'stone';
-export type UnitKind = 'villager' | 'militia' | 'spearman' | 'archer';
+export type UnitKind = 'villager' | 'militia' | 'spearman' | 'archer' | 'trade-cart';
 export type BuildingKind =
   | 'town-center' | 'barracks' | 'house'
   | 'mill' | 'lumber-camp' | 'mining-camp' | 'farm'
@@ -19,7 +19,9 @@ export type Order =
   | { kind: 'move'; target: Point }
   | { kind: 'gather'; targetId: number }
   | { kind: 'build'; targetId: number }
-  | { kind: 'attack'; targetId: number };
+  | { kind: 'attack'; targetId: number }
+  /** A trade cart shuttling to the market with this id and back to its own. */
+  | { kind: 'trade'; targetId: number };
 
 export interface Entity {
   id: number;
@@ -36,6 +38,8 @@ export interface Entity {
   amount?: number;
   /** Villagers. */
   carrying?: { kind: ResourceKind; amount: number };
+  /** Fractional progress towards the next whole unit: a villager's gathering,
+   * or a trade cart's goods earned on the road. */
   gatherProgress?: number;
   /** Buildings. */
   buildProgress?: number; // 0..1; undefined once complete

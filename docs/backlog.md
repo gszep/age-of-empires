@@ -11,8 +11,6 @@ are deleted, not ticked.
 
 The overnight tech-tree run added buildings faster than the units they train:
 
-- **Market trains nothing** — no trade cart. Audit every production building:
-  each must train the units the DAT assigns it, or be recorded here.
 - **Stable is not imported** — the local decoder now reads its SLD (the
   crash that excluded it is fixed, see status.md), so what remains is
   content work: spec entries plus sim rules for the stable and the scout
@@ -48,5 +46,13 @@ sounds, and under-attack alerts, each resolved through `sounds.json` events.
 
 ## Simulation
 
+- **A unit ordered somewhere unreachable walks on the spot.** `findPath`
+  answers a blocked goal with `nearestFreeTile`, which can land inside a pocket
+  the walker cannot reach — a market placed at (19, 9) on the default map seals
+  one — and `moveAlong` then reports "arrived" every tick. `updateTrader` now
+  ends the order when that happens, but `updateGatherer`, `updateBuilder` and
+  `updateAttacker` still ignore the same signal, so a villager sent to a walled
+  resource freezes in `moving` for good. The fix is either a reachable-tile
+  search in `nav.ts` or handling the give-up return at every call site.
 - **Mirror-AI stalemates**: some built-in-vs-built-in matches stall to the
   timeout; the example AI never breaks a defensive equilibrium.

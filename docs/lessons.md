@@ -64,6 +64,12 @@ keeps the record.
   (verified byte-identical to the openage decoder it replaced, which corrupted
   the heap on masks and crashed on the stable); extend it rather than adding a
   decoder dependency.
+- **A DAT unit's internal name is a lie; its graphic file name is not.** Unit
+  74 is called SPRMN and is the militia. Unit 7 is called XBOWM and draws
+  `u_arc_skirmisher_*` — it is the skirmisher, while unit 24 (CARCH) draws
+  `u_arc_crossbowman_*`. The names are AoK leftovers that never moved with the
+  ids. Rule: identify a DAT unit by `dat.graphics[...].file_name` and its
+  numbers (cost, hit points, train time), never by `unit.name`.
 - **Distrust "always" in reverse-engineered specs.** The SLD header field
   documented as "unknown, always 0x10" is really the frame-data start offset,
   and layer padding aligns to it — the stable uses 14 and crashed every

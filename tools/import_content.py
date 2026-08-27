@@ -233,6 +233,17 @@ def extract_entity(
         # uses the magnitude for the visual arc height.
         entity["projectile"] = {"arc": rounded(unit.projectile.projectile_arc)}
 
+    if "trade" in spec:
+        # A trade cart carries goods between markets rather than gathering from
+        # a node: the DAT gives its rate and how much it can hold, and names
+        # the building the route runs between.
+        task = find_task(unit, spec["trade"]["task"])
+        entity["trade"] = {
+            "ratePerSecond": rounded(unit.bird.work_rate),
+            "capacity": int(unit.resource_capacity),
+            "buildingId": task.unit_id,
+        }
+
     if category == "unit-variant":
         task = find_task(unit, spec["task"])
         resource_type = task.resource_out if task.resource_out >= 0 else task.resource_in
