@@ -833,7 +833,7 @@ describe('herding and hunting', () => {
   const animalOf = (state: GameState, kind: string) =>
     state.entities.find(e => e.kind === kind && !e.dead)!;
 
-  it('walks a sheep over to whoever came closest, and not while both are near', () => {
+  it('gives a sheep to whoever came closest, and not while both are near', () => {
     const state = createGame(31);
     const sheep = animalOf(state, 'sheep');
     expect(sheep.owner).toBe(0);
@@ -850,6 +850,32 @@ describe('herding and hunting', () => {
     theirs.position = { x: 25, y: 9 };
     run(state, 20);
     expect(sheep.owner).toBe(1);
+  });
+
+  it('leaves a claimed sheep where it stands, and lets its owner move it', () => {
+    const state = createGame(32);
+    const sheep = animalOf(state, 'sheep');
+    const mine = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    mine.position = { x: sheep.position.x + 1, y: sheep.position.y };
+    run(state, 20);
+    expect(sheep.owner).toBe(1);
+
+    // The villager wanders off; the sheep does not trail after it.
+    const stood = { ...sheep.position };
+    mine.position = { x: sheep.position.x + 12, y: sheep.position.y + 8 };
+    run(state, 20 * 20);
+    expect(sheep.position).toEqual(stood);
+    expect(sheep.order.kind).toBe('idle');
+
+    // And an order given to it is an order it keeps: driving it about after it
+    // joined would overwrite this a quarter of a second later.
+    const target = { x: stood.x + 6, y: stood.y };
+    expect(applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [sheep.id], target,
+    }).ok).toBe(true);
+    expect(sheep.order).toEqual({ kind: 'move', target });
+    run(state, 20 * 20);
+    expect(distanceBetween(sheep, { position: target } as Entity)).toBeLessThan(0.5);
   });
 
   it('turns a claimed sheep into food a villager banks', () => {

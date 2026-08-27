@@ -353,6 +353,22 @@ tree a rotating list of bearings happened to reach first. A camp on the far
 side leaves the walk exactly as long as it was, and the wood it cost is wood
 not spent on a barracks; camps now go between the resource and home.
 
+## Herdables
+
+Which animals walk over to you and which have to be hunted is the DAT's own
+line, not a rule invented here: task action type 107 — the auto-convert task —
+is carried by the sheep (594), turkey, goat, llama, cow, pig, goose, chicken,
+buffalo and capybara, and by nothing else. The boar (48), deer (65) and bear
+(486) carry 6 and 7 instead. That is exactly the split the rules draw with
+`herdRange` against `fleeRange`.
+
+A claimed herdable stops where it stands and is its owner's to move from then
+on: selectable, orderable, and left alone by the simulation. It used to follow
+the nearest unit of its owner about, which meant every order given to it was
+overwritten a quarter of a second later — the same as not being able to command
+it at all. Nothing in the owned files describes following; that behaviour was
+ours, and the conversion is the part the DAT actually models.
+
 ## Carrying on after the work runs out
 
 When a villager's node is spent it looks for more of the same, and what counts

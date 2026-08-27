@@ -1281,12 +1281,13 @@ function updateAnimals(state: GameState): void {
       }
     }
     if (rules.herdRange !== undefined) {
-      if (!contested && claimant && animal.owner !== claimant) animal.owner = claimant;
-      // Follow the owner about, at walking pace and not on top of them.
-      if (animal.owner !== 0 && nearest && nearest.owner === animal.owner) {
-        animal.order = nearestDistance > 1.6
-          ? { kind: 'move', target: { ...nearest.position } }
-          : { kind: 'idle' };
+      // A herdable joins whoever came closest, stops where it stands, and is
+      // theirs to move from then on. Driving it after that — following the
+      // nearest unit about — would overwrite every order given to it a moment
+      // later, which is the same as not being able to command it at all.
+      if (!contested && claimant && animal.owner !== claimant) {
+        animal.owner = claimant;
+        becomeIdle(animal);
       }
       continue;
     }
