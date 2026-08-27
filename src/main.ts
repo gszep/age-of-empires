@@ -176,9 +176,12 @@ function selectionMarker(entity: Entity): { shape: 'round' | 'square'; half: { x
 }
 
 /**
- * The clicked target of an order flashes its own marker, AoE2's confirmation
- * of which entity the order landed on — what singles the victim out of a
- * crowd. That it happens is the reference; the cadence and colour are not in
+ * An enemy told to expect company flashes its own marker: the confirmation of
+ * which of them a group was just sent at, which is the one case a player
+ * cannot read off the board for themselves. Gaia and your own things do not —
+ * a tree, a bush or your own mill blinking on every right-click is noise over
+ * the question this exists to answer. That it happens is the reference; the
+ * cadence and colour are not in
  * the owned files (the DAT's `unit_selection_color_1/2` exist but hold unused
  * palette index 0, and widgetui names no such widget — the behaviour lives in
  * the closed runtime), so both are approximated and recorded in
@@ -187,6 +190,9 @@ function selectionMarker(entity: Entity): { shape: 'round' | 'square'; half: { x
 const ORDER_FLASH_PERIOD_SECONDS = 0.2;
 const ORDER_FLASH_TOTAL_SECONDS = 1.2;
 let orderFlash: { entityId: number; startedAt: number } | undefined;
+
+/** Somebody else's: not this player's, and not gaia's trees and animals. */
+const isHostile = (entity: Entity): boolean => entity.owner !== 0 && entity.owner !== 1;
 
 /**
  * Placement preview: the building's own art where it will stand, over the tile
@@ -286,6 +292,7 @@ if (import.meta.hot) {
     cameraCenter: () => cameraCenter,
     zoom: () => zoom,
     selectedIds: () => selectedIds,
+    flashTarget: () => orderFlash?.entityId,
     apply: command => applyCommand(game, command),
     select: ids => { selectedIds = ids; },
     lookAt: point => { cameraCenter = worldToIso(point.x, point.y); },
@@ -515,14 +522,19 @@ function contextOrder(point: Point, _clientX: number, _clientY: number): void {
     if (!result.ok) reject(result.reason);
     else {
       acknowledge();
-      if (targetId !== undefined) orderFlash = { entityId: targetId, startedAt: gameTimeSeconds(game) };
+      // Only somebody else's: the flash says "this is what you just told them
+      // to attack", so firing it on a tree, a bush or your own mill is noise
+      // over the one case it exists to answer.
+      if (target && isHostile(target)) {
+        orderFlash = { entityId: target.id, startedAt: gameTimeSeconds(game) };
+      }
     }
     return;
   }
   // Defensive buildings take a target the same way units do.
   const towers = selection.filter(e => rules.buildings[e.kind as BuildingKind]?.attack && e.buildProgress === undefined);
   if (towers.length) {
-    const hostile = target && target.owner !== 0 && target.owner !== 1;
+    const hostile = target && isHostile(target);
     const result = applyCommand(game, {
       kind: 'order', player: 1, entityIds: towers.map(e => e.id),
       target: point, targetId: hostile ? target.id : undefined,

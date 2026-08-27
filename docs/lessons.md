@@ -203,6 +203,15 @@ keeps the record.
   `.command-button` titles out of the DOM — text that says "Build Castle (650
   stone) (G)". That caught the fifteen-slot overflow immediately and needed no
   eyes. Rule: HUD questions are DOM questions; keep screenshots for geometry.
+  The same applies to anything that blinks: three rounds of pixel sampling
+  failed to settle whether the order flash fired on a tree, because a
+  two-tenths-of-a-second band in a histogram is a bad signal and a wandering
+  villager is worse. Reporting `flashTarget` through the `sim` query answered
+  it in one run — and revealed that two of those rounds had been measuring a
+  click that never landed, because the target had slipped back into fog. Rule:
+  when a check needs three attempts, stop sampling the consequence and report
+  the decision; and give a staged scene a stationary observer so visibility is
+  never the variable under test.
 
 ## Process
 

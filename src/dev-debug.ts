@@ -26,6 +26,8 @@ export interface DebugContext {
   cameraCenter(): Point;
   zoom(): number;
   selectedIds(): number[];
+  /** The entity whose marker is blinking as the last order's target, if any. */
+  flashTarget(): number | undefined;
   /** Apply one public command, exactly as the UI and every strategy does. */
   apply(command: Command): CommandResult;
   select(ids: number[]): void;
@@ -229,6 +231,11 @@ export function installDebug(context: DebugContext): void {
         }])),
         entities: counts,
         projectiles: game.projectiles.length,
+        selected: context.selectedIds(),
+        // Which entity's marker is blinking as the last order's target: the
+        // rule is "somebody else's only", and this is how that is checked
+        // without hunting for a two-tenths-of-a-second blink in pixels.
+        flashTarget: context.flashTarget(),
       };
     }
     if (query.type === 'entities') {
