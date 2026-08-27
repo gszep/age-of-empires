@@ -217,6 +217,21 @@ class ContentImportIntegrationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             resolve_graphic_id(units[504], {"slot": "dead"}, units)  # the arrow
 
+    def test_skirmisher_is_identified_by_its_art_not_its_name(self):
+        # The DAT calls unit 7 "XBOWM" and unit 24 "CARCH": AoK names that never
+        # moved with the ids. The graphics say which is which.
+        skirmisher = self.result["entities"]["skirmisher"]
+        self.assertEqual(skirmisher["id"], 7)
+        self.assertEqual(skirmisher["internalName"], "XBOWM")
+        for state, source in (("idle", "u_arc_skirmisher_idleA_x1.sld"),
+                              ("attack", "u_arc_skirmisher_attackA_x1.sld")):
+            self.assertEqual(skirmisher["animations"][state]["source"], source)
+        self.assertEqual(skirmisher["cost"], {"food": 25, "wood": 35})
+        self.assertEqual(skirmisher["train"], {"buildingId": 87, "seconds": 26})
+        # Minimum range is what makes it a skirmisher rather than a small archer.
+        self.assertEqual(skirmisher["combat"]["minimumRange"], 1.0)
+        self.assertEqual(skirmisher["combat"]["maximumRange"], 4.0)
+
     def test_stable_and_its_scout_resolve_including_the_sld_that_crashed_openage(self):
         entities = self.result["entities"]
         stable = entities["stable"]

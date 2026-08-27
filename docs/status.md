@@ -94,6 +94,25 @@ name matching anything but exactly one. The gather-point flag is the first:
 `WaypointFlag Britons`, 90 frames, drawn at a selected building's rally point in
 the owner's colour.
 
+### Every production building trains its Dark/Feudal list
+
+Audited against `creatable.train_locations` for the imported civilisation, which
+is the only list that counts — the DAT's `unit.name` fields are AoK leftovers
+that never moved with the ids, so unit 7 is called XBOWM and draws
+`u_arc_skirmisher_*`.
+
+| Building | Trains in this slice | Left in the DAT |
+|---|---|---|
+| Town center | villager | herdables (sheep, goat, turkey…) |
+| Barracks | militia, spearman | man-at-arms and above, eagle scout, civ uniques |
+| Archery range | archer, skirmisher | crossbowman, elite skirmisher, cavalry archer, hand cannoneer |
+| Stable | scout cavalry | knight line, camels, civ uniques |
+| Market | trade cart | trade cog (water) |
+| Mill, lumber camp, mining camp, house, outpost, watch tower, blacksmith | nothing | nothing |
+
+What is left out is age-gated or another civilisation's, which is the omitted
+scope above — except the herdables, which are their own item.
+
 ### Trade pays what the road costs
 
 The market trains the DAT's trade cart (unit 128, 100 wood + 50 gold, 51s), and

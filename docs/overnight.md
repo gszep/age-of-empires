@@ -87,13 +87,16 @@ items land.
   file that used to crash the decoder. *Verified:* an import test resolves both
   and names that source; a simulation test builds the stable, trains a scout,
   and checks the stable trains nothing else.
-- [ ] **Archery-range audit — skirmisher.** The range trains archers only;
-  DE's Feudal range also trains skirmishers. Resolve the skirmisher unit in
-  the DAT (DE ids differ from legacy — use the cheat-sheet, don't guess),
-  import, add to sim. Then audit every production building against
-  `creatable.train_locations` and record any remaining gap in backlog.md.
-  *Verify:* per building, the sim's trainable list matches the DAT's
-  age-appropriate list or the difference is recorded.
+- [x] **Archery-range audit — skirmisher.** The skirmisher is unit 7, which the
+  DAT calls "XBOWM" — its identity comes from `u_arc_skirmisher_*`, not its
+  name. Imported (25 food + 35 wood, 26s) with its minimum range of 1 tile
+  honoured, so a skirmisher with an enemy on top of it holds rather than
+  shooting. The audit of every production building's
+  `creatable.train_locations` is a table in status.md; what is left out is
+  age-gated, another civilisation's, or the herdables (their own item).
+  *Verified:* the archery range's trainable list is exactly archer and
+  skirmisher, and a simulation test shows the minimum range biting and then
+  releasing.
 - [ ] **Herdables and hunting.** TC-area sheep and map deer/boar are core
   Dark Age food. Gaia units with capture-on-proximity (sheep), hunt
   behaviour (deer flee, boar retaliates), villager hunter task variant

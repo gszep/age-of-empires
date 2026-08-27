@@ -302,6 +302,13 @@ function attackRange(state: GameState, entity: Entity): number {
 const inAttackRange = (state: GameState, entity: Entity, target: Entity): boolean =>
   inRange(entity, target, 0.35 + attackRange(state, entity));
 
+/** Nearer than a shooter's minimum range, where its shot has nowhere to go. */
+function tooClose(state: GameState, entity: Entity, target: Entity): boolean {
+  if (!isUnit(entity.kind)) return false;
+  const minimum = state.rules.units[entity.kind as UnitKind].minRange ?? 0;
+  return minimum > 0 && inRange(entity, target, minimum);
+}
+
 const interactionRange = (target: Entity): number => target.radius + 1.6;
 
 function nearestNode(state: GameState, from: Point, resource: ResourceKind): Entity | undefined {
@@ -539,6 +546,15 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
   const target = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
   if (!target || target.owner === entity.owner || target.hp <= 0) { becomeIdle(entity); return; }
   const rules = state.rules.units[entity.kind as UnitKind];
+  if (tooClose(state, entity, target)) {
+    // Inside its minimum range a skirmisher cannot bring its javelin to bear.
+    // AoE2 leaves it standing there rather than closing further, which is what
+    // makes minimum range a weakness rather than a formality.
+    entity.attackWindup = undefined;
+    entity.activity = 'idle';
+    clearPath(entity);
+    return;
+  }
   if (!inAttackRange(state, entity, target)) {
     // Leaving range cancels a started swing: no damage before release.
     entity.attackWindup = undefined;

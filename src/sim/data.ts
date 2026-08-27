@@ -23,6 +23,8 @@ export interface UnitRules {
   attackReleaseSeconds: number;
   /** Tiles a ranged unit may strike from; melee units leave this unset. */
   range?: number;
+  /** Tiles a shot needs to clear: a skirmisher cannot hit what is on top of it. */
+  minRange?: number;
   /** Arrow travel speed in tiles per second; set only for ranged attackers. */
   projectileSpeed?: number;
   /** Height the shot leaves from, in tiles (DAT graphic displacement z). */
@@ -107,6 +109,14 @@ export const FALLBACK_RULES: GameRules = {
       attacks: [{ class: 4, amount: 3 }, { class: 8, amount: 15 }, { class: 21, amount: 1 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 3, attackReleaseSeconds: 0.5,
+    },
+    skirmisher: {
+      hp: 30, radius: 0.2, speed: 0.96, lineOfSight: 6, cost: cost(25, 35), trainSeconds: 26,
+      trainedAt: 'archery-range', popCost: 1,
+      attacks: [{ class: 27, amount: 3 }, { class: 15, amount: 3 }, { class: 3, amount: 2 }, { class: 35, amount: 2 }],
+      armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 3 }, { class: 31, amount: 0 }, { class: 38, amount: 0 }],
+      attackReloadSeconds: 3, attackReleaseSeconds: 0.63,
+      range: 4, minRange: 1, projectileSpeed: 7, launchHeight: 1.5,
     },
     'scout-cavalry': {
       hp: 45, radius: 0.25, speed: 1.2, lineOfSight: 4, cost: cost(80), trainSeconds: 30,
@@ -271,6 +281,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
         (e[key].combat?.frameDelay ?? 10) * (e[key].animations?.attack?.frameSeconds ?? 0.05) * 100,
       ) / 100,
       range: e[key].combat?.maximumRange || fallback?.range,
+      minRange: e[key].combat?.minimumRange || fallback?.minRange,
       projectileSpeed: fallback?.projectileSpeed,
       launchHeight: e[key].combat?.launchOffset?.[2] ?? fallback?.launchHeight,
     };
@@ -319,6 +330,10 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       militia: unit('militia', 'barracks'),
       spearman: unit('spearman', 'barracks'),
       archer: { ...unit('archer', 'archery-range'), range: FALLBACK_RULES.units.archer.range },
+      skirmisher: {
+        ...unit('skirmisher', 'archery-range'),
+        projectileSpeed: FALLBACK_RULES.units.skirmisher.projectileSpeed,
+      },
       'scout-cavalry': unit('scout-cavalry', 'stable'),
       'trade-cart': {
         ...unit('trade-cart', 'market'),
@@ -360,7 +375,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
 }
 
 const UNIT_KINDS = new Set<string>([
-  'villager', 'militia', 'spearman', 'archer', 'scout-cavalry', 'trade-cart',
+  'villager', 'militia', 'spearman', 'archer', 'skirmisher', 'scout-cavalry', 'trade-cart',
 ]);
 const BUILDING_KINDS = new Set<string>([
   'town-center', 'barracks', 'house', 'mill', 'lumber-camp', 'mining-camp', 'farm',

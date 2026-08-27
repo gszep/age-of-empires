@@ -44,6 +44,18 @@
       }
     },
     {
+      "key": "skirmisher",
+      "unitId": 7,
+      "category": "unit",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "attack": { "slot": "attack" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
       "key": "villager",
       "unitId": 83,
       "category": "unit",

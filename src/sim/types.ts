@@ -4,7 +4,8 @@ import type { PlayerVisibility } from './visibility';
 export type PlayerId = 1 | 2;
 export type ResourceKind = 'food' | 'wood' | 'gold' | 'stone';
 export type UnitKind =
-  | 'villager' | 'militia' | 'spearman' | 'archer' | 'scout-cavalry' | 'trade-cart';
+  | 'villager' | 'militia' | 'spearman' | 'archer' | 'skirmisher'
+  | 'scout-cavalry' | 'trade-cart';
 export type BuildingKind =
   | 'town-center' | 'barracks' | 'house'
   | 'mill' | 'lumber-camp' | 'mining-camp' | 'farm'

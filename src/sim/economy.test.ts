@@ -558,6 +558,43 @@ describe('towers', () => {
   });
 });
 
+describe('the archery range', () => {
+  it('trains the skirmisher as well as the archer', () => {
+    const state = createGame(23);
+    const trainedHere = (Object.keys(state.rules.units) as (keyof typeof state.rules.units)[])
+      .filter(kind => state.rules.units[kind].trainedAt === 'archery-range')
+      .sort();
+    expect(trainedHere).toEqual(['archer', 'skirmisher']);
+    expect(state.rules.units.skirmisher.cost).toEqual({ food: 25, wood: 35, gold: 0, stone: 0 });
+  });
+
+  it("leaves a skirmisher standing when its target is inside its minimum range", () => {
+    const state = createGame(24);
+    const rules = state.rules.units.skirmisher;
+    expect(rules.minRange).toBeGreaterThan(0);
+    const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const enemy = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
+    // Stand a skirmisher on top of an enemy.
+    villager.kind = 'skirmisher';
+    villager.hp = villager.maxHp = rules.hp;
+    villager.radius = rules.radius;
+    enemy.position = { x: villager.position.x + 0.3, y: villager.position.y };
+    const before = enemy.hp;
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [villager.id], target: enemy.position, targetId: enemy.id,
+    });
+    run(state, 200);
+    expect(enemy.hp).toBe(before);
+    // It holds where it stands rather than shoving its way closer.
+    expect(villager.activity).toBe('idle');
+
+    // Backed off past the minimum, the same shot lands.
+    enemy.position = { x: villager.position.x + 2.5, y: villager.position.y };
+    run(state, 200);
+    expect(enemy.hp).toBeLessThan(before);
+  });
+});
+
 describe('the stable', () => {
   it('builds and trains the scout it is for', () => {
     const state = createGame(21);
@@ -711,6 +748,11 @@ describe('imported rules', () => {
     expect(importedRules!.nodes.gold.amount).toBe(800);
     // The trade cart's rate and capacity are its own DAT fields, not a
     // hand-picked gold-per-tile constant.
+    const skirmisher = importedRules!.units.skirmisher;
+    expect(skirmisher.trainedAt).toBe('archery-range');
+    expect(skirmisher.cost).toEqual({ food: 25, wood: 35, gold: 0, stone: 0 });
+    expect(skirmisher.range).toBe(4);
+    expect(skirmisher.minRange).toBe(1);
     const scout = importedRules!.units['scout-cavalry'];
     expect(scout.trainedAt).toBe('stable');
     expect(scout.trainSeconds).toBe(30);
