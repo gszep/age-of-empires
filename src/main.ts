@@ -11,7 +11,7 @@ import type { BuildingKind, Entity, GameState, Point, UnitKind } from './sim/typ
 import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
-import { createEntityView, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateKey, type EntityView } from './view/sprites';
+import { createEntityView, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline } from './view/world';
 import { createCueWatcher, pollCues } from './view/cues';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
@@ -27,7 +27,7 @@ const view = {
   pollCues,
   createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline,
   createEntityView, updateEntityView, createProjectileView, updateProjectileView,
-  createFlagView, updateFlagView, updateOcclusion, entityKey, gateKey, Hud,
+  createFlagView, updateFlagView, updateOcclusion, entityKey, gateBoxKey, Hud,
 };
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
@@ -165,7 +165,7 @@ const SELECTION_COLOR = 0xf5f0dc;
  * what was a ring around an animal becomes a flat box over what is left of it.
  */
 function selectionMarker(entity: Entity): { shape: 'round' | 'square'; half: { x: number; y: number } } {
-  const key = entity.kind === 'palisade-gate' ? view.gateKey(entity) : view.entityKey(entity);
+  const key = entity.kind === 'palisade-gate' ? view.gateBoxKey(entity) : view.entityKey(entity);
   const entry = assets?.entities[key]?.selection;
   const imported = entity.dead ? entry?.dead ?? entry : entry;
   const shape = imported?.shape ?? (isUnit(entity.kind) ? 'round' : 'square');

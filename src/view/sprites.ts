@@ -228,15 +228,21 @@ export function treeIsFelled(state: GameState, entity: Entity): boolean {
  * Which frame of the palisade's base graphic a segment draws.
  *
  * The DAT gives the palisade one base graphic with five deltas and AoE2 picks
- * between them by what the segment is joined to. Compositing the deltas offline
- * along each axis (see docs/lessons.md) showed which is which: frame 1 tiles
- * seamlessly along +x, frame 0 along +y, frame 4 is the lone stake bundle and
- * frame 3 fills every corner, T and cross. Frame 2 carries iron bracing and is
- * the gate section, so a plain wall never draws it.
+ * between them by what the segment is joined to. The deltas carry no labels,
+ * so which is which is a measurement: each candidate is composited into the
+ * arrangement it would have to serve, and the one that joins without a seam is
+ * that arrangement's frame (see docs/lessons.md).
+ *
+ * Frame 1 tiles seamlessly along +x and frame 0 along +y; frame 4 is the lone
+ * stake bundle. Frame 2 -- a boxed post with a horizontal brace -- is what
+ * fills a corner, a T and a cross: dropped into a right-angle or a four-way it
+ * closes every arm, where frame 3 leaves the outer angle open and reads as a
+ * low straight section, which is what made corners look like runs (issue #15).
+ * What frame 3 is for has not been identified; nothing draws it.
  */
 export const WALL_RUN_X = 1;
 export const WALL_RUN_Y = 0;
-export const WALL_JOINT = 3;
+export const WALL_JOINT = 2;
 export const WALL_POST = 4;
 
 export function wallShape(state: GameState, entity: Entity): number {
@@ -259,9 +265,26 @@ export function wallShape(state: GameState, entity: Entity): number {
   return WALL_POST;
 }
 
-/** Which axis a gate lies along, and so which of the DAT's two gate units it is. */
-export const gateKey = (entity: Entity): string =>
+/**
+ * A gate is two DAT units, one turned. Which of them a gate uses depends on
+ * what is being asked, because the DAT's axes and this projection's are
+ * mirrored: `worldToIso` sends +x down-**right**, while AoE2 sends its own +x
+ * down-**left**. Unit 789 obstructs 2x1 along the DAT's x and draws
+ * `..._ne_closed`, whose stakes run down-left on screen; unit 793 is the
+ * reverse. Compositing each gate into each wall run proves it — a gate laid
+ * along our +x only continues the fence when it draws 793's art (issue #15).
+ *
+ * So the box and the picture come from different units, and conflating them is
+ * what left every gate lying across the wall it was built into.
+ */
+
+/** The unit whose obstruction box matches this gate: for the selection marker. */
+export const gateBoxKey = (entity: Entity): string =>
   (entity.footprint?.y ?? 0) > (entity.footprint?.x ?? 0) ? 'palisade-gate-y' : 'palisade-gate';
+
+/** The unit whose art lies along this gate's run on screen: for drawing it. */
+export const gateArtKey = (entity: Entity): string =>
+  (entity.footprint?.y ?? 0) > (entity.footprint?.x ?? 0) ? 'palisade-gate' : 'palisade-gate-y';
 
 /**
  * How close one of the owner's units has to come for the gate to swing open.
@@ -287,7 +310,7 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
   if (isBuilding(kind)) {
     // A gate is two units in the DAT, one per axis, each with a closed leaf and
     // an open one; which of the four to draw is the footprint and who is near.
-    const key = kind === 'palisade-gate' ? gateKey(entity) : kind;
+    const key = kind === 'palisade-gate' ? gateArtKey(entity) : kind;
     if (entity.dead) return { key, name: 'death' };
     if (entity.buildProgress !== undefined) return { key, name: 'construction' };
     if (kind === 'palisade-gate' && gateIsOpen(state, entity)) return { key, name: 'open' };

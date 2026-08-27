@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 import { applyCommand, createGame, stepGame } from '../sim/game';
@@ -5,7 +6,8 @@ import type { Entity, GameState } from '../sim/types';
 import { RAMP_LEVELS, rampLut, type Atlas, type ContentAssets } from './assets';
 import {
   PLAYER_COLORS, chooseAnimation, createEntityView, createFlagView, decayFraction, playerColorHex,
-  treeIsFelled, updateEntityView, updateFlagView, updateOcclusion, wallShape, type EntityView,
+  gateBoxKey, treeIsFelled, updateEntityView, updateFlagView, updateOcclusion, wallShape,
+  WALL_JOINT, WALL_POST, WALL_RUN_X, WALL_RUN_Y, type EntityView,
 } from './sprites';
 
 const run = (state: GameState, ticks: number) => {
@@ -325,6 +327,23 @@ describe('wall connection shapes', () => {
     expect(new Set([post, straight, corner]).size).toBe(3);
   });
 
+  it('indexes frames the imported palisade actually has', () => {
+    // The renderer clamps the shape to the atlas (`Math.min(framesInFile - 1,
+    // ...)`), so a mapping that ran off the end would quietly collapse the
+    // corner and the post onto the same picture rather than fail. Which delta
+    // means what is a measurement -- each was composited into the arrangement
+    // it has to serve -- and this asserts the numbers still land somewhere.
+    const path = 'public/imported/aoe2/manifest.json';
+    if (!existsSync(path)) return; // open-content checkout: nothing to check
+    const manifest = JSON.parse(readFileSync(path, 'utf8')) as {
+      entities: Record<string, { atlases: Record<string, { framesInFile: number }> }>;
+    };
+    const frames = manifest.entities['palisade-wall'].atlases['idle'].framesInFile;
+    const shapes = [WALL_RUN_X, WALL_RUN_Y, WALL_JOINT, WALL_POST];
+    for (const shape of shapes) expect(shape).toBeLessThan(frames);
+    expect(new Set(shapes).size).toBe(shapes.length);
+  });
+
   it('reads the two axes as different runs, and joins only its own walls', () => {
     const east = createGame(62);
     const alongX = wallAt(east, 20.5, 4.5);
@@ -360,10 +379,19 @@ describe('gates', () => {
     return entity;
   };
 
-  it('draws the gate unit that lies along the wall it is in', () => {
+  it('draws the gate unit whose stakes run the way the wall does', () => {
+    // Issue #15. The DAT's axes and this projection's are mirrored --
+    // `worldToIso` sends +x down-right, AoE2 sends its own +x down-left -- so
+    // the unit that obstructs 2x1 along our x (789, `..._ne_closed`) is the
+    // one whose art runs the *other* way. Compositing each gate into each wall
+    // run settled it: a gate along our +x continues the fence only with 793's
+    // art, which the manifest calls `palisade-gate-y`.
     const state = createGame(64);
-    expect(chooseAnimation(state, gateAt(state, 20, 4.5, 'x')).key).toBe('palisade-gate');
-    expect(chooseAnimation(state, gateAt(state, 24.5, 8, 'y')).key).toBe('palisade-gate-y');
+    expect(chooseAnimation(state, gateAt(state, 20, 4.5, 'x')).key).toBe('palisade-gate-y');
+    expect(chooseAnimation(state, gateAt(state, 24.5, 8, 'y')).key).toBe('palisade-gate');
+    // The obstruction box is a world-space question and keeps the other unit.
+    expect(gateBoxKey(gateAt(state, 20, 4.5, 'x'))).toBe('palisade-gate');
+    expect(gateBoxKey(gateAt(state, 24.5, 8, 'y'))).toBe('palisade-gate-y');
   });
 
   it('swings open for its owner and stays shut for everybody else', () => {

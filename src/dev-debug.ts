@@ -20,6 +20,7 @@ import type { CommandResult } from './sim/game';
 import type { Command, Entity, GameState, Point } from './sim/types';
 import { colorStats, type ColorStats } from './dev-debug-stats';
 import { worldToIso, TILE_W } from './view/iso';
+import { WALL_JOINT, WALL_POST, WALL_RUN_X, WALL_RUN_Y, wallShape } from './view/sprites';
 
 export interface DebugContext {
   game(): GameState;
@@ -121,8 +122,27 @@ export function installDebug(context: DebugContext): void {
       animation: view?.animationState,
       frame: view?.frameIndex,
       facing: view ? round(view.facing) : undefined,
+      // What a wall or gate believes it is joined to. The frame index alone
+      // answers this only if you remember which delta is which; the tag says
+      // it, so "is this gate lying the way I dragged it" is a field to read.
+      shape: wallOrGateShape(entity),
       colorTint,
     };
+  }
+
+  /** `run-x`, `run-y`, `joint` or `post` for a palisade; the axis for a gate. */
+  function wallOrGateShape(entity: Entity): string | undefined {
+    if (entity.kind === 'palisade-gate') {
+      // The axis it lies along in world terms, which is what a drag chose.
+      return (entity.footprint?.y ?? 0) > (entity.footprint?.x ?? 0) ? 'gate-y' : 'gate-x';
+    }
+    if (entity.kind !== 'palisade-wall') return undefined;
+    const shape = wallShape(context.game(), entity);
+    if (shape === WALL_RUN_X) return 'run-x';
+    if (shape === WALL_RUN_Y) return 'run-y';
+    if (shape === WALL_JOINT) return 'joint';
+    if (shape === WALL_POST) return 'post';
+    return `frame ${shape}`;
   }
 
   /** Screen box an entity's art plausibly covers, biased upward for sprites. */

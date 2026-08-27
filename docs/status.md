@@ -512,6 +512,22 @@ wherever it is sent, and the example AI still tasks villagers onto nodes it
 remembers through fog — that is a decision it makes, not something the unit
 does on its own.
 
+## The DAT's axes are mirrored against this projection
+
+`worldToIso` sends +x down-**right** on screen; AoE2 sends its own +x
+down-**left**. Nothing symmetric shows it — a town center or a barracks looks
+the same either way — but anything the DAT labels by axis does. The palisade
+gate is two units, 789 obstructing 2x1 along the DAT's x and drawing
+`b_dark_gate_palisade_ne_closed`, and 793 the reverse; composited into a wall
+run, 789's art lies across a gate laid along *our* x and 793's lies along it.
+
+So a gate asks two different questions of the DAT and gets two different units:
+the obstruction box comes from the unit whose collision matches the footprint
+(`gateBoxKey`), and the picture from the unit whose stakes run the right way on
+screen (`gateArtKey`). Conflating them is what left every gate lying across the
+wall it was built into (issue #15). Flipping the projection to match the DAT's
+handedness would remove the mirror and is not worth a board-wide change.
+
 ## Palisade walls
 
 The palisade is one 1x1 building placed a tile at a time but dragged as a line:
@@ -522,10 +538,19 @@ preview tints every tile in the line by whether it could stand there.
 The DAT gives the palisade a single base graphic (`b_dark_wall_palisade_x1`,
 graphic 587) with five deltas, and AoE2 picks between them by what a segment is
 joined to. Which delta is which was measured rather than guessed: compositing
-each one as a run along +x and along +y showed frame 1 tiles seamlessly along
-+x and frame 0 along +y; frame 4 is the lone stake bundle; frame 3 fills every
-corner, T and cross; and frame 2 carries iron bracing — it is the gate section,
-so a plain wall never draws it.
+each one into the arrangement it has to serve, and keeping the one that joins
+without a seam. Frame 1 tiles seamlessly along +x and frame 0 along +y; frame 4
+is the lone stake bundle; and **frame 2** — a boxed post with a horizontal
+brace — is the corner, the T and the cross, closing every arm where frame 3
+leaves the outer angle open.
+
+The first pass at this had 2 and 3 the other way round, which is why corners
+drew as low straight sections rather than as corners (issue #15). Frame 3 was
+described then as "iron bracing, the gate section"; the bracing is the corner
+post's, and what frame 3 is actually for has not been identified. Nothing
+draws it. The renderer clamps a shape index to the atlas, so a mapping that ran
+off the end would collapse two shapes onto one picture silently rather than
+fail — a test asserts all four indices land inside the imported atlas.
 
 A dragged line of foundations would otherwise leave nine untouched, because each
 `build` command retasks the same builders to the newest site. On finishing a

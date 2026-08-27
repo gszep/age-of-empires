@@ -86,12 +86,26 @@ keeps the record.
   file as the specification: a clean walk that ends exactly at the last byte
   is the proof.
 
-- **Composite the sprite offline before mapping frames to meaning.** The
-  palisade's five deltas carry no labels; guessing a connection table produced
-  a fence that looked like separate stake bundles. Rendering each frame as a
-  run along each axis answered it in one picture — the frame that tiles
-  seamlessly *is* that axis's run. Rule: when art has to be indexed by game
-  state, prove the index by drawing the arrangement, not by reading numbers.
+- **Composite the sprite offline before mapping frames to meaning — and
+  composite *every* arrangement, not the easy ones.** The palisade's five
+  deltas carry no labels. Rendering each as a run along each axis settled the
+  two runs and the lone post in one picture: the frame that tiles seamlessly
+  *is* that axis's run. But the corner was never drawn, only reasoned about
+  from what the leftover frames looked like — and it was wrong, so every
+  corner drew a low straight section for weeks. Drawing the right-angle and the
+  T took one more composite and was unambiguous: frame 2 closes all four arms,
+  frame 3 leaves the angle open. Rule: prove the index by drawing the
+  arrangement, and draw one for every state the index can take; the frames you
+  reason about instead of rendering are the ones that end up wrong.
+
+- **A DAT axis label is not this projection's axis.** `worldToIso` sends +x
+  down-right; AoE2 sends its own +x down-left. Everything symmetric hides it,
+  so it surfaced only on the palisade gate, where the unit that obstructs 2x1
+  along the DAT's x draws stakes running the other way — and every gate lay
+  across the wall it was built into. Rule: a DAT field named for an axis
+  describes the original's handedness, not ours. Where a box and a picture both
+  come from the DAT, they may need different units; measure which sprite lies
+  along the run rather than trusting the label that says it does.
 
 - **A predicate that lists its members by hand will be missed.** `isBuilding`
   is a hardcoded set, and the palisade was added to the rules, the schemas and
