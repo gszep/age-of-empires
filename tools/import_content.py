@@ -17,6 +17,8 @@ from typing import Any
 from genieutils.datfile import DatFile
 
 RESOURCE_NAMES = {0: "food", 1: "wood", 2: "stone", 3: "gold"}
+# The bit of a projectile's `smart_mode` that makes it lead a moving target.
+PROJECTILE_LEADS_TARGET = 1
 POPULATION_TYPE = 4
 
 
@@ -268,6 +270,11 @@ def extract_entity(
             "maximumRange": rounded(combat.max_range),
             "attacks": [{"class": a.class_, "amount": a.amount} for a in combat.attacks],
             "armors": [{"class": a.class_, "amount": a.amount} for a in combat.armours],
+            # The chance a shot is aimed true. The DAT varies it widely -- an
+            # archer 80, a cavalry archer 50, a longbowman 70, a tower 100 --
+            # and Thumb Ring is an effect that sets it to 100 for the archer
+            # classes, so it is a real attribute rather than a constant.
+            "accuracyPercent": combat.accuracy_percent,
         }
         # Ranged shooters name the projectile they launch; the arrow's own
         # entry carries its travel speed and art.
@@ -285,7 +292,14 @@ def extract_entity(
         # `projectile_arc` is a fraction of the shot's distance. Its sign varies
         # between units in ways this import does not interpret; the renderer
         # uses the magnitude for the visual arc height.
-        entity["projectile"] = {"arc": rounded(unit.projectile.projectile_arc)}
+        entity["projectile"] = {
+            "arc": rounded(unit.projectile.projectile_arc),
+            # Whether the shot leads a moving target. `smart_mode` is a flag
+            # field and this is its low bit: Ballistics sets every projectile
+            # to 1, or to 3 for the fourteen that already carry a second flag,
+            # and that single `set attribute` is the whole of that technology.
+            "leadsTarget": bool(unit.projectile.smart_mode & PROJECTILE_LEADS_TARGET),
+        }
 
     if "trade" in spec:
         # A trade cart carries goods between markets rather than gathering from

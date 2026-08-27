@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { FALLBACK_RULES, isAnimal, rulesFromManifest, type ContentManifest, type GameRules } from './data';
+import { FALLBACK_RULES, TICK_SECONDS, isAnimal, rulesFromManifest, type ContentManifest, type GameRules } from './data';
 import { checksumState } from './checksum';
 import { applyCommand, buildingFootprint, createGame, isCarcass, placementLegal, stepGame } from './game';
 import type { BuildingKind, Entity, GameState, ResourceKind } from './types';
@@ -712,7 +712,7 @@ describe('towers', () => {
     expect(other.hp).toBeLessThan(otherHp);
   });
 
-  it('spends an arrow whose target dies mid-flight', () => {
+  it('lets an arrow whose target dies mid-flight fly on and land on nothing', () => {
     const state = createGame();
     inFeudal(state);
     state.players[1].stone = 500;
@@ -730,11 +730,23 @@ describe('towers', () => {
     victim.position = { x: tower.position.x + range - 0.5, y: tower.position.y };
     while (state.projectiles.length === 0) stepGame(state);
 
+    // A second enemy well off to one side: if the arrow were retargeted rather
+    // than aimed once, this is who it would go for.
+    const bystander = state.entities.find(
+      e => e.owner === 2 && e.kind === 'villager' && e.id !== victim.id)!;
+    bystander.position = { x: tower.position.x, y: tower.position.y + range - 0.5 };
+    const bystanderHp = bystander.hp;
+
     victim.hp = 0;
     victim.dead = true;
     stepGame(state);
-    // No target left to hit, so the arrow is dropped rather than retargeted.
+    // A shot is aimed once. It keeps flying to the spot it was aimed at
+    // rather than turning to chase somebody else...
+    expect(state.projectiles.length).toBeGreaterThan(0);
+    for (let i = 0; i < 200 && state.projectiles.length; i++) stepGame(state);
+    // ...and lands there on nothing at all, hurting no one.
     expect(state.projectiles.length).toBe(0);
+    expect(bystander.hp).toBe(bystanderHp);
   });
 });
 
@@ -1528,5 +1540,96 @@ describe('gather points', () => {
       const walking = order as Extract<typeof order, { kind: 'move' }>;
       expect(Math.hypot(walking.target.x - flag.x, walking.target.y - flag.y)).toBeLessThan(1.5);
     }
+  });
+});
+
+describe('what a shot is aimed at', () => {
+  /**
+   * An archer of player 1 and a lone villager of player 2, set up somewhere
+   * empty so nothing else wanders into the shot. Returns both plus a helper
+   * that runs until the archer has loosed and the arrow has landed.
+   */
+  function duel(seed: number, range = 3.5) {
+    const state = createGame(seed);
+    inFeudal(state);
+    parkScouts(state);
+    const archerRules = state.rules.units.archer;
+    const spot = { x: 60.5, y: 60.5 };
+    const archer: Entity = {
+      id: state.nextId++, kind: 'archer', owner: 1, position: { ...spot },
+      hp: archerRules.hp, maxHp: archerRules.hp, radius: archerRules.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(archer);
+    const victim = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
+    victim.position = { x: spot.x + range, y: spot.y };
+    return { state, archer, victim };
+  }
+
+  it('hits a target that stands still', () => {
+    // The archer's own accuracy is 80, so a few of these go wide; over a run
+    // of shots a standing target is hit again and again.
+    const { state, archer, victim } = duel(81);
+    victim.hp = 100_000;
+    victim.maxHp = 100_000;
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [archer.id], target: victim.position, targetId: victim.id,
+    });
+    const before = victim.hp;
+    for (let i = 0; i < 600; i++) {
+      stepGame(state);
+      victim.position = { x: archer.position.x + 3.5, y: archer.position.y }; // pinned
+    }
+    expect(victim.hp).toBeLessThan(before);
+  });
+
+  it('misses a target that keeps walking across the shot', () => {
+    // The reference: without Ballistics a shot goes to where the target stood
+    // when it was loosed, so anything not walking along the line of fire is
+    // missed. This is the whole reason that technology exists.
+    const { state, archer, victim } = duel(82);
+    victim.hp = 100_000;
+    victim.maxHp = 100_000;
+    const speed = state.rules.units.villager.speed;
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [archer.id], target: victim.position, targetId: victim.id,
+    });
+    const before = victim.hp;
+    let shots = 0;
+    for (let i = 0; i < 600; i++) {
+      shots = Math.max(shots, state.projectiles.length);
+      stepGame(state);
+      // Walked steadily across the line of fire, at its own pace.
+      victim.position = {
+        x: archer.position.x + 3.5,
+        y: victim.position.y + speed * TICK_SECONDS,
+      };
+      victim.activity = 'moving';
+    }
+    expect(shots, 'the archer never loosed at all').toBeGreaterThan(0);
+    expect(victim.hp, 'a walking target was hit anyway').toBe(before);
+  });
+
+  it('hits a target walking straight at the shooter', () => {
+    // Also the reference: a unit closing on the archer stays on the line the
+    // arrow travels, so it runs onto the shot rather than out of it.
+    const { state, archer, victim } = duel(83, 3.5);
+    victim.hp = 100_000;
+    victim.maxHp = 100_000;
+    const speed = state.rules.units.villager.speed;
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [archer.id], target: victim.position, targetId: victim.id,
+    });
+    const before = victim.hp;
+    for (let i = 0; i < 600; i++) {
+      stepGame(state);
+      const gap = victim.position.x - archer.position.x;
+      victim.position = {
+        x: archer.position.x + (gap > 1 ? gap - speed * TICK_SECONDS : 3.5),
+        y: archer.position.y,
+      };
+      victim.activity = 'moving';
+    }
+    expect(victim.hp).toBeLessThan(before);
   });
 });

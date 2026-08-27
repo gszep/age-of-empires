@@ -255,6 +255,40 @@ player-owned thing, and are still remembered as last-seen ghosts. That memory
 is the engine's own record of the map rather than a unit flag, and it is where
 the `buildProgress` and hit points a returning scout sees come from.
 
+### A shot is aimed once
+
+Arrows used to steer: a projectile re-aimed at its target's live position every
+tick, so nothing ever missed (issue #3). The reference is the opposite —
+without Ballistics a ranged unit fires at the spot its target occupies at the
+moment of release, and anything that is not standing still, or walking along
+the line of fire, is missed ([AoE
+wiki](https://ageofempires.fandom.com/wiki/Ballistics_(Age_of_Empires_II))).
+
+The DAT carries both halves of it and neither was read before:
+
+- **`accuracy_percent`** is the chance a shot is aimed true at all: an archer
+  80, a crossbowman 85, a skirmisher 90, a longbowman 70, a cavalry archer 50,
+  and 100 for a tower, a castle, a mangonel, a hunting villager and everything
+  that fights hand to hand. Thumb Ring (tech 437, at the archery range) is an
+  effect that *sets* that attribute to 100 for the archer classes, which is
+  most of what that technology is.
+- **`smart_mode`** on the projectile unit decides whether the shot leads a
+  moving target. Every projectile ships at 0, and Ballistics (tech 93, at the
+  university, Castle Age) is an effect that sets it to 1 on all forty of them.
+  That is the whole of that technology.
+
+A shot now flies to a fixed point and hits its target if the target's body is
+still somewhere along the line it travels — which is what makes the reference's
+three cases come out right: standing still is hit, walking across the shot is
+missed, walking straight at the shooter is hit anyway. If it reaches its aim
+untouched it lands, and whoever else is standing on that spot takes it instead.
+
+**What a miss looks like is approximated.** The DAT states the odds but not the
+scatter, so a shot that fails its accuracy roll is aimed one tile off in a
+random direction. One tile is the board's own unit, and it is wider than any
+unit and narrower than any building — which is why an arrow that goes wide of a
+villager still lands inside the town center behind him, as in AoE2.
+
 ### Food on the hoof
 
 Gaia's animals are units, not resource nodes: they walk, they can be killed, and

@@ -38,6 +38,13 @@ export interface UnitRules {
    * succeed and the second by which it must — and the reach it works at. */
   convert?: { minSeconds: number; maxSeconds: number; range: number };
   /**
+   * The DAT's `accuracy_percent`: how often a shot is aimed true. An archer is
+   * 80, a cavalry archer 50, a longbowman 70; a tower, a mangonel and anything
+   * that fights hand to hand are 100. Thumb Ring sets the archer classes to
+   * 100, which is what that technology is.
+   */
+  accuracyPercent?: number;
+  /**
    * Villagers: the bow they hunt with. The DAT keeps the hunter as its own
    * unit (122, `VMHUN`) with a reach and a projectile the plain villager has
    * neither of — which is how a hunter hits a deer that is walking away.
@@ -99,6 +106,8 @@ export interface BuildingRules {
     releaseSeconds: number;
     projectileSpeed: number;
     launchHeight: number;
+    /** As `UnitRules.accuracyPercent`; a tower and a castle are both 100. */
+    accuracyPercent?: number;
   };
 }
 

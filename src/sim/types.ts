@@ -116,6 +116,13 @@ export interface Projectile {
   launchHeight: number;
   /** Tiles around the impact that also take the hit, for a siege shot. */
   blastRadius?: number;
+  /**
+   * Where it is actually going. Fixed at release: a shot is aimed once and
+   * then flies, so a target that walks away is missed. Ballistics moves this
+   * to where the target will be; a failed accuracy roll moves it off the
+   * target altogether.
+   */
+  aim: Point;
 }
 
 export interface GameState {

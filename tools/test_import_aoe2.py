@@ -371,6 +371,45 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(cart["animations"]["carry"]["source"], "u_trade_cart_west_walkA_x1.sld")
         self.assertNotIn("combat", cart)
 
+    def test_accuracy_and_ballistics_are_attributes_the_dat_states(self):
+        # Both halves of how a shot lands are in the DAT and neither was read
+        # before (issue #3). Accuracy varies widely enough that a constant
+        # would be wrong for almost every shooter.
+        entities = self.result["entities"]
+        self.assertEqual(entities["archer"]["combat"]["accuracyPercent"], 80)
+        self.assertEqual(entities["skirmisher"]["combat"]["accuracyPercent"], 90)
+        self.assertEqual(entities["longbowman"]["combat"]["accuracyPercent"], 70)
+        self.assertEqual(entities["cavalry-archer"]["combat"]["accuracyPercent"], 50)
+        for key in ("watch-tower", "castle", "mangonel", "villager-hunter", "militia"):
+            self.assertEqual(entities[key]["combat"]["accuracyPercent"], 100, key)
+
+        # Every projectile ships without the lead, and Ballistics is the
+        # effect that turns it on: a `set attribute` on smart_mode (19) for
+        # each projectile unit. If that ever ships as 1 the technology would
+        # be doing nothing, so assert the starting state.
+        self.assertIs(entities["arrow"]["projectile"]["leadsTarget"], False)
+        dat = _dat()
+        ballistics = dat.effects[dat.techs[93].effect_id]
+        self.assertEqual(ballistics.name, "Ballistics")
+        commands = [c for c in ballistics.effect_commands if c.type == 0 and int(c.c) == 19]
+        self.assertGreater(len(commands), 30)
+        # `smart_mode` is a flag field: Ballistics sets the low bit on every
+        # projectile, and fourteen of them already carry a second flag and so
+        # come out as 3. Reading it as a boolean would drop those fourteen.
+        self.assertTrue(all(int(c.d) & 1 for c in commands))
+        self.assertEqual({int(c.d) for c in commands}, {1, 3})
+        # And it does nothing else at all.
+        self.assertEqual(
+            {(c.type, int(c.c)) for c in ballistics.effect_commands}, {(0, 19)},
+        )
+
+        # ...and Thumb Ring is the one that sets accuracy, by unit class.
+        thumb_ring = dat.effects[dat.techs[437].effect_id]
+        self.assertEqual(thumb_ring.name, "Thumb Ring")
+        accuracy = [c for c in thumb_ring.effect_commands if c.type == 0 and int(c.c) == 11]
+        self.assertTrue(accuracy)
+        self.assertTrue(all(int(c.a) == -1 and c.d == 100.0 for c in accuracy))
+
     def test_each_age_brings_the_building_the_dat_upgrades_it_into(self):
         # Ageing up in AoE2 replaces a building rather than restyling it: the
         # Feudal Age technology carries `upgrade unit` commands turning the

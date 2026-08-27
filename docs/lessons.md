@@ -79,6 +79,14 @@ keeps the record.
   `u_arc_crossbowman_*`. The names are AoK leftovers that never moved with the
   ids. Rule: identify a DAT unit by `dat.graphics[...].file_name` and its
   numbers (cost, hit points, train time), never by `unit.name`.
+- **A DAT field that reads like a boolean may be a flag field.** A
+  projectile's `smart_mode` is 0 until Ballistics sets it, so importing it as
+  `bool(smart_mode)` looked exactly right — until the effect itself was read
+  and turned out to write 1 on ninety projectiles and 3 on fourteen others,
+  which already carry a second flag. Rule: before importing a small integer as
+  a boolean, look at the whole set of values it takes across the file and at
+  what writes it; `{1, 3}` is a bitfield answering a different question.
+
 - **Distrust "always" in reverse-engineered specs.** The SLD header field
   documented as "unknown, always 0x10" is really the frame-data start offset,
   and layer padding aligns to it — the stable uses 14 and crashed every
@@ -278,15 +286,20 @@ keeps the record.
   re-recording it and convert it into structure — a tool that makes the right
   way easier than the wrong way (`tools/wait_for.sh`, `tools/datq.py`), a
   checklist line, or a hook.
-- **Piping a gate step to `tail` throws its exit status away.** The quality
-  gate was being run as `npm test | tail -5 && npm run build | tail -2 && npm
-  run test:import | tail -3`, and `&&` sees the status of `tail`, which is
-  always 0. A `tsc` error therefore sailed through a green-looking gate and
-  into a commit, and was found two items later by a run that happened not to
-  pipe. Rule: never let a pipe stand between a check and the `&&` that trusts
-  it — the gate now lives in `.local/gate.sh`, which reads `PIPESTATUS` and
-  stops on the first failure. A convenience that can silently invert a check
-  is worth converting into a tool, per the lesson below.
+- **A pipe between a check and the thing that trusts it throws the answer
+  away, and it does it twice.** The quality gate was being run as `npm test |
+  tail -5 && npm run build | tail -2 && ...`, and `&&` sees the status of
+  `tail`, which is always 0 — so a `tsc` error sailed through a green-looking
+  gate into a commit and was found two items later by a run that happened not
+  to pipe. The gate was then moved into `.local/gate.sh` to read `PIPESTATUS`,
+  and *that* had the same defect one layer down: the step ran as `if ! $step |
+  tail -6; then :; fi`, and `:` is a command, so it reset `PIPESTATUS` before
+  the next line read it. Only the failing case was affected, which is the only
+  case the check exists for — a run reported GATE GREEN over `FAILED
+  (failures=1)`. Rule: read a status on the line after the command produced it
+  and never through a construct that runs anything in between; and when a
+  fix's own machinery repeats the bug, test the fix against a deliberate
+  failure before trusting it.
 
 - **A leaked waiter is invisible until somebody looks.** None of the sixteen
   produced output, failed, or slowed anything down; they were found only

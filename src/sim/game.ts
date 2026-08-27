@@ -4,7 +4,8 @@ import { buildNavGrid, findPath, halfExtent, isBlocked, separateUnits, tileOf, t
 import { random01 } from './random';
 import { createVisibility, isEntityVisible, updateVisibility } from './visibility';
 import type {
-  AnimalKind, BuildingKind, Command, Entity, GameState, PlayerId, Point, ResourceKind, UnitKind,
+  AnimalKind, BuildingKind, Command, Entity, GameState, PlayerId, Point, Projectile, ResourceKind,
+  UnitKind,
 } from './types';
 
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -1136,6 +1137,46 @@ function applyDamage(
   }
 }
 
+/**
+ * How far a shot that goes wide lands from where it was aimed.
+ *
+ * The DAT states the odds (`accuracy_percent`) but not what a miss looks like,
+ * so this is an approximation and is recorded as one in `docs/status.md`. One
+ * tile is the board's own unit and the smallest distance that means anything
+ * here; it is also comfortably wider than any unit and comfortably narrower
+ * than a building, which is why an arrow that goes wide of a villager still
+ * lands inside the town center behind it -- as it does in AoE2.
+ */
+const MISS_TILES = 1;
+
+/** Where a target will be when a shot fired now reaches it. */
+function leadPoint(state: GameState, shooter: Entity, target: Entity, speed: number): Point {
+  const velocity = velocityOf(state, target);
+  if (velocity.x === 0 && velocity.y === 0) return { ...target.position };
+  // Two passes: guess the flight time from the present distance, then re-time
+  // it against where that guess puts the target. Deterministic and close
+  // enough at these speeds -- the reference calls it "where the unit should be
+  // when the arrow reaches it".
+  let time = distance(shooter.position, target.position) / speed;
+  for (let pass = 0; pass < 2; pass++) {
+    const at = { x: target.position.x + velocity.x * time, y: target.position.y + velocity.y * time };
+    time = distance(shooter.position, at) / speed;
+  }
+  return { x: target.position.x + velocity.x * time, y: target.position.y + velocity.y * time };
+}
+
+/** A unit's present velocity in tiles a second, from the step it is taking. */
+function velocityOf(state: GameState, entity: Entity): Point {
+  const next = entity.path?.[0];
+  if (!next || entity.activity !== 'moving') return { x: 0, y: 0 };
+  const dx = next.x - entity.position.x;
+  const dy = next.y - entity.position.y;
+  const gap = Math.hypot(dx, dy);
+  if (gap < 1e-6) return { x: 0, y: 0 };
+  const speed = isUnit(entity.kind) ? state.rules.units[entity.kind as UnitKind].speed : 0;
+  return { x: dx / gap * speed, y: dy / gap * speed };
+}
+
 function releaseAttack(
   state: GameState, shooter: Entity, target: Entity,
   attacks: AttackValue[], projectileSpeed: number | undefined, launchHeight = 0,
@@ -1144,6 +1185,20 @@ function releaseAttack(
   if (!projectileSpeed) {
     applyDamage(state, target, attacks, shooter.id);
     return;
+  }
+  // A shot is aimed once and then flies. Without Ballistics it goes to where
+  // the target stands at the moment of release, which is why a unit that keeps
+  // walking is missed; with it, to where the target will be.
+  const leads = shooterLeadsTarget(state, shooter);
+  const aim = leads
+    ? leadPoint(state, shooter, target, projectileSpeed)
+    : { ...target.position };
+  // ...and whether it was aimed true at all is the DAT's own accuracy.
+  const accuracy = accuracyOf(state, shooter);
+  if (accuracy < 100 && random01(state) * 100 >= accuracy) {
+    const angle = random01(state) * Math.PI * 2;
+    aim.x += Math.cos(angle) * MISS_TILES;
+    aim.y += Math.sin(angle) * MISS_TILES;
   }
   state.projectiles.push({
     id: state.nextId++,
@@ -1155,8 +1210,27 @@ function releaseAttack(
     attacks: attacks.map(a => ({ ...a })),
     speed: projectileSpeed,
     launchHeight,
+    aim,
     ...(blastRadius ? { blastRadius } : {}),
   });
+}
+
+/**
+ * The shooter's `accuracy_percent`, or 100 for anything the DAT gives none.
+ * Read through the owner's research, because Thumb Ring is exactly a change to
+ * this number.
+ */
+function accuracyOf(state: GameState, shooter: Entity): number {
+  if (isBuilding(shooter.kind)) {
+    return state.rules.buildings[shooter.kind].attack?.accuracyPercent ?? 100;
+  }
+  return unitRulesFor(state, shooter.owner, shooter.kind as UnitKind)?.accuracyPercent ?? 100;
+}
+
+/** Whether this shooter's owner has the technology that leads a moving target. */
+function shooterLeadsTarget(state: GameState, shooter: Entity): boolean {
+  if (shooter.owner === 0) return false;
+  return state.players[shooter.owner as PlayerId].researched.includes('ballistics');
 }
 
 /**
@@ -1178,31 +1252,85 @@ function applyBlast(
   }
 }
 
+/** Closest approach of the segment a->b to a point, for a swept hit test. */
+function pointToSegment(point: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared < 1e-12) return distance(point, a);
+  let t = ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(point.x - (a.x + dx * t), point.y - (a.y + dy * t));
+}
+
+/**
+ * An arrow flies to the spot it was aimed at, and does not steer on the way.
+ *
+ * It hits its target if the target's body is still somewhere along the line it
+ * travels, which is what makes the reference's three cases come out right: a
+ * unit standing still is hit, one walking across the shot is missed, and one
+ * walking straight at the shooter is hit anyway because it is still on the
+ * line. Missing a moving target is the whole reason Ballistics exists.
+ *
+ * If the shot reaches its aim without touching the target it lands there, and
+ * whoever else happens to be standing on that spot takes it instead -- an
+ * arrow does not know it was meant for somebody else.
+ */
 function updateProjectiles(state: GameState): void {
   const remaining: typeof state.projectiles = [];
   for (const projectile of state.projectiles) {
-    const target = state.entities.find(e => e.id === projectile.targetId && !e.dead);
-    // The target died or despawned first: the arrow is spent, not redirected.
-    if (!target) continue;
-    const dx = target.position.x - projectile.position.x;
-    const dy = target.position.y - projectile.position.y;
-    const gap = Math.hypot(dx, dy);
     const step = projectile.speed * TICK_SECONDS;
-    if (gap <= step + target.radius) {
-      const at = { ...target.position };
-      applyDamage(state, target, projectile.attacks, projectile.shooterId);
-      if (projectile.blastRadius) {
-        applyBlast(state, at, projectile.blastRadius, projectile.attacks, target.id);
-      }
-      continue;
-    }
-    projectile.position = {
+    const dx = projectile.aim.x - projectile.position.x;
+    const dy = projectile.aim.y - projectile.position.y;
+    const gap = Math.hypot(dx, dy);
+    const landing = gap <= step;
+    const next = landing ? { ...projectile.aim } : {
       x: projectile.position.x + dx / gap * step,
       y: projectile.position.y + dy / gap * step,
     };
-    remaining.push(projectile);
+
+    // Anything not the shooter's own can be struck, gaia's animals included:
+    // a hunter's arrow is the same arrow.
+    const intended = state.entities.find(e => e.id === projectile.targetId
+      && !e.dead && e.owner !== projectile.owner);
+    if (intended && pointToSegment(intended.position, projectile.position, next) <= intended.radius) {
+      const at = { ...intended.position };
+      applyDamage(state, intended, projectile.attacks, projectile.shooterId);
+      if (projectile.blastRadius) {
+        applyBlast(state, at, projectile.blastRadius, projectile.attacks, intended.id);
+      }
+      continue;
+    }
+    if (!landing) {
+      projectile.position = next;
+      remaining.push(projectile);
+      continue;
+    }
+    const at = { ...projectile.aim };
+    const struck = struckBy(state, projectile, at);
+    if (struck) applyDamage(state, struck, projectile.attacks, projectile.shooterId);
+    if (projectile.blastRadius) {
+      applyBlast(state, at, projectile.blastRadius, projectile.attacks, struck?.id ?? -1);
+    }
   }
   state.projectiles = remaining;
+}
+
+/** Who is standing where a shot came down, if anybody. */
+function struckBy(state: GameState, projectile: Projectile, at: Point): Entity | undefined {
+  let closest: Entity | undefined;
+  let best = Infinity;
+  for (const entity of state.entities) {
+    if (entity.dead || entity.kind === 'resource' || entity.owner === projectile.owner) continue;
+    const gap = distance(entity.position, at);
+    if (gap > entity.radius) continue;
+    // Ties broken by id, so the same shot lands on the same head in a replay.
+    if (gap < best || (gap === best && closest !== undefined && entity.id < closest.id)) {
+      best = gap;
+      closest = entity;
+    }
+  }
+  return closest;
 }
 
 /** Idle military units acquire the nearest living enemy in line of sight. */

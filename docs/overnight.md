@@ -128,7 +128,15 @@ asserts the age sets came from the DAT.
 
 ## Phase 2 — arrows, then research
 
-### P2.1 Arrow accuracy and ballistics (#3)
+### P2.1 Arrow accuracy and ballistics (#3) — *split*
+
+Landed as **P2.1a**: a shot is aimed once and can miss. What remains — Thumb
+Ring and Ballistics, the two technologies that modify it — needs the general
+effect machinery and, for Ballistics, the university, so both are folded into
+**P2.4** rather than built twice. Issue #3 stays open until they are
+researchable in a real match.
+
+### P2.1a (landed) Arrow accuracy and ballistics (#3)
 
 Arrows currently never miss. They should fire at where the target *is*, and
 follow it; only Ballistics makes them lead a moving target. `accuracy_percent`
