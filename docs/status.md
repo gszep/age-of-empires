@@ -36,9 +36,10 @@ The target does not include Castle+ ages, other civilizations, formations, naval
 
 Measured on calcifer:
 
-- 16 paired-seed matches in 16 concurrent Node processes: **17,756 simulated seconds in 115.771 wall seconds (153.37× aggregate real time)**.
-- Outcomes: 12 decided, 4 timeout draws; strategy-one mirror win rate 0.5, Wilson 95% interval `[0.2538, 0.7462]`.
+- 16 paired-seed matches in 16 concurrent Node processes: **12,615.8 simulated seconds in 12.722 wall seconds (992× aggregate real time)**.
+- Outcomes: 16 decided, 0 timeout draws; strategy-one mirror win rate 0.5, Wilson 95% interval `[0.2800, 0.7200]`.
 - All 16 replay records re-simulated with **0 checksum failures**.
+- The previous run of this batch measured 153× and left 4 matches stalemated to the timeout. Both moved with the pathing fix: a unit that could not reach its goal used to re-run A* every tick forever, which cost the throughput and left mirror matches deadlocked.
 - Browser file replay reported `Replay verified: 1 checksums match` for a six-second imported-rules record.
 - Headless Chrome software-rendering sample at 1920×1080: 4.0 fps, 8.3 MiB JS heap used / 13.8 MiB total after selection-ring pooling. A run without the forced SwiftShader flag reported 6.0 fps and 12.9/21.8 MiB, but headless Chrome still did not establish representative hardware acceleration; this is a known measurement limitation, not a desktop GPU claim.
 - 844×390 landscape Chrome smoke retained the complete top bar, world, command frame, and minimap.
@@ -50,7 +51,7 @@ Batch artifacts are intentionally ignored under `.local/batches/phase6-16/`.
 
 The importer integration resolves every consumed DAT graphic/rule and widgetui source, hashes inputs, and regenerates byte-identically. Viewer smoke tests loaded imported atlases and WEST UI without application console errors; selection, gather orders, fog expansion, and browser replay were exercised through Chrome DevTools Protocol. Timing, resource conservation, hidden information, pathing, combat release, protocol validation, and replay determinism have focused tests.
 
-Known discrepancies are single-terrain ground without the multi-terrain blend masks, missing fire/corpse delta overlays, and some mirror-AI matches that stalemate until the configured timeout.
+Known discrepancies are single-terrain ground without the multi-terrain blend masks and missing fire delta overlays on damaged buildings.
 
 The ground samples the imported DAT terrain texture (slot 0, `Grass`/`g_grs`) at the authored `terrain_dimensions` tile span; `terrain/blends` and `terrain/masks` are not consumed, so terrain-to-terrain transitions are absent rather than approximated. The DAT gives each terrain a `blend_type` (grass 0, both farm slots 1) and a `blend_priority`, but nothing in the owned files maps a `blend_type` to one of the ten files in `terrain/blends/`, nor says how a 512x512 blend is indexed against a tile — its shapes are irregular parcels that straddle every even split. `overlay_mask_name` (grass -> `masks/grass.png`) is a noise texture, and the `terrain_unit_masked_density` field beside it suggests it drives decorative scatter rather than the ground's appearance. Farms are terrain too (slots 7 and 29, `Farm1`/`Farm Cnst1`): the DAT gives them no SLD, so they draw as their own patch of the isometric grid.
 

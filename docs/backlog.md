@@ -52,5 +52,6 @@ construction-complete cue, so that one has no owned source to draw on.
 - **The built-in AI ignores sheep, deer and boar.** It picks gather targets by
   `kind === 'resource'`, which animals are not, so the whole Dark Age food
   opening is invisible to it. Its matches still run on berries and farms.
-- **Mirror-AI stalemates**: some built-in-vs-built-in matches stall to the
-  timeout; the example AI never breaks a defensive equilibrium.
+- **The example AI is a Dark Age militia rush and nothing else.** It no longer
+  stalemates — all 16 of the paired batch decide — but it gathers, houses,
+  builds a barracks and attacks in threes, and that is the whole repertoire.
