@@ -170,6 +170,21 @@ keeps the record.
   targets has to learn the same thing — and a cheap approximation of "can
   anything stand here" (four grid lookups) beats discovering it by pathfinding.
 
+- **The dev-session snapshot is how you photograph a state nobody can reach
+  yet.** Verifying the Castle Age in the running game meant reaching an age that
+  costs 1300 resources and twenty minutes of gathering, which no debug command
+  can grant. Building the state in Node with the sim's own `applyCommand`, then
+  writing it into `sessionStorage` as a dev-session snapshot before the page
+  loads, put a finished castle and every new unit on screen in seconds. Rule: to
+  see a late-game rendering change, construct the state through the simulation's
+  public entry points and hand it to the page as a snapshot — do not add a cheat
+  to the debug protocol, and do not play twenty minutes to get there.
+- **Ask the panel what it is showing, not a screenshot.** The build menu, the
+  train buttons and the research button were all checked by reading
+  `.command-button` titles out of the DOM — text that says "Build Castle (650
+  stone) (G)". That caught the fifteen-slot overflow immediately and needed no
+  eyes. Rule: HUD questions are DOM questions; keep screenshots for geometry.
+
 ## Process
 
 - **Complete one playable behaviour end to end** (from the working style
