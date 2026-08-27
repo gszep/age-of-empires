@@ -122,8 +122,12 @@ const views = new Map<string, EntityView>();
 const ringGeometry = new THREE.RingGeometry(50, 53, 32);
 const ringPool: THREE.Mesh[] = [];
 const outlinePool: THREE.Mesh[] = [];
+// The group must keep the default renderOrder: a Group's renderOrder becomes
+// the sort's groupOrder, which outranks every child's renderOrder, and the
+// entity sprites live in groups at 0. Only with the markers also at group
+// order 0 does their meshes' 950 put them above shadows (500+) but under
+// bodies (1000+), so a building covers the back of its own ground outline.
 const selectionRings = new THREE.Group();
-selectionRings.renderOrder = 900;
 scene.add(selectionRings);
 const SELECTION_COLOR = 0xf5f0dc;
 
