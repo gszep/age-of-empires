@@ -150,6 +150,19 @@ function selectionMarker(entity: Entity): { shape: 'round' | 'square'; half: { x
 }
 
 /**
+ * The clicked target of an order flashes its own marker, AoE2's confirmation
+ * of which entity the order landed on — what singles the victim out of a
+ * crowd. That it happens is the reference; the cadence and colour are not in
+ * the owned files (the DAT's `unit_selection_color_1/2` exist but hold unused
+ * palette index 0, and widgetui names no such widget — the behaviour lives in
+ * the closed runtime), so both are approximated and recorded in
+ * `docs/status.md`. Timed on the game clock like every other view animation.
+ */
+const ORDER_FLASH_PERIOD_SECONDS = 0.2;
+const ORDER_FLASH_TOTAL_SECONDS = 1.2;
+let orderFlash: { entityId: number; startedAt: number } | undefined;
+
+/**
  * Placement preview: the building's own art where it will stand, over the tile
  * square it will occupy. Rebuilt whenever the chosen building changes, since
  * footprint size and sprite both depend on it.
@@ -460,12 +473,16 @@ function contextOrder(point: Point, _clientX: number, _clientY: number): void {
   const target = pickEntity(point);
   const units = selection.filter(e => isUnit(e.kind));
   if (units.length) {
+    const targetId = target && target.id !== units[0].id ? target.id : undefined;
     const result = applyCommand(game, {
       kind: 'order', player: 1, entityIds: units.map(e => e.id),
-      target: point, targetId: target && target.id !== units[0].id ? target.id : undefined,
+      target: point, targetId,
     });
     if (!result.ok) reject(result.reason);
-    else acknowledge();
+    else {
+      acknowledge();
+      if (targetId !== undefined) orderFlash = { entityId: targetId, startedAt: gameTimeSeconds(game) };
+    }
     return;
   }
   // Defensive buildings take a target the same way units do.
@@ -477,7 +494,10 @@ function contextOrder(point: Point, _clientX: number, _clientY: number): void {
       target: point, targetId: hostile ? target.id : undefined,
     });
     if (!result.ok) reject(result.reason);
-    else hud.showMessage(hostile ? 'Target set' : 'Target cleared');
+    else {
+      hud.showMessage(hostile ? 'Target set' : 'Target cleared');
+      if (hostile) orderFlash = { entityId: target.id, startedAt: gameTimeSeconds(game) };
+    }
     return;
   }
   const building = selection.find(e => e.kind === 'town-center' || e.kind === 'barracks');
@@ -813,9 +833,7 @@ function syncScene(time: number): void {
   // outlines on the ground under buildings and resources (`selectionMarker`).
   let ringsUsed = 0;
   let outlinesUsed = 0;
-  for (const id of selectedIds) {
-    const entity = game.entities.find(e => e.id === id && !e.dead);
-    if (!entity) continue;
+  const drawMarker = (entity: Entity): void => {
     const marker = selectionMarker(entity);
     const iso = worldToIso(entity.position.x, entity.position.y);
     if (marker.shape === 'round') {
@@ -845,6 +863,17 @@ function syncScene(time: number): void {
       view.updateSelectionOutline(outline, marker.half);
       outline.position.set(iso.x, iso.y, 0);
     }
+  };
+  for (const id of selectedIds) {
+    const entity = game.entities.find(e => e.id === id && !e.dead);
+    if (entity) drawMarker(entity);
+  }
+  // The last order's clicked target blinks its marker (see `orderFlash`).
+  if (orderFlash) {
+    const elapsed = time - orderFlash.startedAt;
+    const entity = game.entities.find(e => e.id === orderFlash!.entityId && !e.dead);
+    if (elapsed >= ORDER_FLASH_TOTAL_SECONDS || !entity) orderFlash = undefined;
+    else if (Math.floor(elapsed / ORDER_FLASH_PERIOD_SECONDS) % 2 === 0) drawMarker(entity);
   }
   for (let index = ringsUsed; index < ringPool.length; index++) ringPool[index].visible = false;
   for (let index = outlinesUsed; index < outlinePool.length; index++) outlinePool[index].visible = false;
