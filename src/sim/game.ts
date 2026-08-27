@@ -387,8 +387,11 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
   if (command.player !== 1 && command.player !== 2) return rejected('unknown player');
 
   if (command.kind === 'order' || command.kind === 'stop') {
+    // A carcass is a thing orders may name: the gatherer loop has always been
+    // able to work one, so refusing it here was the only reason a villager
+    // could not be sent to a kill it had not made itself.
     const targetEntity = 'targetId' in command && command.targetId
-      ? state.entities.find(e => e.id === command.targetId && !e.dead)
+      ? state.entities.find(e => e.id === command.targetId && (!e.dead || isCarcass(e)))
       : undefined;
     if (command.kind === 'order' && command.targetId && !targetEntity) {
       return rejected(`target ${command.targetId} does not exist`);
@@ -775,7 +778,7 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
 
   const targetId = (entity.order as { targetId: number }).targetId;
   let node = state.entities.find(e => e.id === targetId
-    && (e.amount ?? 0) > 0 && (!e.dead || isAnimal(e.kind)));
+    && (e.amount ?? 0) > 0 && (!e.dead || isCarcass(e)));
   if (!node) {
     // What it was working, so it can look for another of the same first.
     const was = state.entities.find(e => e.id === targetId)?.kind;

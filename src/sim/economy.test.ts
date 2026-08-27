@@ -921,6 +921,46 @@ describe('herding and hunting', () => {
     expect(isCarcass(militia)).toBe(false);
   });
 
+  it('takes an order onto a carcass from a villager that did not make the kill', () => {
+    const state = createGame(40);
+    const sheep = animalOf(state, 'sheep');
+    // A kill nobody is standing over: the carcass is just food lying there.
+    sheep.hp = 0;
+    sheep.dead = true;
+    sheep.decayTicks = 0;
+    const food = sheep.amount!;
+    expect(food).toBeGreaterThan(0);
+
+    const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    villager.position = { x: sheep.position.x + 3, y: sheep.position.y };
+    const result = applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [villager.id],
+      target: sheep.position, targetId: sheep.id,
+    });
+    // The command layer used to answer "target does not exist" here, so a
+    // second villager could never be put on a carcass at all.
+    expect(result.ok).toBe(true);
+    expect(villager.order.kind).toBe('gather');
+
+    run(state, 600);
+    expect(sheep.amount!).toBeLessThan(food);
+  });
+
+  it('refuses an order onto a corpse with nothing left on it', () => {
+    const state = createGame(41);
+    const sheep = animalOf(state, 'sheep');
+    sheep.hp = 0;
+    sheep.dead = true;
+    sheep.amount = 0;
+    const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const result = applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [villager.id],
+      target: sheep.position, targetId: sheep.id,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain('does not exist');
+  });
+
   it('keeps a hunted carcass selectable for as long as its food lasts', () => {
     const state = createGame(35);
     const boar = animalOf(state, 'boar');

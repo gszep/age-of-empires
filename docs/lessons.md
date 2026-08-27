@@ -179,6 +179,16 @@ keeps the record.
   see a late-game rendering change, construct the state through the simulation's
   public entry points and hand it to the page as a snapshot — do not add a cheat
   to the debug protocol, and do not play twenty minutes to get there.
+- **Making a thing clickable is three layers, and the middle one was missed.**
+  Carcasses were made selectable and the fix was verified twice — the sim
+  predicate by unit test, the click by driving a real mouse — and ordering a
+  villager onto one still failed, because `applyCommand`'s own target lookup
+  filtered `!e.dead` and answered "target does not exist". Selection and
+  commands are separate paths to the same entity and neither implies the
+  other. Rule: when a class of entity becomes interactable, walk every layer
+  that resolves an entity by id — picking, the command entry, and the tick
+  loop that services the order — and test the command entry directly; a view
+  test and a predicate test together still leave the layer between them unrun.
 - **A reasonable-sounding refinement re-created the bug it was fixing.**
   Carcasses were made clickable, and picking was then biased toward living
   units because a click near a villager is "probably meant for the villager".
