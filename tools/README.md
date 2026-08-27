@@ -28,6 +28,12 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    `public/imported/aoe2/<key>/<state>.png` plus the combined manifest. The
    player-colour sheet carries the main layer's grey in RGB and the mask's
    coverage in alpha, because that grey indexes the player's palette block.
+   Decoding all of it takes about twenty minutes, so an atlas is reused from
+   `.local/aoe2de/atlas-cache.json` when its source hash, its frame count and a
+   fingerprint of the decoder's own code are unchanged — adding one unit costs
+   under a minute, and editing the decoder still regenerates everything.
+   `--fresh` ignores the cache; a fresh run was verified to produce
+   byte-identical atlases and manifest.
 4. `import_ui.py` extracts the WEST widget-UI subset (resource/command/map/
    bottom/menu panels, materials, entity + action + stat icons, click-sound
    aliases from `sounds.json`) into `public/imported/aoe2/ui/`, converting DDS

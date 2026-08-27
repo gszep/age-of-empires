@@ -99,6 +99,19 @@ def convert_terrain(
     return converted
 
 
+def decoder_fingerprint() -> str:
+    """What the conversion code itself would produce, in one hash.
+
+    The cache below reuses an atlas only when its source, its frame count and
+    this fingerprint all match, so any edit to the decoder or the packing
+    regenerates everything rather than leaving stale art behind.
+    """
+    digest = hashlib.sha256()
+    for name in ("sld_layers.py", "convert_sld.py"):
+        digest.update(Path(__file__).with_name(name).read_bytes())
+    return digest.hexdigest()
+
+
 def atlas_jobs(imported: dict[str, Any]) -> list[dict[str, Any]]:
     """Every main-layer atlas to produce."""
     jobs: list[dict[str, Any]] = []
@@ -134,31 +147,76 @@ def main() -> None:
         default=Path.home() / "Steam/steamapps/content/app_813780/depot_813782/resources/_common/terrain/textures/2x",
     )
     parser.add_argument("--out", type=Path, default=root / "public/imported/aoe2")
+    parser.add_argument("--cache", type=Path, default=root / ".local/aoe2de/atlas-cache.json")
+    parser.add_argument("--fresh", action="store_true", help="ignore the atlas cache")
     args = parser.parse_args()
 
     imported = json.loads(args.content.read_text())
     jobs = atlas_jobs(imported)
+    source_hashes = imported["source"]["sha256"]
 
-    # Everything decodes in-process now: the local pure-Python decoder cannot
-    # crash the run the way the previously used openage native decoder did,
-    # so the per-atlas subprocess isolation is gone with it.
+    # Decoding every frame of every animation takes about twenty minutes, and
+    # adding one unit re-decodes the other seventy-odd sources for nothing. An
+    # atlas is reused only when its source file, its frame count and the
+    # decoder's own fingerprint are all unchanged, so a decoder edit still
+    # regenerates the lot. `--fresh` skips the cache entirely.
+    cache_path = args.cache
+    fingerprint = decoder_fingerprint()
+    previous: dict[str, Any] = {}
+    if cache_path.is_file() and not args.fresh:
+        stored = json.loads(cache_path.read_text())
+        if stored.get("decoder") == fingerprint:
+            previous = stored.get("atlases", {})
+    cache: dict[str, Any] = {}
+
+    def cached(identifier: str, job: dict[str, Any], image: str) -> dict[str, Any] | None:
+        entry = previous.get(identifier)
+        if not entry:
+            return None
+        if entry["source"] != source_hashes.get(job["source"]) or entry["expected"] != job["expected"]:
+            return None
+        atlas = entry["atlas"]
+        if atlas and not (args.out / image).is_file():
+            return None
+        return atlas
+
     args.out.mkdir(parents=True, exist_ok=True)
     atlases: dict[str, dict[str, Any]] = {}
     skipped: list[str] = []
+    reused = 0
     for job in jobs:
         identifier = f"{job['key']}:{job['name']}"
-        atlas = convert(
-            args.graphics / job["source"], args.out / job["key"] / f"{job['name']}.png", job["expected"]
-        )
-        atlas["image"] = f"{job['key']}/{job['name']}.png"
+        image = f"{job['key']}/{job['name']}.png"
+        atlas = cached(identifier, job, image)
+        if atlas is None:
+            atlas = convert(
+                args.graphics / job["source"], args.out / job["key"] / f"{job['name']}.png", job["expected"]
+            )
+            print(identifier)
+        else:
+            reused += 1
+        cache[identifier] = {"source": source_hashes.get(job["source"]), "expected": job["expected"], "atlas": atlas}
+        atlas = dict(atlas)
+        atlas["image"] = image
         atlases.setdefault(job["key"], {})[job["name"]] = atlas
-        print(identifier)
 
     # A mask failure costs that entity one mask and is recorded, never fatal.
     mask_skipped: list[str] = []
     for job in jobs:
         for layer in MASK_LAYERS:
             identifier = f"{job['key']}:{job['name']}:{layer}"
+            image = f"{job['key']}/{job['name']}-{layer}.png"
+            atlas = cached(identifier, job, image)
+            if atlas is not None:
+                reused += 1
+                cache[identifier] = {
+                    "source": source_hashes.get(job["source"]), "expected": job["expected"], "atlas": atlas,
+                }
+                if atlas:
+                    atlas = dict(atlas)
+                    atlas["image"] = image
+                    atlases.setdefault(job["key"], {})[f"{job['name']}-{layer}"] = atlas
+                continue
             try:
                 atlas = convert_mask(
                     args.graphics / job["source"],
@@ -170,7 +228,11 @@ def main() -> None:
                 mask_skipped.append(identifier)
                 print(f"skipped {identifier}: {error}")
                 continue
+            cache[identifier] = {
+                "source": source_hashes.get(job["source"]), "expected": job["expected"], "atlas": atlas,
+            }
             if atlas:
+                atlas = dict(atlas)
                 atlas["image"] = f"{job['key']}/{job['name']}-{layer}.png"
                 atlases.setdefault(job["key"], {})[f"{job['name']}-{layer}"] = atlas
             print(identifier)
@@ -205,6 +267,10 @@ def main() -> None:
     }
     manifest_path = args.out / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n")
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(json.dumps({"decoder": fingerprint, "atlases": cache},
+                                     separators=(",", ":"), sort_keys=True) + "\n")
+    print(f"{reused} atlases reused from {cache_path.name}")
     print(manifest_path)
 
 
