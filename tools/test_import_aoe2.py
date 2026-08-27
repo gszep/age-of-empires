@@ -371,6 +371,21 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(cart["animations"]["carry"]["source"], "u_trade_cart_west_walkA_x1.sld")
         self.assertNotIn("combat", cart)
 
+    def test_the_published_manifest_carries_the_technologies(self):
+        # The atlas step assembles the manifest the game actually loads, and
+        # for a while it left `technologies` out of that dict entirely -- so
+        # `rulesFromManifest` found no key and every match ran on the
+        # hand-written fallback rules. It failed silently because those
+        # numbers agree with the DAT's.
+        manifest = Path("public/imported/aoe2/manifest.json")
+        if not manifest.is_file():
+            self.skipTest("no published manifest to check")
+        published = json.loads(manifest.read_text())
+        self.assertIn("technologies", published)
+        for key, tech in self.result["technologies"].items():
+            self.assertIn(key, published["technologies"])
+            self.assertEqual(published["technologies"][key], tech)
+
     def test_accuracy_and_ballistics_are_attributes_the_dat_states(self):
         # Both halves of how a shot lands are in the DAT and neither was read
         # before (issue #3). Accuracy varies widely enough that a constant

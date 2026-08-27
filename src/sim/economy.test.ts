@@ -754,6 +754,35 @@ describe('technologies', () => {
   const townCenter = (state: GameState) =>
     state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
 
+  it('reads its technologies from the manifest rather than the fallback table', () => {
+    // The importer extracted the DAT's technologies into content.json and the
+    // atlas step then dropped them on the way to the published manifest, so
+    // `rulesFromManifest` found no key and every match ran on the hand-written
+    // fallback rules. Nothing failed, because the fallback numbers happen to
+    // match the DAT. This asserts the wire is connected rather than the
+    // numbers agreeing: a manifest that says something else must win.
+    const manifest = existsSync(MANIFEST_PATH)
+      ? JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as ContentManifest
+      : undefined;
+    if (manifest) {
+      expect(manifest.technologies, 'the published manifest carries no technologies').toBeDefined();
+      expect(Object.keys(manifest.technologies!)).toContain('loom');
+    }
+    const fixture: ContentManifest = {
+      entities: {},
+      technologies: {
+        loom: {
+          techId: 22, name: 'Loom', researchSeconds: 999, researchedAt: 109,
+          requiresAge: 0, cost: { gold: 7 },
+        },
+      },
+    };
+    const rules = rulesFromManifest(fixture);
+    expect(rules.technologies.loom.researchSeconds).toBe(999);
+    expect(rules.technologies.loom.cost.gold).toBe(7);
+    expect(FALLBACK_RULES.technologies.loom.researchSeconds).not.toBe(999);
+  });
+
   it('researches Loom at its DAT cost and heals the villagers already standing there', () => {
     const state = createGame(41);
     const loom = state.rules.technologies.loom;

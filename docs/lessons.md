@@ -301,6 +301,17 @@ keeps the record.
   fix's own machinery repeats the bug, test the fix against a deliberate
   failure before trusting it.
 
+- **Re-running a slow job because it "seems stuck" is how it gets stuck.** The
+  atlas conversion normally takes under a minute, so when the manifest had not
+  changed after forty seconds it was started again, and again — three of them
+  ended up decoding the same sprites at once, each making the others slower,
+  and the next one timed out at 115 seconds and looked like a hang. Nothing
+  errored; the log file was simply block-buffered and empty. Rule: before
+  restarting a background job, check whether it is still running (`ps -eo
+  pid,etimes,args` filtered in a script, never a `-f` pattern that matches the
+  asking shell) and pass `-u` to a Python job whose progress you intend to
+  watch. A second copy of a CPU-bound job is never the fix.
+
 - **A leaked waiter is invisible until somebody looks.** None of the sixteen
   produced output, failed, or slowed anything down; they were found only
   because a human noticed the process list. Rule: a run that starts background
