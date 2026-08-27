@@ -123,3 +123,22 @@ keeps the record.
   and the barracks" pinpointed a multiply-through bug immediately. When
   reporting or relaying visual defects, name the entity, the state, and the
   colour seen — and prefer the debug protocol's numbers over adjectives.
+- **`pgrep -f` and `pkill -f` match the shell that is running them.** The
+  pattern is tested against whole command lines, and the wrapper shell running
+  `while pgrep -f herd.py; do sleep 15; done` has `herd.py` in its own command
+  line — so the loop matched itself, the condition never went false, and the
+  wait never ended. Sixteen of these accumulated over one long run, each waking
+  every fifteen seconds against a script that had finished hours earlier; the
+  same footgun had already killed a task with `pkill -f`, which matched and
+  terminated its own wrapper (exit 144). Rule: do not wait on a background job
+  by polling for its name. Wait on the thing itself — run it with
+  `run_in_background` and read the task result, or have it write a pid file or
+  a sentinel file and poll that. If a `-f` pattern is genuinely the only
+  handle, exclude the watcher (`pgrep -f pat | grep -v $$`) and prove the
+  loop terminates before leaving it running.
+- **A leaked waiter is invisible until somebody looks.** None of the sixteen
+  produced output, failed, or slowed anything down; they were found only
+  because a human noticed the process list. Rule: a run that starts background
+  waits ends by listing what it left running, and says which processes are
+  meant to outlive it — here the Vite dev server and the debug harness — and
+  which are litter.
