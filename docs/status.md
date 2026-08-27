@@ -30,22 +30,36 @@ Controls and hotkeys are listed in the root `README.md`. The essential loop is l
 
 ## Deliberately omitted
 
-The target does not include Castle+ ages, other civilizations, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, relics, gates/walls, or a genetic-algorithm framework. Of the technology tree only Loom and the Feudal Age are researchable. Mobile has no separate or simplified gameplay. All SLD layers convert through the local decoder.
+The target does not include Castle+ ages, other civilizations, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, relics, or a genetic-algorithm framework. Palisade walls and gates are built; stone walls and their gates are not. Of the technology tree only Loom and the Feudal Age are researchable. Mobile has no separate or simplified gameplay. All SLD layers convert through the local decoder.
 
 ## Measurements and gate evidence
 
-Measured on calcifer:
+Measured on calcifer. Every number here is from the current board (120x120,
+about 310 entities); anything older is not comparable, because the map size
+changed underneath it.
 
-- 16 paired-seed matches in 16 concurrent Node processes: **12,615.8 simulated seconds in 12.722 wall seconds (992× aggregate real time)**.
-- Outcomes: 16 decided, 0 timeout draws; strategy-one mirror win rate 0.5, Wilson 95% interval `[0.2800, 0.7200]`.
-- All 16 replay records re-simulated with **0 checksum failures**.
-- The previous run of this batch measured 153× and left 4 matches stalemated to the timeout. Both moved with the pathing fix: a unit that could not reach its goal used to re-run A* every tick forever, which cost the throughput and left mirror matches deadlocked.
-- Browser file replay reported `Replay verified: 1 checksums match` for a six-second imported-rules record.
-- Headless Chrome software-rendering sample at 1920×1080: 4.0 fps, 8.3 MiB JS heap used / 13.8 MiB total after selection-ring pooling. A run without the forced SwiftShader flag reported 6.0 fps and 12.9/21.8 MiB, but headless Chrome still did not establish representative hardware acceleration; this is a known measurement limitation, not a desktop GPU claim.
-- 844×390 landscape Chrome smoke retained the complete top bar, world, command frame, and minimap.
-- Opt-in live-agent scenario completed successfully through the authenticated pi/OpenAI-Codex provider with one schema-valid command.
+- 16 paired-seed matches in 16 concurrent Node processes: **16 decided, 0
+  timeout draws, 0 replay checksum failures**, mirror win rate 0.5, around
+  **420x aggregate real time** (40 seconds of wall clock).
+- Per-tick cost over a full 900-second match (seed 102): median **0.58ms**,
+  p99 **1.72ms**, worst **11.7ms**, against a 50ms budget at 20Hz. The median
+  was never the problem; the worst tick is the number to watch, and it was
+  105ms before the pathfinder's open list became a heap.
+- Forests are solid: seed 7 grows two clumps of exactly 55 tiles, no row has a
+  clear line through, and crossing one costs 1.66x the straight line while
+  never stepping on a tree.
+- Browser, headless Chrome on SwiftShader at 1280x800: about **16 ticks a
+  second at 1x** speed and **170 at 10x** — the ratio is the meaningful part
+  (the speed control scales as it should); the absolute rate is software
+  rendering and is not a claim about a desktop GPU.
+- Browser file replay reported `Replay verified: 1 checksums match` for a
+  six-second imported-rules record.
+- 844x390 landscape Chrome smoke retained the complete top bar, world, command
+  frame, and minimap.
+- Opt-in live-agent scenario completed successfully through the authenticated
+  provider with one schema-valid command.
 
-Batch artifacts are intentionally ignored under `.local/batches/phase6-16/`.
+Batch artifacts are intentionally ignored under `.local/batches/`.
 
 ## Compatibility evidence and discrepancies
 
@@ -440,7 +454,25 @@ belong to a wall this slice does not build.
 npm test
 npm run build
 npm run test:import
-npm run batch -- --matches 16 --concurrency 16 --seed-start 100 --max-time 1800 --out .local/batches/phase6-16
+npm run batch -- --matches 16 --concurrency 16 --seed-start 100 --max-time 1800 --out .local/batches/gate
 npm run test:live-agent   # opt-in; requires valid existing machine provider auth
 ```
+
+The batch's `summary.json` carries `decided`, `timeouts`, `replayFailures` and
+`throughput`; a change that moves any of them is a change worth explaining.
+
+Two things the gate does not measure, both worth running by hand after anything
+that touches the map, the pathfinder or the frame loop:
+
+- **Worst-tick cost.** Run a match tick by tick, time each `stepGame`, and
+  report the median and the maximum. A regression here is a lurch the player
+  feels and an average never shows.
+- **A real page.** Open the game in headless Chrome and drive it through the
+  same input path a player uses — `page.mouse.click`, `page.keyboard.press` —
+  reading state back through `/__debug`. Start a **private Vite server on its
+  own port** for this and open the only page attached to it: the debug bridge
+  answers from whichever client replies first, and a browser tab somebody left
+  open on 5173 will answer from its own match. Pass `root` and `configFile`
+  explicitly to `createServer`, or it takes the working directory as the
+  project and serves a 404.
 

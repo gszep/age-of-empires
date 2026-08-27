@@ -111,6 +111,31 @@ terrain blends above.
   `land_resources.inc`; the neutral forests, relics and contested resources the
   scripts put between the players do not, so a 120x120 board is two furnished
   corners and a lot of grass.
+- **Forest clumps have ragged interiors.** A wood is grown outward from a seed
+  one free tile at a time, which gives an organic edge and leaves holes: 19 of
+  63 interior tiles were open in the wood measured on seed 7. No straight route
+  crosses a clump and the pathfinder goes round, but a determined unit could
+  thread a diagonal gap in some of them. Filling the interior would fix it and
+  would also make the shapes read as blobs rather than woods; nobody has
+  decided which matters more.
+- **Herdables no longer walk home behind a scout.** A claimed sheep stops where
+  it stands and is ordered about by hand, which is what makes it controllable
+  at all (the simulation used to overwrite its order four times a second). The
+  original's herding — sheep trailing the unit that converted them, so you walk
+  them home with the scout — is gone with it. The middle ground, if it is
+  wanted, is following only until the first order.
+- **The example AI's camp siting is one node deep.** It builds a camp between
+  home and the nearest known node of a resource, one per resource until the
+  barracks is up and three thereafter, and never re-sites one whose wood has
+  been cut out from under it. It is enough to keep an economy running and no
+  more; two of the sixteen batch seeds have turned on it so far.
+
+## Interface
+
+- **Game speed does not survive a reload.** `+` and `-` set 1x to 10x and it
+  resets to 1x on refresh, because the speed is a view preference and the saved
+  session holds game state. Persisting it means deciding where a view
+  preference lives.
 
 ## Debug tooling
 

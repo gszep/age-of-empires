@@ -92,6 +92,15 @@ curl -s localhost:5173/__debug -d '{"type":"select","ids":[1]}'   # what the HUD
 curl -s localhost:5173/__debug -d '{"type":"look","entity":12}'   # centre the camera
 ```
 
+Two things about this endpoint that will waste an afternoon otherwise. It
+broadcasts to **every** page attached to the dev server and answers with
+whichever replies first, so a browser tab somebody left open on 5173 answers
+from its own match — for anything you intend to *measure*, start a private Vite
+server on its own port and open the only page attached to it (pass `root` and
+`configFile` to `createServer`, or it takes the working directory as the
+project and serves a 404). And `entities` returns at most 200 matches, which on
+a 120x120 map is well short of gaia's resources.
+
 `pixels` returns mean colour and a dominant-colour histogram read back from
 the actual canvas — use it to verify rendering changes (tints, masks,
 visibility) numerically instead of asking a human to look. Prefer it over

@@ -20,6 +20,42 @@ enumerate the processes the run started (background tasks, dev servers,
 headless browsers, waiters), kill the litter, and state what is deliberately
 left running.
 
+## Where this queue stands
+
+The run is finished. Twelve of the fourteen items are `[x]` below with what was
+found and how it was checked; **A6 (terrain blends)** is blocked on evidence
+and should not be reattempted without new evidence, and **D2 (water)** is
+scoped in `docs/water-design.md` and deliberately not started.
+
+Everything after that has come from playtesting rather than from this list, and
+this file is not the place to look for the current state of the game —
+`docs/status.md` is. In order, what landed after the queue:
+
+1. **Game speed**, `+` and `-`, 1x to 10x, multiplying how much time the frame
+   loop hands the accumulator so the tick length and every checksum are
+   untouched.
+2. **The map** became 120x120 and square, AoE2's "tiny", with each player's
+   opening laid out at `land_resources.inc`'s own distances. That change forced
+   three others: a starting scout (without one nothing is visible to gather and
+   the match never starts), drop-site siting in the example AI, and a minimap
+   that draws terrain as one image rather than a path per tile.
+3. **Bounded auto-continuation**: what a worker picks up next when its node runs
+   out is now limited to what its owner can see and to three times its line of
+   sight, and prefers the same kind of thing it was working.
+4. **Pathfinding cost**: resources snapped to tile centres (a one-tile footprint
+   off-centre blocks four tiles), and the A* open list became a binary heap
+   keyed on the same total order, which left every path identical and the worst
+   tick 105ms lighter.
+5. **Solid forests**, grown as contiguous tile clumps the way `create_terrain`
+   builds one, with the pathfinder and the target chooser both taught that a
+   tree inside a wood is nobody's to cut.
+6. **Herdables** stop where they stand when claimed and take orders, instead of
+   following the nearest unit and having every order overwritten.
+
+The standing rules at the top of this file still apply to whatever comes next:
+one item at a time, the gate green before a commit, and an honest gap recorded
+in `docs/backlog.md` rather than a half-shipped feature.
+
 ## A. Visual fidelity (no new gameplay, all source data already local)
 
 - [x] **Player-colour palette ramps.** Done, but not where this item pointed:
