@@ -44,6 +44,11 @@ const nodeOf = (state: GameState, resource: ResourceKind, from?: Entity) => {
     .sort((a, b) => distanceBetween(origin, a) - distanceBetween(origin, b) || a.id - b.id)[0];
 };
 
+/** Clear an order the way the public `stop` command does. */
+const becomeIdleFor = (state: GameState, units: Entity[]) => {
+  applyCommand(state, { kind: 'stop', player: 1, entityIds: units.map(u => u.id) });
+};
+
 const distanceBetween = (a: Entity, b: Entity) =>
   Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y);
 
@@ -143,6 +148,119 @@ describe('gathering', () => {
     expect(totalOf(state, 'food')).toBe(totals.food);
     expect(totalOf(state, 'wood')).toBe(totals.wood);
     expect(totalOf(state, 'gold')).toBe(totals.gold);
+  });
+});
+
+describe('carrying on after the work runs out', () => {
+  const villagerNear = (state: GameState, at: { x: number; y: number }) => {
+    const villager = villagerOf(state);
+    villager.position = { ...at };
+    return villager;
+  };
+
+  it('turns to the next sheep rather than to a bush across the field', () => {
+    const state = createGame(81);
+    parkScouts(state);
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    // Two claimed sheep side by side, and the nearest bush further off.
+    const sheep = state.entities.filter(e => e.kind === 'sheep').slice(0, 2);
+    for (const [index, animal] of sheep.entries()) {
+      animal.owner = 1;
+      animal.position = { x: tc.position.x + 3 + index, y: tc.position.y + 3 };
+    }
+    const villager = villagerNear(state, { x: tc.position.x + 3, y: tc.position.y + 2.5 });
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [villager.id],
+      target: sheep[0].position, targetId: sheep[0].id,
+    });
+    sheep[0].amount = 8; // nearly eaten
+
+    for (let i = 0; i < 4000; i++) {
+      stepGame(state);
+      if (villager.order.kind !== 'gather') break;
+      if (villager.order.targetId !== sheep[0].id) break;
+    }
+    expect(sheep[0].amount).toBe(0);
+    expect(villager.order).toEqual({ kind: 'gather', targetId: sheep[1].id });
+  });
+
+  it('stops rather than walking to food nobody can see', () => {
+    const state = createGame(82);
+    parkScouts(state);
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const villager = villagerNear(state, { x: tc.position.x + 3, y: tc.position.y + 3 });
+    // One bush beside the villager and one on the far side of the map, and
+    // nothing else edible anywhere.
+    for (const food of state.entities.filter(e => e.resourceKind === 'food' && e.id !== tc.id)) {
+      food.amount = 0;
+    }
+    const near = state.entities.find(e => e.kind === 'resource' && e.resourceKind === 'food')!;
+    near.position = { x: villager.position.x + 1, y: villager.position.y };
+    near.amount = 8;
+    const far = state.entities.filter(e => e.kind === 'resource' && e.resourceKind === 'food')[1]!;
+    far.position = { x: state.width - 5, y: state.height - 5 };
+    far.amount = 100;
+
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [villager.id], target: near.position, targetId: near.id,
+    });
+    for (let i = 0; i < 4000 && (near.amount ?? 0) > 0; i++) stepGame(state);
+    expect(near.amount).toBe(0);
+    // It banks what it has and stops, rather than setting off across the map.
+    for (let i = 0; i < 2000 && villager.order.kind !== 'idle'; i++) stepGame(state);
+    expect(villager.order.kind).toBe('idle');
+    expect(villager.position.x).toBeLessThan(state.width / 2);
+  });
+
+  it('builds on down a dragged line but not to a foundation out of sight', () => {
+    const state = createGame(83);
+    parkScouts(state);
+    state.players[1].wood = 500;
+    const builders = state.entities.filter(e => e.owner === 1 && e.kind === 'villager').map(e => e.id);
+
+    // A run of wall, and one more segment joined to its far end — far enough
+    // from where the builders start that they should never set off for it.
+    let row: number | undefined;
+    let startX: number | undefined;
+    for (let y = 4.5; y < state.height - 4 && row === undefined; y++) {
+      for (let x = 4.5; x < state.width - 40; x++) {
+        const tiles = [...Array(4).keys()].map(i => x + i);
+        if (!tiles.every(at => placementLegal(state, 'palisade-wall', { x: at, y }).ok)) continue;
+        row = y; startX = x; break;
+      }
+    }
+    expect(row, 'a clear row to wall').toBeDefined();
+
+    for (const at of [startX!, startX! + 1, startX! + 2, startX! + 3]) {
+      expect(applyCommand(state, {
+        kind: 'build', player: 1, builderIds: builders, building: 'palisade-wall', target: { x: at, y: row! },
+      }).ok, `${at}`).toBe(true);
+    }
+    const line = () => state.entities.filter(e => !e.dead && e.kind === 'palisade-wall');
+    for (let i = 0; i < 8000 && line().some(e => e.buildProgress !== undefined); i++) stepGame(state);
+    // The whole drag goes up: each next piece is a tile from the last.
+    expect(line().filter(e => e.buildProgress === undefined)).toHaveLength(4);
+
+    // Now a segment joined to nothing the builders can see. Reachable through
+    // the wall they just built, but a long walk they were never asked for.
+    const strays = state.entities.filter(e => e.owner === 1 && e.kind === 'villager');
+    for (const [index, villager] of strays.entries()) {
+      villager.position = { x: startX! + index * 0.4, y: row! + 2 };
+    }
+    const remote = { x: startX! + 30, y: row! };
+    expect(placementLegal(state, 'palisade-wall', remote).ok).toBe(true);
+    expect(applyCommand(state, {
+      kind: 'build', player: 1, builderIds: [strays[0].id], building: 'palisade-wall', target: remote,
+    }).ok).toBe(true);
+    const remoteSite = state.entities.find(e => e.kind === 'palisade-wall'
+      && Math.abs(e.position.x - remote.x) < 0.6 && e.buildProgress !== undefined)!;
+    // The one villager asked for it goes; the other two were never tasked and
+    // stay where they are.
+    becomeIdleFor(state, strays.slice(1));
+    run(state, 400);
+    for (const villager of strays.slice(1)) {
+      expect(distanceBetween(villager, remoteSite)).toBeGreaterThan(20);
+    }
   });
 });
 

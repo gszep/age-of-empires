@@ -120,6 +120,15 @@ keeps the record.
   fifty-second round trips. Rule: distances are a gameplay rule like any other,
   and a strategy tuned against toy distances is not tuned at all.
 
+- **An automatic continuation needs a bound, and sight is the honest one.** A
+  villager whose sheep ran out picked the nearest bush *on the whole map*,
+  through fog, because the search that fed it had no radius and no visibility
+  test — invisible on a 32x18 board and absurd on a full-size one. Rule: when
+  a unit decides for itself what to do next, it may only consider what its
+  owner can presently see and what is within a stated distance; if the answer
+  is nothing, idle is the correct answer. Reaching further is a decision, and
+  decisions belong to whoever is playing.
+
 ## Process
 
 - **Complete one playable behaviour end to end** (from the working style

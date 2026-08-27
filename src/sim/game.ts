@@ -2,7 +2,7 @@ import { FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isAnimal, isBuilding, i
 import type { AttackValue, Cost, GameRules, NodeKind, TechKey, UnitRules } from './data';
 import { buildNavGrid, findPath, halfExtent, isBlocked, isWalled, separateUnits, tileOf, type NavGrid } from './nav';
 import { random01 } from './random';
-import { createVisibility, updateVisibility } from './visibility';
+import { createVisibility, isEntityVisible, updateVisibility } from './visibility';
 import type {
   AnimalKind, BuildingKind, Command, Entity, GameState, PlayerId, Point, ResourceKind, UnitKind,
 } from './types';
@@ -533,15 +533,46 @@ function tooClose(state: GameState, entity: Entity, target: Entity): boolean {
 
 const interactionRange = (target: Entity): number => target.radius + 1.6;
 
-function nearestNode(state: GameState, from: Point, resource: ResourceKind): Entity | undefined {
+/**
+ * How far a worker looks for more of the same when what it was working runs
+ * out. A villager sees four tiles; three times that is about the width of one
+ * forest clump, which is the point — step to the next tree, not walk across
+ * the map to a bush somebody scouted an hour ago.
+ */
+function autoContinueRange(state: GameState, entity: Entity): number {
+  const los = isUnit(entity.kind) ? state.rules.units[entity.kind as UnitKind].lineOfSight : 0;
+  return los * 3;
+}
+
+/**
+ * What to work next when the current node is spent: the nearest thing of the
+ * same kind first — another sheep after a sheep, the next tree in the wood —
+ * and only then anything else yielding the same resource. Nothing the owner
+ * cannot presently see counts, however close, and nothing beyond
+ * `autoContinueRange`; a worker with nothing in reach goes idle and waits to
+ * be told, which is the honest answer and what AoE2 does.
+ */
+function nextToWork(
+  state: GameState, entity: Entity, resource: ResourceKind, was: Entity['kind'] | undefined,
+): Entity | undefined {
+  const range = autoContinueRange(state, entity);
+  const owner = entity.owner as PlayerId;
   let best: Entity | undefined;
-  let bestDistance = Infinity;
-  for (const entity of state.entities) {
-    if (entity.dead || entity.kind !== 'resource' || entity.resourceKind !== resource || (entity.amount ?? 0) <= 0) continue;
-    const d = distance(from, entity.position);
-    if (d < bestDistance || (d === bestDistance && best && entity.id < best.id)) {
-      best = entity;
-      bestDistance = d;
+  let bestKey = Infinity;
+  for (const candidate of state.entities) {
+    if (candidate.dead && !isAnimal(candidate.kind)) continue;
+    if (candidate.resourceKind !== resource || (candidate.amount ?? 0) <= 0) continue;
+    if (!isGatherable(state, candidate, entity)) continue;
+    const d = distance(entity.position, candidate.position);
+    if (d > range) continue;
+    if (!isEntityVisible(state, owner, candidate)) continue;
+    // Same kind first, then distance. Adding a whole range to everything else
+    // orders the two groups without a second pass, and ids break exact ties so
+    // two runs of the same match choose the same thing.
+    const key = d + (candidate.kind === was ? 0 : range + 1);
+    if (key < bestKey - 1e-9 || (Math.abs(key - bestKey) <= 1e-9 && best && candidate.id < best.id)) {
+      best = candidate;
+      bestKey = key;
     }
   }
   return best;
@@ -625,11 +656,14 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
     return;
   }
 
-  let node = state.entities.find(e => e.id === (entity.order as { targetId: number }).targetId
+  const targetId = (entity.order as { targetId: number }).targetId;
+  let node = state.entities.find(e => e.id === targetId
     && (e.amount ?? 0) > 0 && (!e.dead || isAnimal(e.kind)));
   if (!node) {
+    // What it was working, so it can look for another of the same first.
+    const was = state.entities.find(e => e.id === targetId)?.kind;
     const wanted = carrying?.kind ?? undefined;
-    node = wanted ? nearestNode(state, entity.position, wanted) : undefined;
+    node = wanted ? nextToWork(state, entity, wanted, was) : undefined;
     if (node) entity.order = { kind: 'gather', targetId: node.id };
     else if (carrying && carrying.amount > 0) {
       // Nothing left to gather: bank what is carried, then idle.
@@ -760,7 +794,7 @@ function updateTrader(state: GameState, grid: NavGrid, entity: Entity): void {
  * but dragged as a line, and AoE2 builds the whole line rather than leaving
  * nine foundations behind the one segment somebody happened to task last.
  */
-function adjacentSite(state: GameState, site: Entity): Entity | undefined {
+function adjacentSite(state: GameState, site: Entity, builder: Entity): Entity | undefined {
   // The whole run the finished piece belongs to, walked through what is
   // already standing: a builder half way along a wall would otherwise dead-end
   // at the last thing it touches and leave the far half of the drag unbuilt.
@@ -775,12 +809,17 @@ function adjacentSite(state: GameState, site: Entity): Entity | undefined {
       connected.push(candidate);
     }
   }
+  // And only as far as the builder can see. A dragged line is contiguous, so
+  // each next piece is a tile away and the whole line still gets built; what
+  // this stops is the walk to a foundation on the other side of the map that
+  // happens to be joined to this one by a wall somebody built an hour ago.
+  const range = autoContinueRange(state, builder);
   let best: Entity | undefined;
   let bestDistance = Infinity;
   for (const candidate of connected) {
     if (candidate.buildProgress === undefined) continue;
     const gap = distance(candidate.position, site.position);
-    if (gap >= bestDistance) continue;
+    if (gap > range || gap >= bestDistance) continue;
     best = candidate;
     bestDistance = gap;
   }
@@ -1253,7 +1292,7 @@ export function stepGame(state: GameState): void {
       }
       for (const builder of state.entities) {
         if (builder.order.kind === 'build' && builder.order.targetId === site.id) {
-          const next = adjacentSite(state, site);
+          const next = adjacentSite(state, site, builder);
           if (next) { builder.order = { kind: 'build', targetId: next.id }; builder.activity = 'moving'; }
           else becomeIdle(builder);
         }

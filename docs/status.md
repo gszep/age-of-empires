@@ -303,6 +303,27 @@ and the match never starts.
 forests and its relics, and the extra resources between the players, are not
 generated.
 
+## Carrying on after the work runs out
+
+When a villager's node is spent it looks for more of the same, and what counts
+as "more" is bounded twice over. The nearest thing of the *same kind* wins
+first — another sheep after a sheep, the next tree in the same wood — and only
+then anything else yielding that resource. Nothing outside the owner's current
+line of sight counts at all, however close, and nothing further than three
+times the worker's own sight, which is about the width of one forest clump.
+A worker with nothing in reach goes idle and waits to be told.
+
+The same bound applies to building. A builder that finishes a piece carries on
+to the nearest unfinished one joined to it, which is what builds a dragged wall
+end to end, but not past what it can see: a foundation on the far side of the
+map, joined to this one only by a wall somebody built an hour ago, is not
+somewhere it sets off for.
+
+This is the automatic behaviour only. An explicit order still sends a villager
+wherever it is sent, and the example AI still tasks villagers onto nodes it
+remembers through fog — that is a decision it makes, not something the unit
+does on its own.
+
 ## Palisade walls
 
 The palisade is one 1x1 building placed a tile at a time but dragged as a line:
