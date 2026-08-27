@@ -44,13 +44,22 @@ Measured on calcifer. Every number here is from the current board (120x120,
 about 310 entities); anything older is not comparable, because the map size
 changed underneath it.
 
-- 16 paired-seed matches in 16 concurrent Node processes: **16 decided, 0
-  timeout draws, 0 replay checksum failures**, mirror win rate 0.5, around
-  **420x aggregate real time** (40 seconds of wall clock).
+- 16 paired-seed matches in concurrent Node processes, re-run after the Castle
+  Age, monk, siege, hunting and startle changes: **16 decided, 0 timeout draws,
+  0 replay checksum failures**, mirror win rate 0.5 (Wilson 95% 0.28–0.72),
+  **364x aggregate real time** (47 seconds of wall clock for 17,110 simulated
+  seconds). The zero replay failures are the load-bearing number: every one of
+  those matches re-simulates to the same checksums after a session that changed
+  combat, damage application, animal behaviour and the RNG's consumers.
+  Note the matches are still Dark Age militia wars — the built-in AI does not
+  research, so none of the Feudal or Castle content above appears in them
+  (queue item N1).
 - Per-tick cost over a full 900-second match (seed 102): median **0.58ms**,
   p99 **1.72ms**, worst **11.7ms**, against a 50ms budget at 20Hz. The median
   was never the problem; the worst tick is the number to watch, and it was
-  105ms before the pathfinder's open list became a heap.
+  105ms before the pathfinder's open list became a heap. These three figures
+  predate the Castle Age and hunting work and have not been re-measured; the
+  batch throughput above is the number that has.
 - Forests are solid: seed 7 grows two clumps of exactly 55 tiles, no row has a
   clear line through, and crossing one costs 1.66x the straight line while
   never stepping on a tree.

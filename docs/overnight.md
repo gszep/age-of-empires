@@ -1,18 +1,21 @@
 # Overnight run checklist
 
-The work queue for autonomous runs, built by comparing the current game
-against the reference AoE2DE data in the owned depots. Work strictly top to
-bottom, **one item at a time**: an item is done only when its verification
-step passes and the quality gate (`npm test`, `npm run build`,
-`npm run test:import`) is green, then commit before starting the next. If an
-item cannot be finished, revert to the last green state, record what blocked
-it here, and move on — a half-shipped feature is worse than an honest gap.
-Do not mark an item done on "looks done": run its check.
+The work queue for autonomous runs, built by comparing the current game against
+the reference AoE2DE data in the owned depots. Work strictly top to bottom,
+**one item at a time**: an item is done only when its verification step passes
+and the quality gate (`npm test`, `npm run build`, `npm run test:import`) is
+green, then commit and push before starting the next. If an item cannot be
+finished, revert to the last green state, record what blocked it here, and move
+on — a half-shipped feature is worse than an honest gap. Do not mark an item
+done on "looks done": run its check.
 
-Use the debug protocol (`AGENTS.md` → Visual debug protocol) and
-`npm run debug:smoke` for rendering verification. Record discoveries in
-`docs/lessons.md` and keep `docs/backlog.md` and `docs/status.md` truthful as
-items land.
+Use the debug protocol (`AGENTS.md` → Visual debug protocol) for rendering
+verification, and prefer its fields to screenshots: `entities` reports
+`amount`, `resourceKind` and the `frame` actually drawn, and `sim` reports
+`selected` and `flashTarget`. To reach a state a fresh match cannot — a Castle
+Age town, an army mid-fight — build it in Node through `applyCommand` and hand
+it to the page as a dev-session snapshot (`docs/lessons.md` has the recipe);
+do not add cheats to the protocol and do not play twenty minutes to get there.
 
 Wait on long jobs by handle, never by pattern — `tools/wait_for.sh` against a
 PID or sentinel file, not `pgrep -f`. End every run with a hygiene pass:
@@ -22,212 +25,143 @@ left running.
 
 ## Where this queue stands
 
-The run is finished. Twelve of the fourteen items are `[x]` below with what was
-found and how it was checked; **A6 (terrain blends)** is blocked on evidence
-and should not be reattempted without new evidence, and **D2 (water)** is
-scoped in `docs/water-design.md` and deliberately not started.
+The previous queue (A–D, visual fidelity through palisades) is finished and its
+findings are folded into `docs/status.md`; only **terrain blends** (blocked on
+evidence — see status.md, do not reattempt without new evidence) and **water**
+(scoped in `docs/water-design.md`, deliberately not started) survive from it.
 
-Everything after that has come from playtesting rather than from this list, and
-this file is not the place to look for the current state of the game —
-`docs/status.md` is. In order, what landed after the queue:
+What landed since, from playtesting rather than from a list:
 
-1. **Game speed**, `+` and `-`, 1x to 10x, multiplying how much time the frame
-   loop hands the accumulator so the tick length and every checksum are
-   untouched.
-2. **The map** became 120x120 and square, AoE2's "tiny", with each player's
-   opening laid out at `land_resources.inc`'s own distances. That change forced
-   three others: a starting scout (without one nothing is visible to gather and
-   the match never starts), drop-site siting in the example AI, and a minimap
-   that draws terrain as one image rather than a path per tile.
-3. **Bounded auto-continuation**: what a worker picks up next when its node runs
-   out is now limited to what its owner can see and to three times its line of
-   sight, and prefers the same kind of thing it was working.
-4. **Pathfinding cost**: resources snapped to tile centres (a one-tile footprint
-   off-centre blocks four tiles), and the A* open list became a binary heap
-   keyed on the same total order, which left every path identical and the worst
-   tick 105ms lighter.
-5. **Solid forests**, grown as contiguous tile clumps the way `create_terrain`
-   builds one, with the pathfinder and the target chooser both taught that a
-   tree inside a wood is nobody's to cut.
-6. **Herdables** stop where they stand when claimed and take orders, instead of
-   following the nearest unit and having every order overwritten.
+1. **Selection markers follow the DAT's obstruction shape** — a ring under a
+   unit, the `outline_size` box on the ground under a building or resource, and
+   a flat box over a carcass (the corpse is its own DAT unit). An enemy told to
+   expect company blinks its marker; nothing else does.
+2. **The Castle Age**, and the monastery, siege workshop and castle with the
+   knight, cavalry archer, longbowman, battering ram, mangonel and monk. Monks
+   heal and convert; a mangonel's stone lands with a blast.
+3. **The default game speed** is the setting the reference calls Default
+   (1.5x). The match used to open at 1x, which is AoE2's Slow.
+4. **Carcasses** are selectable and orderable while they hold food, rot by how
+   much has been eaten rather than by the clock, and show the food left.
+5. **Hunting** uses the DAT hunter's bow (3 tiles, projectile 509); working a
+   herdable draws the shepherd; a deer is startled from one tile, hops 1.5, and
+   then grazes for 14–20 seconds instead of being walked away indefinitely.
 
-The standing rules at the top of this file still apply to whatever comes next:
-one item at a time, the gate green before a commit, and an honest gap recorded
-in `docs/backlog.md` rather than a half-shipped feature.
+**The one thing to understand before picking up N1:** the simulation is now
+well ahead of what a played match shows. Three ages, six Castle Age units and
+three Castle Age buildings exist and are covered by tests, and the built-in AI
+still opens with Dark Age militia and never researches anything, so none of it
+appears in a match anybody watches. That is what the top of this queue is for.
 
-## A. Visual fidelity (no new gameplay, all source data already local)
+## N. The queue
 
-- [x] **Player-colour palette ramps.** Done, but not where this item pointed:
-  the mask value *is* a coverage alpha (solid 255 inside, BC4 edge noise
-  outside) and the shade lives in the main layer's greys, while the ramp is the
-  game palette's 8-shade block at the DAT's `player_color_base` — not
-  `playercolor_*.pal`. The importer packs shade+coverage into the player-colour
-  sheet and emits each player's block; the renderer looks the grey up through
-  it. *Verified:* militia cloth renders 357 distinct palette blues (was one flat
-  `#1a6cff`), and the debug readback was fixed to report screen colours.
-- [x] **Town-center (annex) player colour.** The importer already produced
-  `annex0/annex2-idle-playercolor`; the TC's *body* art carries no
-  player-colour layer at all, so its colour is entirely in the annexes and the
-  renderer drew none of it. Each annex now gets its own ramp piece.
-  *Verified:* pixel sample over the TC returns 3,258 player-blue pixels in
-  2,783 shades (was none), and `colorTint` is reported for it again.
-- [x] **Sprite outlines.** The layer is not BC1 and not a dark contour: it is
-  its own per-block-row command stream (see status.md) holding the one-pixel
-  contour AoE2 shows *through* a building standing in front of a unit, in the
-  colour the DAT names in `unit_outline_color`. Exported as a tintable mask
-  and drawn on occlusion rather than always. *Verified:* import tests assert
-  the walk and the militia's outline atlas; a villager walked behind the town
-  center renders 198 pixels of the DAT's pure blue and none in the open.
-- [x] **Rally-point flags.** No unit in the DAT points at the waypoint flag, so
-  the importer resolves it by its own graphic name (`WaypointFlag Britons`, 90
-  frames) through a new `effects` section of the spec, and fails if the name
-  matches anything but one graphic. Drawn over every sprite at the rally target
-  while its building is selected, player colour and all. *Verified:* the
-  entities query reports the rally point, and a screenshot with the town center
-  selected shows the British flag flying at it.
-- [x] **Corpse decay and tree stumps.** The DAT models what a death leaves
-  behind as its own unit at `dead_unit_id`, and its standing graphic is the
-  art: `u_*_decayA_x1` per unit and task variant, `n_tree_stump_generic_x1`
-  for a spent tree or berry bush. Imported through a new `dead` slot; the
-  renderer switches from the dying graphic to it once that graphic has played
-  out. *Verified:* an entity query (which now reports corpses) shows a killed
-  villager move from `villager/death` to `villager/decay`, and a spent tree to
-  `tree-oak/decay`.
-- [ ] **Terrain blend edges. Blocked on evidence, not effort.** What the owned
-  files do say: the DAT gives each terrain a `blend_type` (grass 0, both farm
-  slots 1) and a `blend_priority` (grass 111, Farm1 186, Farm Cnst1 180), and
-  `terrain/blends/` holds ten 8-bit masks — `farmland.png` the only farm-named
-  one. What they do not say is which file a `blend_type` selects, or how a
-  512x512 mask is indexed against a tile: its shapes are irregular parcels that
-  straddle any 2x2 or 4x4 split, so it is neither one plot nor an atlas of edge
-  tiles. `masks/` is a different thing again — `overlay_mask_name` (grass ->
-  `masks/grass.png`) is noise, and the neighbouring `terrain_unit_masked_density`
-  field suggests it drives decorative scatter rather than the ground's look.
-  Picking a blend file by its name and an anchoring by eye would invent a
-  visual, which is what the download-first rule exists to prevent. Needs either
-  a mapping found in the owned data or a side-by-side against the installed
-  game.
+### N1. Teach the built-in AI to age up
 
-## B. Tech tree toward a faithful Dark→Feudal slice
+`src/sim/ai.ts` has no notion of research, so Loom, the Feudal Age and the
+Castle Age are all out of its reach, and with them the market, archery range,
+stable, blacksmith, monastery, siege workshop, castle and every unit they
+train. This is the largest gap between what the simulation supports and what
+the game shows, and it blocks N2 and N3 from being observable.
 
-- [x] **Trade cart at the market (the reported gap).** Unit 128 TCART imported
-  with its idle/walk/laden/death/decay art, trained at the market for
-  100 wood + 50 gold in 51s. The route's economics are the cart's own DAT
-  fields rather than the community's gold-per-tile constant, which is not in
-  the owned data: it earns at `bird.work_rate` (0.2875/s) for every second on
-  the road since its last delivery, capped at `resource_capacity` (100), loads
-  at a foreign market and banks whole gold at its own, the remainder riding on
-  to the next run. *Verified:* simulation tests build both markets, train a
-  cart, and watch gold rise only on the return leg — refusing a route onto the
-  cart's own market, and ending the order rather than walking on the spot when
-  the far market is walled off. In the live match a cart trained at the market
-  renders in player colour, swaps to its laden art on the way home, and pays.
-- [x] **Stable and scout cavalry.** Stable (unit 101, 175 wood, 50s) and scout
-  cavalry (448, 80 food, 30s, and the only thing the stable trains in this
-  slice) imported from the DAT, including `b_west_stable_age2_x1.sld` — the
-  file that used to crash the decoder. *Verified:* an import test resolves both
-  and names that source; a simulation test builds the stable, trains a scout,
-  and checks the stable trains nothing else.
-- [x] **Archery-range audit — skirmisher.** The skirmisher is unit 7, which the
-  DAT calls "XBOWM" — its identity comes from `u_arc_skirmisher_*`, not its
-  name. Imported (25 food + 35 wood, 26s) with its minimum range of 1 tile
-  honoured, so a skirmisher with an enemy on top of it holds rather than
-  shooting. The audit of every production building's
-  `creatable.train_locations` is a table in status.md; what is left out is
-  age-gated, another civilisation's, or the herdables (their own item).
-  *Verified:* the archery range's trainable list is exactly archer and
-  skirmisher, and a simulation test shows the minimum range biting and then
-  releasing.
-- [x] **Herdables and hunting.** Four sheep by each town center, two deer and a
-  boar out on the map, all gaia units carrying the food the DAT stores on them
-  (100, 140, 340). A sheep walks over to whoever comes closest — and stays put
-  while two players are near it — then follows them; working it turns it into a
-  carcass, as in AoE2. Deer bolt from anything that is not gaia; a wounded boar
-  turns on whoever wounded it. A carcass outlives the corpse window while it
-  still has food on it, and the villager that made it carries the meat home as
-  the DAT's hunter (unit 122). *Verified:* simulation tests for each behaviour,
-  and in the live match a claimed sheep renders with a player-blue collar
-  through the palette ramp while `villager-hunter/work` turns `sheep/idle` into
-  `sheep/death` then `sheep/decay` and banks 10 food.
-- [x] **Technologies + Feudal age-up.** A building researches one technology at
-  a time; cost, research time, building and effects all come from the DAT.
-  Loom (50 gold, 25s at the town center) reads its +15 hit points and +1/+2
-  armour off the effect commands and heals the villagers already standing
-  there. The Feudal Age (500 food, 130s) is tech 101 — which the DAT calls
-  "Middle Age" while its *effect* is called "Feudal Age", the same name-versus-
-  data trap as the units. Which age a thing belongs to is read from the tech
-  that turns it on, so the gate is the DAT's: market, blacksmith, archery
-  range, stable, watch tower, archer, skirmisher, spearman, scout cavalry and
-  trade cart are all Feudal. *Verified:* a determinism test replays a research
-  to an identical checksum; a gate test refuses each Feudal building by name in
-  the Dark Age and lets it through after; and the live match walked the whole
-  loom → herd → age-up → market chain.
+Read `applyCommand`'s `research` branch for the rules the AI must satisfy
+(building idle, age reached, cost affordable). Bank toward the age rather than
+spending everything on villagers; the observation already carries `age` and
+`researched`.
 
-## C. Audio (depot 813783 and vgmstream-cli are installed locally)
+*Verify:* a 16-match paired batch (`npm run batch -- --matches 16 --seed-start
+1`) in which at least half the matches reach the Feudal Age and at least one
+reaches the Castle Age, still 16/16 decided with 0 replay checksum failures.
+Record the new age distribution in `docs/status.md`.
 
-- [x] **Selection and acknowledgement voices.** Not through `sounds.json`,
-  which holds only UI events: a unit's voice is a Wwise id the DAT already
-  carries (`wwise_selection_sound_id`, `wwise_train_sound_id`), so the
-  resolver takes an id as well as a name. Those events cover every
-  civilisation through one switch container on `Civilization`; its switch
-  table is decoded so only the imported civ's branch is taken — the militia's
-  three Britons files, exactly the three the DAT lists for civ 1. *Verified:*
-  an import test resolves every consumed cue to owned media and asserts the
-  narrowing (178 → 3, and nothing at all for an unknown civ rather than
-  everything); fifteen aliases are in the audio manifest, and a simulation
-  test checks every trainable unit has the `<kind>-select` alias the view
-  asks for.
-- [x] **Alert and feedback cues.** Ten cues from `sounds.json` — under attack
-  (unit and town), population capped, farm depleted, gather point set, error,
-  age up, technology researched, victory, defeat — imported through the same
-  pipeline. `src/view/cues.ts` reads them out of observed state and answers
-  with alias names; the simulation never raises them, because it does not know
-  about sound. *Verified:* nine tests drive the watcher over real matches —
-  wounding a building raises the town alert once and not again for ten
-  seconds, wounding a unit raises the other one, somebody else's losses raise
-  neither, and a resumed match says nothing on its first look. A guard test
-  checks every cue the watcher can name is in the audio manifest.
-  *Not covered:* `sounds.json` names no construction-complete cue, so that one
-  is absent rather than approximated; a trained unit is announced by its own
-  voice instead (see the item above).
+### N2. Teach it to hunt and herd
 
-## D. Stretch (large; only after A–C are clean)
+It picks gather targets by `kind === 'resource'`, which animals are not, so the
+whole Dark Age food opening — four sheep by each town center, deer and boar out
+on the map — is invisible to it and its economy runs on berries and farms.
 
-- [x] **Palisade walls and gates.** A palisade segment is a 1x1 building
-  placed a tile at a time and dragged as a line; which of its base graphic's
-  five deltas a segment draws was measured by compositing each as a run along
-  both axes rather than guessed. The gate is the first building that is not
-  square: the DAT holds it as two unit pairs, one lying along each axis, each
-  with a closed leaf and an open one, so building rules gained an optional
-  `footprint` of half-extents and the importer learned to read one animation
-  slot from a different unit. `buildNavGrid` now takes an owner and leaves out
-  the gates that owner may walk through, so a gate is a doorway for its owner
-  and a wall for everybody else. Two things fell out of it: the palisade and
-  the gate were missing from `isBuilding`, so units had been strolling through
-  walls, and the victory check hung off a flag combat never sets, so one batch
-  match ran the full half hour over a razed town center. *Verified:* eleven
-  tests — the connection shapes, the whole dragged line getting built including
-  across the gate, the per-player obstruction map, a foundation being nobody's
-  doorway, the two gate axes and their open leaves, and a guard that every kind
-  in the rules answers to `isBuilding`/`isUnit`; an import test that the gate's
-  open art comes from the DAT unit that holds it; a live match that built a
-  ten-piece palisade with a gate, shut it, opened it on approach and walked a
-  villager through; and a 16-match batch back to 16/16 decided, 0 replay
-  failures, 910x real time.
-  *Not covered:* the DAT's other two gate pairs (797/798, 801/802) are two
-  tiles square and belong to a wall this slice does not build, and a gate does
-  not shut itself against an enemy standing in the doorway.
-- [ ] **Water: shoreline terrain, dock, fishing ship.** Requires map-gen
-  water, shore tiles, and boat pathing — a subsystem, not an item. Scope a
-  design note first; do not start it mid-run.
-  *Scoped, not started, as the item asks:* `docs/water-design.md` reads the
-  water terrain slots, the three terrain-restriction rows involved, and the
-  dock, fishing ship and fish out of the owned DAT, and stages the work as
-  W1–W5 with acceptance criteria. Two things it found are worth knowing before
-  anyone starts: land units already have the shallows exception authored
-  (restriction 7 crosses Beach and Shallows and refuses open water), and the
-  only real unknown is the shore seam, which is the same blend-mask mapping
-  that blocks A6 — the note recommends a one-tile beach ring rather than
-  waiting on it.
+*Verify:* a batch in which the AI's food income in the first four minutes is
+measurably higher than the current baseline (record both), and a simulation
+test that an AI-driven player claims and works a sheep.
 
+### N3. Import technology icons
+
+`import_ui.py` takes Buildings, Units, StatIcons and MenuIcons, so research
+buttons are text-only while every other button has its art. The DAT gives each
+tech an `icon_id` (the manifest already carries it for `castle-age`); the icon
+category to add is the researches sheet.
+
+*Verify:* the command panel with a town center selected shows an icon on the
+Loom, Feudal and Castle buttons — read `.command-button` background images out
+of the DOM rather than looking.
+
+### N4. Minimap player colours from the DAT
+
+`src/view/minimap.ts` reads `PLAYER_COLORS`, the open-content fallback, while
+the manifest carries each player's own `minimapColor`. The minimap has no
+`ContentAssets` handle; plumbing one through is the whole job.
+
+*Verify:* a pixel probe of the minimap returns the DAT's blue and red rather
+than `#1a6cff`/`#e02b2b`.
+
+### N5. A spent forage bush should leave nothing
+
+Playtest report: an exhausted bush briefly draws the generic tree stump,
+because the `dead` slot routes bushes through `n_tree_stump_generic_x1`. Check
+the bush's own `dead_unit_id` against the reference before deciding what it
+should leave; if the DAT assigns it nothing, it should draw nothing.
+
+*Verify:* an entities query on a worked-out bush reports no decay art, and the
+import test asserts whatever the DAT actually says.
+
+### N6. Building rubble, and a corpse window that follows its animation
+
+Every building's `dead_unit_id` names its rubble (`b_*_rubble_x1`) and the
+importer's `dead` slot already knows how to reach it, but `kill()` gives every
+corpse a 3-second window while a building's death graphic runs 8.3s — so a
+building vanishes mid-collapse and the rubble would never draw. The corpse
+window has to follow the death animation's length first, which is a simulation
+change and a checksum change.
+
+*Verify:* a razed barracks plays its collapse to the end and leaves rubble
+(entities query: `barracks/death` through to `barracks/decay`), and the
+determinism tests still pass with the new window.
+
+### N7. The under-attack alert nags
+
+Playtest report: while a building is under sustained attack the cue fires every
+few seconds. It should announce a *newly* attacked target and then hold its
+tongue. Check whether the watcher's rearm window resets per hit rather than per
+target, and what interval the reference uses.
+
+*Verify:* a cues test drives a sustained attack and asserts one alert, not a
+stream.
+
+### N8. Blacksmith and university technologies
+
+The tech system already reads cost, time, building and flat effects from the
+DAT; this is breadth. Do the blacksmith's armour and attack lines first — they
+are flat modifiers of the shape Loom already uses. Unit *upgrades*
+(man-at-arms, crossbowman, pikeman, light cavalry) are **not** this item: they
+need a rule that replaces one unit kind with another, which is its own change.
+
+*Verify:* each new technology is refused before its age and applies its DAT
+effect after, with a determinism test across a research.
+
+## Blocked or deliberately not started
+
+- **Terrain blend edges.** Blocked on evidence, not effort. The DAT gives a
+  `blend_type` and `blend_priority` and `terrain/blends/` holds ten masks, but
+  nothing says which file a type selects or how a 512x512 mask indexes against
+  a tile. Picking one by name and anchoring it by eye would invent a visual,
+  which is what the download-first rule exists to prevent. Needs a mapping
+  found in the owned data or a side-by-side against the installed game.
+- **Water.** `docs/water-design.md` scopes it as W1–W5 from the owned DAT. It
+  changes the board rather than adding to it; do not start it mid-run. Its one
+  open question is the shore seam, which is the same blend-mask mapping that
+  blocks the item above.
+- **The monk's occlusion contour.** Its idle and attack outline layers are the
+  only consumed sources that fail `tools/sld_layers.py`'s walk invariant, so
+  they sit in the manifest's `skippedMasks`. The invariant is the decoder
+  working as intended; what those two layers encode differently has not been
+  measured, and guessing would undo the thing that makes the decoder
+  trustworthy.
