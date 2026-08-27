@@ -114,10 +114,19 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   const idleMilitia = militia.filter(e => e.order === 'idle');
   if (idleMilitia.length && militia.length >= 3) {
     const enemyTc = enemyTcVisible;
+    // Anything of theirs that is still standing, nearest first: an army whose
+    // only heading was the mirror of its own town center had nowhere to go
+    // once that town center fell, and stood in the ruins until the clock ran
+    // out with the enemy barracks still up.
+    const enemyBuilding = known
+      .filter(e => e.owner !== 0 && e.owner !== player && e.kind !== 'resource'
+        && e.kind !== 'villager' && e.kind !== 'militia')
+      .sort((a, b) => distance(idleMilitia[0], a) - distance(idleMilitia[0], b) || a.id - b.id)[0];
     // March toward the mirrored base position until the enemy town center is seen.
     const target = enemyTc
       ? { x: enemyTc.x, y: enemyTc.y }
-      : tc ? { x: observation.mapWidth - tc.x, y: tc.y } : undefined;
+      : tc ? { x: observation.mapWidth - tc.x, y: tc.y }
+      : enemyBuilding ? { x: enemyBuilding.x, y: enemyBuilding.y } : undefined;
     if (target) {
       commands.push({
         kind: 'order', player, entityIds: idleMilitia.map(e => e.id).sort((a, b) => a - b),

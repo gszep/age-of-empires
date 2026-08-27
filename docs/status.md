@@ -291,9 +291,29 @@ A dragged line of foundations would otherwise leave nine untouched, because each
 segment a builder carries on to a touching unfinished foundation of the same
 kind, which is what AoE2 does with a wall drag and harmless everywhere else.
 
-*Not covered:* gates. The palisade gate is four unit pairs in the DAT (789/790,
-793/794, 797/798, 801/802) and needs an obstruction map that is passable for
-one player and not the others; see `docs/backlog.md`.
+## Palisade gates
+
+The gate is the first building that is not square: the DAT gives it as two unit
+pairs, 789/790 lying along x and 793/794 along y, each a closed leaf and an open
+one with identical numbers (240 hit points, 30 wood, 30 seconds) and mirrored
+collision boxes of two tiles by one. Building rules therefore carry an optional
+`footprint` of half-extents, placement and snapping work per axis, and the
+importer can read one animation slot from a different unit — which is how the
+open leaf is reached without inventing a second entity in the simulation.
+
+Passability is per player. `buildNavGrid` takes an owner and leaves out the
+finished gates that owner may walk through, so the owner of a gate walks a
+different map from everybody else; only players who actually have one pay for
+the extra grid. A foundation is nobody's doorway, including its owner's.
+
+The view picks between the four leaves by footprint and by whether one of the
+owner's units is within two and a half tiles, which is the art catching up with
+the pathing rather than a second rule. Walls beside a gate read it as part of
+their run, so the line joins up; so do the builders, who carry on down the whole
+palisade rather than stopping at the piece somebody happened to task last.
+
+Two DAT gate pairs are unused: 797/798 and 801/802 are two tiles square and
+belong to a wall this slice does not build.
 
 ## Verification
 

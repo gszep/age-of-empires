@@ -9,19 +9,37 @@
  * grid search is implemented instead (see docs/library-strategy.md).
  */
 import { isBuilding } from './data';
-import type { Entity, GameState, Point } from './types';
+import type { Entity, GameState, PlayerId, Point } from './types';
+
+/** A building's half-extents in tiles: square unless it says otherwise. */
+export const halfExtent = (entity: Entity): { x: number; y: number } =>
+  entity.footprint ?? { x: entity.radius, y: entity.radius };
+
+/** What stands on a tile: nothing, somebody's building, or gaia's scenery. */
+export const CLEAR = 0;
+export const WALLED = 1;
+export const SCENERY = 2;
 
 export interface NavGrid {
   width: number;
   height: number;
+  /** `CLEAR`, `WALLED` or `SCENERY` per tile. */
   blocked: Uint8Array;
 }
 
 const index = (grid: NavGrid, x: number, y: number) => y * grid.width + x;
 export const tileOf = (p: Point) => ({ x: Math.floor(p.x), y: Math.floor(p.y) });
 
-/** Static obstructions: complete buildings, foundations, and resource nodes. */
-export function buildNavGrid(state: GameState, ignoreEntityId?: number): NavGrid {
+/**
+ * Static obstructions: complete buildings, foundations, and resource nodes.
+ *
+ * `forOwner` builds the map one player walks on rather than the map everybody
+ * shares: a gate is a hole in its owner's wall and a wall to everyone else, so
+ * passability is per player and the grid has to be too.
+ */
+export function buildNavGrid(
+  state: GameState, ignoreEntityId?: number, forOwner?: PlayerId,
+): NavGrid {
   const grid: NavGrid = {
     width: state.width,
     height: state.height,
@@ -30,20 +48,38 @@ export function buildNavGrid(state: GameState, ignoreEntityId?: number): NavGrid
   for (const entity of state.entities) {
     if (entity.dead || entity.id === ignoreEntityId) continue;
     if (!isBuilding(entity.kind) && entity.kind !== 'resource') continue;
-    const half = entity.radius;
-    const minX = Math.max(0, Math.floor(entity.position.x - half + 1e-6));
-    const maxX = Math.min(grid.width - 1, Math.ceil(entity.position.x + half - 1e-6) - 1);
-    const minY = Math.max(0, Math.floor(entity.position.y - half + 1e-6));
-    const maxY = Math.min(grid.height - 1, Math.ceil(entity.position.y + half - 1e-6) - 1);
+    if (forOwner !== undefined && entity.owner === forOwner && entity.buildProgress === undefined
+      && state.rules.buildings[entity.kind as keyof typeof state.rules.buildings]?.passableForOwner) {
+      continue;
+    }
+    const half = halfExtent(entity);
+    const fill = entity.kind === 'resource' ? SCENERY : WALLED;
+    const minX = Math.max(0, Math.floor(entity.position.x - half.x + 1e-6));
+    const maxX = Math.min(grid.width - 1, Math.ceil(entity.position.x + half.x - 1e-6) - 1);
+    const minY = Math.max(0, Math.floor(entity.position.y - half.y + 1e-6));
+    const maxY = Math.min(grid.height - 1, Math.ceil(entity.position.y + half.y - 1e-6) - 1);
     for (let y = minY; y <= maxY; y++) {
-      for (let x = minX; x <= maxX; x++) grid.blocked[index(grid, x, y)] = 1;
+      for (let x = minX; x <= maxX; x++) {
+        const at = index(grid, x, y);
+        // A wall over scenery is still a wall; scenery never softens one.
+        if (fill === WALLED || grid.blocked[at] === CLEAR) grid.blocked[at] = fill;
+      }
     }
   }
   return grid;
 }
 
 export const isBlocked = (grid: NavGrid, x: number, y: number): boolean =>
-  x < 0 || y < 0 || x >= grid.width || y >= grid.height || grid.blocked[index(grid, x, y)] === 1;
+  x < 0 || y < 0 || x >= grid.width || y >= grid.height || grid.blocked[index(grid, x, y)] !== CLEAR;
+
+/**
+ * Whether a tile is blocked by something somebody built rather than by gaia's
+ * trees and rocks. A unit that has ended up among scenery can squeeze back out
+ * of it — AoE2 trees do not fill their tile the way a wall does — but a wall is
+ * built to stop people and stops them.
+ */
+export const isWalled = (grid: NavGrid, x: number, y: number): boolean =>
+  x < 0 || y < 0 || x >= grid.width || y >= grid.height || grid.blocked[index(grid, x, y)] === WALLED;
 
 /** Nearest free tile to a target, by ring search with deterministic ordering. */
 export function nearestFreeTile(grid: NavGrid, target: Point): { x: number; y: number } | undefined {

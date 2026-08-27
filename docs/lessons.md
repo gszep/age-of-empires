@@ -84,6 +84,26 @@ keeps the record.
   seamlessly *is* that axis's run. Rule: when art has to be indexed by game
   state, prove the index by drawing the arrangement, not by reading numbers.
 
+- **A predicate that lists its members by hand will be missed.** `isBuilding`
+  is a hardcoded set, and the palisade was added to the rules, the schemas and
+  the renderer without being added to it — so units strolled through walls and
+  a foundation drew as a finished building, with every test green. Rule: when a
+  kind is added, a test asserts every key of `FALLBACK_RULES` answers to
+  `isBuilding`/`isUnit`; type-checking will not do it for you.
+- **A condition that is only asked sometimes is only right sometimes.** The
+  victory check hung off a `newlyDead` flag that combat never sets, because an
+  attack resolves its own kill the moment the blow lands. Matches usually ended
+  anyway, on the next berry bush to run out — until one did not, and ran the
+  full half hour over a razed town center. Rule: gating a cheap check on a
+  "something happened" flag is an optimisation, and it needs the same proof
+  that the flag covers every way the thing can happen.
+- **A unit that cannot find a way must stop, not walk through the wall.** The
+  escape hatch for a walker boxed into its own tile let it step straight at its
+  destination, which is right for a villager stuck in a wood line and wrong for
+  anything facing a palisade. Rule: distinguish what gaia put there from what a
+  player built — the grid marks them apart — and let a walker squeeze out of
+  scenery but never through somebody's wall.
+
 ## Process
 
 - **Complete one playable behaviour end to end** (from the working style

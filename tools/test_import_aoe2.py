@@ -277,6 +277,34 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(scout["train"], {"buildingId": stable["id"], "seconds": 30})
         self.assertEqual(scout["animations"]["idle"]["source"], "u_cav_scout_idleA_x1.sld")
 
+    def test_gate_leaves_and_axes_come_from_the_dat_units_that_hold_them(self):
+        entities = self.result["entities"]
+        along_x = entities["palisade-gate"]
+        along_y = entities["palisade-gate-y"]
+        self.assertEqual((along_x["id"], along_y["id"]), (789, 793))
+        # The two are one gate turned: identical numbers, mirrored collision
+        # boxes. Two tiles by one is the DAT's, not a guess.
+        for gate in (along_x, along_y):
+            self.assertEqual(gate["hitPoints"], 240)
+            self.assertEqual(gate["cost"], {"wood": 30})
+            self.assertEqual(gate["build"]["seconds"], 30)
+        self.assertEqual(along_x["collision"], [1.0, 0.5])
+        self.assertEqual(along_y["collision"], [0.5, 1.0])
+        # Open and closed are separate units in the DAT sharing everything but
+        # the art, so the open leaf is read from the unit that holds it.
+        self.assertEqual(
+            along_x["animations"]["idle"]["source"], "b_dark_gate_palisade_ne_closed_x1.sld"
+        )
+        self.assertEqual(
+            along_x["animations"]["open"]["source"], "b_dark_gate_palisade_ne_open_x1.sld"
+        )
+        self.assertEqual(
+            along_y["animations"]["idle"]["source"], "b_dark_gate_palisade_se_closed_x1.sld"
+        )
+        self.assertEqual(
+            along_y["animations"]["open"]["source"], "b_dark_gate_palisade_se_open_x1.sld"
+        )
+
     def test_trade_cart_carries_its_own_route_rules(self):
         cart = self.result["entities"]["trade-cart"]
         self.assertEqual(cart["id"], 128)

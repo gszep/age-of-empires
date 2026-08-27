@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES, isAnimal, rulesFromManifest, type ContentManifest, type GameRules } from './data';
 import { checksumState } from './checksum';
-import { applyCommand, createGame, placementLegal, stepGame } from './game';
+import { applyCommand, buildingFootprint, createGame, placementLegal, stepGame } from './game';
 import type { BuildingKind, Entity, GameState, ResourceKind } from './types';
 
 const MANIFEST_PATH = 'public/imported/aoe2/manifest.json';
@@ -809,6 +809,80 @@ describe('palisade walls', () => {
     // And once the line is up the builders stop rather than wandering off to
     // somebody else's foundations.
     expect(state.entities.filter(e => builders.includes(e.id)).every(e => e.order.kind === 'idle')).toBe(true);
+  });
+
+  it('turns a gate to the axis it was placed on, and charges the DAT price', () => {
+    const state = createGame(72);
+    state.players[1].wood = 200;
+    const builders = state.entities.filter(e => e.owner === 1 && e.kind === 'villager').map(e => e.id);
+
+    // Two tiles by one, so a legal spot has to be searched for either way round.
+    let placed: { target: { x: number; y: number }; along: 'x' | 'y' } | undefined;
+    for (let y = 4; y < 20 && !placed; y++) {
+      for (let x = 4; x < 22 && !placed; x++) {
+        if (placementLegal(state, 'palisade-gate', { x, y: y + 0.5 }, 'x').ok) {
+          placed = { target: { x, y: y + 0.5 }, along: 'x' };
+        }
+      }
+    }
+    expect(placed, 'somewhere to put a gate').toBeDefined();
+
+    const before = state.players[1].wood;
+    expect(applyCommand(state, {
+      kind: 'build', player: 1, builderIds: builders, building: 'palisade-gate',
+      target: placed!.target, orientation: 'x',
+    }).ok).toBe(true);
+    expect(before - state.players[1].wood).toBe(state.rules.buildings['palisade-gate'].cost.wood);
+
+    const gate = state.entities.find(e => e.kind === 'palisade-gate')!;
+    expect(gate.footprint).toEqual({ x: 1, y: 0.5 });
+    // The other way round is the same box turned, which is what the DAT's two
+    // gate units are: identical numbers, one long in x and one long in y.
+    expect(buildingFootprint(state, 'palisade-gate', 'y')).toEqual({ x: 0.5, y: 1 });
+
+    // And the same spot is no longer free for a gate lying the other way.
+    expect(placementLegal(state, 'palisade-gate', placed!.target, 'y').ok).toBe(false);
+  });
+
+  it('carries the builders across the gate in the line rather than stopping at it', () => {
+    // The gate is a different kind from the wall either side of it, but one
+    // drag placed the lot, so it is the same line to whoever is building it.
+    const state = createGame(73);
+    state.players[1].wood = 300;
+    const builders = state.entities.filter(e => e.owner === 1 && e.kind === 'villager').map(e => e.id);
+
+    // A wall centre sits on a tile, a gate centre on the corner between the two
+    // it covers: with walls on x0 and x0+1 the gate goes on x0+2.5, filling the
+    // two tiles between them and the walls on x0+4 and x0+5.
+    let row: number | undefined;
+    let startX: number | undefined;
+    for (let y = 4.5; y < 20 && row === undefined; y++) {
+      for (let x = 4.5; x < 18; x++) {
+        const tiles = [x, x + 1, x + 4, x + 5];
+        if (!tiles.every(at => placementLegal(state, 'palisade-wall', { x: at, y }).ok)) continue;
+        if (!placementLegal(state, 'palisade-gate', { x: x + 2.5, y }, 'x').ok) continue;
+        row = y; startX = x; break;
+      }
+    }
+    expect(row, 'a clear row for a wall with a gate in it').toBeDefined();
+
+    for (const at of [startX!, startX! + 1, startX! + 4, startX! + 5]) {
+      expect(applyCommand(state, {
+        kind: 'build', player: 1, builderIds: builders, building: 'palisade-wall',
+        target: { x: at, y: row! },
+      }).ok).toBe(true);
+    }
+    // Tasked last, so it is the one the builders start on and the walls are
+    // only reached by carrying on down the line.
+    expect(applyCommand(state, {
+      kind: 'build', player: 1, builderIds: builders, building: 'palisade-gate',
+      target: { x: startX! + 2.5, y: row! }, orientation: 'x',
+    }).ok).toBe(true);
+
+    const line = () => state.entities.filter(
+      e => !e.dead && (e.kind === 'palisade-wall' || e.kind === 'palisade-gate'));
+    for (let i = 0; i < 8000 && line().some(e => e.buildProgress !== undefined); i++) stepGame(state);
+    expect(line().filter(e => e.buildProgress === undefined)).toHaveLength(5);
   });
 });
 

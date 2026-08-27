@@ -268,6 +268,65 @@ describe('wall connection shapes', () => {
   });
 });
 
+describe('gates', () => {
+  const gateAt = (state: GameState, x: number, y: number, along: 'x' | 'y'): Entity => {
+    const rules = state.rules.buildings['palisade-gate'];
+    const entity: Entity = {
+      id: state.nextId++, kind: 'palisade-gate', owner: 1, position: { x, y },
+      hp: rules.hp, maxHp: rules.hp, radius: rules.radius,
+      footprint: along === 'x' ? { x: 1, y: 0.5 } : { x: 0.5, y: 1 },
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(entity);
+    return entity;
+  };
+
+  it('draws the gate unit that lies along the wall it is in', () => {
+    const state = createGame(64);
+    expect(chooseAnimation(state, gateAt(state, 20, 4.5, 'x')).key).toBe('palisade-gate');
+    expect(chooseAnimation(state, gateAt(state, 24.5, 8, 'y')).key).toBe('palisade-gate-y');
+  });
+
+  it('swings open for its owner and stays shut for everybody else', () => {
+    const state = createGame(65);
+    // Somewhere nobody starts, so only the units this test places are near.
+    const gate = gateAt(state, 26, 26.5, 'x');
+    expect(chooseAnimation(state, gate).name).toBe('idle');
+
+    const mine = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    mine.position = { x: 26.5, y: 26.5 };
+    expect(chooseAnimation(state, gate).name).toBe('open');
+
+    mine.position = { x: 40, y: 40 };
+    const theirs = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
+    theirs.position = { x: 26.5, y: 26.5 };
+    expect(chooseAnimation(state, gate).name).toBe('idle');
+  });
+
+  it('is a foundation before it is a gate, however close its owner stands', () => {
+    const state = createGame(66);
+    const gate = gateAt(state, 26, 26.5, 'x');
+    gate.buildProgress = 0.4;
+    const mine = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    mine.position = { x: 26.5, y: 26.5 };
+    expect(chooseAnimation(state, gate).name).toBe('construction');
+  });
+
+  it('counts as part of the run the walls beside it draw', () => {
+    const state = createGame(67);
+    // A wall at (24.5, 30.5) with a gate covering (25, 26) of the same row.
+    const wall = {
+      id: state.nextId++, kind: 'palisade-wall' as const, owner: 1 as const,
+      position: { x: 24.5, y: 30.5 }, hp: 1, maxHp: 1, radius: 0.5,
+      activity: 'idle' as const, order: { kind: 'idle' as const },
+    };
+    state.entities.push(wall);
+    expect(wallShape(state, wall)).toBe(4);
+    gateAt(state, 26, 30.5, 'x');
+    expect(wallShape(state, wall)).toBe(1);
+  });
+});
+
 describe('the gather-point flag', () => {
   function flagAssets(): ContentAssets {
     const assets = fakeAssets();

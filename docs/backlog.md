@@ -52,6 +52,12 @@ construction-complete cue, so that one has no owned source to draw on.
 - **The built-in AI ignores sheep, deer and boar.** It picks gather targets by
   `kind === 'resource'`, which animals are not, so the whole Dark Age food
   opening is invisible to it. Its matches still run on berries and farms.
+- **A gate does not shut itself.** AoE2 closes a gate when an enemy is in it,
+  which is what stops an attacker walking in behind a retreating villager. Here
+  the art opens for the owner's units and passability is decided per player, so
+  an enemy is stopped by the closed gate at all times and never squeezes
+  through — but the two rules are not the same rule, and making them one means
+  giving the simulation a gate state the checksum can see.
 - **The example AI is a Dark Age militia rush and nothing else.** It no longer
   stalemates — all 16 of the paired batch decide — but it gathers, houses,
   builds a barracks and attacks in threes, and that is the whole repertoire.

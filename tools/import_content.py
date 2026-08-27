@@ -294,8 +294,20 @@ def extract_entity(
     if sounds:
         entity["sounds"] = sounds
 
+    # An animation may name another unit to read its slot from: a gate's open
+    # leaf is a unit of its own in the DAT, sharing everything but the art.
     entity["animations"] = {
-        name: animation_entry(dat, graphics_dir, resolve_graphic_id(unit, animation, civ_units, dat), hashes)
+        name: animation_entry(
+            dat,
+            graphics_dir,
+            resolve_graphic_id(
+                civ_units[animation["unitId"]] if "unitId" in animation else unit,
+                animation,
+                civ_units,
+                dat,
+            ),
+            hashes,
+        )
         for name, animation in spec["animations"].items()
     }
 

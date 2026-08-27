@@ -3,7 +3,7 @@ import { FALLBACK_RULES } from './data';
 import { applyCommand, createGame, stepGame } from './game';
 import { buildNavGrid, findPath, isBlocked, type NavGrid } from './nav';
 import { observe } from './observe';
-import type { Entity, GameState, Point } from './types';
+import type { BuildingKind, Entity, GameState, Point } from './types';
 
 /** An empty arena: the seeded map with every resource node removed. */
 function arena(seed = 1): GameState {
@@ -22,14 +22,30 @@ function unit(state: GameState, position: Point, owner: 1 | 2 = 1, kind: 'villag
   return entity;
 }
 
-function building(state: GameState, kind: 'house' | 'barracks', position: Point, owner: 1 | 2 = 1): Entity {
+function building(
+  state: GameState, kind: BuildingKind, position: Point, owner: 1 | 2 = 1,
+  footprint?: { x: number; y: number },
+): Entity {
   const rules = state.rules.buildings[kind];
   const entity: Entity = {
     id: state.nextId++, kind, owner, position: { ...position }, hp: rules.hp, maxHp: rules.hp,
     radius: rules.radius, activity: 'idle', order: { kind: 'idle' },
+    ...(footprint ? { footprint } : {}),
   };
   state.entities.push(entity);
   return entity;
+}
+
+/**
+ * A palisade across the whole map at x = 15 with a gate in it at y = 14..15.
+ * Every tile of the line is filled, so the only way through is the doorway.
+ */
+function wallWithGate(state: GameState, owner: 1 | 2 = 1): Entity {
+  for (let y = 0; y < state.height; y++) {
+    if (y === 14 || y === 15) continue;
+    building(state, 'palisade-wall', { x: 15.5, y: y + 0.5 }, owner);
+  }
+  return building(state, 'palisade-gate', { x: 15.5, y: 15 }, owner, { x: 0.5, y: 1 });
 }
 
 const run = (state: GameState, ticks: number, invariant?: () => void) => {
@@ -97,6 +113,50 @@ describe('navigation compatibility suite', () => {
     // The path uses the gap row rather than a long detour.
     expect(path.some(w => Math.floor(w.y) === 15 && Math.floor(w.x) >= 14 && Math.floor(w.x) <= 17)).toBe(true);
     expect(south.id).toBeGreaterThan(0);
+  });
+
+  it('gate: is a doorway for its owner and a wall for everybody else', () => {
+    const state = arena();
+    const gate = wallWithGate(state, 1);
+
+    const shared = buildNavGrid(state);
+    const mine = buildNavGrid(state, undefined, 1);
+    const theirs = buildNavGrid(state, undefined, 2);
+    // Both tiles the gate covers, and no more than those.
+    for (const y of [14, 15]) {
+      expect(isBlocked(shared, 15, y), `shared ${y}`).toBe(true);
+      expect(isBlocked(mine, 15, y), `owner ${y}`).toBe(false);
+      expect(isBlocked(theirs, 15, y), `enemy ${y}`).toBe(true);
+    }
+    expect(isBlocked(mine, 15, 13)).toBe(true);
+    expect(isBlocked(mine, 15, 16)).toBe(true);
+    expect(gate.footprint).toEqual({ x: 0.5, y: 1 });
+  });
+
+  it('gate: its owner walks through and the enemy is left outside', () => {
+    const state = arena();
+    wallWithGate(state, 1);
+    const mine = unit(state, { x: 12, y: 15 }, 1);
+    const theirs = unit(state, { x: 12, y: 16 }, 2);
+    applyCommand(state, { kind: 'order', player: 1, entityIds: [mine.id], target: { x: 20, y: 15 } });
+    applyCommand(state, { kind: 'order', player: 2, entityIds: [theirs.id], target: { x: 20, y: 16 } });
+    run(state, 20 * 40);
+    expect(distance(mine.position, { x: 20, y: 15 })).toBeLessThan(0.6);
+    // The wall runs the height of the map, so there is no way round it at all.
+    expect(theirs.position.x).toBeLessThan(15);
+  });
+
+  it('gate: is not a doorway until it is built', () => {
+    // A foundation is a hole nobody may walk through, its owner included:
+    // otherwise a wall could be opened for the cost of starting a gate.
+    const state = arena();
+    const gate = wallWithGate(state, 1);
+    gate.buildProgress = 0.5;
+    expect(isBlocked(buildNavGrid(state, undefined, 1), 15, 15)).toBe(true);
+    const mine = unit(state, { x: 12, y: 15 }, 1);
+    applyCommand(state, { kind: 'order', player: 1, entityIds: [mine.id], target: { x: 20, y: 15 } });
+    run(state, 20 * 20);
+    expect(mine.position.x).toBeLessThan(15);
   });
 
   it('crossing groups: two opposing groups pass and settle without stacking', () => {

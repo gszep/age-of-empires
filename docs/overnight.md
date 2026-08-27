@@ -152,8 +152,30 @@ items land.
 
 ## D. Stretch (large; only after A–C are clean)
 
-- [ ] **Palisade walls and gates.** Wall-segment placement (drag lines),
-  gate pathing. Big obstruction-map surface — keep nav tests green.
+- [x] **Palisade walls and gates.** A palisade segment is a 1x1 building
+  placed a tile at a time and dragged as a line; which of its base graphic's
+  five deltas a segment draws was measured by compositing each as a run along
+  both axes rather than guessed. The gate is the first building that is not
+  square: the DAT holds it as two unit pairs, one lying along each axis, each
+  with a closed leaf and an open one, so building rules gained an optional
+  `footprint` of half-extents and the importer learned to read one animation
+  slot from a different unit. `buildNavGrid` now takes an owner and leaves out
+  the gates that owner may walk through, so a gate is a doorway for its owner
+  and a wall for everybody else. Two things fell out of it: the palisade and
+  the gate were missing from `isBuilding`, so units had been strolling through
+  walls, and the victory check hung off a flag combat never sets, so one batch
+  match ran the full half hour over a razed town center. *Verified:* eleven
+  tests — the connection shapes, the whole dragged line getting built including
+  across the gate, the per-player obstruction map, a foundation being nobody's
+  doorway, the two gate axes and their open leaves, and a guard that every kind
+  in the rules answers to `isBuilding`/`isUnit`; an import test that the gate's
+  open art comes from the DAT unit that holds it; a live match that built a
+  ten-piece palisade with a gate, shut it, opened it on approach and walked a
+  villager through; and a 16-match batch back to 16/16 decided, 0 replay
+  failures, 910x real time.
+  *Not covered:* the DAT's other two gate pairs (797/798, 801/802) are two
+  tiles square and belong to a wall this slice does not build, and a gate does
+  not shut itself against an enemy standing in the doorway.
 - [ ] **Water: shoreline terrain, dock, fishing ship.** Requires map-gen
   water, shore tiles, and boat pathing — a subsystem, not an item. Scope a
   design note first; do not start it mid-run.

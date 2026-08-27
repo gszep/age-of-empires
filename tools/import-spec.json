@@ -192,6 +192,30 @@
       }
     },
     {
+      "key": "palisade-gate",
+      "unitId": 789,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "open": { "unitId": 790, "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
+      "key": "palisade-gate-y",
+      "unitId": 793,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "open": { "unitId": 794, "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
       "key": "house",
       "unitId": 70,
       "category": "building",

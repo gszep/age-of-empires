@@ -12,7 +12,8 @@ export type BuildingKind =
   | 'town-center' | 'barracks' | 'house'
   | 'mill' | 'lumber-camp' | 'mining-camp' | 'farm'
   | 'outpost' | 'watch-tower'
-  | 'archery-range' | 'blacksmith' | 'market' | 'stable' | 'palisade-wall';
+  | 'archery-range' | 'blacksmith' | 'market' | 'stable'
+  | 'palisade-wall' | 'palisade-gate';
 export type EntityKind = UnitKind | BuildingKind | 'resource';
 export type Activity = 'idle' | 'moving' | 'gathering' | 'carrying' | 'building' | 'attacking' | 'dying';
 
@@ -46,6 +47,9 @@ export interface Entity {
    * or a trade cart's goods earned on the road. */
   gatherProgress?: number;
   /** Buildings. */
+  /** Half-extents in tiles when the footprint is not the square `radius` says:
+   * a gate is two tiles by one, and which way round is its orientation. */
+  footprint?: { x: number; y: number };
   buildProgress?: number; // 0..1; undefined once complete
   training?: { kind: UnitKind; remainingTicks: number };
   researching?: { tech: string; remainingTicks: number };
@@ -111,7 +115,9 @@ export interface GameState {
 export type Command =
   | { kind: 'order'; player: PlayerId; entityIds: number[]; target: Point; targetId?: number }
   | { kind: 'train'; player: PlayerId; buildingId: number; unit: UnitKind }
-  | { kind: 'build'; player: PlayerId; builderIds: number[]; building: BuildingKind; target: Point }
+  | { kind: 'build'; player: PlayerId; builderIds: number[]; building: BuildingKind; target: Point;
+      /** Which way a building longer than it is wide lies. Defaults to `x`. */
+      orientation?: 'x' | 'y' }
   | { kind: 'rally'; player: PlayerId; buildingId: number; target: Point; targetId?: number }
   | { kind: 'stop'; player: PlayerId; entityIds: number[] }
   | { kind: 'research'; player: PlayerId; buildingId: number; tech: string };

@@ -1,6 +1,6 @@
 import { FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isAnimal, isBuilding, isMilitary, isUnit } from './data';
 import type { AttackValue, Cost, GameRules, NodeKind, TechKey, UnitRules } from './data';
-import { buildNavGrid, findPath, isBlocked, separateUnits, tileOf, type NavGrid } from './nav';
+import { buildNavGrid, findPath, halfExtent, isBlocked, isWalled, separateUnits, tileOf, type NavGrid } from './nav';
 import { random01 } from './random';
 import { createVisibility, updateVisibility } from './visibility';
 import type {
@@ -149,20 +149,37 @@ function canShoot(state: GameState, entity: Entity): boolean {
 }
 
 /** Axis-aligned square-footprint overlap for placement legality. */
-function footprintsOverlap(a: Point, aHalf: number, b: Point, bHalf: number): boolean {
-  return Math.abs(a.x - b.x) < aHalf + bHalf && Math.abs(a.y - b.y) < aHalf + bHalf;
+function footprintsOverlap(
+  a: Point, aHalf: { x: number; y: number }, b: Point, bHalf: { x: number; y: number },
+): boolean {
+  return Math.abs(a.x - b.x) < aHalf.x + bHalf.x && Math.abs(a.y - b.y) < aHalf.y + bHalf.y;
 }
 
-export function placementLegal(state: GameState, building: BuildingKind, target: Point): CommandResult {
-  const half = state.rules.buildings[building].radius;
-  if (target.x - half < 0 || target.x + half > state.width || target.y - half < 0 || target.y + half > state.height) {
+/**
+ * The half-extents a building would occupy. Everything is square except a
+ * gate, which is two tiles by one and lies whichever way it was placed.
+ */
+export function buildingFootprint(
+  state: GameState, building: BuildingKind, orientation: 'x' | 'y' = 'x',
+): { x: number; y: number } {
+  const rules = state.rules.buildings[building];
+  const half = rules.footprint ?? { x: rules.radius, y: rules.radius };
+  return orientation === 'y' ? { x: half.y, y: half.x } : { ...half };
+}
+
+export function placementLegal(
+  state: GameState, building: BuildingKind, target: Point, orientation: 'x' | 'y' = 'x',
+): CommandResult {
+  const half = buildingFootprint(state, building, orientation);
+  if (target.x - half.x < 0 || target.x + half.x > state.width
+    || target.y - half.y < 0 || target.y + half.y > state.height) {
     return rejected('placement is outside the map');
   }
   // Units are ignored: real AoE nudges them off foundations (recorded approximation).
   for (const entity of state.entities) {
     if (entity.dead) continue;
     if (!isBuilding(entity.kind) && entity.kind !== 'resource') continue;
-    if (footprintsOverlap(target, half, entity.position, entity.radius)) {
+    if (footprintsOverlap(target, half, entity.position, halfExtent(entity))) {
       return rejected(`placement overlaps ${entity.kind} ${entity.id}`);
     }
   }
@@ -300,13 +317,18 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     e => !e.dead && command.builderIds.includes(e.id) && e.owner === command.player && e.kind === 'villager',
   );
   if (!builders.length) return rejected('builders must be owned villagers');
-  const legal = placementLegal(state, command.building, command.target);
+  const orientation = command.orientation ?? 'x';
+  const legal = placementLegal(state, command.building, command.target, orientation);
   if (!legal.ok) return legal;
   const paid = spend(state, command.player, command.building);
   if (!paid.ok) return paid;
+  const footprint = buildingFootprint(state, command.building, orientation);
   const site = addEntity(state, command.building, command.player, command.target, rules, {
     hp: 1,
     buildProgress: 0,
+    // Only a building that is longer than it is wide needs one; leaving it off
+    // everything else keeps the state a square footprint writes today.
+    ...(rules.footprint ? { footprint } : {}),
   });
   site.maxHp = rules.hp;
   for (const builder of builders) {
@@ -339,6 +361,28 @@ function clearPath(entity: Entity): void {
  * progress. Returns true once the destination (or its nearest reachable
  * tile) is reached.
  */
+/**
+ * A step straight at the destination, off the grid's path. A walker that has
+ * ended up standing inside a footprint — the final approach and the separation
+ * nudge both move in continuous space — must be able to step out again, and one
+ * that hunted its way into a pocket of woodland has to be able to squeeze back
+ * out of it. What it may not do is walk through something somebody built: there
+ * it stops where it stands, and reporting arrival is how the caller learns to
+ * give up rather than walking on the spot forever.
+ */
+function moveDirect(grid: NavGrid, entity: Entity, destination: Point, speed: number): boolean {
+  const from = tileOf(entity.position);
+  const before = { ...entity.position };
+  const arrived = moveToward(entity, destination, speed);
+  const to = tileOf(entity.position);
+  if ((to.x !== from.x || to.y !== from.y)
+    && isWalled(grid, to.x, to.y) && !isBlocked(grid, from.x, from.y)) {
+    entity.position = before;
+    return true;
+  }
+  return arrived;
+}
+
 function moveAlong(state: GameState, grid: NavGrid, entity: Entity, destination: Point, speed: number, directRange = 0): boolean {
   // Final approach straight at an interaction target whose footprint blocks
   // the grid; the caller's range check stops movement at its edge.
@@ -361,7 +405,7 @@ function moveAlong(state: GameState, grid: NavGrid, entity: Entity, destination:
       // of. It goes straight at its destination until it is out again, which
       // is how it got in.
       clearPath(entity);
-      return moveToward(entity, destination, speed);
+      return moveDirect(grid, entity, destination, speed);
     }
   }
   const before = { ...entity.position };
@@ -375,7 +419,7 @@ function moveAlong(state: GameState, grid: NavGrid, entity: Entity, destination:
     // is how the walker got in there in the first place.
     const far = distance(entity.position, destination) > Math.max(directRange, 1.5);
     const arrivedExactly = !isBlocked(grid, tile.x, tile.y) || far
-      ? moveToward(entity, destination, speed)
+      ? moveDirect(grid, entity, destination, speed)
       : true;
     if (arrivedExactly) clearPath(entity);
     return arrivedExactly;
@@ -638,20 +682,44 @@ function updateTrader(state: GameState, grid: NavGrid, entity: Entity): void {
  * nine foundations behind the one segment somebody happened to task last.
  */
 function adjacentSite(state: GameState, site: Entity): Entity | undefined {
+  // The whole run the finished piece belongs to, walked through what is
+  // already standing: a builder half way along a wall would otherwise dead-end
+  // at the last thing it touches and leave the far half of the drag unbuilt.
+  const run = state.entities.filter(e => !e.dead && e.owner === site.owner
+    && sameRun(e.kind, site.kind));
+  const connected = [site];
+  const seen = new Set([site.id]);
+  for (let i = 0; i < connected.length; i++) {
+    for (const candidate of run) {
+      if (seen.has(candidate.id) || !touching(connected[i], candidate)) continue;
+      seen.add(candidate.id);
+      connected.push(candidate);
+    }
+  }
   let best: Entity | undefined;
   let bestDistance = Infinity;
-  for (const candidate of state.entities) {
-    if (candidate.dead || candidate.id === site.id) continue;
-    if (candidate.kind !== site.kind || candidate.owner !== site.owner) continue;
+  for (const candidate of connected) {
     if (candidate.buildProgress === undefined) continue;
-    const reach = (candidate.radius + site.radius) * 2.1;
     const gap = distance(candidate.position, site.position);
-    if (gap > reach || gap >= bestDistance) continue;
+    if (gap >= bestDistance) continue;
     best = candidate;
     bestDistance = gap;
   }
   return best;
 }
+
+/** Whether two footprints share an edge or a corner. */
+function touching(a: Entity, b: Entity): boolean {
+  const halfA = halfExtent(a);
+  const halfB = halfExtent(b);
+  return Math.abs(a.position.x - b.position.x) <= halfA.x + halfB.x + 0.01
+    && Math.abs(a.position.y - b.position.y) <= halfA.y + halfB.y + 0.01;
+}
+
+/** A palisade and the gate in it are one dragged line; anything else is not. */
+const PALISADE = new Set<string>(['palisade-wall', 'palisade-gate']);
+const sameRun = (a: Entity['kind'], b: Entity['kind']): boolean =>
+  a === b || (PALISADE.has(a) && PALISADE.has(b));
 
 function updateBuilder(state: GameState, grid: NavGrid, entity: Entity, builderCounts: Map<number, number>): void {
   if (entity.order.kind !== 'build') return;
@@ -874,7 +942,7 @@ function spawnFree(state: GameState, point: Point, radius: number): boolean {
   for (const entity of state.entities) {
     if (entity.dead) continue;
     if (!isBuilding(entity.kind) && entity.kind !== 'resource') continue;
-    if (footprintsOverlap(point, radius, entity.position, entity.radius)) return false;
+    if (footprintsOverlap(point, { x: radius, y: radius }, entity.position, halfExtent(entity))) return false;
   }
   return true;
 }
@@ -973,12 +1041,19 @@ function updateBuildingProduction(state: GameState, entity: Entity): void {
 }
 
 function isDefeated(state: GameState, player: PlayerId): boolean {
-  const alive = state.entities.filter(e => !e.dead && e.owner === player && !isAnimal(e.kind));
-  if (!alive.some(e => e.kind === 'town-center')) return true;
+  let townCenter = false;
+  let unit = false;
+  let production = false;
+  for (const entity of state.entities) {
+    if (entity.dead || entity.owner !== player || isAnimal(entity.kind)) continue;
+    if (entity.kind === 'town-center') townCenter = true;
+    if (isUnit(entity.kind)) unit = true;
+    if ((entity.kind === 'barracks' || entity.kind === 'town-center')
+      && entity.buildProgress === undefined) production = true;
+  }
   // Domination: no units and nothing that can produce them (approximation of
   // AoE2 conquest, which requires razing everything).
-  return !alive.some(e => isUnit(e.kind)) &&
-    !alive.some(e => (e.kind === 'barracks' || e.kind === 'town-center') && e.buildProgress === undefined);
+  return !townCenter || (!unit && !production);
 }
 
 /**
@@ -1045,6 +1120,15 @@ export function stepGame(state: GameState): void {
   state.tick += 1;
   updateAnimals(state);
   const grid = buildNavGrid(state);
+  // A gate is a hole in its owner's wall and a wall to everybody else, so the
+  // owner of one walks a different map. Only players who have one pay for it.
+  const owned = new Map<PlayerId, NavGrid>();
+  for (const entity of state.entities) {
+    if (entity.dead || entity.owner === 0 || entity.buildProgress !== undefined) continue;
+    if (!state.rules.buildings[entity.kind as BuildingKind]?.passableForOwner) continue;
+    const owner = entity.owner as PlayerId;
+    if (!owned.has(owner)) owned.set(owner, buildNavGrid(state, undefined, owner));
+  }
   const builderCounts = new Map<number, number>();
   const movable: Entity[] = [];
   for (const entity of [...state.entities]) {
@@ -1053,7 +1137,7 @@ export function stepGame(state: GameState): void {
       continue;
     }
     if (isUnit(entity.kind)) {
-      updateUnit(state, grid, entity, builderCounts);
+      updateUnit(state, (entity.owner !== 0 && owned.get(entity.owner as PlayerId)) || grid, entity, builderCounts);
       movable.push(entity);
     } else if (isBuilding(entity.kind) && entity.buildProgress === undefined) {
       updateBuildingProduction(state, entity);
@@ -1117,13 +1201,15 @@ export function stepGame(state: GameState): void {
   }
   if (newlyDead || expired) recalculatePopulation(state);
 
-  if (newlyDead) {
-    const p1Out = isDefeated(state, 1);
-    const p2Out = isDefeated(state, 2);
-    if (p1Out && !p2Out) state.winner = 2;
-    else if (p2Out && !p1Out) state.winner = 1;
-    else if (p1Out && p2Out) state.winner = 2; // simultaneous: attacker's tick order favors 2 deterministically
-  }
+  // Asked every tick, not only when `newlyDead` fired: an attack resolves its
+  // own kill the moment the blow lands, so a town center razed in a fight never
+  // reaches that flag. One match ran the full half hour with the loser's town
+  // center rubble and nothing left to decide it.
+  const p1Out = isDefeated(state, 1);
+  const p2Out = isDefeated(state, 2);
+  if (p1Out && !p2Out) state.winner = 2;
+  else if (p2Out && !p1Out) state.winner = 1;
+  else if (p1Out && p2Out) state.winner = 2; // simultaneous: attacker's tick order favors 2 deterministically
 }
 
 export function nearestEntity(state: GameState, point: Point, maxDistance = 1.3): Entity | undefined {

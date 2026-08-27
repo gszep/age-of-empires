@@ -96,12 +96,13 @@ export function createTerrainPatch(
  * so an axis-aligned quad would sit at the wrong angle to the grid and
  * misreport which tiles are covered.
  */
-export function createFootprint(half: number): THREE.Mesh {
+export function createFootprint(half: number | { x: number; y: number }): THREE.Mesh {
+  const { x, y } = typeof half === 'number' ? { x: half, y: half } : half;
   const corners = [
-    worldToIso(-half, -half),
-    worldToIso(half, -half),
-    worldToIso(half, half),
-    worldToIso(-half, half),
+    worldToIso(-x, -y),
+    worldToIso(x, -y),
+    worldToIso(x, y),
+    worldToIso(-x, y),
   ];
   const positions: number[] = [];
   for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]] as const) {

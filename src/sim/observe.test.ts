@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { FALLBACK_RULES, isAnimal } from './data';
+import { FALLBACK_RULES, isAnimal, isBuilding, isUnit } from './data';
 import { createGame, applyCommand, stepGame } from './game';
 import { describeObservation, observe } from './observe';
 import { validateObservation, explain } from '../protocol/validate';
@@ -32,6 +32,20 @@ describe('the public contract', () => {
     for (const [kind, rules] of Object.entries(FALLBACK_RULES.buildings)) {
       if (!rules.buildable) continue;
       expect(command, `buildable ${kind}`).toContain(`"${kind}"`);
+    }
+  });
+
+  it('answers to what it is for every kind the rules know', () => {
+    // `isBuilding` and `isUnit` decide who is stepped, what obstructs, and
+    // which art a thing draws. A kind missing from them is not a compile
+    // error: it is a wall units stroll through, found only by looking.
+    for (const kind of Object.keys(FALLBACK_RULES.buildings)) {
+      expect(isBuilding(kind as never), `building ${kind}`).toBe(true);
+      expect(isUnit(kind as never), `not a unit: ${kind}`).toBe(false);
+    }
+    for (const kind of Object.keys(FALLBACK_RULES.units)) {
+      expect(isUnit(kind as never), `unit ${kind}`).toBe(true);
+      expect(isBuilding(kind as never), `not a building: ${kind}`).toBe(false);
     }
   });
 });

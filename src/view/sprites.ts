@@ -214,10 +214,13 @@ export function wallShape(state: GameState, entity: Entity): number {
   let alongX = false;
   let alongY = false;
   for (const offset of [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]) {
+    // A gate is part of the run it stands in, and it covers two tiles rather
+    // than sitting on one, so what is asked is whether it reaches this tile.
+    const at = { x: entity.position.x + offset.x, y: entity.position.y + offset.y };
     const joined = state.entities.some(other => !other.dead && other.owner === entity.owner
-      && other.kind === entity.kind
-      && Math.abs(other.position.x - (entity.position.x + offset.x)) < 0.01
-      && Math.abs(other.position.y - (entity.position.y + offset.y)) < 0.01);
+      && (other.kind === 'palisade-wall' || other.kind === 'palisade-gate')
+      && Math.abs(other.position.x - at.x) < (other.footprint?.x ?? other.radius)
+      && Math.abs(other.position.y - at.y) < (other.footprint?.y ?? other.radius));
     if (!joined) continue;
     if (offset.x !== 0) alongX = true; else alongY = true;
   }
@@ -225,6 +228,24 @@ export function wallShape(state: GameState, entity: Entity): number {
   if (alongX) return WALL_RUN_X;
   if (alongY) return WALL_RUN_Y;
   return WALL_POST;
+}
+
+/** Which axis a gate lies along, and so which of the DAT's two gate units it is. */
+export const gateKey = (entity: Entity): string =>
+  (entity.footprint?.y ?? 0) > (entity.footprint?.x ?? 0) ? 'palisade-gate-y' : 'palisade-gate';
+
+/**
+ * How close one of the owner's units has to come for the gate to swing open.
+ * AoE2 opens on approach and closes behind; the simulation lets the owner
+ * through regardless, so this is the art catching up with the pathing.
+ */
+export const GATE_OPEN_RANGE = 2.5;
+
+export function gateIsOpen(state: GameState, entity: Entity): boolean {
+  return state.entities.some(other => !other.dead && other.owner === entity.owner
+    && isUnit(other.kind)
+    && Math.abs(other.position.x - entity.position.x) <= GATE_OPEN_RANGE
+    && Math.abs(other.position.y - entity.position.y) <= GATE_OPEN_RANGE);
 }
 
 /** Choose the imported sprite source (entity variant) and animation name. */
@@ -235,9 +256,13 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
     return { key: entityKey(entity), name: felled ? 'death' : 'idle' };
   }
   if (isBuilding(kind)) {
-    if (entity.dead) return { key: kind, name: 'death' };
-    if (entity.buildProgress !== undefined) return { key: kind, name: 'construction' };
-    return { key: kind, name: 'idle' };
+    // A gate is two units in the DAT, one per axis, each with a closed leaf and
+    // an open one; which of the four to draw is the footprint and who is near.
+    const key = kind === 'palisade-gate' ? gateKey(entity) : kind;
+    if (entity.dead) return { key, name: 'death' };
+    if (entity.buildProgress !== undefined) return { key, name: 'construction' };
+    if (kind === 'palisade-gate' && gateIsOpen(state, entity)) return { key, name: 'open' };
+    return { key, name: 'idle' };
   }
   if (kind !== 'villager') {
     if (entity.dead) return { key: kind, name: 'death' };

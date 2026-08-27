@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
 import { observe } from './sim/observe';
-import { applyCommand, createGame, gameTimeSeconds, placementLegal, stepGame } from './sim/game';
+import { applyCommand, buildingFootprint, createGame, gameTimeSeconds, placementLegal, stepGame } from './sim/game';
 import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, rulesFromManifest, type ContentManifest, type Cost, type GameRules, type TechKey } from './sim/data';
 import { isTileVisible } from './sim/visibility';
 import { checksumState } from './sim/checksum';
@@ -122,6 +122,8 @@ scene.add(selectionRings);
  * footprint size and sprite both depend on it.
  */
 let ghostKind: BuildingKind | undefined;
+/** The pending footprint, so a gate turning rebuilds the preview mesh. */
+let ghostShape: string | undefined;
 let ghostFootprint: THREE.Mesh | undefined;
 let ghostView: EntityView | undefined;
 let pointerWorld: Point = { x: 16, y: 9 };
@@ -156,6 +158,9 @@ function ghostEntity(kind: BuildingKind, at: Point): Entity {
     id: 0, kind, owner: 1, position: at,
     hp: 1, maxHp: 1, radius: rules.buildings[kind].radius,
     activity: 'idle', order: { kind: 'idle' },
+    ...(rules.buildings[kind].footprint
+      ? { footprint: buildingFootprint(game, kind, orientationOf(kind, at)) }
+      : {}),
   };
 }
 
@@ -171,6 +176,7 @@ function disposeGhost(): void {
     ghostView = undefined;
   }
   ghostKind = undefined;
+  ghostShape = undefined;
 }
 
 /** A rejected command, reported and sounded the way the game does. */
@@ -246,7 +252,11 @@ function runUiCommand(id: string): void {
   if (replay) return;
   const selection = ownSelected();
   if (id.startsWith('build-')) {
-    buildMode = id.slice('build-'.length) as BuildingKind;
+    const kind = id.slice('build-'.length) as BuildingKind;
+    if (kind === buildMode && rules.buildings[kind].footprint) {
+      gateOrientation = gateOrientation === 'x' ? 'y' : 'x';
+    }
+    buildMode = kind;
     return;
   }
   if (id === 'stop') {
@@ -309,12 +319,32 @@ renderer.domElement.addEventListener('contextmenu', event => event.preventDefaul
 const isWall = (kind: BuildingKind): boolean => kind === 'palisade-wall';
 let wallStart: Point | undefined;
 
+/**
+ * Which way the pending gate lies. AoE2 turns a gate to the wall it is going
+ * into, so the run under the cursor decides it; picking the gate again while it
+ * is already pending turns it by hand, for a gate with no wall to follow yet.
+ */
+let gateOrientation: 'x' | 'y' = 'x';
+
+function orientationOf(kind: BuildingKind, at: Point): 'x' | 'y' {
+  if (!rules.buildings[kind].footprint) return 'x';
+  const joins = (dx: number, dy: number) => game.entities.some(e => !e.dead && e.owner === 1
+    && e.kind === 'palisade-wall'
+    && Math.abs(e.position.x - (at.x + dx)) < 0.6 && Math.abs(e.position.y - (at.y + dy)) < 0.6);
+  if (joins(-1.5, 0) || joins(1.5, 0)) return 'x';
+  if (joins(0, -1.5) || joins(0, 1.5)) return 'y';
+  return gateOrientation;
+}
+
 function placeBuilding(kind: BuildingKind, targets: Point[]): void {
   const builders = ownSelected().filter(e => e.kind === 'villager').map(e => e.id);
   if (!builders.length) { reject('Select a villager first'); return; }
   let failure: string | undefined;
   for (const target of targets) {
-    const result = applyCommand(game, { kind: 'build', player: 1, builderIds: builders, building: kind, target });
+    const result = applyCommand(game, {
+      kind: 'build', player: 1, builderIds: builders, building: kind, target,
+      orientation: orientationOf(kind, target),
+    });
     if (!result.ok) failure ??= result.reason;
   }
   if (failure) reject(failure);
@@ -330,7 +360,7 @@ renderer.domElement.addEventListener('pointerdown', event => {
     }
     if (buildMode && !replay) {
       // Commit exactly where the preview showed it, not the raw cursor point.
-      placeBuilding(buildMode, [snapPlacement(point, rules.buildings[buildMode].radius)]);
+      placeBuilding(buildMode, [placementTarget()]);
       buildMode = undefined;
       return;
     }
@@ -755,17 +785,19 @@ function syncScene(time: number): void {
 
   // Placement preview.
   if (buildMode) {
-    if (ghostKind !== buildMode) {
+    const shape = buildingFootprint(game, buildMode, orientationOf(buildMode, placementTarget()));
+    if (ghostKind !== buildMode || ghostShape !== `${shape.x},${shape.y}`) {
       disposeGhost();
       ghostKind = buildMode;
-      ghostFootprint = view.createFootprint(rules.buildings[buildMode].radius);
+      ghostShape = `${shape.x},${shape.y}`;
+      ghostFootprint = view.createFootprint(shape);
       scene.add(ghostFootprint);
       ghostView = view.createEntityView(assets, ghostEntity(buildMode, pointerWorld));
       ghostView.group.renderOrder = 6000;
       scene.add(ghostView.group);
     }
     const target = placementTarget();
-    const legal = placementLegal(game, buildMode, target).ok;
+    const legal = placementLegal(game, buildMode, target, orientationOf(buildMode, target)).ok;
     const tint = legal ? 0x7fff9e : 0xff5f5f;
     const iso = worldToIso(target.x, target.y);
     ghostFootprint!.visible = true;
@@ -828,7 +860,8 @@ function updateWallPreview(): void {
 /** Where the pending building would actually land, snapped to the tile grid. */
 function placementTarget(): Point {
   if (!buildMode) return pointerWorld;
-  return snapPlacement(pointerWorld, rules.buildings[buildMode].radius);
+  const rough = snapPlacement(pointerWorld, rules.buildings[buildMode].radius);
+  return snapPlacement(pointerWorld, buildingFootprint(game, buildMode, orientationOf(buildMode, rough)));
 }
 
 function resize(): void {

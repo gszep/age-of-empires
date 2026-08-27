@@ -30,7 +30,7 @@ export const isoDepth = (x: number, y: number): number => x + y;
  * diagonal line with gaps nothing can stand in. Repeats from the snapping are
  * dropped, so each tile is built once.
  */
-export function wallLine(from: Point, to: Point, half: number): Point[] {
+export function wallLine(from: Point, to: Point, half: number | { x: number; y: number }): Point[] {
   const start = snapPlacement(from, half);
   const end = snapPlacement(to, half);
   const dx = end.x - start.x;
@@ -52,8 +52,9 @@ export function wallLine(from: Point, to: Point, half: number): Point[] {
  * the footprint edges land on tile boundaries, so the preview matches the
  * square `placementLegal` tests and the covered tiles are unambiguous.
  */
-export function snapPlacement(point: Point, half: number): Point {
-  const odd = Math.round(half * 2) % 2 === 1;
-  const snap = (value: number) => odd ? Math.floor(value) + 0.5 : Math.round(value);
-  return { x: snap(point.x), y: snap(point.y) };
+export function snapPlacement(point: Point, half: number | { x: number; y: number }): Point {
+  const halves = typeof half === 'number' ? { x: half, y: half } : half;
+  const snap = (value: number, side: number) => Math.round(side * 2) % 2 === 1
+    ? Math.floor(value) + 0.5 : Math.round(value);
+  return { x: snap(point.x, halves.x), y: snap(point.y, halves.y) };
 }

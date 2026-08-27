@@ -57,6 +57,11 @@ export interface BuildingRules {
   accepts: ResourceKind[];
   /** Food a farm holds; undefined for everything else. */
   farmAmount?: number;
+  /** Half-extents in tiles when the building is not the square `radius` says.
+   * A gate lies along x by default and swaps both when placed along y. */
+  footprint?: { x: number; y: number };
+  /** A gate: its owner walks through it, everybody else has to knock it down. */
+  passableForOwner?: boolean;
   /** Set for buildings that shoot: range in tiles plus the militia-style timing. */
   attack?: {
     range: number;
@@ -273,6 +278,12 @@ export const FALLBACK_RULES: GameRules = {
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 2 }],
     },
+    'palisade-gate': {
+      hp: 240, radius: 1, footprint: { x: 1, y: 0.5 }, passableForOwner: true,
+      lineOfSight: 6, cost: cost(0, 30), buildSeconds: 30,
+      popSupport: 0, buildable: true, accepts: [],
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 2 }, { class: 3, amount: 4 }],
+    },
     stable: {
       age: 1,
       hp: 1500, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
@@ -412,6 +423,10 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       // building shoots are gameplay roles, not DAT fields the importer reads.
       accepts: fallback.accepts,
       farmAmount: e[key].storage?.food ?? fallback.farmAmount,
+      // The DAT's collision box is a pair of half-extents; only a gate's two
+      // differ. Whether that footprint is a doorway is a role, not a field.
+      footprint: fallback.footprint && { x: e[key].collision[0], y: e[key].collision[1] },
+      passableForOwner: fallback.passableForOwner,
       attack: fallback.attack && {
         ...fallback.attack,
         range: e[key].combat?.maximumRange || fallback.attack.range,
@@ -471,6 +486,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       market: building('market', true),
       stable: building('stable', true),
       'palisade-wall': building('palisade-wall', true),
+      'palisade-gate': building('palisade-gate', true),
     },
     nodes: {
       berries: node('berries', 'food', 'berries'),
@@ -531,6 +547,7 @@ const UNIT_KINDS = new Set<string>([
 const BUILDING_KINDS = new Set<string>([
   'town-center', 'barracks', 'house', 'mill', 'lumber-camp', 'mining-camp', 'farm',
   'outpost', 'watch-tower', 'archery-range', 'blacksmith', 'market', 'stable',
+  'palisade-wall', 'palisade-gate',
 ]);
 
 export const isUnit = (kind: EntityKind): kind is UnitKind => UNIT_KINDS.has(kind);
