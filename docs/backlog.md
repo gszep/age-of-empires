@@ -76,10 +76,6 @@ terrain blends above.
 
 ## Simulation
 
-- **Carcasses cannot be selected.** Playtest report: there is no way to click
-  a hunted animal's carcass to see how much food remains on it. It carries
-  sim state a player is entitled to inspect; make it selectable with the
-  remaining-resource readout the HUD already shows for bushes and trees.
 - **Trade is unverifiable in normal play.** The cart's loop is proven by
   tests, but a human cannot check it: trading needs a foreign market and the
   built-in AI never builds one (it never leaves the Dark Age, below). Fixing

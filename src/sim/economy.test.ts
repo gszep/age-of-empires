@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES, isAnimal, rulesFromManifest, type ContentManifest, type GameRules } from './data';
 import { checksumState } from './checksum';
-import { applyCommand, buildingFootprint, createGame, placementLegal, stepGame } from './game';
+import { applyCommand, buildingFootprint, createGame, isCarcass, placementLegal, stepGame } from './game';
 import type { BuildingKind, Entity, GameState, ResourceKind } from './types';
 
 const MANIFEST_PATH = 'public/imported/aoe2/manifest.json';
@@ -900,6 +900,45 @@ describe('herding and hunting', () => {
     expect(sheep.dead).toBe(true);
     expect(sheep.amount).toBeLessThan(food);
     expect(state.players[1].food).toBeGreaterThan(banked);
+  });
+
+  it('leaves a carcass a player may still inspect, and a corpse they may not', () => {
+    const state = createGame(34);
+    const boar = animalOf(state, 'boar');
+    // Alive, it is not a carcass however much food it carries.
+    expect(isCarcass(boar)).toBe(false);
+    boar.hp = 0;
+    boar.dead = true;
+    expect(isCarcass(boar)).toBe(true);
+    expect(boar.amount).toBeGreaterThan(0);
+    // Eaten out, it stops being something to click and goes away.
+    boar.amount = 0;
+    expect(isCarcass(boar)).toBe(false);
+
+    // A soldier's corpse never was: it carries nothing to read off it.
+    const militia = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    militia.dead = true;
+    expect(isCarcass(militia)).toBe(false);
+  });
+
+  it('keeps a hunted carcass selectable for as long as its food lasts', () => {
+    const state = createGame(35);
+    const boar = animalOf(state, 'boar');
+    boar.position = { x: 40, y: 40 };
+    boar.hp = 1;
+    const hunter = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    hunter.position = { x: 40.8, y: 40 };
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [hunter.id], target: boar.position, targetId: boar.id,
+    });
+    for (let i = 0; i < 400 && !boar.dead; i++) stepGame(state);
+    expect(boar.dead).toBe(true);
+
+    // Well past the corpse decay window a soldier's body would have gone in,
+    // the carcass is still in the world and still worth clicking.
+    run(state, 20 * 20);
+    expect(state.entities.some(e => e.id === boar.id)).toBe(true);
+    expect(isCarcass(state.entities.find(e => e.id === boar.id)!)).toBe(true);
   });
 
   it('sends a deer running from anything that is not gaia', () => {

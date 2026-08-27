@@ -9,8 +9,13 @@ export interface ImportedEntity {
   iconId?: number;
   /** What a selection draws on the ground: the DAT's obstruction shape —
    * round under a unit, the outline box (half-extents in tiles, can exceed
-   * the collision box) under a building or resource. */
-  selection?: { shape: 'round' | 'square'; outline: [number, number] };
+   * the collision box) under a building or resource. `dead` is the corpse
+   * unit's own shape, which is what a selected carcass is marked with. */
+  selection?: {
+    shape: 'round' | 'square';
+    outline: [number, number];
+    dead?: { shape: 'round' | 'square'; outline: [number, number] };
+  };
   /** Projectiles only: arc height as a fraction of the shot's distance. */
   projectile?: { arc: number };
   animations: Record<string, AnimationInfo>;

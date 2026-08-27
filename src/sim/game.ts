@@ -309,6 +309,17 @@ export function placementLegal(
 }
 
 /** Resource nodes, and the owner's finished farms, can be gathered from. */
+/**
+ * A corpse that is still worth something. AoE2 lets a player click a hunted
+ * animal to read the food left on it, and the thing that separates that from a
+ * dead soldier is what it carries: in the DAT only the huntables and herdables
+ * store food, and here only a carcass keeps an `amount` after it dies. Corpses
+ * with nothing left decay unselected, as they should.
+ */
+export function isCarcass(entity: Entity): boolean {
+  return !!entity.dead && (entity.amount ?? 0) > 0;
+}
+
 function isGatherable(state: GameState, entity: Entity, gatherer: Entity): boolean {
   if (entity.kind === 'resource') return true;
   if (isAnimal(entity.kind)) {

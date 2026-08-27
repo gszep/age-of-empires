@@ -195,11 +195,14 @@ def extract_ui(
         "Buildings": sorted(
             {e["iconId"] for e in content["entities"].values() if e["category"] == "building" and "iconId" in e}
         ),
+        # Animals are units the player selects — a sheep walked home, a carcass
+        # clicked to read the food left on it — so their portraits belong in the
+        # same sheet as everything else the selection panel shows.
         "Units": sorted(
             {
                 e["iconId"]
                 for e in content["entities"].values()
-                if e["category"] in ("unit", "unit-variant") and "iconId" in e
+                if e["category"] in ("unit", "unit-variant", "animal") and "iconId" in e
             }
         ),
     }

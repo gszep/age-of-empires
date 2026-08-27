@@ -179,6 +179,19 @@ def costs_of(creatable: Any) -> tuple[dict[str, int], int]:
     return paid, population
 
 
+def selection_of(unit: Any) -> dict[str, Any]:
+    """What a selection draws on the ground for this unit.
+
+    Obstruction type 5 is the round unit outline; everything else marks its
+    outline box (buildings and resources, whose box can exceed the collision
+    box — a barracks collides at 1.5 half-tiles but outlines at 1.6).
+    """
+    return {
+        "shape": "round" if unit.obstruction_type == 5 else "square",
+        "outline": [rounded(unit.outline_size_x), rounded(unit.outline_size_y)],
+    }
+
+
 def extract_entity(
     dat: DatFile,
     civ_units: Any,
@@ -203,11 +216,15 @@ def extract_entity(
         # unit outline, everything else marks its outline box (buildings and
         # resources, whose box can exceed the collision box — a barracks
         # collides at 1.5 half-tiles but outlines at 1.6).
-        "selection": {
-            "shape": "round" if unit.obstruction_type == 5 else "square",
-            "outline": [rounded(unit.outline_size_x), rounded(unit.outline_size_y)],
-        },
+        "selection": selection_of(unit),
     }
+    # What is left behind is its own unit in the DAT with its own obstruction:
+    # a carcass stops being a body in the way and marks a flat box on the
+    # ground instead of the live animal's ring.
+    if "dead" in {a.get("slot") for a in spec["animations"].values()}:
+        corpse = civ_units[unit.dead_unit_id] if unit.dead_unit_id and unit.dead_unit_id >= 0 else None
+        if corpse is not None:
+            entity["selection"]["dead"] = selection_of(corpse)
     if unit.icon_id >= 0:
         entity["iconId"] = unit.icon_id
     if unit.speed and unit.speed > 0:

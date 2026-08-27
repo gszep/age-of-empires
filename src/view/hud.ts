@@ -20,8 +20,10 @@ export interface CommandButton {
 export interface SelectionInfo {
   name: string;
   icon?: string;
-  hp: number;
-  maxHp: number;
+  /** Left off for something with no health to show: a carcass is read by the
+   * food left on it, and the DAT gives its corpse unit no hit points at all. */
+  hp?: number;
+  maxHp?: number;
   details: string[];
   progress?: { label: string; fraction: number };
 }
@@ -241,13 +243,15 @@ export class Hud {
       this.selectionPanel.innerHTML = '';
       return;
     }
-    const fraction = Math.max(0, Math.min(1, info.hp / info.maxHp));
+    const health = info.hp !== undefined && info.maxHp !== undefined && info.maxHp > 0;
+    const fraction = health ? Math.max(0, Math.min(1, info.hp! / info.maxHp!)) : 0;
     this.selectionPanel.innerHTML = `
       <div class="portrait" style="background-image:${info.icon ?? 'none'}"></div>
       <div class="object-info">
         <div class="object-name">${info.name}</div>
+        ${health ? `
         <div class="hp-bar"><div class="hp-fill" style="width:${(fraction * 100).toFixed(1)}%"></div></div>
-        <div class="object-hp">${Math.ceil(info.hp)} / ${info.maxHp}</div>
+        <div class="object-hp">${Math.ceil(info.hp!)} / ${info.maxHp}</div>` : ''}
         ${info.details.map(line => `<div class="object-detail">${line}</div>`).join('')}
         ${info.progress ? `
           <div class="progress-label">${info.progress.label}</div>

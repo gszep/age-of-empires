@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
 import { observe } from './sim/observe';
-import { applyCommand, buildingFootprint, createGame, gameTimeSeconds, placementLegal, stepGame } from './sim/game';
+import { applyCommand, buildingFootprint, createGame, gameTimeSeconds, isCarcass, placementLegal, stepGame } from './sim/game';
 import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, rulesFromManifest, type ContentManifest, type Cost, type GameRules, type TechKey } from './sim/data';
 import { isTileVisible } from './sim/visibility';
 import { checksumState } from './sim/checksum';
@@ -159,10 +159,15 @@ const SELECTION_COLOR = 0xf5f0dc;
  * shade larger than the collision box — falling back to the sim footprint for
  * the open-content skin. A gate is two DAT units, one per axis, so the turned
  * one carries the swapped box.
+ *
+ * A carcass takes the shape of the DAT's own corpse unit rather than the live
+ * animal's: `BOARX_D` obstructs nothing where `BOARX` obstructs like a unit, so
+ * what was a ring around an animal becomes a flat box over what is left of it.
  */
 function selectionMarker(entity: Entity): { shape: 'round' | 'square'; half: { x: number; y: number } } {
   const key = entity.kind === 'palisade-gate' ? view.gateKey(entity) : view.entityKey(entity);
-  const imported = assets?.entities[key]?.selection;
+  const entry = assets?.entities[key]?.selection;
+  const imported = entity.dead ? entry?.dead ?? entry : entry;
   const shape = imported?.shape ?? (isUnit(entity.kind) ? 'round' : 'square');
   const half = imported && shape === 'square'
     ? { x: imported.outline[0], y: imported.outline[1] }
@@ -365,8 +370,14 @@ function pickEntity(point: Point): Entity | undefined {
   let best: Entity | undefined;
   let bestDistance = Infinity;
   for (const entity of game.entities) {
-    if (entity.dead) continue;
+    // A carcass is still food, and a player is entitled to click it and read
+    // how much is left; a corpse with nothing on it stays unclickable, so a
+    // battlefield of dead soldiers never gets in the way of the living.
+    if (entity.dead && !isCarcass(entity)) continue;
     if (entity.owner !== 1 && entity.owner !== 0 && !isTileVisible(game, 1, entity.position.x, entity.position.y)) continue;
+    // Nearest to the click wins, carcass or not. Preferring the living sounds
+    // reasonable and is not: villagers eating a carcass stand right on it, so
+    // any bias at all puts the corpse back out of reach, which is the bug.
     const d = Math.hypot(entity.position.x - point.x, entity.position.y - point.y) - entity.radius;
     if (d < Math.min(bestDistance, 0.9)) {
       best = entity;
@@ -725,10 +736,12 @@ function displayName(kind: string): string {
 }
 
 function selectionInfo(): SelectionInfo | undefined {
-  const selection = ownSelected().length ? ownSelected() : game.entities.filter(e => selectedIds.includes(e.id) && !e.dead);
+  const selection = ownSelected().length
+    ? ownSelected()
+    : game.entities.filter(e => selectedIds.includes(e.id) && (!e.dead || isCarcass(e)));
   const entity = selection[0];
   if (!entity) return undefined;
-  const names: Record<string, string> = { resource: 'Resource' };
+  const names: Record<string, string> = { resource: 'Resource', boar: 'Wild Boar' };
   const name = entity.kind === 'resource'
     ? entity.resourceKind === 'food' ? 'Forage Bush' : entity.resourceKind === 'gold' ? 'Gold Mine' : 'Tree'
     : names[entity.kind] ?? displayName(entity.kind);
@@ -759,8 +772,9 @@ function selectionInfo(): SelectionInfo | undefined {
   return {
     name,
     icon: entity.kind !== 'resource' ? hud.iconFor(category, iconIndex) : undefined,
-    hp: entity.hp,
-    maxHp: entity.maxHp,
+    // A carcass shows no health: the DAT's corpse unit has none, and what a
+    // player wants off it is the food still on it, which `details` carries.
+    ...(isCarcass(entity) ? {} : { hp: entity.hp, maxHp: entity.maxHp }),
     details,
     progress,
   };
@@ -920,13 +934,13 @@ function syncScene(time: number): void {
     }
   };
   for (const id of selectedIds) {
-    const entity = game.entities.find(e => e.id === id && !e.dead);
+    const entity = game.entities.find(e => e.id === id && (!e.dead || isCarcass(e)));
     if (entity) drawMarker(entity);
   }
   // The last order's clicked target blinks its marker (see `orderFlash`).
   if (orderFlash) {
     const elapsed = time - orderFlash.startedAt;
-    const entity = game.entities.find(e => e.id === orderFlash!.entityId && !e.dead);
+    const entity = game.entities.find(e => e.id === orderFlash!.entityId && (!e.dead || isCarcass(e)));
     if (elapsed >= ORDER_FLASH_TOTAL_SECONDS || !entity) orderFlash = undefined;
     else if (Math.floor(elapsed / ORDER_FLASH_PERIOD_SECONDS) % 2 === 0) drawMarker(entity);
   }
@@ -1084,7 +1098,10 @@ renderer.setAnimationLoop(now => {
     }
   }
 
-  selectedIds = selectedIds.filter(id => game.entities.some(e => e.id === id && !e.dead));
+  // A selection outlives its entity's death only while there is still food on
+  // it: the carcass a player clicked stays selected until it is eaten or rots.
+  selectedIds = selectedIds.filter(id =>
+    game.entities.some(e => e.id === id && (!e.dead || isCarcass(e))));
   syncScene(gameTimeSeconds(game));
   fog.update(game);
 
