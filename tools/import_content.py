@@ -199,6 +199,14 @@ def extract_entity(
         "lineOfSight": rounded(unit.line_of_sight),
         "collision": [rounded(unit.collision_size_x), rounded(unit.collision_size_y)],
         "clearance": [rounded(value) for value in unit.clearance_size],
+        # What a selection draws on the ground: obstruction type 5 is the round
+        # unit outline, everything else marks its outline box (buildings and
+        # resources, whose box can exceed the collision box — a barracks
+        # collides at 1.5 half-tiles but outlines at 1.6).
+        "selection": {
+            "shape": "round" if unit.obstruction_type == 5 else "square",
+            "outline": [rounded(unit.outline_size_x), rounded(unit.outline_size_y)],
+        },
     }
     if unit.icon_id >= 0:
         entity["iconId"] = unit.icon_id

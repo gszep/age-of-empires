@@ -305,6 +305,23 @@ class ContentImportIntegrationTest(unittest.TestCase):
             along_y["animations"]["open"]["source"], "b_dark_gate_palisade_se_open_x1.sld"
         )
 
+    def test_selection_markers_carry_the_dat_obstruction_shape_and_outline_box(self):
+        entities = self.result["entities"]
+        # Units select with the round outline (obstruction type 5); buildings
+        # and resources mark their outline box on the ground instead.
+        self.assertEqual(entities["villager"]["selection"]["shape"], "round")
+        self.assertEqual(entities["villager"]["selection"]["outline"], [0.2, 0.2])
+        self.assertEqual(entities["tree-oak"]["selection"]["shape"], "square")
+        barracks = entities["barracks"]["selection"]
+        self.assertEqual(barracks["shape"], "square")
+        # The outline box exceeds the collision box — 1.6 half-tiles drawn
+        # around a building that collides at 1.5 — so it is its own field.
+        self.assertEqual(barracks["outline"], [1.6, 1.6])
+        # A gate outlines its whole four-tile run, not its two collision
+        # tiles, and the turned gate unit carries the swapped box.
+        self.assertEqual(entities["palisade-gate"]["selection"]["outline"], [2.0, 0.5])
+        self.assertEqual(entities["palisade-gate-y"]["selection"]["outline"], [0.5, 2.0])
+
     def test_trade_cart_carries_its_own_route_rules(self):
         cart = self.result["entities"]["trade-cart"]
         self.assertEqual(cart["id"], 128)

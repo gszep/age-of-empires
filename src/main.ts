@@ -11,8 +11,8 @@ import type { BuildingKind, Entity, GameState, Point, UnitKind } from './sim/typ
 import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
-import { createEntityView, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, type EntityView } from './view/sprites';
-import { createGround, createFog, createFootprint } from './view/world';
+import { createEntityView, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateKey, type EntityView } from './view/sprites';
+import { createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline } from './view/world';
 import { createCueWatcher, pollCues } from './view/cues';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 
@@ -25,9 +25,9 @@ import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
  */
 const view = {
   pollCues,
-  createGround, createFog, createFootprint,
+  createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline,
   createEntityView, updateEntityView, createProjectileView, updateProjectileView,
-  createFlagView, updateFlagView, updateOcclusion, entityKey, Hud,
+  createFlagView, updateFlagView, updateOcclusion, entityKey, gateKey, Hud,
 };
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
@@ -121,9 +121,29 @@ scene.add(fog.mesh);
 const views = new Map<string, EntityView>();
 const ringGeometry = new THREE.RingGeometry(50, 53, 32);
 const ringPool: THREE.Mesh[] = [];
+const outlinePool: THREE.Mesh[] = [];
 const selectionRings = new THREE.Group();
 selectionRings.renderOrder = 900;
 scene.add(selectionRings);
+const SELECTION_COLOR = 0xf5f0dc;
+
+/**
+ * What a selection draws under an entity, as the DAT's obstruction shape has
+ * it: the round outline under a unit, the outline box on the ground under a
+ * building or resource. The box is the manifest's own `outline_size` — often a
+ * shade larger than the collision box — falling back to the sim footprint for
+ * the open-content skin. A gate is two DAT units, one per axis, so the turned
+ * one carries the swapped box.
+ */
+function selectionMarker(entity: Entity): { shape: 'round' | 'square'; half: { x: number; y: number } } {
+  const key = entity.kind === 'palisade-gate' ? view.gateKey(entity) : view.entityKey(entity);
+  const imported = assets?.entities[key]?.selection;
+  const shape = imported?.shape ?? (isUnit(entity.kind) ? 'round' : 'square');
+  const half = imported && shape === 'square'
+    ? { x: imported.outline[0], y: imported.outline[1] }
+    : entity.footprint ?? { x: entity.radius, y: entity.radius };
+  return { shape, half };
+}
 
 /**
  * Placement preview: the building's own art where it will stand, over the tile
@@ -785,27 +805,45 @@ function syncScene(time: number): void {
   // piece this frame has been placed.
   view.updateOcclusion(views, game);
 
-  // Selection rings from a reusable pool.
-  while (ringPool.length < selectedIds.length) {
-    const ring = new THREE.Mesh(
-      ringGeometry,
-      new THREE.MeshBasicMaterial({ color: 0xf5f0dc, transparent: true, depthTest: false, depthWrite: false }),
-    );
-    ring.renderOrder = 950;
-    ringPool.push(ring);
-    selectionRings.add(ring);
-  }
-  for (const [index, ring] of ringPool.entries()) {
-    const entity = index < selectedIds.length
-      ? game.entities.find(e => e.id === selectedIds[index] && !e.dead)
-      : undefined;
-    ring.visible = !!entity;
+  // Selection markers from reusable pools: rings under units, footprint
+  // outlines on the ground under buildings and resources (`selectionMarker`).
+  let ringsUsed = 0;
+  let outlinesUsed = 0;
+  for (const id of selectedIds) {
+    const entity = game.entities.find(e => e.id === id && !e.dead);
     if (!entity) continue;
+    const marker = selectionMarker(entity);
     const iso = worldToIso(entity.position.x, entity.position.y);
-    const radius = Math.max(0.4, entity.radius) * TILE_W * 0.75;
-    ring.position.set(iso.x, iso.y, 0);
-    ring.scale.set(radius / 50, radius / 50 * (TILE_H / TILE_W), 1);
+    if (marker.shape === 'round') {
+      if (ringsUsed === ringPool.length) {
+        const ring = new THREE.Mesh(
+          ringGeometry,
+          new THREE.MeshBasicMaterial({ color: SELECTION_COLOR, transparent: true, depthTest: false, depthWrite: false }),
+        );
+        ring.renderOrder = 950;
+        ringPool.push(ring);
+        selectionRings.add(ring);
+      }
+      const ring = ringPool[ringsUsed++];
+      ring.visible = true;
+      const radius = Math.max(0.4, entity.radius) * TILE_W * 0.75;
+      ring.position.set(iso.x, iso.y, 0);
+      ring.scale.set(radius / 50, radius / 50 * (TILE_H / TILE_W), 1);
+    } else {
+      if (outlinesUsed === outlinePool.length) {
+        const outline = view.createSelectionOutline(SELECTION_COLOR);
+        outline.renderOrder = 950;
+        outlinePool.push(outline);
+        selectionRings.add(outline);
+      }
+      const outline = outlinePool[outlinesUsed++];
+      outline.visible = true;
+      view.updateSelectionOutline(outline, marker.half);
+      outline.position.set(iso.x, iso.y, 0);
+    }
   }
+  for (let index = ringsUsed; index < ringPool.length; index++) ringPool[index].visible = false;
+  for (let index = outlinesUsed; index < outlinePool.length; index++) outlinePool[index].visible = false;
 
   // Placement preview.
   if (buildMode) {

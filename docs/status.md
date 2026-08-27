@@ -23,6 +23,7 @@ Controls and hotkeys are listed in the root `README.md`. The essential loop is l
 - Authoritative explored/current visibility, filtered observations, and legal last-seen memory.
 - Patch-matched DAT rules, palettes, and AoE2DE entity/widgetui assets through a byte-identical local import; open fallback remains playable.
 - WEST/Dark Age desktop composition with dimetric world, task animations, composite town center, fog, command/selection panels, minimap, menus, hotkeys, pointer interactions, and landscape scaling.
+- Selection markers follow the DAT's obstruction shape: a round outline under units (obstruction type 5), the `outline_size` box drawn on the ground under buildings and resources — the box the DAT draws slightly larger than the collision box, and a gate's spanning its whole four-tile run.
 - Versioned JSON public contracts; browser, built-in AI, JSONL subprocess, deadline subprocess, WebSocket, and MCP strategies share `applyCommand`.
 - Full-state FNV-1a periodic checksums, command-stream records, Node verification, and browser playback.
 - Process-isolated paired batches with configurable concurrency, Wilson 95% intervals, strategy hashes, per-match results, and replay records.

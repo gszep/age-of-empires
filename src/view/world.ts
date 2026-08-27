@@ -117,6 +117,74 @@ export function createFootprint(half: number | { x: number; y: number }): THREE.
   return mesh;
 }
 
+/**
+ * AoE2 marks a selected building or resource by drawing its outline box on the
+ * ground, not a circle: the DAT gives every non-unit an obstruction box
+ * (`outline_size`, often a shade larger than the collision box) and the marker
+ * is that box's iso diamond as a thin band.
+ */
+const SELECTION_OUTLINE_WIDTH = 2.5;
+
+/**
+ * Inset a convex polygon around the origin by `width`: each edge is pushed
+ * toward the centre and neighbouring edges re-intersected, so the band between
+ * the two rings has constant screen width even on the squashed iso diamond.
+ */
+export function insetConvex(
+  points: { x: number; y: number }[], width: number,
+): { x: number; y: number }[] {
+  const count = points.length;
+  const edges = points.map((from, index) => {
+    const to = points[(index + 1) % count];
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy) || 1;
+    let nx = dy / length;
+    let ny = -dx / length;
+    const midX = (from.x + to.x) / 2;
+    const midY = (from.y + to.y) / 2;
+    if (nx * midX + ny * midY > 0) { nx = -nx; ny = -ny; }
+    return { px: from.x + nx * width, py: from.y + ny * width, dx, dy };
+  });
+  return points.map((_, index) => {
+    const into = edges[(index + count - 1) % count];
+    const out = edges[index];
+    const det = into.dx * out.dy - into.dy * out.dx;
+    if (Math.abs(det) < 1e-6) return { x: out.px, y: out.py };
+    const t = ((out.px - into.px) * out.dy - (out.py - into.py) * out.dx) / det;
+    return { x: into.px + t * into.dx, y: into.py + t * into.dy };
+  });
+}
+
+export function createSelectionOutline(color: number): THREE.Mesh {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(8 * 3 * 3), 3));
+  return new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+    color, transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+  }));
+}
+
+/** Reshape a pooled outline to `half` extents; a no-op while they hold. */
+export function updateSelectionOutline(mesh: THREE.Mesh, half: { x: number; y: number }): void {
+  const shape = `${half.x},${half.y}`;
+  if (mesh.userData.outlineShape === shape) return;
+  mesh.userData.outlineShape = shape;
+  const outer = [
+    worldToIso(-half.x, -half.y), worldToIso(half.x, -half.y),
+    worldToIso(half.x, half.y), worldToIso(-half.x, half.y),
+  ];
+  const inner = insetConvex(outer, SELECTION_OUTLINE_WIDTH);
+  const positions = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+  let vertex = 0;
+  const put = (point: { x: number; y: number }) => positions.setXYZ(vertex++, point.x, point.y, 0);
+  for (let corner = 0; corner < 4; corner++) {
+    const next = (corner + 1) % 4;
+    put(outer[corner]); put(outer[next]); put(inner[next]);
+    put(outer[corner]); put(inner[next]); put(inner[corner]);
+  }
+  positions.needsUpdate = true;
+}
+
 export interface FogLayer {
   mesh: THREE.Mesh;
   update(state: GameState): void;

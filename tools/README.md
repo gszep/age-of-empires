@@ -79,6 +79,7 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 |---|---|
 | id, name, HP, LOS, icon | `unit.id`, `.name`, `.hit_points`, `.line_of_sight`, `.icon_id` |
 | footprint / clearance | `unit.collision_size_x/_y`, `unit.clearance_size` |
+| selection marker shape and size | `unit.obstruction_type` (5 = round unit outline, others square/footprint), `unit.outline_size_x/_y` (half-extents in tiles, can exceed the collision box) |
 | movement speed, walk graphic | `unit.speed`; `unit.dead_fish.walking_graphic` |
 | idle / death graphics | `unit.standing_graphic`, `unit.dying_graphic` |
 | cost and train time/location | `unit.creatable.resource_costs`; `unit.creatable.train_locations[0].unit_id/.train_time` |
