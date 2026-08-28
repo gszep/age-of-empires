@@ -1,4 +1,4 @@
-import type { Command, EntityKind, ResourceKind } from './types';
+import type { BuildingKind, Command, EntityKind, ResourceKind } from './types';
 import { isBuilding } from './data';
 import type { PlayerObservation } from '../protocol/types';
 
@@ -232,6 +232,19 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
 
   const idleBuilder = villagers.find(e => e.order === 'idle') ?? villagers[0];
   /**
+   * One building per decision. Every `build` retasks the villager it names, so
+   * asking the same one for a camp, then a house, then a barracks in a single
+   * pass leaves it walking to the last of the three and the first two as
+   * foundations nobody is coming back to. Measured: the population sat at 5/5
+   * for the first four minutes because the house was always overwritten.
+   */
+  let builderTasked = false;
+  const build = (building: BuildingKind, target: { x: number; y: number }) => {
+    if (builderTasked || !idleBuilder) return;
+    builderTasked = true;
+    commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building, target });
+  };
+  /**
    * The first of these spots with nothing already standing on it.
    *
    * Cycling blindly through candidates and letting the simulation refuse the
@@ -274,7 +287,6 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     }
     return undefined;
   };
-  const housesUnderway = mine.some(e => e.kind === 'house' && (e.buildProgress ?? 1) < 1);
   const headroom = observation.populationCap - observation.population;
   // Economy before barracks: the starting wood is exactly enough for either a
   // barracks or a camp and a house, and on a map where the trees are twenty
@@ -293,6 +305,27 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     return { node, walk };
   };
 
+  // Housing before anything else it might spend wood on. Two hundred wood is
+  // exactly one camp, and a player who buys the camp first is capped at five
+  // population with one villager on wood -- which earns about ten wood a
+  // minute, so the twenty-five for a house is four minutes away and nothing
+  // else happens in them. Measured: pop 5/5 for the first four minutes of
+  // every match, and no barracks until twenty.
+  // Build ahead of the cap, not at it. A house takes time to go up, so
+  // waiting until there is one place left means standing at the cap for as
+  // long as it takes to build -- measured at pop 5/5 for the first four
+  // minutes of a match, which starves the villagers that buy the wood that
+  // buys the barracks. Two of them at once once the cap is actually reached.
+  const houseHeadroom = 3;
+  const housesAtOnce = headroom <= 0 ? 2 : 1;
+  const building = mine.filter(e => e.kind === 'house' && (e.buildProgress ?? 1) < 1).length;
+  if (idleBuilder && headroom <= houseHeadroom && building < housesAtOnce
+      && observation.wood >= 25) {
+    // Cycle deterministically through candidate spots so a blocked placement
+    // is retried elsewhere on the next decision.
+    const spot = clearSpot(HOUSE_SPOTS, 1);
+    if (spot) build('house', spot);
+  }
   for (const camp of CAMPS) {
     if (observation.wood < CAMP_COST_WOOD || !idleBuilder || !tc) continue;
     const built = mine.filter(e => e.kind === camp.building);
@@ -309,20 +342,9 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     const home = Math.atan2(tc.y - at.node.y, tc.x - at.node.x);
     const bearing = home + CAMP_FAN[step % CAMP_FAN.length];
     const reach = CAMP_RADII[Math.floor(step / CAMP_FAN.length) % CAMP_RADII.length];
-    commands.push({
-      kind: 'build', player, builderIds: [idleBuilder.id], building: camp.building,
-      target: { x: at.node.x + Math.cos(bearing) * reach, y: at.node.y + Math.sin(bearing) * reach },
-    });
+    build(camp.building, { x: at.node.x + Math.cos(bearing) * reach, y: at.node.y + Math.sin(bearing) * reach });
   }
 
-  if (idleBuilder && headroom <= 1 && !housesUnderway && observation.wood >= 25) {
-    // Cycle deterministically through candidate spots so a blocked placement
-    // is retried elsewhere on the next decision.
-    const spot = clearSpot(HOUSE_SPOTS, 1);
-    if (spot) {
-      commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'house', target: spot });
-    }
-  }
   // Not until the wood is banked somewhere near the trees. The starting wood
   // buys either a barracks or an economy, and a barracks bought first is one
   // militia followed by a wood queue that never clears — the town center is
@@ -336,18 +358,14 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   const range = mine.find(e => e.kind === 'archery-range');
   if (!range && barracks && idleBuilder && observation.age >= 1 && observation.wood >= 175) {
     const spot = clearSpot(RANGE_SPOTS, 1.5);
-    if (spot) {
-      commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'archery-range', target: spot });
-    }
+    if (spot) build('archery-range', spot);
   }
 
   if (!barracks && idleBuilder && observation.wood >= 175 && woodIsHandy) {
     // Cycle candidate spots like houses do, so terrain under one spot cannot
     // block the barracks -- and the whole military opening -- permanently.
     const spot = clearSpot(BARRACKS_SPOTS, 1.5);
-    if (spot) {
-      commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'barracks', target: spot });
-    }
+    if (spot) build('barracks', spot);
   }
 
   // Farms keep the food supply alive once the berries and the herd are gone.
@@ -380,9 +398,7 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   if ((!foodNearby || (observation.age >= 1 && foodShort)) && mayFarm && idleBuilder
       && !farmsUnderway && farms.length < FARM_SPOTS.length && observation.wood >= 60) {
     const spot = clearSpot(FARM_SPOTS, 1.5);
-    if (spot) {
-      commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'farm', target: spot });
-    }
+    if (spot) build('farm', spot);
   }
 
   // The next age, and whether it is close enough to be worth saving for.

@@ -51,22 +51,23 @@ range and buys Loom and the man-at-arms.
 
 ## The queue
 
-### Q1. The example AI cannot close out a won game
+### Q1. The example AI cannot afford the Castle Age and a win at once
 
-Four of sixteen paired matches run out the thirty-minute clock, where the old
-Dark Age militia rush decided all sixteen. This is the single biggest thing
-standing between the strategy and a decisive match, and it is worth more than
-any further tuning of its economy — the trade-off curve between the two is
-measured in `status.md` and the economy end of it is exhausted.
+The batch is 16/16 decided again, and no match reaches the Castle Age: they
+end first. Push the economy and the Castle Age arrives in four to six of
+sixteen — along with four to six draws. Seven configurations were measured and
+the economy end of that trade-off is exhausted; what is missing is a strategy
+that can *finish* a won game, so that a longer match is not also an undecided
+one.
 
-Neither side can finish an opponent as rich as itself. The army marches at the
-enemy town center and grinds; reinforcements arrive one at a time; the endgame
-raze only sends villagers in once the enemy field is completely clear, which
-stops being true the moment the other side has an economy of its own.
+Neither side can close out an opponent as rich as itself. The army marches at
+the enemy town center and grinds; reinforcements arrive one at a time; the
+endgame raze only sends villagers in once the enemy field is completely clear,
+which stops being true the moment the other side has an economy of its own.
 
 *Verify:* a 16-match paired batch that is 16/16 decided with 0 replay checksum
-failures, without giving up the ages — at least 12 of 16 still reaching the
-Feudal Age. Record the new distribution in `status.md`.
+failures **and** at least one match reaching the Castle Age. Record the new
+distribution in `status.md`.
 
 ### Q2. A blacksmith the AI never builds
 

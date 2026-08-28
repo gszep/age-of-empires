@@ -53,20 +53,28 @@ changed underneath it.
   how every shot is aimed, what fifty technologies do, and how long a body lies
   on the ground. Corpses lasting five minutes rather than three seconds cost
   nothing measurable — throughput went up, not down.
-- **The built-in AI researches now, and the batch says what that costs.**
-  Re-run with its upgrade wish list: **Loom in all 32 player-slots, the Feudal
-  Age in 30, Man-at-Arms in 8 and the Castle Age in 4** — every match reaches
-  the Feudal Age and four reach the Castle Age, against a baseline where the
-  strategy never researched anything at all. Still 0 replay checksum failures
-  and a 0.5 mirror win rate, at 357x real time.
-  **12 of 16 decided, against the 16 of 16 this queue asked for.** That is a
-  real regression and it is the price of the economy: two sides that both farm
-  and both reach the Castle Age cannot finish each other inside the
-  thirty-minute cap. The trade-off was measured across five configurations —
-  six farm spots gives 12 decided and 6 Castle Age matches, twelve gives 10
-  decided and 6, and starving the farms back gives 14 decided but only 2. What
-  is actually missing is a strategy that can close out a won game; that is now
-  the first line of `backlog.md`.
+- **The built-in AI researches now, and the batch is decisive again.**
+  **16 of 16 decided, 0 timeouts, 0 replay checksum failures**, a 0.5 mirror
+  win rate at 340x real time, with **Loom in all 32 player-slots, the Feudal
+  Age in 28 and Man-at-Arms in 10** — against a baseline where the strategy
+  never researched anything at all.
+  **No match reaches the Castle Age**, where the queue asked for at least one,
+  and the reason is the opposite of the earlier failure: matches now *end*
+  before eight hundred food is banked. The Castle Age is demonstrably
+  reachable — a test drives the strategy into it, and earlier configurations
+  reached it in four to six of sixteen matches while running out the clock in
+  four to six others. That trade-off was measured across seven configurations
+  and the economy end of it is exhausted: more farms and more villagers buy
+  the Castle Age with draws, every time. What would buy both is a strategy
+  that can finish a won game faster, which is `overnight.md`'s first item.
+- **The population cap was the thing throttling all of it.** Housing was built
+  only when one place was left, and a house takes time to raise, so a match
+  opened at 5/5 population for its first four minutes — with one villager on
+  wood earning about ten wood a minute, which is four minutes to afford the
+  next house. The barracks did not go up until minute twenty and neither side
+  ever trained a soldier. Housing now comes before anything else wood is spent
+  on, and is bought three places ahead of the cap. That one change took the
+  batch from 12 of 16 decided to 16 of 16.
 - Per-tick cost over a full 900-second match (seed 102): median **0.58ms**,
   p99 **1.72ms**, worst **11.7ms**, against a 50ms budget at 20Hz. The median
   was never the problem; the worst tick is the number to watch, and it was
