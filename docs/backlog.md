@@ -148,8 +148,6 @@ terrain blends above.
   siege workshop, the castle, and every unit they train — is out of its reach.
   Its matches are Dark Age militia wars. This is now the single biggest gap
   between what the simulation supports and what a played match shows.
-- **Technology icons are not imported.** `import_ui.py` takes Buildings, Units,
-  StatIcons and MenuIcons; research buttons therefore show text only.
 - **The built-in AI ignores sheep, deer and boar.** It picks gather targets by
   `kind === 'resource'`, which animals are not, so the whole Dark Age food
   opening is invisible to it. Its matches still run on berries and farms.

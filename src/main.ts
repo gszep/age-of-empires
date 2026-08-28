@@ -708,6 +708,7 @@ function currentCommands(): CommandButton[] {
       id: `research-${key}`,
       label: `Research ${tech.name} (${costLabel(tech.cost)})`,
       enabled: !building.researching && affordable(tech.cost),
+      icon: hud.iconFor('Techs', tech.iconId),
     });
   }
   return buttons;

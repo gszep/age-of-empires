@@ -203,6 +203,8 @@ export interface TechRules {
   researchSeconds: number;
   researchedAt: BuildingKind;
   requiresAge: number;
+  /** The widgetui `Techs` sheet index for its button art. */
+  iconId?: number;
   /** Age techs move the player on; everything else changes rules. */
   grantsAge?: number;
   /**
@@ -597,6 +599,7 @@ interface ManifestTech {
   researchSeconds: number;
   researchedAt: number;
   requiresAge: number;
+  iconId?: number;
   grantsAge?: number;
   requires?: string[];
   effects?: TechEffect[];
@@ -848,6 +851,7 @@ function technologies(
       researchSeconds: tech.researchSeconds,
       researchedAt,
       requiresAge: tech.requiresAge,
+      iconId: tech.iconId,
       grantsAge: tech.grantsAge,
       requires: tech.requires,
       effects: tech.effects ?? [],

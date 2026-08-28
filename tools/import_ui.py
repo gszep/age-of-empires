@@ -205,11 +205,17 @@ def extract_ui(
                 if e["category"] in ("unit", "unit-variant", "animal") and "iconId" in e
             }
         ),
+        # Research buttons were the only ones without art. Each technology
+        # carries its own `icon_id`, and the widgetui sheet is `Techs`.
+        "Techs": sorted(
+            {t["iconId"] for t in content["technologies"].values() if "iconId" in t}
+        ),
     }
     for category, mode in ui_spec["iconCategories"].items():
         table = icons[category]
         wanted = (
-            [f"{index:03d}" for index in entity_icons[category]] if mode == "entities" else sorted(table)
+            [f"{index:03d}" for index in entity_icons[category]]
+            if mode in ("entities", "technologies") else sorted(table)
         )
         selected: dict[str, str] = {}
         for index in wanted:

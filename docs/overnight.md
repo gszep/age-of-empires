@@ -46,6 +46,20 @@ Decisions already taken, so they are not re-litigated mid-run:
 - Commit and push to `origin/main` per verified item; never rewrite pushed
   history.
 
+## Progress
+
+Phase 1 is complete: issues 1, 2, 4, 8, 9, 12, 13 and 15 are fixed, verified
+and closed. Phase 2 is complete bar unit upgrades: the aim model, the manifest
+`technologies` fix, the Britons civilisation, fifty technologies from their own
+tree, the university, and Ballistics — which closed issue 3. The three issues
+left open on GitHub are all tagged `enhancement` and outside this run's scope.
+
+Remaining, in order: **N3** (technology icons — the fifty new research buttons
+are text-only, which is this run's own loose end), **unit upgrades** (the last
+part of the tech tree), then **N4**, **N6**, **N7**, **N8**, then **N1** and
+**N2**, then whatever of Phase 4 fits. Note the Imperial Age is already
+researchable and every building already has its Imperial art.
+
 ## Phase 1 — the open `bug` issues
 
 ### P1.1 Buildings gain line of sight when placed but not yet fully built (#1)
@@ -187,15 +201,12 @@ excluded nodes are listed with reasons in `docs/status.md`.
 
 Ordered as agreed: N3, N4, N6, N7, N8-remainder, then N1 and N2 last.
 
-### N3. Import technology icons
+### N3. Import technology icons — **done**
 
-`import_ui.py` takes Buildings, Units, StatIcons and MenuIcons, so research
-buttons are text-only. The DAT gives each tech an `icon_id`; the icon category
-to add is the researches sheet.
-
-*Verify:* the command panel with a town center selected shows an icon on the
-Loom, Feudal and Castle buttons — read `.command-button` background images out
-of the DOM rather than looking.
+The widgetui sheet is `Techs`, 313 entries named after the technology
+(`TechIconsT006Loom`), and each technology's own `icon_id` indexes it. Verified
+by reading `.command-button` background images out of the DOM with a town
+center selected: every button has art, research included.
 
 ### N4. Minimap player colours from the DAT
 

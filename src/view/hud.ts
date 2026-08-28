@@ -277,7 +277,7 @@ export class Hud {
     this.endDialog.classList.add('hidden');
   }
 
-  iconFor(category: 'Units' | 'Buildings', index: number | undefined): string | undefined {
+  iconFor(category: 'Units' | 'Buildings' | 'Techs', index: number | undefined): string | undefined {
     if (index === undefined) return undefined;
     const url = iconUrl(this.ui, category, index);
     return url ? `url('${url}')` : undefined;

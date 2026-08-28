@@ -852,6 +852,26 @@ class UiImportIntegrationTest(unittest.TestCase):
             any(name.startswith("IconAction") for name in self.result["materials"])
         )
 
+    def test_every_technology_gets_its_own_button_art(self):
+        # Research buttons were the only ones in the game with no art at all,
+        # because the UI import took Buildings, Units and the stat sheets but
+        # not Techs. Each technology carries its own `icon_id`.
+        icons = self.result["icons"]
+        self.assertIn("Techs", icons)
+        content = extracted_content()
+        for key, tech in content["technologies"].items():
+            self.assertIn("iconId", tech, key)
+            index = f"{tech['iconId']:03d}"
+            self.assertIn(index, icons["Techs"], f"{key} icon {index}")
+            material = icons["Techs"][index]
+            self.assertIn("texture", self.result["materials"][material], key)
+        # The sheet names each entry after the technology, so a wrong id shows
+        # up as a wrong name rather than as a plausible picture.
+        self.assertEqual(icons["Techs"][f"{content['technologies']['loom']['iconId']:03d}"],
+                         "TechIconsT006Loom")
+        self.assertEqual(icons["Techs"][f"{content['technologies']['ballistics']['iconId']:03d}"],
+                         "TechIconsT025Ballistics")
+
     def test_west_style_variants_and_sounds_are_included(self):
         self.assertIn("CivWestResourcePanel", self.result["materials"])
         self.assertEqual(self.result["sounds"].get("button_ui"), "Play_Button_UI")

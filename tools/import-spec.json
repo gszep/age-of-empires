@@ -584,6 +584,7 @@
     "iconCategories": {
       "Buildings": "entities",
       "Units": "entities",
+      "Techs": "technologies",
       "StatIcons": "all",
       "MenuIcons": "all"
     },
