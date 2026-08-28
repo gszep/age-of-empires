@@ -125,6 +125,32 @@
       }
     },
     {
+      "key": "pikeman",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 358,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
       "key": "archer",
       "sounds": [
         "select",
@@ -151,12 +177,64 @@
       }
     },
     {
+      "key": "crossbowman",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 24,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
       "key": "skirmisher",
       "sounds": [
         "select",
         "train"
       ],
       "unitId": 7,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "elite-skirmisher",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 6,
       "category": "unit",
       "animations": {
         "idle": {
@@ -806,6 +884,32 @@
         "train"
       ],
       "unitId": 448,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "light-cavalry",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 546,
       "category": "unit",
       "animations": {
         "idle": {

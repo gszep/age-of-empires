@@ -365,6 +365,42 @@ export const FALLBACK_RULES: GameRules = {
       attackReloadSeconds: 3, attackReleaseSeconds: 0.63,
       range: 4, minRange: 1, projectileSpeed: 7, launchHeight: 1.5,
     },
+    // The Castle Age upgrades. Their numbers are the DAT's; like the
+    // man-at-arms, none of them is trainable until its upgrade is researched.
+    crossbowman: {
+      age: 2,
+      hp: 35, radius: 0.2, speed: 0.96, lineOfSight: 7, cost: cost(0, 25, 45), trainSeconds: 27,
+      trainedAt: 'archery-range', popCost: 1,
+      attacks: [{ class: 27, amount: 3 }, { class: 21, amount: 0 }, { class: 3, amount: 5 }, { class: 17, amount: 0 }, { class: 13, amount: 0 }],
+      armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 0 }, { class: 31, amount: 0 }],
+      attackReloadSeconds: 2, attackReleaseSeconds: 0.35,
+      range: 5, minRange: 1, projectileSpeed: 7, launchHeight: 1.5,
+    },
+    'elite-skirmisher': {
+      age: 2,
+      hp: 35, radius: 0.2, speed: 0.96, lineOfSight: 7, cost: cost(25, 35), trainSeconds: 22,
+      trainedAt: 'archery-range', popCost: 1,
+      attacks: [{ class: 28, amount: 2 }, { class: 27, amount: 4 }, { class: 15, amount: 4 }, { class: 3, amount: 3 }, { class: 35, amount: 2 }],
+      armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 4 }, { class: 31, amount: 0 }, { class: 38, amount: 0 }],
+      attackReloadSeconds: 3, attackReleaseSeconds: 0.63,
+      range: 5, minRange: 1, projectileSpeed: 7, launchHeight: 1.5,
+    },
+    pikeman: {
+      age: 2,
+      hp: 55, radius: 0.2, speed: 1, lineOfSight: 4, cost: cost(35, 25), trainSeconds: 22,
+      trainedAt: 'barracks', popCost: 1,
+      attacks: [{ class: 29, amount: 1 }, { class: 21, amount: 1 }, { class: 5, amount: 25 }, { class: 4, amount: 4 }, { class: 8, amount: 22 }, { class: 16, amount: 16 }, { class: 30, amount: 18 }, { class: 35, amount: 7 }],
+      armors: [{ class: 27, amount: 0 }, { class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }, { class: 31, amount: 0 }],
+      attackReloadSeconds: 3, attackReleaseSeconds: 0.5,
+    },
+    'light-cavalry': {
+      age: 2,
+      hp: 60, radius: 0.25, speed: 1.5, lineOfSight: 4, cost: cost(80), trainSeconds: 30,
+      trainedAt: 'stable', popCost: 1,
+      attacks: [{ class: 25, amount: 10 }, { class: 4, amount: 7 }, { class: 11, amount: 0 }, { class: 21, amount: 0 }],
+      armors: [{ class: 4, amount: 0 }, { class: 8, amount: 0 }, { class: 3, amount: 2 }, { class: 31, amount: 0 }],
+      attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
+    },
     'scout-cavalry': {
       age: 1,
       hp: 45, radius: 0.25, speed: 1.2, lineOfSight: 4, cost: cost(80), trainSeconds: 30,
@@ -801,6 +837,16 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       },
       militia: unit('militia', 'barracks'),
       'man-at-arms': unit('man-at-arms', 'barracks'),
+      pikeman: unit('pikeman', 'barracks'),
+      crossbowman: {
+        ...unit('crossbowman', 'archery-range'),
+        projectileSpeed: FALLBACK_RULES.units.crossbowman.projectileSpeed,
+      },
+      'elite-skirmisher': {
+        ...unit('elite-skirmisher', 'archery-range'),
+        projectileSpeed: FALLBACK_RULES.units['elite-skirmisher'].projectileSpeed,
+      },
+      'light-cavalry': unit('light-cavalry', 'stable'),
       spearman: unit('spearman', 'barracks'),
       archer: { ...unit('archer', 'archery-range'), range: FALLBACK_RULES.units.archer.range },
       skirmisher: {
@@ -914,8 +960,9 @@ function technologies(
 }
 
 const UNIT_KINDS = new Set<string>([
-  'villager', 'militia', 'man-at-arms', 'spearman', 'archer', 'skirmisher', 'scout-cavalry',
-  'trade-cart',
+  'villager', 'militia', 'man-at-arms', 'spearman', 'pikeman',
+  'archer', 'crossbowman', 'skirmisher', 'elite-skirmisher',
+  'scout-cavalry', 'light-cavalry', 'trade-cart',
   'knight', 'cavalry-archer', 'longbowman', 'battering-ram', 'mangonel', 'monk',
   'sheep', 'deer', 'boar',
 ]);

@@ -4,8 +4,9 @@ import type { PlayerVisibility } from './visibility';
 export type PlayerId = 1 | 2;
 export type ResourceKind = 'food' | 'wood' | 'gold' | 'stone';
 export type UnitKind =
-  | 'villager' | 'militia' | 'man-at-arms' | 'spearman' | 'archer' | 'skirmisher'
-  | 'scout-cavalry' | 'trade-cart'
+  | 'villager' | 'militia' | 'man-at-arms' | 'spearman' | 'pikeman'
+  | 'archer' | 'crossbowman' | 'skirmisher' | 'elite-skirmisher'
+  | 'scout-cavalry' | 'light-cavalry' | 'trade-cart'
   | 'knight' | 'cavalry-archer' | 'longbowman' | 'battering-ram' | 'mangonel' | 'monk'
   | AnimalKind;
 /** Gaia's food on the hoof: herded, or hunted where it stands. */

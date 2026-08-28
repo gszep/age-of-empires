@@ -241,7 +241,7 @@ a test, so the game cannot offer something the Britons were never given.
 
 ### Ages and technologies
 
-**Fifty-one technologies, and the list is the civilisation's own tree.** Three
+**Fifty-six technologies, and the list is the civilisation's own tree.** Three
 were written out by hand here; now a `Research` node in `CivTechTrees/`
 BRITONS.json names the technology, the building it happens at and the age it
 appears in, and the DAT's effect commands say what it does. Nothing is
@@ -303,13 +303,17 @@ trained before it: the DAT gives the man-at-arms no enabling technology of its
 own, so without that rule it would sit in the Dark Age barracks beside the
 unit it replaces.
 
-The **man-at-arms** is the one that is imported (100 food and 40 gold at the
-barracks in the Feudal Age, from the DAT). The rest of the Britons' twenty-
-eight upgrade nodes are recorded in `skippedTechnologies` as *upgrades to a
-unit that is not imported* — the long swordsman, the crossbowman, the pikeman,
-the light cavalry and the others are units this slice does not have, and each
-is a unit's worth of art rather than a rule. The mechanism is done; the rest is
-content.
+**Five of the Britons' twenty-eight upgrades are researchable**, each at its
+own building for the DAT's own price: the man-at-arms (100 food, 40 gold,
+Feudal, barracks), the pikeman (160 food, 90 gold), the crossbowman (175 food,
+100 gold), the elite skirmisher (230 wood, 130 gold) and the light cavalry
+(150 food, 50 gold), the last four all Castle Age. Each brings its unit with
+its art and its own selection and training voices out of the owned audio.
+
+The remaining twenty-three are recorded in `skippedTechnologies` as *upgrades
+to a unit that is not imported* — the long swordsman, the arbalester, the
+halberdier, the cavalier and the rest. Each is a unit's worth of art rather
+than a rule; `backlog.md` lists them in order of value.
 
 Which age a thing belongs to is not a list here either: the importer finds the
 "(make avail)" technology that enables each unit and reads the age technology in

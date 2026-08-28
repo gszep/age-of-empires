@@ -7,7 +7,7 @@ import {
 import { checksumState } from './checksum';
 import {
   applyCommand, buildingFootprint, carryCapacityFor, createGame, isCarcass, placementLegal,
-  stepGame, unitRulesFor,
+  notYetUpgradedInto, stepGame, unitRulesFor,
 } from './game';
 import type { BuildingKind, Entity, GameState, ResourceKind } from './types';
 
@@ -1294,7 +1294,23 @@ describe('the archery range', () => {
     const trainedHere = (Object.keys(state.rules.units) as (keyof typeof state.rules.units)[])
       .filter(kind => state.rules.units[kind].trainedAt === 'archery-range')
       .sort();
-    expect(trainedHere).toEqual(['archer', 'cavalry-archer', 'skirmisher']);
+    // The crossbowman and the elite skirmisher belong to the range too, but
+    // as the far end of an upgrade: they are what it trains *instead of* the
+    // archer and the skirmisher, once that upgrade is researched.
+    expect(trainedHere).toEqual([
+      'archer', 'cavalry-archer', 'crossbowman', 'elite-skirmisher', 'skirmisher',
+    ]);
+    // Only imported content has the upgrade technologies; the open fallback
+    // has no upgrades at all, so there is nothing to be gated behind.
+    if (importedRules) {
+      const upgraded = createGame(23, importedRules);
+      for (const kind of ['crossbowman', 'elite-skirmisher']) {
+        expect(notYetUpgradedInto(upgraded, 1, kind), `${kind} is on offer already`).toBe(true);
+      }
+      for (const kind of ['archer', 'skirmisher', 'cavalry-archer']) {
+        expect(notYetUpgradedInto(upgraded, 1, kind), `${kind} needs an upgrade first`).toBe(false);
+      }
+    }
     expect(state.rules.units.skirmisher.cost).toEqual({ food: 25, wood: 35, gold: 0, stone: 0 });
   });
 
