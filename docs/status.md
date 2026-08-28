@@ -468,6 +468,26 @@ random direction. One tile is the board's own unit, and it is wider than any
 unit and narrower than any building — which is why an arrow that goes wide of a
 villager still lands inside the town center behind him, as in AoE2.
 
+### A selected group is shown as its members
+
+The selection panel used to show whichever of a group happened to be first,
+with "12 selected" underneath. It now shows **one portrait per selected
+entity**, each with what is left of it, and clicking a portrait singles that
+one out — which is what makes the grid worth having rather than a tally
+(issue #6).
+
+**Double-clicking a unit takes every one of its kind that can presently be
+seen.** On screen rather than on the map, which is AoE2's own rule and the
+reason it is a selection you could have made with a drag. Only the player's
+own units group that way: a double-click on somebody else's soldier, on a
+building or on a tree takes just that one thing.
+
+The double click is read from the pointer events this app already handles —
+the same thing clicked twice within 350 ms — rather than from the browser's
+`dblclick`, which did not arrive reliably over a canvas that captures the
+pointer. That was measured, not assumed: synthesising a double click in a real
+browser did nothing until the detection moved.
+
 ### A building trains fifteen deep
 
 Up to fifteen units may wait at one building, the one being trained included --

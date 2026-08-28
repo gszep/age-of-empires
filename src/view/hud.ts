@@ -26,10 +26,18 @@ export interface SelectionInfo {
   maxHp?: number;
   details: string[];
   progress?: { label: string; fraction: number };
+  /**
+   * One entry per selected entity, when more than one is. AoE2 shows the
+   * group as a grid of portraits rather than the first of them, and each is
+   * clickable to single out that unit (issue #6).
+   */
+  members?: { id: number; name: string; icon?: string; hp: number; maxHp: number }[];
 }
 
 export interface HudCallbacks {
   onCommand(id: string): void;
+  /** A portrait in the group grid was clicked: select that one entity. */
+  onSelectMember(id: number): void;
   onMinimapNavigate(point: Point): void;
   onSelectIdleVillager(): void;
   onMenu(action: 'resume' | 'restart' | 'pause'): void;
@@ -241,6 +249,28 @@ export class Hud {
     panel.style.display = info ? '' : 'none';
     if (!info) {
       this.selectionPanel.innerHTML = '';
+      return;
+    }
+    // A group is shown as its members, not as whichever of them happens to be
+    // first: one portrait per selected unit, each with what is left of it.
+    if (info.members && info.members.length > 1) {
+      this.selectionPanel.innerHTML = `
+        <div class="object-name">${info.members.length} selected</div>
+        <div class="selection-grid">
+          ${info.members.map(member => `
+            <button class="selection-member" data-id="${member.id}" title="${member.name}">
+              <span class="member-portrait" style="background-image:${member.icon ?? 'none'}"></span>
+              <span class="member-hp"><span class="member-hp-fill" style="width:${
+                (Math.max(0, Math.min(1, member.maxHp > 0 ? member.hp / member.maxHp : 0)) * 100).toFixed(1)
+              }%"></span></span>
+            </button>`).join('')}
+        </div>`;
+      for (const button of this.selectionPanel.querySelectorAll<HTMLElement>('.selection-member')) {
+        button.addEventListener('click', () => {
+          const id = Number(button.dataset.id);
+          if (Number.isFinite(id)) this.callbacks.onSelectMember(id);
+        });
+      }
       return;
     }
     const health = info.hp !== undefined && info.maxHp !== undefined && info.maxHp > 0;

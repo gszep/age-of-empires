@@ -9,6 +9,7 @@ import { checksumState } from './sim/checksum';
 import type { MatchRecord } from './protocol/types';
 import type { BuildingKind, Entity, GameState, Point, UnitKind } from './sim/types';
 import { buildMenu, type BuildPage } from './view/build-menu';
+import { sameKindOnScreen } from './view/selection';
 import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
@@ -274,6 +275,10 @@ function createHud(): Hud {
       cameraCenter = worldToIso(world.x, world.y);
     },
     onSelectIdleVillager: () => selectIdleVillager(),
+    onSelectMember: id => {
+      if (game.entities.some(e => e.id === id && !e.dead)) selectedIds = [id];
+      hud.setSelection(selectionInfo());
+    },
     onMenu: action => {
       if (action === 'pause') paused = !paused;
       if (action === 'resume') paused = false;
@@ -394,6 +399,20 @@ function runUiCommand(id: string): void {
 }
 
 /** Screen pixel -> world tile point under the current camera. */
+/** Whether a world point is inside the visible canvas, for "on screen" rules. */
+function isOnScreen(point: Point): boolean {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const iso = worldToIso(point.x, point.y);
+  const sx = (iso.x - cameraCenter.x) * zoom + rect.width / 2;
+  const sy = -(iso.y - cameraCenter.y) * zoom + rect.height / 2;
+  return sx >= 0 && sx <= rect.width && sy >= 0 && sy <= rect.height;
+}
+
+/**
+ * A double-click takes everything of that kind that can be seen, which is
+ * AoE2's own rule and the reason it says "on screen" rather than "on the map"
+ * (issue #6): it is a selection you could have made with a drag.
+ */
 function screenToWorld(clientX: number, clientY: number): Point {
   const rect = renderer.domElement.getBoundingClientRect();
   const sx = (clientX - rect.left - rect.width / 2) / zoom + cameraCenter.x;
@@ -430,6 +449,15 @@ app.appendChild(selectionBox);
 let dragStart: { x: number; y: number } | undefined;
 
 renderer.domElement.addEventListener('contextmenu', event => event.preventDefault());
+
+/**
+ * How long after clicking a thing clicking it again is a double click. Read
+ * from the pointer events this app already handles rather than from the
+ * browser's own `dblclick`, which a canvas that captures the pointer does not
+ * reliably produce.
+ */
+const DOUBLE_CLICK_MS = 350;
+let lastClick: { id: number; at: number } | undefined;
 /** A building placed one tile at a time along a dragged line, as AoE2 walls are. */
 const isWall = (kind: BuildingKind): boolean => kind === 'palisade-wall';
 let wallStart: Point | undefined;
@@ -524,7 +552,15 @@ addEventListener('pointerup', event => {
     if (units.length) selectedIds = units.map(e => e.id);
   } else {
     const target = pickEntity(screenToWorld(event.clientX, event.clientY));
-    if (target && target.owner === 1) {
+    // The same thing clicked twice quickly takes every one of its kind that
+    // can be seen, which is AoE2's rule and issue #6's request.
+    const now = performance.now();
+    const again = target && lastClick && lastClick.id === target.id
+      && now - lastClick.at <= DOUBLE_CLICK_MS;
+    lastClick = target ? { id: target.id, at: now } : undefined;
+    if (target && again && !event.shiftKey) {
+      selectedIds = sameKindOnScreen(game.entities, target, 1, isOnScreen).map(e => e.id);
+    } else if (target && target.owner === 1) {
       selectedIds = event.shiftKey ? [...new Set([...selectedIds, target.id])] : [target.id];
     } else if (target) {
       selectedIds = [target.id];
@@ -846,6 +882,16 @@ function selectionInfo(): SelectionInfo | undefined {
     : names[entity.kind] ?? displayName(entity.kind);
   const details: string[] = [];
   if (selection.length > 1) details.push(`${selection.length} selected`);
+  const members = selection.length > 1
+    ? selection.map(member => ({
+      id: member.id,
+      name: names[member.kind] ?? displayName(member.kind),
+      icon: hud.iconFor(isUnit(member.kind) ? 'Units' : 'Buildings',
+        assets?.entities[view.entityKey(member)]?.iconId),
+      hp: member.hp,
+      maxHp: member.maxHp,
+    }))
+    : undefined;
   if (entity.kind === 'town-center' && entity.owner === 1) details.push(AGE_NAMES[game.players[1].age]);
   if (entity.amount !== undefined) details.push(`${Math.floor(entity.amount)} ${entity.resourceKind}`);
   if (entity.carrying) details.push(`Carrying ${entity.carrying.amount} ${entity.carrying.kind}`);
@@ -873,6 +919,7 @@ function selectionInfo(): SelectionInfo | undefined {
   const iconIndex = assets?.entities[view.entityKey(entity)]?.iconId;
   const category = isUnit(entity.kind) ? 'Units' : 'Buildings';
   return {
+    members,
     name,
     icon: entity.kind !== 'resource' ? hud.iconFor(category, iconIndex) : undefined,
     // A carcass shows no health: the DAT's corpse unit has none, and what a

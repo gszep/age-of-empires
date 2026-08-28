@@ -181,3 +181,39 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 @media (max-width: 900px) {
   #hud { --ui-scale: 0.24 !important; }
 }
+
+/* A selected group is shown as its members, one portrait each (issue #6). */
+.selection-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-content: flex-start;
+  overflow-y: auto;
+  max-height: 100%;
+  padding: 2px 0;
+}
+.selection-member {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.selection-member:hover { border-color: rgba(255, 226, 150, 0.9); }
+.member-portrait {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+.member-hp {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  bottom: 1px;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.6);
+}
+.member-hp-fill { display: block; height: 100%; background: #46c02c; }
