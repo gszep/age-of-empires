@@ -66,6 +66,22 @@ range and buys Loom and the man-at-arms.
 
 ## The queue
 
+### Q0 and Q0b are done. Where the queue stands on 2026-08-28
+
+**Q0: eleven of the twelve bugs are closed** — #17, #18, #19, #20, #21, #23,
+#24, #25, #26, #27 and #28. **#22 (farm textures) is blocked on the human**,
+who has been asked on the issue which of three rendered candidates matches
+their game; nothing in the DAT settles it. **Q0b: all three enhancements are
+closed** — #5 (reviewed, `docs/pathing-review.md`), #6 and #7. #5 also carries
+a question back to the human, because nine measurements could not reproduce
+the defect it reports.
+
+The batch was re-measured afterwards and is in `status.md`: 16/16 decided, 0
+timeouts, 0 replay checksum failures, 431x throughput, and **0 of 32
+player-slots reaching the Castle Age**. So Q1's verification is still unmet and
+its subject is unchanged — what is missing is a strategy that can finish, not
+an economy. Start there.
+
 ### Q0. The twelve open `bug` issues from the 2026-08-28 playtest
 
 Read each one on GitHub before starting it; the human's own words are the

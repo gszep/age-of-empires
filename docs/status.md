@@ -45,10 +45,21 @@ Measured on calcifer. Every number here is from the current board (120x120,
 about 310 entities); anything older is not comparable, because the map size
 changed underneath it.
 
-- 16 paired-seed matches in concurrent Node processes, re-run after the shot
-  model, the technology tree and the DAT's corpse lifetimes: **16 decided, 0
-  timeout draws, 0 replay checksum failures**, mirror win rate 0.5,
-  **393x aggregate real time** (43.4 seconds of wall clock for 17,058 simulated
+- 16 paired-seed matches, re-run after the 2026-08-28 bug work — building
+  armour, attacker pursuit, the gathering rule, the mill technologies, the farm
+  reseed and the training queue: **16 decided, 0 timeout draws, 0 replay
+  checksum failures**, mirror win rate 0.5, **431x aggregate real time** (47.9
+  seconds of wall clock for 20,672 simulated seconds). The zero replay failures
+  are again the load-bearing number: every match re-simulates to the same
+  checksums after a session that changed what a blow does to a building, how an
+  attacker follows its target, what a worker turns to next, and what a farm
+  holds. Match lengths ran 1050 to 1619 seconds, median about 1230.
+  **Ages reached across the 32 player-slots: 30 Feudal, 0 Castle** — the
+  economy is better and matches still decide before the Castle Age is
+  affordable, which is exactly what `overnight.md`'s Q1 is about. Technologies
+  bought: Loom 32 times, the Feudal Age 30, the man-at-arms 8.
+- The previous run of the same batch, before that work: **16 decided, 0
+  timeouts, 0 replay failures**, win rate 0.5, **393x aggregate real time** (43.4 seconds of wall clock for 17,058 simulated
   seconds). The zero replay failures are the load-bearing number: every one of
   those matches re-simulates to the same checksums after a session that changed
   how every shot is aimed, what sixty-six technologies do, and how long a body
