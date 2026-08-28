@@ -156,7 +156,39 @@ class Heap {
  * "arrived", and a unit that believes it has arrived somewhere it never left
  * walks on the spot for the rest of the match.
  */
+/**
+ * Paths already found against *this* grid, which lives for exactly one tick.
+ * A group ordered to one point asks the same question once per unit, and the
+ * answer is the same whenever both ends reduce to the same tiles -- the search
+ * is over tiles and nothing else.
+ *
+ * Only used when both the start tile and the goal tile are free. When either
+ * is blocked, `nearestFreeTile` breaks its ties on the *fractional* position,
+ * so two units in one tile can legitimately get different answers, and the
+ * cache would be wrong rather than slow. A `WeakMap` on the grid means the
+ * entries go when the tick's grid does, with nothing to invalidate.
+ */
+const pathCache = new WeakMap<NavGrid, Map<string, Point[] | undefined>>();
+
+/** Its own copy, because the caller shifts waypoints off the front as it walks. */
+const copyPath = (path: Point[] | undefined) => path?.map(point => ({ ...point }));
+
 export function findPath(grid: NavGrid, from: Point, to: Point): Point[] | undefined {
+  const startTile = tileOf(from);
+  const goalTile = tileOf(to);
+  const cacheable = !isBlocked(grid, startTile.x, startTile.y)
+    && !isBlocked(grid, goalTile.x, goalTile.y);
+  if (!cacheable) return searchPath(grid, from, to);
+  let cache = pathCache.get(grid);
+  if (!cache) { cache = new Map(); pathCache.set(grid, cache); }
+  const key = `${startTile.x},${startTile.y}|${goalTile.x},${goalTile.y}`;
+  if (cache.has(key)) return copyPath(cache.get(key));
+  const path = searchPath(grid, from, to);
+  cache.set(key, path);
+  return copyPath(path);
+}
+
+function searchPath(grid: NavGrid, from: Point, to: Point): Point[] | undefined {
   const startTile = tileOf(from);
   const goal = nearestFreeTile(grid, to);
   if (!goal) return undefined;

@@ -468,6 +468,27 @@ random direction. One tile is the board's own unit, and it is wider than any
 unit and narrower than any building — which is why an arrow that goes wide of a
 villager still lands inside the town center behind him, as in AoE2.
 
+### The pathing was reviewed, and one tick was halved
+
+`docs/pathing-review.md` is the review issue #5 asked for: nine measurements,
+the comparison against the standard references, and what was changed. In short
+the tile layer is already textbook — 8-connected A* with an octile heuristic
+and a true `sqrt(2)` diagonal, no corner cutting, a heap ordered by a *total*
+key so equal-cost paths are stable, per-player grids, and a nearest-reachable
+fallback — and nine measurements failed to reproduce a defect: zero stuck ticks
+in ten minutes of a match, twelve units through a one-tile gap, a sealed goal
+given up on at tick 142.
+
+What was found is a cost, not a defect: the tick a fifty-unit order lands on
+took **22.35ms** of a fifty-millisecond budget. A per-tick path cache, keyed on
+the tick's own grid, took it to **11.95ms**, with byte-identical checksums
+across three six-thousand-tick matches — the proof that it is a saving and not
+a change.
+
+The flow field the literature recommends for this is deliberately not built:
+it wins at hundreds of agents, this game runs tens, and it would change every
+path and every stored replay. The review names the trigger to revisit.
+
 ### A selected group is shown as its members
 
 The selection panel used to show whichever of a group happened to be first,

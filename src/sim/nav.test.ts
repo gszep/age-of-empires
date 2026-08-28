@@ -387,3 +387,58 @@ describe('unreachable goals', () => {
     expect(findPath(grid, { x: 2.5, y: 2.5 }, { x: 0.5, y: 0.5 })).toBeUndefined();
   });
 });
+
+describe('asking the same question twice in one tick', () => {
+  // A group ordered to one point asks it once per unit, and the answer is the
+  // same whenever both ends reduce to the same tiles -- the search is over
+  // tiles and nothing else. Caching that against the tick's own grid halved
+  // the cost of the tick a fifty-unit order lands on (issue #5).
+  const maze = (): NavGrid => {
+    const grid: NavGrid = { width: 20, height: 20, blocked: new Uint8Array(400) };
+    for (let y = 0; y < 14; y++) grid.blocked[y * 20 + 10] = 1;
+    return grid;
+  };
+
+  it('gives every caller the same path', () => {
+    const grid = maze();
+    const first = findPath(grid, { x: 2.5, y: 2.5 }, { x: 17.5, y: 2.5 });
+    const second = findPath(grid, { x: 2.5, y: 2.5 }, { x: 17.5, y: 2.5 });
+    expect(second).toEqual(first);
+  });
+
+  it('gives each caller its own copy to walk down', () => {
+    // The caller shifts waypoints off the front as it goes; a shared array
+    // would leave the second unit following a path the first had eaten.
+    const grid = maze();
+    const first = findPath(grid, { x: 2.5, y: 2.5 }, { x: 17.5, y: 2.5 })!;
+    const length = first.length;
+    first.shift();
+    first[0].x = -999;
+    const second = findPath(grid, { x: 2.5, y: 2.5 }, { x: 17.5, y: 2.5 })!;
+    expect(second).toHaveLength(length);
+    expect(second[0].x).not.toBe(-999);
+  });
+
+  it('answers per position when the goal tile is blocked', () => {
+    // `nearestFreeTile` breaks its ties on the fractional target, so two goals
+    // inside one blocked tile can legitimately differ. The cache stands aside
+    // for those rather than being wrong.
+    const grid: NavGrid = { width: 12, height: 12, blocked: new Uint8Array(144) };
+    grid.blocked[6 * 12 + 6] = 1;
+    const fromNorth = findPath(grid, { x: 1.5, y: 1.5 }, { x: 6.1, y: 6.1 })!;
+    const fromSouth = findPath(grid, { x: 1.5, y: 1.5 }, { x: 6.9, y: 6.9 })!;
+    expect(fromNorth[fromNorth.length - 1]).not.toEqual(fromSouth[fromSouth.length - 1]);
+  });
+
+  it('separates one grid\'s answers from another\'s', () => {
+    // Per-player grids exist in the same tick: a gate is a hole in its owner's
+    // wall and a wall to everybody else.
+    const open: NavGrid = { width: 12, height: 12, blocked: new Uint8Array(144) };
+    const walled: NavGrid = { width: 12, height: 12, blocked: new Uint8Array(144) };
+    for (let y = 0; y < 12; y++) walled.blocked[y * 12 + 6] = 1;
+    const through = findPath(open, { x: 1.5, y: 1.5 }, { x: 10.5, y: 1.5 })!;
+    const around = findPath(walled, { x: 1.5, y: 1.5 }, { x: 10.5, y: 1.5 })!;
+    expect(around).not.toEqual(through);
+    expect(around[around.length - 1].x).toBeLessThan(6);
+  });
+});
