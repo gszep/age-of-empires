@@ -142,6 +142,25 @@ function annexedAssets(): ContentAssets {
   return assets;
 }
 
+describe('the colours a player is drawn in', () => {
+  it('takes them from the imported palette, not the open-content pair', () => {
+    // The minimap used to read the fallback (a soft `#1a6cff` and `#e02b2b`)
+    // while the manifest carried each player's own `minimapColor`. The DAT's
+    // are the pure primaries, which is what AoE2 draws.
+    const path = 'public/imported/aoe2/manifest.json';
+    if (!existsSync(path)) return;
+    const manifest = JSON.parse(readFileSync(path, 'utf8')) as {
+      playerColors: { players: Record<string, { minimapColor: [number, number, number] }> };
+    };
+    const assets = { playerColors: manifest.playerColors } as unknown as ContentAssets;
+    expect(playerColorHex(assets, 1)).toBe('#0000ff');
+    expect(playerColorHex(assets, 2)).toBe('#ff0000');
+    // ...and they really are different from what the fallback would give.
+    expect(playerColorHex(assets, 1)).not.toBe(`#${PLAYER_COLORS[1].toString(16)}`);
+    expect(playerColorHex(assets, 2)).not.toBe(`#${PLAYER_COLORS[2].toString(16)}`);
+  });
+});
+
 describe('what a building wears in each age', () => {
   /** A barracks with Dark and Castle art but nothing for the Feudal Age. */
   function agedAssets(present: string[]): ContentAssets {

@@ -1,5 +1,6 @@
 import type { GameState, PlayerId, Point } from '../sim/types';
-import { PLAYER_COLORS } from './sprites';
+import type { ContentAssets } from './assets';
+import { playerColorHex } from './sprites';
 
 const RESOURCE_COLORS: Record<string, string> = {
   food: '#c4506e',
@@ -77,8 +78,18 @@ export class Minimap {
     return { x: (dy + dx) / 2, y: (dy - dx) / 2 };
   }
 
-  draw(state: GameState, viewCenter: Point, viewTiles: { w: number; h: number }): void {
+  /**
+   * `assets` is what makes a player's dot the colour the DAT gives them --
+   * the manifest carries each player's own `minimapColor`, pure blue and pure
+   * red, where the open-content fallback picks its own softer pair.
+   */
+  draw(
+    state: GameState, viewCenter: Point, viewTiles: { w: number; h: number },
+    assets?: ContentAssets,
+  ): void {
     const ctx = this.context;
+    const ownerColor = (owner: number): string =>
+      playerColorHex(assets, owner) ?? '#ffffff';
     const visibility = state.visibility[this.player];
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -106,7 +117,7 @@ export class Minimap {
       if (entity.owner === this.player || visible) {
         const color = entity.kind === 'resource'
           ? RESOURCE_COLORS[entity.resourceKind ?? 'wood']
-          : `#${PLAYER_COLORS[entity.owner].toString(16).padStart(6, '0')}`;
+          : ownerColor(entity.owner);
         const size = entity.kind === 'town-center' ? 6 : entity.kind === 'resource' ? 3 : entity.radius > 0.5 ? 5 : 2.5;
         drawDot(entity.position.x, entity.position.y, color, size);
       }
@@ -116,7 +127,7 @@ export class Minimap {
       if (visibility.visible[index] === 1) continue;
       const color = remembered.kind === 'resource'
         ? RESOURCE_COLORS[remembered.resource ?? 'wood']
-        : `#${PLAYER_COLORS[remembered.owner].toString(16).padStart(6, '0')}`;
+        : ownerColor(remembered.owner);
       drawDot(remembered.x, remembered.y, color, remembered.kind === 'town-center' ? 6 : 3);
     }
 

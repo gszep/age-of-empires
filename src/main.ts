@@ -1141,7 +1141,7 @@ renderer.setAnimationLoop(now => {
     hud.minimap.draw(game, isoToWorld(cameraCenter.x, cameraCenter.y), {
       w: innerWidth / zoom / TILE_W * 1.2,
       h: innerHeight / zoom / TILE_H * 0.9,
-    });
+    }, assets);
     if (game.winner && !ended) {
       ended = true;
       hud.showEnd(game.winner === 1);

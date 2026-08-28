@@ -30,11 +30,6 @@ construction-complete cue, so that one has no owned source to draw on.
 
 ## Rendering
 
-- **The minimap still uses hand-picked player colours.** `src/view/minimap.ts`
-  reads `PLAYER_COLORS`, the open-content fallback, while the manifest now
-  carries the DAT's own `minimapColor` per player. The minimap has no
-  `ContentAssets` handle; plumbing one through is the whole job.
-
 - **Terrain blends/masks** are not consumed; terrain-to-terrain transitions
   are absent (single-terrain maps hide this today). The blocker is a mapping,
   not the pipeline: nothing in the owned files says which `terrain/blends/`

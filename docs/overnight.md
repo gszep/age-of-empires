@@ -54,11 +54,18 @@ and closed. Phase 2 is complete bar unit upgrades: the aim model, the manifest
 tree, the university, and Ballistics — which closed issue 3. The three issues
 left open on GitHub are all tagged `enhancement` and outside this run's scope.
 
-Remaining, in order: **N3** (technology icons — the fifty new research buttons
-are text-only, which is this run's own loose end), **unit upgrades** (the last
-part of the tech tree), then **N4**, **N6**, **N7**, **N8**, then **N1** and
-**N2**, then whatever of Phase 4 fits. Note the Imperial Age is already
-researchable and every building already has its Imperial art.
+N3 is done too. Remaining, in order: **N4**, **N6**, **N7**, **N8**, then
+**N1** and **N2**, then whatever of Phase 4 fits.
+
+**Unit upgrades are deliberately deferred into Phase 4.** They are the last
+part of the tech tree, but a `UnitUpgrade` node's target — the man-at-arms, the
+crossbowman, the pikeman — is a unit this game does not have, so the agreed cut
+(a node whose building *and* target already exist) excludes them until the
+units are imported. Importing fifteen new units with their animations is
+content work of exactly the shape Phase 4 is for, and the Imperial Age already
+being researchable is the reason to do it there. The replace-a-kind rule itself
+is small: the DAT states an upgrade as an `upgrade unit` effect command, the
+same one the age building variants already use.
 
 ## Phase 1 — the open `bug` issues
 
@@ -208,15 +215,12 @@ The widgetui sheet is `Techs`, 313 entries named after the technology
 by reading `.command-button` background images out of the DOM with a town
 center selected: every button has art, research included.
 
-### N4. Minimap player colours from the DAT
+### N4. Minimap player colours from the DAT — **done**
 
-`src/view/minimap.ts` reads `PLAYER_COLORS`, the open-content fallback, while
-the manifest carries each player's own `minimapColor` (blue `0,0,255`, red
-`255,0,0`). The minimap has no `ContentAssets` handle; plumbing one through is
-the whole job.
-
-*Verify:* a pixel probe of the minimap returns the DAT's blue and red rather
-than `#1a6cff`/`#e02b2b`.
+Plumbed `ContentAssets` through to `draw` and reused `playerColorHex`, which
+already read the manifest's own `minimapColor`. Verified by reading the
+minimap canvas's pixels in the browser: the player's dots are `#0000ff`, the
+DAT's pure blue, where the fallback would have given `#1a6cff`.
 
 ### N6. Building rubble, and a corpse window that follows its animation
 
