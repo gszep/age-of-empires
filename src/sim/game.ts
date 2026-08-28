@@ -911,7 +911,7 @@ function attackProfile(
       releaseSeconds: attack?.releaseSeconds,
     };
   }
-  const rules = state.rules.units[entity.kind as UnitKind];
+  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
   if (rules.hunt && target && isAnimal(target.kind)) return { ...rules.hunt };
   return {
     range: rules.range ?? 0,
@@ -936,7 +936,7 @@ const inAttackRange = (state: GameState, entity: Entity, target: Entity): boolea
 function tooClose(state: GameState, entity: Entity, target: Entity): boolean {
   const minimum = isBuilding(entity.kind)
     ? buildingRulesFor(state, entity.owner, entity.kind).attack?.minRange ?? 0
-    : state.rules.units[entity.kind as UnitKind]?.minRange ?? 0;
+    : unitRulesFor(state, entity.owner, entity.kind as UnitKind)?.minRange ?? 0;
   return minimum > 0 && inRange(entity, target, minimum);
 }
 
@@ -1338,6 +1338,12 @@ function updateBuilder(state: GameState, grid: NavGrid, entity: Entity, builderC
 
 function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'attack') return;
+  // Everything below reads the *researched* rules. Reading the base ones here
+  // is how a blacksmith upgrade could change `unitRulesFor` and change nothing
+  // a target ever felt: Fletching moved the archer's attack from 4 to 5 and a
+  // villager went on taking 4 (issue #26). The tower path has always gone
+  // through `buildingRulesFor`, which is why Murder Holes worked and this did
+  // not.
   const targetId = (entity.order as { targetId: number }).targetId;
   const target = state.entities.find(e => !e.dead && e.id === targetId);
   if (!target || target.owner === entity.owner || target.hp <= 0) {
@@ -1351,7 +1357,7 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
     becomeIdle(entity);
     return;
   }
-  const rules = state.rules.units[entity.kind as UnitKind];
+  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
   if (tooClose(state, entity, target)) {
     // Inside its minimum range a skirmisher cannot bring its javelin to bear.
     // AoE2 leaves it standing there rather than closing further, which is what

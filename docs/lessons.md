@@ -298,6 +298,20 @@ keeps the record.
   invariant, not the inventory; if an exact list is genuinely the point, say
   why in the test.
 
+- **A test that asserts what the rules say cannot see whether the game reads
+  them.** Issue #26 was "attack upgrades do nothing", and the first fix -- the
+  importer had been dropping every non-combat building's armour -- was real,
+  large, and not the whole bug. The test written beside it asserted that
+  `unitRulesFor` returned 5 after Fletching, which it did; the attacker loop
+  read `state.rules.units[kind]` instead and dealt 4 for the rest of the match.
+  The defect survived a green gate, a determinism check and an issue comment
+  claiming it fixed. It was found only when a *different* piece of work needed
+  to know where combat reads its numbers. Rule: when a technology, an upgrade
+  or a modifier is meant to change an outcome, the test measures the outcome --
+  the hit points the target loses, the food the player banks -- and never the
+  intermediate table. A lookup function returning the right number proves the
+  lookup, and the bug is usually in who calls it.
+
 ## Process
 
 - **Complete one playable behaviour end to end** (from the working style

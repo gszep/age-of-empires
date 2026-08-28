@@ -631,6 +631,17 @@ armour and did not move):
 
 Every number outside the last column was 1 before.
 
+**A second defect sat behind the first, and the first fix's test could not
+see it.** The attacker loop read `state.rules.units[kind]` -- the *base* rules
+-- rather than `unitRulesFor`, so a researched attack upgrade changed what the
+rules said and nothing a target ever felt. Measured: an archer dealt 4 to a
+villager before Fletching and 4 after, while the rules read 5. The tower path
+had always gone through `buildingRulesFor`, which is why Murder Holes worked
+and this did not. `attackProfile`, `tooClose` and `updateAttacker` now read the
+researched rules, and the regression test measures the **hit points the target
+loses** rather than what the rules contain -- asserting on `unitRulesFor` is
+what let this through the first time.
+
 **The archer row is not a defect.** A house has 7 pierce armour against an
 archer's 4, so an arrow scores the minimum whatever the blacksmith has said —
 and Fletching, Bodkin Arrow and Bracer together only reach 7. That is why

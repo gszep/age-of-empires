@@ -1830,6 +1830,37 @@ describe('what a blow does to a building', () => {
     expect(start - house.hp).toBe(expected);
   });
 
+  it.skipIf(!importedRules)('lands the upgrade on the target, not only in the rules', () => {
+    // The half of #26 that the first fix missed, and that asserting on
+    // `unitRulesFor` could never catch: the attacker loop read the *base*
+    // rules, so Fletching moved the archer's attack from 4 to 5 and a villager
+    // went on taking 4. Measure what the target actually loses.
+    const dealt = (researched: string[]): number => {
+      const state = createGame(101, importedRules);
+      state.players[1].researched.push(...researched);
+      const rules = importedRules!.units.archer;
+      const archer: Entity = {
+        id: state.nextId++, kind: 'archer', owner: 1, position: { x: 60, y: 60 },
+        hp: rules.hp, maxHp: rules.hp, radius: rules.radius,
+        activity: 'idle', order: { kind: 'idle' },
+      };
+      state.entities.push(archer);
+      const prey = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
+      prey.position = { x: 62, y: 60 };
+      applyCommand(state, { kind: 'stop', player: 2, entityIds: [prey.id] });
+      applyCommand(state, {
+        kind: 'order', player: 1, entityIds: [archer.id],
+        target: prey.position, targetId: prey.id,
+      });
+      const start = prey.hp;
+      for (let i = 0; i < 400 && prey.hp === start; i++) stepGame(state);
+      return start - prey.hp;
+    };
+    const base = dealt([]);
+    expect(base).toBeGreaterThan(1);
+    expect(dealt(['fletching'])).toBe(base + 1);
+  });
+
   it.skipIf(!importedRules)('carries the blacksmith upgrade into what the arrow hits', () => {
     // The other half of #26: the effect does reach the shot. It cannot show on
     // a house, and that is the DAT's answer rather than a defect -- 7 pierce
