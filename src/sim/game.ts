@@ -2,6 +2,7 @@ import { FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isAnimal, isBuilding, i
 import type {
   AttackValue, BuildingRules, Cost, GameRules, NodeKind, TechEffect, TechKey, UnitRules,
 } from './data';
+import { ARABIA, generateMap } from './mapgen';
 import { buildNavGrid, findPath, halfExtent, isBlocked, separateUnits, tileOf, type NavGrid } from './nav';
 import { random01 } from './random';
 import { buildingRulesFor, combine, unitRulesFor } from './rules';
@@ -47,44 +48,6 @@ export const MAP_TILES = 120;
 /** Where a player's town center stands. The other player's mirrors across x. */
 const START = { x: 30, y: 60 };
 
-/**
- * One group of starting resources, read out of `land_resources.inc` — the
- * include every Arabia-family script pulls in for its player openings.
- * `near`/`far` are the script's `min/max_distance_to_players` in tiles, and
- * `spread` its `group_placement_radius`; `groups` repeats the group at its own
- * bearing, as `number_of_groups` does.
- */
-interface StartGroup {
-  kind: NodeKind | AnimalKind;
-  count: number;
-  groups?: number;
-  near: number;
-  far: number;
-  spread: number;
-  /** Fill contiguous tiles rather than scatter over a disc; see `growClump`. */
-  solid?: boolean;
-}
-
-const OPENING: StartGroup[] = [
-  { kind: 'berries', count: 6, near: 10, far: 12, spread: 3 },
-  { kind: 'gold', count: 7, near: 12, far: 16, spread: 3 },
-  { kind: 'gold', count: 4, near: 18, far: 26, spread: 3 },
-  { kind: 'gold', count: 4, near: 25, far: 35, spread: 3 },
-  { kind: 'stone', count: 5, near: 14, far: 18, spread: 2 },
-  { kind: 'stone', count: 4, near: 20, far: 26, spread: 2 },
-  { kind: 'sheep', count: 4, near: 10, far: 12, spread: 3 },
-  { kind: 'sheep', count: 2, groups: 2, near: 14, far: 30, spread: 3 },
-  { kind: 'deer', count: 4, near: 14, far: 30, spread: 3 },
-  { kind: 'boar', count: 1, near: 16, far: 22, spread: 1 },
-  { kind: 'boar', count: 1, near: 16, far: 22, spread: 1 },
-  // Wood is the one the script sizes by the map rather than by the group:
-  // `PLAYER_FOREST_TILES` is `PLAYER_FOREST_BASE_COUNT` (55 at its smallest)
-  // times `PLAYER_FOREST_CLUMPS` (2 when forests are few), kept off the start
-  // area by `PLAYER_FOREST_AVOIDANCE`. It is a terrain clump in the script, not
-  // scattered objects, which is why woods in AoE2 are solid.
-  { kind: 'tree', count: 55, groups: 2, near: 14, far: 26, spread: 7, solid: true },
-];
-
 function addAnimal(state: GameState, kind: AnimalKind, position: Point): Entity {
   const rules = state.rules.units[kind];
   return addEntity(state, kind, 0, position, rules, {
@@ -93,94 +56,10 @@ function addAnimal(state: GameState, kind: AnimalKind, position: Point): Entity 
   });
 }
 
-const TAU = Math.PI * 2;
-
-/**
- * The middle of the tile a point falls in. Everything the map generator places
- * is one tile across, and a one-tile footprint centred anywhere else straddles
- * four tiles of the obstruction map instead of filling one — which turned a
- * forest into a wall with a few holes in it and made the pathfinder work
- * through the whole map to find its way to a tree.
- */
-const onTile = (at: Point): Point => ({ x: Math.floor(at.x) + 0.5, y: Math.floor(at.y) + 0.5 });
-
 /** A point inside the map, clear of every footprint already placed. */
 function freeSpot(state: GameState, at: Point): boolean {
   return at.x >= 1 && at.y >= 1 && at.x <= state.width - 1 && at.y <= state.height - 1
     && spawnFree(state, at, 0.5);
-}
-
-/**
- * A forest: `count` contiguous tiles grown outward from a seed, one free
- * neighbour at a time. The script builds one with `create_terrain`, which
- * fills every tile of the area it covers, and forest terrain carries a tree on
- * each — which is why woods in AoE2 are something to walk round rather than
- * through, and why they can be walled with. A ragged edge comes free from
- * taking the next tile out of the frontier at random.
- */
-function growClump(
-  state: GameState, kind: NodeKind, seed: Point, count: number, mirror: (p: Point) => Point,
-): number {
-  const frontier: Point[] = [seed];
-  let filled = 0;
-  while (filled < count && frontier.length) {
-    const at = frontier.splice(Math.floor(random01(state) * frontier.length), 1)[0];
-    const other = mirror(at);
-    if (!freeSpot(state, at) || !freeSpot(state, other)) continue;
-    addNode(state, kind, at);
-    addNode(state, kind, other);
-    filled++;
-    for (const step of [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]) {
-      frontier.push({ x: at.x + step.x, y: at.y + step.y });
-    }
-  }
-  return filled;
-}
-
-/**
- * Scatter one group around a bearing from each player's start, placing both
- * players' copies together so the two halves are exact mirrors of each other
- * and neither can land on the other. A member that finds nowhere to stand is
- * dropped rather than stacked; the count is what the script asks for, not a
- * promise the ground can hold it.
- */
-function placeGroup(state: GameState, group: StartGroup, mirror: (p: Point) => Point): void {
-  for (let attempt = 0; attempt < 60; attempt++) {
-    const angle = random01(state) * TAU;
-    const distance = group.near + random01(state) * (group.far - group.near);
-    const centre = {
-      x: START.x + Math.cos(angle) * distance,
-      y: START.y + Math.sin(angle) * distance,
-    };
-    if (!freeSpot(state, onTile(centre))) continue;
-    if (group.solid) {
-      if (growClump(state, group.kind as NodeKind, onTile(centre), group.count, mirror)) return;
-      continue;
-    }
-    let placed = 0;
-    for (let i = 0; i < group.count; i++) {
-      for (let tries = 0; tries < 16; tries++) {
-        const spin = random01(state) * TAU;
-        // Square-rooted radius spreads the group evenly over its disc rather
-        // than piling it at the middle.
-        const radius = Math.sqrt(random01(state)) * group.spread;
-        const at = onTile({ x: centre.x + Math.cos(spin) * radius, y: centre.y + Math.sin(spin) * radius });
-        const other = onTile(mirror(at));
-        if (!freeSpot(state, at) || !freeSpot(state, other)) continue;
-        const kind = group.kind;
-        if (kind === 'sheep' || kind === 'deer' || kind === 'boar') {
-          addAnimal(state, kind, at);
-          addAnimal(state, kind, other);
-        } else {
-          addNode(state, kind, at);
-          addNode(state, kind, other);
-        }
-        placed++;
-        break;
-      }
-    }
-    if (placed) return;
-  }
 }
 
 export function createGame(
@@ -189,7 +68,7 @@ export function createGame(
 ): GameState {
   const state: GameState = {
     rules, seed: seed || 1, tick: 0, nextId: 1, width: MAP_TILES, height: MAP_TILES,
-    entities: [], projectiles: [],
+    entities: [], projectiles: [], terrain: [],
     players: {
       1: {
         id: 1, civilization: civilizations[1], ...rules.startingResources,
@@ -217,9 +96,18 @@ export function createGame(
     // there is nothing known to gather from and the game never starts.
     addEntity(state, 'scout-cavalry', player, at({ x: START.x + 8, y: START.y }), rules.units['scout-cavalry']);
   }
-  for (const group of OPENING) {
-    for (let repeat = 0; repeat < (group.groups ?? 1); repeat++) placeGroup(state, group, mirror);
-  }
+  const { terrain } = generateMap(
+    {
+      rng: state, width: state.width, height: state.height,
+      free: at => freeSpot(state, at),
+      place: (kind, at) => {
+        if (kind === 'sheep' || kind === 'deer' || kind === 'boar') addAnimal(state, kind, at);
+        else addNode(state, kind as NodeKind, at);
+      },
+    },
+    ARABIA, [START, mirror(START)], mirror,
+  );
+  state.terrain = terrain;
 
   recalculatePopulation(state);
   updateVisibility(state);

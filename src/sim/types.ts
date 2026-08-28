@@ -173,6 +173,8 @@ export interface GameState {
   height: number;
   entities: Entity[];
   projectiles: Projectile[];
+  /** Per-tile DAT terrain id, row-major width x height. Fixed at generation. */
+  terrain: number[];
   players: Record<PlayerId, PlayerState>;
   visibility: Record<PlayerId, PlayerVisibility>;
   winner?: PlayerId;

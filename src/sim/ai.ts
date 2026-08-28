@@ -199,11 +199,67 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
       .filter(e => e.resource === wanted && (e.amount ?? 1) > 0
         && (e.kind === 'resource' || HERD.includes(e.kind)
           || (e.kind === 'farm' && e.owner === player && (e.buildProgress ?? 1) >= 1)))
-      .sort((a, b) => distance(villager, a) - distance(villager, b) || a.id - b.id)[0];
+      // A claimed herdable first, as the reference opening eats sheep before
+      // berries -- and since the map's distance bands became the original's
+      // boxes, the near sheep can stand in a band corner a few tiles beyond
+      // the berries, where "nearest food wins" left every one of them to rot.
+      .sort((a, b) =>
+        Number(!(HERD.includes(b.kind) && b.owner === player))
+          - Number(!(HERD.includes(a.kind) && a.owner === player))
+        || distance(villager, a) - distance(villager, b) || a.id - b.id)[0];
     if (node) {
       commands.push({
         kind: 'order', player, entityIds: [villager.id],
         target: { x: node.x, y: node.y }, targetId: node.id,
+      });
+    }
+  }
+
+  // Assignment only ever lands on an idle villager, and a villager is almost
+  // never idle: the moment one has nothing to do it acquires whatever is
+  // nearest, which at the start of a match is always food, because the wood
+  // is beyond the town's sight until the scout finds it. On the old board a
+  // wood villager usually sat idle long enough to be told; on the real
+  // distance bands it never was, and player after player reached minute
+  // thirty with zero wood income. So re-pin: a villager whose slot is wood or
+  // gold, working something that is not wood or gold -- not carrying it, not
+  // standing at a known node of it -- is sent to the nearest known node.
+  for (const [index, villager] of villagers.entries()) {
+    const wanted = ASSIGNMENT[index % ASSIGNMENT.length];
+    if (wanted === 'food') continue; // food assigns itself; the herd rule below
+    if (villager.order === 'idle' || villager.order === 'build') continue;
+    if (villager.carrying?.kind === wanted) continue;
+    const nodes = known.filter(e =>
+      e.kind === 'resource' && e.resource === wanted && (e.amount ?? 1) > 0);
+    if (!nodes.length) continue;
+    if (nodes.some(n => distance(villager, n) < 3)) continue;
+    const nearest = nodes
+      .sort((a, b) => distance(villager, a) - distance(villager, b) || a.id - b.id)[0];
+    commands.push({
+      kind: 'order', player, entityIds: [villager.id],
+      target: { x: nearest.x, y: nearest.y }, targetId: nearest.id,
+    });
+  }
+
+  // A claimed sheep is dinner nobody idle will come to: villagers busy on
+  // berries never re-decide, so a flock the scout claims in minute five would
+  // stand untouched for the whole match. Pull one food villager onto the
+  // nearest claimed herdable that nobody is standing at -- the observation
+  // does not say what a villager is working, so "somebody is at it" is the
+  // proximity test, and one pull per decision keeps this from retasking the
+  // whole economy at once.
+  const dinner = known
+    .filter(e => HERD.includes(e.kind) && e.owner === player && (e.amount ?? 0) > 0
+      && !villagers.some(v => distance(v, e) < 2.5))
+    .sort((a, b) => (tc ? distance(a, tc) - distance(b, tc) : 0) || a.id - b.id)[0];
+  if (dinner) {
+    const puller = villagers
+      .filter((v, index) => ASSIGNMENT[index % ASSIGNMENT.length] === 'food' && v.order === 'gather')
+      .sort((a, b) => distance(a, dinner) - distance(b, dinner) || a.id - b.id)[0];
+    if (puller) {
+      commands.push({
+        kind: 'order', player, entityIds: [puller.id],
+        target: { x: dinner.x, y: dinner.y }, targetId: dinner.id,
       });
     }
   }
@@ -326,8 +382,17 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     const spot = clearSpot(HOUSE_SPOTS, 1);
     if (spot) build('house', spot);
   }
+  // Either the trees are near a drop site already, or a camp has been built
+  // to make them so. Everything downstream prices in wood, so this is also
+  // the guard that keeps the starting wood for the lumber camp: buying the
+  // mining camp first, in the minutes before the scout has even found the
+  // trees, left 15 wood, an income of ten a minute, and a lumber camp that
+  // arrived at minute eleven -- measured, on the real distance bands.
+  const woodIsHandy = mine.some(e => e.kind === 'lumber-camp' && (e.buildProgress ?? 1) >= 1)
+    || (supply('wood')?.walk ?? Infinity) <= CAMP_RANGE;
   for (const camp of CAMPS) {
     if (observation.wood < CAMP_COST_WOOD || !idleBuilder || !tc) continue;
+    if (camp.resource !== 'wood' && !woodIsHandy) continue;
     const built = mine.filter(e => e.kind === camp.building);
     if (built.length >= CAMPS_PER_RESOURCE) continue;
     // One of each until the barracks is up. Three camps and a mill is four
@@ -348,13 +413,9 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   // Not until the wood is banked somewhere near the trees. The starting wood
   // buys either a barracks or an economy, and a barracks bought first is one
   // militia followed by a wood queue that never clears — the town center is
-  // twenty tiles from the nearest forest on a full-size map.
-  // Either the trees are near a drop site already, or a camp has been built to
-  // make them so. Asking only about the nearest tree to the town center meant
-  // that a player whose camp served a different wood never built a barracks at
-  // all, sitting on two hundred and forty wood for half an hour.
-  const woodIsHandy = mine.some(e => e.kind === 'lumber-camp' && (e.buildProgress ?? 1) >= 1)
-    || (supply('wood')?.walk ?? Infinity) <= CAMP_RANGE;
+  // twenty tiles from the nearest forest on a full-size map. (`woodIsHandy`
+  // asks about a drop site near *known* wood, not the town center: a player
+  // whose camp served a different wood once never built a barracks at all.)
   const range = mine.find(e => e.kind === 'archery-range');
   if (!range && barracks && idleBuilder && observation.age >= 1 && observation.wood >= 175) {
     const spot = clearSpot(RANGE_SPOTS, 1.5);
