@@ -78,9 +78,15 @@ changed underneath it.
 - Per-tick cost over a full 900-second match (seed 102): median **0.58ms**,
   p99 **1.72ms**, worst **11.7ms**, against a 50ms budget at 20Hz. The median
   was never the problem; the worst tick is the number to watch, and it was
-  105ms before the pathfinder's open list became a heap. These three figures
-  predate the Castle Age and hunting work and have not been re-measured; the
-  batch throughput above is the number that has.
+  105ms before the pathfinder's open list became a heap. **These three figures
+  are stale and name the wrong session**: they predate the shot model, the
+  sixty-six technologies, corpses that last five minutes rather than three
+  seconds, and an AI economy roughly three times the size. The batch
+  throughput above is the number that has been re-measured, and it went *up*
+  (334-404x against 364x), which is weak evidence that nothing has regressed —
+  but it is aggregate wall clock across sixteen processes, not a tick
+  distribution, and it would not show a worst-tick spike. Re-measuring the
+  per-tick cost is queued in `overnight.md`.
 - Forests are solid: seed 7 grows two clumps of exactly 55 tiles, no row has a
   clear line through, and crossing one costs 1.66x the straight line while
   never stepping on a tree.

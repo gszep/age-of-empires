@@ -108,7 +108,20 @@ same blend-mask mapping that blocks terrain blends.
 If water is not going to be built, say so in `status.md` and stop listing its
 technologies as gaps.
 
-### Q5. Building rubble per age, and the hit points an age gives
+### Q5. Re-measure the per-tick cost
+
+`status.md`'s tick distribution — median 0.58ms, p99 1.72ms, worst 11.7ms —
+was measured before the shot model, the technology tree, five-minute corpses
+and an AI economy three times the size. Batch throughput went up rather than
+down over the same period, which is weak evidence that nothing regressed, but
+it is aggregate wall clock across sixteen processes and would not show a
+worst-tick spike. The worst tick is the number that matters: it was 105ms
+before the pathfinder's open list became a heap.
+
+*Verify:* the same 900-second single-match measurement on seed 102, recorded
+beside the old figures rather than replacing them.
+
+### Q6. Building rubble per age, and the hit points an age gives
 
 Two loose ends left by the age work, both small and both in `backlog.md`. Each
 age variant has its own rubble unit (`Barracks Age2 (Rubble)`), so a razed
