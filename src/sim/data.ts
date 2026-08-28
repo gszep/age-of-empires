@@ -120,6 +120,12 @@ export interface BuildingRules {
   accepts: ResourceKind[];
   /** Food a farm holds; undefined for everything else. */
   farmAmount?: number;
+  /**
+   * Its slot in the villager's build menu, from the DAT's own build button.
+   * The DAT states the slot and not the page, but it states the page's shape:
+   * two buildings share a button id only when they are on different pages.
+   */
+  buildButton?: number;
   /** Half-extents in tiles when the building is not the square `radius` says.
    * A gate lies along x by default and swaps both when placed along y. */
   footprint?: { x: number; y: number };
@@ -610,36 +616,43 @@ export const FALLBACK_RULES: GameRules = {
       hp: 1200, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+      buildButton: 1,
     },
     house: {
       hp: 550, radius: 1, lineOfSight: 2, cost: cost(0, 25), buildSeconds: 25,
       popSupport: 5, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: -2 }, { class: 3, amount: 7 }],
+      buildButton: 1,
     },
     mill: {
       hp: 600, radius: 1, lineOfSight: 6, cost: cost(0, 100), buildSeconds: 35,
       popSupport: 0, buildable: true, accepts: ['food'],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+      buildButton: 2,
     },
     'lumber-camp': {
       hp: 600, radius: 1, lineOfSight: 6, cost: cost(0, 100), buildSeconds: 35,
       popSupport: 0, buildable: true, accepts: ['wood'],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+      buildButton: 4,
     },
     'mining-camp': {
       hp: 600, radius: 1, lineOfSight: 6, cost: cost(0, 100), buildSeconds: 35,
       popSupport: 0, buildable: true, accepts: ['gold', 'stone'],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+      buildButton: 3,
     },
     farm: {
       hp: 480, radius: 1.5, lineOfSight: 1, cost: cost(0, 60), buildSeconds: 15,
       popSupport: 0, buildable: true, accepts: [], farmAmount: 175,
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
+      buildButton: 6,
     },
     outpost: {
       hp: 500, radius: 0.5, lineOfSight: 12, cost: cost(0, 25, 0, 5), buildSeconds: 15,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 3 }],
+      buildButton: 6,
     },
     'watch-tower': {
       age: 1,
@@ -650,29 +663,34 @@ export const FALLBACK_RULES: GameRules = {
         range: 8, attacks: [{ class: 3, amount: 5 }], reloadSeconds: 2, releaseSeconds: 0.35,
         projectileSpeed: 7, launchHeight: 5,
       },
+      buildButton: 9,
     },
     'archery-range': {
       age: 1,
       hp: 1500, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+      buildButton: 2,
     },
     blacksmith: {
       age: 1,
       hp: 1800, radius: 1.5, lineOfSight: 6, cost: cost(0, 150), buildSeconds: 40,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+      buildButton: 7,
     },
     market: {
       age: 1,
       hp: 1800, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 60,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+      buildButton: 8,
     },
     'palisade-wall': {
       hp: 150, radius: 0.5, lineOfSight: 2, cost: cost(0, 3), buildSeconds: 7,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 2 }],
+      buildButton: 7,
     },
     'palisade-gate': {
       hp: 240, radius: 1, footprint: { x: 1, y: 0.5 }, passableForOwner: true,
@@ -685,18 +703,21 @@ export const FALLBACK_RULES: GameRules = {
       hp: 1500, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+      buildButton: 3,
     },
     monastery: {
       age: 2,
       hp: 2100, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 40,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+      buildButton: 9,
     },
     'siege-workshop': {
       age: 2,
       hp: 1500, radius: 2, lineOfSight: 6, cost: cost(0, 200), buildSeconds: 40,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+      buildButton: 4,
     },
     // Trains nothing; it is where the technologies that do not belong to a
     // barracks or a blacksmith are researched, Ballistics chief among them.
@@ -705,6 +726,7 @@ export const FALLBACK_RULES: GameRules = {
       hp: 2100, radius: 2, lineOfSight: 6, cost: cost(0, 200), buildSeconds: 60,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+      buildButton: 10,
     },
     // Stone, slow to raise, and the only building besides the town center that
     // both shoots and houses people: the DAT gives it 20 population support.
@@ -717,6 +739,7 @@ export const FALLBACK_RULES: GameRules = {
         range: 8, attacks: [{ class: 27, amount: 2 }, { class: 3, amount: 11 }],
         reloadSeconds: 2, releaseSeconds: 0.35, projectileSpeed: 7, launchHeight: 4,
       },
+      buildButton: 13,
     },
   },
   nodes: {
@@ -756,7 +779,7 @@ interface ManifestEntity {
   cost?: Partial<Record<ResourceKind, number>>;
   populationCost?: number;
   train?: { buildingId: number; seconds: number };
-  build?: { builderId: number; seconds: number };
+  build?: { builderId: number; seconds: number; button?: number };
   combat?: {
     reloadSeconds: number;
     frameDelay: number;
@@ -890,6 +913,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       // building shoots are gameplay roles, not DAT fields the importer reads.
       accepts: fallback.accepts,
       farmAmount: e[key].storage?.food ?? fallback.farmAmount,
+      buildButton: e[key].build?.button ?? fallback.buildButton,
       // The DAT's collision box is a pair of half-extents; only a gate's two
       // differ. Whether that footprint is a doorway is a role, not a field.
       footprint: fallback.footprint && { x: e[key].collision[0], y: e[key].collision[1] },

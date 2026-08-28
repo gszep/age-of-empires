@@ -286,6 +286,15 @@ def extract_entity(
         train = unit.creatable.train_locations[0]
         if category == "building":
             entity["build"] = {"builderId": train.unit_id, "seconds": train.train_time}
+            # Where it sits in the villager's build menu. The DAT states the
+            # slot and not the page, but it states the page's *shape*: two
+            # buildings may share a button id only if they are on different
+            # pages, and every collision is one economic building against one
+            # military one -- house against barracks, mill against archery
+            # range, farm against outpost, blacksmith against palisade wall.
+            # That is the reference for the layout (issue #25).
+            if train.button_id > 0:
+                entity["build"]["button"] = train.button_id
         elif train.unit_id >= 0:
             entity["train"] = {"buildingId": train.unit_id, "seconds": train.train_time}
 

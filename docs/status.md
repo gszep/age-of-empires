@@ -468,6 +468,43 @@ random direction. One tile is the board's own unit, and it is wider than any
 unit and narrower than any building — which is why an arrow that goes wide of a
 villager still lands inside the town center behind him, as in AoE2.
 
+### The villager's build menu is the DAT's own layout
+
+Selecting a villager offers two buttons — **Build economic buildings** and
+**Build military buildings** — and opens neither until one is clicked, which
+is what AoE2 does and what issue #25 asked for. Each page then lists its
+buildings in the DAT's own order, with a Back button.
+
+The layout is imported rather than arranged. Every building a villager can put
+up carries a **build button id** in its `creatable.train_locations`, which is
+its slot in the command grid. The DAT never says which *page* a building is
+on, but it states the pages' shape: two buildings may share a slot only when
+they are on different pages, and every collision in the Britons' list is one
+economic building against one military one.
+
+| slot | economic | military |
+| --- | --- | --- |
+| 1 | house | barracks |
+| 2 | mill | archery range |
+| 3 | mining camp | stable |
+| 4 | lumber camp | siege workshop |
+| 6 | farm | outpost |
+| 7 | blacksmith | palisade wall |
+| 8 | market | — |
+| 9 | monastery | watch tower |
+| 10 | university | — |
+| 12 | wonder | — |
+| 13 | — | castle |
+
+That is also a check, and it found a real defect: the hand-written split this
+replaced put the **blacksmith** and the **monastery** on the military page,
+where the DAT's own numbers say they collide with the palisade wall and the
+watch tower. A test asserts no page collides with itself, in both the imported
+and the open rules, so the next building added cannot land quietly in the
+wrong half. Walls and gates stay with the defences by the reference's
+grouping: a wall is dragged rather than picked, and the DAT gives the gate no
+build button at all.
+
 ### A fallow farm sown again, as an option that starts off
 
 AoE2's own description of a farm is that it "provides a limited amount of food

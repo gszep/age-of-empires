@@ -8,6 +8,7 @@ import { isTileVisible } from './sim/visibility';
 import { checksumState } from './sim/checksum';
 import type { MatchRecord } from './protocol/types';
 import type { BuildingKind, Entity, GameState, Point, UnitKind } from './sim/types';
+import { buildMenu, type BuildPage } from './view/build-menu';
 import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
@@ -373,6 +374,7 @@ function runUiCommand(id: string): void {
   }
   if (id === 'page-economic') { buildPage = 'economic'; return; }
   if (id === 'page-military') { buildPage = 'military'; return; }
+  if (id === 'page-back') { buildPage = undefined; return; }
   if (id === 'cancel') buildMode = undefined;
 }
 
@@ -665,24 +667,32 @@ function currentCommands(): CommandButton[] {
     return [{ id: 'cancel', label: 'Cancel placement', hotkey: 'escape', enabled: true, active: true }];
   }
   if (selection.some(e => e.kind === 'villager')) {
-    for (const [index, kind] of buildableKinds().entries()) {
-      const building = rules.buildings[kind];
+    if (!buildPage) {
+      // AoE2 gives a villager two build buttons and opens neither until one is
+      // clicked, which is what selecting a villager shows (issue #25).
       buttons.push({
-        id: `build-${kind}`,
-        label: `Build ${displayName(kind)} (${costLabel(building.cost)})`,
-        hotkey: BUILD_HOTKEYS[index],
-        enabled: affordable(building.cost),
-        icon: hud.iconFor('Buildings', assets?.entities[kind]?.iconId),
+        id: 'page-economic', label: 'Build economic buildings',
+        hotkey: BUILD_PAGE_HOTKEYS.economic, enabled: true,
+      });
+      buttons.push({
+        id: 'page-military', label: 'Build military buildings',
+        hotkey: BUILD_PAGE_HOTKEYS.military, enabled: true,
+      });
+    } else {
+      for (const [index, kind] of buildMenu(rules, player.age, buildPage).entries()) {
+        const building = rules.buildings[kind];
+        buttons.push({
+          id: `build-${kind}`,
+          label: `Build ${displayName(kind)} (${costLabel(building.cost)})`,
+          hotkey: BUILD_HOTKEYS[index],
+          enabled: affordable(building.cost),
+          icon: hud.iconFor('Buildings', assets?.entities[kind]?.iconId),
+        });
+      }
+      buttons.push({
+        id: 'page-back', label: 'Back', hotkey: 'escape', enabled: true,
       });
     }
-    // The other page of the build menu, as AoE2 splits it.
-    const other = buildPage === 'economic' ? 'military' : 'economic';
-    buttons.push({
-      id: `page-${other}`,
-      label: `${displayName(other)} buildings`,
-      hotkey: BUILD_PAGE_HOTKEY,
-      enabled: true,
-    });
   }
   if (selection.some(e => isUnit(e.kind))) {
     buttons.push({ id: 'stop', label: 'Stop', hotkey: 's', enabled: true });
@@ -737,26 +747,16 @@ function currentCommands(): CommandButton[] {
 }
 
 const BUILD_HOTKEYS = ['q', 'w', 'e', 'r', 't', 'a', 'd', 'f', 'g', 'z', 'x', 'c'];
-const BUILD_PAGE_HOTKEY = 'v';
+const BUILD_PAGE_HOTKEYS = { economic: 'b', military: 'v' } as const;
 const TRAIN_HOTKEYS = ['q', 'w', 'e', 'r', 't'];
 
 /**
- * AoE2 splits the villager's build menu into an economic and a military page,
- * which is what keeps it inside the command panel's fifteen slots — seventeen
- * buildings do not fit. The split is the reference game's own; the DAT's
- * `interface_kind` is a different grouping and does not state it (see
- * `docs/status.md`).
+ * Which page of the villager's build menu is open, or none: selecting a
+ * villager opens neither, and offers the two buttons that choose. The pages
+ * themselves are laid out from the DAT's own build slots -- see
+ * `src/view/build-menu.ts`.
  */
-const MILITARY_BUILDINGS = new Set<BuildingKind>([
-  'barracks', 'archery-range', 'stable', 'blacksmith', 'monastery', 'siege-workshop',
-  'university', 'castle', 'outpost', 'watch-tower', 'palisade-wall', 'palisade-gate',
-]);
-let buildPage: 'economic' | 'military' = 'economic';
-
-const buildableKinds = (): BuildingKind[] =>
-  (Object.keys(rules.buildings) as BuildingKind[]).filter(kind =>
-    rules.buildings[kind].buildable && (rules.buildings[kind].age ?? 0) <= game.players[1].age
-    && MILITARY_BUILDINGS.has(kind) === (buildPage === 'military'));
+let buildPage: BuildPage | undefined;
 
 const trainableAt = (building: BuildingKind): UnitKind[] =>
   (Object.keys(rules.units) as UnitKind[]).filter(kind =>
