@@ -6,8 +6,8 @@ import {
 } from './data';
 import { checksumState } from './checksum';
 import {
-  applyCommand, buildingFootprint, carryCapacityFor, computeDamage, createGame, farmFoodAmountFor,
-  isCarcass, placementLegal, notYetUpgradedInto, stepGame, unitRulesFor,
+  TRAINING_QUEUE_LIMIT, applyCommand, buildingFootprint, carryCapacityFor, computeDamage, createGame,
+  farmFoodAmountFor, isCarcass, placementLegal, notYetUpgradedInto, queuedCount, stepGame, unitRulesFor,
 } from './game';
 import type { BuildingKind, Entity, GameState, ResourceKind } from './types';
 
@@ -681,6 +681,129 @@ describe('sowing a fallow farm again', () => {
       applyCommand(state, { kind: 'reseed', player: 1, buildingId: mill.id, enabled: true });
       nearlySpentFarm(state);
       run(state, 800);
+      return checksumState(state);
+    };
+    expect(play()).toBe(play());
+  });
+});
+
+describe('a building\'s training queue', () => {
+  // Issue #7: up to fifteen units may wait at one building, each paid for when
+  // it is asked for, as AoE2 does -- and each refundable, which is what makes
+  // a queue safe to fill.
+  const centre = (state: GameState) =>
+    state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+
+  /**
+   * Room to train into. The houses are what keeps the cap high once the game
+   * recomputes it -- which it does whenever a unit spawns or a building
+   * finishes, not on a bare tick -- and the direct set covers the queue-time
+   * checks that happen before any of that.
+   */
+  const roomFor = (state: GameState, houses: number) => {
+    const rules = state.rules.buildings.house;
+    const home = centre(state);
+    for (let i = 0; i < houses; i++) {
+      state.entities.push({
+        id: state.nextId++, kind: 'house', owner: 1,
+        position: { x: home.position.x + 6 + i * 2, y: home.position.y + 8 },
+        hp: rules.hp, maxHp: rules.hp, radius: rules.radius,
+        activity: 'idle', order: { kind: 'idle' },
+      });
+    }
+    stepGame(state);
+    state.players[1].populationCap = state.rules.startingPopulationCap + houses * state.rules.buildings.house.popSupport;
+  };
+
+  it('takes fifteen and refuses the sixteenth', () => {
+    const state = createGame(140);
+    const tc = centre(state);
+    state.players[1].food = 10_000;
+    roomFor(state, 6);
+    for (let i = 0; i < TRAINING_QUEUE_LIMIT; i++) {
+      expect(applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' }).ok,
+        `queueing ${i + 1}`).toBe(true);
+    }
+    expect(queuedCount(tc)).toBe(TRAINING_QUEUE_LIMIT);
+    expect(applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' }))
+      .toEqual({ ok: false, reason: 'training queue is full' });
+  });
+
+  it('pays as each is asked for, and works through them in order', () => {
+    const state = createGame(141);
+    const tc = centre(state);
+    state.players[1].food = 10_000;
+    roomFor(state, 6);
+    const cost = FALLBACK_RULES.units.villager.cost.food;
+    const before = state.players[1].food;
+    for (let i = 0; i < 3; i++) {
+      applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' });
+    }
+    // Three paid for up front, not one.
+    expect(state.players[1].food).toBe(before - 3 * cost);
+    const opening = state.players[1].population;
+    const perUnit = Math.round(FALLBACK_RULES.units.villager.trainSeconds * TICKS_PER_SECOND);
+    run(state, perUnit);
+    expect(state.players[1].population).toBe(opening + 1);
+    expect(queuedCount(tc)).toBe(2);
+    run(state, perUnit);
+    expect(state.players[1].population).toBe(opening + 2);
+    run(state, perUnit);
+    expect(state.players[1].population).toBe(opening + 3);
+    expect(queuedCount(tc)).toBe(0);
+    // And nothing was charged twice.
+    expect(state.players[1].food).toBe(before - 3 * cost);
+  });
+
+  it('gives the last one back, and then the one on the anvil', () => {
+    const state = createGame(142);
+    const tc = centre(state);
+    state.players[1].food = 10_000;
+    roomFor(state, 6);
+    const cost = FALLBACK_RULES.units.villager.cost.food;
+    const before = state.players[1].food;
+    for (let i = 0; i < 3; i++) {
+      applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' });
+    }
+    expect(applyCommand(state, { kind: 'cancel-train', player: 1, buildingId: tc.id }))
+      .toEqual({ ok: true });
+    expect(queuedCount(tc)).toBe(2);
+    expect(state.players[1].food).toBe(before - 2 * cost);
+    applyCommand(state, { kind: 'cancel-train', player: 1, buildingId: tc.id });
+    applyCommand(state, { kind: 'cancel-train', player: 1, buildingId: tc.id });
+    // Everything back, including the one that had started.
+    expect(queuedCount(tc)).toBe(0);
+    expect(state.players[1].food).toBe(before);
+    expect(applyCommand(state, { kind: 'cancel-train', player: 1, buildingId: tc.id }))
+      .toEqual({ ok: false, reason: 'nothing is being trained' });
+  });
+
+  it('counts what is queued against the population cap', () => {
+    // Otherwise fifteen villagers could be ordered into five places.
+    const state = createGame(143);
+    const tc = centre(state);
+    state.players[1].food = 10_000;
+    // No houses: the opening cap is all the room there is.
+    const room = state.players[1].populationCap - state.players[1].population;
+    expect(room).toBeGreaterThan(0);
+    for (let i = 0; i < room; i++) {
+      expect(applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' }).ok,
+        `villager ${i + 1} of ${room}`).toBe(true);
+    }
+    expect(applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' }))
+      .toEqual({ ok: false, reason: 'population cap reached' });
+  });
+
+  it('replays identically through a queue', () => {
+    const play = () => {
+      const state = createGame(144);
+      const tc = centre(state);
+      state.players[1].food = 10_000;
+      state.players[1].populationCap = 200;
+      for (let i = 0; i < 4; i++) {
+        applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' });
+      }
+      run(state, 1200);
       return checksumState(state);
     };
     expect(play()).toBe(play());

@@ -76,6 +76,12 @@ export interface Entity {
   footprint?: { x: number; y: number };
   buildProgress?: number; // 0..1; undefined once complete
   training?: { kind: UnitKind; remainingTicks: number };
+  /**
+   * Units waiting behind the one being trained, in the order they were asked
+   * for. Each was paid for when it was queued, as in AoE2, and is refunded if
+   * it is cancelled.
+   */
+  trainingQueue?: UnitKind[];
   researching?: { tech: string; remainingTicks: number };
   rally?: { target: Point; targetId?: number };
   attackCooldown?: number; // ticks until a new swing may start
@@ -184,4 +190,6 @@ export type Command =
   /** Turn automatic farm re-sowing on or off, from one of the player's mills. */
   | { kind: 'reseed'; player: PlayerId; buildingId: number; enabled: boolean }
   /** Set a siege engine up to shoot, or pack it up to travel. */
-  | { kind: 'pack'; player: PlayerId; entityIds: number[]; unpacked: boolean };
+  | { kind: 'pack'; player: PlayerId; entityIds: number[]; unpacked: boolean }
+  /** Take the last unit off a building's queue and refund it. */
+  | { kind: 'cancel-train'; player: PlayerId; buildingId: number };

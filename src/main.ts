@@ -354,6 +354,12 @@ function runUiCommand(id: string): void {
     if (!result.ok) reject(result.reason);
     return;
   }
+  if (id === 'cancel-train') {
+    const producer = ownSelected().find(e => isBuilding(e.kind) && (e.training || e.trainingQueue?.length));
+    if (!producer) return;
+    applyCommand(game, { kind: 'cancel-train', player: 1, buildingId: producer.id });
+    return;
+  }
   if (id === 'pack' || id === 'unpack') {
     const engines = ownSelected().filter(e => isUnit(e.kind)
       && rules.units[e.kind as UnitKind].unpacked !== undefined);
@@ -735,6 +741,20 @@ function currentCommands(): CommandButton[] {
       });
     }
   }
+  // Anything queued can be taken back, which is what makes a queue safe to
+  // fill: the last one asked for is refunded (issue #7).
+  const producing = selection.find(e => isBuilding(e.kind) && (e.training || e.trainingQueue?.length));
+  if (producing) {
+    const waiting = producing.trainingQueue?.length ?? 0;
+    buttons.push({
+      id: 'cancel-train',
+      label: waiting
+        ? `Cancel last of ${waiting + 1} queued (refund)`
+        : `Cancel ${displayName(producing.training!.kind)} (refund)`,
+      hotkey: 'escape',
+      enabled: true,
+    });
+  }
   // Technologies the selected building researches, in the DAT's own order.
   const player1 = game.players[1];
   for (const [key, tech] of Object.entries(rules.technologies) as [TechKey, typeof rules.technologies[TechKey]][]) {
@@ -833,8 +853,12 @@ function selectionInfo(): SelectionInfo | undefined {
     };
   } else if (entity.training) {
     const total = rules.units[entity.training.kind].trainSeconds / TICK_SECONDS;
+    // What is on the anvil, and how many are waiting behind it (issue #7).
+    const waiting = entity.trainingQueue?.length ?? 0;
     progress = {
-      label: `Training ${entity.training.kind}`,
+      label: waiting
+        ? `Training ${entity.training.kind} (+${waiting} queued)`
+        : `Training ${entity.training.kind}`,
       fraction: 1 - entity.training.remainingTicks / total,
     };
   }

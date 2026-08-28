@@ -468,6 +468,23 @@ random direction. One tile is the board's own unit, and it is wider than any
 unit and narrower than any building — which is why an arrow that goes wide of a
 villager still lands inside the town center behind him, as in AoE2.
 
+### A building trains fifteen deep
+
+Up to fifteen units may wait at one building, the one being trained included --
+AoE2's own limit and the number issue #7 asked for. Each is **paid for when it
+is asked for**, as the reference does, and the population it will take counts
+against the cap at that moment: otherwise fifteen villagers could be ordered
+into five places.
+
+Each is also refundable. The last one asked for is the first taken back, and
+once the queue is empty the one on the anvil goes too, cost returned. That is
+what makes a queue safe to fill -- fifteen knights is 900 resources, and a
+queue with no way out would be a trap rather than a convenience. A razed
+building refunds nothing, as in AoE2.
+
+The selection panel reads `Training villager (+3 queued)` while any are
+waiting, and the command panel offers `Cancel last of 4 queued (refund)`.
+
 ### The wonder is built, and wins nothing
 
 Every number is the DAT's: 1000 wood, 1000 gold and 1000 stone, 4800 hit

@@ -301,6 +301,30 @@
         "unpacked"
       ],
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "cancel-train"
+        },
+        "player": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "buildingId": {
+          "type": "integer",
+          "$comment": "Takes the last unit off this building's queue, or the one being trained when the queue is empty, and refunds its cost."
+        }
+      },
+      "required": [
+        "kind",
+        "player",
+        "buildingId"
+      ],
+      "additionalProperties": false
     }
   ],
   "definitions": {

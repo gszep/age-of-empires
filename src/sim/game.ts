@@ -701,7 +701,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
     if (!building) return rejected(`building ${command.buildingId} is not owned`);
     if (building.buildProgress !== undefined) return rejected('building is under construction');
-    if (building.training) return rejected('building is already training');
+    if (queuedCount(building) >= TRAINING_QUEUE_LIMIT) return rejected('training queue is full');
     const unitRules = state.rules.units[command.unit];
     if (upgradedAway(state, command.player, command.unit)) {
       return rejected(`${command.unit} has been upgraded`);
@@ -715,10 +715,42 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (unitRules.trainedAt !== building.kind) return rejected(`${building.kind} cannot train ${command.unit}`);
     const player = state.players[command.player];
     if ((unitRules.age ?? 0) > player.age) return rejected(`${command.unit} needs a later age`);
-    if (player.population + unitRules.popCost > player.populationCap) return rejected('population cap reached');
+    // What is already queued is already spoken for: counting only the units on
+    // the map would let fifteen villagers be ordered into five places.
+    if (player.population + committedPopulation(state, building) + unitRules.popCost > player.populationCap) {
+      return rejected('population cap reached');
+    }
     const paid = spend(state, command.player, command.unit);
     if (!paid.ok) return paid;
-    building.training = { kind: command.unit, remainingTicks: Math.round(unitRules.trainSeconds * TICKS_PER_SECOND) };
+    // Paid for when it is asked for, as in AoE2, and refunded if cancelled.
+    if (building.training) {
+      building.trainingQueue = [...(building.trainingQueue ?? []), command.unit];
+    } else {
+      building.training = { kind: command.unit, remainingTicks: Math.round(unitRules.trainSeconds * TICKS_PER_SECOND) };
+    }
+    return { ok: true };
+  }
+
+  if (command.kind === 'cancel-train') {
+    const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
+    if (!building) return rejected(`building ${command.buildingId} is not owned`);
+    // The last one asked for is the first one taken back, which is what makes
+    // a queue safe to fill: nothing is spent that cannot be undone.
+    const queue = building.trainingQueue ?? [];
+    let refund: UnitKind | undefined;
+    if (queue.length) {
+      refund = queue[queue.length - 1];
+      building.trainingQueue = queue.slice(0, -1);
+      if (!building.trainingQueue.length) building.trainingQueue = undefined;
+    } else if (building.training) {
+      refund = building.training.kind;
+      building.training = undefined;
+    }
+    if (!refund) return rejected('nothing is being trained');
+    const cost = state.rules.units[refund].cost;
+    const player = state.players[command.player];
+    player.food += cost.food; player.wood += cost.wood;
+    player.gold += cost.gold; player.stone += cost.stone;
     return { ok: true };
   }
 
@@ -1136,6 +1168,9 @@ function kill(state: GameState, entity: Entity): void {
   entity.activity = 'dying';
   entity.order = { kind: 'idle' };
   entity.training = undefined;
+  // Whatever was waiting behind it dies with the building; AoE2 does not
+  // refund a queue that is razed, and neither does this.
+  entity.trainingQueue = undefined;
   // The DAT states how long a body lies there, on the corpse unit itself.
   // Never shorter than the death graphic, or the thing vanishes mid-fall.
   const rules = isBuilding(entity.kind)
@@ -2013,6 +2048,25 @@ function updateBuildingResearch(state: GameState, entity: Entity): void {
   completeResearch(state, entity.owner as PlayerId, key);
 }
 
+/** How many units a building has spoken for: the one on the anvil and the queue. */
+export const queuedCount = (entity: Entity): number =>
+  (entity.training ? 1 : 0) + (entity.trainingQueue?.length ?? 0);
+
+/** The population every unit this building has been paid for will take. */
+function committedPopulation(state: GameState, entity: Entity): number {
+  const kinds = [
+    ...(entity.training ? [entity.training.kind] : []),
+    ...(entity.trainingQueue ?? []),
+  ];
+  return kinds.reduce((total, kind) => total + state.rules.units[kind].popCost, 0);
+}
+
+/**
+ * How many units may be waiting at one building, the one being trained
+ * included. AoE2's own limit, and the number the request asked for.
+ */
+export const TRAINING_QUEUE_LIMIT = 15;
+
 function updateBuildingProduction(state: GameState, entity: Entity): void {
   if (!entity.training) return;
   entity.training.remainingTicks -= 1;
@@ -2026,6 +2080,16 @@ function updateBuildingProduction(state: GameState, entity: Entity): void {
   entity.training = undefined;
   spawnTrainedUnit(state, entity, kind);
   recalculatePopulation(state);
+  // Straight on to the next one asked for; it was paid for when it was queued.
+  const queue = entity.trainingQueue;
+  if (queue && queue.length) {
+    const next = queue[0];
+    entity.trainingQueue = queue.length > 1 ? queue.slice(1) : undefined;
+    entity.training = {
+      kind: next,
+      remainingTicks: Math.round(state.rules.units[next].trainSeconds * TICKS_PER_SECOND),
+    };
+  }
 }
 
 /** Whether the rules train any unit at this kind of building. */
