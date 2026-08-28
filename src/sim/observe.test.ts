@@ -187,6 +187,41 @@ describe('player observations', () => {
     expect(fogged.memory.some(e => e.id === sheep.id)).toBe(true);
   });
 
+  it('forgets the unclaimed sheep once the sheep is its own', () => {
+    // Issue #17. A memory is of somebody else's thing. A claimed sheep stops
+    // being somebody else's -- but the snapshot taken where it was found was
+    // never refreshed, because the refresh loop skips what the player owns,
+    // and never dropped, because the forget loop only examines spots the
+    // player can presently see. So the discovery spot went on showing an
+    // unclaimed sheep for the rest of the match, beside the real one.
+    const state = createGame(11);
+    const scout = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const sheep = state.entities.find(e => e.kind === 'sheep')!;
+    sheep.position = { x: 41, y: 40 };
+    scout.position = { x: 40, y: 41 };
+    stepGame(state);
+    // Seen, so it is not yet *remembered* in the observation -- the snapshot
+    // that outlives the fog is the one taken here.
+    expect(state.visibility[1].memory[sheep.id]).toBeDefined();
+
+    // Claim it and walk it home, leaving the spot it was found in the fog.
+    sheep.owner = 1;
+    sheep.position = { x: 60, y: 60 };
+    scout.position = { x: 60, y: 61 };
+    stepGame(state);
+    expect(isTileVisible(state, 1, 41, 40)).toBe(false);
+    // The renderer reads this map directly and draws every entry whose tile is
+    // fogged, with the owner the snapshot recorded -- which is why the ghost
+    // showed on screen while `observe` never reported it: the observation
+    // filters memory by what is currently visible, and a sheep you own is
+    // always visible to you.
+    expect(state.visibility[1].memory[sheep.id]).toBeUndefined();
+    const seen = observe(state, 1);
+    expect(seen.memory.some(e => e.id === sheep.id)).toBe(false);
+    // And it is reported once, where it now stands.
+    expect(seen.entities.filter(e => e.id === sheep.id)).toHaveLength(1);
+  });
+
   it('hides unexplored gaia resources until scouted', () => {
     const state = createGame(11);
     const observation = observe(state, 1);

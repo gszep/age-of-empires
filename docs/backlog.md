@@ -40,6 +40,15 @@ construction-complete cue, so that one has no owned source to draw on.
   and a monk behind a building simply has no contour. The invariant is the
   decoder working as intended; what these two layers encode differently has not
   been measured.
+- **The observation and the renderer read fog memory differently, and only
+  one of them filters it.** `observe` drops any remembered entity that is
+  currently visible, and everything a player owns is always visible to it, so
+  a stale memory of something the player has since claimed never reaches a
+  strategy. The renderer walks `visibility.memory` itself and skips only
+  entries whose *tile* is fogged, so the same stale entry was drawn on screen
+  (issue #17, fixed at the source -- memory of an owned entity is now
+  dropped). Worth knowing: a bug in that map is invisible to every protocol
+  check and visible only on the canvas.
 - **A corpse re-seen through fog replays its death.** Playtest report, now
   half fixed: the decay *stage* is right, because it is derived from the food
   left rather than from a clock, and the remaining food is right too. What

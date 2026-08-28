@@ -96,7 +96,18 @@ export function updateVisibility(state: GameState): void {
     // pose where he was last seen (issue #4); a wood, a gold pile and a sheep
     // stay where you found them.
     for (const entity of state.entities) {
-      if (entity.owner === player) continue;
+      if (entity.owner === player) {
+        // A memory is of somebody else's thing, and a claimed sheep has
+        // stopped being one. Skipping what the player owns left the snapshot
+        // taken where the sheep was found never refreshed and never dropped
+        // -- the forget pass below only examines spots the player can
+        // presently see -- so the discovery spot went on drawing an
+        // unclaimed sheep beside the real one for the rest of the match
+        // (issue #17). The observation hid it and the renderer did not: it
+        // reads this map directly.
+        delete visibility.memory[entity.id];
+        continue;
+      }
       if (entity.dead) continue;
       if (!lingersInFog(state.rules, entity)) continue;
       if (isEntityVisible(state, player, entity)) remember(state, player, entity);
