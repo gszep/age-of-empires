@@ -73,6 +73,84 @@
       }
     },
     {
+      "key": "champion",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 567,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "two-handed-swordsman",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 473,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "long-swordsman",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 77,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
       "key": "man-at-arms",
       "sounds": [
         "select",
@@ -125,6 +203,32 @@
       }
     },
     {
+      "key": "halberdier",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 359,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
       "key": "pikeman",
       "sounds": [
         "select",
@@ -157,6 +261,32 @@
         "train"
       ],
       "unitId": 4,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "arbalester",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 492,
       "category": "unit",
       "animations": {
         "idle": {
@@ -1138,12 +1268,64 @@
       }
     },
     {
+      "key": "cavalier",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 283,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
       "key": "cavalry-archer",
       "sounds": [
         "select",
         "train"
       ],
       "unitId": 39,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "heavy-cavalry-archer",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 474,
       "category": "unit",
       "animations": {
         "idle": {
@@ -1190,6 +1372,32 @@
       }
     },
     {
+      "key": "elite-longbowman",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 530,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
       "key": "battering-ram",
       "sounds": [
         "select",
@@ -1216,12 +1424,64 @@
       }
     },
     {
+      "key": "capped-ram",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 422,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
       "key": "mangonel",
       "sounds": [
         "select",
         "train"
       ],
       "unitId": 280,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "onager",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 550,
       "category": "unit",
       "animations": {
         "idle": {

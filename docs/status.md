@@ -36,7 +36,7 @@ Controls and hotkeys are listed in the root `README.md`. The essential loop is l
 
 ## Deliberately omitted
 
-The target does not include the Imperial Age, other civilizations, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, relics, or a genetic-algorithm framework. Palisade walls and gates are built; stone walls and their gates are not. Of the technology tree only Loom, the Feudal Age and the Castle Age are researchable — no unit upgrade, blacksmith or university technology is. Mobile has no separate or simplified gameplay. All SLD layers convert through the local decoder.
+The target does not include other civilizations, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, relics, or a genetic-algorithm framework. Palisade walls and gates are built; stone walls and their gates are not. Of the technology tree only Loom, the Feudal Age and the Castle Age are researchable — no unit upgrade, blacksmith or university technology is. Mobile has no separate or simplified gameplay. All SLD layers convert through the local decoder.
 
 ## Measurements and gate evidence
 
@@ -241,7 +241,7 @@ a test, so the game cannot offer something the Britons were never given.
 
 ### Ages and technologies
 
-**Fifty-six technologies, and the list is the civilisation's own tree.** Three
+**Sixty-six technologies, and the list is the civilisation's own tree.** Three
 were written out by hand here; now a `Research` node in `CivTechTrees/`
 BRITONS.json names the technology, the building it happens at and the age it
 appears in, and the DAT's effect commands say what it does. Nothing is
@@ -303,17 +303,32 @@ trained before it: the DAT gives the man-at-arms no enabling technology of its
 own, so without that rule it would sit in the Dark Age barracks beside the
 unit it replaces.
 
-**Five of the Britons' twenty-eight upgrades are researchable**, each at its
-own building for the DAT's own price: the man-at-arms (100 food, 40 gold,
-Feudal, barracks), the pikeman (160 food, 90 gold), the crossbowman (175 food,
-100 gold), the elite skirmisher (230 wood, 130 gold) and the light cavalry
-(150 food, 50 gold), the last four all Castle Age. Each brings its unit with
-its art and its own selection and training voices out of the owned audio.
+**Fifteen unit upgrades are researchable**, each at its own building for the
+DAT's own price, and every chain the Britons actually have is complete:
 
-The remaining twenty-three are recorded in `skippedTechnologies` as *upgrades
-to a unit that is not imported* — the long swordsman, the arbalester, the
-halberdier, the cavalier and the rest. Each is a unit's worth of art rather
-than a rule; `backlog.md` lists them in order of value.
+- militia → man-at-arms → long swordsman → two-handed swordsman → champion
+- spearman → pikeman → halberdier
+- archer → crossbowman → arbalester
+- skirmisher → elite skirmisher, scout cavalry → light cavalry
+- knight → cavalier, cavalry archer → heavy cavalry archer
+- mangonel → onager, battering ram → capped ram
+- **longbowman → elite longbowman**, the civilisation's unique unit
+
+Each brings its unit with its art, its icon and its own selection and training
+voices out of the owned audio, and each is refused before its own predecessor:
+the DAT states those chains and nothing here transcribes them.
+
+Two things that shape looked wrong and was not. The Champion technology
+carries *four* upgrade commands — militia, man-at-arms, long swordsman and
+two-handed swordsman all become champions — which is the DAT being thorough
+rather than a mis-decode: anything still standing gets promoted. And the elite
+longbowman is not a `UnitUpgrade` node at all but a `UniqueUnit` one carrying a
+trigger tech, where the plain longbowman is a `UniqueUnit` with none, because
+it simply exists.
+
+What is left skipped is naval — the dock and its ships — plus the scorpion
+line, and the four the Britons do without (hussar, paladin, siege ram, siege
+onager), which their tree says outright.
 
 Which age a thing belongs to is not a list here either: the importer finds the
 "(make avail)" technology that enables each unit and reads the age technology in

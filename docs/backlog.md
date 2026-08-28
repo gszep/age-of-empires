@@ -119,15 +119,11 @@ terrain blends above.
   effects rather than with the renderer. Each age's variant also has its own
   rubble unit (`Barracks Age2 (Rubble)` and friends), so a razed Feudal
   barracks still leaves the Dark Age rubble.
-- **Five unit upgrades of the Britons' twenty-eight are researchable** — the
-  man-at-arms, pikeman, crossbowman, elite skirmisher and light cavalry. The
-  mechanism is general and the rest is content: each needs its unit imported
-  with animations, an entry in the kind lists and the two schemas, and a
-  re-run of the audio import for its voices. What is left is the Imperial
-  tier — arbalester, halberdier, champion (by way of long swordsman and
-  two-handed swordsman), cavalier, heavy cavalry archer, onager and capped
-  ram. The Britons have no hussar, paladin, siege ram or siege onager, and
-  their tree says so.
+- **Every land unit upgrade the Britons have is researchable** — fifteen of
+  them, through to the champion, the halberdier, the arbalester and the elite
+  longbowman. What is left is naval (the dock and its ships) and the scorpion
+  line, which are units this slice does not have at all rather than upgrades
+  it is missing.
 - **The built-in AI does not research upgrades.** It trains whichever infantry
   its barracks currently offers, so it uses a man-at-arms if one is researched
   — but nothing researches one. It banks for the age instead, which is the

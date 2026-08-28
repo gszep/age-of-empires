@@ -770,8 +770,11 @@ def technologies_from_tree(
     for node in tree_nodes(dat_path, spec):
         # A `UnitUpgrade` node is a technology too -- it just replaces one unit
         # with another rather than adding to it, and the tree names the
-        # technology that does it separately from the unit it produces.
-        upgrade = node["Node Type"] == "UnitUpgrade"
+        # technology that does it separately from the unit it produces. A
+        # civilisation's unique unit takes the same shape: the Elite Longbowman
+        # is a `UniqueUnit` node carrying a `Trigger Tech ID`, where the plain
+        # Longbowman is a `UniqueUnit` with none because it simply exists.
+        upgrade = node["Node Type"] in ("UnitUpgrade", "UniqueUnit") and node.get("Trigger Tech ID")
         if node["Node Type"] != "Research" and not upgrade:
             continue
         name = node["Name"]

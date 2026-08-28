@@ -1294,21 +1294,22 @@ describe('the archery range', () => {
     const trainedHere = (Object.keys(state.rules.units) as (keyof typeof state.rules.units)[])
       .filter(kind => state.rules.units[kind].trainedAt === 'archery-range')
       .sort();
-    // The crossbowman and the elite skirmisher belong to the range too, but
-    // as the far end of an upgrade: they are what it trains *instead of* the
-    // archer and the skirmisher, once that upgrade is researched.
-    expect(trainedHere).toEqual([
-      'archer', 'cavalry-archer', 'crossbowman', 'elite-skirmisher', 'skirmisher',
-    ]);
+    // Asserting the exact roster here breaks every time a unit is added, and
+    // says nothing useful when it does. What matters is the rule: the range
+    // is where the archer line lives, and everything on it that exists only
+    // as the far end of an upgrade is offered only once that is researched.
+    expect(trainedHere).toEqual(expect.arrayContaining(['archer', 'skirmisher', 'cavalry-archer']));
     // Only imported content has the upgrade technologies; the open fallback
     // has no upgrades at all, so there is nothing to be gated behind.
     if (importedRules) {
       const upgraded = createGame(23, importedRules);
-      for (const kind of ['crossbowman', 'elite-skirmisher']) {
-        expect(notYetUpgradedInto(upgraded, 1, kind), `${kind} is on offer already`).toBe(true);
-      }
-      for (const kind of ['archer', 'skirmisher', 'cavalry-archer']) {
-        expect(notYetUpgradedInto(upgraded, 1, kind), `${kind} needs an upgrade first`).toBe(false);
+      const here = (Object.keys(upgraded.rules.units) as (keyof typeof upgraded.rules.units)[])
+        .filter(kind => upgraded.rules.units[kind].trainedAt === 'archery-range');
+      expect(here).toEqual(expect.arrayContaining(['crossbowman', 'arbalester', 'elite-skirmisher']));
+      for (const kind of here) {
+        const gated = notYetUpgradedInto(upgraded, 1, kind);
+        const isBase = ['archer', 'skirmisher', 'cavalry-archer'].includes(kind);
+        expect(gated, `${kind} should ${isBase ? 'not ' : ''}need an upgrade first`).toBe(!isBase);
       }
     }
     expect(state.rules.units.skirmisher.cost).toEqual({ food: 25, wood: 35, gold: 0, stone: 0 });

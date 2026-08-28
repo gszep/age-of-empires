@@ -463,11 +463,28 @@ class ContentImportIntegrationTest(unittest.TestCase):
         was = {a["class"]: a["amount"] for a in militia["combat"]["attacks"]}
         self.assertGreater(melee[4], was[4])
 
+        # The whole infantry chain is here, and the champion promotes every
+        # rung of it at once -- which is what the DAT says: if you still own a
+        # militia when Champion lands, it becomes a champion too.
+        chain = {"long-swordsman": "man-at-arms", "two-handed-swordsman": "long-swordsman",
+                 "champion": "two-handed-swordsman"}
+        for key, first in chain.items():
+            self.assertIn(first, techs[key]["requires"], key)
+        promoted = {u["from"] for u in techs["champion"]["upgrades"]}
+        self.assertEqual(promoted, {"militia", "man-at-arms", "long-swordsman",
+                                    "two-handed-swordsman"})
+
+        # A civilisation's unique unit takes the same shape, and is not a
+        # `UnitUpgrade` node at all: the Elite Longbowman is a `UniqueUnit`
+        # carrying a trigger tech, where the plain Longbowman carries none.
+        self.assertEqual(techs["elite-longbowman"]["upgrades"],
+                         [{"from": "longbowman", "to": "elite-longbowman"}])
+
         # The upgrades whose far end is not imported say so rather than
-        # vanishing: the long swordsman is a unit this game does not have.
+        # vanishing: the heavy scorpion needs a unit this game does not have.
         skipped = {row["name"]: row["reason"] for row in self.result["skippedTechnologies"]}
-        self.assertIn("Long Swordsman", skipped)
-        self.assertIn("not imported", skipped["Long Swordsman"])
+        self.assertIn("Heavy Scorpion", skipped)
+        self.assertIn("not imported", skipped["Heavy Scorpion"])
 
     def test_the_civilisation_is_read_from_its_own_tech_tree(self):
         # An AoE2 civilisation is mostly what it does not get, and the depot
