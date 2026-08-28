@@ -879,6 +879,26 @@ class UiImportIntegrationTest(unittest.TestCase):
             any(name.startswith("IconAction") for name in self.result["materials"])
         )
 
+    def test_nothing_the_game_can_show_is_left_without_an_icon(self):
+        # Adding a unit and forgetting to re-run this import leaves a blank
+        # button and nothing else -- no error, no missing file, just a hole in
+        # the panel. Every entity that carries an `icon_id` must be in the
+        # sheet its category is drawn from.
+        icons = self.result["icons"]
+        content = extracted_content()
+        sheets = {
+            "building": "Buildings",
+            "unit": "Units", "unit-variant": "Units", "animal": "Units",
+        }
+        checked = 0
+        for key, entity in content["entities"].items():
+            sheet = sheets.get(entity.get("category"))
+            if sheet is None or "iconId" not in entity:
+                continue
+            self.assertIn(f"{entity['iconId']:03d}", icons[sheet], f"{key} ({sheet})")
+            checked += 1
+        self.assertGreater(checked, 30)
+
     def test_every_technology_gets_its_own_button_art(self):
         # Research buttons were the only ones in the game with no art at all,
         # because the UI import took Buildings, Units and the stat sheets but
