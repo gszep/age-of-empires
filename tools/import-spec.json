@@ -453,6 +453,16 @@
       }
     },
     {
+      "key": "university",
+      "unitId": 209,
+      "category": "building",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" }
+      }
+    },
+    {
       "key": "siege-workshop",
       "unitId": 49,
       "category": "building",

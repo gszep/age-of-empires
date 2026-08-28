@@ -1654,6 +1654,47 @@ describe('what a shot is aimed at', () => {
     expect(victim.hp, 'a walking target was hit anyway').toBe(before);
   });
 
+  it('hits a walking target once Ballistics is researched, and not before', () => {
+    // The whole of what that technology is. A watch tower, whose own accuracy
+    // is 100 so nothing else can explain a miss, shoots at a villager walking
+    // straight past it four tiles out. Same seed, same walk, same fifteen
+    // shots; the only difference is the research.
+    if (!importedRules) return;
+    const walkPast = (ballistics: boolean): { damage: number; shots: number } => {
+      const state = createGame(84, importedRules);
+      state.players[1].age = 2;
+      if (ballistics) state.players[1].researched.push('ballistics');
+      const towerRules = state.rules.buildings['watch-tower'];
+      const tower: Entity = {
+        id: state.nextId++, kind: 'watch-tower', owner: 1, position: { x: 60.5, y: 60.5 },
+        hp: towerRules.hp, maxHp: towerRules.hp, radius: towerRules.radius,
+        activity: 'idle', order: { kind: 'idle' },
+      };
+      state.entities.push(tower);
+      const victim = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
+      victim.position = { x: 64.5, y: 54.5 };
+      victim.hp = 1_000_000;
+      victim.maxHp = 1_000_000;
+      applyCommand(state, {
+        kind: 'order', player: 2, entityIds: [victim.id], target: { x: 64.5, y: 70.5 },
+      });
+      const before = victim.hp;
+      const seen = new Set<number>();
+      for (let i = 0; i < 1200; i++) {
+        stepGame(state);
+        for (const shot of state.projectiles) seen.add(shot.id);
+      }
+      return { damage: before - victim.hp, shots: seen.size };
+    };
+    const without = walkPast(false);
+    const with_ = walkPast(true);
+    expect(without.shots, 'the tower never shot').toBeGreaterThan(5);
+    expect(with_.shots, 'a different number of shots is not a fair comparison')
+      .toBe(without.shots);
+    expect(without.damage, 'a walking target was hit without Ballistics').toBe(0);
+    expect(with_.damage, 'Ballistics did not help').toBeGreaterThan(0);
+  });
+
   it('hits a target walking straight at the shooter', () => {
     // Also the reference: a unit closing on the archer stays on the line the
     // arrow travels, so it runs onto the shot rather than out of it.
@@ -1823,6 +1864,23 @@ describe('the technology tree', () => {
       expect(research(state, key).ok, `${key} was refused in its own age`).toBe(true);
       expect(state.players[1].researched).toContain(key);
     }
+  });
+
+  it('opens the university, and the university opens Ballistics', () => {
+    // The building was left out because it trains nothing; the technologies
+    // are the reason to build it. Ballistics is 300 wood and 175 gold at the
+    // university in the Castle Age, which is what the DAT says.
+    if (!importedRules) return;
+    const ballistics = importedRules.technologies.ballistics;
+    expect(ballistics, 'Ballistics is not researchable').toBeDefined();
+    expect(ballistics.researchedAt).toBe('university');
+    expect(ballistics.requiresAge).toBe(2);
+    expect(ballistics.cost).toMatchObject({ wood: 300, gold: 175 });
+    expect(ballistics.effects).toEqual([
+      { unit: 'arrow', attribute: 'leadsTarget', operation: 'set', amount: 1 },
+    ]);
+    expect(importedRules.buildings.university.buildable).toBe(true);
+    expect(importedRules.buildings.university.age).toBe(2);
   });
 
   it('will not take a technology before the one it follows', () => {

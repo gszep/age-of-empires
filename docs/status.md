@@ -229,7 +229,7 @@ a test, so the game cannot offer something the Britons were never given.
 
 ### Ages and technologies
 
-**Forty-two technologies, and the list is the civilisation's own tree.** Three
+**Fifty technologies, and the list is the civilisation's own tree.** Three
 were written out by hand here; now a `Research` node in `CivTechTrees/`
 BRITONS.json names the technology, the building it happens at and the age it
 appears in, and the DAT's effect commands say what it does. Nothing is
@@ -251,14 +251,17 @@ Bodkin Arrow, Hand Cart needs Wheelbarrow. Without them a player could take
 Blast Furnace without ever taking Forging and collect the same bonus for a
 third of the clicks. The command refuses it and the panel does not offer it.
 
+The university is built now, and it is the technologies that made it worth
+building: it trains nothing, and Ballistics, Chemistry, Masonry, Architecture,
+Heated Shot, Arrowslits, Siege Engineers and Treadmill Crane are researched
+there.
+
 What the tree offers and this game cannot hold is recorded rather than dropped,
-with the reason — 43 nodes, in three groups. Thumb Ring and nine others say
-*the British do not have it*, which is the tree's own `NotAvailable`.
-Ballistics and the rest of the university's list say *researched at DAT unit
-209, not imported*. Horse Collar, Coinage, Heavy Plow and the monastery's
-healing technologies say *none of its effects reach anything imported* — a farm
-that holds more food, a market that charges less, a monk who heals faster are
-all attributes this slice does not model. A technology that keeps some of its
+with the reason, in two groups. Thumb Ring and nine others say *the British do
+not have it*, which is the tree's own `NotAvailable`. Horse Collar, Coinage,
+Heavy Plow and the monastery's healing technologies say *none of its effects
+reach anything imported* — a farm that holds more food, a market that charges
+less, a monk who heals faster are all attributes this slice does not model. A technology that keeps some of its
 effects and loses others carries an `unmodelled` list naming the attributes, so
 a half-applied technology says so.
 
@@ -328,6 +331,19 @@ still somewhere along the line it travels — which is what makes the reference'
 three cases come out right: standing still is hit, walking across the shot is
 missed, walking straight at the shooter is hit anyway. If it reaches its aim
 untouched it lands, and whoever else is standing on that spot takes it instead.
+
+**Ballistics is now researchable**, at a university, in the Castle Age, for
+300 wood and 175 gold — which is what the DAT says. Measured: a watch tower
+whose own accuracy is 100 shoots fifteen times at a villager walking straight
+past it four tiles out, and lands *nothing* without the technology and 40
+damage with it. The same fifteen shots either way; only the research differs.
+The rule reads the effect rather than the technology's name, so it stays true
+for any content that turns `smart_mode` on somewhere else.
+
+**Thumb Ring, the other technology that changes this, the Britons do not
+have** — their tree marks it `NotAvailable`, which is the real tech tree. So
+accuracy is what the DAT gives each shooter and nothing in a Britons match
+raises it.
 
 **What a miss looks like is approximated.** The DAT states the odds but not the
 scatter, so a shot that fails its accuracy roll is aimed one tile off in a

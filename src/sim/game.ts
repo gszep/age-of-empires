@@ -1384,10 +1384,21 @@ function accuracyOf(state: GameState, shooter: Entity): number {
   return unitRulesFor(state, shooter.owner, shooter.kind as UnitKind)?.accuracyPercent ?? 100;
 }
 
-/** Whether this shooter's owner has the technology that leads a moving target. */
+/**
+ * Whether this shooter's owner has the technology that leads a moving target.
+ *
+ * Read off the effects rather than by name: Ballistics is one `set` of the
+ * projectile's `smart_mode`, and asking what the researched technologies
+ * actually do keeps the rule true for any content that turns it on elsewhere.
+ */
 function shooterLeadsTarget(state: GameState, shooter: Entity): boolean {
   if (shooter.owner === 0) return false;
-  return state.players[shooter.owner as PlayerId].researched.includes('ballistics');
+  for (const key of state.players[shooter.owner as PlayerId].researched) {
+    for (const effect of state.rules.technologies[key]?.effects ?? []) {
+      if (effect.attribute === 'leadsTarget' && effect.amount >= 1) return true;
+    }
+  }
+  return false;
 }
 
 /**

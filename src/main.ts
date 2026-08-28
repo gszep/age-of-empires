@@ -726,7 +726,7 @@ const TRAIN_HOTKEYS = ['q', 'w', 'e', 'r', 't'];
  */
 const MILITARY_BUILDINGS = new Set<BuildingKind>([
   'barracks', 'archery-range', 'stable', 'blacksmith', 'monastery', 'siege-workshop',
-  'castle', 'outpost', 'watch-tower', 'palisade-wall', 'palisade-gate',
+  'university', 'castle', 'outpost', 'watch-tower', 'palisade-wall', 'palisade-gate',
 ]);
 let buildPage: 'economic' | 'military' = 'economic';
 

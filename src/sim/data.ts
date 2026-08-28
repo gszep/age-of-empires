@@ -242,7 +242,9 @@ export interface TechEffect {
 
 export type TechAttribute =
   | 'hitPoints' | 'lineOfSight' | 'speed' | 'armor' | 'attack'
-  | 'reloadSeconds' | 'accuracyPercent' | 'range' | 'workRate' | 'carryCapacity';
+  | 'reloadSeconds' | 'accuracyPercent' | 'range' | 'workRate' | 'carryCapacity'
+  /** On a projectile: whether the shot leads a moving target. Ballistics. */
+  | 'leadsTarget';
 
 export const AGE_NAMES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'];
 
@@ -499,6 +501,14 @@ export const FALLBACK_RULES: GameRules = {
     'siege-workshop': {
       age: 2,
       hp: 1500, radius: 2, lineOfSight: 6, cost: cost(0, 200), buildSeconds: 40,
+      popSupport: 0, buildable: true, accepts: [],
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+    },
+    // Trains nothing; it is where the technologies that do not belong to a
+    // barracks or a blacksmith are researched, Ballistics chief among them.
+    university: {
+      age: 2,
+      hp: 2100, radius: 2, lineOfSight: 6, cost: cost(0, 200), buildSeconds: 60,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
     },
@@ -786,6 +796,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       stable: building('stable', true),
       monastery: building('monastery', true),
       'siege-workshop': building('siege-workshop', true),
+      university: building('university', true),
       castle: building('castle', true),
       'palisade-wall': building('palisade-wall', true),
       'palisade-gate': building('palisade-gate', true),
@@ -854,7 +865,7 @@ const UNIT_KINDS = new Set<string>([
 const BUILDING_KINDS = new Set<string>([
   'town-center', 'barracks', 'house', 'mill', 'lumber-camp', 'mining-camp', 'farm',
   'outpost', 'watch-tower', 'archery-range', 'blacksmith', 'market', 'stable',
-  'monastery', 'siege-workshop', 'castle',
+  'monastery', 'siege-workshop', 'castle', 'university',
   'palisade-wall', 'palisade-gate',
 ]);
 

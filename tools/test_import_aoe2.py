@@ -413,13 +413,32 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # ...and the first of a chain has none.
         self.assertNotIn("requires", techs["forging"])
 
+        # Ballistics is the reason the university is built at all: one `set`
+        # of the projectile's smart_mode, and nothing else.
+        ballistics = techs["ballistics"]
+        self.assertEqual(ballistics["researchedAt"], 209)
+        self.assertEqual(ballistics["cost"], {"wood": 300, "gold": 175})
+        self.assertEqual(ballistics["effects"], [{
+            "unit": "arrow", "attribute": "leadsTarget", "operation": "set", "amount": 1.0,
+        }])
+
+        # A multiply on attack packs the armour class the same way an add
+        # does, and its low byte is a percentage: Heated Shot arrives as 4321,
+        # which is class 16 at x2.25, and Siege Engineers as 2936, class 11 at
+        # x1.2. Read as a plain number those are nonsense multipliers.
+        heated = [e for e in techs["heated-shot"]["effects"] if e["operation"] == "multiply"]
+        self.assertTrue(heated)
+        self.assertEqual(heated[0]["amount"], 2.25)
+        self.assertEqual(heated[0]["armorClass"], 16)
+
         # What was left out says why, and Thumb Ring is left out for the
         # reason the civilisation tree gives rather than for a missing entity.
         skipped = {row["name"]: row["reason"] for row in self.result["skippedTechnologies"]}
         self.assertIn("Thumb Ring", skipped)
         self.assertIn("do not have it", skipped["Thumb Ring"])
-        self.assertIn("Ballistics", skipped)
-        self.assertIn("not imported", skipped["Ballistics"])
+        self.assertNotIn("Ballistics", skipped)
+        # The dock is not imported, so its technologies are not offered.
+        self.assertIn("not imported", skipped["Fishing Lines"])
         for reason in skipped.values():
             self.assertTrue(reason)
 

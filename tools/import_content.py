@@ -546,8 +546,14 @@ ATTRIBUTE_NAMES = {
     12: "range",
     13: "workRate",
     14: "carryCapacity",
+    # On a projectile, whether the shot leads a moving target. Ballistics is
+    # one `set` of this and nothing else.
+    19: "leadsTarget",
 }
-# 8 and 9 pack an armour class into the high byte and the amount into the low.
+# 8 and 9 pack an armour class into the high byte. The low byte is the amount
+# for `set` and `add`, and a percentage for `multiply` -- Heated Shot arrives
+# as 4321, which is class 16 and x2.25, and Siege Engineers as 2936, class 11
+# and x1.2. Both are exactly what those technologies do in AoE2.
 PACKED_ATTRIBUTES = {"armor", "attack"}
 OPERATION_NAMES = {0: "set", 4: "add", 5: "multiply"}
 
@@ -601,10 +607,11 @@ def effects_of(
             effect: dict[str, Any] = {
                 "unit": key, "attribute": attribute, "operation": operation,
             }
-            if attribute in PACKED_ATTRIBUTES and operation in ("set", "add"):
+            if attribute in PACKED_ATTRIBUTES:
                 packed = int(amount)
                 effect["armorClass"] = packed >> 8
-                effect["amount"] = packed & 0xFF
+                low = packed & 0xFF
+                effect["amount"] = rounded(low / 100) if operation == "multiply" else low
             else:
                 effect["amount"] = rounded(amount)
             effects.append(effect)
