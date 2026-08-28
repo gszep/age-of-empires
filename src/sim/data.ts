@@ -41,6 +41,25 @@ export interface UnitRules {
   blastRadius?: number;
   /** Monks: hit points restored a second, and how close they must come. */
   heal?: { hitPointsPerSecond: number; range: number };
+  /**
+   * A siege engine that travels packed and shoots unpacked. The DAT keeps the
+   * two as separate units -- the trebuchet is 331 packed and 42 unpacked --
+   * and states everything about each except which is the other, so the pairing
+   * is named here and the numbers are imported. Packed it has no attack at
+   * all; unpacked it cannot move.
+   */
+  unpacked?: {
+    attacks: AttackValue[];
+    range: number;
+    minRange: number;
+    attackReloadSeconds: number;
+    attackReleaseSeconds: number;
+    projectileSpeed?: number;
+    launchHeight?: number;
+    blastRadius?: number;
+    /** Seconds to set up or pack away. The DAT's own work rate for the pair. */
+    seconds: number;
+  };
   /** Monks: the DAT's window for a conversion — the earliest second it can
    * succeed and the second by which it must — and the reach it works at. */
   convert?: { minSeconds: number; maxSeconds: number; range: number };
@@ -510,6 +529,26 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 4, amount: 0 }, { class: 3, amount: 7 }, { class: 20, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 6.0, attackReleaseSeconds: 0.0,
       range: 8.0, minRange: 3.0, projectileSpeed: 5, launchHeight: 1.5, blastRadius: 1.25,
+    },
+    /**
+     * Packed: what it costs, how it moves, and no attack at all. What it can
+     * do once it is set up is in `unpacked`.
+     */
+    trebuchet: {
+      age: 3,
+      hp: 150, radius: 0.5, speed: 0.8, lineOfSight: 18,
+      cost: cost(0, 200, 200, 0), trainSeconds: 50,
+      trainedAt: 'castle', popCost: 1,
+      attacks: [],
+      armors: [{ class: 4, amount: 1 }, { class: 3, amount: 8 }, { class: 20, amount: 0 }, { class: 31, amount: 1 }],
+      attackReloadSeconds: 10, attackReleaseSeconds: 0,
+      unpacked: {
+        attacks: [{ class: 11, amount: 250 }, { class: 3, amount: 200 }],
+        range: 16, minRange: 4,
+        attackReloadSeconds: 10, attackReleaseSeconds: 0.88,
+        projectileSpeed: 3.5, launchHeight: 1.5,
+        seconds: 4.5,
+      },
     },
     'capped-ram': {
       age: 3,
@@ -1031,6 +1070,30 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
         projectileSpeed: FALLBACK_RULES.units.mangonel.projectileSpeed,
       },
       monk: unit('monk', 'monastery'),
+      // Packed and unpacked are two DAT units and the pairing is not stated,
+      // so it is named here; every number on both sides is imported.
+      trebuchet: {
+        ...unit('trebuchet', 'castle'),
+        attacks: [],
+        unpacked: {
+          ...FALLBACK_RULES.units.trebuchet.unpacked!,
+          attacks: attackValues(e['trebuchet-unpacked']?.combat?.attacks).length
+            ? attackValues(e['trebuchet-unpacked']?.combat?.attacks)
+            : FALLBACK_RULES.units.trebuchet.unpacked!.attacks,
+          range: e['trebuchet-unpacked']?.combat?.maximumRange
+            ?? FALLBACK_RULES.units.trebuchet.unpacked!.range,
+          minRange: e['trebuchet-unpacked']?.combat?.minimumRange
+            ?? FALLBACK_RULES.units.trebuchet.unpacked!.minRange,
+          attackReloadSeconds: e['trebuchet-unpacked']?.combat?.reloadSeconds
+            ?? FALLBACK_RULES.units.trebuchet.unpacked!.attackReloadSeconds,
+          attackReleaseSeconds: (e['trebuchet-unpacked']?.combat?.frameDelay ?? 24)
+            * (e['trebuchet-unpacked']?.animations?.attack?.frameSeconds ?? 0.0367),
+          projectileSpeed: e['trebuchet-rock']?.speedTilesPerSecond
+            ?? FALLBACK_RULES.units.trebuchet.unpacked!.projectileSpeed,
+          launchHeight: e['trebuchet-unpacked']?.combat?.launchOffset?.[2]
+            ?? FALLBACK_RULES.units.trebuchet.unpacked!.launchHeight,
+        },
+      },
       sheep: animal('sheep'),
       deer: animal('deer'),
       boar: animal('boar'),
@@ -1136,7 +1199,7 @@ const UNIT_KINDS = new Set<string>([
   'scout-cavalry', 'light-cavalry', 'trade-cart',
   'knight', 'cavalier', 'cavalry-archer', 'heavy-cavalry-archer',
   'longbowman', 'elite-longbowman',
-  'battering-ram', 'capped-ram', 'mangonel', 'onager', 'monk',
+  'battering-ram', 'capped-ram', 'mangonel', 'onager', 'monk', 'trebuchet',
   'sheep', 'deer', 'boar',
 ]);
 const BUILDING_KINDS = new Set<string>([

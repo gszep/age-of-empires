@@ -611,7 +611,7 @@ function assignOrder(state: GameState, entity: Entity, target: Point, targetEnti
   const unitRules = isUnit(entity.kind) ? state.rules.units[entity.kind as UnitKind] : undefined;
   // A unit with no attack is never given one by a right-click: a monk sent at
   // a boar would otherwise stand over it forever, swinging nothing.
-  const armed = !unitRules || unitRules.attacks.some(attack => attack.amount > 0);
+  const armed = !unitRules || combatOf(state, entity).attacks.some(attack => attack.amount > 0);
   if (entity.kind === 'trade-cart' && targetEntity && isTradePartner(state, entity, targetEntity)) {
     entity.order = { kind: 'trade', targetId: targetEntity.id };
     entity.carrying = undefined;
@@ -643,6 +643,13 @@ function assignOrder(state: GameState, entity: Entity, target: Point, targetEnti
   } else if (targetEntity && targetEntity.owner !== 0 && targetEntity.owner !== entity.owner && armed) {
     entity.order = { kind: 'attack', targetId: targetEntity.id };
   } else {
+    // Told to go somewhere, a siege engine that is set up packs itself away
+    // first, as the reference does. An order to *attack* does not: an engine
+    // in range should shoot rather than fold up.
+    if (entity.unpacked && unitRules?.unpacked) {
+      entity.packingTicks = Math.max(
+        1, Math.round(unitRules.unpacked.seconds * TICKS_PER_SECOND));
+    }
     entity.order = { kind: 'move', target: { ...target } };
   }
   entity.activity = 'moving';
@@ -749,6 +756,27 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (mill.buildProgress !== undefined) return rejected('building is under construction');
     state.players[command.player].autoReseedFarms = command.enabled;
     return { ok: true };
+  }
+
+  if (command.kind === 'pack') {
+    let matched = 0;
+    for (const entity of state.entities) {
+      if (entity.dead || !command.entityIds.includes(entity.id) || entity.owner !== command.player) continue;
+      const setup = isUnit(entity.kind)
+        && unitRulesFor(state, entity.owner, entity.kind as UnitKind).unpacked;
+      if (!setup) continue;
+      matched++;
+      if ((entity.unpacked === true) === command.unpacked) continue;  // already there
+      // Setting up takes the DAT's own time, and nothing else happens while it
+      // does: the order is dropped so a half-packed engine does not keep
+      // walking or shooting.
+      entity.packingTicks = Math.max(1, Math.round(setup.seconds * TICKS_PER_SECOND));
+      entity.attackWindup = undefined;
+      entity.order = { kind: 'idle' };
+      entity.activity = 'idle';
+      clearPath(entity);
+    }
+    return matched ? { ok: true } : rejected('no siege engine matched');
   }
 
   if (command.kind === 'rally') {
@@ -891,6 +919,39 @@ function moveAlong(state: GameState, grid: NavGrid, entity: Entity, destination:
 const inRange = (entity: Entity, target: Entity, margin = 0.15): boolean =>
   distance(entity.position, target.position) <= entity.radius + target.radius + margin;
 
+/**
+ * What a unit fights with at this moment. A siege engine that has to be set up
+ * is two DAT units, and only one of them has an attack: a packed trebuchet
+ * carries nothing and an unpacked one carries the whole of it, so the answer
+ * depends on the entity and not only on its kind (issue #28).
+ */
+function combatOf(state: GameState, entity: Entity): {
+  attacks: AttackValue[]; range: number; minRange: number;
+  reloadSeconds: number; releaseSeconds: number;
+  projectileSpeed?: number; launchHeight?: number; blastRadius?: number;
+} {
+  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
+  const setup = rules.unpacked;
+  if (setup) {
+    return entity.unpacked
+      ? { ...setup, reloadSeconds: setup.attackReloadSeconds, releaseSeconds: setup.attackReleaseSeconds }
+      : {
+        attacks: [], range: 0, minRange: 0,
+        reloadSeconds: rules.attackReloadSeconds, releaseSeconds: rules.attackReleaseSeconds,
+      };
+  }
+  return {
+    attacks: rules.attacks,
+    range: rules.range ?? 0,
+    minRange: rules.minRange ?? 0,
+    reloadSeconds: rules.attackReloadSeconds,
+    releaseSeconds: rules.attackReleaseSeconds,
+    projectileSpeed: rules.projectileSpeed,
+    launchHeight: rules.launchHeight,
+    blastRadius: rules.blastRadius,
+  };
+}
+
 /** Melee units close to contact; ranged ones stop at their weapon range. */
 /**
  * How a unit fights this particular target. A villager swings a tool at
@@ -913,11 +974,12 @@ function attackProfile(
   }
   const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
   if (rules.hunt && target && isAnimal(target.kind)) return { ...rules.hunt };
+  const combat = combatOf(state, entity);
   return {
-    range: rules.range ?? 0,
-    projectileSpeed: rules.projectileSpeed,
-    launchHeight: rules.launchHeight,
-    releaseSeconds: rules.attackReleaseSeconds,
+    range: combat.range,
+    projectileSpeed: combat.projectileSpeed,
+    launchHeight: combat.launchHeight,
+    releaseSeconds: combat.releaseSeconds,
   };
 }
 
@@ -936,7 +998,7 @@ const inAttackRange = (state: GameState, entity: Entity, target: Entity): boolea
 function tooClose(state: GameState, entity: Entity, target: Entity): boolean {
   const minimum = isBuilding(entity.kind)
     ? buildingRulesFor(state, entity.owner, entity.kind).attack?.minRange ?? 0
-    : unitRulesFor(state, entity.owner, entity.kind as UnitKind)?.minRange ?? 0;
+    : combatOf(state, entity).minRange;
   return minimum > 0 && inRange(entity, target, minimum);
 }
 
@@ -1358,6 +1420,12 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
     return;
   }
   const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
+  // A siege engine that is packed has no attack, and one that is set up cannot
+  // walk to reach anything: either way there is nothing to do but stand.
+  if (rules.unpacked) {
+    if (!entity.unpacked) { becomeIdle(entity); return; }
+    if (!inAttackRange(state, entity, target)) { entity.activity = 'idle'; clearPath(entity); return; }
+  }
   if (tooClose(state, entity, target)) {
     // Inside its minimum range a skirmisher cannot bring its javelin to bear.
     // AoE2 leaves it standing there rather than closing further, which is what
@@ -1407,12 +1475,13 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
   }
   entity.attackWindup -= 1;
   if (entity.attackWindup <= 0) {
+    const combat = combatOf(state, entity);
     releaseAttack(
-      state, entity, target, rules.attacks,
-      profile.projectileSpeed, profile.launchHeight, rules.blastRadius,
+      state, entity, target, combat.attacks,
+      profile.projectileSpeed, profile.launchHeight, combat.blastRadius,
     );
     entity.attackWindup = undefined;
-    entity.attackCooldown = Math.max(1, Math.round(rules.attackReloadSeconds * TICKS_PER_SECOND) - Math.max(1, Math.round(releaseSeconds * TICKS_PER_SECOND)));
+    entity.attackCooldown = Math.max(1, Math.round(combat.reloadSeconds * TICKS_PER_SECOND) - Math.max(1, Math.round(releaseSeconds * TICKS_PER_SECOND)));
   }
 }
 
@@ -1802,6 +1871,16 @@ function updateTower(state: GameState, entity: Entity): void {
 }
 
 function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCounts: Map<number, number>): void {
+  // A siege engine being set up or packed away does nothing else while it is:
+  // the DAT gives the pair a work rate and this spends it (issue #28).
+  if (entity.packingTicks !== undefined) {
+    entity.activity = 'idle';
+    entity.packingTicks -= 1;
+    if (entity.packingTicks > 0) return;
+    entity.packingTicks = undefined;
+    entity.unpacked = !entity.unpacked;
+    return;
+  }
   switch (entity.order.kind) {
     case 'move': {
       entity.activity = 'moving';

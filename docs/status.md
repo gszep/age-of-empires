@@ -468,6 +468,34 @@ random direction. One tile is the board's own unit, and it is wider than any
 unit and narrower than any building — which is why an arrow that goes wide of a
 villager still lands inside the town center behind him, as in AoE2.
 
+### The trebuchet travels packed and shoots unpacked
+
+The DAT keeps a trebuchet as two units — **331 `PTREB`** packed and **42
+`TREBU`** unpacked — and states everything about each except which is the
+other. So the pairing is named in the rules and every number is imported: 200
+wood and 200 gold over 50 seconds at the castle in the Imperial Age, 150 hit
+points, 0.8 tiles a second packed, and unpacked a sixteen-tile reach with a
+four-tile minimum, a ten-second reload and 250 against buildings. Its stone is
+projectile 371, `p_rock_x1`, at 3.5 tiles a second.
+
+Packed it carries no attack at all, which is the DAT's own arrangement rather
+than a rule invented here: a right-click on an enemy cannot become an attack
+order, because the packed unit has nothing to attack with. Unpacked it cannot
+move. Setting up or packing away takes the pair's own work rate, 4.5 seconds,
+and nothing else happens while it does. Told to go somewhere, an engine that
+is set up packs itself away first, as the reference does — but an order to
+*attack* does not fold it up, because an engine already in range should shoot.
+
+What the DAT does not say is which unit is the other one, and that is recorded
+as the approximation it is. The pack/unpack task (`action_type` 109 on both)
+names no target unit, and there is no `transform_unit_id` field.
+
+Verified in the running game: the castle's panel reads `Train Trebuchet (200
+wood, 200 gold)`; a packed engine's panel offers `Unpack (set up to shoot)`
+and an unpacked one `Pack (fold up to move)`; and the two draw their own art —
+`trebuchet/idle` on wheels and `trebuchet-unpacked/idle` on its frame, both in
+player colour.
+
 ### The villager's build menu is the DAT's own layout
 
 Selecting a villager offers two buttons — **Build economic buildings** and

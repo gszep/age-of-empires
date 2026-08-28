@@ -1,7 +1,8 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { rulesFromManifest, type ContentManifest, type GameRules } from './data';
+import { TICKS_PER_SECOND, rulesFromManifest, type ContentManifest, type GameRules } from './data';
 import { applyCommand, createGame, placementLegal, stepGame } from './game';
+import { checksumState } from './checksum';
 import type { BuildingKind, Entity, GameState, UnitKind } from './types';
 
 const MANIFEST_PATH = 'public/imported/aoe2/manifest.json';
@@ -306,6 +307,133 @@ describe('the monk', () => {
     expect(state.players[1].population).toBe(owned(1));
     expect(state.players[2].population).toBe(owned(2));
     expect(state.entities.filter(e => !e.dead && e.owner === 2 && e.kind === 'militia')).toHaveLength(0);
+  });
+});
+
+describe('the trebuchet', () => {
+  // Issue #28. The DAT keeps it as two units -- 331 packed, 42 unpacked -- and
+  // states everything about each except which is the other, so the pairing is
+  // named in the rules and every number is imported. Packed it travels and has
+  // no attack at all; unpacked it shoots sixteen tiles and cannot move.
+  const imperial = (state: GameState) => {
+    for (const player of [1, 2] as const) {
+      state.players[player].age = 3;
+      state.players[player].researched.push('feudal-age', 'castle-age', 'imperial-age');
+    }
+  };
+
+  const engineFor = (state: GameState, at: { x: number; y: number }): Entity => {
+    const rules = state.rules.units.trebuchet;
+    const entity: Entity = {
+      id: state.nextId++, kind: 'trebuchet', owner: 1, position: { ...at },
+      hp: rules.hp, maxHp: rules.hp, radius: rules.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(entity);
+    return entity;
+  };
+
+  it('is an Imperial unit the castle trains, at the DAT\'s price', () => {
+    const state = createGame(120, importedRules);
+    const rules = state.rules.units.trebuchet;
+    expect(rules.trainedAt).toBe('castle');
+    expect(rules.age).toBe(3);
+    expect(rules.cost).toMatchObject({ wood: 200, gold: 200 });
+    expect(rules.trainSeconds).toBe(50);
+    // Packed it carries no attack; what it does once set up is its own block.
+    expect(rules.attacks).toEqual([]);
+    expect(rules.unpacked?.range).toBe(16);
+    expect(rules.unpacked?.minRange).toBe(4);
+    expect(rules.unpacked?.attackReloadSeconds).toBe(10);
+    expect(rules.unpacked?.attacks.find(a => a.class === 11)?.amount).toBe(250);
+  });
+
+  it('takes the DAT\'s own time to set up, and does nothing while it does', () => {
+    const state = createGame(121, importedRules);
+    imperial(state);
+    const engine = engineFor(state, { x: 60.5, y: 60.5 });
+    const setup = state.rules.units.trebuchet.unpacked!.seconds;
+    expect(applyCommand(state, {
+      kind: 'pack', player: 1, entityIds: [engine.id], unpacked: true,
+    })).toEqual({ ok: true });
+    const ticks = Math.round(setup * TICKS_PER_SECOND);
+    for (let i = 0; i < ticks - 1; i++) stepGame(state);
+    expect(engine.unpacked).toBeFalsy();
+    stepGame(state);
+    expect(engine.unpacked).toBe(true);
+  });
+
+  it('shoots only when it is set up, and reaches what a castle cannot', () => {
+    const state = createGame(122, importedRules);
+    imperial(state);
+    const enemy = state.entities.find(e => e.owner === 2 && e.kind === 'town-center')!;
+    // Twelve tiles out: inside the trebuchet's sixteen and outside everything
+    // else's, and outside its own four-tile minimum.
+    const engine = engineFor(state, { x: enemy.position.x - 12, y: enemy.position.y });
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [engine.id],
+      target: enemy.position, targetId: enemy.id,
+    });
+    // Packed, it is not armed: the order cannot become an attack. It reads as
+    // a move instead, so stop it before it walks inside its own minimum range.
+    expect(engine.order.kind).not.toBe('attack');
+    const untouched = enemy.hp;
+    run(state, 20);
+    applyCommand(state, { kind: 'stop', player: 1, entityIds: [engine.id] });
+    run(state, 100);
+    expect(enemy.hp).toBe(untouched);
+
+    // Set it up where it stands, then send it at the town center again.
+    applyCommand(state, { kind: 'pack', player: 1, entityIds: [engine.id], unpacked: true });
+    run(state, Math.round(state.rules.units.trebuchet.unpacked!.seconds * TICKS_PER_SECOND));
+    expect(engine.unpacked).toBe(true);
+    const where = { ...engine.position };
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [engine.id],
+      target: enemy.position, targetId: enemy.id,
+    });
+    expect(engine.order).toEqual({ kind: 'attack', targetId: enemy.id });
+    for (let i = 0; i < 600 && enemy.hp === untouched; i++) stepGame(state);
+    expect(enemy.hp).toBeLessThan(untouched);
+    // And it never moved an inch to do it.
+    expect(engine.position).toEqual(where);
+  });
+
+  it('packs itself away when it is told to go somewhere', () => {
+    const state = createGame(123, importedRules);
+    imperial(state);
+    const engine = engineFor(state, { x: 60.5, y: 60.5 });
+    applyCommand(state, { kind: 'pack', player: 1, entityIds: [engine.id], unpacked: true });
+    run(state, Math.round(state.rules.units.trebuchet.unpacked!.seconds * TICKS_PER_SECOND));
+    expect(engine.unpacked).toBe(true);
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [engine.id], target: { x: 70.5, y: 60.5 },
+    });
+    // It folds up first, and only then travels.
+    run(state, 2);
+    expect(engine.position.x).toBeCloseTo(60.5, 5);
+    run(state, Math.round(state.rules.units.trebuchet.unpacked!.seconds * TICKS_PER_SECOND));
+    expect(engine.unpacked).toBe(false);
+    run(state, 100);
+    expect(engine.position.x).toBeGreaterThan(60.5);
+  });
+
+  it('replays identically through a set-up and a shot', () => {
+    const play = () => {
+      const state = createGame(124, importedRules);
+      imperial(state);
+      const enemy = state.entities.find(e => e.owner === 2 && e.kind === 'town-center')!;
+      const engine = engineFor(state, { x: enemy.position.x - 12, y: enemy.position.y });
+      applyCommand(state, { kind: 'pack', player: 1, entityIds: [engine.id], unpacked: true });
+      run(state, 120);
+      applyCommand(state, {
+        kind: 'order', player: 1, entityIds: [engine.id],
+        target: enemy.position, targetId: enemy.id,
+      });
+      run(state, 400);
+      return checksumState(state);
+    };
+    expect(play()).toBe(play());
   });
 });
 

@@ -185,6 +185,12 @@ terrain blends above.
 - **A monk carries no relic, and a monastery holds none.** Relics are named in
   the omitted scope; a monk that could pick one up would need the relic entity,
   the carry state, and the gold trickle.
+- **A siege engine does not re-aim itself, and the AI never builds one.** The
+  trebuchet is trainable, packs, unpacks and shoots, but nothing automates it:
+  it does not unpack when an enemy building comes into reach, it is not part of
+  the built-in strategy's wish list, and a group of them must be packed and
+  unpacked one order at a time. The petard, the castle's other Imperial unit,
+  is still absent.
 - **A castle trains only the British longbowman.** The importer reads civ 1, so
   the castle's other trainable units (trebuchet — Imperial — and petard) and
   every other civilisation's unique unit are absent.

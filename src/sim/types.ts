@@ -12,6 +12,7 @@ export type UnitKind =
   | 'knight' | 'cavalier' | 'cavalry-archer' | 'heavy-cavalry-archer'
   | 'longbowman' | 'elite-longbowman'
   | 'battering-ram' | 'capped-ram' | 'mangonel' | 'onager' | 'monk'
+  | 'trebuchet'
   | AnimalKind;
 /** Gaia's food on the hoof: herded, or hunted where it stands. */
 export type AnimalKind = 'sheep' | 'deer' | 'boar';
@@ -79,6 +80,15 @@ export interface Entity {
   rally?: { target: Point; targetId?: number };
   attackCooldown?: number; // ticks until a new swing may start
   attackWindup?: number; // ticks until the started swing releases damage
+  /**
+   * A siege engine that has to be set up: a trebuchet travels packed and
+   * shoots unpacked, and is two units in the DAT (331 and 42) with the
+   * pairing left to the engine. Absent means packed, which is how it is
+   * trained.
+   */
+  unpacked?: boolean;
+  /** Ticks left in a pack or unpack; the engine can do nothing else meanwhile. */
+  packingTicks?: number;
   /** Monks: ticks spent working on the current conversion target. Reset the
    * moment the monk stops, so a broken-off attempt is not banked. */
   convertTicks?: number;
@@ -172,4 +182,6 @@ export type Command =
   | { kind: 'stop'; player: PlayerId; entityIds: number[] }
   | { kind: 'research'; player: PlayerId; buildingId: number; tech: string }
   /** Turn automatic farm re-sowing on or off, from one of the player's mills. */
-  | { kind: 'reseed'; player: PlayerId; buildingId: number; enabled: boolean };
+  | { kind: 'reseed'; player: PlayerId; buildingId: number; enabled: boolean }
+  /** Set a siege engine up to shoot, or pack it up to travel. */
+  | { kind: 'pack'; player: PlayerId; entityIds: number[]; unpacked: boolean };

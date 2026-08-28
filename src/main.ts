@@ -354,6 +354,15 @@ function runUiCommand(id: string): void {
     if (!result.ok) reject(result.reason);
     return;
   }
+  if (id === 'pack' || id === 'unpack') {
+    const engines = ownSelected().filter(e => isUnit(e.kind)
+      && rules.units[e.kind as UnitKind].unpacked !== undefined);
+    if (!engines.length) return;
+    applyCommand(game, {
+      kind: 'pack', player: 1, entityIds: engines.map(e => e.id), unpacked: id === 'unpack',
+    });
+    return;
+  }
   if (id === 'reseed') {
     const mill = selection.find(e => e.kind === 'mill' && e.buildProgress === undefined);
     if (!mill) return;
@@ -696,6 +705,19 @@ function currentCommands(): CommandButton[] {
   }
   if (selection.some(e => isUnit(e.kind))) {
     buttons.push({ id: 'stop', label: 'Stop', hotkey: 's', enabled: true });
+  }
+  // A siege engine that has to be set up before it can shoot.
+  const engines = selection.filter(e => isUnit(e.kind)
+    && rules.units[e.kind as UnitKind].unpacked !== undefined);
+  if (engines.length) {
+    const packing = engines.some(e => e.packingTicks !== undefined);
+    const anyPacked = engines.some(e => !e.unpacked);
+    buttons.push({
+      id: anyPacked ? 'unpack' : 'pack',
+      label: anyPacked ? 'Unpack (set up to shoot)' : 'Pack (fold up to move)',
+      hotkey: 'p',
+      enabled: !packing,
+    });
   }
   // Every completed production building offers the units the rules train there.
   const producer = selection.find(e => isBuilding(e.kind) && e.buildProgress === undefined

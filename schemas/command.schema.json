@@ -81,6 +81,7 @@
             "capped-ram",
             "mangonel",
             "onager",
+            "trebuchet",
             "monk"
           ]
         }
@@ -265,6 +266,38 @@
         "player",
         "buildingId",
         "enabled"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "pack"
+        },
+        "player": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "entityIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1
+        },
+        "unpacked": {
+          "type": "boolean",
+          "$comment": "True sets a siege engine up to shoot, false packs it away to travel. The DAT keeps the two states as separate units (a trebuchet is 331 packed and 42 unpacked)."
+        }
+      },
+      "required": [
+        "kind",
+        "player",
+        "entityIds",
+        "unpacked"
       ],
       "additionalProperties": false
     }

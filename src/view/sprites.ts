@@ -365,6 +365,14 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
     return { key, name: ageIdle(state, entity) };
   }
   if (kind !== 'villager') {
+    // A siege engine that is set up is its own DAT unit and its own art: the
+    // trebuchet packed is 331 and unpacked is 42 (issue #28).
+    if (entity.unpacked) {
+      const key = `${kind}-unpacked`;
+      if (entity.dead) return { key, name: 'death' };
+      if (entity.activity === 'attacking') return { key, name: 'attack' };
+      return { key, name: 'idle' };
+    }
     if (entity.dead) return { key: kind, name: 'death' };
     if (entity.activity === 'attacking') return { key: kind, name: 'attack' };
     // A laden trade cart has its own art: the DAT gives the trade task a

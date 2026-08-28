@@ -1548,6 +1548,58 @@
           "slot": "standing"
         }
       }
+    },
+    {
+      "key": "trebuchet",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 331,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "trebuchet-unpacked",
+      "unitId": 42,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "trebuchet-rock",
+      "unitId": 371,
+      "category": "projectile",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        }
+      }
     }
   ],
   "ui": {

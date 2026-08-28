@@ -102,6 +102,7 @@
               "capped-ram",
               "mangonel",
               "onager",
+              "trebuchet",
               "monk",
               "sheep",
               "deer",
@@ -226,6 +227,7 @@
               "capped-ram",
               "mangonel",
               "onager",
+              "trebuchet",
               "monk",
               "sheep",
               "deer",
@@ -361,6 +363,7 @@
                   "capped-ram",
                   "mangonel",
                   "onager",
+                  "trebuchet",
                   "monk"
                 ]
               },
