@@ -293,13 +293,33 @@ Heated Shot, Arrowslits, Siege Engineers and Treadmill Crane are researched
 there.
 
 What the tree offers and this game cannot hold is recorded rather than dropped,
-with the reason, in two groups. Thumb Ring and nine others say *the British do
-not have it*, which is the tree's own `NotAvailable`. Horse Collar, Coinage,
-Heavy Plow and the monastery's healing technologies say *none of its effects
-reach anything imported* — a farm that holds more food, a market that charges
-less, a monk who heals faster are all attributes this slice does not model. A technology that keeps some of its
-effects and loses others carries an `unmodelled` list naming the attributes, so
-a half-applied technology says so.
+and each entry in `skippedTechnologies` says what that technology was actually
+asking for rather than only that it was refused. Forty-eight of them, in four
+groups:
+
+- **Sixteen the British do not have** — the tree's own `NotAvailable`.
+- **Eleven researched at the dock**, which is not imported.
+- **One that upgrades to a unit that is not imported** (the heavy scorpion).
+- **Twenty whose effects reach nothing here**, and these divide further, which
+  is only visible now that each says which attribute it wanted and on what:
+  - *Six change a player resource rather than a unit attribute.* Coinage,
+    Banking and Guilds adjust a market fee; Faith, Devotion and Theocracy
+    adjust conversion resistance. These are effect command **type 1**, a
+    resource modifier, and this importer reads only types 0, 4 and 5 (set,
+    add and multiply on a *unit* attribute) and type 3 (upgrade unit). Type 1
+    is a category it never looks at — so these are not blocked on modelling an
+    attribute but on reading a kind of command at all, and one change would
+    unlock all six.
+  - *Four want an attribute this game does not model on something it does
+    have.* Herbal Medicine wants attribute 108 on the town center and the
+    watch tower — garrison healing.
+  - *The rest target units this slice has no equivalent of*: Horse Collar and
+    Heavy Plow change the work rate and carry capacity of units 214 and 259
+    (the farm's own gatherers), Guard Tower and Keep raise the attack of tower
+    units we do not import, and the remainder are naval.
+
+A technology that keeps some of its effects and loses others carries an
+`unmodelled` list naming the attributes, so a half-applied technology says so.
 
 **Which technologies exist is now a property of the content**, so the command
 schema names a technology by string where it used to enumerate three. The

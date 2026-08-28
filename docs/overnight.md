@@ -108,7 +108,25 @@ same blend-mask mapping that blocks terrain blends.
 If water is not going to be built, say so in `status.md` and stop listing its
 technologies as gaps.
 
-### Q5. Re-measure the per-tick cost
+### Q5. Read effect command type 1, and gain six technologies
+
+The importer reads effect commands of type 0, 4 and 5 — set, add and multiply
+on a *unit* attribute — and type 3, upgrade unit. It has never looked at
+**type 1, the resource modifier**, which changes a player-level attribute
+rather than a unit's. Six of the twenty technologies recorded as reaching
+nothing are blocked on exactly that and nothing else: Coinage, Banking and
+Guilds adjust a market fee; Faith, Devotion and Theocracy adjust conversion
+resistance. `a` is the resource id, `b` chooses set or add, `d` is the amount.
+
+This is the best value left in the tree per unit of work — one command type
+for six technologies — and it is only visible because `skippedTechnologies`
+now records what each refused technology was asking for.
+
+*Verify:* the six are researchable and each measurably changes what it names
+(a trade run pays more after Coinage; a monk resists conversion after Faith),
+with a determinism test across one of them.
+
+### Q6. Re-measure the per-tick cost
 
 `status.md`'s tick distribution — median 0.58ms, p99 1.72ms, worst 11.7ms —
 was measured before the shot model, the technology tree, five-minute corpses
@@ -121,7 +139,7 @@ before the pathfinder's open list became a heap.
 *Verify:* the same 900-second single-match measurement on seed 102, recorded
 beside the old figures rather than replacing them.
 
-### Q6. Building rubble per age, and the hit points an age gives
+### Q7. Building rubble per age, and the hit points an age gives
 
 Two loose ends left by the age work, both small and both in `backlog.md`. Each
 age variant has its own rubble unit (`Barracks Age2 (Rubble)`), so a razed

@@ -610,8 +610,10 @@ def effects_of(
     DAT class: Loom is not "+15 hit points to the villager", it is "+15 to
     class 4", and the villager task variants are all class 4.
 
-    Returns the effects that landed and the names of the attributes that did
-    not, so a technology is never quietly half-applied.
+    Returns the effects that landed, the names of the attributes that did not,
+    and -- for a technology where *nothing* landed -- what each of its commands
+    was actually asking for, so "none of its effects reach anything imported"
+    can say which effects and what they wanted.
     """
     tech = dat.techs[tech_id]
     by_id: dict[int, list[str]] = {}
@@ -624,17 +626,26 @@ def effects_of(
 
     effects: list[dict[str, Any]] = []
     unmodelled: set[str] = set()
+    unreached: set[str] = set()
     for command in dat.effects[tech.effect_id].effect_commands:
         operation = OPERATION_NAMES.get(command.type)
         if operation is None:
             continue  # enable, upgrade-unit and the rest are not attribute changes
         target = int(command.a)
         targets = by_id.get(target, []) if target >= 0 else by_class.get(int(command.b), [])
+        attribute_id = int(command.c)
         if not targets:
-            continue  # something this slice of the game does not have
-        attribute = ATTRIBUTE_NAMES.get(int(command.c))
+            # Something this slice of the game does not have. Say which
+            # attribute it wanted to change and on what, by the DAT's own
+            # numbers -- naming them would be guessing at attributes this
+            # importer does not model.
+            where = f"unit {target}" if target >= 0 else f"unit class {int(command.b)}"
+            unreached.add(f"attribute {attribute_id} on {where}")
+            continue
+        attribute = ATTRIBUTE_NAMES.get(attribute_id)
         if attribute is None:
-            unmodelled.add(f"attribute {int(command.c)}")
+            unmodelled.add(f"attribute {attribute_id}")
+            unreached.add(f"attribute {attribute_id} on {targets[0]}, which is not modelled")
             continue
         amount = float(command.d)
         for key in targets:
@@ -649,7 +660,7 @@ def effects_of(
             else:
                 effect["amount"] = rounded(amount)
             effects.append(effect)
-    return effects, sorted(unmodelled)
+    return effects, sorted(unmodelled), sorted(unreached)
 
 
 def technology_entry(dat: DatFile, spec: dict[str, Any], hashes: dict[str, str]) -> dict[str, Any]:
@@ -677,12 +688,14 @@ def technology_entry(dat: DatFile, spec: dict[str, Any], hashes: dict[str, str])
 
     # What it changes, decoded from the effect commands against the entities
     # this game actually has, rather than transcribed into the spec.
-    effects, unmodelled = effects_of(dat, spec["techId"], spec["entities"])
+    effects, unmodelled, unreached = effects_of(dat, spec["techId"], spec["entities"])
     if effects:
         entry["effects"] = effects
     if unmodelled:
         # Kept so a half-applied technology is visible rather than a surprise.
         entry["unmodelled"] = unmodelled
+    # Only of interest when nothing landed; the caller strips it otherwise.
+    entry["_unreached"] = unreached
     return entry
 
 
@@ -807,9 +820,17 @@ def technologies_from_tree(
                 continue
             entry["upgrades"] = becomes
         elif not entry.get("effects") and "grantsAge" not in entry:
+            # Say what it was actually asking for. "None of its effects reach
+            # anything imported" is true of twenty technologies and tells the
+            # next reader nothing about which twenty or why.
+            wanted = entry.get("_unreached") or []
+            detail = "; ".join(wanted[:4]) if wanted else "it changes no attribute at all"
+            if len(wanted) > 4:
+                detail += f"; and {len(wanted) - 4} more"
             skipped.append({"name": name, "techId": tech_id,
-                            "reason": "none of its effects reach anything imported"})
+                            "reason": f"none of its effects reach anything imported ({detail})"})
             continue
+        entry.pop("_unreached", None)
         entry["name"] = name
         keep[slug(name)] = entry
 
