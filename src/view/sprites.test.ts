@@ -3,7 +3,7 @@ import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 import { applyCommand, createGame, stepGame } from '../sim/game';
 import type { Entity, GameState } from '../sim/types';
-import { RAMP_LEVELS, rampLut, type Atlas, type ContentAssets } from './assets';
+import { RAMP_LEVELS, rampLut, type AnimationInfo, type Atlas, type ContentAssets } from './assets';
 import {
   PLAYER_COLORS, chooseAnimation, createEntityView, createFlagView, decayFraction, playerColorHex,
   gateBoxKey, treeIsFelled, updateEntityView, updateFlagView, updateOcclusion, wallShape,
@@ -230,6 +230,98 @@ describe('what a building wears in each age', () => {
     const b = createEntityView(older, barracks);
     updateEntityView(b, older, state, barracks, 0);
     expect(b.animationState).toBe('barracks/idle-feudal');
+  });
+
+  /**
+   * A house as the DAT gives it: three models in every age, and no frame
+   * duration, because they are alternatives rather than a sequence.
+   */
+  function houseAssets(): ContentAssets {
+    const assets = fakeAssets();
+    const frames = [
+      { x: 0, y: 0, w: 4, h: 4, cx: 2, cy: 2 },
+      { x: 4, y: 0, w: 4, h: 4, cx: 2, cy: 2 },
+      { x: 8, y: 0, w: 4, h: 4, cx: 2, cy: 2 },
+    ];
+    const animations: Record<string, AnimationInfo> = {};
+    const atlases: Record<string, Atlas> = {};
+    for (const name of ['idle', 'idle-feudal']) {
+      const image = `house/${name}.png`;
+      const texture = new THREE.DataTexture(new Uint8Array(12 * 4 * 4), 12, 4);
+      texture.needsUpdate = true;
+      assets.textures.set(image, texture);
+      animations[name] = { frames: 3, directions: 1, frameSeconds: 0, mirroringMode: 0 };
+      atlases[name] = { image, size: [12, 4], framesInFile: 3, frames };
+    }
+    assets.entities['house'] = { category: 'building', animations, atlases };
+    return assets;
+  }
+
+  const houseOf = (state: GameState, x: number): Entity => {
+    const rules = state.rules.buildings.house;
+    const entity: Entity = {
+      id: state.nextId++, kind: 'house', owner: 1, position: { x, y: 30.5 },
+      hp: rules.hp, maxHp: rules.hp, radius: rules.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(entity);
+    return entity;
+  };
+
+  it('keeps one of the three house models for the life of the house', () => {
+    // Issue #20: the rule that picks a variation was keyed on the literal name
+    // `idle`, so a Feudal house drawing `idle-feudal` fell through to the
+    // animation path -- where a zero frame time takes the 0.1s default -- and
+    // cycled all three models three times a second.
+    const assets = houseAssets();
+    const state = createGame(72);
+    const house = houseOf(state, 30.5);
+    const view = createEntityView(assets, house);
+
+    for (const age of [0, 1]) {
+      state.players[1].age = age;
+      updateEntityView(view, assets, state, house, 0);
+      const first = view.frameIndex;
+      expect(first).toBeLessThan(3);
+      for (const time of [0.1, 0.35, 5]) {
+        updateEntityView(view, assets, state, house, time);
+        expect(view.frameIndex).toBe(first);
+      }
+    }
+  });
+
+  it('does not give every house on the street the same model', () => {
+    const assets = houseAssets();
+    const state = createGame(73);
+    state.players[1].age = 1;
+    const drawn = new Set<number | undefined>();
+    for (let i = 0; i < 6; i++) {
+      const house = houseOf(state, 30.5 + i);
+      const view = createEntityView(assets, house);
+      updateEntityView(view, assets, state, house, 0);
+      drawn.add(view.frameIndex);
+    }
+    expect(drawn.size).toBeGreaterThan(1);
+  });
+
+  it('still reads a foundation\'s frames as the stages of going up', () => {
+    // The variation rule sits behind the construction rule for this reason:
+    // a palisade foundation also has three frames and no frame duration, and
+    // they are stages, not alternatives.
+    const assets = houseAssets();
+    const state = createGame(74);
+    const house = houseOf(state, 30.5);
+    assets.entities['house'].animations['construction'] =
+      { frames: 3, directions: 1, frameSeconds: 0, mirroringMode: 0 };
+    assets.entities['house'].atlases['construction'] =
+      assets.entities['house'].atlases['idle'];
+    const view = createEntityView(assets, house);
+    house.buildProgress = 0;
+    updateEntityView(view, assets, state, house, 0);
+    expect(view.frameIndex).toBe(0);
+    house.buildProgress = 0.9;
+    updateEntityView(view, assets, state, house, 1);
+    expect(view.frameIndex).toBe(2);
   });
 });
 

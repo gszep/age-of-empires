@@ -333,6 +333,21 @@ export function ageIdleChain(state: GameState, entity: Entity): string[] {
   return names;
 }
 
+/**
+ * Whether a graphic's frames are alternative versions of one object rather
+ * than a sequence. The DAT answers it rather than a name does: a graphic given
+ * no frame duration never advances, so more than one frame can only mean
+ * alternatives. A house is the only building with them -- three in each age --
+ * and keying this on the literal name `idle` was issue #20: a Feudal house
+ * draws `idle-feudal`, missed the rule, and went down the animation path,
+ * where a zero frame time falls back to the 0.1s default and cycled all three
+ * house models three times a second. A building never faces anywhere, so the
+ * frame is the building's own and it keeps it for life.
+ */
+function isVariantArt(entity: Entity, animation: AnimationInfo): boolean {
+  return isBuilding(entity.kind) && animation.frameSeconds === 0 && animation.frames > 1;
+}
+
 /** Choose the imported sprite source (entity variant) and animation name. */
 export function chooseAnimation(state: GameState, entity: Entity): { key: string; name: string } {
   const kind = entity.kind;
@@ -749,14 +764,17 @@ export function updateEntityView(
   let frameIndex: number;
   if (entity.kind === 'palisade-wall' && choice.name === 'idle') {
     frameIndex = Math.min(atlas.framesInFile - 1, wallShape(state, entity));
-  } else if (entity.kind === 'resource' || (entity.kind === 'house' && choice.name === 'idle')) {
-    // Angle count encodes art variations for scenery; pick one by id.
-    frameIndex = entity.id % atlas.framesInFile;
   } else if (choice.name === 'construction') {
+    // Ahead of the variation rule: a foundation's frames are the stages of
+    // going up, and the palisade's three of them would otherwise read as
+    // three different foundations.
     frameIndex = Math.min(
       atlas.framesInFile - 1,
       Math.floor((entity.buildProgress ?? 0) * atlas.framesInFile),
     );
+  } else if (entity.kind === 'resource' || isVariantArt(entity, animation)) {
+    // Angle count encodes art variations for scenery; pick one by id.
+    frameIndex = entity.id % atlas.framesInFile;
   } else {
     const framesPerDirection = animation.frames;
     const directionsInFile = Math.max(1, Math.floor(atlas.framesInFile / framesPerDirection));
