@@ -15,14 +15,11 @@ DAT sound id), building construction and completion, and the ambient loops
 terrain slots name in `wwise_sound_id`. `sounds.json` names no
 construction-complete cue, so that one has no owned source to draw on.
 
-- **The under-attack alert nags, and is deaf while it nags.** Playtest report:
-  while a building is being attacked, the alert fires again every few seconds.
-  The cause is not a rearm window resetting per hit — `cues.ts` writes
-  `alertedAt` only when the cue actually fires — it is that the ten-second
-  throttle is a single global timer rather than one per newly attacked target.
-  So a sustained attack re-announces itself every ten seconds, and a *second*
-  building attacked inside that window is not announced at all, which is the
-  worse half. Wants a per-target memory, and the reference's own interval.
+- **The under-attack alert's rearm window is approximated.** The per-target
+  memory is in (a fight that goes on is one alert; something else being hit
+  meanwhile is its own), but how long a thing must be left alone before being
+  hit again is news is not in the owned files — `sounds.json` names the cue and
+  not its rearm — so ten seconds stands as an approximation.
 - **In-game music is missing.** Only voices and feedback cues play. Find the
   music tracks in the owned audio depot (Wwise music events / ambient
   containers) and wire a playlist; if the events are not resolvable through

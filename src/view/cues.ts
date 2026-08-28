@@ -24,14 +24,26 @@ export interface CueWatcher {
   researched: number;
   capped: boolean;
   ended: boolean;
-  /** Game seconds of the last attack alert; AoE2 does not repeat them. */
-  alertedAt: number;
+  /**
+   * Game seconds each owned thing was last seen losing hit points, per entity.
+   *
+   * Per entity is the whole point. A single timer for the whole player says
+   * "something of yours was attacked recently", which gets both halves wrong:
+   * a building under sustained attack re-announces itself every time the timer
+   * lapses, and a *second* building attacked while the timer is still running
+   * is never announced at all. That second half is the worse one -- it is
+   * exactly the moment a player needs telling.
+   */
+  hitAt: Map<number, number>;
   started: boolean;
 }
 
 /**
- * How long an attack alert stays quiet after sounding. AoE2 keeps a long gap
- * so a sustained fight does not become a siren; ten seconds is that shape.
+ * How long a thing has to go unhurt before being hit again is news.
+ *
+ * Nothing in the owned files states it: `sounds.json` names the cue but not
+ * its rearm, and the behaviour lives in the closed runtime. Ten seconds is an
+ * approximation of AoE2's feel and is recorded as one in `docs/status.md`.
  */
 export const ALERT_INTERVAL = 10;
 
@@ -41,7 +53,7 @@ export const createCueWatcher = (): CueWatcher => ({
   researched: 0,
   capped: false,
   ended: false,
-  alertedAt: -Infinity,
+  hitAt: new Map(),
   started: false,
 });
 
@@ -56,6 +68,7 @@ export function pollCues(
   const cues: Cue[] = [];
   const hp = new Map<number, number>();
   const farms = new Set<number>();
+  const hitAt = new Map<number, number>();
   let attacked: 'under_attack' | 'under_attack_town' | undefined;
 
   for (const entity of state.entities) {
@@ -63,10 +76,19 @@ export function pollCues(
     if (!entity.dead) {
       hp.set(entity.id, entity.hp);
       const previous = watcher.hp.get(entity.id);
+      const lastHit = watcher.hitAt.get(entity.id);
       if (previous !== undefined && entity.hp < previous) {
-        // A building being hit is the one worth interrupting for.
-        if (isBuilding(entity.kind)) attacked = 'under_attack_town';
-        else attacked ??= 'under_attack';
+        hitAt.set(entity.id, seconds);
+        // News only if this one has been left alone for a while: a fight that
+        // goes on is one alert, not a siren, and something else being hit
+        // meanwhile is its own alert however loud the first one was.
+        if (lastHit === undefined || seconds - lastHit >= ALERT_INTERVAL) {
+          // A building being hit is the one worth interrupting for.
+          if (isBuilding(entity.kind)) attacked = 'under_attack_town';
+          else attacked ??= 'under_attack';
+        }
+      } else if (lastHit !== undefined) {
+        hitAt.set(entity.id, lastHit);
       }
     }
     if (entity.kind === 'farm' && (entity.amount ?? 0) > 0 && !entity.dead) farms.add(entity.id);
@@ -75,10 +97,9 @@ export function pollCues(
     if (!farms.has(id)) cues.push('farm_depleted');
   }
 
-  if (watcher.started && attacked && seconds - watcher.alertedAt >= ALERT_INTERVAL) {
-    cues.push(attacked);
-    watcher.alertedAt = seconds;
-  }
+  // One sound however many were hit at once; the next one to be hit after a
+  // quiet spell gets its own.
+  if (watcher.started && attacked) cues.push(attacked);
 
   const self = state.players[player];
   if (watcher.started) {
@@ -96,6 +117,8 @@ export function pollCues(
 
   watcher.hp = hp;
   watcher.farms = farms;
+  // Rebuilt from what is still standing, so the map does not grow without end.
+  watcher.hitAt = hitAt;
   watcher.researched = self.researched.length;
   watcher.ended = state.winner !== undefined;
   watcher.started = true;

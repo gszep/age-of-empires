@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { applyCommand, createGame, placementLegal, stepGame } from '../sim/game';
-import type { GameState } from '../sim/types';
+import type { Entity, GameState } from '../sim/types';
 import { ALERT_INTERVAL, createCueWatcher, pollCues, type Cue } from './cues';
 
 const run = (state: GameState, ticks: number) => {
@@ -54,8 +54,11 @@ describe('feedback cues', () => {
     // would be a siren rather than a warning.
     tc.hp -= 20;
     expect(pollCues(watcher, state, 1, 6)).toEqual([]);
+    // ...and still quiet past the rearm window, because it has not been left
+    // alone for any of it. A fight that goes on is one alert; the cases where
+    // it should speak again have their own tests below.
     tc.hp -= 20;
-    expect(pollCues(watcher, state, 1, 5 + ALERT_INTERVAL)).toEqual(['under_attack_town']);
+    expect(pollCues(watcher, state, 1, 5 + ALERT_INTERVAL)).toEqual([]);
   });
 
   it('tells a wounded unit from a wounded building', () => {
@@ -65,6 +68,60 @@ describe('feedback cues', () => {
     const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
     villager.hp -= 3;
     expect(pollCues(watcher, state, 1, 20)).toEqual(['under_attack']);
+  });
+
+  it('announces a sustained attack once, not once every ten seconds', () => {
+    // The alert used to hang off a single timer for the whole player, so a
+    // building being ground down re-announced itself every time that timer
+    // lapsed. One fight, one alert.
+    const state = createGame(56);
+    const watcher = createCueWatcher();
+    pollCues(watcher, state, 1, seconds(state));
+    const town = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const raised: Cue[] = [];
+    for (let second = 1; second <= 60; second++) {
+      town.hp -= 5;
+      raised.push(...pollCues(watcher, state, 1, second));
+    }
+    expect(raised).toEqual(['under_attack_town']);
+  });
+
+  it('announces a second building attacked while the first still is', () => {
+    // The worse half of the same bug: with one timer, anything hit inside the
+    // window was silently ignored — exactly the moment a player needs telling.
+    const state = createGame(57);
+    const watcher = createCueWatcher();
+    pollCues(watcher, state, 1, seconds(state));
+    const town = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const rules = state.rules.buildings.house;
+    const house: Entity = {
+      id: state.nextId++, kind: 'house', owner: 1, position: { x: 50.5, y: 50.5 },
+      hp: rules.hp, maxHp: rules.hp, radius: rules.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(house);
+    pollCues(watcher, state, 1, 1);
+
+    town.hp -= 5;
+    expect(pollCues(watcher, state, 1, 2)).toEqual(['under_attack_town']);
+    // Three seconds later, well inside the old ten-second window.
+    town.hp -= 5;
+    house.hp -= 5;
+    expect(pollCues(watcher, state, 1, 5)).toEqual(['under_attack_town']);
+  });
+
+  it('alerts again once a thing has been left alone for a while', () => {
+    const state = createGame(58);
+    const watcher = createCueWatcher();
+    pollCues(watcher, state, 1, seconds(state));
+    const town = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    town.hp -= 5;
+    expect(pollCues(watcher, state, 1, 2)).toEqual(['under_attack_town']);
+    for (let second = 3; second < 2 + ALERT_INTERVAL; second++) {
+      expect(pollCues(watcher, state, 1, second)).toEqual([]);
+    }
+    town.hp -= 5;
+    expect(pollCues(watcher, state, 1, 2 + ALERT_INTERVAL + 1)).toEqual(['under_attack_town']);
   });
 
   it('never alerts for somebody else being hit', () => {

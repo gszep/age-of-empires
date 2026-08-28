@@ -235,16 +235,13 @@ change and a checksum change.
 (entities query: `barracks/death` through to `barracks/decay`), and the
 determinism tests still pass with the new window.
 
-### N7. The under-attack alert nags
+### N7. The under-attack alert nags — **done**
 
-`ALERT_INTERVAL` is one global ten-second throttle rather than one per newly
-attacked target, so a sustained attack re-announces every ten seconds and a
-second building attacked inside that window is silently ignored. The second
-half is the worse bug.
-
-*Verify:* a cues test drives a sustained attack on one building and asserts one
-alert rather than a stream, and a second test attacks a *different* building
-inside the window and asserts it is still announced.
+Replaced the single global timer with a per-entity memory of when each thing
+was last hurt. A fight that goes on is one alert; a second building hit
+meanwhile is its own alert however loud the first was; and a thing left alone
+for the window and then hit again speaks up. Three tests, one per case, and the
+old test that asserted the nagging now asserts the silence.
 
 ### N8. Whatever the tech tree left
 
