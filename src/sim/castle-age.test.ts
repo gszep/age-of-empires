@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { TICKS_PER_SECOND, rulesFromManifest, type ContentManifest, type GameRules } from './data';
+import { FALLBACK_RULES, TICKS_PER_SECOND, rulesFromManifest, type ContentManifest, type GameRules } from './data';
 import { applyCommand, createGame, placementLegal, stepGame } from './game';
 import { checksumState } from './checksum';
 import type { BuildingKind, Entity, GameState, UnitKind } from './types';
@@ -307,6 +307,53 @@ describe('the monk', () => {
     expect(state.players[1].population).toBe(owned(1));
     expect(state.players[2].population).toBe(owned(2));
     expect(state.entities.filter(e => !e.dead && e.owner === 2 && e.kind === 'militia')).toHaveLength(0);
+  });
+});
+
+describe('the wonder', () => {
+  // Issue #27, shipped deliberately without a victory condition: it stands
+  // there and it can be knocked down, and that decision is the human's, in
+  // backlog.md. Everything it *is* comes from the DAT.
+  it.skipIf(!importedRules)('costs and stands as the DAT says', () => {
+    const rules = importedRules!.buildings.wonder;
+    expect(rules.age).toBe(3);
+    expect(rules.cost).toMatchObject({ wood: 1000, gold: 1000, stone: 1000 });
+    expect(rules.hp).toBe(4800);
+    expect(rules.radius).toBe(2.5);       // five tiles across
+    expect(rules.buildSeconds).toBe(3500);
+    expect(rules.buildButton).toBe(12);
+    expect(rules.buildable).toBe(true);
+    // It houses nobody and takes no resources: it is a monument.
+    expect(rules.popSupport).toBe(0);
+    expect(rules.accepts).toEqual([]);
+  });
+
+  it('wins nothing by standing', () => {
+    // The check that keeps the omission honest: if a countdown is added later,
+    // this test is what it has to argue with.
+    const state = createGame(130, importedRules);
+    for (const player of [1, 2] as const) {
+      state.players[player].age = 3;
+      state.players[player].researched.push('feudal-age', 'castle-age', 'imperial-age');
+    }
+    const rules = state.rules.buildings.wonder;
+    const home = townCenter(state);
+    const wonder: Entity = {
+      id: state.nextId++, kind: 'wonder', owner: 1,
+      position: { x: home.position.x + 8, y: home.position.y + 8 },
+      hp: rules.hp, maxHp: rules.hp, radius: rules.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(wonder);
+    run(state, 2000);
+    expect(state.winner).toBeUndefined();
+    expect(wonder.dead).toBeFalsy();
+  });
+
+  it('is a villager building on the economic page, where the DAT puts it', () => {
+    // Slot 12 is the wonder's own build button, and the economic page is the
+    // half it does not collide with.
+    expect(FALLBACK_RULES.buildings.wonder.buildButton).toBe(12);
   });
 });
 

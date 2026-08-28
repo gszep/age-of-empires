@@ -1204,6 +1204,25 @@
       }
     },
     {
+      "key": "wonder",
+      "unitId": 276,
+      "category": "building",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
       "key": "siege-workshop",
       "unitId": 49,
       "category": "building",

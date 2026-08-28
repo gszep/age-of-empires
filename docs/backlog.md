@@ -185,6 +185,15 @@ terrain blends above.
 - **A monk carries no relic, and a monastery holds none.** Relics are named in
   the omitted scope; a monk that could pick one up would need the relic entity,
   the carry state, and the gold trickle.
+- **The wonder wins nothing, and whether it should is undecided.** It is
+  buildable with every number the DAT gives it (issue #27), but AoE2's wonder
+  starts a countdown that ends the match, and that changes how a game can be
+  won rather than adding to what is in it. The human was asked and the
+  decision is theirs: a countdown wants a length (AoE2 uses 200 years of game
+  time, which is a map-setting this game has no equivalent for), a visible
+  timer, an alert to the other player, and a rule for what a razed wonder
+  does to it. `castle-age.test.ts` asserts a standing wonder wins nothing, so
+  a countdown cannot arrive by accident.
 - **A siege engine does not re-aim itself, and the AI never builds one.** The
   trebuchet is trainable, packs, unpacks and shoots, but nothing automates it:
   it does not unpack when an enemy building comes into reach, it is not part of

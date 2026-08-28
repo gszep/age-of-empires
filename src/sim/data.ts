@@ -767,6 +767,23 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
       buildButton: 10,
     },
+    /**
+     * Five tiles across, 4800 hit points, and 3500 build seconds spread across
+     * however many villagers are on it -- all the DAT's own numbers. It stands
+     * there and it can be knocked down; **it wins nothing**. AoE2's wonder
+     * starts a countdown to victory, and whether this game should have one is
+     * the human's decision rather than this run's, so it is recorded in
+     * `backlog.md` and deliberately not built (issue #27).
+     */
+    wonder: {
+      age: 3,
+      hp: 4800, radius: 2.5, lineOfSight: 8, cost: cost(0, 1000, 1000, 1000),
+      buildSeconds: 3500,
+      popSupport: 0, buildable: true, accepts: [],
+      armors: [{ class: 0, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 3 },
+               { class: 3, amount: 10 }, { class: 31, amount: 3 }],
+      buildButton: 12,
+    },
     // Stone, slow to raise, and the only building besides the town center that
     // both shoots and houses people: the DAT gives it 20 population support.
     castle: {
@@ -1130,6 +1147,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       monastery: building('monastery', true),
       'siege-workshop': building('siege-workshop', true),
       university: building('university', true),
+      wonder: building('wonder', true),
       castle: building('castle', true),
       'palisade-wall': building('palisade-wall', true),
       'palisade-gate': building('palisade-gate', true),
@@ -1205,7 +1223,7 @@ const UNIT_KINDS = new Set<string>([
 const BUILDING_KINDS = new Set<string>([
   'town-center', 'barracks', 'house', 'mill', 'lumber-camp', 'mining-camp', 'farm',
   'outpost', 'watch-tower', 'archery-range', 'blacksmith', 'market', 'stable',
-  'monastery', 'siege-workshop', 'castle', 'university',
+  'monastery', 'siege-workshop', 'castle', 'university', 'wonder',
   'palisade-wall', 'palisade-gate',
 ]);
 

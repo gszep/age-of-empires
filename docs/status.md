@@ -468,6 +468,20 @@ random direction. One tile is the board's own unit, and it is wider than any
 unit and narrower than any building — which is why an arrow that goes wide of a
 villager still lands inside the town center behind him, as in AoE2.
 
+### The wonder is built, and wins nothing
+
+Every number is the DAT's: 1000 wood, 1000 gold and 1000 stone, 4800 hit
+points, five tiles across, 3500 build seconds spread across whatever villagers
+are on it, Imperial, and slot 12 of the villager's economic page. It draws the
+Britons' own `b_west_wonder_britons_x1`.
+
+**It has no victory condition, deliberately.** AoE2's wonder starts a
+countdown that ends the game, and adding one changes how a match can be won —
+a product decision rather than an import, so it was put to the human and is
+recorded in `backlog.md` instead of being taken here. A test asserts a
+standing wonder wins nothing, so a countdown added later has to argue with it
+rather than appear by accident.
+
 ### The trebuchet travels packed and shoots unpacked
 
 The DAT keeps a trebuchet as two units — **331 `PTREB`** packed and **42

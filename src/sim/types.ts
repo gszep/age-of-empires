@@ -21,7 +21,7 @@ export type BuildingKind =
   | 'mill' | 'lumber-camp' | 'mining-camp' | 'farm'
   | 'outpost' | 'watch-tower'
   | 'archery-range' | 'blacksmith' | 'market' | 'stable'
-  | 'monastery' | 'siege-workshop' | 'castle' | 'university'
+  | 'monastery' | 'siege-workshop' | 'castle' | 'university' | 'wonder'
   | 'palisade-wall' | 'palisade-gate';
 export type EntityKind = UnitKind | BuildingKind | 'resource';
 export type Activity =
