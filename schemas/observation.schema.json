@@ -329,6 +329,22 @@
               "remainingSeconds"
             ],
             "additionalProperties": false
+          },
+          "researching": {
+            "type": "object",
+            "properties": {
+              "tech": {
+                "type": "string"
+              },
+              "remainingSeconds": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "tech",
+              "remainingSeconds"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

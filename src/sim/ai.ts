@@ -2,20 +2,77 @@ import type { Command, EntityKind, ResourceKind } from './types';
 import { isBuilding } from './data';
 import type { PlayerObservation } from '../protocol/types';
 
-interface Spotted { id: number; kind: string; owner: number; x: number; y: number; resource?: ResourceKind; amount?: number; training?: unknown; buildProgress?: number; order?: string }
+interface Spotted {
+  id: number; kind: string; owner: number; x: number; y: number;
+  resource?: ResourceKind; amount?: number; training?: unknown; researching?: unknown;
+  buildProgress?: number; order?: string;
+}
 
 const distance = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
-const ASSIGNMENT: ResourceKind[] = ['food', 'wood', 'food', 'gold', 'wood', 'food'];
+/**
+ * Which resource each villager works, by its place in the line.
+ *
+ * Food is what everything costs -- a villager, a militia, and every age -- and
+ * three-food-two-wood-one-gold ended matches with twelve hundred wood banked
+ * and twenty food, which is a lumber yard rather than an economy. But cutting
+ * wood to one in six was worse in a way that took a while to see: the first
+ * hundred wood buys the lumber camp and the next hundred and seventy-five the
+ * barracks, so halving wood income pushed the first militia out past
+ * twenty-five minutes and the strategy could no longer finish off an opponent
+ * who did nothing at all. Five food, two wood and a gold in eight keeps both.
+ */
+const ASSIGNMENT: ResourceKind[] = [
+  'food', 'wood', 'food', 'gold', 'food', 'wood', 'food', 'food',
+];
+
+/**
+ * Food that walks. These observe exactly like a berry bush -- `resource:
+ * 'food'` and an `amount` -- and were invisible to this strategy only because
+ * it asked for `kind === 'resource'`, so the whole Dark Age food opening went
+ * past it and its economy ran on berries and farms.
+ *
+ * The boar is deliberately not here. It has seventy-five hit points and hits
+ * back for seven, and AoE2's answer is to lure it home with one villager while
+ * the rest wait -- a manoeuvre, not a gather order. Sending two villagers at
+ * one loses both. Recorded in `docs/backlog.md`.
+ */
+const HERD: string[] = ['sheep', 'deer'];
 
 const HOUSE_SPOTS: { x: number; y: number }[] = [
   { x: -1, y: -4 }, { x: 2, y: -4 }, { x: -4, y: -2 }, { x: 5, y: -4 }, { x: -4, y: 1 },
+  { x: 8, y: -4 }, { x: -7, y: -2 }, { x: 8, y: -1 }, { x: -7, y: 1 }, { x: 5, y: 7 },
+];
+/**
+ * Where the archery range goes. Reaching the Feudal Age and then fighting the
+ * rest of the match with Dark Age militia is most of an age wasted: the range
+ * is what the age opened, and an archer outranges everything the other side
+ * has until it builds one too.
+ */
+const RANGE_SPOTS: { x: number; y: number }[] = [
+  { x: 4, y: 6 }, { x: -5, y: 6 }, { x: 7, y: 2 }, { x: -8, y: 2 }, { x: 4, y: -7 },
 ];
 const BARRACKS_SPOTS: { x: number; y: number }[] = [
   { x: 1, y: 5 }, { x: -2, y: 5 }, { x: 4, y: 4 }, { x: 1, y: -6 }, { x: -5, y: -4 },
 ];
+/**
+ * Where farms go: a ring around the town center, far enough out that they do
+ * not sit inside it -- a town center is two tiles of radius and a farm one and
+ * a half, so the old spots were inside it once a placement had to be genuinely
+ * clear.
+ *
+ * Six of them, and the number is a decision rather than an oversight. Twelve
+ * spots build twelve farms, and twelve farms feed a Castle Age economy on both
+ * sides: six of sixteen matches reached the Castle Age and six ran out the
+ * thirty-minute clock, because neither side could finish an opponent as rich
+ * as itself. Six spots is the balance measured -- every match reaches the
+ * Feudal Age, some reach the Castle Age, and fourteen of sixteen still end in
+ * a win. What is actually missing is a strategy that can close out a game; see
+ * `docs/backlog.md`.
+ */
 const FARM_SPOTS: { x: number; y: number }[] = [
-  { x: -3, y: 2 }, { x: -3, y: -1 }, { x: -1, y: 3 }, { x: 2, y: 3 }, { x: -6, y: 2 }, { x: -6, y: -1 },
+  { x: -4, y: 3 }, { x: -4, y: -2 }, { x: -1, y: 4 }, { x: 3, y: 4 }, { x: -7, y: 3 },
+  { x: -7, y: -2 },
 ];
 
 /**
@@ -30,6 +87,45 @@ const CAMPS: { resource: ResourceKind; building: 'lumber-camp' | 'mining-camp' |
   { resource: 'food', building: 'mill' },
 ];
 const CAMP_COST_WOOD = 100;
+/** How far from home food still counts as food you are eating. */
+const FOOD_WALK = 20;
+/** Food in hand above which nothing more needs planting today. */
+const FOOD_COMFORTABLE = 400;
+/**
+ * What the next age costs, in the order they come. Written out here like every
+ * other price this strategy knows (a house is 25 wood, a barracks 175): a
+ * strategy sees only its observation, and the observation carries what it has
+ * researched rather than what everything costs.
+ *
+ * Ageing up is the whole difference between a Dark Age militia war and a match
+ * in which the market, the archery range, the stable, the blacksmith, the
+ * monastery, the siege workshop and the castle exist at all.
+ */
+const AGE_UP: { tech: string; food: number; gold: number }[] = [
+  { tech: 'feudal-age', food: 500, gold: 0 },
+  { tech: 'castle-age', food: 800, gold: 200 },
+  { tech: 'imperial-age', food: 1000, gold: 800 },
+];
+/**
+ * How many soldiers are worth keeping before saving for the age. Below this it
+ * builds the army first: a player with nothing standing loses the match long
+ * before the age arrives. Above it, every fifty food spent on another militia
+ * is fifty food the age is waiting for.
+ *
+ * Measured twice. Banking with no floor at all stalled four of sixteen matches
+ * into timeouts, because neither side ever fielded enough to finish the other
+ * off. A single floor of five did the same once the Feudal Age was reached:
+ * the strategy held exactly five soldiers and saved for the Castle Age
+ * forever. So the floor rises with the age -- an army the age can afford.
+ */
+const ARMY_BEFORE_AGE = [5, 14, 16];
+/**
+ * How many villagers to keep, by age. Eight is an opening, not an economy: it
+ * is enough to reach the Feudal Age and nowhere near the eight hundred food
+ * and two hundred gold the Castle Age wants. AoE2 players keep making them all
+ * game; this at least keeps making them each time the age moves on.
+ */
+const VILLAGERS_BY_AGE = [8, 14, 20, 20];
 /** How far a resource may be from a drop site before one is worth building. */
 const CAMP_RANGE = 8;
 const CAMPS_PER_RESOURCE = 3;
@@ -63,7 +159,11 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   const known: Spotted[] = [...observation.entities, ...observation.memory];
   const mine = observation.entities.filter(e => e.owner === player);
   const villagers = mine.filter(e => e.kind === 'villager');
-  const militia = mine.filter(e => e.kind === 'militia');
+  // Everything that fights. The army is not militia any more once the Feudal
+  // Age opens the archery range, and the attack, the endgame raze and the
+  // decision to keep saving all count soldiers rather than militia.
+  const army = mine.filter(e => e.kind === 'militia' || e.kind === 'archer');
+  const militia = army;
   const tc = mine.find(e => e.kind === 'town-center');
   const barracks = mine.find(e => e.kind === 'barracks');
   const direction = tc && tc.x < observation.mapWidth / 2 ? 1 : -1;
@@ -77,7 +177,8 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     // after the berries run out.
     const node = known
       .filter(e => e.resource === wanted && (e.amount ?? 1) > 0
-        && (e.kind === 'resource' || (e.kind === 'farm' && e.owner === player && (e.buildProgress ?? 1) >= 1)))
+        && (e.kind === 'resource' || HERD.includes(e.kind)
+          || (e.kind === 'farm' && e.owner === player && (e.buildProgress ?? 1) >= 1)))
       .sort((a, b) => distance(villager, a) - distance(villager, b) || a.id - b.id)[0];
     if (node) {
       commands.push({
@@ -110,6 +211,49 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   }
 
   const idleBuilder = villagers.find(e => e.order === 'idle') ?? villagers[0];
+  /**
+   * The first of these spots with nothing already standing on it.
+   *
+   * Cycling blindly through candidates and letting the simulation refuse the
+   * bad ones looked harmless and was not: with every farm spot occupied, this
+   * strategy asked for a farm on every decision of every match -- twenty-three
+   * thousand build commands across sixteen matches, all refused -- and each
+   * one retasked the villager that was going to build it, so it stood there
+   * being told to start something it could never start. Asking what is
+   * already there costs one pass over what it can see.
+   */
+  /**
+   * Roughly how much room a thing takes, for deciding whether a spot is free.
+   * Centre to centre, so both footprints count -- and a tree is not a town
+   * center. Using one number for everything was measurably wrong in both
+   * directions: two and a half tiles let a farm be asked for inside the town
+   * center every decision, and five tiles ruled out every barracks spot on the
+   * map, because there is always a tree within five tiles of home. The AI
+   * cannot read the rules, so these are the same order of approximation as the
+   * prices it already knows.
+   */
+  const bulk = (kind: string): number =>
+    kind === 'town-center' || kind === 'castle' ? 2
+      : isBuilding(kind as EntityKind) ? 1.5
+      : kind === 'resource' ? 0.5 : 0.3;
+  const clearSpot = (spots: { x: number; y: number }[], half: number) => {
+    const offset = Math.floor(observation.time / 3);
+    for (let i = 0; i < spots.length; i++) {
+      const at = place(spots[(i + offset) % spots.length]);
+      if (at.x < 2 || at.y < 2 || at.x > observation.mapWidth - 2 || at.y > observation.mapHeight - 2) continue;
+      // Only what stays put. A villager standing on the spot walks away when
+      // the foundation goes down; counting them meant that every candidate
+      // near home was "occupied" by whoever happened to be wandering past, and
+      // the barracks -- and with it the entire army -- was never built at all.
+      const blocked = [...known, ...mine].some(
+        e => (isBuilding(e.kind as EntityKind) || e.kind === 'resource')
+          && distance(e, at) < half + bulk(e.kind) + 0.4,
+      );
+      if (blocked) continue;
+      return at;
+    }
+    return undefined;
+  };
   const housesUnderway = mine.some(e => e.kind === 'house' && (e.buildProgress ?? 1) < 1);
   const headroom = observation.populationCap - observation.population;
   // Economy before barracks: the starting wood is exactly enough for either a
@@ -154,9 +298,10 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   if (idleBuilder && headroom <= 1 && !housesUnderway && observation.wood >= 25) {
     // Cycle deterministically through candidate spots so a blocked placement
     // is retried elsewhere on the next decision.
-    const attempt = mine.filter(e => e.kind === 'house').length + Math.floor(observation.time / 2);
-    const spot = HOUSE_SPOTS[attempt % HOUSE_SPOTS.length];
-    commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'house', target: place(spot) });
+    const spot = clearSpot(HOUSE_SPOTS, 1);
+    if (spot) {
+      commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'house', target: spot });
+    }
   }
   // Not until the wood is banked somewhere near the trees. The starting wood
   // buys either a barracks or an economy, and a barracks bought first is one
@@ -168,42 +313,105 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   // all, sitting on two hundred and forty wood for half an hour.
   const woodIsHandy = mine.some(e => e.kind === 'lumber-camp' && (e.buildProgress ?? 1) >= 1)
     || (supply('wood')?.walk ?? Infinity) <= CAMP_RANGE;
+  const range = mine.find(e => e.kind === 'archery-range');
+  if (!range && barracks && idleBuilder && observation.age >= 1 && observation.wood >= 175) {
+    const spot = clearSpot(RANGE_SPOTS, 1.5);
+    if (spot) {
+      commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'archery-range', target: spot });
+    }
+  }
+
   if (!barracks && idleBuilder && observation.wood >= 175 && woodIsHandy) {
     // Cycle candidate spots like houses do, so terrain under one spot cannot
     // block the barracks -- and the whole military opening -- permanently.
-    const spot = BARRACKS_SPOTS[Math.floor(observation.time / 5) % BARRACKS_SPOTS.length];
-    commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'barracks', target: place(spot) });
+    const spot = clearSpot(BARRACKS_SPOTS, 1.5);
+    if (spot) {
+      commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'barracks', target: spot });
+    }
   }
 
-  // Farms keep the food supply alive once the berries are gone, which is what
-  // lets a match run past the opening rush instead of stalling on starvation.
-  const foodLeft = known.some(e => e.kind === 'resource' && e.resource === 'food' && (e.amount ?? 0) > 0);
+  // Farms keep the food supply alive once the berries and the herd are gone.
+  //
+  // Waiting for the map to be empty of food was too late, and measurably so:
+  // matches ended with eight hundred gold banked and twenty food, because the
+  // strategy counted a remembered bush on the far side of the map as a reason
+  // not to farm. Anything more than a walk away is not food you are eating, so
+  // the question is what is near home -- and from the Feudal Age a player
+  // farms whatever else it has, which is what pays for the Castle Age.
+  const foodNearby = known.some(e => e.resource === 'food' && (e.amount ?? 0) > 0
+    && (e.kind === 'resource' || HERD.includes(e.kind))
+    && tc && distance(e, tc) <= FOOD_WALK);
   const farms = mine.filter(e => e.kind === 'farm');
   const farmsUnderway = farms.some(e => (e.buildProgress ?? 1) < 1);
-  if (!foodLeft && idleBuilder && !farmsUnderway && farms.length < FARM_SPOTS.length
-      && observation.wood >= 60) {
-    const spot = FARM_SPOTS[(farms.length + Math.floor(observation.time / 3)) % FARM_SPOTS.length];
-    commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'farm', target: place(spot) });
+  // Only when the food is actually short. "Farm from the Feudal Age" without
+  // that condition asked for a farm every single decision -- twenty-four
+  // thousand build commands across sixteen matches, almost all of them
+  // rejected onto an occupied spot, and each one retasking the same villager
+  // so it never finished anything else.
+  const foodShort = observation.food < FOOD_COMFORTABLE;
+  // The barracks comes first, exactly as it does before the second camp. A
+  // farm is sixty wood and there is always another one worth building, so a
+  // player who farms first spends the barracks' hundred and seventy-five wood
+  // sixty at a time and never fields a soldier at all -- measured: the first
+  // militia arrived after twenty-five minutes and the strategy could no
+  // longer beat an opponent who did nothing. One farm before the barracks, so
+  // a starving opening is not fatal; the rest afterwards.
+  const mayFarm = barracks !== undefined || farms.length < 1;
+  if ((!foodNearby || (observation.age >= 1 && foodShort)) && mayFarm && idleBuilder
+      && !farmsUnderway && farms.length < FARM_SPOTS.length && observation.wood >= 60) {
+    const spot = clearSpot(FARM_SPOTS, 1.5);
+    if (spot) {
+      commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building: 'farm', target: spot });
+    }
   }
 
-  if (tc && !tc.training && villagers.length < 8 && observation.food >= 50 && headroom > 0) {
+  // The next age, and whether it is close enough to be worth saving for.
+  const nextAge = AGE_UP[observation.age];
+  const ageing = nextAge !== undefined && !observation.researched.includes(nextAge.tech);
+  // Save for the age once there is an army to hold the ground -- but only the
+  // age's own price. Everything above that is spent, so a player who can
+  // already afford the age is never also refusing to build soldiers.
+  const banking = ageing && nextAge !== undefined
+    && army.length >= ARMY_BEFORE_AGE[Math.min(observation.age, ARMY_BEFORE_AGE.length - 1)]
+    && observation.food < nextAge.food + 50;
+  if (ageing && nextAge && tc && !tc.researching
+      && observation.food >= nextAge.food && observation.gold >= nextAge.gold) {
+    commands.push({ kind: 'research', player, buildingId: tc.id, tech: nextAge.tech });
+  }
+
+  const wantVillagers = VILLAGERS_BY_AGE[Math.min(observation.age, VILLAGERS_BY_AGE.length - 1)];
+  if (tc && !tc.training && villagers.length < wantVillagers
+      && observation.food >= 50 && headroom > 0) {
     commands.push({ kind: 'train', player, buildingId: tc.id, unit: 'villager' });
   }
   if (
-    barracks && (barracks.buildProgress ?? 1) >= 1 && !barracks.training &&
+    barracks && (barracks.buildProgress ?? 1) >= 1 && !barracks.training && !banking &&
     observation.food >= 50 && observation.gold >= 20 && headroom > 0
   ) {
     commands.push({ kind: 'train', player, buildingId: barracks.id, unit: 'militia' });
   }
+  // Archers cost wood and gold rather than food, so they are what a player
+  // saving food for the next age can still afford to build.
+  if (
+    range && (range.buildProgress ?? 1) >= 1 && !range.training &&
+    observation.wood >= 25 && observation.gold >= 45 && headroom > 0
+  ) {
+    commands.push({ kind: 'train', player, buildingId: range.id, unit: 'archer' });
+  }
 
-  const enemyUnits = observation.entities.filter(
-    e => e.owner !== 0 && e.owner !== player && (e.kind === 'villager' || e.kind === 'militia'),
+  // What could actually stop a demolition. Villagers are not it: counting them
+  // meant that against an opponent who simply sat there -- the passive side of
+  // every headless test -- the field was never "clear", the villagers never
+  // joined the raze, and five militia were left to chew through a town center
+  // with two thousand four hundred hit points on their own.
+  const enemySoldiers = observation.entities.filter(
+    e => e.owner !== 0 && e.owner !== player && e.kind !== 'villager' && !isBuilding(e.kind as EntityKind),
   );
   const enemyTcVisible = known.find(e => e.kind === 'town-center' && e.owner !== 0 && e.owner !== player);
 
   // Endgame raze: militia alone barely dent a town center (DAT armor), so
   // once the enemy field is clear, villagers join the demolition.
-  if (enemyTcVisible && militia.length >= 3 && enemyUnits.length === 0) {
+  if (enemyTcVisible && army.length >= 3 && enemySoldiers.length === 0) {
     const razers = villagers.filter(e => e.order !== 'attack');
     if (razers.length) {
       commands.push({

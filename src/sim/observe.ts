@@ -28,6 +28,15 @@ function observeEntity(entity: Entity, player: PlayerId): ObservedEntity {
         remainingSeconds: Math.round(entity.training.remainingTicks * TICK_SECONDS * 100) / 100,
       };
     }
+    // What it is researching, on the same terms. A strategy that cannot see
+    // this has no way to tell "the age is on its way" from "the age was
+    // refused", and re-issues the command every decision.
+    if (entity.researching) {
+      observed.researching = {
+        tech: entity.researching.tech,
+        remainingSeconds: Math.round(entity.researching.remainingTicks * TICK_SECONDS * 100) / 100,
+      };
+    }
   }
   return observed;
 }

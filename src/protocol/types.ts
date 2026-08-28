@@ -18,6 +18,8 @@ export interface ObservedEntity {
   order?: Order['kind'];
   carrying?: { kind: ResourceKind; amount: number };
   training?: { kind: UnitKind; remainingSeconds: number };
+  /** What it is researching; own buildings only, like `training`. */
+  researching?: { tech: string; remainingSeconds: number };
 }
 
 export interface PlayerObservation {
@@ -73,6 +75,10 @@ export interface PlayerSummary {
   stone: number;
   population: number;
   entities: number;
+  /** 0 is the Dark Age. What a batch needs to say whether anybody aged up. */
+  age: number;
+  /** Technologies finished, in the order they completed. */
+  researched: string[];
 }
 
 export interface MatchResult {

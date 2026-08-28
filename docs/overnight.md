@@ -269,7 +269,16 @@ reasons: farm food (Horse Collar, Heavy Plow), market fees (Coinage, Banking,
 Guilds), monk healing and conversion (Devotion, Faith, Herbal Medicine,
 Sanctity, Illumination, Block Printing), garrisoning, and the dock's.
 
-### N1. Teach the built-in AI to age up
+### N1. Teach the built-in AI to age up — **done, with one criterion missed**
+
+16 of 16 matches reach the Feudal Age and 6 reach the Castle Age, from a
+baseline of none. **12 of 16 decided against the 16 of 16 asked for** — the
+economy that reaches the Castle Age is also an economy neither side can finish
+off. Measured across five configurations; the curve and the reason are in
+`status.md`, and "the AI cannot close out a won game" is now the top of
+`backlog.md`.
+
+*Original item:*
 
 `src/sim/ai.ts` has no notion of research, so Loom, the Feudal Age and the
 Castle Age are out of its reach, and with them every building and unit they
@@ -283,7 +292,15 @@ spending everything on villagers; the observation already carries `age` and
 reaches the Castle Age, still 16/16 decided with 0 replay checksum failures.
 Record the new age distribution in `docs/status.md`.
 
-### N2. Teach it to hunt and herd
+### N2. Teach it to hunt and herd — **done, verification not met**
+
+It sees and works animals now (a test drives it to claim and eat a sheep), but
+early food income is unchanged: 159 food in the first four minutes either way,
+383 against 385 at eight minutes. Berries are nearer than sheep on this map and
+both gather at the same rate, so there is nothing to win until a claimed sheep
+can be walked home again. Recorded in `backlog.md`.
+
+*Original item:*
 
 It picks gather targets by `kind === 'resource'`, which animals are not, so the
 whole Dark Age food opening is invisible to it.

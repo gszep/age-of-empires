@@ -81,6 +81,30 @@ terrain blends above.
 
 ## Simulation
 
+- **The example AI cannot close out a won game.** Now that both sides farm,
+  reach the Feudal Age and sometimes the Castle Age, four of sixteen paired
+  matches run out the thirty-minute clock — where the old Dark Age militia
+  rush decided all sixteen. Neither side can finish an opponent as rich as
+  itself: the army marches at the enemy town center, grinds against its
+  garrison, and reinforcements arrive one at a time. The endgame raze only
+  sends villagers in once the enemy field is completely clear, which stops
+  being true the moment the other side has an economy. This is the single
+  biggest thing standing between the strategy and a decisive match, and it is
+  worth more than any further tuning of the economy — the trade-off curve
+  between economy and decisiveness is recorded in `status.md`.
+- **The AI eats sheep, and it does not help.** It claims and works them now
+  (six claimed within eight minutes, verified), but its food income is
+  unchanged: 159 food in the first four minutes with the herd and 159 without,
+  383 against 385 at eight minutes. On this map the berries are nearer than
+  the sheep (7.5 tiles against 9.5) and both yield food at the same rate, so
+  there is nothing to gain — in AoE2 the gain comes from walking a sheep home
+  and eating it under the town center with no return trip, and herdables no
+  longer follow anybody here (see below). The queue's N2 verification asked
+  for measurably higher early food income and it is not met; this is why.
+- **The AI will not touch a boar.** Deliberate: seventy-five hit points and
+  seven damage a hit, and AoE2's answer is to lure it home with one villager
+  while the rest wait. Ordering two villagers onto one loses both.
+
 - **Trade is unverifiable in normal play.** The cart's loop is proven by
   tests, but a human cannot check it: trading needs a foreign market and the
   built-in AI never builds one (it never leaves the Dark Age, below). Fixing

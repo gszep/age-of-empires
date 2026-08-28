@@ -131,5 +131,7 @@ function summary(state: ReturnType<typeof createGame>, player: PlayerId) {
     stone: state.players[player].stone,
     population: state.players[player].population,
     entities: state.entities.filter(e => e.owner === player).length,
+    age: state.players[player].age,
+    researched: [...state.players[player].researched],
   };
 }

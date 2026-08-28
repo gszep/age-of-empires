@@ -235,6 +235,30 @@ keeps the record.
   the decision; and give a staged scene a stationary observer so visibility is
   never the variable under test.
 
+- **A strategy change that improves one number can silently break the game it
+  plays.** Teaching the example AI to age up worked -- sixteen of sixteen
+  matches reached the Feudal Age where none had before -- and it also stopped
+  the AI being able to beat an opponent that did nothing at all, which three
+  existing tests caught and no batch metric would have. Four separate causes,
+  none of them the research code: cutting wood gatherers from two in six to
+  one in eight starved the lumber camp and the barracks; farming from the
+  Feudal Age spent the barracks' hundred and seventy-five wood sixty at a
+  time; a new "is this spot free" check counted wandering villagers as
+  obstacles, so no barracks site ever qualified; and the endgame raze counted
+  enemy *villagers* as a reason to hold back, so against a passive opponent the
+  field was never clear. Rule: when tuning a strategy, the batch's headline
+  numbers are not the test suite -- keep a fixed adversary in the suite whose
+  defeat is not negotiable, and read the whole causal chain before adjusting
+  the thing you just changed.
+
+- **Measure the baseline before deciding a number is bad.** "Twelve hundred
+  wood banked and twenty food" looked like an obviously wrong gatherer split,
+  and rebalancing it made the AI strictly worse -- because the first two
+  hundred and seventy-five wood buys the buildings the whole military opening
+  depends on, and only the wood after that is surplus. Rule: a resource that
+  looks over-gathered at the end of a match may have been exactly right at the
+  start of it; check what the early spend is before rebalancing the income.
+
 ## Process
 
 - **Complete one playable behaviour end to end** (from the working style

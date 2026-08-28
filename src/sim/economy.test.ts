@@ -2062,3 +2062,66 @@ describe('a tower has a minimum range, and Murder Holes takes it away', () => {
     expect(towerAndVictim(true)).toBeGreaterThan(0);
   });
 });
+
+describe('the built-in strategy', () => {
+  /** Run the example AI for one side for `seconds`, deciding once a second. */
+  const play = async (state: GameState, seconds: number) => {
+    const { exampleAiCommands } = await import('./ai');
+    const { observe } = await import('./observe');
+    for (let tick = 0; tick < seconds * TICKS_PER_SECOND; tick++) {
+      if (tick % TICKS_PER_SECOND === 0) {
+        for (const command of exampleAiCommands(observe(state, 1))) applyCommand(state, command);
+      }
+      stepGame(state);
+    }
+  };
+
+  it('claims and works a sheep', async () => {
+    // It used to pick gather targets by `kind === 'resource'`, and an animal
+    // is not one — so the whole Dark Age food opening was invisible to it.
+    const state = createGame(1, importedRules ?? FALLBACK_RULES);
+    const sheep = state.entities.filter(e => e.kind === 'sheep').length;
+    expect(sheep, 'the map put no sheep out').toBeGreaterThan(0);
+    await play(state, 8 * 60);
+    const claimed = state.entities.filter(e => e.kind === 'sheep' && e.owner === 1);
+    expect(claimed.length, 'no sheep was ever claimed').toBeGreaterThan(0);
+    const eaten = state.entities.filter(
+      e => e.kind === 'sheep' && (e.amount ?? Infinity) < (importedRules?.units.sheep.foodAmount ?? 100),
+    );
+    expect(eaten.length, 'a sheep was claimed but never eaten').toBeGreaterThan(0);
+  }, 30_000);
+
+  it('researches its way out of the Dark Age when it can afford to', async () => {
+    // The whole of N1: the strategy had no notion of research at all, so the
+    // market, the archery range, the stable, the blacksmith, the monastery,
+    // the siege workshop and the castle were out of its reach for ever. How
+    // long its economy takes to find five hundred food is a separate question
+    // and a batch measures that; this asks whether it spends it.
+    const state = createGame(1, importedRules ?? FALLBACK_RULES);
+    state.players[1].food = 600;
+    await play(state, 3 * 60);
+    expect(state.players[1].researched, 'never left the Dark Age').toContain('feudal-age');
+    expect(state.players[1].age).toBeGreaterThanOrEqual(1);
+  }, 30_000);
+
+  it('builds what the new age opened rather than fighting on with militia', async () => {
+    // An age nothing uses is a number. Reaching the Feudal Age and then
+    // fielding Dark Age militia for the rest of the match is most of it wasted.
+    const state = createGame(1, importedRules ?? FALLBACK_RULES);
+    Object.assign(state.players[1], { food: 900, wood: 900, gold: 400 });
+    // The range needs a barracks, in AoE2 and here: its tree node links to
+    // one. Stand it up rather than waiting out the economy that buys it.
+    const barracksRules = state.rules.buildings.barracks;
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    state.entities.push({
+      id: state.nextId++, kind: 'barracks', owner: 1,
+      position: { x: tc.position.x + 6, y: tc.position.y + 6 },
+      hp: barracksRules.hp, maxHp: barracksRules.hp, radius: barracksRules.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    });
+    await play(state, 6 * 60);
+    expect(state.players[1].age).toBeGreaterThanOrEqual(1);
+    expect(state.entities.some(e => e.owner === 1 && e.kind === 'archery-range'),
+      'never built an archery range').toBe(true);
+  }, 40_000);
+});

@@ -53,9 +53,19 @@ changed underneath it.
   how every shot is aimed, what fifty technologies do, and how long a body lies
   on the ground. Corpses lasting five minutes rather than three seconds cost
   nothing measurable — throughput went up, not down.
-  Note the matches are still Dark Age militia wars — the built-in AI does not
-  research, so none of the Feudal or Castle content above appears in them
-  (queue item N1).
+- **The built-in AI ages up now, and the batch says what that costs.** Re-run
+  after teaching it to research: **16 of 16 matches reach the Feudal Age** (30
+  of 32 player-slots) and **6 reach the Castle Age** (12 slots), against a
+  baseline where neither age was ever reached. Still 0 replay checksum
+  failures and a 0.5 mirror win rate, at 404x real time.
+  **12 of 16 decided, against the 16 of 16 this queue asked for.** That is a
+  real regression and it is the price of the economy: two sides that both farm
+  and both reach the Castle Age cannot finish each other inside the
+  thirty-minute cap. The trade-off was measured across five configurations —
+  six farm spots gives 12 decided and 6 Castle Age matches, twelve gives 10
+  decided and 6, and starving the farms back gives 14 decided but only 2. What
+  is actually missing is a strategy that can close out a won game; that is now
+  the first line of `backlog.md`.
 - Per-tick cost over a full 900-second match (seed 102): median **0.58ms**,
   p99 **1.72ms**, worst **11.7ms**, against a 50ms budget at 20Hz. The median
   was never the problem; the worst tick is the number to watch, and it was
