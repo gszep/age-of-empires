@@ -73,6 +73,32 @@
       }
     },
     {
+      "key": "man-at-arms",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 75,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
       "key": "spearman",
       "sounds": [
         "select",

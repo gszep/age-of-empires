@@ -119,8 +119,16 @@ terrain blends above.
   effects rather than with the renderer. Each age's variant also has its own
   rubble unit (`Barracks Age2 (Rubble)` and friends), so a razed Feudal
   barracks still leaves the Dark Age rubble.
-- **No unit upgrade is researchable.** Forty-two technologies are, taken from
-  the Britons' own tree — the blacksmith's armour and attack lines, the economy
+- **One unit upgrade of the Britons' twenty-eight is researchable.** The
+  man-at-arms; the mechanism is general and the rest is content — each needs
+  its unit imported with animations, an entry in the kind lists and schemas,
+  and a re-run of the audio import for its voices. In rough order of value:
+  crossbowman and elite skirmisher (Castle, archery range), pikeman (Castle,
+  barracks), light cavalry (Castle, stable), then the Imperial tier —
+  arbalester, halberdier, champion by way of long swordsman and two-handed
+  swordsman, cavalier, heavy cavalry archer, onager, capped ram. The Britons
+  have no hussar, paladin, siege ram or siege onager and their tree says so.
+- **Fifty-two technologies are researchable**, taken from the Britons' own tree — the blacksmith's armour and attack lines, the economy
   technologies, the monastery's and the castle's, and all three ages. What is
   still missing is the *upgrades*: man-at-arms, crossbowman, pikeman, light
   cavalry, elite skirmisher. They are a different rule — one unit kind is

@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
 import { observe } from './sim/observe';
-import { applyCommand, buildingFootprint, createGame, gameTimeSeconds, isCarcass, placementLegal, stepGame } from './sim/game';
+import { applyCommand, buildingFootprint, createGame, gameTimeSeconds, isCarcass, placementLegal, stepGame, upgradedAway, notYetUpgradedInto } from './sim/game';
 import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, rulesFromManifest, type ContentManifest, type Cost, type GameRules, type TechKey } from './sim/data';
 import { isTileVisible } from './sim/visibility';
 import { checksumState } from './sim/checksum';
@@ -739,7 +739,11 @@ const buildableKinds = (): BuildingKind[] =>
 const trainableAt = (building: BuildingKind): UnitKind[] =>
   (Object.keys(rules.units) as UnitKind[]).filter(kind =>
     rules.units[kind].trainedAt === building && (rules.units[kind].age ?? 0) <= game.players[1].age
-    && !isAnimal(kind));
+    && !isAnimal(kind)
+    // A unit that has been upgraded past is gone from the panel, not greyed
+    // out: the barracks offers the man-at-arms in place of the militia.
+    && !upgradedAway(game, 1, kind)
+    && !notYetUpgradedInto(game, 1, kind));
 
 function affordable(cost: Cost): boolean {
   const player = game.players[1];

@@ -276,6 +276,39 @@ const civNameOf = (state: GameState, player: PlayerId): string =>
     ? state.rules.civilization.name
     : state.players[player].civilization;
 
+/**
+ * Has this player upgraded past this unit? AoE2 does not let a barracks keep
+ * offering the militia once the man-at-arms exists -- the upgrade replaces the
+ * unit rather than adding a second one beside it.
+ */
+export function upgradedAway(state: GameState, player: PlayerId, kind: string): boolean {
+  for (const key of state.players[player].researched) {
+    for (const upgrade of state.rules.technologies[key]?.upgrades ?? []) {
+      if (upgrade.from === kind) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * ...and the other side of it: a unit that only exists as the far end of an
+ * upgrade cannot be trained until that upgrade is researched. The DAT gives
+ * the man-at-arms no enabling technology of its own -- being upgraded into is
+ * how it becomes available -- so without this it would sit in the Dark Age
+ * barracks beside the militia it is supposed to replace.
+ */
+export function notYetUpgradedInto(state: GameState, player: PlayerId, kind: string): boolean {
+  let isUpgradeTarget = false;
+  for (const [key, tech] of Object.entries(state.rules.technologies)) {
+    for (const upgrade of tech.upgrades ?? []) {
+      if (upgrade.to !== kind) continue;
+      isUpgradeTarget = true;
+      if (state.players[player].researched.includes(key)) return false;
+    }
+  }
+  return isUpgradeTarget;
+}
+
 /** What a player has researched, applied to one unit kind's rules. */
 export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: UnitKind): UnitRules {
   const base = state.rules.units[kind];
@@ -620,6 +653,12 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (building.buildProgress !== undefined) return rejected('building is under construction');
     if (building.training) return rejected('building is already training');
     const unitRules = state.rules.units[command.unit];
+    if (upgradedAway(state, command.player, command.unit)) {
+      return rejected(`${command.unit} has been upgraded`);
+    }
+    if (notYetUpgradedInto(state, command.player, command.unit)) {
+      return rejected(`${command.unit} needs its upgrade researched`);
+    }
     if (!civHas(state, command.player, 'units', unitRules.datId)) {
       return rejected(`the ${civNameOf(state, command.player)} do not have ${command.unit}`);
     }
@@ -1748,6 +1787,24 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
   if (!tech || player.researched.includes(key)) return;
   player.researched.push(key);
   if (tech.grantsAge !== undefined) player.age = Math.max(player.age, tech.grantsAge);
+  // An upgrade replaces what you own: every militia becomes a man-at-arms the
+  // moment it lands, keeping the wounds it had rather than being healed by
+  // promotion. AoE2 does the same, and it is why the barracks stops offering
+  // the militia at all afterwards (see `upgradedAway`).
+  for (const upgrade of tech.upgrades ?? []) {
+    const to = state.rules.units[upgrade.to as UnitKind];
+    if (!to) continue;
+    for (const entity of state.entities) {
+      if (entity.dead || entity.owner !== owner || entity.kind !== upgrade.from) continue;
+      const damage = entity.maxHp - entity.hp;
+      const promoted = unitRulesFor(state, owner, upgrade.to as UnitKind);
+      entity.kind = upgrade.to as UnitKind;
+      entity.maxHp = promoted.hp;
+      entity.hp = Math.max(1, promoted.hp - damage);
+      entity.radius = promoted.radius;
+    }
+  }
+
   // Hit points reach what is already standing, as AoE2's Loom heals the
   // villagers you already have. Everything else is read off the rules when it
   // is next asked for, so nothing has to be walked.

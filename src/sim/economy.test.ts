@@ -2125,3 +2125,82 @@ describe('the built-in strategy', () => {
       'never built an archery range').toBe(true);
   }, 40_000);
 });
+
+describe('unit upgrades', () => {
+  it('turns every militia into a man-at-arms, wounds and all', () => {
+    // An upgrade is not a modifier. AoE2 replaces the unit, so a militia
+    // standing on the map becomes a man-at-arms where it stands — and being
+    // promoted is not a heal: it keeps the damage it had taken.
+    if (!importedRules) return;
+    const state = createGame(64, importedRules);
+    state.players[1].age = 1;
+    Object.assign(state.players[1], { food: 9000, gold: 9000, wood: 9000 });
+    const rules = state.rules.buildings.barracks;
+    const barracks: Entity = {
+      id: state.nextId++, kind: 'barracks', owner: 1, position: { x: 56.5, y: 56.5 },
+      hp: rules.hp, maxHp: rules.hp, radius: rules.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(barracks);
+    const militiaRules = state.rules.units.militia;
+    const hurt: Entity = {
+      id: state.nextId++, kind: 'militia', owner: 1, position: { x: 54.5, y: 56.5 },
+      hp: militiaRules.hp - 12, maxHp: militiaRules.hp, radius: militiaRules.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(hurt);
+
+    expect(applyCommand(state, {
+      kind: 'research', player: 1, buildingId: barracks.id, tech: 'man-at-arms',
+    }).ok).toBe(true);
+    for (let i = 0; i < 4000 && !state.players[1].researched.includes('man-at-arms'); i++) {
+      stepGame(state);
+    }
+    expect(state.players[1].researched).toContain('man-at-arms');
+
+    const promoted = state.entities.find(e => e.id === hurt.id)!;
+    expect(promoted.kind).toBe('man-at-arms');
+    const upgraded = state.rules.units['man-at-arms'];
+    expect(promoted.maxHp).toBe(upgraded.hp);
+    expect(upgraded.hp - promoted.hp, 'promotion healed it').toBe(12);
+    // ...and it hits harder, which is the point of the upgrade.
+    const before = militiaRules.attacks.find(a => a.class === 4)!.amount;
+    expect(upgraded.attacks.find(a => a.class === 4)!.amount).toBeGreaterThan(before);
+  });
+
+  it('stops the barracks offering what it has upgraded past', () => {
+    if (!importedRules) return;
+    const state = createGame(65, importedRules);
+    state.players[1].age = 1;
+    Object.assign(state.players[1], { food: 9000, gold: 9000, populationCap: 50 });
+    const rules = state.rules.buildings.barracks;
+    const barracks: Entity = {
+      id: state.nextId++, kind: 'barracks', owner: 1, position: { x: 56.5, y: 56.5 },
+      hp: rules.hp, maxHp: rules.hp, radius: rules.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(barracks);
+    // Before: the militia is what it trains, and the man-at-arms does not
+    // exist yet however much you can afford it.
+    expect(applyCommand(state, {
+      kind: 'train', player: 1, buildingId: barracks.id, unit: 'militia',
+    }).ok).toBe(true);
+    barracks.training = undefined;
+    const early = applyCommand(state, {
+      kind: 'train', player: 1, buildingId: barracks.id, unit: 'man-at-arms',
+    });
+    expect(early.ok).toBe(false);
+    expect(early.ok ? '' : early.reason).toContain('upgrade');
+
+    state.players[1].researched.push('man-at-arms');
+    barracks.training = undefined;
+    const late = applyCommand(state, {
+      kind: 'train', player: 1, buildingId: barracks.id, unit: 'militia',
+    });
+    expect(late.ok, 'the militia was still on offer after the upgrade').toBe(false);
+    barracks.training = undefined;
+    expect(applyCommand(state, {
+      kind: 'train', player: 1, buildingId: barracks.id, unit: 'man-at-arms',
+    }).ok).toBe(true);
+  });
+});

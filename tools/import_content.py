@@ -760,13 +760,22 @@ def technologies_from_tree(
         for key, entity in entities.items()
         if entity.get("category") == "building" and "id" in entity
     }
+    units = {
+        entity["id"]: key
+        for key, entity in entities.items()
+        if entity.get("category") in ("unit", "animal") and "id" in entity
+    }
     keep: dict[str, Any] = {}
     skipped: list[dict[str, str]] = []
     for node in tree_nodes(dat_path, spec):
-        if node["Node Type"] != "Research":
+        # A `UnitUpgrade` node is a technology too -- it just replaces one unit
+        # with another rather than adding to it, and the tree names the
+        # technology that does it separately from the unit it produces.
+        upgrade = node["Node Type"] == "UnitUpgrade"
+        if node["Node Type"] != "Research" and not upgrade:
             continue
         name = node["Name"]
-        tech_id = int(node["Node ID"])
+        tech_id = int(node["Trigger Tech ID"]) if upgrade else int(node["Node ID"])
         if node["Node Status"] == "NotAvailable":
             skipped.append({"name": name, "techId": tech_id,
                             "reason": f"the {civilization['name']} do not have it"})
@@ -779,7 +788,22 @@ def technologies_from_tree(
         entry = technology_entry(
             dat, {"techId": tech_id, "entities": entities}, hashes
         )
-        if not entry.get("effects") and "grantsAge" not in entry:
+        if upgrade:
+            # What it turns into, from the DAT's own `upgrade unit` command --
+            # the same command the age technologies use on buildings.
+            becomes = [
+                {"from": units[int(c.a)], "to": units[int(c.b)]}
+                for c in dat.effects[dat.techs[tech_id].effect_id].effect_commands
+                if c.type == EFFECT_UPGRADE_UNIT
+                and int(c.a) in units and int(c.b) in units
+            ]
+            if not becomes:
+                missing = units.get(int(node.get("Link ID", -1)), f"unit {node['Node ID']}")
+                skipped.append({"name": name, "techId": tech_id,
+                                "reason": f"upgrades to a unit that is not imported ({missing})"})
+                continue
+            entry["upgrades"] = becomes
+        elif not entry.get("effects") and "grantsAge" not in entry:
             skipped.append({"name": name, "techId": tech_id,
                             "reason": "none of its effects reach anything imported"})
             continue

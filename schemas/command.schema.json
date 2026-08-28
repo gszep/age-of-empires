@@ -56,6 +56,7 @@
           "enum": [
             "villager",
             "militia",
+            "man-at-arms",
             "spearman",
             "archer",
             "skirmisher",

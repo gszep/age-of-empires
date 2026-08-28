@@ -162,7 +162,8 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   // Everything that fights. The army is not militia any more once the Feudal
   // Age opens the archery range, and the attack, the endgame raze and the
   // decision to keep saving all count soldiers rather than militia.
-  const army = mine.filter(e => e.kind === 'militia' || e.kind === 'archer');
+  const army = mine.filter(
+    e => e.kind === 'militia' || e.kind === 'man-at-arms' || e.kind === 'archer');
   const militia = army;
   const tc = mine.find(e => e.kind === 'town-center');
   const barracks = mine.find(e => e.kind === 'barracks');
@@ -388,7 +389,10 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     barracks && (barracks.buildProgress ?? 1) >= 1 && !barracks.training && !banking &&
     observation.food >= 50 && observation.gold >= 20 && headroom > 0
   ) {
-    commands.push({ kind: 'train', player, buildingId: barracks.id, unit: 'militia' });
+    // Whatever the barracks actually offers: once the upgrade lands the
+    // militia is gone from it, and asking for one is refused for ever.
+    const infantry = observation.researched.includes('man-at-arms') ? 'man-at-arms' : 'militia';
+    commands.push({ kind: 'train', player, buildingId: barracks.id, unit: infantry });
   }
   // Archers cost wood and gold rather than food, so they are what a player
   // saving food for the next age can still afford to build.

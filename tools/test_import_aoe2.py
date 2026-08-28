@@ -442,6 +442,33 @@ class ContentImportIntegrationTest(unittest.TestCase):
         for reason in skipped.values():
             self.assertTrue(reason)
 
+    def test_a_unit_upgrade_is_a_technology_that_replaces_a_unit(self):
+        # The tree states these as `UnitUpgrade` nodes rather than `Research`,
+        # and names the technology that performs one separately from the unit
+        # it produces. The DAT then states the swap as an `upgrade unit`
+        # command -- the same command the ages use on buildings.
+        techs = self.result["technologies"]
+        maa = techs["man-at-arms"]
+        self.assertEqual(maa["techId"], 222)
+        self.assertEqual(maa["researchedAt"], 12)
+        self.assertEqual(maa["requiresAge"], 1)
+        self.assertEqual(maa["cost"], {"food": 100, "gold": 40})
+        self.assertEqual(maa["upgrades"], [{"from": "militia", "to": "man-at-arms"}])
+
+        # And it really is a better unit, or the upgrade would be a tax.
+        militia = self.result["entities"]["militia"]
+        upgraded = self.result["entities"]["man-at-arms"]
+        self.assertGreater(upgraded["hitPoints"], militia["hitPoints"])
+        melee = {a["class"]: a["amount"] for a in upgraded["combat"]["attacks"]}
+        was = {a["class"]: a["amount"] for a in militia["combat"]["attacks"]}
+        self.assertGreater(melee[4], was[4])
+
+        # The upgrades whose far end is not imported say so rather than
+        # vanishing: the long swordsman is a unit this game does not have.
+        skipped = {row["name"]: row["reason"] for row in self.result["skippedTechnologies"]}
+        self.assertIn("Long Swordsman", skipped)
+        self.assertIn("not imported", skipped["Long Swordsman"])
+
     def test_the_civilisation_is_read_from_its_own_tech_tree(self):
         # An AoE2 civilisation is mostly what it does not get, and the depot
         # ships that per civilisation next to the DAT. Nothing here lists a

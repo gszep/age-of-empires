@@ -291,9 +291,25 @@ schema names a technology by string where it used to enumerate three. The
 contract that replaced it is that every technology the rules offer is a legal
 command, which a test asserts.
 
-Unit upgrades (man-at-arms, crossbowman, pikeman, light cavalry, elite
-skirmisher) are deliberately not researchable yet, so the Castle Age adds what
-it opens rather than what it improves.
+**An upgrade is not a modifier, and it now works like one isn't.** The tree
+states these as `UnitUpgrade` nodes rather than `Research`, naming the
+technology that performs one separately from the unit it produces, and the DAT
+states the swap as an `upgrade unit` effect command — the same command the age
+technologies use on buildings. Researching one turns every militia a player
+owns into a man-at-arms where it stands, keeping the damage it had taken
+rather than being healed by promotion, and the barracks stops offering the
+militia at all. A unit that exists only as the far end of an upgrade cannot be
+trained before it: the DAT gives the man-at-arms no enabling technology of its
+own, so without that rule it would sit in the Dark Age barracks beside the
+unit it replaces.
+
+The **man-at-arms** is the one that is imported (100 food and 40 gold at the
+barracks in the Feudal Age, from the DAT). The rest of the Britons' twenty-
+eight upgrade nodes are recorded in `skippedTechnologies` as *upgrades to a
+unit that is not imported* — the long swordsman, the crossbowman, the pikeman,
+the light cavalry and the others are units this slice does not have, and each
+is a unit's worth of art rather than a rule. The mechanism is done; the rest is
+content.
 
 Which age a thing belongs to is not a list here either: the importer finds the
 "(make avail)" technology that enables each unit and reads the age technology in

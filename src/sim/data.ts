@@ -228,6 +228,13 @@ export interface TechRules {
   requiresAge: number;
   /** The widgetui `Techs` sheet index for its button art. */
   iconId?: number;
+  /**
+   * Units this replaces with others. An upgrade is not a modifier: AoE2 turns
+   * every militia you own into a man-at-arms and stops the barracks offering
+   * the militia at all. The DAT states it as an `upgrade unit` effect command,
+   * the same one the age technologies use on buildings.
+   */
+  upgrades?: { from: string; to: string }[];
   /** Age techs move the player on; everything else changes rules. */
   grantsAge?: number;
   /**
@@ -299,6 +306,17 @@ export const FALLBACK_RULES: GameRules = {
       hp: 40, radius: 0.2, speed: 0.9, lineOfSight: 4, cost: cost(50, 0, 20), trainSeconds: 21,
       trainedAt: 'barracks', popCost: 1,
       attacks: [{ class: 4, amount: 4 }],
+      armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 1 }],
+      attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
+    },
+    // What a militia becomes. Not trainable in its own right: AoE2 replaces
+    // the militia at the barracks when the upgrade is researched, so its
+    // `trainedAt` matters only for what the barracks offers afterwards.
+    'man-at-arms': {
+      age: 1,
+      hp: 45, radius: 0.2, speed: 0.9, lineOfSight: 4, cost: cost(50, 0, 20), trainSeconds: 21,
+      trainedAt: 'barracks', popCost: 1,
+      attacks: [{ class: 4, amount: 6 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 1 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
     },
@@ -628,6 +646,7 @@ interface ManifestTech {
   iconId?: number;
   grantsAge?: number;
   requires?: string[];
+  upgrades?: { from: string; to: string }[];
   effects?: TechEffect[];
   unmodelled?: string[];
 }
@@ -781,6 +800,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
           : FALLBACK_RULES.units.villager.hunt,
       },
       militia: unit('militia', 'barracks'),
+      'man-at-arms': unit('man-at-arms', 'barracks'),
       spearman: unit('spearman', 'barracks'),
       archer: { ...unit('archer', 'archery-range'), range: FALLBACK_RULES.units.archer.range },
       skirmisher: {
@@ -885,6 +905,7 @@ function technologies(
       iconId: tech.iconId,
       grantsAge: tech.grantsAge,
       requires: tech.requires,
+      upgrades: tech.upgrades,
       effects: tech.effects ?? [],
       unmodelled: tech.unmodelled,
     };
@@ -893,7 +914,8 @@ function technologies(
 }
 
 const UNIT_KINDS = new Set<string>([
-  'villager', 'militia', 'spearman', 'archer', 'skirmisher', 'scout-cavalry', 'trade-cart',
+  'villager', 'militia', 'man-at-arms', 'spearman', 'archer', 'skirmisher', 'scout-cavalry',
+  'trade-cart',
   'knight', 'cavalry-archer', 'longbowman', 'battering-ram', 'mangonel', 'monk',
   'sheep', 'deer', 'boar',
 ]);
