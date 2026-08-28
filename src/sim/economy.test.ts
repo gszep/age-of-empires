@@ -6,8 +6,8 @@ import {
 } from './data';
 import { checksumState } from './checksum';
 import {
-  applyCommand, buildingFootprint, carryCapacityFor, computeDamage, createGame, isCarcass,
-  placementLegal, notYetUpgradedInto, stepGame, unitRulesFor,
+  applyCommand, buildingFootprint, carryCapacityFor, computeDamage, createGame, farmFoodAmountFor,
+  isCarcass, placementLegal, notYetUpgradedInto, stepGame, unitRulesFor,
 } from './game';
 import type { BuildingKind, Entity, GameState, ResourceKind } from './types';
 
@@ -509,6 +509,71 @@ function freeSpot(state: GameState, kind: BuildingKind, near: { x: number; y: nu
   }
   throw new Error(`no legal ${kind} placement near ${near.x},${near.y}`);
 }
+
+describe('the mill technologies', () => {
+  // Issue #23. Horse Collar and Heavy Plow were recorded as reaching nothing,
+  // because the importer only read effect commands that change a *unit*
+  // attribute. Both are really made of effect command type 1, the resource
+  // modifier, which changes a player attribute: how much food a farm is built
+  // with. The DAT keeps that as resource 36 and civ 1 starts it at 175 --
+  // exactly the number the open fallback had hand-written.
+  it.skipIf(!importedRules)('reads the farm\'s food out of the DAT rather than a constant', () => {
+    expect(importedRules!.buildings.farm.farmAmount).toBe(175);
+  });
+
+  it.skipIf(!importedRules)('is researched at the mill, in the DAT\'s own order', () => {
+    const collar = importedRules!.technologies['horse-collar'];
+    const plow = importedRules!.technologies['heavy-plow'];
+    expect(collar.researchedAt).toBe('mill');
+    expect(plow.researchedAt).toBe('mill');
+    expect(collar.cost).toMatchObject({ food: 75, wood: 75 });
+    expect(plow.cost).toMatchObject({ food: 125, wood: 125 });
+    // The DAT's own chain: the plough needs the collar, and the Castle Age.
+    expect(plow.requires).toContain('horse-collar');
+    expect(collar.requiresAge).toBe(1);
+    expect(plow.requiresAge).toBe(2);
+    // And each says what it could not deliver rather than looking whole: the
+    // +1 carry Heavy Plow gives the farmer villagers (DAT units 214 and 259)
+    // has no farmer variant here to land on.
+    expect(plow.unmodelled).toContain('attribute 14 on unit 214');
+  });
+
+  it.skipIf(!importedRules)('adds the DAT\'s food to every farm sown after it', () => {
+    const state = createGame(88, importedRules);
+    expect(farmFoodAmountFor(state, 1)).toBe(175);
+    state.players[1].researched.push('horse-collar');
+    expect(farmFoodAmountFor(state, 1)).toBe(250);
+    state.players[1].researched.push('heavy-plow');
+    expect(farmFoodAmountFor(state, 1)).toBe(375);
+    // The other player has researched nothing and gets nothing.
+    expect(farmFoodAmountFor(state, 2)).toBe(175);
+  });
+
+  it.skipIf(!importedRules)('sows a richer farm once the mill has paid for it', () => {
+    const state = createGame(89, importedRules);
+    const villager = villagerOf(state);
+    state.players[1].wood = 500;
+    state.players[1].researched.push('horse-collar');
+    expect(applyCommand(state, {
+      kind: 'build', player: 1, builderIds: [villager.id], building: 'farm',
+      target: freeSpot(state, 'farm', villager.position),
+    })).toEqual({ ok: true });
+    const farm = state.entities.find(e => e.kind === 'farm')!;
+    for (let i = 0; i < 4000 && farm.buildProgress !== undefined; i++) stepGame(state);
+    expect(farm.buildProgress).toBeUndefined();
+    expect(farm.amount).toBe(250);
+  });
+
+  it.skipIf(!importedRules)('replays identically across the research', () => {
+    const play = () => {
+      const state = createGame(90, importedRules);
+      state.players[1].researched.push('horse-collar');
+      for (let i = 0; i < 400; i++) stepGame(state);
+      return checksumState(state);
+    };
+    expect(play()).toBe(play());
+  });
+});
 
 describe('drop sites', () => {
   const buildFor = (state: GameState, kind: 'mill' | 'lumber-camp' | 'mining-camp', near: { x: number; y: number }) => {

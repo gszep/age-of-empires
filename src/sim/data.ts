@@ -264,13 +264,29 @@ export interface TechRules {
  * or one of the villager task variants that carry the gather rates.
  */
 export interface TechEffect {
-  unit: string;
-  attribute: TechAttribute;
+  /** Absent on a player-level effect, which names no unit. */
+  unit?: string;
+  attribute?: TechAttribute;
   operation: 'set' | 'add' | 'multiply';
   amount: number;
   /** For `armor` and `attack`, which armour class the amount is against. */
   armorClass?: number;
+  /**
+   * A player attribute rather than a unit's -- the DAT's effect command type
+   * 1, which addresses a resource id instead of a unit. The mill's
+   * technologies are made of these: Horse Collar and Heavy Plow add 75 and
+   * 125 to how much food a farm is built with, and change nothing about any
+   * unit that this game models.
+   */
+  resource?: PlayerAttribute;
 }
+
+/**
+ * A player-level attribute a technology can change. `farmFoodAmount` is
+ * resource 36 in the DAT, where civ 1 starts it at 175 -- the number the open
+ * fallback had hand-written before anybody looked.
+ */
+export type PlayerAttribute = 'farmFoodAmount';
 
 export type TechAttribute =
   | 'hitPoints' | 'lineOfSight' | 'speed' | 'armor' | 'attack'
@@ -789,6 +805,8 @@ export interface ContentManifest {
   entities: Record<string, ManifestEntity>;
   technologies?: Record<string, ManifestTech>;
   civilization?: CivilizationRules & { datIndex?: number; treeFile?: string };
+  /** Where each modelled player attribute starts, from the civ's own table. */
+  playerAttributes?: Partial<Record<PlayerAttribute, number>>;
 }
 
 
@@ -1007,7 +1025,15 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       mill: building('mill', true),
       'lumber-camp': building('lumber-camp', true),
       'mining-camp': building('mining-camp', true),
-      farm: building('farm', true),
+      farm: {
+        ...building('farm', true),
+        // How much food a farm is built with is a player attribute in the DAT
+        // (resource 36), not the farm unit's storage -- which is why the mill's
+        // technologies change it and why 175 was hand-written here until the
+        // importer went looking. See `PlayerAttribute`.
+        farmAmount: manifest.playerAttributes?.farmFoodAmount
+          ?? FALLBACK_RULES.buildings.farm.farmAmount,
+      },
       outpost: building('outpost', true),
       'watch-tower': building('watch-tower', true),
       'archery-range': building('archery-range', true),

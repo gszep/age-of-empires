@@ -468,6 +468,45 @@ random direction. One tile is the board's own unit, and it is wider than any
 unit and narrower than any building — which is why an arrow that goes wide of a
 villager still lands inside the town center behind him, as in AoE2.
 
+### The mill's technologies, and the effect command that carries them
+
+Horse Collar and Heavy Plow were among the forty-eight skipped, recorded as
+"none of its effects reach anything imported". That reading was of the wrong
+commands. The importer read effect command types 0, 4 and 5 -- set, add and
+multiply on a *unit* attribute -- and both technologies are really made of
+**type 1, the resource modifier**, which changes a player attribute addressed
+by resource id.
+
+The DAT states the whole of it, including a number this repo had hand-written
+since the beginning:
+
+- A farm's food is **resource 36**, and civ 1 starts it at **175** -- exactly
+  the figure `FALLBACK_RULES` carried as a constant. It is a player attribute
+  rather than the farm unit's storage, which is precisely why a technology can
+  change it.
+- **Horse Collar** (75 food, 75 wood, 20 s, Feudal) adds 75 to it.
+- **Heavy Plow** (125 food, 125 wood, 40 s, Castle, and the DAT makes it
+  require Horse Collar) adds 125 more.
+- **Crop Rotation** would add another 175 and stays skipped, because the
+  Britons' own tree marks it `NotAvailable`. That is the real tech tree, not a
+  gap.
+
+So a farm is 175 food, 250 after the collar and 375 after the plough, and a
+farm already in the ground keeps what is left in it -- the research pays off
+on the next one sown, as in AoE2. Verified in the running game: a mill in the
+Feudal Age offers "Research Horse Collar (75 food, 75 wood)" in its panel.
+
+Both technologies still record what they could not deliver. Heavy Plow's
+`+1 carry capacity` for the farmer villagers is attribute 14 on DAT units 214
+(`VFFAR`) and 259 (`VMFAR`), and this game has no farmer villager variant to
+put it on, so it sits in the technology's `unmodelled` list rather than being
+quietly dropped.
+
+**This is the machinery Q5 was asking for.** Effect command type 1 is now
+read; what the six technologies it names still need is their own resource ids
+in `RESOURCE_ATTRIBUTES` and something in the simulation for a market fee and
+a conversion resistance to change.
+
 ### An attacker stays with what it is attacking
 
 A unit stopped moving the instant its target was inside the reach margin, and

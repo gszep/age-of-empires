@@ -737,6 +737,35 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # A building that never fights is still given no attack of its own.
         self.assertEqual(entities["house"]["combat"]["attacks"], [])
 
+    def test_the_mill_technologies_change_a_player_attribute(self):
+        """Issue #23.
+
+        Horse Collar and Heavy Plow were recorded as reaching nothing, because
+        the importer read only the effect commands that change a *unit*
+        attribute (types 0, 4 and 5). Both are really made of type 1, the
+        resource modifier, which addresses a player attribute by resource id.
+        A farm's food is resource 36, and civ 1 starts it at 175 -- the number
+        the open fallback had hand-written.
+        """
+        self.assertEqual(self.result["playerAttributes"]["farmFoodAmount"], 175.0)
+        techs = self.result["technologies"]
+        for key, added, age in (("horse-collar", 75.0, 1), ("heavy-plow", 125.0, 2)):
+            with self.subTest(tech=key):
+                tech = techs[key]
+                self.assertEqual(tech["researchedAt"], 68)  # the mill
+                self.assertEqual(tech["requiresAge"], age)
+                self.assertIn(
+                    {"resource": "farmFoodAmount", "operation": "add", "amount": added},
+                    tech["effects"],
+                )
+        # The DAT's own chain, and the DAT's own refusal: the Britons have no
+        # Crop Rotation, so it stays skipped for that reason and not this one.
+        self.assertIn("horse-collar", techs["heavy-plow"]["requires"])
+        self.assertNotIn("crop-rotation", techs)
+        # A technology that lands something still says what it did not: the +1
+        # carry for the farmer villagers has no farmer variant to land on.
+        self.assertIn("attribute 14 on unit 214", techs["heavy-plow"]["unmodelled"])
+
     def test_every_animation_resolves_to_hashed_source(self):
         hashes = self.result["source"]["sha256"]
         for key, entity in self.result["entities"].items():

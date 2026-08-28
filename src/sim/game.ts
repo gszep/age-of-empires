@@ -386,6 +386,27 @@ function applyEffect(rules: UnitRules, effect: TechEffect): void {
  * the minimum range that stops it shooting somebody stood against its wall --
  * so this reaches the same attributes a unit's does, not hit points alone.
  */
+/**
+ * How much food a farm this player builds now holds. The DAT keeps it as a
+ * player attribute (resource 36, 175 to begin with) rather than on the farm,
+ * which is exactly why the mill's technologies can change it: Horse Collar
+ * adds 75 and Heavy Plow another 125, and neither touches a unit this game
+ * models. A farm already in the ground keeps what is left in it, as in AoE2 --
+ * the research pays off on the next one sown.
+ */
+export function farmFoodAmountFor(state: GameState, owner: Entity['owner']): number | undefined {
+  const base = state.rules.buildings.farm.farmAmount;
+  if (base === undefined || owner === 0) return base;
+  let amount = base;
+  for (const key of state.players[owner as PlayerId].researched) {
+    for (const effect of state.rules.technologies[key]?.effects ?? []) {
+      if (effect.resource !== 'farmFoodAmount') continue;
+      amount = combine(effect.operation, amount, effect.amount);
+    }
+  }
+  return Math.round(amount);
+}
+
 export function buildingRulesFor(
   state: GameState, owner: Entity['owner'], kind: BuildingKind,
 ): BuildingRules {
@@ -2020,7 +2041,13 @@ export function stepGame(state: GameState): void {
     if (site.buildProgress >= 1) {
       site.buildProgress = undefined;
       site.hp = Math.min(site.maxHp, Math.round(site.hp));
-      const farmAmount = state.rules.buildings[site.kind as BuildingKind].farmAmount;
+      // Only a farm stores food. How *much* is a player attribute the mill's
+      // technologies raise, but whether this building stores any at all is
+      // still the building's own rule -- asking the player attribute first
+      // turned every finished wall into a farm.
+      const farmAmount = state.rules.buildings[site.kind as BuildingKind].farmAmount === undefined
+        ? undefined
+        : farmFoodAmountFor(state, site.owner);
       if (farmAmount !== undefined) {
         // A finished farm becomes a food source its owner can work until spent.
         site.resourceKind = 'food';

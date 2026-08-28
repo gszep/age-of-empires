@@ -598,6 +598,16 @@ ATTRIBUTE_NAMES = {
 PACKED_ATTRIBUTES = {"armor", "attack"}
 OPERATION_NAMES = {0: "set", 4: "add", 5: "multiply"}
 
+# Effect command type 1 changes a *player* attribute rather than a unit's, and
+# addresses it by resource id. The civ's own `resources` table holds the
+# starting value, which is how a number nobody could find turns out to be
+# stated: a farm's food is resource 36 and civ 1 starts it at 175, exactly the
+# figure the open fallback had hand-written. Horse Collar adds 75 to it and
+# Heavy Plow 125, which is the whole of what those technologies do here.
+RESOURCE_ATTRIBUTES = {36: "farmFoodAmount"}
+# `b` on a type 1 command: 0 writes the value, 1 adds to it.
+RESOURCE_OPERATIONS = {0: "set", 1: "add"}
+
 
 def slug(name: str) -> str:
     """A stable key from a technology's own name: `Bodkin Arrow` -> bodkin-arrow."""
@@ -635,6 +645,21 @@ def effects_of(
     unmodelled: set[str] = set()
     unreached: set[str] = set()
     for command in dat.effects[tech.effect_id].effect_commands:
+        if command.type == 1:
+            # A player attribute: `a` names the resource, `b` chooses write or
+            # add, `d` is the amount. `c` is a bookkeeping slot this does not
+            # read.
+            resource = RESOURCE_ATTRIBUTES.get(int(command.a))
+            resource_operation = RESOURCE_OPERATIONS.get(int(command.b))
+            if resource is None or resource_operation is None:
+                unreached.add(f"resource {int(command.a)} at the player level")
+                continue
+            effects.append({
+                "resource": resource,
+                "operation": resource_operation,
+                "amount": rounded(float(command.d)),
+            })
+            continue
         operation = OPERATION_NAMES.get(command.type)
         if operation is None:
             continue  # enable, upgrade-unit and the rest are not attribute changes
@@ -698,9 +723,13 @@ def technology_entry(dat: DatFile, spec: dict[str, Any], hashes: dict[str, str])
     effects, unmodelled, unreached = effects_of(dat, spec["techId"], spec["entities"])
     if effects:
         entry["effects"] = effects
-    if unmodelled:
+    if unmodelled or (effects and unreached):
         # Kept so a half-applied technology is visible rather than a surprise.
-        entry["unmodelled"] = unmodelled
+        # A technology that lands *something* still says what it did not: Heavy
+        # Plow's farm food arrives and its +1 carry for the farmer villagers
+        # (DAT units 214 and 259) does not, because this game has no farmer
+        # variant to put it on.
+        entry["unmodelled"] = sorted(set(unmodelled) | (set(unreached) if effects else set()))
     # Only of interest when nothing landed; the caller strips it otherwise.
     entry["_unreached"] = unreached
     return entry
@@ -908,6 +937,13 @@ def extract(
         "terrain": terrain,
         "audio": spec.get("audio", {}),
         "civilization": civilization,
+        # Where a player-level attribute starts, from the civ's own resource
+        # table. A farm's food has always been 175 here and was hand-written;
+        # it is resource 36, and the DAT has been stating it all along.
+        "playerAttributes": {
+            name: rounded(dat.civs[spec["civIndex"]].resources[resource_id])
+            for resource_id, name in sorted(RESOURCE_ATTRIBUTES.items())
+        },
         "technologies": technologies,
         # What the civilisation's tree offers that this game cannot represent,
         # and why. Recorded rather than dropped, so the gap is visible.

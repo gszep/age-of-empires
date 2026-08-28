@@ -223,6 +223,13 @@ technologies as gaps.
 
 ### Q5. Read effect command type 1, and gain six technologies
 
+**Type 1 is now read** — issue #23's mill technologies are made of it, and
+`RESOURCE_ATTRIBUTES` in `tools/import_content.py` plus `PlayerAttribute` in
+`src/sim/data.ts` are where a resource id becomes something the game has. What
+is left for this item is the six technologies' own resource ids and the two
+things they change: a market fee and a conversion resistance, neither of which
+the simulation has yet. The paragraph below is the original statement of it.
+
 The importer reads effect commands of type 0, 4 and 5 — set, add and multiply
 on a *unit* attribute — and type 3, upgrade unit. It has never looked at
 **type 1, the resource modifier**, which changes a player-level attribute
