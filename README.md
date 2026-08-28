@@ -1,6 +1,6 @@
 # Open Empires Lab
 
-A deterministic, agent-native 1v1 Dark-through-Castle-Age RTS slice with an authoritative TypeScript simulation, imported AoE2DE content, an AoE2DE-style desktop viewer, and reproducible headless evaluation.
+A deterministic, agent-native 1v1 Dark-through-Imperial-Age RTS slice with an authoritative TypeScript simulation, imported AoE2DE content, an AoE2DE-style desktop viewer, and reproducible headless evaluation.
 
 ## Play
 
@@ -40,8 +40,10 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   length does not change — the speed only decides how many of the same ticks a
   second holds — so a match run fast plays out exactly as it would at any other
   speed, and replays and checksums are unaffected.
-- Select the town center to research Loom (villagers survive more), the Feudal Age, and then the Castle Age. Markets, blacksmiths, archery ranges, stables, watch towers and everything they train are Feudal; monasteries, siege workshops, castles and everything they train are Castle, as in the original. The command grid only offers what the age allows.
+- Select a building to research what it offers: sixty-six technologies, taken from the Britons' own tech tree in the owned files. The town center has Loom and the three ages; the blacksmith has the armour and attack lines; the university has Ballistics, which is what makes your arrows lead a moving target. Markets, blacksmiths, archery ranges, stables, watch towers and everything they train are Feudal; monasteries, siege workshops, universities, castles and everything they train are Castle, as in the original. The command grid only offers what the age allows, and only what the chain before it allows: Iron Casting appears once Forging is done, not beside it.
+- Fifteen of those technologies are unit upgrades, and an upgrade replaces rather than adds. Research Man-at-Arms and every militia you own becomes one, wounds and all, and the barracks stops offering the militia — through to the champion, the halberdier, the arbalester and the elite longbowman. Your buildings change with the age too: the town center goes from open timber to thatch to tile to slate.
 - Select a villager to place any building — the build menu has an economic and a military page, as in the original. Select a town center to train villagers, a barracks for militia and spearmen, an archery range for archers, skirmishers and cavalry archers, a stable for scout cavalry and knights, a market for trade carts, a siege workshop for battering rams and mangonels, a monastery for monks, or a castle for longbowmen (the British unique unit). Destroy the enemy town center to win.
+- Both sides play the Britons, which is the civilisation the content is imported for. A civilisation is mostly what it goes without: the Britons have no Thumb Ring, no Bloodlines, no Hussar and no Paladin, and their own tree says so — the game will not offer you what they were never given.
 - A monk right-clicked onto a wounded ally heals it, and onto an enemy soldier converts it to your side — it takes between five and nine seconds, and walking out of the monk's reach loses all of that work. A mangonel's stone hurts everything it lands beside, your own soldiers included, so keep them clear.
 - Right-click a trade cart onto the opponent's market to open a trade route: it loads there and banks gold each time it reaches your own market, and a longer road pays more.
 - Sheep join whoever walks up to them and then stand where they are: select them

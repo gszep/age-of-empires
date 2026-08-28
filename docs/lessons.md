@@ -259,6 +259,29 @@ keeps the record.
   looks over-gathered at the end of a match may have been exactly right at the
   start of it; check what the early spend is before rebalancing the income.
 
+- **The DAT states more than you expect; look before approximating.** Three
+  times in one run a number that looked like it needed inventing turned out to
+  be in the file. How long a corpse lies there is a type-12 resource storage
+  draining at the corpse unit's own rate (300 seconds for a unit, 60 for
+  rubble) rather than a window somebody has to choose. Which building art an
+  age uses is an `upgrade unit` command on the age technology, not a naming
+  convention. Which technologies a civilisation gets is a `Node Status` in a
+  file shipped beside the DAT. Rule: when about to pick a number, spend five
+  minutes dumping the fields of the thing it belongs to and the effect
+  commands of whatever changes it — the miss rate on that search is lower than
+  it feels, and the approximations you do keep are then genuinely the ones the
+  files do not answer.
+
+- **A test that pins a roster breaks on every addition and says nothing when
+  it does.** `expect(trainedHere).toEqual(['archer', 'cavalry-archer',
+  'skirmisher'])` failed three times in one afternoon as units were added, and
+  each failure was a line to edit rather than a fact to learn. Rewritten to
+  assert the rule — everything on that building which exists only as the far
+  end of an upgrade is offered only once the upgrade is researched — it covers
+  every unit added since and would catch a real defect. Rule: assert the
+  invariant, not the inventory; if an exact list is genuinely the point, say
+  why in the test.
+
 ## Process
 
 - **Complete one playable behaviour end to end** (from the working style

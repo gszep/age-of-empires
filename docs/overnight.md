@@ -2,319 +2,122 @@
 
 The work queue for autonomous runs. Work strictly top to bottom, **one item at a
 time**: an item is done only when its verification step passes and the quality
-gate (`npm test`, `npm run build`, `npm run test:import`) is green, then commit
-and push before starting the next. If an item cannot be finished, revert to the
-last green state, record what blocked it here, and move on — a half-shipped
-feature is worse than an honest gap. Do not mark an item done on "looks done":
-run its check.
+gate is green, then commit and push before starting the next. If an item cannot
+be finished, revert to the last green state, record what blocked it here, and
+move on — a half-shipped feature is worse than an honest gap. Do not mark an
+item done on "looks done": run its check.
+
+Run the gate with `.local/gate.sh`, not by hand. Piping a step to `tail` hands
+`&&` the status of `tail`, which is always 0, and a broken build sails straight
+into a commit — that happened twice in one run, once in the ad-hoc chain and
+once in the first script written to replace it. The script reads `PIPESTATUS`
+on the line after the command and has been tested against a deliberate failure.
 
 Use the debug protocol (`AGENTS.md` → Visual debug protocol) for rendering
 verification, and prefer its fields to screenshots: `entities` reports
-`amount`, `resourceKind` and the `frame` actually drawn, and `sim` reports
-`selected` and `flashTarget`. To reach a state a fresh match cannot — a Castle
-Age town, an army mid-fight — build it in Node through `applyCommand` and hand
-it to the page as a dev-session snapshot (`docs/lessons.md` has the recipe);
-do not add cheats to the protocol and do not play twenty minutes to get there.
+`amount`, `resourceKind`, the `frame` actually drawn and a `shape` tag for
+walls and gates; `sim` reports `selected` and `flashTarget`. To reach a state a
+fresh match cannot — a Castle Age town, an army mid-fight, a building
+mid-collapse — build it in Node through `applyCommand` and hand it to the page
+as a dev-session snapshot (`docs/lessons.md` has the recipe, and
+`.local/probes/` has half a dozen working examples). Do not add cheats to the
+protocol and do not play twenty minutes to get there.
 
 Wait on long jobs by handle, never by pattern — `tools/wait_for.sh` against a
-PID or sentinel file, not `pgrep -f`. End every run with a hygiene pass:
-enumerate the processes the run started (background tasks, dev servers,
-headless browsers, waiters), kill the litter, and state what is deliberately
-left running.
-
-## The run this queue was written for
-
-Agreed with the human on 2026-08-27, deadline **18:00 Friday 2026-08-28**.
-Start nothing new after ~17:00; finish the item in hand, run the gate, commit,
-push, hygiene pass, hand over. Refresh `status.md`/`backlog.md`/`lessons.md`
-and this file at ~70% context and again at handover.
-
-Four phases, in order. Phase 4 is not expected to finish; whatever is not
-reached is written into `backlog.md` honestly rather than half-shipped.
-
-Decisions already taken, so they are not re-litigated mid-run:
-
-- The Britons tech tree is cut to nodes whose research building **and** target
-  entity already exist in the simulation. Every excluded node is recorded with
-  its reason in `docs/status.md`; entities are not stubbed just to hang a
-  technology on one.
-- Both players are Britons. Civilisation is a per-player match-config field so
-  a second civilisation is a later data addition, not a refactor.
-- Civilisation *bonuses* (archer range, shepherd rate, town-center wood, free
-  Yeomen) are **out of scope** — they are not part of the tech tree.
-- Issues are closed on GitHub with a one-line note naming the commit.
-- Commit and push to `origin/main` per verified item; never rewrite pushed
-  history.
-
-## Progress
-
-Phase 1 is complete: issues 1, 2, 4, 8, 9, 12, 13 and 15 are fixed, verified
-and closed. Phase 2 is complete bar unit upgrades: the aim model, the manifest
-`technologies` fix, the Britons civilisation, fifty technologies from their own
-tree, the university, and Ballistics — which closed issue 3. The three issues
-left open on GitHub are all tagged `enhancement` and outside this run's scope.
-
-N3 is done too. Remaining, in order: **N4**, **N6**, **N7**, **N8**, then
-**N1** and **N2**, then whatever of Phase 4 fits.
-
-**Unit upgrades are deliberately deferred into Phase 4.** They are the last
-part of the tech tree, but a `UnitUpgrade` node's target — the man-at-arms, the
-crossbowman, the pikeman — is a unit this game does not have, so the agreed cut
-(a node whose building *and* target already exist) excludes them until the
-units are imported. Importing fifteen new units with their animations is
-content work of exactly the shape Phase 4 is for, and the Imperial Age already
-being researchable is the reason to do it there. The replace-a-kind rule itself
-is small: the DAT states an upgrade as an `upgrade unit` effect command, the
-same one the age building variants already use.
-
-## Phase 1 — the open `bug` issues
-
-### P1.1 Buildings gain line of sight when placed but not yet fully built (#1)
-
-A foundation should not see. Find where visibility gathers its sources and gate
-a building's line of sight on `buildProgress === undefined`.
-
-*Verify:* a visibility test that a fresh foundation reveals nothing beyond what
-its builders already see, and that the same building reveals its `lineOfSight`
-once complete.
-
-### P1.2 Farms are invisible (#2)
-
-Farms are drawn as terrain, not sprites — DAT terrain slots 7 (`Farm1`,
-`g_fm1`) and 29 (`Farm Cnst1`, `g_fc1`), both present in the manifest, and
-`sprites.ts` already selects between them. So this is a rendering defect, not a
-missing import. Find why the terrain patch does not reach the screen.
-
-*Verify:* a pixel probe over a finished farm returns the farm texture's colours
-rather than grass, and the same over a foundation returns the construction
-variant.
-
-### P1.3 Enemy units in fog of war do not disappear (#4)
-
-They default to a neutral pose instead of vanishing. Units are not remembered
-in AoE2 — only buildings are. Check what `observe.ts`/`visibility.ts` puts in
-last-seen memory against what the view draws from it.
-
-*Verify:* an observation test that a unit which walks into fog leaves no
-remembered entity while a building does, and an entities query in the running
-game showing the enemy villager gone once the sight lapses.
-
-### P1.4 Town Centre is the only building which permits setting rally points (#8)
-
-*Verify:* a command test that a rally order lands on a barracks, archery range,
-stable, siege workshop, castle and monastery, and that a unit trained there
-walks to the flag.
-
-### P1.5 Villagers should fire arrows when hunting (#9)
-
-Believed already fixed by `6286149` ("Hunt with the bow the DAT gives a
-hunter"). Verify against the reported behaviour before closing; if it is fixed,
-close with the commit and do not re-implement.
-
-*Verify:* an entities query on a villager hunting a deer shows the bow
-animation and a projectile, not a melee strike.
-
-### P1.6 Exhausted forage bushes briefly turn into tree stumps (#12)
-
-The `dead` import slot routes bushes through `n_tree_stump_generic_x1`. Check
-the bush's own `dead_unit_id` in the DAT before deciding what it should leave;
-if the DAT assigns it nothing, it should draw nothing.
-
-*Verify:* an entities query on a worked-out bush reports no decay art, and the
-import test asserts whatever the DAT actually says.
-
-### P1.7 Palisade walls and gates do not orient correctly (#15)
-
-Walls orient vertically by default instead of taking the corner piece, and
-gates do not snap to the axis of the palisade they join. The frame-to-meaning
-mapping was proved once by compositing (see `lessons.md`); the defect is in
-which frame the connection state selects.
-
-*Verify:* build an L of palisade through `applyCommand` and read each segment's
-frame — the corner tile draws the corner run, not a straight one — and a gate
-dragged onto a horizontal line reports the horizontal orientation. Report the
-orientation tag through the debug protocol as part of this item (the backlog
-asks for it and this is the item that needs it).
-
-### P1.8 Advancing to Feudal does not change building appearance (#13)
-
-The largest of the bugs: age-specific building art is an importer change (the
-DAT's per-age graphic sets for town center, house, mill, barracks) plus a
-renderer change that selects the set by the owner's age. Read what the DAT
-actually keys the variant on before adding a slot.
-
-*Verify:* a dev-session snapshot at Feudal shows the Feudal art for all four
-buildings by `frame`/atlas name in an entities query, and the import test
-asserts the age sets came from the DAT.
-
-## Phase 2 — arrows, then research
-
-### P2.1 Arrow accuracy and ballistics (#3) — *split*
-
-Landed as **P2.1a**: a shot is aimed once and can miss. What remains — Thumb
-Ring and Ballistics, the two technologies that modify it — needs the general
-effect machinery and, for Ballistics, the university, so both are folded into
-**P2.4** rather than built twice. Issue #3 stays open until they are
-researchable in a real match.
-
-### P2.1a (landed) Arrow accuracy and ballistics (#3)
-
-Arrows currently never miss. They should fire at where the target *is*, and
-follow it; only Ballistics makes them lead a moving target. `accuracy_percent`
-is a DAT attribute that is not implemented at all, and Thumb Ring modifies it —
-so this lands before the tech tree, or those technologies would modify nothing.
-
-Read the DAT for `accuracy_percent`, the projectile's own fields, and what
-Ballistics' effect commands actually change, before choosing a miss model.
-Record any part the owned data does not answer as a discrepancy in
-`docs/status.md` rather than approximating silently.
-
-*Verify:* a simulation test that a moving target is missed without Ballistics
-at a rate matching the DAT's accuracy, hit reliably with it, and that a
-research changes the outcome; plus a determinism test across the change.
-
-### P2.2 Carry `technologies` through to the published manifest
-
-`import_content.py` writes `technologies` into `.local/aoe2de/content.json`,
-but `convert_sld.py` never copies it into `public/imported/aoe2/manifest.json`
-— so `rulesFromManifest` finds no key and the game silently runs on the
-hardcoded `FALLBACK_RULES`. It matches the DAT today, which is why nothing
-caught it. Everything imported below depends on this.
-
-*Verify:* the manifest carries `technologies`, a test asserts the imported
-values reach `rulesFromManifest` (change one in a fixture and watch the rules
-follow), and the import test guards the key's presence.
-
-### P2.3 Civilisation as a match-config field, Britons for both players
-
-*Verify:* the match config carries a civilisation per player, defaults to
-Britons, round-trips through the schema and the replay record, and a
-determinism test passes across it.
-
-### P2.4 The Britons technology tree
-
-Source of truth: `depot_813781/resources/_common/dat/CivTechTrees/BRITONS.json`
-(170 nodes — 85 `Research`, 28 `UnitUpgrade`, 26 `Unit`, 29 buildings, 2
-`UniqueUnit`, tagged by `Age ID` 1–4), cross-referenced against the DAT for
-cost, time, research building and effect commands. Blacksmith armour and attack
-lines first — they are flat modifiers of the shape Loom already uses — then the
-`UnitUpgrade` rule that replaces one unit kind with another.
-
-*Verify:* each technology is refused before its age and applies its DAT effect
-after; a determinism test across a research and across an upgrade; and the
-excluded nodes are listed with reasons in `docs/status.md`.
-
-## Phase 3 — the N queue
-
-Ordered as agreed: N3, N4, N6, N7, N8-remainder, then N1 and N2 last.
-
-### N3. Import technology icons — **done**
-
-The widgetui sheet is `Techs`, 313 entries named after the technology
-(`TechIconsT006Loom`), and each technology's own `icon_id` indexes it. Verified
-by reading `.command-button` background images out of the DOM with a town
-center selected: every button has art, research included.
-
-### N4. Minimap player colours from the DAT — **done**
-
-Plumbed `ContentAssets` through to `draw` and reused `playerColorHex`, which
-already read the manifest's own `minimapColor`. Verified by reading the
-minimap canvas's pixels in the browser: the player's dots are `#0000ff`, the
-DAT's pure blue, where the fallback would have given `#1a6cff`.
-
-### N6. Building rubble, and a corpse window that follows its animation — **done**
-
-Better than the item asked for: the window does not merely follow the death
-animation, it is the DAT's own number. Every corpse unit carries a type-12
-resource storage draining at its own rate — 300 seconds for a unit, 60 for a
-building's rubble — and only dead units carry one. Every building's `decay`
-slot is imported, and a razed barracks was watched through
-`barracks/idle -> barracks/death -> barracks/decay` in a real match.
-
-*Original item, for the record:*
-
-Every building's `dead_unit_id` names its rubble (`b_*_rubble_x1`) and the
-importer's `dead` slot already knows how to reach it, but `kill()` gives every
-corpse a 3-second window while a building's death graphic runs 8.3s — so a
-building vanishes mid-collapse and the rubble would never draw. The corpse
-window has to follow the death animation's length first, which is a simulation
-change and a checksum change.
-
-*Verify:* a razed barracks plays its collapse to the end and leaves rubble
-(entities query: `barracks/death` through to `barracks/decay`), and the
-determinism tests still pass with the new window.
-
-### N7. The under-attack alert nags — **done**
-
-Replaced the single global timer with a per-entity memory of when each thing
-was last hurt. A fight that goes on is one alert; a second building hit
-meanwhile is its own alert however loud the first was; and a thing left alone
-for the window and then hit again speaks up. Three tests, one per case, and the
-old test that asserted the nagging now asserts the silence.
-
-### N8. Whatever the tech tree left — **done**
-
-The sweep over the twenty-one technologies excluded for "none of its effects
-reach anything imported" found exactly one that could be reached — Murder
-Holes — and two defects in what had already shipped. `buildingRulesFor`
-applied hit points alone, so Arrowslits and Heated Shot imported correctly and
-then did nothing; and `tooClose` answered false for every building, so the tile
-of minimum range the DAT gives a watch tower and a castle was never enforced.
-Buildings now read attacks, armour, ranges and sight through research, a tower
-will not shoot somebody stood against its wall, and Murder Holes is the
-fifty-first technology.
-
-The other twenty are genuinely out of reach and stay recorded with their
-reasons: farm food (Horse Collar, Heavy Plow), market fees (Coinage, Banking,
-Guilds), monk healing and conversion (Devotion, Faith, Herbal Medicine,
-Sanctity, Illumination, Block Printing), garrisoning, and the dock's.
-
-### N1. Teach the built-in AI to age up — **done, with one criterion missed**
-
-16 of 16 matches reach the Feudal Age and 6 reach the Castle Age, from a
-baseline of none. **12 of 16 decided against the 16 of 16 asked for** — the
-economy that reaches the Castle Age is also an economy neither side can finish
-off. Measured across five configurations; the curve and the reason are in
-`status.md`, and "the AI cannot close out a won game" is now the top of
-`backlog.md`.
-
-*Original item:*
-
-`src/sim/ai.ts` has no notion of research, so Loom, the Feudal Age and the
-Castle Age are out of its reach, and with them every building and unit they
-open. Read `applyCommand`'s `research` branch for the rules the AI must satisfy
-(building idle, age reached, cost affordable). Bank toward the age rather than
-spending everything on villagers; the observation already carries `age` and
-`researched`.
-
-*Verify:* a 16-match paired batch (`npm run batch -- --matches 16 --seed-start
-1`) in which at least half the matches reach the Feudal Age and at least one
-reaches the Castle Age, still 16/16 decided with 0 replay checksum failures.
-Record the new age distribution in `docs/status.md`.
-
-### N2. Teach it to hunt and herd — **done, verification not met**
-
-It sees and works animals now (a test drives it to claim and eat a sheep), but
-early food income is unchanged: 159 food in the first four minutes either way,
-383 against 385 at eight minutes. Berries are nearer than sheep on this map and
-both gather at the same rate, so there is nothing to win until a claimed sheep
-can be walked home again. Recorded in `backlog.md`.
-
-*Original item:*
-
-It picks gather targets by `kind === 'resource'`, which animals are not, so the
-whole Dark Age food opening is invisible to it.
-
-*Verify:* a batch in which the AI's food income in the first four minutes is
-measurably higher than the current baseline (record both), and a simulation
-test that an AI-driven player claims and works a sheep.
-
-## Phase 4 — Imperial Age
-
-Expected to be reached only in part. Strict order so that whatever lands is
-coherent: the age technology (tech 103) and the university → research icons →
-building and unit icons → the new Imperial units and their art. A unit without
-its art is not shipped; it is recorded in `backlog.md`.
+PID or sentinel file, not `pgrep -f`. Before restarting a background job that
+looks stuck, check whether it is still running: three atlas conversions once
+ran at once, each making the others slower, and it looked exactly like a hang.
+End every run with a hygiene pass: enumerate the processes the run started,
+kill the litter, and state what is deliberately left running.
+
+## Where this queue stands
+
+The previous queue (N1–N8) is finished and folded into `docs/status.md`, along
+with the eight `bug` issues and the whole of the technology work. What is left
+on GitHub is three `enhancement` issues, untouched by design: #5 pathing, #6
+multi-unit selection, #7 spawn queue.
+
+What landed, in one paragraph each, because the next run should know what it is
+standing on. **Combat**: a shot is aimed once and can miss — `accuracy_percent`
+decides whether it was aimed true, and Ballistics decides whether it leads a
+moving target. **The tree**: sixty-six technologies read from
+`CivTechTrees/BRITONS.json` and the DAT's own effect commands, including
+fifteen unit upgrades through to the champion and the elite longbowman, with
+the DAT's own prerequisite chains. **The board**: farms draw, buildings wear
+their age, a razed building falls all the way down and leaves its rubble for
+the sixty seconds the DAT allows it, and enemy units do not linger in the fog.
+**The strategy**: the built-in AI ages up, hunts, farms, builds an archery
+range and buys Loom and the man-at-arms.
+
+## The queue
+
+### Q1. The example AI cannot close out a won game
+
+Four of sixteen paired matches run out the thirty-minute clock, where the old
+Dark Age militia rush decided all sixteen. This is the single biggest thing
+standing between the strategy and a decisive match, and it is worth more than
+any further tuning of its economy — the trade-off curve between the two is
+measured in `status.md` and the economy end of it is exhausted.
+
+Neither side can finish an opponent as rich as itself. The army marches at the
+enemy town center and grinds; reinforcements arrive one at a time; the endgame
+raze only sends villagers in once the enemy field is completely clear, which
+stops being true the moment the other side has an economy of its own.
+
+*Verify:* a 16-match paired batch that is 16/16 decided with 0 replay checksum
+failures, without giving up the ages — at least 12 of 16 still reaching the
+Feudal Age. Record the new distribution in `status.md`.
+
+### Q2. A blacksmith the AI never builds
+
+The armour and attack lines are the best value in the tree — Forging is +1
+attack for every melee unit for 150 food — and the strategy has no blacksmith,
+so it has never seen them. Its wish list is three technologies long and fixed
+in order; sixty-six are researchable.
+
+*Verify:* a batch in which the AI researches at least one blacksmith line, and
+its army measurably out-fights the same strategy without it (run the two
+against each other and record the win rate).
+
+### Q3. Herdables that follow you home
+
+The one thing that would make hunting worth doing. A claimed sheep stands where
+it is, so eating it means walking to it — and on this map the berries are
+nearer, which is why teaching the AI to hunt changed its food income by nothing
+at all (159 food in the first four minutes either way; the measurement is in
+`backlog.md`). AoE2's gain comes from walking a sheep under the town center and
+eating it with no return trip.
+
+The history matters: herdables used to follow, and it was removed because the
+simulation overwrote their orders four times a second, which made them
+uncontrollable. The middle ground named in `backlog.md` is following only until
+the first order.
+
+*Verify:* a claimed sheep follows the unit that claimed it until given an order
+of its own, and the AI's food income in the first four minutes is measurably
+higher than the 159 recorded now.
+
+### Q4. The naval slice, or an honest note that it is out of scope
+
+Everything still skipped in `skippedTechnologies` is the dock and its ships,
+plus the scorpion line. `docs/water-design.md` scopes water as W1–W5 and it is
+deliberately not started; its one open question is the shore seam, which is the
+same blend-mask mapping that blocks terrain blends.
+
+If water is not going to be built, say so in `status.md` and stop listing its
+technologies as gaps.
+
+### Q5. Building rubble per age, and the hit points an age gives
+
+Two loose ends left by the age work, both small and both in `backlog.md`. Each
+age variant has its own rubble unit (`Barracks Age2 (Rubble)`), so a razed
+Feudal barracks leaves Dark Age rubble. And those variants carry more hit
+points than the Dark Age original — a barracks goes 1200 to 1500, a house 550
+to 750 — which is a real effect of ageing up that is not applied.
+
+*Verify:* a razed Feudal barracks leaves the Feudal rubble, and a house built
+after the Feudal Age has 750 hit points where one built before has 550 — with
+a determinism test across the change, because it is a checksum change.
 
 ## Blocked or deliberately not started
 
@@ -325,12 +128,14 @@ its art is not shipped; it is recorded in `backlog.md`.
   which is what the download-first rule exists to prevent. Needs a mapping
   found in the owned data or a side-by-side against the installed game.
 - **Water.** `docs/water-design.md` scopes it as W1–W5 from the owned DAT. It
-  changes the board rather than adding to it; do not start it mid-run. Its one
-  open question is the shore seam, which is the same blend-mask mapping that
-  blocks the item above.
+  changes the board rather than adding to it; do not start it mid-run.
 - **The monk's occlusion contour.** Its idle and attack outline layers are the
   only consumed sources that fail `tools/sld_layers.py`'s walk invariant, so
   they sit in the manifest's `skippedMasks`. The invariant is the decoder
   working as intended; what those two layers encode differently has not been
   measured, and guessing would undo the thing that makes the decoder
   trustworthy.
+- **Civilisation bonuses.** Deliberately out of scope for the tech-tree work:
+  they live in the DAT as civ-specific effect commands rather than in the tree,
+  and the human ruled them out for that run. The Britons' archer range, faster
+  shepherds, cheaper town centers and free Yeomen are all absent.
