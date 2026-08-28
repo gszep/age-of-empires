@@ -93,6 +93,70 @@ describe('simulation', () => {
     expect(attackersDealing(3)).toBe(single * 3);
   });
 
+  it('catches a target that is walking away from it', () => {
+    // Issue #18. A swing that is under way was thrown away the moment the
+    // target drifted out of reach, and the next one started from nothing --
+    // so a unit with a real windup could never land a blow on anything that
+    // kept moving. A scout has a 0.6s windup and a villager walks 0.48 tiles
+    // in that time, which is further than the reach margin: it swung, lost
+    // the swing, closed the gap, swung again, and never connected once.
+    const state = createGame(91);
+    const prey = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const scout = state.entities.find(e => e.owner === 2 && e.kind === 'scout-cavalry')!;
+    // Side by side in open ground, with the villager walking steadily away.
+    prey.position = { x: 60.5, y: 60.5 };
+    scout.position = { x: 59.5, y: 60.5 };
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [prey.id], target: { x: 100.5, y: 60.5 },
+    });
+    applyCommand(state, {
+      kind: 'order', player: 2, entityIds: [scout.id],
+      target: prey.position, targetId: prey.id,
+    });
+    const hits: number[] = [];
+    let hp = prey.hp;
+    let flips = 0;
+    let last = scout.activity;
+    for (let i = 0; i < 600 && !prey.dead; i++) {
+      stepGame(state);
+      if (scout.activity !== last) { flips++; last = scout.activity; }
+      if (prey.hp !== hp) { hits.push(i); hp = prey.hp; }
+    }
+    // It catches the villager and kills it.
+    expect(hits.length).toBeGreaterThan(3);
+    expect(prey.dead).toBe(true);
+    // And the blows arrive on the weapon's own reload clock rather than on
+    // however long it takes to re-close a gap that should never have opened.
+    const reload = Math.round(state.rules.units['scout-cavalry'].attackReloadSeconds * 20);
+    for (let i = 1; i < hits.length; i++) expect(hits[i] - hits[i - 1]).toBe(reload);
+    // One flip: it walks in once and then stays on its target. It used to
+    // bounce between 'moving' and 'attacking' hundreds of times, which is the
+    // attack animation restarting that the report describes.
+    expect(flips).toBe(1);
+  });
+
+  it('replays a chase identically', () => {
+    // Pursuit is a checksum change: an attacker now moves on ticks where it
+    // used to stand still.
+    const chase = (seed: number) => {
+      const state = createGame(seed);
+      const prey = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+      const hunter = state.entities.find(e => e.owner === 2 && e.kind === 'scout-cavalry')!;
+      prey.position = { x: 60.5, y: 60.5 };
+      hunter.position = { x: 59.5, y: 60.5 };
+      applyCommand(state, {
+        kind: 'order', player: 1, entityIds: [prey.id], target: { x: 100.5, y: 60.5 },
+      });
+      applyCommand(state, {
+        kind: 'order', player: 2, entityIds: [hunter.id],
+        target: prey.position, targetId: prey.id,
+      });
+      run(state, 500);
+      return digest(state);
+    };
+    expect(chase(91)).toBe(chase(91));
+  });
+
   it('lets the example AI finish a match against a passive opponent', () => {
     const state = createGame(7);
     for (let i = 0; i < 40_000 && !state.winner; i++) {

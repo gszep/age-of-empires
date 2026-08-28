@@ -468,6 +468,42 @@ random direction. One tile is the board's own unit, and it is wider than any
 unit and narrower than any building — which is why an arrow that goes wide of a
 villager still lands inside the town center behind him, as in AoE2.
 
+### An attacker stays with what it is attacking
+
+A unit stopped moving the instant its target was inside the reach margin, and
+a swing already under way was thrown away the moment the target drifted back
+out of it. Together those made a unit with a real windup unable to land a blow
+on anything that kept walking. A scout has 0.6 s of windup (frame delay 12 at
+0.05 s a frame) and a villager covers 0.48 tiles in that time, which is
+further than the 0.35-tile margin: the scout swung, lost the swing, closed the
+gap, and swung again — for ever. Infantry hid it, because the DAT gives a
+militia and a man-at-arms a frame delay of 0 and their blow lands on the tick
+it starts (issue #18).
+
+Two rules now, both narrow:
+
+- **A swing is spent only while the attacker is in reach, and is not
+  discarded when it is not.** Retasking aborts it, which is the reference's
+  own rule ([attack delay](https://ageofempires.fandom.com/wiki/Attack_delay)),
+  and that is handled where an order is given.
+- **The reach margin is tolerance for landing a blow, not a place to stand.**
+  An attacker closes to its weapon's own range — contact for a melee unit,
+  four tiles for an archer — so the margin is slack it can lose without
+  leaving reach.
+
+Measured, scout cavalry against a villager walking steadily away, under both
+imported and open rules:
+
+| | before | after |
+| --- | --- | --- |
+| ticks between hits | 115 (5.7 s) | 40 (2.0 s, the reload) |
+| hits in 60 s | 0 | 9, and the villager dies |
+| moving/attacking flips | 663 | 1 |
+
+The flip count is the other half of the report — each flip restarts the attack
+animation, which is what "plays the very beginning of the attack animation,
+then has to move closer, then plays the beginning again" was describing.
+
 ### A building has armour, and it decides what an upgrade is worth
 
 Damage is scored class by class: for every class the attacker's attack names,

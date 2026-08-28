@@ -630,6 +630,10 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       const defensive = canShoot(state, entity);
       if (!isUnit(entity.kind) && !defensive) continue;
       matched++;
+      // Retasking aborts a swing in progress -- the reference's own rule, and
+      // the reason the windup survives a target drifting out of reach but not
+      // an order.
+      entity.attackWindup = undefined;
       if (command.kind === 'stop') {
         entity.order = { kind: 'idle' };
         entity.activity = 'idle';
@@ -1282,13 +1286,32 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
     return;
   }
   if (!inAttackRange(state, entity, target)) {
-    // Leaving range cancels a started swing: no damage before release.
-    entity.attackWindup = undefined;
+    // A swing in progress is kept, not thrown away. It is only spent while the
+    // attacker is actually in reach, so nothing lands early -- but a target
+    // drifting a few tenths of a tile no longer costs the whole windup. It
+    // used to, and the swing then started again from nothing, so anything
+    // with a real windup could never land a blow on a target that kept
+    // walking: a scout has 0.6s of windup and a villager covers 0.48 tiles in
+    // it, which is further than the reach margin, so the scout swung, lost
+    // the swing, closed the gap and swung again, for ever (issue #18).
+    // Retasking is what aborts a swing, as it does in the reference, and that
+    // is handled where an order is given.
     entity.activity = 'moving';
     moveAlong(state, grid, entity, target.position, rules.speed, interactionRange(target) + attackRange(state, entity, target));
     return;
   }
-  clearPath(entity);
+  // In reach -- but a target that is walking away has to be kept up with. The
+  // reach margin is tolerance for landing a blow, not a place to stand: a
+  // scout that stopped the moment it was inside the margin let the villager
+  // step back out of it between every swing, and took six seconds a hit
+  // against a two-second reload (issue #18). Closing to the weapon's own
+  // range keeps a melee unit in contact and leaves an archer at four tiles.
+  if (inRange(entity, target, attackRange(state, entity, target))) {
+    clearPath(entity);
+  } else {
+    moveAlong(state, grid, entity, target.position, rules.speed,
+      interactionRange(target) + attackRange(state, entity, target));
+  }
   entity.activity = 'attacking';
   if (entity.attackCooldown !== undefined && entity.attackCooldown > 0) {
     entity.attackCooldown -= 1;
