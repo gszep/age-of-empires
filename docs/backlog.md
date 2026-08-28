@@ -124,10 +124,13 @@ terrain blends above.
   longbowman. What is left is naval (the dock and its ships) and the scorpion
   line, which are units this slice does not have at all rather than upgrades
   it is missing.
-- **The built-in AI does not research upgrades.** It trains whichever infantry
-  its barracks currently offers, so it uses a man-at-arms if one is researched
-  — but nothing researches one. It banks for the age instead, which is the
-  right priority; spending the surplus on upgrades would be the next step.
+- **The built-in AI's wish list is three technologies long.** Loom, the
+  man-at-arms and the crossbowman — the ones whose building it actually puts
+  up. Sixty-six are researchable; it buys three, in a fixed order, with
+  whatever the next age is not waiting for. A strategy that chose among them
+  by what it is fighting would be a real improvement, and so would building a
+  blacksmith at all: the armour and attack lines are the best value in the
+  tree and it never sees them.
 - **Fifty-two technologies are researchable**, taken from the Britons' own tree — the blacksmith's armour and attack lines, the economy
   technologies, the monastery's and the castle's, and all three ages. What is
   still missing is the *upgrades*: man-at-arms, crossbowman, pikeman, light

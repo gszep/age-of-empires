@@ -53,11 +53,12 @@ changed underneath it.
   how every shot is aimed, what fifty technologies do, and how long a body lies
   on the ground. Corpses lasting five minutes rather than three seconds cost
   nothing measurable — throughput went up, not down.
-- **The built-in AI ages up now, and the batch says what that costs.** Re-run
-  after teaching it to research: **16 of 16 matches reach the Feudal Age** (30
-  of 32 player-slots) and **6 reach the Castle Age** (12 slots), against a
-  baseline where neither age was ever reached. Still 0 replay checksum
-  failures and a 0.5 mirror win rate, at 404x real time.
+- **The built-in AI researches now, and the batch says what that costs.**
+  Re-run with its upgrade wish list: **Loom in all 32 player-slots, the Feudal
+  Age in 30, Man-at-Arms in 8 and the Castle Age in 4** — every match reaches
+  the Feudal Age and four reach the Castle Age, against a baseline where the
+  strategy never researched anything at all. Still 0 replay checksum failures
+  and a 0.5 mirror win rate, at 357x real time.
   **12 of 16 decided, against the 16 of 16 this queue asked for.** That is a
   real regression and it is the price of the economy: two sides that both farm
   and both reach the Castle Age cannot finish each other inside the

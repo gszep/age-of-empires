@@ -107,6 +107,25 @@ const AGE_UP: { tech: string; food: number; gold: number }[] = [
   { tech: 'imperial-age', food: 1000, gold: 800 },
 ];
 /**
+ * Technologies worth buying with what is left over, in the order it wants
+ * them, and the building each happens at. Only ones this strategy actually
+ * builds somewhere for: a wish list naming a blacksmith it never puts up
+ * would be a list of commands that are always refused.
+ *
+ * Prices are written out like every other price here, because a strategy sees
+ * only its observation and the observation carries what it has researched
+ * rather than what everything costs.
+ */
+const WISH_LIST: {
+  tech: string; at: 'town-center' | 'barracks' | 'archery-range';
+  food: number; wood: number; gold: number;
+}[] = [
+  { tech: 'loom', at: 'town-center', food: 0, wood: 0, gold: 50 },
+  { tech: 'man-at-arms', at: 'barracks', food: 100, wood: 0, gold: 40 },
+  { tech: 'crossbowman', at: 'archery-range', food: 175, wood: 0, gold: 100 },
+];
+
+/**
  * How many soldiers are worth keeping before saving for the age. Below this it
  * builds the army first: a player with nothing standing loses the match long
  * before the age arrives. Above it, every fifty food spent on another militia
@@ -381,6 +400,20 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   }
 
   const wantVillagers = VILLAGERS_BY_AGE[Math.min(observation.age, VILLAGERS_BY_AGE.length - 1)];
+  // Spend what the age is not waiting for. Anything on the list it can afford
+  // outright, at a building of its own that is standing idle.
+  if (!banking) {
+    for (const want of WISH_LIST) {
+      if (observation.researched.includes(want.tech)) continue;
+      if (observation.food < want.food || observation.wood < want.wood
+        || observation.gold < want.gold) continue;
+      const at = mine.find(e => e.kind === want.at && (e.buildProgress ?? 1) >= 1 && !e.researching);
+      if (!at) continue;
+      commands.push({ kind: 'research', player, buildingId: at.id, tech: want.tech });
+      break; // one at a time: the next decision will pick up the next one
+    }
+  }
+
   if (tc && !tc.training && villagers.length < wantVillagers
       && observation.food >= 50 && headroom > 0) {
     commands.push({ kind: 'train', player, buildingId: tc.id, unit: 'villager' });
