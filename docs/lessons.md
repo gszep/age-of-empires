@@ -312,6 +312,17 @@ keeps the record.
   intermediate table. A lookup function returning the right number proves the
   lookup, and the bug is usually in who calls it.
 
+- **A simulation feature can be complete and completely unreachable.** The
+  training queue was right in the rules, right in five tests, and impossible to
+  use: the train button's `enabled` still read `!producer.training`, so the
+  moment a building started training, the button that queues behind it went
+  grey. Four clicks in a real browser produced one villager. Nothing in the
+  test suite could see it, because the tests call `applyCommand` and a player
+  cannot. Rule: a feature reached through a button is verified by *pressing the
+  button* in a running page, not by asserting the command it would send; and
+  when a rule changes what is allowed, search the interface for the old rule
+  spelled as an enablement.
+
 ## Process
 
 - **Complete one playable behaviour end to end** (from the working style

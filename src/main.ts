@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
 import { observe } from './sim/observe';
-import { applyCommand, buildingFootprint, createGame, gameTimeSeconds, isCarcass, placementLegal, stepGame, upgradedAway, notYetUpgradedInto } from './sim/game';
+import { TRAINING_QUEUE_LIMIT, applyCommand, buildingFootprint, createGame, gameTimeSeconds, isCarcass, placementLegal, queuedCount, stepGame, upgradedAway, notYetUpgradedInto } from './sim/game';
 import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, rulesFromManifest, type ContentManifest, type Cost, type GameRules, type TechKey } from './sim/data';
 import { isTileVisible } from './sim/visibility';
 import { checksumState } from './sim/checksum';
@@ -735,8 +735,11 @@ function currentCommands(): CommandButton[] {
         id: `train-${kind}`,
         label: `Train ${displayName(kind)} (${costLabel(unitRules.cost)})`,
         hotkey: TRAIN_HOTKEYS[index],
-        enabled: !producer.training && affordable(unitRules.cost)
-          && player.population < player.populationCap,
+        // Not "is it already training" -- that is what the queue is for. What
+        // stops another is a full queue, the price, or no room for what is
+        // already spoken for (issue #7).
+        enabled: queuedCount(producer) < TRAINING_QUEUE_LIMIT && affordable(unitRules.cost)
+          && player.population + queuedPopulation(producer) + unitRules.popCost <= player.populationCap,
         icon: hud.iconFor('Units', assets?.entities[kind]?.iconId),
       });
     }
@@ -787,6 +790,11 @@ function currentCommands(): CommandButton[] {
   }
   return buttons;
 }
+
+/** The population everything queued at this building will take when it lands. */
+const queuedPopulation = (building: Entity): number =>
+  [...(building.training ? [building.training.kind] : []), ...(building.trainingQueue ?? [])]
+    .reduce((total, kind) => total + rules.units[kind].popCost, 0);
 
 const BUILD_HOTKEYS = ['q', 'w', 'e', 'r', 't', 'a', 'd', 'f', 'g', 'z', 'x', 'c'];
 const BUILD_PAGE_HOTKEYS = { economic: 'b', military: 'v' } as const;
