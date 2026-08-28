@@ -587,6 +587,8 @@ export function updateProjectileView(
   launchHeight: number,
   /** Which shot this is: an arrow unless a siege engine threw it. */
   projectileKey = 'arrow',
+  /** Wall-clock seconds, for art whose frames are a timed tumble. */
+  timeSeconds = 0,
 ): void {
   const arrow = assets?.entities[projectileKey] ?? assets?.entities['arrow'];
   const atlas = arrow?.atlases['idle'];
@@ -599,6 +601,8 @@ export function updateProjectileView(
   // The frames within a direction are the shaft's pitch along the arc, from
   // steeply up through level to steeply down, so the frame tracks how far the
   // arrow has flown. Holding one frame is what made shots look rigid.
+  // A rock is different, and the DAT says which is which: an arrow's frames
+  // have no duration (pitch alternatives), a rock's do (a tumble to play).
   // Trajectory: drop from the launch height to the ground over the flight,
   // bulged by the DAT's arc fraction of the span. A tower shoots from its top,
   // so a close shot is descending the whole way and never points up, while a
@@ -615,8 +619,11 @@ export function updateProjectileView(
   const angle = Math.atan2(climbPerFlight * HEIGHT_PIXELS, Math.max(1e-6, groundScreen));
   const normalized = Math.max(-1, Math.min(1, angle / (Math.PI / 2)));
   const pitch = Math.round((1 - normalized) / 2 * (framesPerDirection - 1));
+  const frame = animation.frameSeconds > 0
+    ? Math.floor(timeSeconds / animation.frameSeconds) % framesPerDirection
+    : pitch;
 
-  applyFrame(view.body, assets, atlas, direction * framesPerDirection + pitch, position, 0xffffff);
+  applyFrame(view.body, assets, atlas, direction * framesPerDirection + frame, position, 0xffffff);
   view.body.mesh.position.y += height * HEIGHT_PIXELS;
   view.body.mesh.renderOrder = 4000 + isoDepth(position.x, position.y);
 }

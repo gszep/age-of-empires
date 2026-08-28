@@ -34,6 +34,13 @@ export interface UnitRules {
   minRange?: number;
   /** Arrow travel speed in tiles per second; set only for ranged attackers. */
   projectileSpeed?: number;
+  /**
+   * Which imported art the shot in flight draws with. The DAT names the
+   * projectile unit (`projectile_unit_id`); this is that unit's entity key
+   * where the importer carries one -- the trebuchet's rock, the mangonel's
+   * stone. Unset draws the arrow (issue #30).
+   */
+  projectileArt?: string;
   /** Height the shot leaves from, in tiles (DAT graphic displacement z). */
   launchHeight?: number;
   /** Tiles around the point of impact that also take the hit: a mangonel's
@@ -55,6 +62,7 @@ export interface UnitRules {
     attackReloadSeconds: number;
     attackReleaseSeconds: number;
     projectileSpeed?: number;
+    projectileArt?: string;
     launchHeight?: number;
     blastRadius?: number;
     /** Seconds to set up or pack away. The DAT's own work rate for the pair. */
@@ -529,6 +537,7 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 4, amount: 0 }, { class: 3, amount: 7 }, { class: 20, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 6.0, attackReleaseSeconds: 0.0,
       range: 8.0, minRange: 3.0, projectileSpeed: 5, launchHeight: 1.5, blastRadius: 1.25,
+      projectileArt: 'mangonel-stone',
     },
     /**
      * Packed: what it costs, how it moves, and no attack at all. What it can
@@ -546,7 +555,7 @@ export const FALLBACK_RULES: GameRules = {
         attacks: [{ class: 11, amount: 250 }, { class: 3, amount: 200 }],
         range: 16, minRange: 4,
         attackReloadSeconds: 10, attackReleaseSeconds: 0.88,
-        projectileSpeed: 3.5, launchHeight: 1.5,
+        projectileSpeed: 3.5, projectileArt: 'trebuchet-rock', launchHeight: 1.5,
         seconds: 4.5,
       },
     },
@@ -631,6 +640,7 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 4, amount: 0 }, { class: 3, amount: 6 }, { class: 20, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 6, attackReleaseSeconds: 0.5,
       range: 7, minRange: 3, projectileSpeed: 3.5, launchHeight: 1.8, blastRadius: 1,
+      projectileArt: 'mangonel-stone',
     },
     // No attack at all: a monk's work is mending its own side and preaching at
     // somebody else's.
@@ -856,6 +866,8 @@ interface ManifestEntity {
   trade?: { ratePerSecond: number; capacity: number; buildingId: number };
   age?: number;
   id?: number;
+  /** The import spec's role for the entity; projectiles are flight art. */
+  category?: string;
   deathSeconds?: number;
   corpseSeconds?: number;
   /** The DAT's `fog_visibility`; 1 keeps it drawn once its tile goes dark. */
@@ -898,6 +910,19 @@ const attackValues = (values: AttackValue[] | undefined): AttackValue[] => value
 /** Build DAT-backed rules from the imported content manifest. */
 export function rulesFromManifest(manifest: ContentManifest): GameRules {
   const e = manifest.entities;
+  // The DAT names each shooter's projectile unit; where the importer carries
+  // that unit as flight art, the shot draws with it (issue #30 -- the
+  // trebuchet's rock existed and nothing referenced it).
+  const projectileArtById = new Map<number, string>();
+  for (const [key, entity] of Object.entries(e)) {
+    if (entity.category === 'projectile' && entity.id !== undefined) {
+      projectileArtById.set(entity.id, key);
+    }
+  }
+  const projectileArt = (key: string): string | undefined => {
+    const id = e[key]?.combat?.projectileUnitId;
+    return id === undefined ? undefined : projectileArtById.get(id);
+  };
   // A manifest generated before an entity existed must not break the game: fall
   // back to that entity's open-content rules and keep everything else imported.
   const unit = (key: string, trainedAt: BuildingKind): UnitRules => {
@@ -922,6 +947,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       range: e[key].combat?.maximumRange || fallback?.range,
       minRange: e[key].combat?.minimumRange || fallback?.minRange,
       projectileSpeed: fallback?.projectileSpeed,
+      projectileArt: projectileArt(key) ?? fallback?.projectileArt,
       launchHeight: e[key].combat?.launchOffset?.[2] ?? fallback?.launchHeight,
       blastRadius: e[key].combat?.blastRadius ?? fallback?.blastRadius,
       heal: e[key].heal ?? fallback?.heal,
@@ -1107,6 +1133,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
             * (e['trebuchet-unpacked']?.animations?.attack?.frameSeconds ?? 0.0367),
           projectileSpeed: e['trebuchet-rock']?.speedTilesPerSecond
             ?? FALLBACK_RULES.units.trebuchet.unpacked!.projectileSpeed,
+          projectileArt: projectileArt('trebuchet-unpacked')
+            ?? FALLBACK_RULES.units.trebuchet.unpacked!.projectileArt,
           launchHeight: e['trebuchet-unpacked']?.combat?.launchOffset?.[2]
             ?? FALLBACK_RULES.units.trebuchet.unpacked!.launchHeight,
         },

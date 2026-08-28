@@ -3,7 +3,7 @@ import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
 import { observe } from './sim/observe';
 import { TRAINING_QUEUE_LIMIT, applyCommand, buildingFootprint, createGame, gameTimeSeconds, isCarcass, placementLegal, queuedCount, stepGame, upgradedAway, notYetUpgradedInto } from './sim/game';
-import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, rulesFromManifest, type ContentManifest, type Cost, type GameRules, type TechKey } from './sim/data';
+import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, rulesFromManifest, type ContentManifest, type Cost, type GameRules, type TechKey, type UnitRules } from './sim/data';
 import { isTileVisible } from './sim/visibility';
 import { checksumState } from './sim/checksum';
 import type { MatchRecord } from './protocol/types';
@@ -1032,11 +1032,17 @@ function syncScene(time: number): void {
       views.set(key, entityView);
       scene.add(entityView.group);
     }
+    // The rules name each shooter's shot (the DAT's own projectile unit):
+    // the trebuchet throws its rock, the mangonel its stone, everything else
+    // an arrow (issue #30 -- the rock's art existed and was never drawn).
+    const shooter = game.entities.find(e => e.id === projectile.shooterId);
+    const shooterRules = shooter
+      ? (game.rules.units as Partial<Record<string, UnitRules>>)[shooter.kind]
+      : undefined;
+    const art = shooterRules?.unpacked?.projectileArt ?? shooterRules?.projectileArt ?? 'arrow';
     view.updateProjectileView(
       entityView, assets, projectile.position, heading, progress, span, projectile.launchHeight,
-      // The stone is the only shot in flight that carries a blast, so what it
-      // does on landing is also what says which art to draw it with.
-      projectile.blastRadius ? 'mangonel-stone' : 'arrow',
+      art, time,
     );
   }
 

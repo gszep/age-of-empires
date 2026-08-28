@@ -377,34 +377,56 @@ def _decode_wanted(
     return frames
 
 
+# WebGPU's default maxTextureDimension2D. A sheet over this limit does not
+# error anywhere: the texture silently fails to sample and the sprite renders
+# as a solid box (issue #30, the unpacked trebuchet's 1920-frame attack).
+MAX_SHEET = 8192
+
+
 def _shelf_pack(
     usable: list[MaskFrame | ColorFrame | None],
 ) -> tuple[list[dict[str, int]], int, int]:
     """Shelf packing in rows about as wide as the widest frame allows, keeping
     the sheet roughly square without a bin-packing dependency. Absent frames
-    keep a zero-sized entry to hold their position in the sequence."""
+    keep a zero-sized entry to hold their position in the sequence.
+
+    A sheet whose square layout would pass MAX_SHEET is capped at it and packed
+    tallest-first instead, so rows hold frames of similar height and the capped
+    width still fits everything under the limit. Placements are indexed by
+    frame, so the physical order on the sheet is free to differ."""
     boxes = [(f.width, f.height) if f else (0, 0) for f in usable]
     widest = max((w for w, _ in boxes), default=1)
     columns = max(1, int(len(usable) ** 0.5))
     sheet_width = max(1, widest * columns)
+    order = list(range(len(usable)))
+    if sheet_width > MAX_SHEET:
+        sheet_width = MAX_SHEET
+        order.sort(key=lambda index: -boxes[index][1])
 
-    placements: list[dict[str, int]] = []
+    placements: list[dict[str, int] | None] = [None] * len(usable)
     x = y = row_height = 0
-    for (width, height), frame in zip(boxes, usable):
+    for index in order:
+        width, height = boxes[index]
+        frame = usable[index]
         if width == 0 or frame is None:
-            placements.append({"x": 0, "y": 0, "w": 0, "h": 0, "cx": 0, "cy": 0})
+            placements[index] = {"x": 0, "y": 0, "w": 0, "h": 0, "cx": 0, "cy": 0}
             continue
         if x + width > sheet_width and x > 0:
             x = 0
             y += row_height
             row_height = 0
-        placements.append({
+        placements[index] = {
             "x": x, "y": y, "w": width, "h": height,
             "cx": frame.hotspot_x, "cy": frame.hotspot_y,
-        })
+        }
         x += width
         row_height = max(row_height, height)
-    return placements, sheet_width, max(1, y + row_height)
+    sheet_height = max(1, y + row_height)
+    if sheet_width > MAX_SHEET or sheet_height > MAX_SHEET:
+        raise ValueError(
+            f"atlas would be {sheet_width}x{sheet_height}, over the {MAX_SHEET} device limit"
+        )
+    return placements, sheet_width, sheet_height
 
 
 def pack_mask_atlas(frames: list[MaskFrame | None], limit: int) -> tuple[Any, dict[str, Any]]:

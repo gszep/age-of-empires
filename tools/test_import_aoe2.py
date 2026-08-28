@@ -536,6 +536,23 @@ class ContentImportIntegrationTest(unittest.TestCase):
             self.assertIn(key, published["technologies"])
             self.assertEqual(published["technologies"][key], tech)
 
+    def test_every_atlas_fits_a_webgpu_texture(self):
+        # A sheet over the device's maxTextureDimension2D (8192 by default)
+        # fails silently: no error anywhere, the sprite just renders as a
+        # solid box. The unpacked trebuchet's 1920-frame attack packed square
+        # was 9116px wide and did exactly that (issue #30).
+        manifest = Path("public/imported/aoe2/manifest.json")
+        if not manifest.is_file():
+            self.skipTest("no published manifest to check")
+        published = json.loads(manifest.read_text())
+        for key, entity in published["entities"].items():
+            for name, atlas in entity.get("atlases", {}).items():
+                width, height = atlas["size"]
+                self.assertLessEqual(
+                    max(width, height), 8192,
+                    f"{key}/{name} is {width}x{height}, over the 8192 device limit",
+                )
+
     def test_accuracy_and_ballistics_are_attributes_the_dat_states(self):
         # Both halves of how a shot lands are in the DAT and neither was read
         # before (issue #3). Accuracy varies widely enough that a constant
