@@ -687,6 +687,14 @@ addEventListener('keydown', event => {
   if (match) runUiCommand(match.id);
 });
 addEventListener('keyup', event => heldKeys.delete(event.key));
+// A keyup that never arrives is a camera that never stops: alt-tabbing or
+// clicking away mid-scroll takes the release to another window, and the map
+// then pans on its own until the same arrow is pressed again (issue #31).
+// Losing focus releases everything held.
+addEventListener('blur', () => heldKeys.clear());
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') heldKeys.clear();
+});
 addEventListener('wheel', event => {
   if ((event.target as HTMLElement).closest('#hud')) return;
   zoom = Math.max(0.4, Math.min(2, zoom * (event.deltaY > 0 ? 0.9 : 1.1)));
