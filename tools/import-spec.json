@@ -1,165 +1,391 @@
 {
   "schemaVersion": 3,
   "civIndex": 1,
-  "civilization": { "key": "britons", "treeFile": "BRITONS.json" },
+  "civilization": {
+    "key": "britons",
+    "treeFile": "BRITONS.json"
+  },
   "gaiaIndex": 0,
-  "playerColors": ["blue", "red", "green", "yellow", "teal", "purple", "grey", "orange"],
-  "effects": [
-    { "key": "rally-flag", "graphic": "WaypointFlag Britons" }
+  "playerColors": [
+    "blue",
+    "red",
+    "green",
+    "yellow",
+    "teal",
+    "purple",
+    "grey",
+    "orange"
   ],
-  "audio": { "switch": "Britons" },
+  "effects": [
+    {
+      "key": "rally-flag",
+      "graphic": "WaypointFlag Britons"
+    }
+  ],
+  "audio": {
+    "switch": "Britons"
+  },
   "technologies": [
-    { "key": "loom", "techId": 22, "effect": "Loom", "appliesTo": ["villager"] },
-    { "key": "feudal-age", "techId": 101, "effect": "Feudal Age" },
-    { "key": "castle-age", "techId": 102, "effect": "Castle Age" }
+    {
+      "key": "loom",
+      "techId": 22,
+      "effect": "Loom",
+      "appliesTo": [
+        "villager"
+      ]
+    },
+    {
+      "key": "feudal-age",
+      "techId": 101,
+      "effect": "Feudal Age"
+    },
+    {
+      "key": "castle-age",
+      "techId": 102,
+      "effect": "Castle Age"
+    }
   ],
   "entities": [
     {
       "key": "militia",
-      "sounds": ["select", "train"],
+      "sounds": [
+        "select",
+        "train"
+      ],
       "unitId": 74,
       "category": "unit",
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "attack": { "slot": "attack" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "spearman",
-      "sounds": ["select", "train"],
+      "sounds": [
+        "select",
+        "train"
+      ],
       "unitId": 93,
       "category": "unit",
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "attack": { "slot": "attack" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "archer",
-      "sounds": ["select", "train"],
+      "sounds": [
+        "select",
+        "train"
+      ],
       "unitId": 4,
       "category": "unit",
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "attack": { "slot": "attack" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "skirmisher",
-      "sounds": ["select", "train"],
+      "sounds": [
+        "select",
+        "train"
+      ],
       "unitId": 7,
       "category": "unit",
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "attack": { "slot": "attack" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "villager",
-      "sounds": ["select", "train"],
+      "sounds": [
+        "select",
+        "train"
+      ],
       "unitId": 83,
       "category": "unit",
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "attack": { "slot": "attack" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "villager-builder",
       "unitId": 118,
       "category": "unit-variant",
-      "task": { "actionType": 101 },
+      "task": {
+        "actionType": 101
+      },
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "work": { "task": { "actionType": 101 }, "graphic": "proceeding" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 101
+          },
+          "graphic": "proceeding"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "villager-forager",
       "unitId": 120,
       "category": "unit-variant",
-      "task": { "actionType": 5, "classId": 7 },
+      "task": {
+        "actionType": 5,
+        "classId": 7
+      },
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "work": { "task": { "actionType": 5, "classId": 7 }, "graphic": "proceeding" },
-        "carry": { "task": { "actionType": 5, "classId": 7 }, "graphic": "carrying" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 5,
+            "classId": 7
+          },
+          "graphic": "proceeding"
+        },
+        "carry": {
+          "task": {
+            "actionType": 5,
+            "classId": 7
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "villager-lumberjack",
       "unitId": 123,
       "category": "unit-variant",
-      "task": { "actionType": 110, "classId": 15 },
+      "task": {
+        "actionType": 110,
+        "classId": 15
+      },
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "work": { "task": { "actionType": 110, "classId": 15 }, "graphic": "working" },
-        "carry": { "task": { "actionType": 110, "classId": 15 }, "graphic": "carrying" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 110,
+            "classId": 15
+          },
+          "graphic": "working"
+        },
+        "carry": {
+          "task": {
+            "actionType": 110,
+            "classId": 15
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "villager-goldminer",
       "unitId": 579,
       "category": "unit-variant",
-      "task": { "actionType": 5, "unitId": 66 },
+      "task": {
+        "actionType": 5,
+        "unitId": 66
+      },
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "work": { "task": { "actionType": 5, "unitId": 66 }, "graphic": "proceeding" },
-        "carry": { "task": { "actionType": 5, "unitId": 66 }, "graphic": "carrying" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 5,
+            "unitId": 66
+          },
+          "graphic": "proceeding"
+        },
+        "carry": {
+          "task": {
+            "actionType": 5,
+            "unitId": 66
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "villager-stonemason",
       "unitId": 124,
       "category": "unit-variant",
-      "task": { "actionType": 5, "unitId": 102 },
+      "task": {
+        "actionType": 5,
+        "unitId": 102
+      },
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "work": { "task": { "actionType": 5, "unitId": 102 }, "graphic": "proceeding" },
-        "carry": { "task": { "actionType": 5, "unitId": 102 }, "graphic": "carrying" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 5,
+            "unitId": 102
+          },
+          "graphic": "proceeding"
+        },
+        "carry": {
+          "task": {
+            "actionType": 5,
+            "unitId": 102
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "trade-cart",
-      "sounds": ["select", "train"],
+      "sounds": [
+        "select",
+        "train"
+      ],
       "unitId": 128,
       "category": "unit",
-      "trade": { "task": { "actionType": 111, "unitId": 84 } },
+      "trade": {
+        "task": {
+          "actionType": 111,
+          "unitId": 84
+        }
+      },
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "carry": { "task": { "actionType": 111, "unitId": 84 }, "graphic": "carrying" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "carry": {
+          "task": {
+            "actionType": 111,
+            "unitId": 84
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -168,9 +394,18 @@
       "category": "building",
       "includeAnnexes": true,
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -178,9 +413,18 @@
       "unitId": 12,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -188,9 +432,15 @@
       "unitId": 72,
       "category": "building",
       "animations": {
-        "idle": { "slot": "base" },
-        "construction": { "slot": "construction" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "base"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -198,11 +448,22 @@
       "unitId": 789,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "open": { "unitId": 790, "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "open": {
+          "unitId": 790,
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -210,11 +471,22 @@
       "unitId": 793,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "open": { "unitId": 794, "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "open": {
+          "unitId": 794,
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -222,9 +494,18 @@
       "unitId": 70,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -233,10 +514,18 @@
       "civ": "gaia",
       "category": "animal",
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -245,10 +534,18 @@
       "civ": "gaia",
       "category": "animal",
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -257,40 +554,98 @@
       "civ": "gaia",
       "category": "animal",
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "attack": { "slot": "attack" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "villager-hunter",
       "unitId": 122,
       "category": "unit-variant",
-      "task": { "actionType": 110, "classId": 9 },
+      "task": {
+        "actionType": 110,
+        "classId": 9
+      },
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "attack": { "slot": "attack" },
-        "work": { "task": { "actionType": 110, "classId": 9 }, "graphic": "working" },
-        "carry": { "task": { "actionType": 110, "classId": 9 }, "graphic": "carrying" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "work": {
+          "task": {
+            "actionType": 110,
+            "classId": 9
+          },
+          "graphic": "working"
+        },
+        "carry": {
+          "task": {
+            "actionType": 110,
+            "classId": 9
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "villager-shepherd",
       "unitId": 592,
       "category": "unit-variant",
-      "task": { "actionType": 110, "classId": 58 },
+      "task": {
+        "actionType": 110,
+        "classId": 58
+      },
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "work": { "task": { "actionType": 110, "classId": 58 }, "graphic": "working" },
-        "carry": { "task": { "actionType": 110, "classId": 58 }, "graphic": "carrying" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 110,
+            "classId": 58
+          },
+          "graphic": "working"
+        },
+        "carry": {
+          "task": {
+            "actionType": 110,
+            "classId": 58
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -299,7 +654,9 @@
       "civ": "gaia",
       "category": "resource",
       "animations": {
-        "idle": { "slot": "standing" }
+        "idle": {
+          "slot": "standing"
+        }
       }
     },
     {
@@ -307,9 +664,18 @@
       "unitId": 68,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -317,9 +683,18 @@
       "unitId": 562,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -327,9 +702,18 @@
       "unitId": 584,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -337,9 +721,18 @@
       "unitId": 598,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -347,9 +740,18 @@
       "unitId": 79,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -357,22 +759,44 @@
       "unitId": 101,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "scout-cavalry",
-      "sounds": ["select", "train"],
+      "sounds": [
+        "select",
+        "train"
+      ],
       "unitId": 448,
       "category": "unit",
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "attack": { "slot": "attack" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -380,9 +804,18 @@
       "unitId": 87,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -390,9 +823,18 @@
       "unitId": 103,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -400,9 +842,18 @@
       "unitId": 84,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -410,7 +861,9 @@
       "unitId": 504,
       "category": "projectile",
       "animations": {
-        "idle": { "slot": "standing" }
+        "idle": {
+          "slot": "standing"
+        }
       }
     },
     {
@@ -419,7 +872,9 @@
       "civ": "gaia",
       "category": "resource",
       "animations": {
-        "idle": { "slot": "standing" }
+        "idle": {
+          "slot": "standing"
+        }
       }
     },
     {
@@ -428,7 +883,9 @@
       "civ": "gaia",
       "category": "resource",
       "animations": {
-        "idle": { "slot": "standing" }
+        "idle": {
+          "slot": "standing"
+        }
       }
     },
     {
@@ -437,9 +894,15 @@
       "civ": "gaia",
       "category": "resource",
       "animations": {
-        "idle": { "slot": "standing" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -447,9 +910,18 @@
       "unitId": 104,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -457,9 +929,18 @@
       "unitId": 209,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -467,9 +948,18 @@
       "unitId": 49,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -477,89 +967,186 @@
       "unitId": 82,
       "category": "building",
       "animations": {
-        "idle": { "slot": "standing" },
-        "construction": { "slot": "construction" },
-        "death": { "slot": "dying" }
+        "idle": {
+          "slot": "standing"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "knight",
-      "sounds": ["select", "train"],
+      "sounds": [
+        "select",
+        "train"
+      ],
       "unitId": 38,
       "category": "unit",
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "attack": { "slot": "attack" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "cavalry-archer",
-      "sounds": ["select", "train"],
+      "sounds": [
+        "select",
+        "train"
+      ],
       "unitId": 39,
       "category": "unit",
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "attack": { "slot": "attack" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "longbowman",
-      "sounds": ["select", "train"],
+      "sounds": [
+        "select",
+        "train"
+      ],
       "unitId": 8,
       "category": "unit",
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "attack": { "slot": "attack" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "battering-ram",
-      "sounds": ["select", "train"],
+      "sounds": [
+        "select",
+        "train"
+      ],
       "unitId": 35,
       "category": "unit",
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "attack": { "slot": "attack" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "mangonel",
-      "sounds": ["select", "train"],
+      "sounds": [
+        "select",
+        "train"
+      ],
       "unitId": 280,
       "category": "unit",
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "attack": { "slot": "attack" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
       "key": "monk",
-      "sounds": ["select", "train"],
+      "sounds": [
+        "select",
+        "train"
+      ],
       "unitId": 125,
       "category": "unit",
-      "convert": { "task": { "actionType": 104, "classId": -1, "unitId": -1 } },
-      "heal": { "task": { "actionType": 105 } },
+      "convert": {
+        "task": {
+          "actionType": 104,
+          "classId": -1,
+          "unitId": -1
+        }
+      },
+      "heal": {
+        "task": {
+          "actionType": 105
+        }
+      },
       "animations": {
-        "idle": { "slot": "standing" },
-        "walk": { "slot": "walking" },
-        "attack": { "slot": "attack" },
-        "death": { "slot": "dying" },
-        "decay": { "slot": "dead" }
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
       }
     },
     {
@@ -567,7 +1154,9 @@
       "unitId": 656,
       "category": "projectile",
       "animations": {
-        "idle": { "slot": "standing" }
+        "idle": {
+          "slot": "standing"
+        }
       }
     }
   ],
@@ -589,15 +1178,33 @@
       "MenuIcons": "all"
     },
     "cues": [
-      "under_attack", "under_attack_town", "pop_capped", "farm_depleted",
-      "gatherpoint_set", "error", "age_up", "tech_researched", "victory", "defeat"
+      "under_attack",
+      "under_attack_town",
+      "pop_capped",
+      "farm_depleted",
+      "gatherpoint_set",
+      "error",
+      "age_up",
+      "tech_researched",
+      "victory",
+      "defeat"
     ],
-    "materialPrefixes": ["IconAction"],
-    "textureDirectories": ["textures/ingame/staticons"]
+    "materialPrefixes": [
+      "IconAction"
+    ],
+    "textureDirectories": [
+      "textures/ingame/staticons"
+    ]
   },
   "terrain": {
-    "ground": { "terrainId": 0 },
-    "farm": { "terrainId": 7 },
-    "farm-construction": { "terrainId": 29 }
+    "ground": {
+      "terrainId": 0
+    },
+    "farm": {
+      "terrainId": 7
+    },
+    "farm-construction": {
+      "terrainId": 29
+    }
   }
 }

@@ -222,7 +222,16 @@ already read the manifest's own `minimapColor`. Verified by reading the
 minimap canvas's pixels in the browser: the player's dots are `#0000ff`, the
 DAT's pure blue, where the fallback would have given `#1a6cff`.
 
-### N6. Building rubble, and a corpse window that follows its animation
+### N6. Building rubble, and a corpse window that follows its animation — **done**
+
+Better than the item asked for: the window does not merely follow the death
+animation, it is the DAT's own number. Every corpse unit carries a type-12
+resource storage draining at its own rate — 300 seconds for a unit, 60 for a
+building's rubble — and only dead units carry one. Every building's `decay`
+slot is imported, and a razed barracks was watched through
+`barracks/idle -> barracks/death -> barracks/decay` in a real match.
+
+*Original item, for the record:*
 
 Every building's `dead_unit_id` names its rubble (`b_*_rubble_x1`) and the
 importer's `dead` slot already knows how to reach it, but `kill()` gives every

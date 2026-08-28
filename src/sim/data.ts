@@ -45,6 +45,20 @@ export interface UnitRules {
    * succeed and the second by which it must — and the reach it works at. */
   convert?: { minSeconds: number; maxSeconds: number; range: number };
   /**
+   * How long this thing's death graphic runs, in seconds. A building's
+   * collapse is 8.3 and a castle's 12.5 where a villager's is 1.5, and the
+   * corpse has to outlast it or the thing vanishes mid-fall.
+   */
+  deathSeconds?: number;
+  /**
+   * How long the body lies there afterwards, in seconds. The DAT states it on
+   * the corpse unit: a type-12 resource storage draining at the corpse's own
+   * `resource_decay`, which is 300 seconds for every unit in the file and 60
+   * for every building's rubble. A huntable's carcass outlives this anyway --
+   * it keeps its food until somebody eats it.
+   */
+  corpseSeconds?: number;
+  /**
    * The DAT's `accuracy_percent`: how often a shot is aimed true. An archer is
    * 80, a cavalry archer 50, a longbowman 70; a tower, a mangonel and anything
    * that fights hand to hand are 100. Thumb Ring sets the archer classes to
@@ -88,6 +102,10 @@ export interface UnitRules {
 export interface BuildingRules {
   /** The DAT unit id; see `UnitRules.datId`. */
   datId?: number;
+  /** As `UnitRules.deathSeconds`: how long its collapse runs. */
+  deathSeconds?: number;
+  /** As `UnitRules.corpseSeconds`: how long its rubble lies there. */
+  corpseSeconds?: number;
   /** The age this becomes available in; 0 is the Dark Age. */
   age?: number;
   hp: number;
@@ -585,6 +603,8 @@ interface ManifestEntity {
   trade?: { ratePerSecond: number; capacity: number; buildingId: number };
   age?: number;
   id?: number;
+  deathSeconds?: number;
+  corpseSeconds?: number;
   /** The DAT's `fog_visibility`; 1 keeps it drawn once its tile goes dark. */
   fogVisibility?: number;
   storage?: Partial<Record<ResourceKind, number>>;
@@ -652,6 +672,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       convert: e[key].convert ?? fallback?.convert,
       fogVisibility: e[key].fogVisibility ?? fallback?.fogVisibility,
       accuracyPercent: e[key].combat?.accuracyPercent ?? fallback?.accuracyPercent,
+      deathSeconds: e[key].deathSeconds ?? fallback?.deathSeconds,
+      corpseSeconds: e[key].corpseSeconds ?? fallback?.corpseSeconds,
       datId: e[key].id,
     };
   };
@@ -676,6 +698,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     if (!e[key]) return { ...fallback, buildable };
     return {
       datId: e[key].id,
+      deathSeconds: e[key].deathSeconds ?? fallback.deathSeconds,
+      corpseSeconds: e[key].corpseSeconds ?? fallback.corpseSeconds,
       age: e[key].age ?? fallback.age,
       hp: e[key].hitPoints,
       radius: e[key].collision[0],

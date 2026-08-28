@@ -117,6 +117,21 @@ def find_task(unit: Any, selector: dict[str, Any]) -> Any:
     raise ValueError(f"unit {unit.id}: no task matches {selector}")
 
 
+# The resource a corpse stores is its remaining lifetime, not a stockpile.
+CORPSE_LIFETIME_RESOURCE = 12
+
+
+def corpse_seconds(corpse: Any) -> float | None:
+    """How long the DAT says this corpse or rubble lies there, in seconds."""
+    rate = getattr(corpse, "resource_decay", 0) or 0
+    if rate <= 0:
+        return None
+    for storage in corpse.resource_storages:
+        if storage.type == CORPSE_LIFETIME_RESOURCE and storage.amount > 0:
+            return rounded(storage.amount / rate)
+    return None
+
+
 def resolve_graphic_id(unit: Any, animation: dict[str, Any], civ_units: Any, dat: Any = None) -> int:
     if "slot" in animation:
         slot = animation["slot"]
@@ -249,6 +264,14 @@ def extract_entity(
         corpse = civ_units[unit.dead_unit_id] if unit.dead_unit_id and unit.dead_unit_id >= 0 else None
         if corpse is not None:
             entity["selection"]["dead"] = selection_of(corpse)
+            # ...and its own lifetime. Only dead units carry a type-12 resource
+            # storage, and it drains at the corpse's own `resource_decay`: 300
+            # at 1.0 a second for every unit corpse in the file, 60 for every
+            # building's rubble. Live units carry types 4, 11 and 19 instead,
+            # which is what says this one is a clock rather than a stockpile.
+            seconds = corpse_seconds(corpse)
+            if seconds is not None:
+                entity["corpseSeconds"] = seconds
     if unit.icon_id >= 0:
         entity["iconId"] = unit.icon_id
     if unit.speed and unit.speed > 0:
@@ -414,6 +437,14 @@ def extract_entity(
             entity["animations"][f"idle-{age}"] = animation_entry(
                 dat, graphics_dir, variant.standing_graphic[0], hashes
             )
+
+    # How long the death graphic runs, so the simulation can keep the corpse
+    # until it has played out. A building's collapse is 8.3 seconds where a
+    # villager's is 1.5, and a flat window shorter than either makes the
+    # building vanish mid-fall and never reach its rubble.
+    death = entity["animations"].get("death")
+    if death and death.get("frames") and death.get("frameSeconds"):
+        entity["deathSeconds"] = rounded(death["frames"] * death["frameSeconds"])
 
     if spec.get("includeAnnexes") and unit.building is not None:
         annexes = []

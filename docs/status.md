@@ -44,13 +44,15 @@ Measured on calcifer. Every number here is from the current board (120x120,
 about 310 entities); anything older is not comparable, because the map size
 changed underneath it.
 
-- 16 paired-seed matches in concurrent Node processes, re-run after the Castle
-  Age, monk, siege, hunting and startle changes: **16 decided, 0 timeout draws,
-  0 replay checksum failures**, mirror win rate 0.5 (Wilson 95% 0.28–0.72),
-  **364x aggregate real time** (47 seconds of wall clock for 17,110 simulated
+- 16 paired-seed matches in concurrent Node processes, re-run after the shot
+  model, the technology tree and the DAT's corpse lifetimes: **16 decided, 0
+  timeout draws, 0 replay checksum failures**, mirror win rate 0.5,
+  **393x aggregate real time** (43.4 seconds of wall clock for 17,058 simulated
   seconds). The zero replay failures are the load-bearing number: every one of
   those matches re-simulates to the same checksums after a session that changed
-  combat, damage application, animal behaviour and the RNG's consumers.
+  how every shot is aimed, what fifty technologies do, and how long a body lies
+  on the ground. Corpses lasting five minutes rather than three seconds cost
+  nothing measurable — throughput went up, not down.
   Note the matches are still Dark Age militia wars — the built-in AI does not
   research, so none of the Feudal or Castle content above appears in them
   (queue item N1).
@@ -303,6 +305,26 @@ Buildings are the exception the DAT does not state: they are 0 like every other
 player-owned thing, and are still remembered as last-seen ghosts. That memory
 is the engine's own record of the map rather than a unit flag, and it is where
 the `buildProgress` and hit points a returning scout sees come from.
+
+### A body lies there for as long as the DAT says
+
+`kill()` gave every corpse a flat three-second window. A building's collapse
+runs 8.3 seconds and a castle's 12.5, so a razed building vanished a third of
+the way through falling down — and could never reach the rubble the DAT names
+for it (`b_dark_barracks_age1_rubble_x1` and one for every other building).
+
+The lifetime is stated, on the corpse unit rather than the live one: a
+`resource_storages` entry of type 12 draining at that unit's own
+`resource_decay`. It is 300 at 1.0 a second for every unit corpse in the file
+and 60 for every building's rubble, and *only* dead units carry a type-12
+entry — a live militia carries types 4, 11 and 19 instead, which is what says
+this one is a clock and not a stockpile. Both numbers are imported and used;
+the fallback three seconds now applies only to open content.
+
+Five-minute corpses cost nothing measurable: the paired batch runs at 393x
+real time, slightly faster than the 364x recorded before the change. A
+huntable's carcass is unaffected either way — it keeps its food until somebody
+eats it, and that rule already outlives this one.
 
 ### A shot is aimed once
 

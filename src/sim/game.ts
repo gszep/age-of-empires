@@ -904,12 +904,29 @@ function armorsOf(state: GameState, entity: Entity): AttackValue[] {
   return [];
 }
 
+/**
+ * What a corpse gets when the content does not say -- the open fallback, and
+ * the flat window everything used to get. It is shorter than a building's
+ * collapse, which is why a razed barracks used to disappear a third of the
+ * way through falling down and never reach its rubble.
+ */
+const FALLBACK_CORPSE_SECONDS = 3;
+
 function kill(state: GameState, entity: Entity): void {
   entity.dead = true;
   entity.activity = 'dying';
   entity.order = { kind: 'idle' };
   entity.training = undefined;
-  entity.decayTicks = 60; // death animation window before the corpse despawns
+  // The DAT states how long a body lies there, on the corpse unit itself.
+  // Never shorter than the death graphic, or the thing vanishes mid-fall.
+  const rules = isBuilding(entity.kind)
+    ? state.rules.buildings[entity.kind]
+    : state.rules.units[entity.kind as UnitKind];
+  const seconds = Math.max(
+    rules?.corpseSeconds ?? FALLBACK_CORPSE_SECONDS,
+    rules?.deathSeconds ?? 0,
+  );
+  entity.decayTicks = Math.round(seconds * TICKS_PER_SECOND);
   clearPath(entity);
 }
 

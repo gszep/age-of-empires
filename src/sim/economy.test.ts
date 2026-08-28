@@ -1,6 +1,9 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { FALLBACK_RULES, TICK_SECONDS, isAnimal, rulesFromManifest, type ContentManifest, type GameRules } from './data';
+import {
+  FALLBACK_RULES, TICKS_PER_SECOND, TICK_SECONDS, isAnimal, rulesFromManifest,
+  type ContentManifest, type GameRules,
+} from './data';
 import { checksumState } from './checksum';
 import {
   applyCommand, buildingFootprint, carryCapacityFor, createGame, isCarcass, placementLegal,
@@ -1958,5 +1961,61 @@ describe('the technology tree', () => {
       return checksumState(state);
     };
     expect(play()).toBe(play());
+  });
+});
+
+describe('what a razing leaves behind', () => {
+  it('keeps a corpse for as long as the DAT says, never less than its death', () => {
+    // A building's collapse runs 8.3 seconds and a castle's 12.5, against the
+    // flat 3-second window everything used to get — so a razed barracks
+    // vanished a third of the way through falling down and never reached the
+    // rubble the DAT names for it. The lifetime is stated on the corpse unit:
+    // a type-12 resource storage draining at its own rate, 300 seconds for
+    // every unit in the file and 60 for every building's rubble.
+    if (!importedRules) return;
+    expect(importedRules.buildings.barracks.deathSeconds).toBeGreaterThan(8);
+    expect(importedRules.buildings.barracks.corpseSeconds).toBe(60);
+    expect(importedRules.units.militia.corpseSeconds).toBe(300);
+
+    const state = createGame(61, importedRules);
+    const rules = state.rules.buildings.barracks;
+    const barracks: Entity = {
+      id: state.nextId++, kind: 'barracks', owner: 1, position: { x: 58.5, y: 58.5 },
+      hp: 1, maxHp: rules.hp, radius: rules.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(barracks);
+    // Killed the way anything is killed, by being hit until it falls.
+    const enemy = state.entities.find(e => e.owner === 2 && e.kind === 'militia')
+      ?? state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
+    enemy.position = { x: 57, y: 58.5 };
+    applyCommand(state, {
+      kind: 'order', player: 2, entityIds: [enemy.id],
+      target: barracks.position, targetId: barracks.id,
+    });
+    for (let i = 0; i < 4000 && !barracks.dead; i++) stepGame(state);
+    expect(barracks.dead, 'the barracks never fell').toBe(true);
+
+    // Long enough to finish falling down, and then to lie there.
+    // Read a tick or two into the collapse, so allow for what has ticked off.
+    const window = barracks.decayTicks! / TICKS_PER_SECOND;
+    expect(window).toBeGreaterThanOrEqual(rules.deathSeconds!);
+    expect(window).toBeCloseTo(rules.corpseSeconds!, 0);
+
+    // Still there once the collapse has played out, which is what the old
+    // three-second window could not manage.
+    for (let i = 0; i < Math.ceil(rules.deathSeconds! * TICKS_PER_SECOND) + 1; i++) stepGame(state);
+    expect(state.entities.some(e => e.id === barracks.id), 'gone mid-collapse').toBe(true);
+  });
+
+  it('gives every building rubble of its own to leave', () => {
+    if (!importedRules) return;
+    const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as ContentManifest;
+    for (const [key, rules] of Object.entries(importedRules.buildings)) {
+      if (!rules.datId) continue;
+      const entity = manifest.entities[key];
+      if (!entity) continue;
+      expect(Object.keys(entity.animations ?? {}), `${key} leaves nothing`).toContain('decay');
+    }
   });
 });
