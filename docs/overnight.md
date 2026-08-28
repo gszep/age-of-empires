@@ -41,8 +41,13 @@ two questions waiting on the human and no work.
 
 The standing priority on this repo is that `bug` issues come before anything in
 this file, so **check the issue list first**: anything newly tagged `bug`
-outruns Q1. The order after that is Q1–Q7, then Q8 (terrain generation), which
-the human added on 2026-08-28 and wants last.
+outruns everything else.
+
+**The order changed on 2026-08-28.** Q8 (map generation) was added that morning
+to sit last; that evening the human scoped it — `docs/map-generation-design.md`
+and `docs/map-conditioning-design.md` — and promoted it to **the work of the
+next overnight run**. Its plan is `docs/map-build-plan.md`, and that file, not
+this one, is the queue for that run. Q1–Q7 below stand and resume after it.
 
 Two things a fresh session needs before touching anything:
 
@@ -255,35 +260,39 @@ to 750 — which is a real effect of ageing up that is not applied.
 after the Feudal Age has 750 hit points where one built before has 550 — with
 a determinism test across the change, because it is a checksum change.
 
-### Q8. A map that looks like Age of Empires
+### Q8. A map that looks like Age of Empires — now scoped, and next
 
-Last, and only once everything above is done. The board today is two furnished
-corners and a lot of grass: player openings come from `land_resources.inc`,
-every tile is the same grass terrain, the ground is flat, and the middle of the
-map holds nothing. The human asked for a genuine AoE2 map — variation in where
-resources sit, in the trees, in the terrain underfoot, and **elevation** — and
-noted that the reference data should describe it.
+**Promoted on 2026-08-28 from last to next. Follow `docs/map-build-plan.md`.**
 
-It should: the owned depot ships the random map scripts, and they are the
-specification. `create_terrain`, `create_elevation`, `create_object` with their
-`number_of_tiles`, `set_scaling_to_map_size`, clumping and spacing parameters
-say what the original actually asks the engine to do, and `lessons.md` already
-records the cost of reading the numbers without reading the instruction —
-scattering objects over a disc is not how the original makes a forest. Find the
-map script this slice is matched to, read what it says about terrain mixes,
-elevation passes and neutral resource placement, and build from that rather
-than from an idea of what a map looks like.
+The board today is two furnished corners and a lot of grass: player openings
+come from `land_resources.inc`, every tile is the same grass terrain, the ground
+is flat, and the middle of the map holds nothing. The human asked for a genuine
+AoE2 map and said the reference data should describe it. It does, and it has now
+been read:
 
-Two known blockers sit next to this and must not be quietly absorbed into it:
-terrain-to-terrain **blend edges** are blocked on a mapping nobody has found
-(see below), so a multi-terrain map will have hard seams until that is settled;
-and elevation is a change to the board that the renderer, the pathfinder, the
-fog and the checksum all have to agree on. Scope it in a design doc first, the
-way `docs/water-design.md` scopes water, and stage it — do not start it as one
-change.
+- `docs/map-generation-design.md` — what the original's generator actually is.
+  Seven phases, and nearly all of it two primitives: a cost-ordered round-robin
+  growth loop whose one-line cost decides every shape on the map, and a
+  randomised candidate scan for objects over square distance bands. It also
+  names the function this codebase is missing — `cleanTerrain` — which is the
+  original's own answer to the ragged forest interiors in `backlog.md`.
+- `docs/map-conditioning-design.md` — the extension the human asked for after:
+  driving the same phases from real geography (Ordnance Survey and Environment
+  Agency LIDAR for Britain, Copernicus and WorldCover elsewhere), and the
+  fidelity dial between a 1:1 battlefield and a deliberately miniaturised city.
+- `docs/map-build-plan.md` — **the run plan**: invariants, a staged queue with a
+  test per stage, the evidence still to be gathered, and an explicit licence to
+  deviate from all of it when the ground says otherwise.
 
-*Verify:* stated per stage in that design doc, each stage with a determinism
-test, because every one of them changes the checksum.
+The two blockers named when this item was written both still stand and are
+handled in the plan rather than absorbed: terrain-to-terrain **blend edges** are
+blocked on a mapping nobody has found, so a multi-terrain map ships with hard
+seams and says so; and **elevation** is a change the renderer, pathfinder, fog
+and checksum all have to agree on, which is why it is staged late and behind a
+question about what adjacency the original actually permits.
+
+*Verify:* stated per stage in `docs/map-build-plan.md`, each with a determinism
+test, because every stage changes the checksum.
 
 ## Blocked or deliberately not started
 
