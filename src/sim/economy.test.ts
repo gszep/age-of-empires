@@ -10,6 +10,7 @@ import {
   farmFoodAmountFor, isCarcass, placementLegal, notYetUpgradedInto, queuedCount, stepGame, unitRulesFor,
 } from './game';
 import type { BuildingKind, Entity, GameState, ResourceKind } from './types';
+import { isTileVisible } from './visibility';
 
 const MANIFEST_PATH = 'public/imported/aoe2/manifest.json';
 const importedRules: GameRules | undefined = existsSync(MANIFEST_PATH)
@@ -2357,6 +2358,41 @@ describe('the technology tree', () => {
       expect(research(state, key).ok, `${key} was refused in its own age`).toBe(true);
       expect(state.players[1].researched).toContain(key);
     }
+  });
+
+  it.skipIf(!importedRules)('town watch makes a building see further (issue #29)', () => {
+    // Measured at the outcome -- the tile the player can see -- not at the
+    // rules table, because #26 proved a lookup can be right while nothing
+    // reads it. On seed 51 the town center stands at (30,60) with 8 tiles of
+    // sight and its villagers to the east; tile (20,60) is ~9.5 tiles west,
+    // beyond base sight, inside the +4 Town Watch grants, and away from
+    // anything that wanders.
+    const state = createGame(51, importedRules!);
+    state.players[1].age = state.rules.technologies['town-watch'].requiresAge;
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    stepGame(state);
+    expect(isTileVisible(state, 1, 20, 60)).toBe(false);
+    Object.assign(state.players[1], { food: 9000, wood: 9000, gold: 9000, stone: 9000 });
+    expect(applyCommand(state, {
+      kind: 'research', player: 1, buildingId: tc.id, tech: 'town-watch',
+    }).ok).toBe(true);
+    for (let i = 0; i < 20_000 && !state.players[1].researched.includes('town-watch'); i++) {
+      stepGame(state);
+    }
+    expect(state.players[1].researched).toContain('town-watch');
+    stepGame(state);
+    expect(isTileVisible(state, 1, 20, 60)).toBe(true);
+  });
+
+  it.skipIf(!importedRules)('replays identically across town watch', () => {
+    const play = () => {
+      const state = createGame(51, importedRules);
+      state.players[1].age = 1;
+      state.players[1].researched.push('town-watch');
+      for (let i = 0; i < 400; i++) stepGame(state);
+      return checksumState(state);
+    };
+    expect(play()).toBe(play());
   });
 
   it('opens the university, and the university opens Ballistics', () => {

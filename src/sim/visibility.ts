@@ -4,7 +4,8 @@
  * entities. Observations and the viewer read only this state.
  */
 import { isBuilding, isUnit, lingersInFog } from './data';
-import type { Entity, GameState, PlayerId, UnitKind } from './types';
+import { buildingRulesFor, unitRulesFor } from './rules';
+import type { BuildingKind, Entity, GameState, PlayerId, UnitKind } from './types';
 
 export interface RememberedEntity {
   id: number;
@@ -35,13 +36,19 @@ export function createVisibility(state: GameState): Record<PlayerId, PlayerVisib
 }
 
 export function lineOfSightOf(state: GameState, entity: Entity): number {
-  if (isUnit(entity.kind)) return state.rules.units[entity.kind as UnitKind].lineOfSight;
+  // Researched rules, not the base table: Town Watch is a lineOfSight effect
+  // on every building, and reading state.rules here left it doing nothing
+  // (issue #29 -- the same shape as #26, where combat read the base table).
+  if (isUnit(entity.kind)) {
+    return unitRulesFor(state, entity.owner, entity.kind as UnitKind).lineOfSight;
+  }
   // A foundation is a claim on the ground, not a garrison: it sees nothing
   // until it is finished. The DAT carries one `line_of_sight` per unit and no
   // construction-time variant, so this rule is the reference's observed
   // behaviour rather than an imported number -- see docs/status.md.
   if (isBuilding(entity.kind)) {
-    return entity.buildProgress === undefined ? state.rules.buildings[entity.kind].lineOfSight : 0;
+    if (entity.buildProgress !== undefined) return 0;
+    return buildingRulesFor(state, entity.owner, entity.kind as BuildingKind).lineOfSight;
   }
   return 0;
 }
