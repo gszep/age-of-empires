@@ -6,8 +6,8 @@ import {
 } from './data';
 import { checksumState } from './checksum';
 import {
-  applyCommand, buildingFootprint, carryCapacityFor, createGame, isCarcass, placementLegal,
-  notYetUpgradedInto, stepGame, unitRulesFor,
+  applyCommand, buildingFootprint, carryCapacityFor, computeDamage, createGame, isCarcass,
+  placementLegal, notYetUpgradedInto, stepGame, unitRulesFor,
 } from './game';
 import type { BuildingKind, Entity, GameState, ResourceKind } from './types';
 
@@ -1529,6 +1529,77 @@ describe('imported rules', () => {
     const a = createGame(77, importedRules);
     const b = createGame(77, importedRules);
     for (let i = 0; i < 400; i++) { stepGame(a); stepGame(b); }
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  });
+});
+
+describe('what a blow does to a building', () => {
+  // Issue #26. Every building that does not shoot came out of the importer
+  // with no armours at all, because a `combat` block was asked for only when
+  // the unit had an attack. Damage is scored class by class and a class the
+  // target has no entry for scores nothing, so a house took exactly the
+  // minimum -- one point a hit, from a sword or an arrow alike -- and no
+  // blacksmith upgrade could move it.
+  it.skipIf(!importedRules)('gives a building that never fights the DAT\'s own armour', () => {
+    for (const [kind, rules] of Object.entries(importedRules!.buildings)) {
+      expect(rules.armors.length, kind).toBeGreaterThan(0);
+    }
+    const house = importedRules!.buildings.house.armors;
+    expect(house.find(a => a.class === 4)?.amount).toBe(-2);
+    expect(house.find(a => a.class === 3)?.amount).toBe(7);
+  });
+
+  it.skipIf(!importedRules)('lets a blade through a house where an arrow scratches it', () => {
+    const house = importedRules!.buildings.house.armors;
+    // -2 melee armour makes a house soft to a sword; 7 pierce against an
+    // archer's 4 is why archers do not raze towns in the original either.
+    expect(computeDamage(importedRules!.units.militia.attacks, house)).toBeGreaterThan(1);
+    expect(computeDamage(importedRules!.units.archer.attacks, house)).toBe(1);
+  });
+
+  it.skipIf(!importedRules)('lands that damage in a real match, not just in the rules', () => {
+    const state = createGame(83, importedRules);
+    const rules = state.rules.buildings.house;
+    const home = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const house: Entity = {
+      id: state.nextId++, kind: 'house', owner: 1,
+      position: { x: home.position.x + 4, y: home.position.y + 4 },
+      hp: rules.hp, maxHp: rules.hp, radius: rules.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(house);
+    const soldier = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
+    soldier.position = { x: house.position.x + house.radius + soldier.radius, y: house.position.y };
+    applyCommand(state, {
+      kind: 'order', player: 2, entityIds: [soldier.id],
+      target: house.position, targetId: house.id,
+    });
+    const expected = computeDamage(
+      unitRulesFor(state, 2, 'villager').attacks, state.rules.buildings.house.armors);
+    expect(expected).toBeGreaterThan(1);
+    const start = house.hp;
+    for (let i = 0; i < 400 && house.hp === start; i++) stepGame(state);
+    expect(start - house.hp).toBe(expected);
+  });
+
+  it.skipIf(!importedRules)('carries the blacksmith upgrade into what the arrow hits', () => {
+    // The other half of #26: the effect does reach the shot. It cannot show on
+    // a house, and that is the DAT's answer rather than a defect -- 7 pierce
+    // armour against 4 + 1 still leaves the minimum.
+    const state = createGame(84, importedRules);
+    const before = unitRulesFor(state, 1, 'archer').attacks;
+    const soft = importedRules!.units.villager.armors;
+    state.players[1].researched.push('fletching');
+    const after = unitRulesFor(state, 1, 'archer').attacks;
+    expect(computeDamage(after, soft)).toBe(computeDamage(before, soft) + 1);
+    expect(computeDamage(after, importedRules!.buildings.house.armors)).toBe(1);
+  });
+
+  it.skipIf(!importedRules)('replays identically now that buildings have armour', () => {
+    const a = createGame(85, importedRules);
+    const b = createGame(85, importedRules);
+    for (let i = 0; i < 600; i++) { stepGame(a); stepGame(b); }
+    expect(checksumState(a)).toBe(checksumState(b));
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 });

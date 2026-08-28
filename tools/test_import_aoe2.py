@@ -287,8 +287,10 @@ class ContentImportIntegrationTest(unittest.TestCase):
             entities["monk"]["convert"], {"minSeconds": 5.0, "maxSeconds": 9.0, "range": 9.0}
         )
         # A monk carries no attack at all, which is what keeps it out of the
-        # units that pick their own fights.
-        self.assertNotIn("combat", entities["monk"])
+        # units that pick their own fights. It does carry armour, which is why
+        # asking whether the whole `combat` block is absent stopped being the
+        # same question (issue #26).
+        self.assertEqual(entities["monk"]["combat"]["attacks"], [])
         # The mangonel's stone lands with a blast; an archer's arrow does not.
         self.assertEqual(entities["mangonel"]["combat"]["blastRadius"], 1.0)
         self.assertNotIn("blastRadius", entities["archer"]["combat"])
@@ -379,7 +381,9 @@ class ContentImportIntegrationTest(unittest.TestCase):
         })
         # A laden cart has its own art, named by the trade task itself.
         self.assertEqual(cart["animations"]["carry"]["source"], "u_trade_cart_west_walkA_x1.sld")
-        self.assertNotIn("combat", cart)
+        # No attack of its own, though it has armour like anything else that
+        # can be shot at.
+        self.assertEqual(cart["combat"]["attacks"], [])
 
     def test_the_technology_list_is_the_civilisation_tree(self):
         # Which technologies exist is read from the civilisation's own tree and
@@ -708,6 +712,30 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(entities["tree-oak"]["storage"], {"wood": 100})
         self.assertEqual(entities["town-center"]["collision"], [2.0, 2.0])
         self.assertTrue(entities["town-center"]["annexes"])
+
+    def test_every_building_carries_armour_whether_or_not_it_fights(self):
+        """Issue #26.
+
+        The importer used to ask for a ``combat`` block only when the unit had
+        an attack, so the four buildings that shoot carried armours and the
+        other fifteen carried none. Damage is scored class by class and a class
+        the target has no entry for scores nothing, so a house took the
+        minimum -- one point -- from a sword, an arrow and a battering ram
+        alike, and no blacksmith upgrade could move it.
+        """
+        entities = self.result["entities"]
+        buildings = [k for k, e in entities.items() if e.get("category") == "building"]
+        self.assertGreater(len(buildings), 15)
+        for key in buildings:
+            with self.subTest(building=key):
+                self.assertTrue(entities[key].get("combat", {}).get("armors"))
+        # A house is soft to a blade and hard to an arrow, which is the DAT's
+        # own answer to why archers do not raze towns.
+        house = entities["house"]["combat"]["armors"]
+        self.assertIn({"class": 4, "amount": -2}, house)
+        self.assertIn({"class": 3, "amount": 7}, house)
+        # A building that never fights is still given no attack of its own.
+        self.assertEqual(entities["house"]["combat"]["attacks"], [])
 
     def test_every_animation_resolves_to_hashed_source(self):
         hashes = self.result["source"]["sha256"]

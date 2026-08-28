@@ -468,6 +468,49 @@ random direction. One tile is the board's own unit, and it is wider than any
 unit and narrower than any building — which is why an arrow that goes wide of a
 villager still lands inside the town center behind him, as in AoE2.
 
+### A building has armour, and it decides what an upgrade is worth
+
+Damage is scored class by class: for every class the attacker's attack names,
+the target's armour of the same class is subtracted, and a class the target
+has no entry for scores nothing at all. That is the reference's rule, and it
+was already implemented — but the importer asked the DAT for a `combat` block
+only when a unit *had an attack*, so of the nineteen imported buildings the
+four that shoot carried armour and the other fifteen carried none.
+
+A building with no armour entries matches no attack class, scores zero, and
+falls to the minimum-damage floor. **Every building that does not shoot took
+exactly one point of damage a hit, from anything** — a sword, an arrow, a
+villager's hammer — and no blacksmith upgrade could move it (issue #26). Four
+units and two animals were in the same position: a monk, a trade cart, a sheep
+and a deer all have armours in the DAT and all of them were dropped.
+
+Armour is now imported for anything that has it. What changed, in damage per
+hit (the town center is here as a control — it shoots, so it already had its
+armour and did not move):
+
+| attacker | house | barracks | mill | archery range | palisade | town center |
+| --- | --- | --- | --- | --- | --- | --- |
+| villager | 8 | 6 | 6 | 5 | 4 | 3 |
+| militia | 6 | 4 | 4 | 3 | 2 | 1 |
+| man-at-arms | 10 | 8 | 8 | 7 | 6 | 5 |
+| scout cavalry | 5 | 3 | 3 | 2 | 1 | 1 |
+| archer | 1 | 1 | 1 | 1 | 1 | 1 |
+
+Every number outside the last column was 1 before.
+
+**The archer row is not a defect.** A house has 7 pierce armour against an
+archer's 4, so an arrow scores the minimum whatever the blacksmith has said —
+and Fletching, Bodkin Arrow and Bracer together only reach 7. That is why
+archers do not raze towns in the original either, and it is the answer to the
+half of issue #26 that reported upgraded arrows doing nothing to a house, a
+barracks or a town center: they do nothing there because the DAT says so. The
+upgrade itself does reach the shot, and is tested against a target whose
+armour is below it.
+
+The house is the sharpest illustration of the data being worth reading:
+**-2 melee armour**, so a house takes *more* than a sword's face value.
+Nothing would have invented that.
+
 ### Food on the hoof
 
 Gaia's animals are units, not resource nodes: they walk, they can be killed, and

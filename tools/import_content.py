@@ -290,7 +290,14 @@ def extract_entity(
             entity["train"] = {"buildingId": train.unit_id, "seconds": train.train_time}
 
     combat = unit.type_50
-    if combat is not None and any(attack.amount for attack in combat.attacks):
+    # Armour is imported even for something that never attacks. Damage is
+    # scored class by class and a class the target has no entry for scores
+    # nothing, so a building with no armours at all took exactly the minimum
+    # damage from everything -- one point a hit, whatever hit it, and no
+    # blacksmith upgrade could change it (issue #26). Every building in the
+    # DAT has armours; only the four that shoot were being asked for them.
+    if combat is not None and (any(attack.amount for attack in combat.attacks)
+                               or combat.armours):
         entity["combat"] = {
             "reloadSeconds": rounded(combat.reload_time),
             "frameDelay": combat.frame_delay,
