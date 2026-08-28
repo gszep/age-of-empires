@@ -238,6 +238,35 @@
         "entityIds"
       ],
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "reseed"
+        },
+        "player": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "buildingId": {
+          "type": "integer",
+          "$comment": "One of the player's finished mills: where the option is offered."
+        },
+        "enabled": {
+          "type": "boolean",
+          "$comment": "Whether a villager whose farm goes fallow sows it again on the spot, paying the farm's wood. Off until asked for."
+        }
+      },
+      "required": [
+        "kind",
+        "player",
+        "buildingId",
+        "enabled"
+      ],
+      "additionalProperties": false
     }
   ],
   "definitions": {

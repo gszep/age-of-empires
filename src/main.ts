@@ -353,6 +353,15 @@ function runUiCommand(id: string): void {
     if (!result.ok) reject(result.reason);
     return;
   }
+  if (id === 'reseed') {
+    const mill = selection.find(e => e.kind === 'mill' && e.buildProgress === undefined);
+    if (!mill) return;
+    applyCommand(game, {
+      kind: 'reseed', player: 1, buildingId: mill.id,
+      enabled: !(game.players[1].autoReseedFarms === true),
+    });
+    return;
+  }
   if (id.startsWith('research-')) {
     const tech = id.slice('research-'.length);
     const at = rules.technologies[tech as TechKey]?.researchedAt;
@@ -709,6 +718,19 @@ function currentCommands(): CommandButton[] {
       label: `Research ${tech.name} (${costLabel(tech.cost)})`,
       enabled: !building.researching && affordable(tech.cost),
       icon: hud.iconFor('Techs', tech.iconId),
+    });
+  }
+  // The mill's one standing option: whether a fallow farm is sown again where
+  // it stood. AoE2 puts re-sowing at the mill and this is the same place for
+  // it; the DAT gives the farm one build location, the villager, so there is
+  // nothing here to import (issue #24).
+  const mill = selection.find(e => e.kind === 'mill' && e.buildProgress === undefined);
+  if (mill) {
+    const on = player1.autoReseedFarms === true;
+    buttons.push({
+      id: 'reseed',
+      label: `Auto-reseed farms: ${on ? 'on' : 'off'} (${costLabel(rules.buildings.farm.cost)} each)`,
+      enabled: true,
     });
   }
   return buttons;

@@ -575,6 +575,118 @@ describe('the mill technologies', () => {
   });
 });
 
+describe('sowing a fallow farm again', () => {
+  // Issue #24. AoE2's own words for a farm are that it "goes fallow and must
+  // be rebuilt", and the DAT gives it exactly one build location -- the
+  // villager. Re-sowing at the mill is the engine's convenience rather than
+  // anything in the data, so it is offered as an option and is off until it is
+  // asked for. What it removes is the clicking, not the sixty wood.
+  const millFor = (state: GameState): Entity => {
+    const villager = villagerOf(state);
+    state.players[1].wood = 1000;
+    const at = freeSpot(state, 'mill', villager.position);
+    expect(applyCommand(state, {
+      kind: 'build', player: 1, builderIds: [villager.id], building: 'mill', target: at,
+    })).toEqual({ ok: true });
+    const mill = state.entities.find(e => e.kind === 'mill')!;
+    mill.buildProgress = undefined;
+    return mill;
+  };
+
+  /** A finished farm with one unit of food left, and its villager on it. */
+  const nearlySpentFarm = (state: GameState): { farm: Entity; villager: Entity } => {
+    const villager = villagerOf(state);
+    state.players[1].wood = 1000;
+    expect(applyCommand(state, {
+      kind: 'build', player: 1, builderIds: [villager.id], building: 'farm',
+      target: freeSpot(state, 'farm', villager.position),
+    })).toEqual({ ok: true });
+    const farm = state.entities.find(e => e.kind === 'farm')!;
+    for (let i = 0; i < 4000 && farm.buildProgress !== undefined; i++) stepGame(state);
+    expect(farm.buildProgress).toBeUndefined();
+    farm.amount = 1;
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [villager.id], target: farm.position, targetId: farm.id,
+    });
+    return { farm, villager };
+  };
+
+  it('is off until a mill is asked for it', () => {
+    const state = createGame(92);
+    const mill = millFor(state);
+    expect(state.players[1].autoReseedFarms).toBeFalsy();
+    expect(applyCommand(state, { kind: 'reseed', player: 1, buildingId: mill.id, enabled: true }))
+      .toEqual({ ok: true });
+    expect(state.players[1].autoReseedFarms).toBe(true);
+    expect(applyCommand(state, { kind: 'reseed', player: 1, buildingId: mill.id, enabled: false }))
+      .toEqual({ ok: true });
+    expect(state.players[1].autoReseedFarms).toBe(false);
+    // Only at a mill, and only at one of your own.
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    expect(applyCommand(state, { kind: 'reseed', player: 1, buildingId: tc.id, enabled: true }).ok)
+      .toBe(false);
+    expect(applyCommand(state, { kind: 'reseed', player: 2, buildingId: mill.id, enabled: true }).ok)
+      .toBe(false);
+  });
+
+  it('leaves a worked-out farm alone while the option is off', () => {
+    const state = createGame(93);
+    const { farm, villager } = nearlySpentFarm(state);
+    const where = { ...farm.position };
+    for (let i = 0; i < 600 && !farm.dead; i++) stepGame(state);
+    expect(farm.dead).toBe(true);
+    run(state, 40);
+    const sown = state.entities.find(
+      e => e.kind === 'farm' && !e.dead && Math.abs(e.position.x - where.x) < 0.01);
+    expect(sown).toBeUndefined();
+    expect(villager.order.kind).not.toBe('build');
+  });
+
+  it('sows it again where it stood, and pays for it', () => {
+    const state = createGame(93);
+    const mill = millFor(state);
+    applyCommand(state, { kind: 'reseed', player: 1, buildingId: mill.id, enabled: true });
+    const { farm, villager } = nearlySpentFarm(state);
+    const where = { ...farm.position };
+    const wood = state.players[1].wood;
+    for (let i = 0; i < 600 && !farm.dead; i++) stepGame(state);
+    expect(farm.dead).toBe(true);
+    run(state, 5);
+    const sown = state.entities.find(
+      e => e.kind === 'farm' && !e.dead && Math.abs(e.position.x - where.x) < 0.01);
+    expect(sown, 'a new farm where the old one stood').toBeDefined();
+    expect(state.players[1].wood).toBe(wood - FALLBACK_RULES.buildings.farm.cost.wood);
+    // And the villager who emptied it is the one putting it back.
+    expect(villager.order).toEqual({ kind: 'build', targetId: sown!.id });
+  });
+
+  it('does not sow one it cannot pay for', () => {
+    const state = createGame(93);
+    const mill = millFor(state);
+    applyCommand(state, { kind: 'reseed', player: 1, buildingId: mill.id, enabled: true });
+    const { farm } = nearlySpentFarm(state);
+    const where = { ...farm.position };
+    state.players[1].wood = FALLBACK_RULES.buildings.farm.cost.wood - 1;
+    for (let i = 0; i < 600 && !farm.dead; i++) stepGame(state);
+    run(state, 40);
+    expect(state.entities.some(
+      e => e.kind === 'farm' && !e.dead && Math.abs(e.position.x - where.x) < 0.01)).toBe(false);
+    expect(state.players[1].wood).toBe(FALLBACK_RULES.buildings.farm.cost.wood - 1);
+  });
+
+  it('replays identically with the option on', () => {
+    const play = () => {
+      const state = createGame(94);
+      const mill = millFor(state);
+      applyCommand(state, { kind: 'reseed', player: 1, buildingId: mill.id, enabled: true });
+      nearlySpentFarm(state);
+      run(state, 800);
+      return checksumState(state);
+    };
+    expect(play()).toBe(play());
+  });
+});
+
 describe('drop sites', () => {
   const buildFor = (state: GameState, kind: 'mill' | 'lumber-camp' | 'mining-camp', near: { x: number; y: number }) => {
     const villager = villagerOf(state);

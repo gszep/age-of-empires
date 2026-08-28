@@ -468,6 +468,27 @@ random direction. One tile is the board's own unit, and it is wider than any
 unit and narrower than any building — which is why an arrow that goes wide of a
 villager still lands inside the town center behind him, as in AoE2.
 
+### A fallow farm sown again, as an option that starts off
+
+AoE2's own description of a farm is that it "provides a limited amount of food
+before it goes fallow and must be rebuilt", and the DAT gives the farm exactly
+one build location: unit 118, the builder villager, on button 6. The mill
+produces nothing. So re-sowing from the mill is the engine's convenience and
+not something the owned files describe — recorded here as the approximation it
+is, and shaped as narrowly as the request allows (issue #24).
+
+A player turns it on at one of their own finished mills, and it is **off until
+they do**, so no existing match changes behaviour by itself. With it on, the
+villager who empties a farm sows another where it stood and builds it, paying
+the farm's own 60 wood; with too little wood, or the ground no longer free, it
+falls through to the ordinary rule for what to work next. What the option
+removes is the clicking, not the cost.
+
+The toggle is a new `reseed` command — the player's own mill, and a boolean —
+in the schema alongside the other six. Verified in the running game: a mill's
+panel reads `Auto-reseed farms: off (60 wood each)`, and reads `on` after the
+button is clicked.
+
 ### The mill's technologies, and the effect command that carries them
 
 Horse Collar and Heavy Plow were among the forty-eight skipped, recorded as

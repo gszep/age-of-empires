@@ -108,6 +108,14 @@ export interface PlayerState {
   stone: number;
   population: number;
   populationCap: number;
+  /**
+   * Whether a villager whose farm goes fallow sows it again on the spot,
+   * paying the farm's wood. Off unless the player turns it on at a mill: the
+   * DAT gives the farm one build location, the villager, so a mill that
+   * re-sows is the engine's behaviour rather than the data's, and nothing
+   * about an existing match changes until it is asked for (issue #24).
+   */
+  autoReseedFarms?: boolean;
 }
 
 /**
@@ -162,4 +170,6 @@ export type Command =
       orientation?: 'x' | 'y' }
   | { kind: 'rally'; player: PlayerId; buildingId: number; target: Point; targetId?: number }
   | { kind: 'stop'; player: PlayerId; entityIds: number[] }
-  | { kind: 'research'; player: PlayerId; buildingId: number; tech: string };
+  | { kind: 'research'; player: PlayerId; buildingId: number; tech: string }
+  /** Turn automatic farm re-sowing on or off, from one of the player's mills. */
+  | { kind: 'reseed'; player: PlayerId; buildingId: number; enabled: boolean };

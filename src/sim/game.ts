@@ -407,6 +407,24 @@ export function farmFoodAmountFor(state: GameState, owner: Entity['owner']): num
   return Math.round(amount);
 }
 
+/**
+ * Sow a fallow farm again where it stood. Returns the new foundation, or
+ * nothing when the player has not asked for it, cannot pay, or the ground is
+ * no longer free -- each of which leaves the villager to the ordinary rule for
+ * what to work next.
+ */
+function reseedFarm(state: GameState, builder: Entity, fallow: Entity): Entity | undefined {
+  const owner = builder.owner;
+  if (owner === 0 || !state.players[owner as PlayerId].autoReseedFarms) return undefined;
+  const at = { ...fallow.position };
+  if (!placementLegal(state, 'farm', at).ok) return undefined;
+  if (!spend(state, owner as PlayerId, 'farm').ok) return undefined;
+  const rules = state.rules.buildings.farm;
+  const site = addEntity(state, 'farm', owner, at, rules, { hp: 1, buildProgress: 0 });
+  site.maxHp = rules.hp;
+  return site;
+}
+
 export function buildingRulesFor(
   state: GameState, owner: Entity['owner'], kind: BuildingKind,
 ): BuildingRules {
@@ -719,6 +737,17 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       tech: command.tech,
       remainingTicks: Math.round(tech.researchSeconds * TICKS_PER_SECOND),
     };
+    return { ok: true };
+  }
+
+  if (command.kind === 'reseed') {
+    // Asked for at a mill, because that is where the player looks for it, and
+    // because a player with no mill has no farms to re-sow either.
+    const mill = state.entities.find(
+      e => e.id === command.buildingId && e.owner === command.player && !e.dead && e.kind === 'mill');
+    if (!mill) return rejected(`building ${command.buildingId} is not an owned mill`);
+    if (mill.buildProgress !== undefined) return rejected('building is under construction');
+    state.players[command.player].autoReseedFarms = command.enabled;
     return { ok: true };
   }
 
@@ -1082,6 +1111,19 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   let node = state.entities.find(e => e.id === targetId
     && (e.amount ?? 0) > 0 && (!e.dead || isCarcass(e)));
   if (!node) {
+    // A farm that has gone fallow is sown again where it stood, by the
+    // villager who emptied it, if its owner has asked for that and can pay
+    // the wood. AoE2's own words for a farm are that it "must be rebuilt";
+    // what the option removes is the clicking, not the cost (issue #24).
+    const fallow = state.entities.find(e => e.id === targetId && e.kind === 'farm');
+    if (fallow) {
+      const sown = reseedFarm(state, entity, fallow);
+      if (sown) {
+        entity.order = { kind: 'build', targetId: sown.id };
+        entity.activity = 'moving';
+        return;
+      }
+    }
     // What it was working, so it can look for another of the same first --
     // and what that thing yielded, because a villager that has just emptied
     // its hands at the mill is carrying nothing to ask for. Reading the want
