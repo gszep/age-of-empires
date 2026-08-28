@@ -42,9 +42,11 @@ work.
 **Since then the human has playtested and filed thirteen more** (2026-08-28),
 twelve of them tagged `bug`. They are the queue now — the standing priority on
 this repo is that `bug` issues come before anything in this file, so start at
-Q0 below and only reach Q1 when the issue list is clear. The three
+Q0 below and only reach Q0b when the issue list is clear. The three
 `enhancement` issues (#5 pathing, #6 multi-unit selection, #7 spawn queue)
-remain untouched by design.
+were untouched by design until 2026-08-28, when the human put them into the
+queue behind the bugs — they are Q0b — and added a new last item, Q8, for
+terrain generation. The order is Q0, Q0b, Q1-Q7, then Q8.
 
 What landed, in one paragraph each, because the next run should know what it is
 standing on. **Combat**: a shot is aimed once and can miss — `accuracy_percent`
@@ -92,8 +94,44 @@ about, because they are not twelve independent bugs:
 - **Missing content** — #28 (trebuchet), #27 (wonder, untagged), #25 (true
   villager build menus).
 
+Two of the twelve were diagnosed before the run started, so they lead:
+
+- **#20** is `src/view/sprites.ts`'s variation rule keyed on the literal name
+  `idle`. A Feudal+ house draws `idle-feudal`, whose manifest entry is three
+  *variations* (`frames: 3, directions: 1, frameSeconds: 0`), so it falls into
+  the animation branch, takes the 0.1s default for a zero frame time, and
+  cycles all three house models three times a second.
+- **#26** is not `releaseAttack` or `struckBy`. The importer writes a `combat`
+  block only for buildings that fight: `castle` and `town-center` carry
+  armours, `house`, `barracks`, `mill` and `outpost` have no `combat` key at
+  all. `computeDamage` skips every attack class the target has no armour entry
+  for, so an arrow into a house scores zero and returns the `Math.max(1, ...)`
+  floor — one damage, forever, upgrade or no upgrade. Farms take the fallback
+  rules, which do carry a class-3 entry, which is exactly why the human saw
+  upgrades work there and nowhere else. The fix is in the importer, and it is
+  a checksum change.
+
+The human approved this order on 2026-08-28: **#20, #26, #18, #19+#21, #17,
+#22, #23, #24, #25, #28, #27** — the diagnosed two first, then by shared cause.
+Two scope decisions came with it: **#24**'s reseed ships with its HUD toggle
+**defaulting off**, so no existing match changes behaviour silently; and
+**#27** ships as a buildable structure **with no victory condition**, with the
+countdown-victory decision recorded in `backlog.md` for the human rather than
+taken here.
+
 *Verify:* each issue closed with the check its own thread asks for, the gate
 green, and the fix committed and pushed on its own. Do not batch them.
+
+### Q0b. The three enhancement issues
+
+Behind the bugs, and in the human's own order: **#5** (pathing algorithm is
+poor), **#6** (multi-unit selection), **#7** (spawn queue). Read each on GitHub
+before starting it. These change how the game is played rather than repairing
+it, so each wants the same treatment as a bug: one at a time, its own
+verification, its own commit.
+
+*Verify:* as Q0 — the check the thread asks for, the gate green, committed and
+pushed on its own.
 
 ### Q1. The example AI cannot afford the Castle Age and a win at once
 
@@ -200,6 +238,36 @@ to 750 — which is a real effect of ageing up that is not applied.
 *Verify:* a razed Feudal barracks leaves the Feudal rubble, and a house built
 after the Feudal Age has 750 hit points where one built before has 550 — with
 a determinism test across the change, because it is a checksum change.
+
+### Q8. A map that looks like Age of Empires
+
+Last, and only once everything above is done. The board today is two furnished
+corners and a lot of grass: player openings come from `land_resources.inc`,
+every tile is the same grass terrain, the ground is flat, and the middle of the
+map holds nothing. The human asked for a genuine AoE2 map — variation in where
+resources sit, in the trees, in the terrain underfoot, and **elevation** — and
+noted that the reference data should describe it.
+
+It should: the owned depot ships the random map scripts, and they are the
+specification. `create_terrain`, `create_elevation`, `create_object` with their
+`number_of_tiles`, `set_scaling_to_map_size`, clumping and spacing parameters
+say what the original actually asks the engine to do, and `lessons.md` already
+records the cost of reading the numbers without reading the instruction —
+scattering objects over a disc is not how the original makes a forest. Find the
+map script this slice is matched to, read what it says about terrain mixes,
+elevation passes and neutral resource placement, and build from that rather
+than from an idea of what a map looks like.
+
+Two known blockers sit next to this and must not be quietly absorbed into it:
+terrain-to-terrain **blend edges** are blocked on a mapping nobody has found
+(see below), so a multi-terrain map will have hard seams until that is settled;
+and elevation is a change to the board that the renderer, the pathfinder, the
+fog and the checksum all have to agree on. Scope it in a design doc first, the
+way `docs/water-design.md` scopes water, and stage it — do not start it as one
+change.
+
+*Verify:* stated per stage in that design doc, each stage with a determinism
+test, because every one of them changes the checksum.
 
 ## Blocked or deliberately not started
 
