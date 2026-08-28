@@ -36,10 +36,13 @@ rely on any external memory system.
 ## Quality gate for every checkpoint
 
 ```bash
-npm test
-npm run build
-npm run test:import
+tools/gate.sh          # npm test, npm run build, npm run test:import
 ```
+
+Run it through that script rather than by hand. Piping a step to `tail` hands
+`&&` the status of `tail`, which is always 0, so a broken build sails into a
+commit — that happened twice in one run, once in an ad-hoc chain and once in
+the first script written to replace it.
 
 Also run the relevant live/headless integration test for changed boundaries.
 Commit only when all gates pass, and always push after committing. Keep

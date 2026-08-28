@@ -334,3 +334,56 @@ describe('Castle Age determinism', () => {
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 });
+
+describe('the Imperial Age', () => {
+  // The Imperial Age is imported content: the open fallback stops at the
+  // Castle Age, so these run only when the manifest is present.
+  it.skipIf(!importedRules)('is researched at the town center, and only after the Castle Age', () => {
+    const state = createGame(61, importedRules);
+    const tc = townCenter(state);
+    const imperial = state.rules.technologies['imperial-age'];
+    expect(imperial.researchedAt).toBe('town-center');
+    expect(imperial.requiresAge).toBe(2);
+    expect(imperial.grantsAge).toBe(3);
+    // The DAT's own price and time, not a transcription.
+    expect(imperial.cost).toEqual({ food: 1000, wood: 0, gold: 800, stone: 0 });
+    expect(imperial.researchSeconds).toBe(190);
+
+    state.players[1].food = 3000;
+    state.players[1].gold = 3000;
+    const early = applyCommand(state, { kind: 'research', player: 1, buildingId: tc.id, tech: 'imperial-age' });
+    expect(early.ok).toBe(false);
+    if (!early.ok) expect(early.reason).toContain('later age');
+
+    state.players[1].age = 2;
+    expect(applyCommand(state, { kind: 'research', player: 1, buildingId: tc.id, tech: 'imperial-age' }).ok).toBe(true);
+    expect(state.players[1].food).toBe(2000);
+    expect(state.players[1].gold).toBe(2200);
+    run(state, 190 * 20 - 1);
+    expect(state.players[1].age).toBe(2);
+    run(state, 1);
+    expect(state.players[1].age).toBe(3);
+    expect(state.players[1].researched).toContain('imperial-age');
+  });
+
+  it.skipIf(!importedRules)('holds its technologies back until the age arrives', () => {
+    const state = createGame(62, importedRules);
+    state.players[1].age = 2;
+    state.players[1].food = 3000;
+    state.players[1].gold = 3000;
+    // The elite longbowman needs the age and nothing else — no prerequisite
+    // technology stands in front of it, so what it proves is the age gate.
+    expect(state.rules.technologies['elite-longbowman'].requiresAge).toBe(3);
+    const castle = place(state, 'castle');
+    const early = applyCommand(state, {
+      kind: 'research', player: 1, buildingId: castle.id, tech: 'elite-longbowman',
+    });
+    expect(early.ok).toBe(false);
+    if (!early.ok) expect(early.reason).toContain('later age');
+
+    state.players[1].age = 3;
+    expect(applyCommand(state, {
+      kind: 'research', player: 1, buildingId: castle.id, tech: 'elite-longbowman',
+    }).ok).toBe(true);
+  });
+});

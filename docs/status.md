@@ -29,6 +29,7 @@ Controls and hotkeys are listed in the root `README.md`. The essential loop is l
 - A hunted animal's carcass is selectable for as long as there is food on it (issue 14): it takes the flat marker of the DAT's own corpse unit rather than the live animal's ring, shows the food remaining, and carries no health bar — `BOARX_D` has no hit points and obstructs nothing where `BOARX` obstructs like a unit. A corpse with nothing left, and a soldier's corpse, stay unclickable: in the DAT only huntables and herdables store food, and here only a carcass keeps an `amount`.
 - Selection markers follow the DAT's obstruction shape: a round outline under units (obstruction type 5), the `outline_size` box drawn on the ground under buildings and resources — the box the DAT draws slightly larger than the collision box, and a gate's spanning its whole four-tile run. An enemy told to expect company blinks its own marker — only somebody else's, since a tree or your own mill blinking on every right-click is noise over the one question the flash answers, which of a crowd a group was just sent at. Its cadence and colour are approximated (0.2 s on/off for 1.2 s, in the marker colour) because no owned file states them — the DAT's `unit_selection_color_1/2` hold the unused palette index 0, and widgetui defines no such widget, so the behaviour lives in the closed runtime.
 - The Castle Age and what it opens: monastery, siege workshop and castle, and the knight, cavalry archer, longbowman, battering ram, mangonel and monk, each gated by the age the DAT's own enabling technology names. A monk heals and converts, a mangonel's stone lands with a blast, and a castle shoots and supports twenty population.
+- The Imperial Age, researched at the town center for the DAT's own 1000 food and 800 gold over 190 seconds, and the twenty-four technologies that wait on it — the plate armour lines, Chemistry, Bracer, Siege Engineers, Hoardings, Conscription, and the eight upgrades that end their line at the champion, halberdier, arbalester, cavalier, elite longbowman, onager, capped ram and heavy cavalry archer. It opens no new building and no new unit, which is what the Britons' own tree says. Age advancement is data-driven off each technology's `grantsAge`, so this is the Castle Age's code path with the DAT's third row of numbers in it — but the age exists only in imported mode: **the open fallback's hand-written rules stop at the Castle Age**, and the Imperial tests skip without a manifest.
 - Versioned JSON public contracts; browser, built-in AI, JSONL subprocess, deadline subprocess, WebSocket, and MCP strategies share `applyCommand`.
 - Full-state FNV-1a periodic checksums, command-stream records, Node verification, and browser playback.
 - Process-isolated paired batches with configurable concurrency, Wilson 95% intervals, strategy hashes, per-match results, and replay records.
@@ -36,7 +37,7 @@ Controls and hotkeys are listed in the root `README.md`. The essential loop is l
 
 ## Deliberately omitted
 
-The target does not include other civilizations, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, relics, or a genetic-algorithm framework. Palisade walls and gates are built; stone walls and their gates are not. Of the technology tree only Loom, the Feudal Age and the Castle Age are researchable — no unit upgrade, blacksmith or university technology is. Mobile has no separate or simplified gameplay. All SLD layers convert through the local decoder.
+The target does not include other civilizations, formations, naval play, campaigns, random-map parsing, multiplayer networking, diplomacy, relics, or a genetic-algorithm framework. Palisade walls and gates are built; stone walls and their gates are not. Of the technology tree the forty-eight technologies listed under “Ages and technologies” below are not researchable, with the reason recorded per technology; civilisation bonuses and team bonuses are not modelled at all, being no part of the tree. Mobile has no separate or simplified gameplay. All SLD layers convert through the local decoder.
 
 ## Measurements and gate evidence
 
@@ -50,8 +51,8 @@ changed underneath it.
   **393x aggregate real time** (43.4 seconds of wall clock for 17,058 simulated
   seconds). The zero replay failures are the load-bearing number: every one of
   those matches re-simulates to the same checksums after a session that changed
-  how every shot is aimed, what fifty technologies do, and how long a body lies
-  on the ground. Corpses lasting five minutes rather than three seconds cost
+  how every shot is aimed, what sixty-six technologies do, and how long a body
+  lies on the ground. Corpses lasting five minutes rather than three seconds cost
   nothing measurable — throughput went up, not down.
 - **The built-in AI researches now, and the batch is decisive again.**
   **16 of 16 decided, 0 timeouts, 0 replay checksum failures**, a 0.5 mirror
@@ -310,13 +311,18 @@ groups:
     is a category it never looks at — so these are not blocked on modelling an
     attribute but on reading a kind of command at all, and one change would
     unlock all six.
-  - *Four want an attribute this game does not model on something it does
+  - *Two more also decode to no attribute at all* and are not type 1: Fortified
+    Wall upgrades to a stone wall this slice does not build, and Spies/Treason
+    buys information rather than changing anything.
+  - *One wants an attribute this game does not model on something it does
     have.* Herbal Medicine wants attribute 108 on the town center and the
     watch tower — garrison healing.
-  - *The rest target units this slice has no equivalent of*: Horse Collar and
-    Heavy Plow change the work rate and carry capacity of units 214 and 259
-    (the farm's own gatherers), Guard Tower and Keep raise the attack of tower
-    units we do not import, and the remainder are naval.
+  - *The remaining eleven target units this slice has no equivalent of*: Horse
+    Collar and Heavy Plow change the work rate and carry capacity of units 214
+    and 259 (the farm's own gatherers), Guard Tower and Keep raise the attack
+    of tower units we do not import, Siphons and Warwolf belong to siege units
+    we lack, and the last five — Careening, Carvel Hull, Clinker Construction,
+    Dry Dock and Shipwright — are naval.
 
 A technology that keeps some of its effects and loses others carries an
 `unmodelled` list naming the attributes, so a half-applied technology says so.

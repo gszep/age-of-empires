@@ -201,6 +201,9 @@ keeps the record.
   see a late-game rendering change, construct the state through the simulation's
   public entry points and hand it to the page as a snapshot — do not add a cheat
   to the debug protocol, and do not play twenty minutes to get there.
+  `tools/probes/snapshot.ts` is that recipe as a script you can run: it names
+  the `sessionStorage` key, the `{version, rulesOrigin, state}` shape, and why
+  `rules` is deliberately left out of it.
 - **Making a thing clickable is three layers, and the middle one was missed.**
   Carcasses were made selectable and the fix was verified twice — the sim
   predicate by unit test, the click by driving a real mouse — and ordering a
@@ -351,7 +354,7 @@ keeps the record.
   tail -5 && npm run build | tail -2 && ...`, and `&&` sees the status of
   `tail`, which is always 0 — so a `tsc` error sailed through a green-looking
   gate into a commit and was found two items later by a run that happened not
-  to pipe. The gate was then moved into `.local/gate.sh` to read `PIPESTATUS`,
+  to pipe. The gate was then moved into `tools/gate.sh` to read `PIPESTATUS`,
   and *that* had the same defect one layer down: the step ran as `if ! $step |
   tail -6; then :; fi`, and `:` is a command, so it reset `PIPESTATUS` before
   the next line read it. Only the failing case was affected, which is the only
@@ -360,6 +363,33 @@ keeps the record.
   and never through a construct that runs anything in between; and when a
   fix's own machinery repeats the bug, test the fix against a deliberate
   failure before trusting it.
+
+- **A doc that points at a gitignored path is a doc that is wrong for
+  everyone but you.** `docs/overnight.md` opened with "run the gate with
+  `.local/gate.sh`" and later sent the reader to "`.local/probes/`, which has
+  half a dozen working examples" — and `.gitignore` contains `.local/`, so
+  neither existed for anybody else, including the next session on the same
+  machine after a clean checkout. The instruction had been true when written
+  and was never false in a way that showed up locally. Rule: when a doc names
+  a path, check it is tracked (`git ls-files --error-unmatch <path>`) before
+  the doc ships; tooling worth writing a doc about is worth committing, so
+  move it out of `.local/` rather than editing the sentence around it.
+
+- **A patch script that asserts every edit and writes once loses every edit
+  when one assertion fails.** The shape is `s = read(); for old, new: assert
+  old in s; s = s.replace(...)` and a single `write()` at the end — so the
+  first failed assertion aborts before the write and the successful
+  replacements vanish with it. This shipped a real defect once: commit
+  `9ba70f4` claimed to wire `accuracyPercent` through and did not, because one
+  of its assertions failed and the whole patch was discarded silently while the
+  commit went ahead. It then happened again on a documentation patch, which is
+  how it was noticed a second time. The failure is quiet in both directions —
+  nothing is written, and nothing says so unless you go back and look. Rule:
+  in a multi-edit patch script, report per-edit hit or miss and write what
+  succeeded (`for i, (old, new): if old not in s: print("MISS", i) else:
+  ...`), then check the report. Do not let one edit's failure decide the
+  others' fate, and never commit a patch script's work without reading its
+  output.
 
 - **Re-running a slow job because it "seems stuck" is how it gets stuck.** The
   atlas conversion normally takes under a minute, so when the manifest had not

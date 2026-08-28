@@ -7,11 +7,13 @@ be finished, revert to the last green state, record what blocked it here, and
 move on — a half-shipped feature is worse than an honest gap. Do not mark an
 item done on "looks done": run its check.
 
-Run the gate with `.local/gate.sh`, not by hand. Piping a step to `tail` hands
+Run the gate with `tools/gate.sh`, not by hand. Piping a step to `tail` hands
 `&&` the status of `tail`, which is always 0, and a broken build sails straight
 into a commit — that happened twice in one run, once in the ad-hoc chain and
 once in the first script written to replace it. The script reads `PIPESTATUS`
-on the line after the command and has been tested against a deliberate failure.
+on the line after the command and has been tested against a deliberate
+failure. `GATE_TAIL` sets how many lines of each step it echoes; the full
+output of the failing step lands in `.local/gate-step.log`.
 
 Use the debug protocol (`AGENTS.md` → Visual debug protocol) for rendering
 verification, and prefer its fields to screenshots: `entities` reports
@@ -19,9 +21,10 @@ verification, and prefer its fields to screenshots: `entities` reports
 walls and gates; `sim` reports `selected` and `flashTarget`. To reach a state a
 fresh match cannot — a Castle Age town, an army mid-fight, a building
 mid-collapse — build it in Node through `applyCommand` and hand it to the page
-as a dev-session snapshot (`docs/lessons.md` has the recipe, and
-`.local/probes/` has half a dozen working examples). Do not add cheats to the
-protocol and do not play twenty minutes to get there.
+as a dev-session snapshot — `tools/probes/snapshot.ts` is a working example to
+copy, and `tools/probes/panel.mjs` reads the HUD out of the DOM and the minimap
+out of its canvas. Do not add cheats to the protocol and do not play twenty
+minutes to get there.
 
 Wait on long jobs by handle, never by pattern — `tools/wait_for.sh` against a
 PID or sentinel file, not `pgrep -f`. Before restarting a background job that
@@ -33,9 +36,15 @@ kill the litter, and state what is deliberately left running.
 ## Where this queue stands
 
 The previous queue (N1–N8) is finished and folded into `docs/status.md`, along
-with the eight `bug` issues and the whole of the technology work. What is left
-on GitHub is three `enhancement` issues, untouched by design: #5 pathing, #6
-multi-unit selection, #7 spawn queue.
+with the twelve `bug` issues open at the time and the whole of the technology
+work.
+
+**Since then the human has playtested and filed thirteen more** (2026-08-28),
+twelve of them tagged `bug`. They are the queue now — the standing priority on
+this repo is that `bug` issues come before anything in this file, so start at
+Q0 below and only reach Q1 when the issue list is clear. The three
+`enhancement` issues (#5 pathing, #6 multi-unit selection, #7 spawn queue)
+remain untouched by design.
 
 What landed, in one paragraph each, because the next run should know what it is
 standing on. **Combat**: a shot is aimed once and can miss — `accuracy_percent`
@@ -43,13 +52,48 @@ decides whether it was aimed true, and Ballistics decides whether it leads a
 moving target. **The tree**: sixty-six technologies read from
 `CivTechTrees/BRITONS.json` and the DAT's own effect commands, including
 fifteen unit upgrades through to the champion and the elite longbowman, with
-the DAT's own prerequisite chains. **The board**: farms draw, buildings wear
-their age, a razed building falls all the way down and leaves its rubble for
-the sixty seconds the DAT allows it, and enemy units do not linger in the fog.
+the DAT's own prerequisite chains. **The ages**: Dark through Imperial, each
+one's cost, time and effects from the DAT, and the Imperial Age's twenty-four
+technologies behind it — but only in imported mode, because the open
+fallback's hand-written rules still stop at the Castle Age. **The board**:
+farms draw, buildings wear their age, a razed building falls all the way down
+and leaves its rubble for the sixty seconds the DAT allows it, and enemy units
+do not linger in the fog.
 **The strategy**: the built-in AI ages up, hunts, farms, builds an archery
 range and buys Loom and the man-at-arms.
 
 ## The queue
+
+### Q0. The twelve open `bug` issues from the 2026-08-28 playtest
+
+Read each one on GitHub before starting it; the human's own words are the
+specification and several carry screenshots. Grouped by what they are actually
+about, because they are not twelve independent bugs:
+
+- **Gathering behaviour** — #19 (a villager does not reliably move to the next
+  pile when one is exhausted), #21 (villagers auto-target sheep once the
+  bushes are gone, which spends the herd without being asked). One target-
+  selection rule sits behind both.
+- **Farms** — #22 (the farm texture has too many rows), #24 (no auto-reseed at
+  the mill), #23 (mill technologies not implemented — Horse Collar and Heavy
+  Plow are two of the skipped forty-eight, and `status.md` records that they
+  change attributes 13 and 14 on DAT units 214 and 259, the farm's own
+  gatherers; this is a real and reachable piece of work).
+- **Combat** — #18 (melee combat ranges not working), #26 (arrow damage
+  upgrades not working). #26 is the more alarming of the two: the blacksmith
+  attack line is imported and tested, so either the effect is not reaching the
+  projectile or the projectile's damage is not read from the shooter. Check
+  `releaseAttack` and `struckBy` in `src/sim/game.ts` first.
+- **Rendering** — #20 (houses flicker between alternate house models several
+  times a second — almost certainly the age-variant art choice being made per
+  frame rather than per building), #17 (sheep discovered in fog reappear
+  unclaimed when the fog returns — the same class of bug as the corpse that
+  replays its death, and `backlog.md` describes that one's cause).
+- **Missing content** — #28 (trebuchet), #27 (wonder, untagged), #25 (true
+  villager build menus).
+
+*Verify:* each issue closed with the check its own thread asks for, the gate
+green, and the fix committed and pushed on its own. Do not batch them.
 
 ### Q1. The example AI cannot afford the Castle Age and a win at once
 
@@ -100,10 +144,16 @@ higher than the 159 recorded now.
 
 ### Q4. The naval slice, or an honest note that it is out of scope
 
-Everything still skipped in `skippedTechnologies` is the dock and its ships,
-plus the scorpion line. `docs/water-design.md` scopes water as W1–W5 and it is
-deliberately not started; its one open question is the shore seam, which is the
-same blend-mask mapping that blocks terrain blends.
+Naval is the largest single block of what is skipped, but it is not all of it:
+of the forty-eight, **sixteen** are technologies the British simply do not
+have, **eleven** are researched at the dock, **five** more change only ship
+attributes, and one upgrades to the heavy scorpion. The rest are land
+technologies blocked on other things — see Q5 and the four-group breakdown in
+`status.md`. Do not read "skipped" as "naval".
+
+`docs/water-design.md` scopes water as W1–W5 and it is deliberately not
+started; its one open question is the shore seam, which is the same blend-mask
+mapping that blocks terrain blends.
 
 If water is not going to be built, say so in `status.md` and stop listing its
 technologies as gaps.

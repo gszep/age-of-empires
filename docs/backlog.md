@@ -81,17 +81,18 @@ terrain blends above.
 
 ## Simulation
 
-- **The example AI cannot close out a won game.** Now that both sides farm,
-  reach the Feudal Age and sometimes the Castle Age, four of sixteen paired
-  matches run out the thirty-minute clock — where the old Dark Age militia
-  rush decided all sixteen. Neither side can finish an opponent as rich as
-  itself: the army marches at the enemy town center, grinds against its
-  garrison, and reinforcements arrive one at a time. The endgame raze only
-  sends villagers in once the enemy field is completely clear, which stops
-  being true the moment the other side has an economy. This is the single
-  biggest thing standing between the strategy and a decisive match, and it is
-  worth more than any further tuning of the economy — the trade-off curve
-  between economy and decisiveness is recorded in `status.md`.
+- **The example AI closes out a game only because matches end early.** The
+  batch is decisive again — 16 of 16, 0 timeouts — but that was bought by
+  fixing the opening's housing stall, not by teaching the strategy to finish:
+  every match is settled in the Feudal Age, and none of the 32 player-slots
+  reaches the Castle Age. When both economies did survive into a long game, four
+  of sixteen ran out the thirty-minute clock, because neither side can finish
+  an opponent as rich as itself — the army marches at the enemy town center,
+  grinds against its garrison, and reinforcements arrive one at a time, while
+  the endgame raze only sends villagers in once the enemy field is completely
+  clear. That failure is dormant rather than fixed, and it will resurface the
+  moment the strategy is made to last longer. The trade-off curve between
+  economy and decisiveness is recorded in `status.md`.
 - **The AI eats sheep, and it does not help.** It claims and works them now
   (six claimed within eight minutes, verified), but its food income is
   unchanged: 159 food in the first four minutes with the herd and 159 without,
@@ -101,14 +102,22 @@ terrain blends above.
   and eating it under the town center with no return trip, and herdables no
   longer follow anybody here (see below). The queue's N2 verification asked
   for measurably higher early food income and it is not met; this is why.
+- **The open fallback stops at the Castle Age.** The hand-written rules in
+  `src/sim/data.ts` name only `feudal-age` and `castle-age`, so a player
+  without the owned files gets neither the Imperial Age nor any of the
+  sixty-six imported technologies — the fallback's tech list is three entries
+  long. The Imperial tests in `castle-age.test.ts` `skipIf` the manifest is
+  absent for this reason. Whether the fallback should grow a third age or
+  stay a Dark-through-Castle demonstration has not been decided.
 - **The AI will not touch a boar.** Deliberate: seventy-five hit points and
   seven damage a hit, and AoE2's answer is to lure it home with one villager
   while the rest wait. Ordering two villagers onto one loses both.
 
 - **Trade is unverifiable in normal play.** The cart's loop is proven by
   tests, but a human cannot check it: trading needs a foreign market and the
-  built-in AI never builds one (it never leaves the Dark Age, below). Fixing
-  the AI's Feudal gap, or an allied player slot, is what makes trade
+  built-in AI never builds one. It reaches the Feudal Age now, so the market is
+  within its reach — it puts up only camps, houses, a barracks and an archery
+  range. Teaching it the market, or an allied player slot, is what makes trade
   observable in a real match.
 - **Ageing up changes how a building looks but not how tough it is.** The
   DAT's age technologies replace each building with the next age's unit, and
@@ -119,11 +128,10 @@ terrain blends above.
   effects rather than with the renderer. Each age's variant also has its own
   rubble unit (`Barracks Age2 (Rubble)` and friends), so a razed Feudal
   barracks still leaves the Dark Age rubble.
-- **Every land unit upgrade the Britons have is researchable** — fifteen of
-  them, through to the champion, the halberdier, the arbalester and the elite
-  longbowman. What is left is naval (the dock and its ships) and the scorpion
-  line, which are units this slice does not have at all rather than upgrades
-  it is missing.
+- **The naval and scorpion upgrade lines are absent.** Every land unit
+  upgrade the Britons have is researchable; what is left is the dock's ships
+  and the scorpion, which are units this slice does not have at all rather
+  than upgrades it is missing. They arrive with the units, not before them.
 - **The built-in AI's wish list is three technologies long.** Loom, the
   man-at-arms and the crossbowman — the ones whose building it actually puts
   up. Sixty-six are researchable; it buys three, in a fixed order, with
@@ -131,33 +139,21 @@ terrain blends above.
   by what it is fighting would be a real improvement, and so would building a
   blacksmith at all: the armour and attack lines are the best value in the
   tree and it never sees them.
-- **Fifty-two technologies are researchable**, taken from the Britons' own tree — the blacksmith's armour and attack lines, the economy
-  technologies, the monastery's and the castle's, and all three ages. What is
-  still missing is the *upgrades*: man-at-arms, crossbowman, pikeman, light
-  cavalry, elite skirmisher. They are a different rule — one unit kind is
-  replaced by another rather than a flat modifier being added — which is the
-  `UnitUpgrade` node type in the tree and the `upgrade unit` effect command in
-  the DAT, the same command the age variants already use for buildings.
 - **Some technologies apply only part of what they say.** Where an effect
   command names an attribute this game does not model, the technology is still
   imported and the attribute is recorded in its `unmodelled` list rather than
-  dropped. Today that is search radius (attribute 23) on Fletching, Bodkin
-  Arrow, Bracer, Yeomen and the ages, and two Imperial-only attributes. Forty-
-  three more nodes are left out entirely, each with its reason, in the
-  manifest's `skippedTechnologies`.
+  dropped. Today that is attribute 23 (search radius) on eight technologies —
+  Fletching, Bodkin Arrow, Bracer, Block Printing, Chemistry, Siege Engineers,
+  Yeomen and the Castle and Imperial Ages — attribute 130 on four (Bodkin
+  Arrow, Bracer, Chemistry, Fletching), and attributes 48 and 49 on the
+  Imperial Age alone. Forty-eight further nodes are left out entirely, each
+  with its own reason, in the manifest's `skippedTechnologies`.
 - **Technology prerequisites are the DAT's own list, not its count.** The DAT
   states a `required_tech_count` alongside the requirements — Hand Cart needs
   two of three — and the importer instead requires every listed technology that
   this game also offers. That happens to be exactly right for all fifteen
   chains the Britons have, because the extra entries are always the age
   technology or a bookkeeping node, but it is not the general rule.
-- **The university is not built, so Ballistics cannot be researched.** It is a
-  Castle Age building that trains nothing, and it was left out until there were
-  technologies for it to research — there are now, and they are the reason to
-  build it: Ballistics is the technology that makes a shot lead a moving
-  target, which is the open half of issue #3. The Imperial Age *is*
-  researchable (tech 103, from the tree), and every building already has its
-  Imperial art, but nothing else above the Castle Age exists yet.
 - **A monk carries no relic, and a monastery holds none.** Relics are named in
   the omitted scope; a monk that could pick one up would need the relic entity,
   the carry state, and the gold trickle.
@@ -169,26 +165,26 @@ terrain blends above.
   rate per resource and one global capacity, so hunting banks at the forager's
   0.31 into 10. Per-task rates would need `gatherRatePerSecond` to become
   per-variant, which touches every gatherer.
-- **The built-in AI never leaves the Dark Age.** It has no notion of research,
-  so it never takes Loom, the Feudal Age or the Castle Age, and everything above
-  the Dark Age — the market, the archery range, the stable, the monastery, the
-  siege workshop, the castle, and every unit they train — is out of its reach.
-  Its matches are Dark Age militia wars. This is now the single biggest gap
-  between what the simulation supports and what a played match shows.
-- **The built-in AI ignores sheep, deer and boar.** It picks gather targets by
-  `kind === 'resource'`, which animals are not, so the whole Dark Age food
-  opening is invisible to it. Its matches still run on berries and farms.
+- **The built-in AI stops at the Feudal Age.** It researches now — Loom in all
+  32 player-slots of the paired batch, the Feudal Age in 28 — but the Castle
+  Age in none, because matches decide before the food is banked. Everything
+  Castle and above (the monastery, the siege workshop, the castle, the
+  university, and every unit they train) is therefore unreachable in a played
+  match even though the simulation offers it. Whether that wants a richer
+  strategy or a longer clock has not been decided.
 - **A gate does not shut itself.** AoE2 closes a gate when an enemy is in it,
   which is what stops an attacker walking in behind a retreating villager. Here
   the art opens for the owner's units and passability is decided per player, so
   an enemy is stopped by the closed gate at all times and never squeezes
   through — but the two rules are not the same rule, and making them one means
   giving the simulation a gate state the checksum can see.
-- **The example AI is a Dark Age militia rush and nothing else.** It no longer
-  stalemates — all 16 of the paired batch decide — and it now scouts, sites
-  lumber camps, mining camps and mills against the resources it finds, and
-  holds the barracks until the wood is banked nearby. Beyond that it gathers,
-  houses and attacks in threes, and that is the whole repertoire.
+- **The example AI's repertoire is still short.** All 16 of the paired batch
+  decide; it scouts, sites lumber camps, mining camps and mills against the
+  resources it finds, holds the barracks until the wood is banked nearby, works
+  sheep, ages up and buys three technologies. Beyond that it gathers, houses
+  and attacks in threes, and that is the whole of it — no blacksmith, no
+  market, no stable, and no choice among the sixty-six technologies it could
+  research.
 - **The middle of the map is empty.** Player openings come from
   `land_resources.inc`; the neutral forests, relics and contested resources the
   scripts put between the players do not, so a 120x120 board is two furnished
