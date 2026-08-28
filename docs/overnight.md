@@ -35,18 +35,24 @@ kill the litter, and state what is deliberately left running.
 
 ## Where this queue stands
 
-The previous queue (N1–N8) is finished and folded into `docs/status.md`, along
-with the twelve `bug` issues open at the time and the whole of the technology
-work.
+**Start at Q1.** Q0 (the twelve playtest bugs) and Q0b (the three enhancement
+issues) are finished — the section below records what is left of them, which is
+two questions waiting on the human and no work.
 
-**Since then the human has playtested and filed thirteen more** (2026-08-28),
-twelve of them tagged `bug`. They are the queue now — the standing priority on
-this repo is that `bug` issues come before anything in this file, so start at
-Q0 below and only reach Q0b when the issue list is clear. The three
-`enhancement` issues (#5 pathing, #6 multi-unit selection, #7 spawn queue)
-were untouched by design until 2026-08-28, when the human put them into the
-queue behind the bugs — they are Q0b — and added a new last item, Q8, for
-terrain generation. The order is Q0, Q0b, Q1-Q7, then Q8.
+The standing priority on this repo is that `bug` issues come before anything in
+this file, so **check the issue list first**: anything newly tagged `bug`
+outruns Q1. The order after that is Q1–Q7, then Q8 (terrain generation), which
+the human added on 2026-08-28 and wants last.
+
+Two things a fresh session needs before touching anything:
+
+1. **Re-run the importer.** `npm run import:aoe2`. Five items in the last run
+   changed it — building armour, the mill technologies, the villager build
+   slots, the trebuchet and the wonder — and `public/imported/` is gitignored,
+   so none of that exists until you regenerate it. The atlas cache makes it
+   quick except for genuinely new sprites.
+2. **Read `docs/lessons.md`.** Three of its entries were written by the last
+   run and all three are about tests that passed while the game was broken.
 
 What landed, in one paragraph each, because the next run should know what it is
 standing on. **Combat**: a shot is aimed once and can miss — `accuracy_percent`
@@ -66,117 +72,68 @@ range and buys Loom and the man-at-arms.
 
 ## The queue
 
-### Q0 and Q0b are done. Where the queue stands on 2026-08-28
+### Q0 and Q0b: done, and the two questions left over
 
-**Q0: eleven of the twelve bugs are closed** — #17, #18, #19, #20, #21, #23,
-#24, #25, #26, #27 and #28. **#22 (farm textures) is blocked on the human**,
-who has been asked on the issue which of three rendered candidates matches
-their game; nothing in the DAT settles it. **Q0b: all three enhancements are
-closed** — #5 (reviewed, `docs/pathing-review.md`), #6 and #7. #5 also carries
-a question back to the human, because nine measurements could not reproduce
-the defect it reports.
+**Q0 — eleven of the twelve `bug` issues closed** on 2026-08-28: #17 (fog
+remembering a sheep you have since claimed), #18 (an attacker that stopped at
+the edge of its reach and threw away its swing), #19 and #21 (one rule for what
+a worker turns to next), #20 (a house cycling three models a second), #23 (the
+mill's technologies, and effect command type 1 with them), #24 (re-sowing a
+fallow farm, off by default), #25 (the villager build menu from the DAT's own
+button slots), #26 (building armour, and then the attacker loop reading the
+base rules instead of the researched ones), #27 (the wonder, without a victory
+condition), #28 (the trebuchet). Each has the evidence on its own thread and a
+section in `status.md`.
 
-The batch was re-measured afterwards and is in `status.md`: 16/16 decided, 0
-timeouts, 0 replay checksum failures, 431x throughput, and **0 of 32
-player-slots reaching the Castle Age**. So Q1's verification is still unmet and
-its subject is unchanged — what is missing is a strategy that can finish, not
-an economy. Start there.
+**Q0b — all three enhancements closed**: #5 (reviewed, see
+`docs/pathing-review.md`), #6 (a group shown as its members, and double-click),
+#7 (a fifteen-deep training queue).
 
-### Q0. The twelve open `bug` issues from the 2026-08-28 playtest
+**What is left is two questions to the human, not work.** Do not guess at
+either; both were left open deliberately, and picking an answer would be
+inventing a fact.
 
-Read each one on GitHub before starting it; the human's own words are the
-specification and several carry screenshots. Grouped by what they are actually
-about, because they are not twelve independent bugs:
+- **#22, farm textures.** The DAT pins the frame layout — `frame_count` is the
+  product of `terrain_dimensions` for every slot, and Grass's slope frames
+  start at `shape_id` 100, so its flat frames really do occupy 0..99 — but it
+  never says *which* frame a tile draws, which is engine behaviour. What the
+  game draws today is the authored density at the reference's own 96x48 tile,
+  so it cannot be called wrong from the data. Three candidates were rendered
+  onto the real diamond by `tools/probes/farm_mapping.py`, which writes the
+  sheet to compare against, and the question is on the issue. Resume when the human
+  answers; nothing else in the farm work is blocked on it.
+- **#5, pathing.** Nine measurements failed to reproduce the defect the issue
+  reports, and the review says so. The question — which units, doing what — is
+  on the issue. Two adjacent things were noted and are in `backlog.md`: ragged
+  forest interiors, and a crowd settling into a ring rather than a formation.
 
-- **Gathering behaviour** — #19 (a villager does not reliably move to the next
-  pile when one is exhausted), #21 (villagers auto-target sheep once the
-  bushes are gone, which spends the herd without being asked). One target-
-  selection rule sits behind both.
-- **Farms** — #22 (the farm texture has too many rows), #24 (no auto-reseed at
-  the mill), #23 (mill technologies not implemented — Horse Collar and Heavy
-  Plow are two of the skipped forty-eight, and `status.md` records that they
-  change attributes 13 and 14 on DAT units 214 and 259, the farm's own
-  gatherers; this is a real and reachable piece of work).
-- **Combat** — #18 (melee combat ranges not working), #26 (arrow damage
-  upgrades not working). #26 is the more alarming of the two: the blacksmith
-  attack line is imported and tested, so either the effect is not reaching the
-  projectile or the projectile's damage is not read from the shooter. Check
-  `releaseAttack` and `struckBy` in `src/sim/game.ts` first.
-- **Rendering** — #20 (houses flicker between alternate house models several
-  times a second — almost certainly the age-variant art choice being made per
-  frame rather than per building), #17 (sheep discovered in fog reappear
-  unclaimed when the fog returns — the same class of bug as the corpse that
-  replays its death, and `backlog.md` describes that one's cause).
-- **Missing content** — #28 (trebuchet), #27 (wonder, untagged), #25 (true
-  villager build menus).
-
-Two of the twelve were diagnosed before the run started, so they lead:
-
-- **#20** is `src/view/sprites.ts`'s variation rule keyed on the literal name
-  `idle`. A Feudal+ house draws `idle-feudal`, whose manifest entry is three
-  *variations* (`frames: 3, directions: 1, frameSeconds: 0`), so it falls into
-  the animation branch, takes the 0.1s default for a zero frame time, and
-  cycles all three house models three times a second.
-- **#26** is not `releaseAttack` or `struckBy`. The importer writes a `combat`
-  block only for buildings that fight: `castle` and `town-center` carry
-  armours, `house`, `barracks`, `mill` and `outpost` have no `combat` key at
-  all. `computeDamage` skips every attack class the target has no armour entry
-  for, so an arrow into a house scores zero and returns the `Math.max(1, ...)`
-  floor — one damage, forever, upgrade or no upgrade. Farms take the fallback
-  rules, which do carry a class-3 entry, which is exactly why the human saw
-  upgrades work there and nowhere else. The fix is in the importer, and it is
-  a checksum change.
-
-The human approved this order on 2026-08-28: **#20, #26, #18, #19+#21, #17,
-#22, #23, #24, #25, #28, #27** — the diagnosed two first, then by shared cause.
-Two scope decisions came with it: **#24**'s reseed ships with its HUD toggle
-**defaulting off**, so no existing match changes behaviour silently; and
-**#27** ships as a buildable structure **with no victory condition**, with the
-countdown-victory decision recorded in `backlog.md` for the human rather than
-taken here.
-
-**#22 is blocked on the human, and the question has been asked on the issue.**
-The DAT pins the layout and not the selection rule: slot 7 (`Farm1`) is
-`terrain_dimensions` (6,6) with `frame_data[0].frame_count` 36, slot 29 (`Farm
-Cnst1`) is (3,3)/9 and Grass is (10,10)/100 — the frame count is the product
-of the dimensions every time, and Grass's slope frames start at `shape_id`
-100, so the flat frames really do occupy 0..99. Which frame a tile draws is
-engine behaviour, not a field. What we draw (one 3x3 block of the 6x6 grid,
-about 20 furrow rows over the field) *is* the authored density at the
-reference's own 96x48 tile, so it cannot be called wrong from the data. Three
-candidates were rendered onto the real diamond and put to the human on the
-issue; `.local/probes/farm_options.png` is the sheet. Resume when the answer
-arrives. Do not pick one by eye — nothing in the DAT supports the 18-tile
-repeat the sparsest option implies.
-
-*Verify:* each issue closed with the check its own thread asks for, the gate
-green, and the fix committed and pushed on its own. Do not batch them.
-
-### Q0b. The three enhancement issues
-
-Behind the bugs, and in the human's own order: **#5** (pathing algorithm is
-poor), **#6** (multi-unit selection), **#7** (spawn queue). Read each on GitHub
-before starting it. These change how the game is played rather than repairing
-it, so each wants the same treatment as a bug: one at a time, its own
-verification, its own commit.
-
-*Verify:* as Q0 — the check the thread asks for, the gate green, committed and
-pushed on its own.
+**The batch was re-measured after all of it** and is in `status.md`: 16/16
+decided, 0 timeouts, **0 replay checksum failures**, 431x throughput, and 30 of
+32 player-slots reaching the Feudal Age and **none the Castle**. That last
+number is why Q1 is next and why its subject has not changed.
 
 ### Q1. The example AI cannot afford the Castle Age and a win at once
 
-**Half of this changed under Q0.** Fixing the villager that went idle whenever
-a pile ran out while it was away banking (issue #19) is worth enough food that
-the strategy now *does* buy the Castle Age -- measured on the passive-opponent
-fixture, seed 7, it reaches age 2 where it never left the Feudal Age before.
-It also wins five hundred seconds later for it (1460 -> 1957 seconds), because
-the wish list is still fixed and it spends 800 food and 200 gold on the age
-rather than on finishing. So the missing half is now the whole of it: what
-this item wants is a strategy that can *finish*. Re-measure the batch before
-tuning anything -- the distribution below predates the armour, pursuit and
-gathering fixes and is no longer the state of the game.
+**This is the top of the queue. Its subject did not change under Q0, but the
+evidence did — read this before touching the strategy.**
 
-The batch is 16/16 decided again, and no match reaches the Castle Age: they
+The batch was re-measured on 2026-08-28 after the whole of Q0: **16/16
+decided, 0 timeouts, 0 replay checksum failures, 431x throughput**, matches
+running 1050 to 1619 seconds, and **30 of 32 player-slots in the Feudal Age
+and none in the Castle**. Technologies bought across the batch: Loom 32 times,
+the Feudal Age 30, the man-at-arms 8. That is the current state of the game;
+the paragraphs below are the older analysis and still hold.
+
+One thing did change, and it is the useful clue. Against the *passive*
+opponent fixture the AI now **does** buy the Castle Age — fixing the villager
+that idled whenever a pile ran out (#19) is worth that much food — and it wins
+five hundred seconds later for it, 1460 to 1957 seconds, because the wish list
+is still three items long and it spends 800 food and 200 gold on an age rather
+than on finishing. So the economy is no longer the binding constraint in a
+one-sided game, and in a paired game the matches still end before the age is
+affordable. What is missing is a strategy that can *finish*.
+
+The batch is 16/16 decided, and no match reaches the Castle Age: they
 end first. Push the economy and the Castle Age arrives in four to six of
 sixteen — along with four to six draws. Seven configurations were measured and
 the economy end of that trade-off is exhausted; what is missing is a strategy
@@ -271,6 +228,17 @@ down over the same period, which is weak evidence that nothing regressed, but
 it is aggregate wall clock across sixteen processes and would not show a
 worst-tick spike. The worst tick is the number that matters: it was 105ms
 before the pathfinder's open list became a heap.
+
+**Part of this is already measured, from a different direction.** The pathing
+review (#5, `docs/pathing-review.md`) timed the tick a group order lands on,
+which is the worst-tick case this item is worried about: a fifty-unit order
+cost **22.35ms** of the fifty-millisecond budget and a per-tick path cache took
+it to **11.95ms**, both in a cold process. Warm, running the whole probe, the
+same tick is **8.85ms** and ordinary ticks are 0.18-0.26ms — so measure warm,
+and beware that a cold single measurement reads about ten milliseconds high. What
+is still unmeasured is the 900-second single-match distribution the item asks
+for, and in particular the worst tick in a real match rather than a staged
+order.
 
 *Verify:* the same 900-second single-match measurement on seed 102, recorded
 beside the old figures rather than replacing them.

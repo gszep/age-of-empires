@@ -92,6 +92,23 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | player colour and contour | `dat.player_colours[i].player_color_base` (start of the eight-shade block in `original.pal`), `.minimap_color`, `.unit_outline_color` |
 | graphic playback | `graphic.file_name`, `.frame_count`, `.angle_count`, `.frame_duration`, `.mirroring_mode` |
 | a graphic with no unit behind it | `dat.graphics[*].name` — the gather-point flag is `WaypointFlag <Civ>` |
+| a unit's build slot in the villager menu | `unit.creatable.train_locations[*].button_id` — the DAT states the *slot*; which page it is on is engine behaviour, and two buildings share a slot only when they are on different pages |
+| a technology's cost, time and place | `tech.resource_costs`; `tech.research_locations[*].location_id` and `.research_time` — **not** `tech.research_time`, which does not exist |
+| what a technology does | `dat.effects[tech.effect_id].effect_commands` — **not** `.effect_configs`. `command.type`: 0 set, 1 **resource modifier** (player attribute: `a` = resource id, `b` = 0 set / 1 add, `d` = amount), 2 enable unit, 3 upgrade unit, 4 add, 5 multiply |
+| where a player attribute starts | `dat.civs[i].resources[id]` — a farm's food is resource 36 and starts at 175, which is why the mill's technologies can change it |
+| a terrain slot | `dat.terrain_block.terrains[i]` — `.name_2` is the texture, `.terrain_dimensions` the frame grid, `.frame_data[0].frame_count` the flat-tile frames (always the product of the dimensions), `.blend_type`/`.blend_priority`, `.colors` the minimap colour |
+| a task's numbers | `bird.tasks[*].work_value_1/_2` and `.work_range` — note the underscores; there is no `work_value1` or `target_diff` |
+| a unit's class | `unit.class_` with the trailing underscore; `unit.unit_class` does not exist |
+
+Fields that do **not** exist, and cost a failed call each time somebody assumes
+they do: `unit.clearance_size_x` (it is the tuple `clearance_size`),
+`unit.collision_size` (it is `collision_size_x`/`_y` — the opposite convention
+to clearance), `unit.transform_unit_id` (a packed and unpacked siege engine are
+two units and the DAT does not say which is the other; see `status.md`).
+
+`tools/datq.py` reloads the whole DAT on every invocation, which takes tens of
+seconds. Asking it more than two or three questions is slower than writing a
+one-shot script that parses once and prints everything you want.
 
 When a needed field is missing here, look it up once —
 `.tools/import-venv/bin/python tools/datq.py fields 'dat.civs[1].units[128]'`

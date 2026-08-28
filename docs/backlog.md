@@ -160,7 +160,10 @@ terrain blends above.
   upgrade the Britons have is researchable; what is left is the dock's ships
   and the scorpion, which are units this slice does not have at all rather
   than upgrades it is missing. They arrive with the units, not before them.
-- **The built-in AI's wish list is three technologies long.** Loom, the
+- **The built-in AI's wish list is three technologies long,** and everything
+  added since is invisible to it: it never builds a blacksmith, a mill
+  technology, a trebuchet or a wonder, never turns the farm re-sowing on, and
+  never queues more than one unit at a building. Loom, the
   man-at-arms and the crossbowman — the ones whose building it actually puts
   up. Sixty-six are researchable; it buys three, in a fixed order, with
   whatever the next age is not waiting for. A strategy that chose among them
@@ -175,7 +178,12 @@ terrain blends above.
   Yeomen and the Castle and Imperial Ages — attribute 130 on four (Bodkin
   Arrow, Bracer, Chemistry, Fletching), and attributes 48 and 49 on the
   Imperial Age alone. Forty-eight further nodes are left out entirely, each
-  with its own reason, in the manifest's `skippedTechnologies`.
+  with its own reason, in the manifest's `skippedTechnologies` — two fewer
+  since issue #23, which took Horse Collar and Heavy Plow out of that list by
+  reading effect command type 1. A technology that lands *something* now also
+  reports what it did not: Heavy Plow's +1 carry for the farmer villagers is
+  attribute 14 on DAT units 214 and 259, and this game has no farmer variant
+  to put it on.
 - **Technology prerequisites are the DAT's own list, not its count.** The DAT
   states a `required_tech_count` alongside the requirements — Hand Cart needs
   two of three — and the importer instead requires every listed technology that
@@ -200,9 +208,10 @@ terrain blends above.
   the built-in strategy's wish list, and a group of them must be packed and
   unpacked one order at a time. The petard, the castle's other Imperial unit,
   is still absent.
-- **A castle trains only the British longbowman.** The importer reads civ 1, so
-  the castle's other trainable units (trebuchet — Imperial — and petard) and
-  every other civilisation's unique unit are absent.
+- **The castle's petard is still absent.** The longbowman and the trebuchet
+  are both trained there now (issue #28); the petard is the third thing the
+  DAT lists at unit 82, and every other civilisation's unique unit is out of
+  scope because the importer reads civ 1.
 - **Hunting pays the forager's wage.** The DAT gives the hunter villager its
   own work rate (0.41 a second) and carry capacity (35); the simulation has one
   rate per resource and one global capacity, so hunting banks at the forager's

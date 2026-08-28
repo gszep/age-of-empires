@@ -69,6 +69,16 @@ keeps the record.
   were spent probing the DAT schema. Rule: consult the cheat-sheet in
   `AGENTS.md`, and when a field is missing from it, `dir()` the object once and
   extend the cheat-sheet instead of trial-and-erroring.
+  That lesson recurred seven times in the 2026-08-28 run — `clearance_size_x`,
+  `collision_size`, `effect_configs`, `research_time`, `target_diff`,
+  `work_value1`, `unit_class` — so, following the rule below about converting a
+  recurring lesson into structure, the cheat-sheet now carries every field that
+  run had to discover *and a list of the plausible names that do not exist*.
+  Two more things worth knowing before reaching for `datq.py`: it reloads the
+  whole DAT per invocation, so more than two or three questions is slower than
+  a one-shot script; and the DAT's naming is not self-consistent — a unit's
+  clearance is the tuple `clearance_size` while its collision is
+  `collision_size_x`/`_y`.
 - **All SLD decoding is local.** `tools/sld_layers.py` handles every layer
   (verified byte-identical to the openage decoder it replaced, which corrupted
   the heap on masks and crashed on the stable); extend it rather than adding a

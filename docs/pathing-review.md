@@ -12,7 +12,8 @@ the case the report was written from — see "What is still open".
 ## What was measured
 
 All figures from the imported rules on the current 120x120 board, in the
-simulation with no browser (`.local/probes/pathing*.ts`).
+simulation with no browser. `tools/probes/pathing.ts` runs all nine; re-run it
+after anything that touches `nav.ts`, movement, or the cost of a tick.
 
 | question | result |
 | --- | --- |
@@ -24,7 +25,7 @@ simulation with no browser (`.local/probes/pathing*.ts`).
 | a goal sealed inside a wall ring | **gives up at tick 142** and stays out, rather than walking on the spot |
 | ordered onto a building | stops **2.09 tiles** out, at the footprint edge |
 | ten minutes of a real match | **zero stuck ticks** across 49,261 moving ticks, zero units ever stuck |
-| the tick a 50-unit order lands on | **22.35ms** before this change, **11.95ms** after |
+| the tick a 50-unit order lands on | **22.35ms** before this change, **11.95ms** after — both measured in a cold process; **8.85ms** when the whole probe runs and the JIT is warm |
 
 ## What the implementation already does
 
@@ -63,7 +64,13 @@ different answers, and the cache would be wrong rather than slow. Each caller
 gets its own copy, because a walker shifts waypoints off the front of its path.
 
 The tick a 50-unit order lands on went from **22.35ms to 11.95ms**, and 25
-units from 11.81ms to 7.68ms, against a 50ms tick. Three full matches of six
+units from 11.81ms to 7.68ms, against a 50ms tick. Those were measured in a
+cold process, one size per run; running `tools/probes/pathing.ts` end to end,
+with the JIT warm, the same ticks come out at **8.85ms for fifty and 5.72ms for
+twenty-five**, with ordinary ticks at 0.18-0.26ms. Take the warm figures as the
+real ones and the cold pair as the before/after — a single unit ordered across
+the map appears to cost 11.83ms cold and 0.68ms warm, which is warm-up and not
+pathfinding. Three full matches of six
 thousand ticks each produce **byte-identical checksums** with the cache on and
 off, which is the proof that it is a saving and not a change.
 
