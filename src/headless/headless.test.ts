@@ -35,8 +35,15 @@ describe('headless matches', () => {
   });
 
   it('runs the example AI as a JSONL subprocess to victory', async () => {
+    // The clock is the fixture's, not the invariant's: the invariant is that
+    // the AI beats an opponent who does nothing. It won at 1460s in the
+    // Feudal Age until villagers stopped going idle when a pile ran out
+    // (issue #19); with that economy it can now afford the Castle Age, buys
+    // it, and razes the same town center at 1957s instead. That trade is the
+    // subject of overnight.md's Q1 and is not this fixture's to resolve --
+    // what it must keep catching is an AI that cannot finish at all.
     const { result } = await runMatch(
-      { version: 1, seed: 7, maxTimeSeconds: 1800, decideIntervalSeconds: 5 },
+      { version: 1, seed: 7, maxTimeSeconds: 2400, decideIntervalSeconds: 5 },
       {
         1: { decide: () => [] },
         2: subprocessStrategy('npx tsx src/headless/builtin-strategy-cli.ts', 30_000),

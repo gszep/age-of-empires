@@ -81,6 +81,19 @@ terrain blends above.
 
 ## Simulation
 
+- **The AI can now afford the Castle Age, and pays for it in time to win.**
+  Villagers used to go idle whenever a pile ran out while they were away
+  banking (issue #19), and fixing that is worth enough food that the built-in
+  strategy buys the Castle Age where it never could before. Measured on the
+  passive-opponent fixture, seed 7: it razed the enemy town center at 1460
+  seconds in the Feudal Age before, and at 1957 seconds after, having spent
+  800 food and 200 gold on the age instead of on the attack. Both are wins,
+  and the trade is the wrong way round -- it is the same fixed wish list in a
+  richer economy, which is exactly what `overnight.md`'s Q1 and Q2 are about.
+  The headless fixture's clock was widened from 1800 to 2400 seconds to keep
+  asserting the invariant (the AI beats an opponent who does nothing) rather
+  than a time that now measures the strategy's priorities.
+
 - **The example AI closes out a game only because matches end early.** The
   batch is decisive again — 16 of 16, 0 timeouts — but that was bought by
   fixing the opening's housing stall, not by teaching the strategy to finish:

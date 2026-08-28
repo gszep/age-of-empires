@@ -135,6 +135,17 @@ pushed on its own.
 
 ### Q1. The example AI cannot afford the Castle Age and a win at once
 
+**Half of this changed under Q0.** Fixing the villager that went idle whenever
+a pile ran out while it was away banking (issue #19) is worth enough food that
+the strategy now *does* buy the Castle Age -- measured on the passive-opponent
+fixture, seed 7, it reaches age 2 where it never left the Feudal Age before.
+It also wins five hundred seconds later for it (1460 -> 1957 seconds), because
+the wish list is still fixed and it spends 800 food and 200 gold on the age
+rather than on finishing. So the missing half is now the whole of it: what
+this item wants is a strategy that can *finish*. Re-measure the batch before
+tuning anything -- the distribution below predates the armour, pursuit and
+gathering fixes and is no longer the state of the game.
+
 The batch is 16/16 decided again, and no match reaches the Castle Age: they
 end first. Push the economy and the Castle Age arrives in four to six of
 sixteen — along with four to six draws. Seven configurations were measured and

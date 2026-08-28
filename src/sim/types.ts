@@ -61,6 +61,14 @@ export interface Entity {
   /** Fractional progress towards the next whole unit: a villager's gathering,
    * or a trade cart's goods earned on the road. */
   gatherProgress?: number;
+  /**
+   * What this worker last put its hands on, so "another of the same first"
+   * survives the thing itself being gone. A carcass is removed once it is
+   * eaten and its corpse window has passed, which is most of a long meal, and
+   * reading the kind off the vanished entity therefore failed exactly when it
+   * mattered.
+   */
+  lastWorked?: Entity['kind'];
   /** Buildings. */
   /** Half-extents in tiles when the footprint is not the square `radius` says:
    * a gate is two tiles by one, and which way round is its orientation. */

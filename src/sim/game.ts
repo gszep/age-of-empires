@@ -938,6 +938,11 @@ function nextToWork(
     if (candidate.dead && !isAnimal(candidate.kind)) continue;
     if (candidate.resourceKind !== resource || (candidate.amount ?? 0) <= 0) continue;
     if (!isGatherable(state, candidate, entity)) continue;
+    // A claimed herdable is an asset its owner walked home, not a pile
+    // anybody may wander onto. Carrying on from a bush onto the flock spends
+    // it without being asked (issue #21); carrying on from one sheep to the
+    // next is the same job and stays, and a carcass is already spent.
+    if (isAnimal(candidate.kind) && !candidate.dead && candidate.kind !== was) continue;
     const d = distance(entity.position, candidate.position);
     if (d > range) continue;
     if (!isEntityVisible(state, owner, candidate)) continue;
@@ -981,6 +986,7 @@ function becomeIdle(entity: Entity): void {
   entity.order = { kind: 'idle' };
   entity.activity = 'idle';
   entity.gatherProgress = 0;
+  entity.lastWorked = undefined;
   entity.attackWindup = undefined;
   entity.path = undefined;
   entity.pathGoal = undefined;
@@ -1055,9 +1061,15 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   let node = state.entities.find(e => e.id === targetId
     && (e.amount ?? 0) > 0 && (!e.dead || isCarcass(e)));
   if (!node) {
-    // What it was working, so it can look for another of the same first.
-    const was = state.entities.find(e => e.id === targetId)?.kind;
-    const wanted = carrying?.kind ?? undefined;
+    // What it was working, so it can look for another of the same first --
+    // and what that thing yielded, because a villager that has just emptied
+    // its hands at the mill is carrying nothing to ask for. Reading the want
+    // off the load alone sent it idle the moment its bush ran out while it
+    // was away banking, with the rest of the cluster a tile in front of it
+    // (issue #19).
+    const previous = state.entities.find(e => e.id === targetId);
+    const was = previous?.kind ?? entity.lastWorked;
+    const wanted = carrying?.kind ?? previous?.resourceKind;
     node = wanted ? nextToWork(state, grid, entity, wanted, was) : undefined;
     if (node) entity.order = { kind: 'gather', targetId: node.id };
     else if (carrying && carrying.amount > 0) {
@@ -1098,6 +1110,7 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   if (isAnimal(node.kind) && !node.dead) kill(state, node);
 
   entity.activity = 'gathering';
+  entity.lastWorked = node.kind;
   const resource = node.resourceKind!;
   entity.gatherProgress = (entity.gatherProgress ?? 0)
     + gatherRateFor(state, entity.owner, resource) * TICK_SECONDS;

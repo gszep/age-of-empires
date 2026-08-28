@@ -218,6 +218,77 @@ describe('carrying on after the work runs out', () => {
     expect(villager.position.x).toBeLessThan(state.width / 2);
   });
 
+  it('takes the next pile after banking a load, not only while carrying one', () => {
+    // Issue #19. What to look for next was read from what the villager
+    // happened to be carrying, and a villager that has just emptied its hands
+    // at the mill is carrying nothing -- so if its bush ran out while it was
+    // away, it had nothing to ask for and went idle with the rest of the
+    // cluster a tile in front of it.
+    const state = createGame(86);
+    parkScouts(state);
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    for (const food of state.entities.filter(e => e.kind === 'resource' && e.resourceKind === 'food')) {
+      food.amount = 0;
+    }
+    const bushes = state.entities.filter(e => e.kind === 'resource' && e.resourceKind === 'food');
+    const [near, beside] = bushes;
+    near.position = { x: tc.position.x + 4, y: tc.position.y };
+    beside.position = { x: tc.position.x + 5, y: tc.position.y };
+    near.amount = 200;
+    beside.amount = 200;
+    const villager = villagerNear(state, { x: tc.position.x + 3.5, y: tc.position.y });
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [villager.id], target: near.position, targetId: near.id,
+    });
+
+    // Work until it has banked a load, so its hands are empty.
+    const banked = state.players[1].food;
+    for (let i = 0; i < 4000 && state.players[1].food === banked; i++) stepGame(state);
+    expect(villager.carrying).toBeUndefined();
+
+    // Somebody else finishes the bush while this one is at the town center.
+    near.amount = 0;
+    for (let i = 0; i < 600; i++) {
+      stepGame(state);
+      if (villager.order.kind !== 'gather') break;
+      if (villager.order.targetId !== near.id) break;
+    }
+    expect(villager.order).toEqual({ kind: 'gather', targetId: beside.id });
+  });
+
+  it('does not spend the herd when the bushes run out', () => {
+    // Issue #21. A claimed sheep is an asset the player walked home, not a
+    // pile anybody may wander onto. Continuing from a bush onto the flock
+    // eats it without being asked; idle is the honest answer, and sheep to
+    // sheep (above) is a continuation of the same job and stays.
+    const state = createGame(87);
+    parkScouts(state);
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    for (const food of state.entities.filter(e => e.kind === 'resource' && e.resourceKind === 'food')) {
+      food.amount = 0;
+    }
+    const bush = state.entities.find(e => e.kind === 'resource' && e.resourceKind === 'food')!;
+    const villager = villagerNear(state, { x: tc.position.x + 3, y: tc.position.y });
+    bush.position = { x: villager.position.x + 1, y: villager.position.y };
+    bush.amount = 8;
+    // A claimed sheep right beside the bush -- well inside the range the
+    // continuation searches.
+    const sheep = state.entities.find(e => e.kind === 'sheep')!;
+    sheep.owner = 1;
+    sheep.position = { x: villager.position.x + 2, y: villager.position.y };
+    const flock = sheep.amount;
+
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [villager.id], target: bush.position, targetId: bush.id,
+    });
+    for (let i = 0; i < 4000 && (bush.amount ?? 0) > 0; i++) stepGame(state);
+    expect(bush.amount).toBe(0);
+    for (let i = 0; i < 2000 && villager.order.kind !== 'idle'; i++) stepGame(state);
+    expect(villager.order.kind).toBe('idle');
+    expect(sheep.amount).toBe(flock);
+    expect(sheep.dead).toBeFalsy();
+  });
+
   it('builds on down a dragged line but not to a foundation out of sight', () => {
     const state = createGame(83);
     parkScouts(state);
