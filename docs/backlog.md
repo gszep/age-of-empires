@@ -32,6 +32,12 @@ construction-complete cue, so that one has no owned source to draw on.
   not the pipeline: nothing in the owned files says which `terrain/blends/`
   file a terrain's `blend_type` selects, nor how a 512x512 blend is indexed
   against a tile. See the note in `overnight.md` for what was measured.
+- **Every farm draws the same arrangement.** The ground plane samples its
+  terrain texture by absolute map position, so grass varies across the board;
+  `createTerrainPatch` builds a farm's UVs in patch-local coordinates instead,
+  so every farm on the map shows the identical corner of `g_fm1` and the 36
+  frames the DAT authors come down to one. Fix alongside issue #22, whose
+  answer decides the scale the same UVs are laid out at.
 - **Fire delta overlays** on damaged buildings are not imported.
 - **The monk draws no occlusion contour.** Its idle and attack outline layers
   are the only consumed sources that fail `tools/sld_layers.py`'s walk

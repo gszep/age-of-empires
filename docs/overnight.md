@@ -119,6 +119,20 @@ Two scope decisions came with it: **#24**'s reseed ships with its HUD toggle
 countdown-victory decision recorded in `backlog.md` for the human rather than
 taken here.
 
+**#22 is blocked on the human, and the question has been asked on the issue.**
+The DAT pins the layout and not the selection rule: slot 7 (`Farm1`) is
+`terrain_dimensions` (6,6) with `frame_data[0].frame_count` 36, slot 29 (`Farm
+Cnst1`) is (3,3)/9 and Grass is (10,10)/100 — the frame count is the product
+of the dimensions every time, and Grass's slope frames start at `shape_id`
+100, so the flat frames really do occupy 0..99. Which frame a tile draws is
+engine behaviour, not a field. What we draw (one 3x3 block of the 6x6 grid,
+about 20 furrow rows over the field) *is* the authored density at the
+reference's own 96x48 tile, so it cannot be called wrong from the data. Three
+candidates were rendered onto the real diamond and put to the human on the
+issue; `.local/probes/farm_options.png` is the sheet. Resume when the answer
+arrives. Do not pick one by eye — nothing in the DAT supports the 18-tile
+repeat the sparsest option implies.
+
 *Verify:* each issue closed with the check its own thread asks for, the gate
 green, and the fix committed and pushed on its own. Do not batch them.
 
