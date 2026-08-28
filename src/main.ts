@@ -109,7 +109,9 @@ function startReplay(raw: unknown): void {
   // A replay drives its own command stream; snapshotting it would resume a
   // spectated match as if it were played.
   clearSession();
-  game = createGame(record.seed, rules);
+  // A record from before civilisations were written down replays as whatever
+  // the content is for, which is what it was played as.
+  game = createGame(record.seed, rules, record.civilizations);
   selectedIds = [];
   buildMode = undefined;
   paused = false;

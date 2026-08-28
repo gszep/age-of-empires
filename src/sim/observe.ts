@@ -66,6 +66,7 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
     stone: self.stone,
     population: self.population,
     populationCap: self.populationCap,
+    civilization: self.civilization,
     age: self.age,
     researched: [...self.researched],
     entities,

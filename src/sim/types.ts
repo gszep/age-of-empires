@@ -83,6 +83,8 @@ export interface Entity {
 
 export interface PlayerState {
   id: PlayerId;
+  /** Which civilisation they are playing; it decides what their tree allows. */
+  civilization: string;
   /** 0 is the Dark Age; a completed age technology moves it on. */
   age: number;
   /** Technology keys already researched, in the order they completed. */

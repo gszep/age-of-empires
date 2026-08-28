@@ -4,20 +4,43 @@
   "title": "MatchRecord",
   "type": "object",
   "properties": {
-    "version": { "const": 1 },
-    "seed": { "type": "integer" },
-    "rulesOrigin": { "enum": ["fallback", "imported"] },
-    "decideIntervalSeconds": { "type": "number", "exclusiveMinimum": 0 },
-    "maxTimeSeconds": { "type": "number", "exclusiveMinimum": 0 },
+    "version": {
+      "const": 1
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "rulesOrigin": {
+      "enum": [
+        "fallback",
+        "imported"
+      ]
+    },
+    "decideIntervalSeconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "maxTimeSeconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
     "commands": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
-          "tick": { "type": "integer", "minimum": 0 },
-          "command": { "$ref": "https://open-empires-lab/command.schema.json" }
+          "tick": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "command": {
+            "$ref": "https://open-empires-lab/command.schema.json"
+          }
         },
-        "required": ["tick", "command"],
+        "required": [
+          "tick",
+          "command"
+        ],
         "additionalProperties": false
       }
     },
@@ -26,15 +49,52 @@
       "items": {
         "type": "object",
         "properties": {
-          "tick": { "type": "integer", "minimum": 1 },
-          "hash": { "type": "string", "pattern": "^[0-9a-f]{8}$" }
+          "tick": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}$"
+          }
         },
-        "required": ["tick", "hash"],
+        "required": [
+          "tick",
+          "hash"
+        ],
         "additionalProperties": false
       }
     },
-    "result": { "$ref": "https://open-empires-lab/match-result.schema.json" }
+    "result": {
+      "$ref": "https://open-empires-lab/match-result.schema.json"
+    },
+    "civilizations": {
+      "type": "object",
+      "properties": {
+        "1": {
+          "type": "string"
+        },
+        "2": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "1",
+        "2"
+      ],
+      "additionalProperties": false
+    }
   },
-  "required": ["version", "seed", "rulesOrigin", "decideIntervalSeconds", "maxTimeSeconds", "commands", "checksums", "result"],
+  "required": [
+    "version",
+    "seed",
+    "rulesOrigin",
+    "decideIntervalSeconds",
+    "maxTimeSeconds",
+    "commands",
+    "checksums",
+    "result",
+    "civilizations"
+  ],
   "additionalProperties": false
 }

@@ -570,6 +570,52 @@ def technology_entry(dat: DatFile, spec: dict[str, Any], hashes: dict[str, str])
     return entry
 
 
+def civilization_entry(
+    dat: DatFile, dat_path: Path, spec: dict[str, Any], hashes: dict[str, str]
+) -> dict[str, Any]:
+    """The civilisation this content is imported for, and what its tree lacks.
+
+    The depot ships a tech tree per civilisation next to the DAT, and each node
+    in it carries a `Node Status`. `NotAvailable` is the game's own record that
+    a civilisation does not get something: the Britons have no Thumb Ring, no
+    Paladin, no Hussar and no Bloodlines, which is exactly their real tree.
+    Those are recorded by DAT id, so the rules can refuse them by the same
+    number the technology and unit entries already carry.
+    """
+    civ_spec = spec["civilization"]
+    tree_path = dat_path.parent / "CivTechTrees" / civ_spec["treeFile"]
+    if not tree_path.is_file():
+        raise ValueError(f"no tech tree at {tree_path}")
+    hashes[tree_path.name] = sha256(tree_path)
+    tree = json.loads(tree_path.read_text())
+    nodes = tree["civ_techs_buildings"] + tree["civ_techs_units"]
+
+    # `Use Type` says which table a node's id belongs to, so a technology and a
+    # unit that share a number are not confused for one another.
+    buckets = {"Tech": "technologies", "Unit": "units", "Building": "buildings"}
+    unavailable: dict[str, list[int]] = {name: [] for name in buckets.values()}
+    for node in nodes:
+        if node["Node Status"] != "NotAvailable":
+            continue
+        bucket = buckets.get(node["Use Type"])
+        if bucket is None:
+            continue
+        node_id = int(node["Node ID"])
+        if node_id not in unavailable[bucket]:
+            unavailable[bucket].append(node_id)
+    for name in unavailable:
+        unavailable[name].sort()
+    return {
+        "key": civ_spec["key"],
+        "datIndex": spec["civIndex"],
+        # The DAT's own name for the civilisation, which is not always the
+        # modern one: civ 1 is "British" where everything else says Britons.
+        "name": dat.civs[spec["civIndex"]].name,
+        "treeFile": civ_spec["treeFile"],
+        "unavailable": unavailable,
+    }
+
+
 def terrain_entry(dat: DatFile, terrain_id: int) -> dict[str, Any]:
     """Texture name, tile span, and minimap color for one DAT terrain slot."""
     terrain = dat.terrain_block.terrains[terrain_id]
@@ -615,6 +661,7 @@ def extract(
     return {
         "terrain": terrain,
         "audio": spec.get("audio", {}),
+        "civilization": civilization_entry(dat, dat_path, spec, hashes),
         "technologies": technologies,
         "playerColors": player_colors(dat, palettes_dir, spec["playerColors"], hashes),
         "schemaVersion": spec["schemaVersion"],

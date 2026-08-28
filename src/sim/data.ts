@@ -8,6 +8,13 @@ export interface Cost { food: number; wood: number; gold: number; stone: number 
 export interface AttackValue { class: number; amount: number }
 
 export interface UnitRules {
+  /**
+   * The DAT unit id, when this came from imported content. It is what a
+   * civilisation's tech tree names its nodes by, so it is what decides
+   * whether a civilisation has this unit at all. Undefined under the open
+   * fallback, where the question cannot be asked.
+   */
+  datId?: number;
   hp: number;
   radius: number;
   speed: number; // tiles per second
@@ -79,6 +86,8 @@ export interface UnitRules {
 }
 
 export interface BuildingRules {
+  /** The DAT unit id; see `UnitRules.datId`. */
+  datId?: number;
   /** The age this becomes available in; 0 is the Dark Age. */
   age?: number;
   hp: number;
@@ -119,8 +128,34 @@ export interface ResourceNodeRules {
   fogVisibility?: number;
 }
 
+/**
+ * Which civilisation the content was imported for, and what its tech tree
+ * withholds. AoE2 civilisations are mostly defined by what they do *not* get:
+ * the Britons have no Thumb Ring, no Paladin, no Hussar and no Bloodlines.
+ * The depot ships a tree per civilisation and marks each of those nodes
+ * `NotAvailable`, which is where these ids come from.
+ */
+export interface CivilizationRules {
+  key: string;
+  /** The DAT's own name for it, which is not always the modern one. */
+  name: string;
+  unavailable: {
+    technologies: number[];
+    units: number[];
+    buildings: number[];
+  };
+}
+
+/** Nobody's tree withholds anything, for the open-content fallback. */
+export const OPEN_CIVILIZATION: CivilizationRules = {
+  key: 'open',
+  name: 'Open content',
+  unavailable: { technologies: [], units: [], buildings: [] },
+};
+
 export interface GameRules {
   origin: 'fallback' | 'imported';
+  civilization: CivilizationRules;
   startingResources: Cost;
   startingPopulationCap: number;
   units: Record<UnitKind, UnitRules>;
@@ -180,6 +215,7 @@ const cost = (food = 0, wood = 0, gold = 0, stone = 0): Cost => ({ food, wood, g
  */
 export const FALLBACK_RULES: GameRules = {
   origin: 'fallback',
+  civilization: OPEN_CIVILIZATION,
   startingResources: cost(200, 200, 100),
   startingPopulationCap: 0,
   units: {
@@ -484,6 +520,8 @@ interface ManifestEntity {
     projectileUnitId?: number;
     launchOffset?: number[];
     blastRadius?: number;
+    /** The DAT's `accuracy_percent`: how often a shot is aimed true. */
+    accuracyPercent?: number;
     attacks: AttackValue[];
     armors: AttackValue[];
   };
@@ -515,7 +553,9 @@ interface ManifestTech {
 export interface ContentManifest {
   entities: Record<string, ManifestEntity>;
   technologies?: Record<string, ManifestTech>;
+  civilization?: CivilizationRules & { datIndex?: number; treeFile?: string };
 }
+
 
 const manifestCost = (entity: ManifestEntity): Cost =>
   cost(entity.cost?.food ?? 0, entity.cost?.wood ?? 0, entity.cost?.gold ?? 0, entity.cost?.stone ?? 0);
@@ -555,6 +595,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       heal: e[key].heal ?? fallback?.heal,
       convert: e[key].convert ?? fallback?.convert,
       fogVisibility: e[key].fogVisibility ?? fallback?.fogVisibility,
+      accuracyPercent: e[key].combat?.accuracyPercent ?? fallback?.accuracyPercent,
+      datId: e[key].id,
     };
   };
   /** Gaia's animals: their own rules plus the food the DAT stores on them. */
@@ -577,6 +619,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     const fallback = FALLBACK_RULES.buildings[key as BuildingKind];
     if (!e[key]) return { ...fallback, buildable };
     return {
+      datId: e[key].id,
       age: e[key].age ?? fallback.age,
       hp: e[key].hitPoints,
       radius: e[key].collision[0],
@@ -602,6 +645,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
           ? attackValues(e[key].combat?.attacks)
           : fallback.attack.attacks,
         reloadSeconds: e[key].combat?.reloadSeconds ?? fallback.attack.reloadSeconds,
+        accuracyPercent: e[key].combat?.accuracyPercent ?? fallback.attack.accuracyPercent,
       },
     };
   };
@@ -616,6 +660,19 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
   };
   return {
     origin: 'imported',
+    // The importer reads one civilisation's units and one civilisation's tree,
+    // so the content names which; without it, nothing is withheld.
+    civilization: manifest.civilization
+      ? {
+        key: manifest.civilization.key,
+        name: manifest.civilization.name,
+        unavailable: {
+          technologies: [...manifest.civilization.unavailable.technologies],
+          units: [...manifest.civilization.unavailable.units],
+          buildings: [...manifest.civilization.unavailable.buildings],
+        },
+      }
+      : OPEN_CIVILIZATION,
     startingResources: FALLBACK_RULES.startingResources,
     startingPopulationCap: 0,
     units: {

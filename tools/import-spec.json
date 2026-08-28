@@ -1,6 +1,7 @@
 {
   "schemaVersion": 3,
   "civIndex": 1,
+  "civilization": { "key": "britons", "treeFile": "BRITONS.json" },
   "gaiaIndex": 0,
   "playerColors": ["blue", "red", "green", "yellow", "teal", "purple", "grey", "orange"],
   "effects": [

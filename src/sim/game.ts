@@ -180,13 +180,22 @@ function placeGroup(state: GameState, group: StartGroup, mirror: (p: Point) => P
   }
 }
 
-export function createGame(seed = 42, rules: GameRules = FALLBACK_RULES): GameState {
+export function createGame(
+  seed = 42, rules: GameRules = FALLBACK_RULES,
+  civilizations: Record<PlayerId, string> = { 1: rules.civilization.key, 2: rules.civilization.key },
+): GameState {
   const state: GameState = {
     rules, seed: seed || 1, tick: 0, nextId: 1, width: MAP_TILES, height: MAP_TILES,
     entities: [], projectiles: [],
     players: {
-      1: { id: 1, ...rules.startingResources, age: 0, researched: [], population: 0, populationCap: 0 },
-      2: { id: 2, ...rules.startingResources, age: 0, researched: [], population: 0, populationCap: 0 },
+      1: {
+        id: 1, civilization: civilizations[1], ...rules.startingResources,
+        age: 0, researched: [], population: 0, populationCap: 0,
+      },
+      2: {
+        id: 2, civilization: civilizations[2], ...rules.startingResources,
+        age: 0, researched: [], population: 0, populationCap: 0,
+      },
     },
     visibility: undefined as never,
   };
@@ -242,6 +251,28 @@ function spendCost(state: GameState, player: PlayerId, cost: Cost): CommandResul
 function spend(state: GameState, player: PlayerId, kind: UnitKind | BuildingKind): CommandResult {
   return spendCost(state, player, isUnit(kind) ? state.rules.units[kind].cost : state.rules.buildings[kind].cost);
 }
+
+/**
+ * Does this player's civilisation have the thing at all? An AoE2 civilisation
+ * is mostly defined by what it withholds -- the Britons get no Thumb Ring, no
+ * Paladin, no Hussar -- and the depot's own tech tree marks each of those
+ * nodes `NotAvailable`. Anything the imported content has no DAT id for is
+ * allowed: the question cannot be asked of it.
+ */
+export function civHas(
+  state: GameState, player: PlayerId,
+  table: 'technologies' | 'units' | 'buildings', datId: number | undefined,
+): boolean {
+  if (datId === undefined) return true;
+  const civilization = state.rules.civilization;
+  if (state.players[player].civilization !== civilization.key) return true;
+  return !civilization.unavailable[table].includes(datId);
+}
+
+const civNameOf = (state: GameState, player: PlayerId): string =>
+  state.players[player].civilization === state.rules.civilization.key
+    ? state.rules.civilization.name
+    : state.players[player].civilization;
 
 /** What a player has researched, applied to one unit kind's rules. */
 export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: UnitKind): UnitRules {
@@ -426,6 +457,9 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (building.buildProgress !== undefined) return rejected('building is under construction');
     if (building.training) return rejected('building is already training');
     const unitRules = state.rules.units[command.unit];
+    if (!civHas(state, command.player, 'units', unitRules.datId)) {
+      return rejected(`the ${civNameOf(state, command.player)} do not have ${command.unit}`);
+    }
     if (unitRules.trainedAt !== building.kind) return rejected(`${building.kind} cannot train ${command.unit}`);
     const player = state.players[command.player];
     if ((unitRules.age ?? 0) > player.age) return rejected(`${command.unit} needs a later age`);
@@ -443,6 +477,9 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (building.researching) return rejected('building is already researching');
     const tech = state.rules.technologies[command.tech as TechKey];
     if (!tech) return rejected(`unknown technology ${command.tech}`);
+    if (!civHas(state, command.player, 'technologies', tech.techId)) {
+      return rejected(`the ${civNameOf(state, command.player)} do not have ${command.tech}`);
+    }
     if (tech.researchedAt !== building.kind) return rejected(`${building.kind} cannot research ${command.tech}`);
     const player = state.players[command.player];
     if (player.researched.includes(command.tech)) return rejected(`${command.tech} is already researched`);
@@ -465,6 +502,9 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
 
   const rules = state.rules.buildings[command.building];
   if (!rules.buildable) return rejected(`${command.building} cannot be built`);
+  if (!civHas(state, command.player, 'buildings', rules.datId)) {
+    return rejected(`the ${civNameOf(state, command.player)} do not have ${command.building}`);
+  }
   if ((rules.age ?? 0) > state.players[command.player].age) {
     return rejected(`${command.building} needs a later age`);
   }

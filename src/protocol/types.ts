@@ -24,6 +24,8 @@ export interface PlayerObservation {
   version: typeof PROTOCOL_VERSION;
   time: number;
   player: PlayerId;
+  /** Which civilisation this player is; public knowledge in AoE2. */
+  civilization: string;
   winner?: PlayerId;
   mapWidth: number;
   mapHeight: number;
@@ -56,6 +58,12 @@ export interface MatchConfig {
   seed: number;
   maxTimeSeconds?: number;
   decideIntervalSeconds?: number;
+  /**
+   * Which civilisation each player is. Absent means both take whichever the
+   * imported content is for, which is the Britons; a match recorded without
+   * the field therefore replays as it was played.
+   */
+  civilizations?: { 1: string; 2: string };
 }
 
 export interface PlayerSummary {
@@ -96,6 +104,12 @@ export interface MatchRecord {
   version: typeof PROTOCOL_VERSION;
   seed: number;
   rulesOrigin: 'fallback' | 'imported';
+  /**
+   * Who each side was playing. A replay rebuilds the match from this record
+   * alone, and a civilisation decides what may be researched, so leaving it
+   * out would let a replay diverge the moment two civilisations differ.
+   */
+  civilizations: { 1: string; 2: string };
   decideIntervalSeconds: number;
   maxTimeSeconds: number;
   commands: { tick: number; command: Command }[];

@@ -4,11 +4,41 @@
   "title": "MatchConfig",
   "type": "object",
   "properties": {
-    "version": { "const": 1 },
-    "seed": { "type": "integer", "minimum": 1 },
-    "maxTimeSeconds": { "type": "number", "exclusiveMinimum": 0 },
-    "decideIntervalSeconds": { "type": "number", "exclusiveMinimum": 0 }
+    "version": {
+      "const": 1
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "maxTimeSeconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "decideIntervalSeconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "civilizations": {
+      "type": "object",
+      "properties": {
+        "1": {
+          "type": "string"
+        },
+        "2": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "1",
+        "2"
+      ],
+      "additionalProperties": false
+    }
   },
-  "required": ["version", "seed"],
+  "required": [
+    "version",
+    "seed"
+  ],
   "additionalProperties": false
 }

@@ -1595,6 +1595,18 @@ describe('what a shot is aimed at', () => {
     return { state, archer, victim };
   }
 
+  it('takes each shooter\'s own accuracy from the imported content', () => {
+    // The field existed on the rules before this was checked and nothing ever
+    // read it out of the manifest, so every shooter silently fell back to a
+    // perfect 100 and the miss could not happen. Assert the numbers arrive.
+    if (!importedRules) return; // open-content checkout
+    expect(importedRules.units.archer.accuracyPercent).toBe(80);
+    expect(importedRules.units.skirmisher.accuracyPercent).toBe(90);
+    expect(importedRules.units.longbowman.accuracyPercent).toBe(70);
+    expect(importedRules.units['cavalry-archer'].accuracyPercent).toBe(50);
+    expect(importedRules.buildings['watch-tower'].attack?.accuracyPercent).toBe(100);
+  });
+
   it('hits a target that stands still', () => {
     // The archer's own accuracy is 80, so a few of these go wide; over a run
     // of shots a standing target is hit again and again.
@@ -1660,5 +1672,98 @@ describe('what a shot is aimed at', () => {
       victim.activity = 'moving';
     }
     expect(victim.hp).toBeLessThan(before);
+  });
+});
+
+describe('civilisations', () => {
+  it('starts both players on the civilisation the content was imported for', () => {
+    const state = createGame(91, importedRules ?? FALLBACK_RULES);
+    expect(state.players[1].civilization).toBe(state.rules.civilization.key);
+    expect(state.players[2].civilization).toBe(state.rules.civilization.key);
+    if (importedRules) {
+      // The DAT calls them the British; everything else calls them the Britons.
+      expect(importedRules.civilization.key).toBe('britons');
+      expect(importedRules.civilization.name).toBe('British');
+    }
+  });
+
+  it('offers nothing the civilisation does not actually have', () => {
+    // The depot's own tech tree marks what a civilisation is missing. Anything
+    // researchable or trainable here must not be on that list, or a player
+    // would be offered something and then refused it.
+    if (!importedRules) return;
+    const missing = importedRules.civilization.unavailable;
+    for (const [key, tech] of Object.entries(importedRules.technologies)) {
+      expect(missing.technologies, `${key} is not in the Britons' tree`).not.toContain(tech.techId);
+    }
+    for (const [kind, rules] of Object.entries(importedRules.units)) {
+      if (rules.datId === undefined) continue;
+      expect(missing.units, `${kind} is not in the Britons' tree`).not.toContain(rules.datId);
+    }
+    for (const [kind, rules] of Object.entries(importedRules.buildings)) {
+      if (rules.datId === undefined || !rules.buildable) continue;
+      expect(missing.buildings, `${kind} is not in the Britons' tree`).not.toContain(rules.datId);
+    }
+  });
+
+  it('refuses a unit its civilisation was never given', () => {
+    // Driven through applyCommand rather than the predicate, because that is
+    // the layer a player meets. The Britons do have the militia; withhold it
+    // and the barracks must say so.
+    if (!importedRules) return;
+    const withheld: GameRules = {
+      ...importedRules,
+      civilization: {
+        ...importedRules.civilization,
+        unavailable: {
+          ...importedRules.civilization.unavailable,
+          units: [...importedRules.civilization.unavailable.units, importedRules.units.militia.datId!],
+        },
+      },
+    };
+    const state = createGame(92, withheld);
+    const barracks: Entity = {
+      id: state.nextId++, kind: 'barracks', owner: 1, position: { x: 60.5, y: 60.5 },
+      hp: 1200, maxHp: 1200, radius: withheld.buildings.barracks.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(barracks);
+    Object.assign(state.players[1], { food: 5000, wood: 5000, populationCap: 100 });
+    const refused = applyCommand(state, {
+      kind: 'train', player: 1, buildingId: barracks.id, unit: 'militia',
+    });
+    expect(refused.ok).toBe(false);
+    expect(refused.ok ? '' : refused.reason).toContain('British');
+
+    // ...and the same barracks under the real tree trains it.
+    const normal = createGame(92, importedRules);
+    const ok: Entity = { ...barracks, id: normal.nextId++ };
+    normal.entities.push(ok);
+    Object.assign(normal.players[1], { food: 5000, wood: 5000, populationCap: 100 });
+    expect(applyCommand(normal, {
+      kind: 'train', player: 1, buildingId: ok.id, unit: 'militia',
+    }).ok).toBe(true);
+  });
+});
+
+describe('a match record carries who was playing', () => {
+  it('round-trips the civilisations through the schema and a replay', async () => {
+    // A replay rebuilds the match from the record alone, and a civilisation
+    // decides what may be researched — so a record that omits it would replay
+    // a different game the moment two sides differ.
+    const { runMatch, replayRecord } = await import('../headless/runner');
+    const { builtinStrategy } = await import('../headless/strategies');
+    const { validateMatchRecord, explain } = await import('../protocol/validate');
+    const rules = importedRules ?? FALLBACK_RULES;
+    const config = {
+      version: 1 as const, seed: 5, maxTimeSeconds: 30, decideIntervalSeconds: 1,
+      civilizations: { 1: rules.civilization.key, 2: rules.civilization.key },
+    };
+    const { record } = await runMatch(config, { 1: builtinStrategy(), 2: { decide: () => [] } }, rules);
+    expect(validateMatchRecord(record), explain(validateMatchRecord)).toBe(true);
+    expect(record.civilizations).toEqual(config.civilizations);
+    const outcome = replayRecord(record, rules);
+    expect(outcome.ok, `replay diverged at tick ${outcome.mismatchTick}`).toBe(true);
+    expect(outcome.checked).toBeGreaterThan(0);
   });
 });

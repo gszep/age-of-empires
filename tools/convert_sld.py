@@ -266,6 +266,7 @@ def main() -> None:
         # fallback rules instead of the DAT's, and matched them closely enough
         # that nothing failed.
         "technologies": imported["technologies"],
+        "civilization": imported["civilization"],
         "playerColors": imported["playerColors"],
         "terrain": terrain,
         "skippedAtlases": sorted(skipped),

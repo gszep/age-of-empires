@@ -72,6 +72,21 @@ terrain-restriction rows that decide who floats and who wades, and the dock
 question is the shore seam, which is the blend-mask mapping that also blocks
 terrain blends above.
 
+## Civilisations
+
+- **Only the Britons exist, and only their tree.** The importer reads one
+  civilisation's units and one civilisation's tech tree; a second would be a
+  data addition (another `CivTechTrees/*.json` and another `civIndex`) rather
+  than a refactor, but nothing selects between them yet and the match config's
+  civilisation field has one legal value.
+- **Civilisation bonuses are not implemented.** The Britons' foot archers get
+  no extra range, their shepherds work at the ordinary rate, their town centers
+  cost full wood from the Castle Age, and Yeomen is not free. These live in the
+  DAT as civ-specific effect commands rather than in the tech tree, and were
+  deliberately left out of the tech-tree work.
+- **The HUD does not say who you are playing.** The civilisation is in the
+  observation and the match record but no panel shows it.
+
 ## Simulation
 
 - **Trade is unverifiable in normal play.** The cart's loop is proven by

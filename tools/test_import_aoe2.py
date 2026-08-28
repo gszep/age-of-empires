@@ -371,6 +371,37 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(cart["animations"]["carry"]["source"], "u_trade_cart_west_walkA_x1.sld")
         self.assertNotIn("combat", cart)
 
+    def test_the_civilisation_is_read_from_its_own_tech_tree(self):
+        # An AoE2 civilisation is mostly what it does not get, and the depot
+        # ships that per civilisation next to the DAT. Nothing here lists a
+        # missing technology by hand: the tree marks them `NotAvailable`.
+        civ = self.result["civilization"]
+        self.assertEqual(civ["key"], "britons")
+        self.assertEqual(civ["datIndex"], SPEC["civIndex"])
+        # The DAT calls civ 1 "British"; everything since calls them Britons.
+        self.assertEqual(civ["name"], "British")
+        self.assertEqual(_dat().civs[SPEC["civIndex"]].name, civ["name"])
+
+        tree = json.loads(
+            (DAT.parent / "CivTechTrees" / civ["treeFile"]).read_text()
+        )
+        nodes = tree["civ_techs_buildings"] + tree["civ_techs_units"]
+        by_use = {"Tech": "technologies", "Unit": "units", "Building": "buildings"}
+        for node in nodes:
+            bucket = by_use.get(node["Use Type"])
+            if bucket is None:
+                continue
+            listed = int(node["Node ID"]) in civ["unavailable"][bucket]
+            self.assertEqual(
+                listed, node["Node Status"] == "NotAvailable",
+                f"{node['Name']} ({bucket} {node['Node ID']})",
+            )
+
+        # The ones everybody knows the Britons do without. Thumb Ring is 437;
+        # if this ever comes back empty the tree file stopped being read.
+        self.assertIn(437, civ["unavailable"]["technologies"])
+        self.assertTrue(civ["unavailable"]["units"])
+
     def test_the_published_manifest_carries_the_technologies(self):
         # The atlas step assembles the manifest the game actually loads, and
         # for a while it left `technologies` out of that dict entirely -- so

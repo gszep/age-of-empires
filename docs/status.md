@@ -203,6 +203,30 @@ that never moved with the ids, so unit 7 is called XBOWM and draws
 What is left out is age-gated or another civilisation's, which is the omitted
 scope above — except the herdables, which are their own item.
 
+### The civilisation is the Britons, and it is what the tree withholds
+
+The importer has always read civilisation 1's units, and the DAT calls civ 1
+"British" — so every stat in the game has been the Britons' all along without
+anything saying so. Now it says so: the manifest names the civilisation, both
+players start on it, and it rides in the match config, the observation and the
+match record, so a replay rebuilds the match the way it was played.
+
+What a civilisation *is*, mechanically, is mostly what it does without. The
+depot ships a tech tree per civilisation beside the DAT
+(`CivTechTrees/BRITONS.json`) and marks each node `NotAvailable` where that
+civilisation does not get it. For the Britons that is ten technologies —
+including Thumb Ring, Bloodlines, Crop Rotation and Stone Shaft Mining — eight
+units including the Hussar, the Paladin and the Hand Cannoneer, and the bombard
+tower. Those ids are imported and `applyCommand` refuses to research, train or
+build anything on the list, naming the civilisation when it does.
+
+Civilisation *bonuses* — the Britons' archer range, faster shepherds, cheaper
+town centers, free Yeomen — are deliberately not implemented. They are not part
+of the tech tree and are recorded in `backlog.md`.
+
+Everything currently researchable or trainable is checked against that tree by
+a test, so the game cannot offer something the Britons were never given.
+
 ### Ages and technologies
 
 A building researches one technology at a time. Cost, research time, the
