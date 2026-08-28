@@ -6,70 +6,221 @@
     {
       "type": "object",
       "properties": {
-        "kind": { "const": "order" },
-        "player": { "enum": [1, 2] },
-        "entityIds": { "type": "array", "items": { "type": "integer" }, "minItems": 1 },
-        "target": { "$ref": "#/definitions/point" },
-        "targetId": { "type": "integer" }
+        "kind": {
+          "const": "order"
+        },
+        "player": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "entityIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1
+        },
+        "target": {
+          "$ref": "#/definitions/point"
+        },
+        "targetId": {
+          "type": "integer"
+        }
       },
-      "required": ["kind", "player", "entityIds", "target"],
+      "required": [
+        "kind",
+        "player",
+        "entityIds",
+        "target"
+      ],
       "additionalProperties": false
     },
     {
       "type": "object",
       "properties": {
-        "kind": { "const": "train" },
-        "player": { "enum": [1, 2] },
-        "buildingId": { "type": "integer" },
-        "unit": { "enum": ["villager", "militia", "spearman", "archer", "skirmisher", "scout-cavalry", "trade-cart", "knight", "cavalry-archer", "longbowman", "battering-ram", "mangonel", "monk"] }
+        "kind": {
+          "const": "train"
+        },
+        "player": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "buildingId": {
+          "type": "integer"
+        },
+        "unit": {
+          "enum": [
+            "villager",
+            "militia",
+            "spearman",
+            "archer",
+            "skirmisher",
+            "scout-cavalry",
+            "trade-cart",
+            "knight",
+            "cavalry-archer",
+            "longbowman",
+            "battering-ram",
+            "mangonel",
+            "monk"
+          ]
+        }
       },
-      "required": ["kind", "player", "buildingId", "unit"],
+      "required": [
+        "kind",
+        "player",
+        "buildingId",
+        "unit"
+      ],
       "additionalProperties": false
     },
     {
       "type": "object",
       "properties": {
-        "kind": { "const": "research" },
-        "player": { "enum": [1, 2] },
-        "buildingId": { "type": "integer" },
-        "tech": { "enum": ["loom", "feudal-age", "castle-age"] }
+        "kind": {
+          "const": "research"
+        },
+        "player": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "buildingId": {
+          "type": "integer"
+        },
+        "tech": {
+          "type": "string",
+          "minLength": 1,
+          "$comment": "Which technologies exist depends on the imported content and the civilisation; the Britons tree carries 42."
+        }
       },
-      "required": ["kind", "player", "buildingId", "tech"],
+      "required": [
+        "kind",
+        "player",
+        "buildingId",
+        "tech"
+      ],
       "additionalProperties": false
     },
     {
       "type": "object",
       "properties": {
-        "kind": { "const": "build" },
-        "player": { "enum": [1, 2] },
-        "builderIds": { "type": "array", "items": { "type": "integer" }, "minItems": 1 },
-        "building": { "enum": ["barracks", "house", "mill", "lumber-camp", "mining-camp", "farm", "outpost", "watch-tower", "archery-range", "blacksmith", "market", "stable", "monastery", "siege-workshop", "castle", "palisade-wall", "palisade-gate"] },
-        "target": { "$ref": "#/definitions/point" },
-        "orientation": { "enum": ["x", "y"] }
+        "kind": {
+          "const": "build"
+        },
+        "player": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "builderIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1
+        },
+        "building": {
+          "enum": [
+            "barracks",
+            "house",
+            "mill",
+            "lumber-camp",
+            "mining-camp",
+            "farm",
+            "outpost",
+            "watch-tower",
+            "archery-range",
+            "blacksmith",
+            "market",
+            "stable",
+            "monastery",
+            "siege-workshop",
+            "castle",
+            "palisade-wall",
+            "palisade-gate"
+          ]
+        },
+        "target": {
+          "$ref": "#/definitions/point"
+        },
+        "orientation": {
+          "enum": [
+            "x",
+            "y"
+          ]
+        }
       },
-      "required": ["kind", "player", "builderIds", "building", "target"],
+      "required": [
+        "kind",
+        "player",
+        "builderIds",
+        "building",
+        "target"
+      ],
       "additionalProperties": false
     },
     {
       "type": "object",
       "properties": {
-        "kind": { "const": "rally" },
-        "player": { "enum": [1, 2] },
-        "buildingId": { "type": "integer" },
-        "target": { "$ref": "#/definitions/point" },
-        "targetId": { "type": "integer" }
+        "kind": {
+          "const": "rally"
+        },
+        "player": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "buildingId": {
+          "type": "integer"
+        },
+        "target": {
+          "$ref": "#/definitions/point"
+        },
+        "targetId": {
+          "type": "integer"
+        }
       },
-      "required": ["kind", "player", "buildingId", "target"],
+      "required": [
+        "kind",
+        "player",
+        "buildingId",
+        "target"
+      ],
       "additionalProperties": false
     },
     {
       "type": "object",
       "properties": {
-        "kind": { "const": "stop" },
-        "player": { "enum": [1, 2] },
-        "entityIds": { "type": "array", "items": { "type": "integer" }, "minItems": 1 }
+        "kind": {
+          "const": "stop"
+        },
+        "player": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "entityIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1
+        }
       },
-      "required": ["kind", "player", "entityIds"],
+      "required": [
+        "kind",
+        "player",
+        "entityIds"
+      ],
       "additionalProperties": false
     }
   ],
@@ -77,10 +228,17 @@
     "point": {
       "type": "object",
       "properties": {
-        "x": { "type": "number" },
-        "y": { "type": "number" }
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
       },
-      "required": ["x", "y"],
+      "required": [
+        "x",
+        "y"
+      ],
       "additionalProperties": false
     }
   }

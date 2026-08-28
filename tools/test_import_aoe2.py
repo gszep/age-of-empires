@@ -235,11 +235,21 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(loom["cost"], {"gold": 50})
         self.assertEqual(loom["researchSeconds"], 25)
         # Read off the effect commands, not transcribed: +15 hit points, +1
-        # melee armour, +2 pierce.
-        self.assertEqual(loom["effects"], [{
-            "unit": "villager", "hitPoints": 15,
-            "armors": [{"class": 4, "amount": 1}, {"class": 3, "amount": 2}],
-        }])
+        # melee armour, +2 pierce. The DAT addresses all three to unit class 4
+        # rather than to the villager, so every villager task variant gets
+        # them -- which is what the class import is for.
+        loom_effects = {
+            (e["unit"], e["attribute"], e.get("armorClass")): (e["operation"], e["amount"])
+            for e in loom["effects"]
+        }
+        variants = [key for key, entity in self.result["entities"].items()
+                    if entity.get("class") == 4]
+        self.assertIn("villager", variants)
+        self.assertGreater(len(variants), 1)
+        for variant in variants:
+            self.assertEqual(loom_effects[(variant, "hitPoints", None)], ("add", 15.0), variant)
+            self.assertEqual(loom_effects[(variant, "armor", 4)], ("add", 1), variant)
+            self.assertEqual(loom_effects[(variant, "armor", 3)], ("add", 2), variant)
 
         # Which age a thing belongs to is read from the tech that turns it on.
         ages = {key: entity.get("age") for key, entity in self.result["entities"].items()}
@@ -370,6 +380,48 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # A laden cart has its own art, named by the trade task itself.
         self.assertEqual(cart["animations"]["carry"]["source"], "u_trade_cart_west_walkA_x1.sld")
         self.assertNotIn("combat", cart)
+
+    def test_the_technology_list_is_the_civilisation_tree(self):
+        # Which technologies exist is read from the civilisation's own tree and
+        # the effect commands behind each one, not transcribed. Three were
+        # hand-written before this; the Britons' tree carries the blacksmith
+        # lines, the economy technologies and the ages.
+        techs = self.result["technologies"]
+        self.assertGreater(len(techs), 30)
+        for key in ("loom", "feudal-age", "castle-age", "imperial-age", "forging",
+                    "fletching", "scale-mail-armor", "wheelbarrow", "double-bit-axe"):
+            self.assertIn(key, techs)
+
+        # Forging is "+1 against armour class 4" to the melee classes, which is
+        # how the DAT states it -- not "+1 attack".
+        forging = {(e["unit"], e["attribute"], e["operation"], e.get("armorClass")): e["amount"]
+                   for e in techs["forging"]["effects"]}
+        for unit in ("militia", "spearman", "knight", "scout-cavalry"):
+            self.assertEqual(forging[(unit, "attack", "add", 4)], 1, unit)
+
+        # Fletching reaches the archers by class, and gives range as well.
+        fletching = {(e["unit"], e["attribute"]) for e in techs["fletching"]["effects"]}
+        for unit in ("archer", "skirmisher", "longbowman", "cavalry-archer"):
+            self.assertIn((unit, "attack"), fletching, unit)
+            self.assertIn((unit, "range"), fletching, unit)
+
+        # Every chain the DAT states, in order.
+        for key, first in (("iron-casting", "forging"), ("blast-furnace", "iron-casting"),
+                           ("bodkin-arrow", "fletching"), ("bracer", "bodkin-arrow"),
+                           ("hand-cart", "wheelbarrow"), ("chain-mail-armor", "scale-mail-armor")):
+            self.assertIn(first, techs[key].get("requires", []), key)
+        # ...and the first of a chain has none.
+        self.assertNotIn("requires", techs["forging"])
+
+        # What was left out says why, and Thumb Ring is left out for the
+        # reason the civilisation tree gives rather than for a missing entity.
+        skipped = {row["name"]: row["reason"] for row in self.result["skippedTechnologies"]}
+        self.assertIn("Thumb Ring", skipped)
+        self.assertIn("do not have it", skipped["Thumb Ring"])
+        self.assertIn("Ballistics", skipped)
+        self.assertIn("not imported", skipped["Ballistics"])
+        for reason in skipped.values():
+            self.assertTrue(reason)
 
     def test_the_civilisation_is_read_from_its_own_tech_tree(self):
         # An AoE2 civilisation is mostly what it does not get, and the depot

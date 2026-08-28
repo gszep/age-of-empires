@@ -229,21 +229,43 @@ a test, so the game cannot offer something the Britons were never given.
 
 ### Ages and technologies
 
-A building researches one technology at a time. Cost, research time, the
-building it happens at, and what it changes all come from the DAT rather than
-from a table here:
+**Forty-two technologies, and the list is the civilisation's own tree.** Three
+were written out by hand here; now a `Research` node in `CivTechTrees/`
+BRITONS.json names the technology, the building it happens at and the age it
+appears in, and the DAT's effect commands say what it does. Nothing is
+transcribed — not a cost, not an amount, not a prerequisite.
 
-- **Loom** — 50 gold, 25 seconds at the town center. Its +15 hit points and
-  +1 melee / +2 pierce armour are decoded from the effect's own commands
-  (attribute 0 and the packed armour attribute 8), and the hit points reach the
-  villagers already standing on the map, as in AoE2.
-- **Feudal Age** — 500 food, 130 seconds at the town center. This is tech 101,
-  which the DAT calls "Middle Age" while its effect is called "Feudal Age" —
-  the same name-versus-data trap as the units, so the effect name is what the
-  importer asserts.
-- **Castle Age** — 800 food and 200 gold, 160 seconds at the town center, and
-  it requires the Feudal Age. Tech 102, whose DAT name is "Feudal Age" and
-  whose effect is "Castle Age": the same shift again.
+An effect command is an operation (set, add, multiply) on an attribute of
+either a unit or a whole unit class, and most of the interesting ones are
+class-wide: Loom is not "+15 hit points to the villager", it is "+15 to class
+4", which is why every entity now carries its DAT class. The importer resolves
+those against the entities this game has, so what reaches the rules is already
+per-entity. Decoded that way, Forging is +1 attack against armour class 4 for
+the melee classes, Fletching is +1 pierce attack, +1 range and +1 line of sight
+for the archer classes, Wheelbarrow is x1.1 speed and more carrying, and the
+Castle Age itself gives a scout and an outpost +2 line of sight and a watch
+tower x1.2 hit points.
+
+Prerequisites come from the DAT too: Iron Casting needs Forging, Bracer needs
+Bodkin Arrow, Hand Cart needs Wheelbarrow. Without them a player could take
+Blast Furnace without ever taking Forging and collect the same bonus for a
+third of the clicks. The command refuses it and the panel does not offer it.
+
+What the tree offers and this game cannot hold is recorded rather than dropped,
+with the reason — 43 nodes, in three groups. Thumb Ring and nine others say
+*the British do not have it*, which is the tree's own `NotAvailable`.
+Ballistics and the rest of the university's list say *researched at DAT unit
+209, not imported*. Horse Collar, Coinage, Heavy Plow and the monastery's
+healing technologies say *none of its effects reach anything imported* — a farm
+that holds more food, a market that charges less, a monk who heals faster are
+all attributes this slice does not model. A technology that keeps some of its
+effects and loses others carries an `unmodelled` list naming the attributes, so
+a half-applied technology says so.
+
+**Which technologies exist is now a property of the content**, so the command
+schema names a technology by string where it used to enumerate three. The
+contract that replaced it is that every technology the rules offer is a legal
+command, which a test asserts.
 
 Unit upgrades (man-at-arms, crossbowman, pikeman, light cavalry, elite
 skirmisher) are deliberately not researchable yet, so the Castle Age adds what

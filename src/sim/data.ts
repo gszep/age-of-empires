@@ -188,7 +188,12 @@ export function lingersInFog(rules: GameRules, entity: Entity): boolean {
   }
   return rules.units[entity.kind as UnitKind]?.fogVisibility === 1;
 }
-export type TechKey = 'loom' | 'feudal-age' | 'castle-age';
+/**
+ * Which technologies exist is a property of the imported content and the
+ * civilisation playing, not of this file: the Britons' tree carries forty-two
+ * that this game can hold. The open fallback has three.
+ */
+export type TechKey = string;
 
 /** One researchable technology, as the DAT records it. */
 export interface TechRules {
@@ -200,9 +205,44 @@ export interface TechRules {
   requiresAge: number;
   /** Age techs move the player on; everything else changes rules. */
   grantsAge?: number;
-  /** Flat additions to a unit kind, read off the DAT's effect commands. */
-  effects: { unit: UnitKind; hitPoints?: number; armors?: AttackValue[] }[];
+  /**
+   * Technologies that have to be researched first. The DAT states them per
+   * technology -- Iron Casting needs Forging, Hand Cart needs Wheelbarrow --
+   * and without them a player could take Blast Furnace without ever taking
+   * Forging and collect the same bonus for less.
+   */
+  requires?: string[];
+  /** What it changes, decoded from the DAT's own effect commands. */
+  effects: TechEffect[];
+  /**
+   * Attributes the DAT's effect carries that this game does not model, so a
+   * technology that is only partly applied says so rather than looking whole.
+   */
+  unmodelled?: string[];
 }
+
+/**
+ * One change a technology makes, as the DAT states it: an operation on an
+ * attribute of something. The DAT addresses most of them to a whole unit
+ * class -- Loom is "+15 hit points to class 4", not "+15 to the villager" --
+ * and the importer resolves those against the entities this game has, so what
+ * arrives here is already per-entity.
+ *
+ * `unit` is an imported entity key, which may be a unit kind, a building kind,
+ * or one of the villager task variants that carry the gather rates.
+ */
+export interface TechEffect {
+  unit: string;
+  attribute: TechAttribute;
+  operation: 'set' | 'add' | 'multiply';
+  amount: number;
+  /** For `armor` and `attack`, which armour class the amount is against. */
+  armorClass?: number;
+}
+
+export type TechAttribute =
+  | 'hitPoints' | 'lineOfSight' | 'speed' | 'armor' | 'attack'
+  | 'reloadSeconds' | 'accuracyPercent' | 'range' | 'workRate' | 'carryCapacity';
 
 export const AGE_NAMES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'];
 
@@ -487,10 +527,11 @@ export const FALLBACK_RULES: GameRules = {
     loom: {
       techId: 22, name: 'Loom', cost: cost(0, 0, 50), researchSeconds: 25,
       researchedAt: 'town-center', requiresAge: 0,
-      effects: [{
-        unit: 'villager', hitPoints: 15,
-        armors: [{ class: 4, amount: 1 }, { class: 3, amount: 2 }],
-      }],
+      effects: [
+        { unit: 'villager', attribute: 'hitPoints', operation: 'add', amount: 15 },
+        { unit: 'villager', attribute: 'armor', operation: 'add', amount: 1, armorClass: 4 },
+        { unit: 'villager', attribute: 'armor', operation: 'add', amount: 2, armorClass: 3 },
+      ],
     },
     'feudal-age': {
       techId: 101, name: 'Feudal Age', cost: cost(500), researchSeconds: 130,
@@ -547,7 +588,9 @@ interface ManifestTech {
   researchedAt: number;
   requiresAge: number;
   grantsAge?: number;
-  effects?: { unit: string; hitPoints?: number; armors?: AttackValue[] }[];
+  requires?: string[];
+  effects?: TechEffect[];
+  unmodelled?: string[];
 }
 
 export interface ContentManifest {
@@ -777,26 +820,30 @@ function technologies(
       kindOf.set(entity.id, key as BuildingKind);
     }
   }
-  const result = { ...FALLBACK_RULES.technologies };
+  // Imported content decides which technologies exist, so the whole list comes
+  // from the manifest rather than being merged into a fixed set of three. The
+  // open-content rules stand in only when there is no manifest at all.
+  const result: Record<TechKey, TechRules> = {};
   for (const [key, tech] of Object.entries(manifest.technologies ?? {})) {
-    const fallback = FALLBACK_RULES.technologies[key as TechKey];
-    if (!fallback) continue;
-    result[key as TechKey] = {
+    const fallback = FALLBACK_RULES.technologies[key];
+    const researchedAt = kindOf.get(tech.researchedAt) ?? fallback?.researchedAt;
+    // Researched at a building this game does not have: there is nowhere to
+    // click it, so it is not offered at all.
+    if (!researchedAt) continue;
+    result[key] = {
       techId: tech.techId,
       name: tech.name,
       cost: cost(tech.cost?.food ?? 0, tech.cost?.wood ?? 0, tech.cost?.gold ?? 0, tech.cost?.stone ?? 0),
       researchSeconds: tech.researchSeconds,
-      researchedAt: kindOf.get(tech.researchedAt) ?? fallback.researchedAt,
+      researchedAt,
       requiresAge: tech.requiresAge,
       grantsAge: tech.grantsAge,
-      effects: (tech.effects ?? []).map(effect => ({
-        unit: effect.unit as UnitKind,
-        hitPoints: effect.hitPoints,
-        armors: effect.armors,
-      })),
+      requires: tech.requires,
+      effects: tech.effects ?? [],
+      unmodelled: tech.unmodelled,
     };
   }
-  return result;
+  return Object.keys(result).length ? result : { ...FALLBACK_RULES.technologies };
 }
 
 const UNIT_KINDS = new Set<string>([

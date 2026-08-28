@@ -1,5 +1,7 @@
 import { FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isAnimal, isBuilding, isMilitary, isUnit } from './data';
-import type { AttackValue, Cost, GameRules, NodeKind, TechKey, UnitRules } from './data';
+import type {
+  AttackValue, BuildingRules, Cost, GameRules, NodeKind, TechEffect, TechKey, UnitRules,
+} from './data';
 import { buildNavGrid, findPath, halfExtent, isBlocked, separateUnits, tileOf, type NavGrid } from './nav';
 import { random01 } from './random';
 import { createVisibility, isEntityVisible, updateVisibility } from './visibility';
@@ -282,18 +284,128 @@ export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: Uni
   if (!researched.length) return base;
   let rules = base;
   for (const key of researched) {
-    for (const effect of state.rules.technologies[key as TechKey]?.effects ?? []) {
+    for (const effect of state.rules.technologies[key]?.effects ?? []) {
       if (effect.unit !== kind) continue;
-      if (rules === base) rules = { ...base, armors: base.armors.map(a => ({ ...a })) };
-      if (effect.hitPoints) rules.hp += effect.hitPoints;
-      for (const bonus of effect.armors ?? []) {
-        const existing = rules.armors.find(a => a.class === bonus.class);
-        if (existing) existing.amount += bonus.amount;
-        else rules.armors.push({ ...bonus });
+      if (rules === base) {
+        rules = {
+          ...base,
+          armors: base.armors.map(a => ({ ...a })),
+          attacks: base.attacks.map(a => ({ ...a })),
+        };
       }
+      applyEffect(rules, effect);
     }
   }
   return rules;
+}
+
+/** Apply one number to one attribute, in the way the DAT's command says. */
+function combine(operation: TechEffect['operation'], current: number, amount: number): number {
+  if (operation === 'set') return amount;
+  if (operation === 'multiply') return current * amount;
+  return current + amount;
+}
+
+/**
+ * One technology effect against one thing's rules. Armour and attack are
+ * per-class lists rather than single numbers -- Forging is "+1 against melee",
+ * not "+1 attack" -- so a class the thing has no entry for gains one, which is
+ * what makes a bonus against a class it never fought before take effect.
+ */
+function applyEffect(rules: UnitRules, effect: TechEffect): void {
+  const armorClass = effect.armorClass ?? 0;
+  switch (effect.attribute) {
+    case 'hitPoints': rules.hp = combine(effect.operation, rules.hp, effect.amount); break;
+    case 'lineOfSight':
+      rules.lineOfSight = combine(effect.operation, rules.lineOfSight, effect.amount); break;
+    case 'speed': rules.speed = combine(effect.operation, rules.speed, effect.amount); break;
+    case 'reloadSeconds':
+      rules.attackReloadSeconds =
+        combine(effect.operation, rules.attackReloadSeconds, effect.amount); break;
+    case 'accuracyPercent':
+      rules.accuracyPercent = combine(effect.operation, rules.accuracyPercent ?? 100, effect.amount);
+      break;
+    case 'range':
+      if (rules.range !== undefined) {
+        rules.range = combine(effect.operation, rules.range, effect.amount);
+      }
+      break;
+    case 'armor': {
+      const existing = rules.armors.find(a => a.class === armorClass);
+      if (existing) existing.amount = combine(effect.operation, existing.amount, effect.amount);
+      else rules.armors.push({ class: armorClass, amount: effect.amount });
+      break;
+    }
+    case 'attack': {
+      const existing = rules.attacks.find(a => a.class === armorClass);
+      if (existing) existing.amount = combine(effect.operation, existing.amount, effect.amount);
+      else rules.attacks.push({ class: armorClass, amount: effect.amount });
+      break;
+    }
+    default: break; // workRate and carryCapacity are not unit attributes here
+  }
+}
+
+/**
+ * A building's rules under what its owner has researched. Only hit points move
+ * today -- the Castle Age gives a watch tower x1.2 of them -- but the shape is
+ * the same as a unit's.
+ */
+export function buildingRulesFor(
+  state: GameState, owner: Entity['owner'], kind: BuildingKind,
+): BuildingRules {
+  const base = state.rules.buildings[kind];
+  if (owner === 0) return base;
+  const researched = state.players[owner as PlayerId].researched;
+  if (!researched.length) return base;
+  let rules = base;
+  for (const key of researched) {
+    for (const effect of state.rules.technologies[key]?.effects ?? []) {
+      if (effect.unit !== kind || effect.attribute !== 'hitPoints') continue;
+      if (rules === base) rules = { ...base };
+      rules.hp = combine(effect.operation, rules.hp, effect.amount);
+    }
+  }
+  return rules;
+}
+
+/**
+ * How fast this player gathers a resource, and how much a villager carries.
+ * The DAT puts both on the villager's task variants -- the gold miner is its
+ * own unit -- so Gold Shaft Mining is a work-rate change to `villager-goldminer`
+ * and Wheelbarrow a carry-capacity change to every one of them.
+ */
+const GATHER_VARIANT: Record<ResourceKind, string> = {
+  food: 'villager-forager', wood: 'villager-lumberjack',
+  gold: 'villager-goldminer', stone: 'villager-stonemason',
+};
+
+export function gatherRateFor(
+  state: GameState, owner: Entity['owner'], resource: ResourceKind,
+): number {
+  let rate = state.rules.gatherRatePerSecond[resource];
+  if (owner === 0) return rate;
+  const variant = GATHER_VARIANT[resource];
+  for (const key of state.players[owner as PlayerId].researched) {
+    for (const effect of state.rules.technologies[key]?.effects ?? []) {
+      if (effect.attribute !== 'workRate' || effect.unit !== variant) continue;
+      rate = combine(effect.operation, rate, effect.amount);
+    }
+  }
+  return rate;
+}
+
+export function carryCapacityFor(state: GameState, owner: Entity['owner']): number {
+  let capacity = state.rules.carryCapacity;
+  if (owner === 0) return capacity;
+  for (const key of state.players[owner as PlayerId].researched) {
+    for (const effect of state.rules.technologies[key]?.effects ?? []) {
+      // The DAT states it once per villager variant; they all carry the same.
+      if (effect.attribute !== 'carryCapacity' || effect.unit !== 'villager-forager') continue;
+      capacity = combine(effect.operation, capacity, effect.amount);
+    }
+  }
+  return capacity;
 }
 
 /** A completed building that shoots, so it can be given a target. */
@@ -484,6 +596,8 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     const player = state.players[command.player];
     if (player.researched.includes(command.tech)) return rejected(`${command.tech} is already researched`);
     if (player.age < tech.requiresAge) return rejected(`${command.tech} needs a later age`);
+    const missing = (tech.requires ?? []).find(other => !player.researched.includes(other));
+    if (missing) return rejected(`${command.tech} needs ${missing} first`);
     const paid = spendCost(state, command.player, tech.cost);
     if (!paid.ok) return paid;
     building.researching = {
@@ -500,7 +614,9 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     return { ok: true };
   }
 
-  const rules = state.rules.buildings[command.building];
+  // Read through research: the Castle Age gives a watch tower a fifth more
+  // hit points, and one placed after it should be built to the new number.
+  const rules = buildingRulesFor(state, command.player, command.building);
   if (!rules.buildable) return rejected(`${command.building} cannot be built`);
   if (!civHas(state, command.player, 'buildings', rules.datId)) {
     return rejected(`the ${civNameOf(state, command.player)} do not have ${command.building}`);
@@ -799,8 +915,8 @@ function kill(state: GameState, entity: Entity): void {
 
 function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'gather') return;
-  const speed = state.rules.units.villager.speed;
-  const capacity = state.rules.carryCapacity;
+  const speed = unitRulesFor(state, entity.owner, 'villager').speed;
+  const capacity = carryCapacityFor(state, entity.owner);
   const carrying = entity.carrying;
 
   if (carrying && carrying.amount >= capacity) {
@@ -865,7 +981,8 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
 
   entity.activity = 'gathering';
   const resource = node.resourceKind!;
-  entity.gatherProgress = (entity.gatherProgress ?? 0) + state.rules.gatherRatePerSecond[resource] * TICK_SECONDS;
+  entity.gatherProgress = (entity.gatherProgress ?? 0)
+    + gatherRateFor(state, entity.owner, resource) * TICK_SECONDS;
   while ((entity.gatherProgress ?? 0) >= 1 && (node.amount ?? 0) > 0 && (entity.carrying?.amount ?? 0) < capacity) {
     entity.gatherProgress! -= 1;
     node.amount! -= 1;
@@ -1541,12 +1658,17 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
   if (!tech || player.researched.includes(key)) return;
   player.researched.push(key);
   if (tech.grantsAge !== undefined) player.age = Math.max(player.age, tech.grantsAge);
+  // Hit points reach what is already standing, as AoE2's Loom heals the
+  // villagers you already have. Everything else is read off the rules when it
+  // is next asked for, so nothing has to be walked.
   for (const effect of tech.effects) {
-    if (!effect.hitPoints) continue;
+    if (effect.attribute !== 'hitPoints') continue;
     for (const entity of state.entities) {
       if (entity.dead || entity.owner !== owner || entity.kind !== effect.unit) continue;
-      entity.maxHp += effect.hitPoints;
-      entity.hp += effect.hitPoints;
+      const raised = combine(effect.operation, entity.maxHp, effect.amount);
+      const gained = raised - entity.maxHp;
+      entity.maxHp = raised;
+      entity.hp = Math.min(raised, entity.hp + gained);
     }
   }
 }

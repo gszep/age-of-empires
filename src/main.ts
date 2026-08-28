@@ -701,6 +701,9 @@ function currentCommands(): CommandButton[] {
     if (!building) continue;
     if (player1.researched.includes(key)) continue;
     if (player1.age < tech.requiresAge) continue;
+    // AoE2 does not show a technology whose predecessor is still outstanding:
+    // Iron Casting appears once Forging is done, not beside it.
+    if ((tech.requires ?? []).some(other => !player1.researched.includes(other))) continue;
     buttons.push({
       id: `research-${key}`,
       label: `Research ${tech.name} (${costLabel(tech.cost)})`,

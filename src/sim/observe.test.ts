@@ -4,7 +4,7 @@ import { FALLBACK_RULES, isAnimal, isBuilding, isUnit } from './data';
 import { createGame, applyCommand, stepGame } from './game';
 import { describeObservation, observe } from './observe';
 import { isTileExplored, isTileVisible } from './visibility';
-import { validateObservation, explain } from '../protocol/validate';
+import { validateCommand, validateObservation, explain } from '../protocol/validate';
 import type { Entity } from './types';
 
 describe('the public contract', () => {
@@ -23,9 +23,6 @@ describe('the public contract', () => {
       expect(observation, `building ${kind}`).toContain(`"${kind}"`);
     }
     const command = JSON.stringify(schema('command'));
-    for (const key of Object.keys(FALLBACK_RULES.technologies)) {
-      expect(command, `researchable ${key}`).toContain(`"${key}"`);
-    }
     for (const kind of Object.keys(FALLBACK_RULES.units)) {
       // Gaia's animals are nobody's to train.
       if (isAnimal(kind as never)) continue;
@@ -34,6 +31,21 @@ describe('the public contract', () => {
     for (const [kind, rules] of Object.entries(FALLBACK_RULES.buildings)) {
       if (!rules.buildable) continue;
       expect(command, `buildable ${kind}`).toContain(`"${kind}"`);
+    }
+  });
+
+  it('accepts a research command for anything the rules offer', () => {
+    // Which technologies exist is a property of the imported content and the
+    // civilisation, not of this file -- the Britons' tree carries forty-two
+    // where the open fallback has three -- so the command contract names a
+    // technology by string rather than enumerating them. What still has to
+    // hold is that every technology the rules offer is a legal command.
+    const state = createGame(31);
+    for (const key of Object.keys(state.rules.technologies)) {
+      const command = {
+        kind: 'research' as const, player: 1 as const, buildingId: 1, tech: key,
+      };
+      expect(validateCommand(command), `${key}: ${explain(validateCommand)}`).toBe(true);
     }
   });
 

@@ -267,6 +267,7 @@ def main() -> None:
         # that nothing failed.
         "technologies": imported["technologies"],
         "civilization": imported["civilization"],
+        "skippedTechnologies": imported["skippedTechnologies"],
         "playerColors": imported["playerColors"],
         "terrain": terrain,
         "skippedAtlases": sorted(skipped),

@@ -230,6 +230,11 @@ def extract_entity(
         # resources, whose box can exceed the collision box — a barracks
         # collides at 1.5 half-tiles but outlines at 1.6).
         "selection": selection_of(unit),
+        # The DAT's unit class. Technology effects are mostly addressed to a
+        # class rather than a unit -- Loom is "+15 hit points to class 4", the
+        # civilians -- so this is what lets those be resolved to our entities
+        # instead of being listed by hand.
+        "class": unit.class_,
         # Whether the thing keeps being drawn once its tile goes dark. Gaia's
         # resources and its huntables/herdables are 1; every player unit and
         # building is 0. This is the field that decides a unit does not linger
@@ -527,11 +532,90 @@ def available_age(dat: DatFile, unit_id: int) -> int:
     return 0
 
 
+# Which DAT attribute each effect command changes, under the name the rules
+# use for it. Anything not here is not modelled; the importer records it rather
+# than dropping it silently (see `unmodelled` in the technology entry).
+ATTRIBUTE_NAMES = {
+    0: "hitPoints",
+    1: "lineOfSight",
+    5: "speed",
+    8: "armor",
+    9: "attack",
+    10: "reloadSeconds",
+    11: "accuracyPercent",
+    12: "range",
+    13: "workRate",
+    14: "carryCapacity",
+}
+# 8 and 9 pack an armour class into the high byte and the amount into the low.
+PACKED_ATTRIBUTES = {"armor", "attack"}
+OPERATION_NAMES = {0: "set", 4: "add", 5: "multiply"}
+
+
+def slug(name: str) -> str:
+    """A stable key from a technology's own name: `Bodkin Arrow` -> bodkin-arrow."""
+    cleaned = "".join(c.lower() if c.isalnum() else "-" for c in name)
+    while "--" in cleaned:
+        cleaned = cleaned.replace("--", "-")
+    return cleaned.strip("-")
+
+
+def effects_of(
+    dat: DatFile, tech_id: int, entities: dict[str, Any]
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Decode one technology's effect commands against the entities we have.
+
+    A command is addressed either to a unit (`a`) or to a whole unit class
+    (`a` is -1 and `b` is the class), which is why every entity carries its
+    DAT class: Loom is not "+15 hit points to the villager", it is "+15 to
+    class 4", and the villager task variants are all class 4.
+
+    Returns the effects that landed and the names of the attributes that did
+    not, so a technology is never quietly half-applied.
+    """
+    tech = dat.techs[tech_id]
+    by_id: dict[int, list[str]] = {}
+    by_class: dict[int, list[str]] = {}
+    for key, entity in entities.items():
+        if "id" in entity:
+            by_id.setdefault(entity["id"], []).append(key)
+        if "class" in entity:
+            by_class.setdefault(entity["class"], []).append(key)
+
+    effects: list[dict[str, Any]] = []
+    unmodelled: set[str] = set()
+    for command in dat.effects[tech.effect_id].effect_commands:
+        operation = OPERATION_NAMES.get(command.type)
+        if operation is None:
+            continue  # enable, upgrade-unit and the rest are not attribute changes
+        target = int(command.a)
+        targets = by_id.get(target, []) if target >= 0 else by_class.get(int(command.b), [])
+        if not targets:
+            continue  # something this slice of the game does not have
+        attribute = ATTRIBUTE_NAMES.get(int(command.c))
+        if attribute is None:
+            unmodelled.add(f"attribute {int(command.c)}")
+            continue
+        amount = float(command.d)
+        for key in targets:
+            effect: dict[str, Any] = {
+                "unit": key, "attribute": attribute, "operation": operation,
+            }
+            if attribute in PACKED_ATTRIBUTES and operation in ("set", "add"):
+                packed = int(amount)
+                effect["armorClass"] = packed >> 8
+                effect["amount"] = packed & 0xFF
+            else:
+                effect["amount"] = rounded(amount)
+            effects.append(effect)
+    return effects, sorted(unmodelled)
+
+
 def technology_entry(dat: DatFile, spec: dict[str, Any], hashes: dict[str, str]) -> dict[str, Any]:
     """One researchable technology: what it costs, where, and what it changes."""
     tech = dat.techs[spec["techId"]]
     effect = dat.effects[tech.effect_id]
-    if effect.name != spec["effect"]:
+    if "effect" in spec and effect.name != spec["effect"]:
         raise ValueError(f"tech {spec['techId']} effect is {effect.name!r}, not {spec['effect']!r}")
     location = next(l for l in tech.research_locations if l.location_id >= 0)
     entry: dict[str, Any] = {
@@ -550,23 +634,14 @@ def technology_entry(dat: DatFile, spec: dict[str, Any], hashes: dict[str, str])
     if spec["techId"] in AGE_TECHS:
         entry["grantsAge"] = AGE_TECHS.index(spec["techId"])
 
-    # Flat modifiers, read off the effect rather than transcribed. The spec
-    # names which of our entities the class-wide change lands on.
-    modifiers: dict[str, dict[str, Any]] = {}
-    for command in dat.effects[tech.effect_id].effect_commands:
-        if command.type != EFFECT_ATTRIBUTE_ADD:
-            continue
-        for key in spec.get("appliesTo", []):
-            target = modifiers.setdefault(key, {"unit": key})
-            if command.c == ATTRIBUTE_HIT_POINTS:
-                target["hitPoints"] = int(command.d)
-            elif command.c == ATTRIBUTE_ARMOR:
-                packed = int(command.d)
-                target.setdefault("armors", []).append(
-                    {"class": packed >> 8, "amount": packed & 0xFF}
-                )
-    if modifiers:
-        entry["effects"] = [modifiers[key] for key in spec.get("appliesTo", []) if key in modifiers]
+    # What it changes, decoded from the effect commands against the entities
+    # this game actually has, rather than transcribed into the spec.
+    effects, unmodelled = effects_of(dat, spec["techId"], spec["entities"])
+    if effects:
+        entry["effects"] = effects
+    if unmodelled:
+        # Kept so a half-applied technology is visible rather than a surprise.
+        entry["unmodelled"] = unmodelled
     return entry
 
 
@@ -616,6 +691,81 @@ def civilization_entry(
     }
 
 
+def tree_nodes(dat_path: Path, spec: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every node of the configured civilisation's own tech tree."""
+    tree_path = dat_path.parent / "CivTechTrees" / spec["civilization"]["treeFile"]
+    tree = json.loads(tree_path.read_text())
+    return tree["civ_techs_buildings"] + tree["civ_techs_units"]
+
+
+def technologies_from_tree(
+    dat: DatFile,
+    dat_path: Path,
+    spec: dict[str, Any],
+    entities: dict[str, Any],
+    civilization: dict[str, Any],
+    hashes: dict[str, str],
+) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    """Every technology the civilisation's tree offers that this game can hold.
+
+    The tree is the list, not a hand-written one: a `Research` node names the
+    technology, the building it happens at and the age it appears in. A node is
+    taken when the civilisation has it, when its building is a building we
+    import, and when at least one of its effect commands lands on an entity we
+    have. Anything left out is returned with the reason.
+    """
+    buildings = {
+        entity["id"]: key
+        for key, entity in entities.items()
+        if entity.get("category") == "building" and "id" in entity
+    }
+    keep: dict[str, Any] = {}
+    skipped: list[dict[str, str]] = []
+    for node in tree_nodes(dat_path, spec):
+        if node["Node Type"] != "Research":
+            continue
+        name = node["Name"]
+        tech_id = int(node["Node ID"])
+        if node["Node Status"] == "NotAvailable":
+            skipped.append({"name": name, "techId": tech_id,
+                            "reason": f"the {civilization['name']} do not have it"})
+            continue
+        building = buildings.get(int(node["Building ID"]))
+        if building is None:
+            skipped.append({"name": name, "techId": tech_id,
+                            "reason": f"researched at DAT unit {node['Building ID']}, not imported"})
+            continue
+        entry = technology_entry(
+            dat, {"techId": tech_id, "entities": entities}, hashes
+        )
+        if not entry.get("effects") and "grantsAge" not in entry:
+            skipped.append({"name": name, "techId": tech_id,
+                            "reason": "none of its effects reach anything imported"})
+            continue
+        entry["name"] = name
+        keep[slug(name)] = entry
+
+    # A second pass for prerequisites, now that the set is known. The DAT lists
+    # each technology's requirements as technology ids -- Iron Casting needs
+    # Forging, Hand Cart needs Wheelbarrow -- alongside the age technology and
+    # some bookkeeping nodes that are not researchable at all ("Shadow Node+
+    # for Age Four"). Only the ones this game offers become requirements; the
+    # age is already a field of its own.
+    by_tech_id = {entry["techId"]: key for key, entry in keep.items()}
+    for key, entry in keep.items():
+        required = [
+            by_tech_id[int(other)]
+            for other in dat.techs[entry["techId"]].required_techs
+            if int(other) >= 0 and int(other) in by_tech_id
+            and by_tech_id[int(other)] != key
+            and int(other) not in AGE_TECHS
+        ]
+        if required:
+            entry["requires"] = sorted(required)
+    skipped.sort(key=lambda row: row["name"])
+    return keep, skipped
+
+
 def terrain_entry(dat: DatFile, terrain_id: int) -> dict[str, Any]:
     """Texture name, tile span, and minimap color for one DAT terrain slot."""
     terrain = dat.terrain_block.terrains[terrain_id]
@@ -650,10 +800,10 @@ def extract(
         )
     for effect_spec in spec.get("effects", []):
         entities[effect_spec["key"]] = effect_entry(dat, graphics_dir, effect_spec, hashes)
-    technologies = {
-        tech_spec["key"]: technology_entry(dat, tech_spec, hashes)
-        for tech_spec in spec.get("technologies", [])
-    }
+    civilization = civilization_entry(dat, dat_path, spec, hashes)
+    technologies, skipped_technologies = technologies_from_tree(
+        dat, dat_path, spec, entities, civilization, hashes
+    )
     terrain = {
         key: terrain_entry(dat, slot["terrainId"])
         for key, slot in spec.get("terrain", {}).items()
@@ -661,8 +811,11 @@ def extract(
     return {
         "terrain": terrain,
         "audio": spec.get("audio", {}),
-        "civilization": civilization_entry(dat, dat_path, spec, hashes),
+        "civilization": civilization,
         "technologies": technologies,
+        # What the civilisation's tree offers that this game cannot represent,
+        # and why. Recorded rather than dropped, so the gap is visible.
+        "skippedTechnologies": skipped_technologies,
         "playerColors": player_colors(dat, palettes_dir, spec["playerColors"], hashes),
         "schemaVersion": spec["schemaVersion"],
         "source": {

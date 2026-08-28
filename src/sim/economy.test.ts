@@ -2,7 +2,10 @@ import { readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES, TICK_SECONDS, isAnimal, rulesFromManifest, type ContentManifest, type GameRules } from './data';
 import { checksumState } from './checksum';
-import { applyCommand, buildingFootprint, createGame, isCarcass, placementLegal, stepGame } from './game';
+import {
+  applyCommand, buildingFootprint, carryCapacityFor, createGame, isCarcass, placementLegal,
+  stepGame, unitRulesFor,
+} from './game';
 import type { BuildingKind, Entity, GameState, ResourceKind } from './types';
 
 const MANIFEST_PATH = 'public/imported/aoe2/manifest.json';
@@ -1765,5 +1768,137 @@ describe('a match record carries who was playing', () => {
     const outcome = replayRecord(record, rules);
     expect(outcome.ok, `replay diverged at tick ${outcome.mismatchTick}`).toBe(true);
     expect(outcome.checked).toBeGreaterThan(0);
+  });
+});
+
+describe('the technology tree', () => {
+  const plantBuilding = (state: GameState, kind: BuildingKind): Entity => {
+    const rules = state.rules.buildings[kind];
+    const entity: Entity = {
+      id: state.nextId++, kind, owner: 1, position: { x: 55.5 + state.nextId % 7, y: 55.5 },
+      hp: rules.hp, maxHp: rules.hp, radius: rules.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(entity);
+    return entity;
+  };
+
+  /** Research `key` to completion, returning the command's own verdict. */
+  const research = (state: GameState, key: string) => {
+    const tech = state.rules.technologies[key];
+    const building = plantBuilding(state, tech.researchedAt);
+    Object.assign(state.players[1], { food: 9000, wood: 9000, gold: 9000, stone: 9000 });
+    const started = applyCommand(state, {
+      kind: 'research', player: 1, buildingId: building.id, tech: key,
+    });
+    if (!started.ok) return started;
+    for (let i = 0; i < 20_000 && !state.players[1].researched.includes(key); i++) stepGame(state);
+    return started;
+  };
+
+  it('takes its whole list from the civilisation tree, not from a table here', () => {
+    if (!importedRules) return;
+    const keys = Object.keys(importedRules.technologies);
+    // Three were hand-written before; the tree carries the blacksmith lines,
+    // the economy technologies and the ages.
+    expect(keys.length).toBeGreaterThan(30);
+    for (const expected of ['loom', 'feudal-age', 'castle-age', 'forging', 'fletching',
+      'scale-mail-armor', 'padded-archer-armor', 'wheelbarrow', 'double-bit-axe']) {
+      expect(keys, `${expected} is missing`).toContain(expected);
+    }
+  });
+
+  it('refuses a technology before its age and applies it after', () => {
+    if (!importedRules) return;
+    for (const key of ['forging', 'fletching', 'wheelbarrow']) {
+      const early = createGame(51, importedRules);
+      const tech = early.rules.technologies[key];
+      expect(tech.requiresAge, `${key} should not be a Dark Age technology`).toBeGreaterThan(0);
+      const refused = research(early, key);
+      expect(refused.ok, `${key} was allowed in the Dark Age`).toBe(false);
+      expect(refused.ok ? '' : refused.reason).toContain('later age');
+
+      const state = createGame(51, importedRules);
+      state.players[1].age = tech.requiresAge;
+      expect(research(state, key).ok, `${key} was refused in its own age`).toBe(true);
+      expect(state.players[1].researched).toContain(key);
+    }
+  });
+
+  it('will not take a technology before the one it follows', () => {
+    // The DAT states each technology's own requirements, and without them a
+    // player could research Blast Furnace without ever taking Forging and
+    // collect the same bonus for a third of the clicks.
+    if (!importedRules) return;
+    const state = createGame(57, importedRules);
+    state.players[1].age = 3;
+    const early = research(state, 'iron-casting');
+    expect(early.ok).toBe(false);
+    expect(early.ok ? '' : early.reason).toContain('forging');
+
+    expect(research(state, 'forging').ok).toBe(true);
+    expect(research(state, 'iron-casting').ok).toBe(true);
+    expect(state.players[1].researched).toEqual(expect.arrayContaining(['forging', 'iron-casting']));
+  });
+
+  it('gives Forging the melee attack the DAT says it gives', () => {
+    if (!importedRules) return;
+    const state = createGame(52, importedRules);
+    state.players[1].age = 1;
+    const meleeBefore = unitRulesFor(state, 1, 'militia').attacks.find(a => a.class === 4)!.amount;
+    expect(research(state, 'forging').ok).toBe(true);
+    const meleeAfter = unitRulesFor(state, 1, 'militia').attacks.find(a => a.class === 4)!.amount;
+    expect(meleeAfter).toBe(meleeBefore + 1);
+    // The other side never researched it.
+    expect(unitRulesFor(state, 2, 'militia').attacks.find(a => a.class === 4)!.amount)
+      .toBe(meleeBefore);
+  });
+
+  it('gives Fletching the range and pierce attack the DAT says it gives', () => {
+    if (!importedRules) return;
+    const state = createGame(53, importedRules);
+    state.players[1].age = 1;
+    const before = unitRulesFor(state, 1, 'archer');
+    const pierceBefore = before.attacks.find(a => a.class === 3)!.amount;
+    const rangeBefore = before.range!;
+    expect(research(state, 'fletching').ok).toBe(true);
+    const after = unitRulesFor(state, 1, 'archer');
+    expect(after.attacks.find(a => a.class === 3)!.amount).toBe(pierceBefore + 1);
+    expect(after.range).toBe(rangeBefore + 1);
+    expect(after.lineOfSight).toBe(before.lineOfSight + 1);
+  });
+
+  it('makes Wheelbarrow move and carry more', () => {
+    if (!importedRules) return;
+    const state = createGame(54, importedRules);
+    state.players[1].age = 1;
+    const speedBefore = unitRulesFor(state, 1, 'villager').speed;
+    const carryBefore = carryCapacityFor(state, 1);
+    expect(research(state, 'wheelbarrow').ok).toBe(true);
+    expect(unitRulesFor(state, 1, 'villager').speed).toBeCloseTo(speedBefore * 1.1, 6);
+    expect(carryCapacityFor(state, 1)).toBeGreaterThan(carryBefore);
+  });
+
+  it('raises the hit points of what is already standing, and of what comes next', () => {
+    if (!importedRules) return;
+    const state = createGame(55, importedRules);
+    const standing = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const before = standing.maxHp;
+    expect(research(state, 'loom').ok).toBe(true);
+    expect(standing.maxHp).toBe(before + 15);
+    expect(standing.hp).toBe(before + 15);
+    expect(unitRulesFor(state, 1, 'villager').hp).toBe(before + 15);
+  });
+
+  it('replays identically across a research it never had before', () => {
+    if (!importedRules) return;
+    const play = (): string => {
+      const state = createGame(56, importedRules);
+      state.players[1].age = 1;
+      research(state, 'fletching');
+      for (let i = 0; i < 400; i++) stepGame(state);
+      return checksumState(state);
+    };
+    expect(play()).toBe(play());
   });
 });

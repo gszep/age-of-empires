@@ -103,17 +103,34 @@ terrain blends above.
   effects rather than with the renderer. Each age's variant also has its own
   rubble unit (`Barracks Age2 (Rubble)` and friends), so a razed Feudal
   barracks still leaves the Dark Age rubble.
-- **No unit upgrade or economic technology is researchable.** Loom, the Feudal
-  Age and the Castle Age are; the blacksmith's armour and attack lines, the
-  university, the monastery's own technologies, and every unit upgrade
-  (man-at-arms, crossbowman, pikeman, light cavalry, elite skirmisher) are not.
-  The tech system reads cost, time, building and effect from the DAT already —
-  the work is breadth, plus upgrades needing a rule that replaces one unit kind
-  with another rather than adding flat modifiers the way Loom does.
-- **The university and the Imperial Age are not built.** The university is a
-  Castle Age building that trains nothing, so it was left out until there are
-  technologies for it to research; the Imperial Age (tech 103) and everything
-  above the Castle Age is out of scope for now.
+- **No unit upgrade is researchable.** Forty-two technologies are, taken from
+  the Britons' own tree — the blacksmith's armour and attack lines, the economy
+  technologies, the monastery's and the castle's, and all three ages. What is
+  still missing is the *upgrades*: man-at-arms, crossbowman, pikeman, light
+  cavalry, elite skirmisher. They are a different rule — one unit kind is
+  replaced by another rather than a flat modifier being added — which is the
+  `UnitUpgrade` node type in the tree and the `upgrade unit` effect command in
+  the DAT, the same command the age variants already use for buildings.
+- **Some technologies apply only part of what they say.** Where an effect
+  command names an attribute this game does not model, the technology is still
+  imported and the attribute is recorded in its `unmodelled` list rather than
+  dropped. Today that is search radius (attribute 23) on Fletching, Bodkin
+  Arrow, Bracer, Yeomen and the ages, and two Imperial-only attributes. Forty-
+  three more nodes are left out entirely, each with its reason, in the
+  manifest's `skippedTechnologies`.
+- **Technology prerequisites are the DAT's own list, not its count.** The DAT
+  states a `required_tech_count` alongside the requirements — Hand Cart needs
+  two of three — and the importer instead requires every listed technology that
+  this game also offers. That happens to be exactly right for all fifteen
+  chains the Britons have, because the extra entries are always the age
+  technology or a bookkeeping node, but it is not the general rule.
+- **The university is not built, so Ballistics cannot be researched.** It is a
+  Castle Age building that trains nothing, and it was left out until there were
+  technologies for it to research — there are now, and they are the reason to
+  build it: Ballistics is the technology that makes a shot lead a moving
+  target, which is the open half of issue #3. The Imperial Age *is*
+  researchable (tech 103, from the tree), and every building already has its
+  Imperial art, but nothing else above the Castle Age exists yet.
 - **A monk carries no relic, and a monastery holds none.** Relics are named in
   the omitted scope; a monk that could pick one up would need the relic entity,
   the carry state, and the gold trickle.
