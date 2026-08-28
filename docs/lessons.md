@@ -235,6 +235,19 @@ keeps the record.
   the decision; and give a staged scene a stationary observer so visibility is
   never the variable under test.
 
+- **Look upstream of the symptom, three times if necessary.** Four of sixteen
+  matches were drawing, so the obvious reading was "the armies are too small
+  to finish" and two rounds of tuning went into army size and farm counts,
+  changing nothing. Tracing one stalled match showed neither side had trained
+  a *single* soldier in thirty minutes, and no barracks until minute twenty --
+  because the population sat at 5/5 for the first four minutes, because
+  housing was only bought when one place was left, because the opening two
+  hundred wood had gone on a camp. The fix was in the first thirty seconds of
+  the match, four causal steps above where the problem showed. Rule: when a
+  measure does not move, stop adjusting the thing you think causes it and
+  print the actual state over time; the answer is usually earlier and duller
+  than the theory.
+
 - **A strategy change that improves one number can silently break the game it
   plays.** Teaching the example AI to age up worked -- sixteen of sixteen
   matches reached the Feudal Age where none had before -- and it also stopped
