@@ -2019,3 +2019,46 @@ describe('what a razing leaves behind', () => {
     }
   });
 });
+
+describe('a tower has a minimum range, and Murder Holes takes it away', () => {
+  const towerAndVictim = (murderHoles: boolean) => {
+    const state = createGame(93, importedRules!);
+    state.players[1].age = 2;
+    if (murderHoles) state.players[1].researched.push('murder-holes');
+    const rules = state.rules.buildings['watch-tower'];
+    const tower: Entity = {
+      id: state.nextId++, kind: 'watch-tower', owner: 1, position: { x: 62.5, y: 62.5 },
+      hp: rules.hp, maxHp: rules.hp, radius: rules.radius,
+      activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(tower);
+    const victim = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
+    // Stood against the wall, inside the DAT's one-tile minimum.
+    victim.position = { x: 63.2, y: 62.5 };
+    victim.hp = 100_000;
+    victim.maxHp = 100_000;
+    const before = victim.hp;
+    for (let i = 0; i < 600; i++) {
+      stepGame(state);
+      victim.position = { x: 63.2, y: 62.5 };
+    }
+    return before - victim.hp;
+  };
+
+  it('will not shoot somebody stood against its wall', () => {
+    if (!importedRules) return;
+    // The DAT gives a watch tower and a castle a tile of minimum range, and
+    // nothing read it: `tooClose` answered false for every building.
+    expect(importedRules.buildings['watch-tower'].attack?.minRange).toBe(1);
+    expect(towerAndVictim(false)).toBe(0);
+  });
+
+  it('shoots them once Murder Holes is researched', () => {
+    if (!importedRules) return;
+    const holes = importedRules.technologies['murder-holes'];
+    expect(holes, 'Murder Holes is not researchable').toBeDefined();
+    expect(holes.effects.some(e => e.unit === 'watch-tower' && e.attribute === 'minRange'
+      && e.operation === 'set' && e.amount === 0)).toBe(true);
+    expect(towerAndVictim(true)).toBeGreaterThan(0);
+  });
+});

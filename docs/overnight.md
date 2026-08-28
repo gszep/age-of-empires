@@ -252,10 +252,22 @@ meanwhile is its own alert however loud the first was; and a thing left alone
 for the window and then hit again speaks up. Three tests, one per case, and the
 old test that asserted the nagging now asserts the silence.
 
-### N8. Whatever the tech tree left
+### N8. Whatever the tech tree left — **done**
 
-Phase 2 covers the blacksmith and university lines. This item is the sweep for
-what P2.4's cut excluded and can now be included.
+The sweep over the twenty-one technologies excluded for "none of its effects
+reach anything imported" found exactly one that could be reached — Murder
+Holes — and two defects in what had already shipped. `buildingRulesFor`
+applied hit points alone, so Arrowslits and Heated Shot imported correctly and
+then did nothing; and `tooClose` answered false for every building, so the tile
+of minimum range the DAT gives a watch tower and a castle was never enforced.
+Buildings now read attacks, armour, ranges and sight through research, a tower
+will not shoot somebody stood against its wall, and Murder Holes is the
+fifty-first technology.
+
+The other twenty are genuinely out of reach and stay recorded with their
+reasons: farm food (Horse Collar, Heavy Plow), market fees (Coinage, Banking,
+Guilds), monk healing and conversion (Devotion, Faith, Herbal Medicine,
+Sanctity, Illumination, Block Printing), garrisoning, and the dock's.
 
 ### N1. Teach the built-in AI to age up
 

@@ -135,6 +135,11 @@ export interface BuildingRules {
     launchHeight: number;
     /** As `UnitRules.accuracyPercent`; a tower and a castle are both 100. */
     accuracyPercent?: number;
+    /**
+     * How close is too close. The DAT gives a watch tower and a castle a tile
+     * of it, and Murder Holes is the technology that removes it.
+     */
+    minRange?: number;
   };
 }
 
@@ -262,7 +267,8 @@ export interface TechEffect {
 
 export type TechAttribute =
   | 'hitPoints' | 'lineOfSight' | 'speed' | 'armor' | 'attack'
-  | 'reloadSeconds' | 'accuracyPercent' | 'range' | 'workRate' | 'carryCapacity'
+  | 'reloadSeconds' | 'accuracyPercent' | 'range' | 'minRange'
+  | 'workRate' | 'carryCapacity'
   /** On a projectile: whether the shot leads a moving target. Ballistics. */
   | 'leadsTarget';
 
@@ -726,6 +732,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
           : fallback.attack.attacks,
         reloadSeconds: e[key].combat?.reloadSeconds ?? fallback.attack.reloadSeconds,
         accuracyPercent: e[key].combat?.accuracyPercent ?? fallback.attack.accuracyPercent,
+        minRange: e[key].combat?.minimumRange ?? fallback.attack.minRange,
       },
     };
   };

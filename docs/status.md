@@ -231,7 +231,7 @@ a test, so the game cannot offer something the Britons were never given.
 
 ### Ages and technologies
 
-**Fifty technologies, and the list is the civilisation's own tree.** Three
+**Fifty-one technologies, and the list is the civilisation's own tree.** Three
 were written out by hand here; now a `Research` node in `CivTechTrees/`
 BRITONS.json names the technology, the building it happens at and the age it
 appears in, and the DAT's effect commands say what it does. Nothing is
@@ -252,6 +252,15 @@ Prerequisites come from the DAT too: Iron Casting needs Forging, Bracer needs
 Bodkin Arrow, Hand Cart needs Wheelbarrow. Without them a player could take
 Blast Furnace without ever taking Forging and collect the same bonus for a
 third of the clicks. The command refuses it and the panel does not offer it.
+
+A building reads its own rules through research the way a unit does — hit
+points, line of sight, armour, and every field of its attack. That was worth
+finding: Arrowslits and Heated Shot imported correctly and then landed on
+nothing, because only hit points were being applied. The same sweep found that
+`tooClose` answered false for every building, so the tile of minimum range the
+DAT gives a watch tower and a castle was never enforced and Murder Holes had
+nothing to take away. Both are fixed, and a tower will now not shoot somebody
+stood against its wall until that technology is researched.
 
 The university is built now, and it is the technologies that made it worth
 building: it trains nothing, and Ballistics, Chemistry, Masonry, Architecture,

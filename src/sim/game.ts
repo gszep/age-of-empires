@@ -347,9 +347,11 @@ function applyEffect(rules: UnitRules, effect: TechEffect): void {
 }
 
 /**
- * A building's rules under what its owner has researched. Only hit points move
- * today -- the Castle Age gives a watch tower x1.2 of them -- but the shape is
- * the same as a unit's.
+ * A building's rules under what its owner has researched. The Castle Age gives
+ * a watch tower a fifth more hit points, Arrowslits gives it another arrow,
+ * Heated Shot multiplies what it does to ships, and Murder Holes takes away
+ * the minimum range that stops it shooting somebody stood against its wall --
+ * so this reaches the same attributes a unit's does, not hit points alone.
  */
 export function buildingRulesFor(
   state: GameState, owner: Entity['owner'], kind: BuildingKind,
@@ -361,12 +363,61 @@ export function buildingRulesFor(
   let rules = base;
   for (const key of researched) {
     for (const effect of state.rules.technologies[key]?.effects ?? []) {
-      if (effect.unit !== kind || effect.attribute !== 'hitPoints') continue;
-      if (rules === base) rules = { ...base };
-      rules.hp = combine(effect.operation, rules.hp, effect.amount);
+      if (effect.unit !== kind) continue;
+      if (rules === base) {
+        rules = {
+          ...base,
+          armors: base.armors.map(a => ({ ...a })),
+          ...(base.attack ? { attack: { ...base.attack, attacks: base.attack.attacks.map(a => ({ ...a })) } } : {}),
+        };
+      }
+      applyBuildingEffect(rules, effect);
     }
   }
   return rules;
+}
+
+function applyBuildingEffect(rules: BuildingRules, effect: TechEffect): void {
+  const armorClass = effect.armorClass ?? 0;
+  switch (effect.attribute) {
+    case 'hitPoints': rules.hp = combine(effect.operation, rules.hp, effect.amount); break;
+    case 'lineOfSight':
+      rules.lineOfSight = combine(effect.operation, rules.lineOfSight, effect.amount); break;
+    case 'armor': {
+      const existing = rules.armors.find(a => a.class === armorClass);
+      if (existing) existing.amount = combine(effect.operation, existing.amount, effect.amount);
+      else rules.armors.push({ class: armorClass, amount: effect.amount });
+      break;
+    }
+    case 'attack': {
+      if (!rules.attack) break;
+      const existing = rules.attack.attacks.find(a => a.class === armorClass);
+      if (existing) existing.amount = combine(effect.operation, existing.amount, effect.amount);
+      else rules.attack.attacks.push({ class: armorClass, amount: effect.amount });
+      break;
+    }
+    case 'range':
+      if (rules.attack) rules.attack.range = combine(effect.operation, rules.attack.range, effect.amount);
+      break;
+    case 'minRange':
+      if (rules.attack) {
+        rules.attack.minRange = combine(effect.operation, rules.attack.minRange ?? 0, effect.amount);
+      }
+      break;
+    case 'reloadSeconds':
+      if (rules.attack) {
+        rules.attack.reloadSeconds =
+          combine(effect.operation, rules.attack.reloadSeconds, effect.amount);
+      }
+      break;
+    case 'accuracyPercent':
+      if (rules.attack) {
+        rules.attack.accuracyPercent =
+          combine(effect.operation, rules.attack.accuracyPercent ?? 100, effect.amount);
+      }
+      break;
+    default: break;
+  }
 }
 
 /**
@@ -759,7 +810,7 @@ function attackProfile(
   state: GameState, entity: Entity, target: Entity | undefined,
 ): { range: number; projectileSpeed?: number; launchHeight?: number; releaseSeconds?: number } {
   if (!isUnit(entity.kind)) {
-    const attack = state.rules.buildings[entity.kind as BuildingKind].attack;
+    const attack = buildingRulesFor(state, entity.owner, entity.kind as BuildingKind).attack;
     return {
       range: attack?.range ?? 0,
       projectileSpeed: attack?.projectileSpeed,
@@ -784,10 +835,15 @@ function attackRange(state: GameState, entity: Entity, target?: Entity): number 
 const inAttackRange = (state: GameState, entity: Entity, target: Entity): boolean =>
   inRange(entity, target, 0.35 + attackRange(state, entity, target));
 
-/** Nearer than a shooter's minimum range, where its shot has nowhere to go. */
+/**
+ * Nearer than a shooter's minimum range, where its shot has nowhere to go.
+ * A tower has one too -- the DAT gives a watch tower and a castle a tile of it
+ * -- which is exactly what Murder Holes exists to take away.
+ */
 function tooClose(state: GameState, entity: Entity, target: Entity): boolean {
-  if (!isUnit(entity.kind)) return false;
-  const minimum = state.rules.units[entity.kind as UnitKind].minRange ?? 0;
+  const minimum = isBuilding(entity.kind)
+    ? buildingRulesFor(state, entity.owner, entity.kind).attack?.minRange ?? 0
+    : state.rules.units[entity.kind as UnitKind]?.minRange ?? 0;
   return minimum > 0 && inRange(entity, target, minimum);
 }
 
@@ -900,7 +956,9 @@ export function computeDamage(attacks: AttackValue[], armors: AttackValue[]): nu
 
 function armorsOf(state: GameState, entity: Entity): AttackValue[] {
   if (isUnit(entity.kind)) return unitRulesFor(state, entity.owner, entity.kind as UnitKind).armors;
-  if (isBuilding(entity.kind)) return state.rules.buildings[entity.kind as BuildingKind].armors;
+  if (isBuilding(entity.kind)) {
+    return buildingRulesFor(state, entity.owner, entity.kind as BuildingKind).armors;
+  }
   return [];
 }
 
@@ -1396,7 +1454,7 @@ function releaseAttack(
  */
 function accuracyOf(state: GameState, shooter: Entity): number {
   if (isBuilding(shooter.kind)) {
-    return state.rules.buildings[shooter.kind].attack?.accuracyPercent ?? 100;
+    return buildingRulesFor(state, shooter.owner, shooter.kind).attack?.accuracyPercent ?? 100;
   }
   return unitRulesFor(state, shooter.owner, shooter.kind as UnitKind)?.accuracyPercent ?? 100;
 }
@@ -1544,7 +1602,7 @@ function autoAcquire(state: GameState, entity: Entity): void {
  * attacker loop without the approach.
  */
 function updateTower(state: GameState, entity: Entity): void {
-  const attack = state.rules.buildings[entity.kind as BuildingKind].attack;
+  const attack = buildingRulesFor(state, entity.owner, entity.kind as BuildingKind).attack;
   if (!attack || entity.buildProgress !== undefined) return;
   let target: Entity | undefined;
   let bestDistance = Infinity;
@@ -1555,7 +1613,8 @@ function updateTower(state: GameState, entity: Entity): void {
   if (entity.order.kind === 'attack') {
     const ordered = state.entities.find(e => e.id === (entity.order as { targetId: number }).targetId && !e.dead);
     const reachable = ordered
-      && distance(entity.position, ordered.position) - ordered.radius <= entity.radius + attack.range;
+      && distance(entity.position, ordered.position) - ordered.radius <= entity.radius + attack.range
+      && !tooClose(state, entity, ordered);
     if (ordered && reachable) {
       target = ordered;
     } else if (!ordered) {
@@ -1571,6 +1630,9 @@ function updateTower(state: GameState, entity: Entity): void {
     const outranks = isUnit(candidate.kind) && target && !isUnit(target.kind);
     const d = distance(entity.position, candidate.position) - candidate.radius;
     if (d > entity.radius + attack.range) continue;
+    // ...and not somebody stood against the wall, inside the minimum range
+    // the DAT gives a tower. Murder Holes is the technology that removes it.
+    if (tooClose(state, entity, candidate)) continue;
     if (outranks || d < bestDistance - 1e-9 || (Math.abs(d - bestDistance) <= 1e-9 && (target?.id ?? Infinity) > candidate.id)) {
       target = candidate;
       bestDistance = d;

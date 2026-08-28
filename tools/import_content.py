@@ -577,6 +577,9 @@ ATTRIBUTE_NAMES = {
     12: "range",
     13: "workRate",
     14: "carryCapacity",
+    # How close is too close. A watch tower and a castle each have a tile of
+    # it, and Murder Holes is one `set` of this to zero.
+    20: "minRange",
     # On a projectile, whether the shot leads a moving target. Ballistics is
     # one `set` of this and nothing else.
     19: "leadsTarget",
