@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { checksumState } from './checksum';
 import { FALLBACK_RULES } from './data';
@@ -206,5 +208,44 @@ describe('black forest', () => {
 
   it('refuses a map type nobody defined', () => {
     expect(() => createGame(1, FALLBACK_RULES, undefined, 'atlantis')).toThrow(/unknown map/);
+  });
+});
+
+describe('a painted map', () => {
+  // C1 (docs/map-build-plan.md): the whole conditioning architecture proved
+  // with a hand-painted PNG -- offline image in, committed descriptor out,
+  // playable board from a pure function of (descriptor, seed).
+  it('lays the painted terrain down as the board, tile for tile', () => {
+    const state = createGame(7, FALLBACK_RULES, undefined, 'painted-proof');
+    const baked = JSON.parse(
+      readFileSync('src/sim/maps/painted-proof.json', 'utf8')) as { terrain: number[] };
+    expect(state.terrain).toEqual(baked.terrain);
+    const treeTiles = new Set(state.entities
+      .filter(e => e.kind === 'resource' && e.resourceKind === 'wood')
+      .map(e => Math.floor(e.position.y) * state.width + Math.floor(e.position.x)));
+    let missing = 0;
+    for (let tile = 0; tile < baked.terrain.length; tile++) {
+      if (baked.terrain[tile] === 10 && !treeTiles.has(tile)) missing++;
+    }
+    // A painted forest tile is a tree unless something already stood there.
+    expect(missing).toBeLessThan(5);
+    expect(treeTiles.size).toBeGreaterThan(2000);
+  });
+
+  it('records what it was painted from, verifiably', () => {
+    const descriptor = JSON.parse(readFileSync('src/sim/maps/painted-proof.json', 'utf8')) as {
+      source: { file: string; sha256: string };
+    };
+    const painted = readFileSync(`tools/maps/${descriptor.source.file}`);
+    expect(createHash('sha256').update(painted).digest('hex')).toBe(descriptor.source.sha256);
+  });
+
+  it('gives the same checksum for the same descriptor and seed', () => {
+    const play = () => {
+      const state = createGame(13, FALLBACK_RULES, undefined, 'painted-proof');
+      for (let i = 0; i < 200; i++) stepGame(state);
+      return checksumState(state);
+    };
+    expect(play()).toBe(play());
   });
 });

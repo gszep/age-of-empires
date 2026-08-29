@@ -19,6 +19,7 @@
  * in whole tiles; game.ts owns turning placements into entities.
  */
 import type { NodeKind } from './data';
+import paintedProof from './maps/painted-proof.json';
 import { random01 } from './random';
 import type { AnimalKind, Point } from './types';
 
@@ -81,6 +82,15 @@ export interface MapDescriptor {
   road?: { width: number };
   playerForest?: ForestSpec;
   neutral?: NeutralSpec;
+  /**
+   * A fixed terrain layer, produced offline (tools/paint_map.py) and
+   * committed beside the rules: geography is data the generator reads, not
+   * something it invents. When present it replaces the grown terrain -- and,
+   * like DE's own Real World maps, it is deliberately *not* mirrored; only
+   * the object pass is. The descriptor records the hash of what it was
+   * painted from.
+   */
+  baked?: { width: number; height: number; terrain: number[] };
   opening: ObjectGroupSpec[];
 }
 
@@ -137,6 +147,13 @@ export const BLACK_FOREST: MapDescriptor = {
 export const MAPS: Record<string, MapDescriptor> = {
   arabia: ARABIA,
   'black-forest': BLACK_FOREST,
+  // The proof that a painted image is a playable board: a wooded river with
+  // one ford, from tools/maps/painted-proof.png through tools/paint_map.py.
+  'painted-proof': {
+    base: 'grass',
+    baked: paintedProof,
+    opening: ARABIA.opening,
+  },
 };
 
 /** What the generator needs from the game: its RNG stream, whether a tile
@@ -393,13 +410,31 @@ export function generateMap(
     return seeds;
   };
 
+  // A baked terrain layer is the geography, laid down whole and unmirrored,
+  // exactly as DE's own Real World maps fix the ground and randomise only the
+  // objects. The random object pass below still mirrors, which is what keeps
+  // the paired evaluation fair on ground that is not.
+  if (descriptor.baked) {
+    const baked = descriptor.baked;
+    for (let y = 0; y < Math.min(ctx.height, baked.height); y++) {
+      for (let x = 0; x < Math.min(ctx.width, baked.width); x++) {
+        const id = baked.terrain[y * baked.width + x];
+        const tile = y * ctx.width + x;
+        terrain[tile] = id;
+        if (id !== TERRAIN_FOREST) continue;
+        const here = tileCentre(x, y);
+        if (ctx.free(here)) ctx.place('tree', here);
+      }
+    }
+  }
+
   // The forest mask for the scanning half; its mirror fills the other. On a
   // grass base the woods are grown onto it; on a forest base the whole half
   // is wood and the player's clearing and the road are carved out of it.
   const mask = new Uint8Array(ctx.width * ctx.height);
   const halfWidth = Math.floor(ctx.width / 2);
 
-  if (descriptor.base === 'forest' && descriptor.land) {
+  if (!descriptor.baked && descriptor.base === 'forest' && descriptor.land) {
     // The clearing: one land grown from the player's origin, kept off the
     // centreline by half the avoidance distance -- under exact mirroring
     // that *is* the distance to the other land's zone.
