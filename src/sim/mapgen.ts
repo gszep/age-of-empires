@@ -55,8 +55,22 @@ export interface ForestSpec {
   groupSpacing: number;
 }
 
+export interface NeutralSpec {
+  /** The middle of the map: neutral wood at the owned Arabia's density
+   * (~8% of the board in a dozen clumps, kept off the start areas by the
+   * script's own probabilistic fade rather than a hard radius). Counts are
+   * per half; every placement is mirrored. */
+  forest: { tiles: number; clumps: number };
+  /** Lone trees scattered over open ground, per half. */
+  stragglers: number;
+  /** `set_avoid_player_start_areas`: rejection chance is
+   * `(radius - distance) * fade`, capped at 101, per start. */
+  avoid: { radius: number; fade: number };
+}
+
 export interface MapDescriptor {
   playerForest: ForestSpec;
+  neutral: NeutralSpec;
   opening: ObjectGroupSpec[];
 }
 
@@ -70,6 +84,11 @@ export const ARABIA: MapDescriptor = {
   // PLAYER_FOREST (55 tiles x 2 clumps); spacing between them borrows the DE
   // script's forest spacing of 6, which the include does not state.
   playerForest: { tiles: 55, groups: 2, near: 14, far: 26, groupSpacing: 6 },
+  // The owned Arabia's global forest is 6-10% of the board in 10-14 clumps,
+  // avoiding start areas; with the two spawn woods that lands total tree
+  // cover at the script's own ~8%. Stragglers are the classic thirty lone
+  // trees at map scale, fifteen a half.
+  neutral: { forest: { tiles: 460, clumps: 6 }, stragglers: 15, avoid: { radius: 18, fade: 10 } },
   opening: [
     { kind: 'berries', count: 6, near: 10, far: 12, grouping: 'tight', groupSpacing: 6 },
     { kind: 'gold', count: 7, near: 12, far: 16, grouping: 'tight', groupSpacing: 7 },
@@ -111,10 +130,15 @@ const tileCentre = (x: number, y: number): Point => ({ x: x + 0.5, y: y + 0.5 })
 function candidateOrder(
   ctx: MapgenContext, centre: Point, far: number,
 ): number[] {
-  const minX = Math.max(0, Math.floor(centre.x) - far);
-  const minY = Math.max(0, Math.floor(centre.y) - far);
-  const maxX = Math.min(ctx.width - 1, Math.floor(centre.x) + far);
-  const maxY = Math.min(ctx.height - 1, Math.floor(centre.y) + far);
+  return candidateOrderBox(ctx,
+    Math.max(0, Math.floor(centre.x) - far), Math.max(0, Math.floor(centre.y) - far),
+    Math.min(ctx.width - 1, Math.floor(centre.x) + far),
+    Math.min(ctx.height - 1, Math.floor(centre.y) + far));
+}
+
+function candidateOrderBox(
+  ctx: MapgenContext, minX: number, minY: number, maxX: number, maxY: number,
+): number[] {
   const stamp = new Map<number, number>();
   let sequence = 0;
   for (let y = minY; y <= maxY; y++) {
@@ -183,40 +207,53 @@ const lessThan = (a: FrontierNode, b: FrontierNode): boolean =>
 const STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 
 /**
- * Grow one clump of `tiles` tiles from a seed, the original's way: the
- * frontier is popped cheapest-first, and a tile with more same-mask
- * neighbours in its 5x5 is cheaper, so `clumping` decides how round the blob
- * comes out. The default 20 is the scripts' own default clumping factor.
+ * Grow clumps to a shared tile budget, the original's way: one tile per clump
+ * per outer pass, so clumps racing for the same ground advance at the same
+ * rate; each clump's frontier pops cheapest-first, and a tile with more
+ * same-mask neighbours in its 5x5 is cheaper, so `clumping` decides how round
+ * the blobs come out (20 is the scripts' own default). A rejected pop --
+ * occupied ground, or a failed avoid-start-area roll -- consumes that clump's
+ * turn, exactly as the engine's does.
  */
-function growMask(
-  ctx: MapgenContext, mask: Uint8Array, seed: { x: number; y: number },
+function growClumps(
+  ctx: MapgenContext, mask: Uint8Array, seeds: { x: number; y: number }[],
   tiles: number, accept: (x: number, y: number) => boolean, clumping = 20,
 ): number {
-  const frontier = new Frontier();
-  frontier.push(seed.x, seed.y, 0);
+  const frontiers = seeds.map(seed => {
+    const frontier = new Frontier();
+    frontier.push(seed.x, seed.y, 0);
+    return frontier;
+  });
   let placed = 0;
-  while (placed < tiles && frontier.size) {
-    const next = frontier.pop()!;
-    const tile = next.y * ctx.width + next.x;
-    if (mask[tile]) continue;
-    if (!accept(next.x, next.y)) continue;
-    mask[tile] = 1;
-    placed++;
-    let neighbours = 1;
-    for (let dy = -2; dy <= 2; dy++) {
-      for (let dx = -2; dx <= 2; dx++) {
+  let grew = true;
+  while (placed < tiles && grew) {
+    grew = false;
+    for (const frontier of frontiers) {
+      if (placed >= tiles) break;
+      const next = frontier.pop();
+      if (!next) continue;
+      grew = true;
+      const tile = next.y * ctx.width + next.x;
+      if (mask[tile]) continue;
+      if (!accept(next.x, next.y)) continue;
+      mask[tile] = 1;
+      placed++;
+      let neighbours = 1;
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const nx = next.x + dx;
+          const ny = next.y + dy;
+          if (nx < 0 || ny < 0 || nx >= ctx.width || ny >= ctx.height) continue;
+          if (mask[ny * ctx.width + nx]) neighbours++;
+        }
+      }
+      const cost = 250 - clumping * neighbours;
+      for (const [dx, dy] of STEPS) {
         const nx = next.x + dx;
         const ny = next.y + dy;
         if (nx < 0 || ny < 0 || nx >= ctx.width || ny >= ctx.height) continue;
-        if (mask[ny * ctx.width + nx]) neighbours++;
+        if (!mask[ny * ctx.width + nx]) frontier.push(nx, ny, cost + randInt(ctx.rng, 100));
       }
-    }
-    const cost = 250 - clumping * neighbours;
-    for (const [dx, dy] of STEPS) {
-      const nx = next.x + dx;
-      const ny = next.y + dy;
-      if (nx < 0 || ny < 0 || nx >= ctx.width || ny >= ctx.height) continue;
-      if (!mask[ny * ctx.width + nx]) frontier.push(nx, ny, cost + randInt(ctx.rng, 100));
     }
   }
   return placed;
@@ -296,30 +333,69 @@ export function generateMap(
 ): { terrain: number[] } {
   const terrain = new Array<number>(ctx.width * ctx.height).fill(TERRAIN_GRASS);
   const start = starts[0];
-
-  // The spawn woods. Grown as masks so the shape is the original's, placed as
-  // tree entities so the resource model is unchanged.
-  const forest = descriptor.playerForest;
-  const mask = new Uint8Array(ctx.width * ctx.height);
   const freeBoth = (x: number, y: number): boolean => {
     const here = tileCentre(x, y);
     return ctx.free(here) && ctx.free(mirror(here));
   };
-  let candidates = candidateOrder(ctx, start, forest.far);
-  let woods = 0;
-  for (const tile of candidates) {
-    if (woods >= forest.groups) break;
-    const x = tile % ctx.width;
-    const y = Math.floor(tile / ctx.width);
-    if (tooClose(starts, x, y, forest.near)) continue;
-    if (!freeBoth(x, y) || mask[tile]) continue;
-    const before = mask.slice();
-    const grown = growMask(ctx, mask, { x, y }, forest.tiles,
-      (gx, gy) => freeBoth(gx, gy) && !tooClose(starts, gx, gy, forest.near));
-    if (grown < forest.tiles / 2) { mask.set(before); continue; }
-    candidates = clearAround(candidates, ctx.width, x, y, forest.groupSpacing);
-    woods++;
+
+  // The avoid-start-areas field: `(radius - distance) * fade` per start,
+  // capped at 101, rolled against random(100) -- so a wood thins out towards
+  // a town center rather than stopping at a line.
+  const avoid = descriptor.neutral.avoid;
+  const startField = new Uint8Array(ctx.width * ctx.height);
+  for (let y = 0; y < ctx.height; y++) {
+    for (let x = 0; x < ctx.width; x++) {
+      let modifier = 0;
+      for (const s of starts) {
+        const reach = Math.floor(avoid.radius - Math.hypot(x + 0.5 - s.x, y + 0.5 - s.y));
+        if (reach > 0) modifier += reach * avoid.fade;
+      }
+      startField[y * ctx.width + x] = Math.min(101, modifier);
+    }
   }
+
+  /** Pop seed tiles from a candidate order, keeping them `separation` apart. */
+  const pickSeeds = (
+    order: number[], count: number, separation: number,
+    ok: (x: number, y: number) => boolean,
+  ): { x: number; y: number }[] => {
+    const seeds: { x: number; y: number }[] = [];
+    let candidates = order;
+    for (const tile of candidates) {
+      if (seeds.length >= count) break;
+      const x = tile % ctx.width;
+      const y = Math.floor(tile / ctx.width);
+      if (!ok(x, y)) continue;
+      seeds.push({ x, y });
+      candidates = clearAround(candidates, ctx.width, x, y, separation);
+    }
+    return seeds;
+  };
+
+  // The woods, grown as masks so the shape is the original's and placed as
+  // tree entities so the resource model is unchanged. The spawn woods sit in
+  // the player band; the neutral wood is the middle of the map, seeded over
+  // the scanning half (its mirror fills the other) and faded off the starts.
+  const forest = descriptor.playerForest;
+  const mask = new Uint8Array(ctx.width * ctx.height);
+  const playerSeeds = pickSeeds(
+    candidateOrder(ctx, start, forest.far), forest.groups, forest.groupSpacing,
+    (x, y) => !tooClose(starts, x, y, forest.near) && freeBoth(x, y));
+  growClumps(ctx, mask, playerSeeds, forest.tiles * forest.groups,
+    (x, y) => freeBoth(x, y) && !tooClose(starts, x, y, forest.near));
+
+  const neutral = descriptor.neutral;
+  const halfWidth = Math.floor(ctx.width / 2);
+  const separation = Math.floor(2 * Math.sqrt(neutral.forest.tiles / neutral.forest.clumps));
+  const inHalf = (x: number, y: number): boolean =>
+    x < halfWidth && freeBoth(x, y)
+    && startField[y * ctx.width + x] <= randInt(ctx.rng, 100);
+  const neutralSeeds = pickSeeds(
+    candidateOrderBox(ctx, 0, 0, halfWidth - 1, ctx.height - 1),
+    neutral.forest.clumps, separation,
+    (x, y) => !mask[y * ctx.width + x] && inHalf(x, y));
+  growClumps(ctx, mask, neutralSeeds, neutral.forest.tiles, inHalf);
+
   cleanMask(mask, ctx.width, ctx.height, freeBoth);
   for (let tile = 0; tile < mask.length; tile++) {
     if (!mask[tile]) continue;
@@ -329,6 +405,34 @@ export function generateMap(
     terrain[tile] = TERRAIN_FOREST;
     const other = mirror(here);
     terrain[Math.floor(other.y) * ctx.width + Math.floor(other.x)] = TERRAIN_FOREST;
+  }
+
+  // Lone trees over the open ground, the classic thirty oaks at map scale. A
+  // straggler keeps two clear tiles from every other tree: one tile of gap
+  // beside a wood reads as a pinhole and walks like one, and the engine's
+  // cleaner only mends terrain, never objects.
+  const nearTree = (x: number, y: number): boolean => {
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= ctx.width || ny >= ctx.height) continue;
+        if (mask[ny * ctx.width + nx]) return true;
+      }
+    }
+    return false;
+  };
+  let stragglers = 0;
+  for (const tile of candidateOrderBox(ctx, 0, 0, halfWidth - 1, ctx.height - 1)) {
+    if (stragglers >= neutral.stragglers) break;
+    const x = tile % ctx.width;
+    const y = Math.floor(tile / ctx.width);
+    if (mask[tile] || nearTree(x, y) || !inHalf(x, y)) continue;
+    mask[tile] = 1; // so the next straggler keeps its distance too
+    const here = tileCentre(x, y);
+    ctx.place('tree', here);
+    ctx.place('tree', mirror(here));
+    stragglers++;
   }
 
   // The opening objects, one candidate scan per line.

@@ -2158,6 +2158,10 @@ describe('what a shot is aimed at', () => {
       const state = createGame(84, importedRules);
       state.players[1].age = 2;
       if (ballistics) state.players[1].researched.push('ballistics');
+      // The duel needs open ground, and the middle of the map now holds the
+      // neutral wood: clear the range and the walking line.
+      state.entities = state.entities.filter(e => !(e.kind === 'resource'
+        && Math.abs(e.position.x - 62) < 9 && Math.abs(e.position.y - 62) < 12));
       const towerRules = state.rules.buildings['watch-tower'];
       const tower: Entity = {
         id: state.nextId++, kind: 'watch-tower', owner: 1, position: { x: 60.5, y: 60.5 },

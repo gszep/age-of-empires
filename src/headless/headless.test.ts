@@ -13,7 +13,9 @@ describe('headless matches', () => {
     );
     expect(result.winner).toBe(2);
     expect(validateMatchResult(result), explain(validateMatchResult)).toBe(true);
-  });
+    // The invariant is the 1800 sim-second cap above; the wall clock only has
+    // to fit a ~27-sim-minute win simulated under the whole suite's load.
+  }, 90_000);
 
   it('is deterministic for the same seed and strategies', async () => {
     const config = { version: 1 as const, seed: 21, maxTimeSeconds: 120 };

@@ -351,9 +351,17 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   // A drop site beside whatever is being gathered furthest from home.
   /** The nearest known node of a resource, and how far it is from a drop site. */
   const supply = (resource: ResourceKind) => {
-    const node = known
+    const nodes = known
       .filter(e => e.kind === 'resource' && e.resource === resource && (e.amount ?? 0) > 0)
-      .sort((a, b) => distance(tc ?? a, a) - distance(tc ?? b, b) || a.id - b.id)[0];
+      .sort((a, b) => distance(tc ?? a, a) - distance(tc ?? b, b) || a.id - b.id);
+    // A lumber camp goes by a *wood*. The map scatters lone trees, and a camp
+    // anchored on the nearest one -- a hundred wood, then nothing -- starved
+    // the whole military opening: measured, no barracks in thirty minutes.
+    // A real wood is a tree with company.
+    const node = resource === 'wood'
+      ? nodes.find(n =>
+        nodes.filter(o => o !== n && Math.abs(o.x - n.x) <= 4 && Math.abs(o.y - n.y) <= 4).length >= 4)
+      : nodes[0];
     if (!node) return undefined;
     const walk = mine
       .filter(e => (BANKS[e.kind] ?? []).includes(resource) && (e.buildProgress ?? 1) >= 1)

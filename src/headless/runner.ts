@@ -56,6 +56,11 @@ export async function runMatch(
       if (state.tick % CHECKSUM_INTERVAL_TICKS === 0 || state.winner) {
         checksums.push({ tick: state.tick, hash: checksumState(state) });
       }
+      // Await only ever reaches the microtask queue, so a long match is one
+      // unbroken block of CPU to the event loop -- and under vitest that
+      // starves the worker's RPC until the run is flagged failed with every
+      // test green. A real yield every ~100 sim-seconds costs nothing.
+      if (state.tick % 2048 === 0) await new Promise(resolve => setImmediate(resolve));
     }
   } finally {
     await Promise.all([strategies[1].stop?.(), strategies[2].stop?.()]);

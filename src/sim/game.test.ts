@@ -157,16 +157,21 @@ describe('simulation', () => {
     expect(chase(91)).toBe(chase(91));
   });
 
-  it('lets the example AI finish a match against a passive opponent', () => {
+  it('lets the example AI finish a match against a passive opponent', async () => {
     const state = createGame(7);
     for (let i = 0; i < 40_000 && !state.winner; i++) {
       if (i % 10 === 0) {
         for (const command of exampleAiCommands(observe(state, 2))) applyCommand(state, command);
       }
       stepGame(state);
+      // A macrotask yield now and then keeps the vitest worker's RPC alive
+      // through a minute of pure simulation.
+      if (i % 2048 === 0) await new Promise(resolve => setImmediate(resolve));
     }
     expect(state.winner).toBe(2);
-  });
+    // 40,000 ticks is the sim-time bound; the wall clock just has to simulate
+    // them while the rest of the suite runs beside it.
+  }, 90_000);
 
   it('rejects invalid commands with a diagnostic reason', () => {
     const state = createGame();
