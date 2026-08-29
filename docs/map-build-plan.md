@@ -189,3 +189,34 @@ middle and the ragged forest interiors — should be closed by M1 and M3, so clo
 them and say by what), new operational facts in `lessons.md`, and this file
 marked with where the queue actually got to. Then the hygiene pass: list what is
 still running, kill the litter, name what deliberately survives.
+
+## Where the run got to (2026-08-29, at dawn)
+
+The whole ladder, including the thing to be greedy for:
+
+- **M1+M2** — commit `fbd277a`. Growth + `cleanTerrain` + candidate scan,
+  from the owned scripts (found in `depot_813784/.../drs/gamedata_x2/`, not
+  the empty `random-map-scripts` directory). 16/16 paired batch, 0 replay
+  failures. The real bands exposed two structural traps in the example AI
+  (assignment never reached a newly-scouted resource; the mining camp spent
+  the lumber camp's wood) — both fixed and written into `ai.ts`'s comments.
+- **M3** — `3230b63`. The neutral wood at the owned Arabia's ~8%, stragglers,
+  start-area fade. Relics deliberately not placed (no art, no monk pickup —
+  in `backlog.md`).
+- **M4** — `1787b53`. Black Forest from a descriptor at the owned script's
+  own numbers; the road is provably the only route (flood-fill test); map
+  types ride in the match record.
+- **C1** — `39aa106`. The painted-PNG proof: `tools/paint_map.py`,
+  `painted-proof` map, descriptor hashes its source.
+- **C2** — `b280844`. `tools/import_terrain.py`, Britain first: the EA WCS
+  endpoints answer plain HTTP (the go-and-find-out item — no portal needed),
+  and the `senlac` map is the real ground at Battle, East Sussex. The ridge
+  is in the descriptor's elevation field; the renderer cannot draw it yet
+  (M5 stands deferred; recorded in `status.md` and `backlog.md`).
+- **C3+** — not started, as the plan predicted. The bias hook has no user
+  until the global classification backend exists; both are in `backlog.md`.
+
+Also closed on the way in, because `bug` issues outrank this file: #29 (town
+watch), #30 (the trebuchet's atlas past the GPU's texture limit, and its
+rock), #31 (the stuck-key camera). After the ladder, the run went back to
+`overnight.md`'s Q1/Q2 (the strategy that can finish, and the blacksmith).

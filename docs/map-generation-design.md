@@ -296,3 +296,31 @@ view subsystem, not a map one.
 4. **Checksum churn.** A terrain grid is hashed by `canonicalSnapshot`, and M2
    changes every map on every seed. Both invalidate stored replays. Better to
    take that once, with M1 and M2 landing together, than twice.
+
+## What the build found (2026-08-29, the run that built it)
+
+M1-M4 are built (`src/sim/mapgen.ts`), and the run corrected this note in
+four places worth keeping:
+
+- **The owned scripts are not where this note said.** The depot's
+  `resources/_common/random-map-scripts` directory exists and is empty; the
+  real scripts live in `depot_813784/resources/_common/drs/gamedata_x2/` —
+  DE-era `Arabia.rms` (biome themes, 1756 lines), `Black_Forest.rms`, and the
+  same `land_resources.inc` the OPENING numbers came from. The DE Arabia
+  global forest is 6-10% of the map in 10-14 clumps at spacing 6; the 12%/10
+  clumps quoted above was the 1999 public copy's reading.
+- **Black Forest's clearing is stated, not guessed:** `create_player_lands`
+  with `land_percent 44` shared across players, `base_size 14` with
+  `set_circular_base`, `clumping_factor 2`, avoidance 6 — a stamped round
+  core with a soft fringe, which is exactly how it is now implemented. A
+  first attempt growing 3400 tiles from a bare seed wandered into an amoeba;
+  the circular base is not decoration, it is the shape.
+- **Deviations taken and kept:** the mirror stays (named in `status.md`);
+  the road's tiles are reserved against objects, because a gold lump in the
+  one corridor is a wall the script's terrain-repaint would never allow;
+  border tiles take trees, or the map rim is a second road; lone stragglers
+  keep two clear tiles from every other tree, because a one-tile gap beside a
+  wood reads and walks as the pinhole `cleanTerrain` exists to close.
+- **`cleanTerrain` was implemented from the decompiled truth table** (both
+  passes, fixed point) and its guarantees are asserted in `mapgen.test.ts`
+  rather than sampled by eye.

@@ -158,8 +158,11 @@ describe('simulation', () => {
   });
 
   it('lets the example AI finish a match against a passive opponent', async () => {
+    // 48,000 ticks is 40 sim-minutes, the same clock the headless fixture
+    // runs: the invariant is the win, and the Q1 rebalance's boom-first
+    // strategy lands it around minute thirty-five.
     const state = createGame(7);
-    for (let i = 0; i < 40_000 && !state.winner; i++) {
+    for (let i = 0; i < 48_000 && !state.winner; i++) {
       if (i % 10 === 0) {
         for (const command of exampleAiCommands(observe(state, 2))) applyCommand(state, command);
       }
@@ -169,9 +172,9 @@ describe('simulation', () => {
       if (i % 2048 === 0) await new Promise(resolve => setImmediate(resolve));
     }
     expect(state.winner).toBe(2);
-    // 40,000 ticks is the sim-time bound; the wall clock just has to simulate
-    // them while the rest of the suite runs beside it.
-  }, 90_000);
+    // The sim-time bound is above; the wall clock just has to simulate it
+    // while the rest of the suite runs beside it.
+  }, 150_000);
 
   it('rejects invalid commands with a diagnostic reason', () => {
     const state = createGame();

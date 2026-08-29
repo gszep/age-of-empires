@@ -559,3 +559,29 @@ descriptor; neither adds a runtime dependency.
 5. **Whether the public build ships real-world maps at all.** They carry
    attribution obligations and file weight that the open-content fallback does
    not. Recommendation: ship one, with its attribution visible, as the proof.
+
+## What the build found (2026-08-29, the run that built C1 and C2)
+
+- **The EA data needs no portal and no human.** The doc worried the download
+  portal might be interactive; it is, but beside it every layer used here is
+  a WCS 2.0 coverage that answers a plain HTTP GetCoverage with a GeoTIFF
+  subset of any EPSG:27700 bounding box: the LIDAR Composite DTM 1m at
+  `environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wcs`
+  and the Vegetation Object Model 2022 beside it. `tools/import_terrain.py`
+  is the importer; `rasterio` reads the result and was the one new
+  dependency, exactly as predicted.
+- **C1 and C2 are built.** The descriptor's baked-terrain layer is proved by
+  `tools/maps/painted-proof.png` -> `paint_map.py` -> the `painted-proof`
+  map, and the `senlac` map is the registered battlefield at Battle, East
+  Sussex: DTM for the ground, VOM for every wood and hedgerow line, start
+  areas cleared and the clearing recorded, attribution and coverage hashes in
+  the descriptor. Baked ground is deliberately unmirrored — DE's own Real
+  World shape — while the object pass still mirrors.
+- **The relief is in the descriptor and not on the screen.** Elevation
+  renders nowhere yet (M5 stands deferred), so `senlac.json` carries the
+  ridge as quantised levels plus datum and metres-per-level, waiting. The
+  acceptance "the ridge is the real ridge" is met in the data and honestly
+  not in the picture; `status.md` says so.
+- **The global Copernicus/WorldCover backend is not built.** Both AWS COGs
+  answer range reads (checked), so the fallback path is open; Britain-first
+  consumed the night. Recorded in `backlog.md`.

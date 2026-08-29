@@ -39,6 +39,9 @@ export interface PlayerObservation {
   populationCap: number;
   /** 0 is the Dark Age; a completed age technology moves it on. */
   age: number;
+  /** Whether this player's fallow farms re-sow themselves (issue #24). Their
+   * own setting, visible so a strategy can decide without remembering. */
+  autoReseedFarms?: boolean;
   /** Technology keys this player has finished researching. */
   researched: string[];
   entities: ObservedEntity[];

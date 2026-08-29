@@ -77,6 +77,7 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
     populationCap: self.populationCap,
     civilization: self.civilization,
     age: self.age,
+    ...(self.autoReseedFarms !== undefined ? { autoReseedFarms: self.autoReseedFarms } : {}),
     researched: [...self.researched],
     entities,
     memory,

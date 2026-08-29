@@ -13,6 +13,12 @@ export function builtinStrategy(): Strategy {
   return { decide: input => exampleAiCommands(input.observation) };
 }
 
+/** The same AI without its blacksmith: Q2's control, so the two can be run
+ * against each other and the value of the smith measured. */
+export function builtinNoSmithStrategy(): Strategy {
+  return { decide: input => exampleAiCommands(input.observation, { blacksmith: false }) };
+}
+
 export interface SubprocessOptions {
   /**
    * 'sync' (default) waits up to timeoutMs and fails the match on silence.

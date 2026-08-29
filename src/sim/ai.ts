@@ -24,6 +24,12 @@ const distance = (a: { x: number; y: number }, b: { x: number; y: number }) => M
  */
 const ASSIGNMENT: ResourceKind[] = [
   'food', 'wood', 'food', 'gold', 'food', 'wood', 'food', 'food',
+  // The second eight lean wood. The opening split above is tuned for the
+  // Dark Age's eight villagers; every Feudal purchase after it -- barracks,
+  // range, blacksmith, houses, every farm -- prices in wood, and with two
+  // lumberjacks in eight the range arrived at minute eighteen and the
+  // blacksmith never (measured, seed 1).
+  'wood', 'food', 'wood', 'gold', 'food', 'wood', 'food', 'food',
 ];
 
 /**
@@ -61,18 +67,16 @@ const BARRACKS_SPOTS: { x: number; y: number }[] = [
  * a half, so the old spots were inside it once a placement had to be genuinely
  * clear.
  *
- * Six of them, and the number is a decision rather than an oversight. Twelve
- * spots build twelve farms, and twelve farms feed a Castle Age economy on both
- * sides: six of sixteen matches reached the Castle Age and six ran out the
- * thirty-minute clock, because neither side could finish an opponent as rich
- * as itself. Six spots is the balance measured -- every match reaches the
- * Feudal Age, some reach the Castle Age, and fourteen of sixteen still end in
- * a win. What is actually missing is a strategy that can close out a game; see
- * `docs/backlog.md`.
+ * The count is a decision, and it has been measured at both ends: twelve
+ * spots once fed a boom that drew six of sixteen matches at the old
+ * 1800-second clock, six spots starved the Castle Age out of existence. Ten
+ * is the Q1 rebalance's answer, bought together with the blacksmith's
+ * finishing power and the 2400-second measurement clock; the batch
+ * distribution in `status.md` is its evidence.
  */
 const FARM_SPOTS: { x: number; y: number }[] = [
   { x: -4, y: 3 }, { x: -4, y: -2 }, { x: -1, y: 4 }, { x: 3, y: 4 }, { x: -7, y: 3 },
-  { x: -7, y: -2 },
+  { x: -7, y: -2 }, { x: 3, y: -5 }, { x: 6, y: 4 }, { x: 6, y: -5 }, { x: -10, y: 1 },
 ];
 
 /**
@@ -117,11 +121,17 @@ const AGE_UP: { tech: string; food: number; gold: number }[] = [
  * rather than what everything costs.
  */
 const WISH_LIST: {
-  tech: string; at: 'town-center' | 'barracks' | 'archery-range';
+  tech: string; at: 'town-center' | 'barracks' | 'archery-range' | 'blacksmith';
   food: number; wood: number; gold: number;
 }[] = [
   { tech: 'loom', at: 'town-center', food: 0, wood: 0, gold: 50 },
   { tech: 'man-at-arms', at: 'barracks', food: 100, wood: 0, gold: 40 },
+  // The blacksmith lines are the best value in the tree (Q2): +1 attack or
+  // armour for every soldier at once, for the price of two of them.
+  { tech: 'fletching', at: 'blacksmith', food: 100, wood: 0, gold: 50 },
+  { tech: 'forging', at: 'blacksmith', food: 150, wood: 0, gold: 0 },
+  { tech: 'padded-archer-armor', at: 'blacksmith', food: 100, wood: 0, gold: 0 },
+  { tech: 'scale-mail-armor', at: 'blacksmith', food: 100, wood: 0, gold: 0 },
   { tech: 'crossbowman', at: 'archery-range', food: 175, wood: 0, gold: 100 },
 ];
 
@@ -137,14 +147,25 @@ const WISH_LIST: {
  * the strategy held exactly five soldiers and saved for the Castle Age
  * forever. So the floor rises with the age -- an army the age can afford.
  */
-const ARMY_BEFORE_AGE = [5, 14, 16];
+// None in the Dark Age: a barracks that now stands by minute seven bought
+// militia with the Feudal Age's food, and three of them plus the raze gate
+// turned every match into a mutual Dark Age raid decided by minute fifteen.
+// The barracks itself still goes up early -- it is the range's and the
+// man-at-arms' prerequisite -- but the army waits for the age that arms it.
+// Ten in the Feudal Age was never reached: a grinding front keeps the
+// standing army at six or seven for the whole war, so the age fund never
+// started. Measured at six, eight and ten across paired batches: six and
+// eight bought four to ten Castle Ages and four timeout draws each; ten is
+// the decisive setting, and the Castle Age arrives in the won game's tail,
+// where the reseeded farms and the pooled army can finally afford it.
+const ARMY_BEFORE_AGE = [0, 10, 16];
 /**
  * How many villagers to keep, by age. Eight is an opening, not an economy: it
  * is enough to reach the Feudal Age and nowhere near the eight hundred food
  * and two hundred gold the Castle Age wants. AoE2 players keep making them all
  * game; this at least keeps making them each time the age moves on.
  */
-const VILLAGERS_BY_AGE = [8, 14, 20, 20];
+const VILLAGERS_BY_AGE = [8, 18, 22, 22];
 /** How far a resource may be from a drop site before one is worth building. */
 const CAMP_RANGE = 8;
 const CAMPS_PER_RESOURCE = 3;
@@ -170,7 +191,15 @@ const BANKS: Record<string, ResourceKind[]> = {
  * groups of three. It sees only its canonical observation and acts only
  * through public commands.
  */
-export function exampleAiCommands(observation: PlayerObservation): Command[] {
+export interface ExampleAiOptions {
+  /** Q2's control: `false` plays the strategy as it was before the
+   * blacksmith, so the two can be run against each other and measured. */
+  blacksmith?: boolean;
+}
+
+export function exampleAiCommands(
+  observation: PlayerObservation, options: ExampleAiOptions = {},
+): Command[] {
   if (observation.winner) return [];
   const player = observation.player;
   const commands: Command[] = [];
@@ -401,6 +430,12 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   for (const camp of CAMPS) {
     if (observation.wood < CAMP_COST_WOOD || !idleBuilder || !tc) continue;
     if (camp.resource !== 'wood' && !woodIsHandy) continue;
+    // Gold waits for the barracks: the mining camp was a hundred wood the
+    // barracks was waiting for, and pushed it to minute eleven (measured,
+    // seed 1). The mill does not wait -- without it every berry walks
+    // thirteen tiles home, and the Feudal Age slipped from eleven minutes to
+    // nineteen (also measured).
+    if (camp.resource === 'gold' && !barracks) continue;
     const built = mine.filter(e => e.kind === camp.building);
     if (built.length >= CAMPS_PER_RESOURCE) continue;
     // One of each until the barracks is up. Three camps and a mill is four
@@ -428,6 +463,19 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   if (!range && barracks && idleBuilder && observation.age >= 1 && observation.wood >= 175) {
     const spot = clearSpot(RANGE_SPOTS, 1.5);
     if (spot) build('archery-range', spot);
+  }
+
+  // The blacksmith, after the range is up (Q2). Its lines arm the whole army
+  // at once, and the strategy had never seen them: its wish list was three
+  // technologies long against sixty-six researchable.
+  const smith = mine.find(e => e.kind === 'blacksmith');
+  if (options.blacksmith !== false && !smith && range && idleBuilder
+      && observation.age >= 1 && observation.wood >= 150) {
+    // Any spot list will do -- on some boards the range's five candidates
+    // are down to one, and a strategy with no smith buys no technology.
+    const spot = clearSpot(RANGE_SPOTS, 1.5) ?? clearSpot(BARRACKS_SPOTS, 1.5)
+      ?? clearSpot(HOUSE_SPOTS, 1.5);
+    if (spot) build('blacksmith', spot);
   }
 
   if (!barracks && idleBuilder && observation.wood >= 175 && woodIsHandy) {
@@ -470,6 +518,17 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     if (spot) build('farm', spot);
   }
 
+  // Farms go fallow, and the option that re-sows them is off until somebody
+  // asks (issue #24). Nobody had ever asked: by minute thirty-five every
+  // farm spot was spent, food income was zero, and two matches in sixteen
+  // sat at a gold-rich food-dead stalemate until the clock -- measured, gold
+  // banks of 1160 and 1480 beside 164 and 28 food. Ask at the mill the first
+  // time a fallow farm is seen; the toggle stays on for the match.
+  const mill = mine.find(e => e.kind === 'mill' && (e.buildProgress ?? 1) >= 1);
+  if (mill && !observation.autoReseedFarms) {
+    commands.push({ kind: 'reseed', player, buildingId: mill.id, enabled: true });
+  }
+
   // The next age, and whether it is close enough to be worth saving for.
   const nextAge = AGE_UP[observation.age];
   const ageing = nextAge !== undefined && !observation.researched.includes(nextAge.tech);
@@ -487,16 +546,17 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   const wantVillagers = VILLAGERS_BY_AGE[Math.min(observation.age, VILLAGERS_BY_AGE.length - 1)];
   // Spend what the age is not waiting for. Anything on the list it can afford
   // outright, at a building of its own that is standing idle.
-  if (!banking) {
-    for (const want of WISH_LIST) {
-      if (observation.researched.includes(want.tech)) continue;
-      if (observation.food < want.food || observation.wood < want.wood
-        || observation.gold < want.gold) continue;
-      const at = mine.find(e => e.kind === want.at && (e.buildProgress ?? 1) >= 1 && !e.researching);
-      if (!at) continue;
-      commands.push({ kind: 'research', player, buildingId: at.id, tech: want.tech });
-      break; // one at a time: the next decision will pick up the next one
-    }
+  for (const want of WISH_LIST) {
+    if (observation.researched.includes(want.tech)) continue;
+    // Saving for an age is saving food; a technology that costs none of it
+    // -- loom is fifty gold -- is not what the age is waiting for.
+    if (banking && want.food > 0) continue;
+    if (observation.food < want.food || observation.wood < want.wood
+      || observation.gold < want.gold) continue;
+    const at = mine.find(e => e.kind === want.at && (e.buildProgress ?? 1) >= 1 && !e.researching);
+    if (!at) continue;
+    commands.push({ kind: 'research', player, buildingId: at.id, tech: want.tech });
+    break; // one at a time: the next decision will pick up the next one
   }
 
   if (tc && !tc.training && villagers.length < wantVillagers
@@ -513,9 +573,14 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     commands.push({ kind: 'train', player, buildingId: barracks.id, unit: infantry });
   }
   // Archers cost wood and gold rather than food, so they are what a player
-  // saving food for the next age can still afford to build.
+  // saving food for the next age can still afford to build -- but the age
+  // has a gold price too, and forty-five gold an archer drained it exactly
+  // as fast as the food was saved: winners ended matches with nine hundred
+  // food and thirty gold. While banking, the age's gold is spoken for.
+  const goldFree = !banking || nextAge === undefined
+    || observation.gold >= nextAge.gold + 100;
   if (
-    range && (range.buildProgress ?? 1) >= 1 && !range.training &&
+    range && (range.buildProgress ?? 1) >= 1 && !range.training && goldFree &&
     observation.wood >= 25 && observation.gold >= 45 && headroom > 0
   ) {
     commands.push({ kind: 'train', player, buildingId: range.id, unit: 'archer' });
@@ -531,10 +596,22 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
   );
   const enemyTcVisible = known.find(e => e.kind === 'town-center' && e.owner !== 0 && e.owner !== player);
 
+  // March only with an army the age would call one. Three militia marched
+  // the moment they existed, and once the barracks stood by minute seven the
+  // match was a mutual Dark Age raid decided at fourteen minutes -- no
+  // Feudal Age, no technology, no game. A small army stays home and defends.
+  const marchAt = [6, 8, 12][Math.min(observation.age, 2)];
   // Endgame raze: militia alone barely dent a town center (DAT armor), so
-  // once the enemy field is clear, villagers join the demolition.
-  if (enemyTcVisible && army.length >= 3 && enemySoldiers.length === 0) {
-    const razers = villagers.filter(e => e.order !== 'attack');
+  // once the enemy field is clear, villagers join the demolition. Only at
+  // march strength: "no soldiers in sight" across a fogged map once sent
+  // three militia and the whole economy on a fifteen-minute villager rush.
+  if (enemyTcVisible && army.length >= marchAt && enemySoldiers.length === 0) {
+    // The food villagers stay home. Sending the whole economy stopped every
+    // farm for the minutes the town center's twenty-four hundred hit points
+    // take to chew through -- which is exactly when the surplus would have
+    // paid for the Castle Age.
+    const razers = villagers.filter((e, index) =>
+      e.order !== 'attack' && ASSIGNMENT[index % ASSIGNMENT.length] !== 'food');
     if (razers.length) {
       commands.push({
         kind: 'order', player, entityIds: razers.map(e => e.id).sort((a, b) => a - b),
@@ -544,8 +621,22 @@ export function exampleAiCommands(observation: PlayerObservation): Command[] {
     }
   }
 
+  // ...and march in waves, not a trickle. Sending each fresh soldier alone
+  // the moment the standing army passed the threshold fed the enemy's front
+  // line one meal at a time, and two equal economies ground at a fixed front
+  // until the clock (measured: the reseeded farms made the stalemate
+  // immortal). Idle soldiers pool at home until there are enough of them to
+  // matter, then surge together.
   const idleMilitia = militia.filter(e => e.order === 'idle');
-  if (idleMilitia.length && militia.length >= 3) {
+  // A pooled wave of five marches regardless of the total: requiring the
+  // standing army to pass the age threshold first produced forty-minute
+  // standoffs, both armies idle at home, pinned below the threshold by
+  // their own food equilibrium while both town centers stood untouched.
+  // (Two refinements were tried and reverted, both measured: sending idle
+  // soldiers to meet any intruder made every mirror-matched attack repel
+  // perfectly and dropped the batch from 14 decided to 4; reinforcing a push
+  // already under way did not close the one slow siege it was written for.)
+  if (idleMilitia.length >= 5 || (idleMilitia.length && militia.length >= marchAt)) {
     const enemyTc = enemyTcVisible;
     // Anything of theirs that is still standing, nearest first: an army whose
     // only heading was the mirror of its own town center had nowhere to go

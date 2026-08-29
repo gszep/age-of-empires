@@ -411,6 +411,9 @@
     },
     "civilization": {
       "type": "string"
+    },
+    "autoReseedFarms": {
+      "type": "boolean"
     }
   },
   "required": [

@@ -10,7 +10,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { FALLBACK_RULES, rulesFromManifest, type GameRules } from '../sim/data';
 import { runMatch, type Strategy } from './runner';
-import { builtinStrategy, mcpStrategy, subprocessStrategy, websocketStrategy } from './strategies';
+import { builtinNoSmithStrategy, builtinStrategy, mcpStrategy, subprocessStrategy, websocketStrategy } from './strategies';
 import { validateMatchConfig, explain } from '../protocol/validate';
 import type { MatchConfig } from '../protocol/types';
 
@@ -29,6 +29,7 @@ function parseArgs(argv: string[]): Record<string, string> {
 
 function strategyFor(name: string): Strategy {
   if (name === 'builtin') return builtinStrategy();
+  if (name === 'builtin-nosmith') return builtinNoSmithStrategy();
   if (name === 'idle') return { decide: () => [] };
   if (name.startsWith('cmd:')) return subprocessStrategy(name.slice(4));
   if (name.startsWith('deadline-cmd:')) return subprocessStrategy(name.slice(13), { mode: 'deadline', deadlineMs: 100 });

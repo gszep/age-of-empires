@@ -443,3 +443,34 @@ keeps the record.
   waits ends by listing what it left running, and says which processes are
   meant to outlive it — here the Vite dev server and the debug harness — and
   which are litter.
+
+- **The tail-pipe trap reproduced itself one layer up, against the script
+  built to prevent it.** `tools/gate.sh` reads `PIPESTATUS` correctly — and
+  was then run as `tools/gate.sh | tail -3 && git commit`, which hands `&&`
+  the status of `tail`, and a red gate committed and pushed (`39aa106`; every
+  test in it was green, so the damage was luck). The trap is not a property of
+  the gate's insides: it re-arms at every call site that pipes. Rule: run the
+  gate with output redirected to a file (`tools/gate.sh > log 2>&1; status=$?`)
+  and read the status variable on the next line; never put a pipe between a
+  command and the thing that trusts its exit.
+
+- **A green test run can still be a red run.** Twice tonight every test passed
+  and vitest exited 1: `[vitest-worker]: Timeout calling "onTaskUpdate"`. The
+  worker's pending RPC reply is seen only when its event loop turns, and a
+  file of back-to-back CPU-bound sim tests can hold the loop for minutes —
+  the reply's own sixty-second timer is then overdue and fires first. Yields
+  *inside* the two slowest tests did not fix it, because the starvation is
+  across tests, not within one. The fix that held is structural: a global
+  `afterEach` yielding one macrotask (`src/test-setup.ts`), plus capped
+  workers so contention does not stretch every test. Rule: an async runner
+  under sync CPU load starves in ways that blame the wrong test; give the
+  event loop a guaranteed turn at a boundary the runner owns.
+
+- **A `&`-backgrounded job dies with the shell that spawned it when the
+  harness times that shell out.** A sixteen-match batch was started with
+  `(...)& ` followed by a wait in the same command; the command hit its
+  ten-minute limit, the harness killed the process group, and the batch died
+  after its matches but before its replay-verification summary — leaving
+  results on disk and no verdict. Rule: a job meant to outlive the command
+  that starts it is started with `setsid` (its own process group) writing an
+  exit-file, and waited on from a *separate* command via the file.

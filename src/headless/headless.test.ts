@@ -7,8 +7,12 @@ import { validateMatchRecord, validateMatchResult, explain } from '../protocol/v
 
 describe('headless matches', () => {
   it('completes a builtin-vs-idle match with a winner and valid result', async () => {
+    // The clock is the fixture's, not the invariant's: the invariant is that
+    // the AI beats an opponent who does nothing. It killed at ~24 minutes
+    // until the Q1 rebalance taught it to hold its army home, tech at the
+    // blacksmith and boom first -- the kill now lands around thirty.
     const { result } = await runMatch(
-      { version: 1, seed: 7, maxTimeSeconds: 1800 },
+      { version: 1, seed: 7, maxTimeSeconds: 2400 },
       { 1: { decide: () => [] }, 2: builtinStrategy() },
     );
     expect(result.winner).toBe(2);

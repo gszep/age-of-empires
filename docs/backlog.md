@@ -237,6 +237,17 @@ terrain blends above.
   and attacks in threes, and that is the whole of it — no blacksmith, no
   market, no stable, and no choice among the sixty-six technologies it could
   research.
+- **The renderer cannot draw elevation, and Senlac is waiting on it.** The
+  `senlac` descriptor carries the real ridge as quantised levels (datum and
+  metres-per-level recorded); the board plays flat. Elevation is M5 in
+  `docs/map-generation-design.md` — a renderer, pathfinder, fog and combat
+  change together (the original's downhill bonus is in the DAT), staged and
+  deliberately not started mid-run.
+- **The global geo backend is not built.** `tools/import_terrain.py` speaks
+  only to the Environment Agency's WCS (Britain, OGL). The Copernicus GLO-30
+  and ESA WorldCover COGs on AWS both answer HTTP range reads (checked
+  2026-08-29), so the fallback for anywhere outside Britain is an afternoon's
+  work behind the same descriptor interface.
 - **Relics are not on the map, and deliberately.** M3 placed the neutral wood
   and the stragglers but not the five relics `land_resources.inc` asks for:
   no relic art is imported and a monk cannot pick one up, so a relic today

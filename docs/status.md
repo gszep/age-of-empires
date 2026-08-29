@@ -46,6 +46,40 @@ Measured on calcifer. Every number here is from the current board (120x120,
 about 310 entities); anything older is not comparable, because the map size
 changed underneath it.
 
+- 16 paired-seed matches on 2026-08-29, after the map rebuild and the Q1/Q2
+  strategy work, at a **2400-second measurement clock** (matches now play a
+  boom-first game and the old 1800 cap was measuring the strategy's
+  priorities, not its ability to win — the same reasoning that widened the
+  fixture clocks before): **14 decided, 2 timeout draws, 0 replay checksum
+  failures**, 32 of 32 player-slots in the Feudal Age and **4 in the Castle
+  Age — the first Castle Ages a paired batch has ever reached.** Match
+  lengths 1487-2400 seconds.
+- The Q1 trade-off curve, now measured at five more configurations in one
+  night, all paired 16s at 2400s: army floor 10 with no farm re-sowing —
+  16/16 decided, 0 Castle; floor 6 — 12/16, **10 Castle**; floor 8 with
+  re-sowing — 12/16, 6 Castle; floor 10 with re-sowing and pooled marching
+  waves (the shipped configuration) — 14/16, 4 Castle; and a defend-the-town
+  refinement that repelled every mirror-matched attack perfectly and dropped
+  the batch to 4/16 before being reverted. The two draws that remain are
+  slow sieges still in motion at the cap, not standoffs — the standoff (both
+  armies idle at home, pinned below the march threshold by their own food
+  equilibrium) was found and fixed by the pooled wave. Q1's verify asked for
+  16/16 *and* a Castle Age in one batch; 14/16 with 4 is where the night
+  landed it, and the curve says the last two matches are bought by finishing
+  power, not by more economy.
+- What the strategy now does that it did not: builds a blacksmith once the
+  range is up and buys fletching, forging and both armour lines with its
+  surplus (measured researching all four in slower configurations; at the
+  decisive equilibrium matches end before the smith pays for itself: the A/B
+  against the smith-less `builtin-nosmith` control measured **7-7 with 2
+  draws**, a null result at this sample size); re-sows
+  fallow farms by asking at the mill the moment it owns one (the toggle now
+  rides in the observation, because a spent farm dies and a stateless
+  strategy could never see the fallowness it was meant to react to); leans
+  its second eight villagers to wood; pulls a food villager onto a claimed
+  herdable; re-pins gatherers whose slot resource was scouted after they
+  went to work; anchors the lumber camp on a tree with company rather than a
+  lone straggler; and keeps its farmers farming through the endgame raze.
 - 16 paired-seed matches, re-run after the 2026-08-28 bug work — building
   armour, attacker pursuit, the gathering rule, the mill technologies, the farm
   reseed and the training queue: **16 decided, 0 timeout draws, 0 replay
