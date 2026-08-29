@@ -74,7 +74,15 @@ export default defineConfig({
   // A whole simulated match runs in a few seconds here, but the 5s default
   // leaves no room for a machine that is also rendering one in a browser; the
   // suite has flaked on wall time alone rather than on anything it measured.
-  test: { exclude: [...configDefaults.exclude, '.claude/**'], testTimeout: 30_000 },
+  test: {
+    exclude: [...configDefaults.exclude, '.claude/**'],
+    testTimeout: 30_000,
+    // The sim-heavy files each block their worker with seconds of pure CPU;
+    // running one per core thrashes every one of them until a single test can
+    // block past the worker RPC's 60s and the run is flagged failed with all
+    // tests green. Fewer workers, faster tests, live RPC.
+    poolOptions: { threads: { maxThreads: 6 }, forks: { maxForks: 6 } },
+  },
   // Public deployments must never package locally converted Microsoft assets.
   // The viewer automatically uses its open fallback when this directory is absent.
   publicDir: process.env.OPEN_CONTENT_ONLY === '1' ? false : 'public',

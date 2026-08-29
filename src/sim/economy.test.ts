@@ -2323,7 +2323,7 @@ describe('the technology tree', () => {
   };
 
   /** Research `key` to completion, returning the command's own verdict. */
-  const research = (state: GameState, key: string) => {
+  const research = async (state: GameState, key: string) => {
     const tech = state.rules.technologies[key];
     const building = plantBuilding(state, tech.researchedAt);
     Object.assign(state.players[1], { food: 9000, wood: 9000, gold: 9000, stone: 9000 });
@@ -2331,7 +2331,10 @@ describe('the technology tree', () => {
       kind: 'research', player: 1, buildingId: building.id, tech: key,
     });
     if (!started.ok) return started;
-    for (let i = 0; i < 20_000 && !state.players[1].researched.includes(key); i++) stepGame(state);
+    for (let i = 0; i < 20_000 && !state.players[1].researched.includes(key); i++) {
+      stepGame(state);
+      if (i % 2048 === 2047) await new Promise(resolve => setImmediate(resolve));
+    }
     return started;
   };
 
@@ -2347,19 +2350,19 @@ describe('the technology tree', () => {
     }
   });
 
-  it('refuses a technology before its age and applies it after', () => {
+  it('refuses a technology before its age and applies it after', async () => {
     if (!importedRules) return;
     for (const key of ['forging', 'fletching', 'wheelbarrow']) {
       const early = createGame(51, importedRules);
       const tech = early.rules.technologies[key];
       expect(tech.requiresAge, `${key} should not be a Dark Age technology`).toBeGreaterThan(0);
-      const refused = research(early, key);
+      const refused = await research(early, key);
       expect(refused.ok, `${key} was allowed in the Dark Age`).toBe(false);
       expect(refused.ok ? '' : refused.reason).toContain('later age');
 
       const state = createGame(51, importedRules);
       state.players[1].age = tech.requiresAge;
-      expect(research(state, key).ok, `${key} was refused in its own age`).toBe(true);
+      expect((await research(state, key)).ok, `${key} was refused in its own age`).toBe(true);
       expect(state.players[1].researched).toContain(key);
     }
   });
@@ -2416,28 +2419,28 @@ describe('the technology tree', () => {
     expect(importedRules.buildings.university.age).toBe(2);
   });
 
-  it('will not take a technology before the one it follows', () => {
+  it('will not take a technology before the one it follows', async () => {
     // The DAT states each technology's own requirements, and without them a
     // player could research Blast Furnace without ever taking Forging and
     // collect the same bonus for a third of the clicks.
     if (!importedRules) return;
     const state = createGame(57, importedRules);
     state.players[1].age = 3;
-    const early = research(state, 'iron-casting');
+    const early = await research(state, 'iron-casting');
     expect(early.ok).toBe(false);
     expect(early.ok ? '' : early.reason).toContain('forging');
 
-    expect(research(state, 'forging').ok).toBe(true);
-    expect(research(state, 'iron-casting').ok).toBe(true);
+    expect((await research(state, 'forging')).ok).toBe(true);
+    expect((await research(state, 'iron-casting')).ok).toBe(true);
     expect(state.players[1].researched).toEqual(expect.arrayContaining(['forging', 'iron-casting']));
   });
 
-  it('gives Forging the melee attack the DAT says it gives', () => {
+  it('gives Forging the melee attack the DAT says it gives', async () => {
     if (!importedRules) return;
     const state = createGame(52, importedRules);
     state.players[1].age = 1;
     const meleeBefore = unitRulesFor(state, 1, 'militia').attacks.find(a => a.class === 4)!.amount;
-    expect(research(state, 'forging').ok).toBe(true);
+    expect((await research(state, 'forging')).ok).toBe(true);
     const meleeAfter = unitRulesFor(state, 1, 'militia').attacks.find(a => a.class === 4)!.amount;
     expect(meleeAfter).toBe(meleeBefore + 1);
     // The other side never researched it.
@@ -2445,52 +2448,52 @@ describe('the technology tree', () => {
       .toBe(meleeBefore);
   });
 
-  it('gives Fletching the range and pierce attack the DAT says it gives', () => {
+  it('gives Fletching the range and pierce attack the DAT says it gives', async () => {
     if (!importedRules) return;
     const state = createGame(53, importedRules);
     state.players[1].age = 1;
     const before = unitRulesFor(state, 1, 'archer');
     const pierceBefore = before.attacks.find(a => a.class === 3)!.amount;
     const rangeBefore = before.range!;
-    expect(research(state, 'fletching').ok).toBe(true);
+    expect((await research(state, 'fletching')).ok).toBe(true);
     const after = unitRulesFor(state, 1, 'archer');
     expect(after.attacks.find(a => a.class === 3)!.amount).toBe(pierceBefore + 1);
     expect(after.range).toBe(rangeBefore + 1);
     expect(after.lineOfSight).toBe(before.lineOfSight + 1);
   });
 
-  it('makes Wheelbarrow move and carry more', () => {
+  it('makes Wheelbarrow move and carry more', async () => {
     if (!importedRules) return;
     const state = createGame(54, importedRules);
     state.players[1].age = 1;
     const speedBefore = unitRulesFor(state, 1, 'villager').speed;
     const carryBefore = carryCapacityFor(state, 1);
-    expect(research(state, 'wheelbarrow').ok).toBe(true);
+    expect((await research(state, 'wheelbarrow')).ok).toBe(true);
     expect(unitRulesFor(state, 1, 'villager').speed).toBeCloseTo(speedBefore * 1.1, 6);
     expect(carryCapacityFor(state, 1)).toBeGreaterThan(carryBefore);
   });
 
-  it('raises the hit points of what is already standing, and of what comes next', () => {
+  it('raises the hit points of what is already standing, and of what comes next', async () => {
     if (!importedRules) return;
     const state = createGame(55, importedRules);
     const standing = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
     const before = standing.maxHp;
-    expect(research(state, 'loom').ok).toBe(true);
+    expect((await research(state, 'loom')).ok).toBe(true);
     expect(standing.maxHp).toBe(before + 15);
     expect(standing.hp).toBe(before + 15);
     expect(unitRulesFor(state, 1, 'villager').hp).toBe(before + 15);
   });
 
-  it('replays identically across a research it never had before', () => {
+  it('replays identically across a research it never had before', async () => {
     if (!importedRules) return;
-    const play = (): string => {
+    const play = async (): Promise<string> => {
       const state = createGame(56, importedRules);
       state.players[1].age = 1;
-      research(state, 'fletching');
+      await research(state, 'fletching');
       for (let i = 0; i < 400; i++) stepGame(state);
       return checksumState(state);
     };
-    expect(play()).toBe(play());
+    expect(await play()).toBe(await play());
   });
 });
 
@@ -2603,6 +2606,9 @@ describe('the built-in strategy', () => {
         for (const command of exampleAiCommands(observe(state, 1))) applyCommand(state, command);
       }
       stepGame(state);
+      // A macrotask now and then keeps the vitest worker's RPC alive through
+      // minutes of pure simulation on the full-size board.
+      if (tick % 2048 === 0) await new Promise(resolve => setImmediate(resolve));
     }
   };
 
