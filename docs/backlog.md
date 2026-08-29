@@ -237,17 +237,16 @@ terrain blends above.
   and attacks in threes, and that is the whole of it — no blacksmith, no
   market, no stable, and no choice among the sixty-six technologies it could
   research.
-- **The middle of the map is empty.** Player openings come from
-  `land_resources.inc`; the neutral forests, relics and contested resources the
-  scripts put between the players do not, so a 120x120 board is two furnished
-  corners and a lot of grass.
-- **Forest clumps have ragged interiors.** A wood is grown outward from a seed
-  one free tile at a time, which gives an organic edge and leaves holes: 19 of
-  63 interior tiles were open in the wood measured on seed 7. No straight route
-  crosses a clump and the pathfinder goes round, but a determined unit could
-  thread a diagonal gap in some of them. Filling the interior would fix it and
-  would also make the shapes read as blobs rather than woods; nobody has
-  decided which matters more.
+- **Relics are not on the map, and deliberately.** M3 placed the neutral wood
+  and the stragglers but not the five relics `land_resources.inc` asks for:
+  no relic art is imported and a monk cannot pick one up, so a relic today
+  would be invisible scenery. When relic mechanics arrive, note the mirror
+  question: five is odd, and an exactly mirrored board wants two pairs plus a
+  decision about the fifth.
+- *(Closed 2026-08-29: the empty middle and the ragged forest interiors, both
+  by the map generator rebuild — the neutral wood at the script's own density
+  now sits between the players, and `cleanTerrain`'s two passes close every
+  pinhole and diagonal squeeze, asserted in `mapgen.test.ts`.)*
 - **Herdables no longer walk home behind a scout.** A claimed sheep stops where
   it stands and is ordered about by hand, which is what makes it controllable
   at all (the simulation used to overwrite its order four times a second). The
