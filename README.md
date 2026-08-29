@@ -31,6 +31,12 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 - `H` selects and centers the town center; `.` cycles idle villagers.
 - Command-grid hotkeys are shown on buttons (`Q`, `W`, `E`… across the grid, `S` to stop). `V` turns the villager's build menu between its economic and military pages.
 - `Esc` cancels placement or opens the menu; `F3` pauses; `F10` toggles the menu.
+- `F4` toggles a debug reveal of the whole map. It is strictly a view-side
+  override — the simulation's fog, the AI's observation and every checksum are
+  untouched, so a revealed match replays identically to a fogged one.
+- `?map=` in the URL picks the board: `black-forest`, `senlac` (the real ground
+  at Battle, East Sussex, from Environment Agency LIDAR), `painted-proof`, or
+  nothing for Arabia. Asking for a map explicitly always deals a fresh board.
 - `+` and `-` step the game speed through the original's own four settings —
   Slow, Normal, Fast and Extra Fast — and then two fast-forward steps past them
   for watching a whole match go by. The game starts at **Normal**, which is the

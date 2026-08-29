@@ -32,7 +32,7 @@ export class Minimap {
     this.context = canvas.getContext('2d')!;
   }
 
-  private terrain(state: GameState): HTMLCanvasElement {
+  private terrain(state: GameState, reveal: boolean): HTMLCanvasElement {
     if (this.tiles?.image.width !== state.width || this.tiles.image.height !== state.height) {
       const canvas = document.createElement('canvas');
       canvas.width = state.width;
@@ -45,7 +45,8 @@ export class Minimap {
     const visibility = state.visibility[this.player];
     const pixels = this.tiles.image.data;
     for (let index = 0; index < state.width * state.height; index++) {
-      const shade = visibility.explored[index] !== 1 ? UNEXPLORED
+      const shade = reveal ? IN_SIGHT
+        : visibility.explored[index] !== 1 ? UNEXPLORED
         : visibility.visible[index] === 1 ? IN_SIGHT : REMEMBERED;
       const at = index * 4;
       pixels[at] = shade[0];
@@ -86,6 +87,8 @@ export class Minimap {
   draw(
     state: GameState, viewCenter: Point, viewTiles: { w: number; h: number },
     assets?: ContentAssets,
+    /** Debug reveal: shade and draw everything as if seen (view-only). */
+    reveal = false,
   ): void {
     const ctx = this.context;
     const ownerColor = (owner: number): string =>
@@ -100,7 +103,7 @@ export class Minimap {
     const scaleY = this.canvas.height / (state.width + state.height);
     ctx.save();
     ctx.setTransform(scaleX, scaleY, -scaleX, scaleY, this.canvas.width / 2, 0);
-    ctx.drawImage(this.terrain(state), 0, 0);
+    ctx.drawImage(this.terrain(state, reveal), 0, 0);
     ctx.restore();
 
     // Entities: live visible ones plus remembered snapshots.
@@ -112,7 +115,7 @@ export class Minimap {
     for (const entity of state.entities) {
       if (entity.dead) continue;
       const index = Math.floor(entity.position.y) * state.width + Math.floor(entity.position.x);
-      const visible = visibility.visible[index] === 1;
+      const visible = reveal || visibility.visible[index] === 1;
       if (entity.owner !== this.player && !visible) continue;
       if (entity.owner === this.player || visible) {
         const color = entity.kind === 'resource'
@@ -122,7 +125,7 @@ export class Minimap {
         drawDot(entity.position.x, entity.position.y, color, size);
       }
     }
-    for (const remembered of Object.values(visibility.memory)) {
+    for (const remembered of reveal ? [] : Object.values(visibility.memory)) {
       const index = Math.floor(remembered.y) * state.width + Math.floor(remembered.x);
       if (visibility.visible[index] === 1) continue;
       const color = remembered.kind === 'resource'

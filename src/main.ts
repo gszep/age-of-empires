@@ -68,6 +68,12 @@ let selectedIds: number[] = [];
 let buildMode: BuildingKind | undefined;
 let paused = false;
 /**
+ * Debug: draw the whole board as if seen. Strictly a view-side override --
+ * the simulation's visibility, the observation and every checksum are
+ * untouched, so a revealed match replays identically to a fogged one.
+ */
+let revealMap = false;
+/**
  * How many game seconds pass per real second. The simulation's tick length is
  * fixed — determinism depends on it — so speed multiplies how much time the
  * frame loop hands the accumulator, and the game runs the same ticks, sooner.
@@ -439,7 +445,7 @@ function pickEntity(point: Point): Entity | undefined {
     // how much is left; a corpse with nothing on it stays unclickable, so a
     // battlefield of dead soldiers never gets in the way of the living.
     if (entity.dead && !isCarcass(entity)) continue;
-    if (entity.owner !== 1 && entity.owner !== 0 && !isTileVisible(game, 1, entity.position.x, entity.position.y)) continue;
+    if (!revealMap && entity.owner !== 1 && entity.owner !== 0 && !isTileVisible(game, 1, entity.position.x, entity.position.y)) continue;
     // Nearest to the click wins, carcass or not. Preferring the living sounds
     // reasonable and is not: villagers eating a carcass stand right on it, so
     // any bias at all puts the corpse back out of reach, which is the bug.
@@ -665,6 +671,12 @@ addEventListener('keydown', event => {
     return;
   }
   if (key === 'F3') { paused = !paused; event.preventDefault(); return; }
+  if (key === 'F4') {
+    revealMap = !revealMap;
+    hud.showMessage(`Reveal map (debug): ${revealMap ? 'on' : 'off'}`);
+    event.preventDefault();
+    return;
+  }
   // AoE2's own speed keys. `=` and `_` come along because `+` and `-` are the
   // shifted faces of those keys on most layouts, and the numpad sends the
   // signs directly. Ctrl and Cmd are left alone: that is the browser's zoom.
@@ -952,7 +964,7 @@ function selectionInfo(): SelectionInfo | undefined {
 // ---------------------------------------------------------------------------
 // Scene sync.
 function entityVisible(entity: Entity): boolean {
-  if (entity.owner === 1) return true;
+  if (revealMap || entity.owner === 1) return true;
   return isTileVisible(game, 1, entity.position.x, entity.position.y);
 }
 
@@ -960,7 +972,7 @@ function syncScene(time: number): void {
   const wanted = new Set<string>();
   for (const entity of game.entities) {
     if (!entityVisible(entity)) continue;
-    if (entity.owner === 0 && !isTileVisible(game, 1, entity.position.x, entity.position.y)) {
+    if (!revealMap && entity.owner === 0 && !isTileVisible(game, 1, entity.position.x, entity.position.y)) {
       // Gaia in unseen tiles is handled through memory below.
       continue;
     }
@@ -981,7 +993,8 @@ function syncScene(time: number): void {
     view.updateEntityView(entityView, assets, game, entity, time);
   }
   // Remembered fogged entities render as static snapshots (fog dims them).
-  for (const remembered of Object.values(game.visibility[1].memory)) {
+  // A revealed board draws the real entities, so the snapshots stand down.
+  for (const remembered of revealMap ? [] : Object.values(game.visibility[1].memory)) {
     if (isTileVisible(game, 1, remembered.x, remembered.y)) continue;
     const key = `m${remembered.id}`;
     wanted.add(key);
@@ -1019,7 +1032,7 @@ function syncScene(time: number): void {
   // Arrows in flight. They are simulation state, so they render from it
   // directly rather than being faked on the view side.
   for (const projectile of game.projectiles) {
-    if (!isTileVisible(game, 1, projectile.position.x, projectile.position.y)) continue;
+    if (!revealMap && !isTileVisible(game, 1, projectile.position.x, projectile.position.y)) continue;
     const key = `p${projectile.id}`;
     wanted.add(key);
     const target = game.entities.find(e => e.id === projectile.targetId);
@@ -1278,7 +1291,8 @@ renderer.setAnimationLoop(now => {
   selectedIds = selectedIds.filter(id =>
     game.entities.some(e => e.id === id && (!e.dead || isCarcass(e))));
   syncScene(gameTimeSeconds(game));
-  fog.update(game);
+  fog.mesh.visible = !revealMap;
+  if (!revealMap) fog.update(game);
 
   camera.position.set(cameraCenter.x, cameraCenter.y, 10);
   camera.zoom = zoom;
@@ -1293,7 +1307,7 @@ renderer.setAnimationLoop(now => {
     hud.minimap.draw(game, isoToWorld(cameraCenter.x, cameraCenter.y), {
       w: innerWidth / zoom / TILE_W * 1.2,
       h: innerHeight / zoom / TILE_H * 0.9,
-    }, assets);
+    }, assets, revealMap);
     if (game.winner && !ended) {
       ended = true;
       hud.showEnd(game.winner === 1);
