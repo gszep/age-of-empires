@@ -66,6 +66,9 @@ export interface MatchConfig {
    * the field therefore replays as it was played.
    */
   civilizations?: { 1: string; 2: string };
+  /** Which map type generates the board. Absent means `arabia`, so a match
+   * recorded before map types existed replays as it was played. */
+  map?: string;
 }
 
 export interface PlayerSummary {
@@ -116,6 +119,8 @@ export interface MatchRecord {
    * out would let a replay diverge the moment two civilisations differ.
    */
   civilizations: { 1: string; 2: string };
+  /** The map type the board was generated from; absent means `arabia`. */
+  map?: string;
   decideIntervalSeconds: number;
   maxTimeSeconds: number;
   commands: { tick: number; command: Command }[];

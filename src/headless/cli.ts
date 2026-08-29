@@ -48,6 +48,7 @@ try {
 const config: MatchConfig = { version: 1, seed: Number(args.seed ?? 1) };
 if (args['max-time']) config.maxTimeSeconds = Number(args['max-time']);
 if (args.interval) config.decideIntervalSeconds = Number(args.interval);
+if (args.map) config.map = args.map;
 if (!validateMatchConfig(config)) {
   console.error(`invalid match config ${explain(validateMatchConfig)}`);
   process.exit(2);

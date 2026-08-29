@@ -34,6 +34,10 @@
         "2"
       ],
       "additionalProperties": false
+    },
+    "map": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "required": [

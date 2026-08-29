@@ -225,7 +225,11 @@ describe('navigation compatibility suite', () => {
 
     const xs = [...wood].map(i => i % state.width);
     const ys = [...wood].map(i => Math.floor(i / state.width));
-    const midY = Math.round((Math.min(...ys) + Math.max(...ys)) / 2);
+    // Cross at the wood's widest row: a grown clump has a waist somewhere,
+    // and a detour measured there says nothing about the wood being solid.
+    const rowWidth = new Map<number, number>();
+    for (const y of ys) rowWidth.set(y, (rowWidth.get(y) ?? 0) + 1);
+    const midY = [...rowWidth.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0];
     const west = { x: Math.min(...xs) - 2.5, y: midY + 0.5 };
     const east = { x: Math.max(...xs) + 2.5, y: midY + 0.5 };
     // Nothing walks the straight line: it is trees the whole way across.

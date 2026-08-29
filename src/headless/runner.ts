@@ -20,7 +20,7 @@ export async function runMatch(
 ): Promise<{ result: MatchResult; record: MatchRecord }> {
   const maxTime = config.maxTimeSeconds ?? 1800;
   const decideInterval = config.decideIntervalSeconds ?? 0.5;
-  const state = createGame(config.seed, rules, config.civilizations);
+  const state = createGame(config.seed, rules, config.civilizations, config.map ?? 'arabia');
   const rejectedCommands: RejectedCommand[] = [];
   const pendingRejections: Record<PlayerId, RejectedCommand[]> = { 1: [], 2: [] };
   const recordedCommands: MatchRecord['commands'] = [];
@@ -82,6 +82,7 @@ export async function runMatch(
     seed: config.seed,
     rulesOrigin: rules.origin,
     civilizations: { 1: state.players[1].civilization, 2: state.players[2].civilization },
+    ...(config.map && config.map !== 'arabia' ? { map: config.map } : {}),
     decideIntervalSeconds: decideInterval,
     maxTimeSeconds: maxTime,
     commands: recordedCommands,
@@ -105,7 +106,7 @@ export function replayRecord(
   rules: GameRules = FALLBACK_RULES,
   onTick?: (state: ReturnType<typeof createGame>) => void,
 ): ReplayOutcome {
-  const state = createGame(record.seed, rules, record.civilizations);
+  const state = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia');
   const commands = [...record.commands];
   const checksums = new Map(record.checksums.map(entry => [entry.tick, entry.hash]));
   const lastTick = record.checksums.at(-1)?.tick ?? 0;

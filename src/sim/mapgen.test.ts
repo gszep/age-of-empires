@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checksumState } from './checksum';
 import { FALLBACK_RULES } from './data';
 import { createGame, stepGame } from './game';
+import { buildNavGrid, findPath } from './nav';
 import type { Entity, GameState } from './types';
 
 /** Tiles of the player-1 half holding a tree, as a set of `y*width+x`. */
@@ -123,5 +124,87 @@ describe('the grown map', () => {
       return checksumState(state);
     };
     expect(play()).toBe(play());
+  });
+});
+
+describe('black forest', () => {
+  // M4: a map type is a descriptor, not code. Black Forest is Arabia with the
+  // base terrain set to forest, a clearing carved per player at the owned
+  // script's numbers, and one road between them.
+  const towncenters = (state: GameState): [Entity, Entity] => {
+    const tcs = state.entities.filter(e => e.kind === 'town-center');
+    return [tcs.find(e => e.owner === 1)!, tcs.find(e => e.owner === 2)!];
+  };
+
+  /** Whether `to`'s neighbourhood is walkable from `from`. findPath never
+   * says no -- it walks as close as it can by design -- so the question
+   * needs a flood fill. 8-connected, so a "no" is a strong no. */
+  const reachable = (grid: ReturnType<typeof buildNavGrid>, from: Entity, to: Entity): boolean => {
+    const seen = new Uint8Array(grid.width * grid.height);
+    const start = { x: Math.floor(from.position.x + 2), y: Math.floor(from.position.y) };
+    const queue = [start.y * grid.width + start.x];
+    seen[queue[0]] = 1;
+    const goal = { x: Math.floor(to.position.x), y: Math.floor(to.position.y) };
+    while (queue.length) {
+      const tile = queue.pop()!;
+      const x = tile % grid.width;
+      const y = Math.floor(tile / grid.width);
+      if (Math.abs(x - goal.x) <= 2 && Math.abs(y - goal.y) <= 2) return true;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= grid.width || ny >= grid.height) continue;
+        const next = ny * grid.width + nx;
+        if (seen[next] || grid.blocked[next]) continue;
+        seen[next] = 1;
+        queue.push(next);
+      }
+    }
+    return false;
+  };
+
+  it('is a wood with two clearings and a road that connects them', () => {
+    const state = createGame(7, FALLBACK_RULES, undefined, 'black-forest');
+    const trees = state.entities.filter(
+      e => e.kind === 'resource' && e.resourceKind === 'wood').length;
+    expect(trees).toBeGreaterThan(8000);
+    const [home, enemy] = towncenters(state);
+    const grid = buildNavGrid(state);
+    expect(reachable(grid, home, enemy)).toBe(true);
+    expect(findPath(grid, home.position, enemy.position)).toBeDefined();
+  });
+
+  it('has no route but the road', () => {
+    // Cutting the road's cross-section at the centreline must disconnect the
+    // two town centers: if any other way round existed -- a gap in the wood,
+    // a walkable rim along the map edge -- the flood fill would find it.
+    const state = createGame(7, FALLBACK_RULES, undefined, 'black-forest');
+    const [home, enemy] = towncenters(state);
+    const grid = buildNavGrid(state);
+    for (const y of [59, 60, 61]) {
+      grid.blocked[y * state.width + 60] = 1;
+    }
+    expect(reachable(grid, home, enemy)).toBe(false);
+  });
+
+  it('replays identically and keeps its opening fair', () => {
+    const play = () => {
+      const state = createGame(11, FALLBACK_RULES, undefined, 'black-forest');
+      for (let i = 0; i < 200; i++) stepGame(state);
+      return checksumState(state);
+    };
+    expect(play()).toBe(play());
+    const state = createGame(11, FALLBACK_RULES, undefined, 'black-forest');
+    for (const kind of ['gold', 'stone', 'food'] as const) {
+      const left = state.entities.filter(
+        e => e.kind === 'resource' && e.resourceKind === kind && e.position.x < 60).length;
+      const right = state.entities.filter(
+        e => e.kind === 'resource' && e.resourceKind === kind && e.position.x >= 60).length;
+      expect(left, kind).toBe(right);
+    }
+  });
+
+  it('refuses a map type nobody defined', () => {
+    expect(() => createGame(1, FALLBACK_RULES, undefined, 'atlantis')).toThrow(/unknown map/);
   });
 });

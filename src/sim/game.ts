@@ -2,7 +2,7 @@ import { FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isAnimal, isBuilding, i
 import type {
   AttackValue, BuildingRules, Cost, GameRules, NodeKind, TechEffect, TechKey, UnitRules,
 } from './data';
-import { ARABIA, generateMap } from './mapgen';
+import { MAPS, generateMap } from './mapgen';
 import { buildNavGrid, findPath, halfExtent, isBlocked, separateUnits, tileOf, type NavGrid } from './nav';
 import { random01 } from './random';
 import { buildingRulesFor, combine, unitRulesFor } from './rules';
@@ -56,16 +56,20 @@ function addAnimal(state: GameState, kind: AnimalKind, position: Point): Entity 
   });
 }
 
-/** A point inside the map, clear of every footprint already placed. */
+/** A point inside the map, clear of every footprint already placed. Border
+ * tiles count: a forest-based map seals its rim with trees, and a one-tile
+ * walkable ring around the wood would be a route the road is meant to be. */
 function freeSpot(state: GameState, at: Point): boolean {
-  return at.x >= 1 && at.y >= 1 && at.x <= state.width - 1 && at.y <= state.height - 1
-    && spawnFree(state, at, 0.5);
+  return spawnFree(state, at, 0.5);
 }
 
 export function createGame(
   seed = 42, rules: GameRules = FALLBACK_RULES,
   civilizations: Record<PlayerId, string> = { 1: rules.civilization.key, 2: rules.civilization.key },
+  map = 'arabia',
 ): GameState {
+  const descriptor = MAPS[map];
+  if (!descriptor) throw new Error(`unknown map type ${map}`);
   const state: GameState = {
     rules, seed: seed || 1, tick: 0, nextId: 1, width: MAP_TILES, height: MAP_TILES,
     entities: [], projectiles: [], terrain: [],
@@ -105,7 +109,7 @@ export function createGame(
         else addNode(state, kind as NodeKind, at);
       },
     },
-    ARABIA, [START, mirror(START)], mirror,
+    descriptor, [START, mirror(START)], mirror,
   );
   state.terrain = terrain;
 
