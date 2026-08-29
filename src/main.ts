@@ -4,6 +4,7 @@ import { exampleAiCommands } from './sim/ai';
 import { observe } from './sim/observe';
 import { TRAINING_QUEUE_LIMIT, applyCommand, buildingFootprint, createGame, gameTimeSeconds, isCarcass, placementLegal, queuedCount, stepGame, upgradedAway, notYetUpgradedInto } from './sim/game';
 import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, rulesFromManifest, type ContentManifest, type Cost, type GameRules, type TechKey, type UnitRules } from './sim/data';
+import { MAPS } from './sim/mapgen';
 import { isTileVisible } from './sim/visibility';
 import { checksumState } from './sim/checksum';
 import type { MatchRecord } from './protocol/types';
@@ -50,8 +51,18 @@ try {
   if (response.ok) rules = rulesFromManifest(await response.json() as ContentManifest);
 } catch { /* open fallback rules */ }
 
-const restored = loadSession(rules);
-let game = restored ?? createGame(42, rules);
+// Which map type the page deals: ?map=black-forest, ?map=senlac,
+// ?map=painted-proof, or nothing for arabia. An unknown name falls back
+// rather than killing the page, and asking for a map explicitly means a
+// fresh board of it -- not whatever match a dev-session snapshot resumes.
+const mapParam = new URLSearchParams(location.search).get('map');
+const mapType = mapParam !== null && mapParam in MAPS ? mapParam : 'arabia';
+if (mapParam !== null && mapType !== mapParam) {
+  console.warn(`[map] unknown map type '${mapParam}', dealing arabia`);
+}
+
+const restored = mapParam === null ? loadSession(rules) : undefined;
+let game = restored ?? createGame(42, rules, undefined, mapType);
 if (restored) console.info(`[dev] resumed match at tick ${restored.tick}; menu restart starts a new one`);
 let selectedIds: number[] = [];
 let buildMode: BuildingKind | undefined;
@@ -113,7 +124,7 @@ function startReplay(raw: unknown): void {
   clearSession();
   // A record from before civilisations were written down replays as whatever
   // the content is for, which is what it was played as.
-  game = createGame(record.seed, rules, record.civilizations);
+  game = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia');
   selectedIds = [];
   buildMode = undefined;
   paused = false;
@@ -314,7 +325,7 @@ if (import.meta.hot) {
 function restart(): void {
   replay = undefined;
   clearSession();
-  game = createGame((Date.now() >>> 0) || 1, rules);
+  game = createGame((Date.now() >>> 0) || 1, rules, undefined, mapType);
   selectedIds = [];
   buildMode = undefined;
   paused = false;
