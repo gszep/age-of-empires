@@ -249,3 +249,56 @@ describe('a painted map', () => {
     expect(play()).toBe(play());
   });
 });
+
+describe('the ridge at senlac', () => {
+  // C2: real ground. The descriptor was built offline from the Environment
+  // Agency's 1m LIDAR and Vegetation Object Model over the registered
+  // battlefield at Battle, East Sussex; these tests pin the board to it.
+  const descriptor = JSON.parse(readFileSync('src/sim/maps/senlac.json', 'utf8')) as {
+    width: number; height: number; terrain: number[]; elevation: number[];
+    attribution: string;
+    source: { clearedStarts: { tiles: [number, number][]; radius: number } };
+  };
+
+  it('puts the real woods and hedgerows on the board', () => {
+    const state = createGame(7, FALLBACK_RULES, undefined, 'senlac');
+    expect(state.terrain).toEqual(descriptor.terrain);
+    const treeTiles = new Set(state.entities
+      .filter(e => e.kind === 'resource' && e.resourceKind === 'wood')
+      .map(e => Math.floor(e.position.y) * state.width + Math.floor(e.position.x)));
+    const painted = descriptor.terrain.filter(t => t === 10).length;
+    expect(treeTiles.size).toBeGreaterThan(painted - 5);
+  });
+
+  it('keeps both start areas open ground, and says so', () => {
+    const { tiles, radius } = descriptor.source.clearedStarts;
+    expect(radius).toBeGreaterThan(0);
+    const state = createGame(7, FALLBACK_RULES, undefined, 'senlac');
+    for (const e of state.entities) {
+      if (e.kind !== 'resource' || e.resourceKind !== 'wood') continue;
+      for (const [sx, sy] of tiles) {
+        const d = Math.hypot(e.position.x - sx, e.position.y - sy);
+        expect(d, `a tree ${d.toFixed(1)} tiles from the start at ${sx},${sy}`)
+          .toBeGreaterThan(radius - 1);
+      }
+    }
+  });
+
+  it('carries the relief and the licence it owes', () => {
+    // The renderer cannot draw elevation yet; the descriptor still carries
+    // the real ridge so nothing has to be re-surveyed when it can.
+    expect(descriptor.elevation.length).toBe(descriptor.width * descriptor.height);
+    expect(Math.max(...descriptor.elevation)).toBeGreaterThan(5);
+    expect(descriptor.attribution).toContain('Environment Agency');
+    expect(descriptor.attribution).toContain('Open Government Licence');
+  });
+
+  it('gives the same checksum for the same seed', () => {
+    const play = () => {
+      const state = createGame(17, FALLBACK_RULES, undefined, 'senlac');
+      for (let i = 0; i < 200; i++) stepGame(state);
+      return checksumState(state);
+    };
+    expect(play()).toBe(play());
+  });
+});

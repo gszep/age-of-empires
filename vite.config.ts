@@ -77,6 +77,7 @@ export default defineConfig({
   test: {
     exclude: [...configDefaults.exclude, '.claude/**'],
     testTimeout: 30_000,
+    setupFiles: ['./src/test-setup.ts'],
     // The sim-heavy files each block their worker with seconds of pure CPU;
     // running one per core thrashes every one of them until a single test can
     // block past the worker RPC's 60s and the run is flagged failed with all

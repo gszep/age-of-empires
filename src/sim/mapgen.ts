@@ -20,6 +20,7 @@
  */
 import type { NodeKind } from './data';
 import paintedProof from './maps/painted-proof.json';
+import senlac from './maps/senlac.json';
 import { random01 } from './random';
 import type { AnimalKind, Point } from './types';
 
@@ -152,6 +153,18 @@ export const MAPS: Record<string, MapDescriptor> = {
   'painted-proof': {
     base: 'grass',
     baked: paintedProof,
+    opening: ARABIA.opening,
+  },
+  // The ridge at Senlac: the ground the Battle of Hastings was fought on,
+  // 1.2 km around Battle, East Sussex, at 10 m a tile -- Environment Agency
+  // 1 m LIDAR for the relief (committed in the descriptor, waiting on an
+  // elevation renderer) and its Vegetation Object Model for every wood,
+  // copse and hedgerow line, all Open Government Licence. Built by
+  // tools/import_terrain.py; the descriptor carries its sources, their
+  // hashes and the attribution.
+  senlac: {
+    base: 'grass',
+    baked: senlac,
     opening: ARABIA.opening,
   },
 };
