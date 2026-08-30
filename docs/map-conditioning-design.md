@@ -575,7 +575,11 @@ descriptor; neither adds a runtime dependency.
   map, and the `senlac` map is the registered battlefield at Battle, East
   Sussex: DTM for the ground, VOM for every wood and hedgerow line, start
   areas cleared and the clearing recorded, attribution and coverage hashes in
-  the descriptor. Baked ground is deliberately unmirrored — DE's own Real
+  the descriptor. The importer samples a **diamond** window — tile (0,0) is
+  the window's north corner, +x runs SE, +y runs SW — so the isometric view
+  puts true north at the top of the screen and the board can be laid over an
+  OS sheet without rotating either; the descriptor's `source.orientation`
+  records this and `source.centre` the diamond's centre. Baked ground is deliberately unmirrored — DE's own Real
   World shape — while the object pass still mirrors.
 - **The relief is in the descriptor and not on the screen.** Elevation
   renders nowhere yet (M5 stands deferred), so `senlac.json` carries the

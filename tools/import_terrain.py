@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Real ground into a map descriptor: the offline half of C2.
 
-    tools/import_terrain.py --bbox 574350 115100 575550 116300 \
+    tools/import_terrain.py --centre 574950 115700 --tiles 120 \
         --pitch 10 --name senlac --out src/sim/maps/senlac.json
 
 Britain first (docs/map-conditioning-design.md): the Environment Agency's
@@ -11,6 +11,12 @@ both served as WCS coverages an HTTP request can subset by bounding box
 (EPSG:27700). A tile of the board is `pitch` metres on a side; its elevation
 is the mean bare-earth height under it, and it is forest when enough of it
 sits under canopy taller than 2.5 m -- the VOM's own threshold for a tree.
+
+The board samples a *diamond* window: tile (0,0) is the window's north
+corner, +x runs south-east and +y runs south-west, so the isometric renderer
+(screen x ~ tx - ty, screen y ~ tx + ty) puts true north at the top of the
+screen and the board sits over the map like a compass rose. The fetched
+coverage is the diamond's axis-aligned bounding square.
 
 The descriptor carries the terrain the game reads today, the quantised
 elevation the renderer cannot yet draw (recorded, not invented -- see
@@ -22,6 +28,7 @@ otherwise real ground.
 import argparse
 import hashlib
 import json
+import math
 import urllib.request
 from pathlib import Path
 
@@ -66,35 +73,49 @@ def fetch(kind: str, bbox: tuple[float, float, float, float]) -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--bbox", nargs=4, type=float, required=True,
-                        metavar=("E1", "N1", "E2", "N2"), help="EPSG:27700")
+    parser.add_argument("--centre", nargs=2, type=float, required=True,
+                        metavar=("E", "N"), help="diamond centre, EPSG:27700")
+    parser.add_argument("--tiles", type=int, default=120, help="board edge, tiles")
     parser.add_argument("--pitch", type=float, default=10.0, help="metres per tile")
     parser.add_argument("--name", required=True)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
-    e1, n1, e2, n2 = args.bbox
-    width = round((e2 - e1) / args.pitch)
-    height = round((n2 - n1) / args.pitch)
+    width = height = args.tiles
+    ce, cn = args.centre
+    half = args.tiles * args.pitch / math.sqrt(2)  # centre to any diamond corner
+    bbox = (math.floor(ce - half), math.floor(cn - half),
+            math.ceil(ce + half), math.ceil(cn + half))
 
-    paths = {kind: fetch(kind, (e1, n1, e2, n2)) for kind in COVERAGES}
+    paths = {kind: fetch(kind, bbox) for kind in COVERAGES}
     with rasterio.open(paths["dtm"]) as src:
-        ground = src.read(1, masked=True)
+        ground = src.read(1, masked=True).filled(np.nan)
+        to_index = ~src.transform
     with rasterio.open(paths["vom"]) as src:
         vom = src.read(1, masked=True)
-    canopy = (~np.ma.getmaskarray(vom)) & (vom.filled(0) > CANOPY_METRES)
+    canopy = ((~np.ma.getmaskarray(vom)) & (vom.filled(0) > CANOPY_METRES)).astype(float)
 
-    # Row 0 of the raster is the northern edge; keep it row 0 of the board.
-    per = round(args.pitch)  # 1 m pixels per tile edge
-    terrain: list[int] = []
-    metres: list[float] = []
-    for ty in range(height):
-        for tx in range(width):
-            gy, gx = ty * per, tx * per
-            cell = ground[gy:gy + per, gx:gx + per]
-            metres.append(float(cell.mean()))
-            fraction = float(canopy[gy:gy + per, gx:gx + per].mean())
-            terrain.append(TERRAIN_FOREST if fraction >= FOREST_FRACTION else TERRAIN_GRASS)
+    # Supersample the diamond at 1 m along the board's own axes: pixel (v, u)
+    # sits u metres down the +x edge (SE) and v metres down the +y edge (SW)
+    # from the window's north corner, then block-mean back to tiles.
+    per = round(args.pitch)
+    u, v = np.meshgrid(np.arange(width * per) + 0.5, np.arange(height * per) + 0.5)
+    east = ce + (u - v) / math.sqrt(2)
+    north = cn + half - (u + v) / math.sqrt(2)
+    cols, rows = to_index * (east, north)
+    cols = np.clip(cols.astype(int), 0, ground.shape[1] - 1)
+    rows = np.clip(rows.astype(int), 0, ground.shape[0] - 1)
+
+    def per_tile(grid: np.ndarray) -> np.ndarray:
+        return grid[rows, cols].reshape(height, per, width, per).mean(axis=(1, 3))
+
+    ground_tiles = per_tile(ground)
+    missing = int(np.isnan(ground_tiles).sum())
+    if missing:
+        raise SystemExit(f"{missing} tiles have no DTM coverage -- move the window")
+    metres = [float(m) for m in ground_tiles.ravel()]
+    terrain = [TERRAIN_FOREST if f >= FOREST_FRACTION else TERRAIN_GRASS
+               for f in per_tile(canopy).ravel()]
 
     # Playability: the two starts get open ground, and the mark is recorded.
     for sx, sy in STARTS:
@@ -117,9 +138,13 @@ def main() -> None:
         "elevationMetres": {"datum": round(low, 2), "perLevel": round(per_level, 3)},
         "source": {
             "backend": "gb-environment-agency",
-            "bbox": [e1, n1, e2, n2],
             "crs": "EPSG:27700",
+            "centre": [ce, cn],
+            "fetchedBbox": list(bbox),
             "pitchMetres": args.pitch,
+            # tile (x, y) centre: E = centreE + (x - y) * pitch / sqrt(2),
+            #                     N = centreN + (tiles - x - y - 1) * pitch / sqrt(2)
+            "orientation": "diamond: tile (0,0) is the north corner; +x runs SE, +y runs SW",
             "coverages": {kind: {
                 "layer": COVERAGES[kind][0],
                 "coverageId": COVERAGES[kind][1],
