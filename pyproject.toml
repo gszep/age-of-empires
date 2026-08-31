@@ -1,0 +1,14 @@
+[project]
+name = "open-empires-tools"
+version = "0.1.0"
+description = "Offline import and map-generation tools for Open Empires Lab"
+requires-python = ">=3.11"
+dependencies = [
+  "genieutils-py==0.1.2",
+  "numpy==1.26.4",
+  "pillow==12.3.0",
+  "rasterio==1.4.3",
+]
+
+[tool.uv]
+package = false

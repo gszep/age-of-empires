@@ -67,7 +67,7 @@ model-provider tests opt-in.
 - **DAT field navigation:** see the genieutils cheat-sheet in
   `tools/README.md` before touching `import_content.py` — do not guess
   attribute names. When the sheet lacks a field, ask the DAT itself:
-  `.tools/import-venv/bin/python tools/datq.py fields|get|grep <expr>`,
+  `uv run --locked python tools/datq.py fields|get|grep <expr>`,
   then extend the sheet.
 
 ## Visual debug protocol

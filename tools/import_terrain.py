@@ -29,7 +29,9 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -52,7 +54,6 @@ TERRAIN_FOREST = 10
 CANOPY_METRES = 2.5
 FOREST_FRACTION = 0.3
 ELEVATION_LEVELS = 8
-STARTS = [(30, 60), (90, 60)]
 START_CLEARING = 12
 
 CACHE = Path(".local/geo-cache")
@@ -79,7 +80,11 @@ def main() -> None:
     parser.add_argument("--pitch", type=float, default=10.0, help="metres per tile")
     parser.add_argument("--name", required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--jobs", type=int, default=os.cpu_count() or 1,
+                        help="parallel fetch/processing workers (default: all CPUs)")
     args = parser.parse_args()
+    if args.jobs < 1:
+        parser.error("--jobs must be at least 1")
 
     width = height = args.tiles
     ce, cn = args.centre
@@ -87,7 +92,12 @@ def main() -> None:
     bbox = (math.floor(ce - half), math.floor(cn - half),
             math.ceil(ce + half), math.ceil(cn + half))
 
-    paths = {kind: fetch(kind, bbox) for kind in COVERAGES}
+    # The independent DTM and VOM coverages are large. Fetch them concurrently;
+    # cap at the number of layers rather than leaving the machine's cores idle
+    # while two network-bound requests run serially.
+    with ThreadPoolExecutor(max_workers=min(args.jobs, len(COVERAGES))) as pool:
+        futures = {kind: pool.submit(fetch, kind, bbox) for kind in COVERAGES}
+        paths = {kind: future.result() for kind, future in futures.items()}
     with rasterio.open(paths["dtm"]) as src:
         ground = src.read(1, masked=True).filled(np.nan)
         to_index = ~src.transform
@@ -109,16 +119,25 @@ def main() -> None:
     def per_tile(grid: np.ndarray) -> np.ndarray:
         return grid[rows, cols].reshape(height, per, width, per).mean(axis=(1, 3))
 
-    ground_tiles = per_tile(ground)
+    # NumPy releases the GIL in these indexed reductions, so sample the two
+    # independent layers in parallel as well. Memory use remains bounded to two
+    # tile grids; the source rasters and index grids already dominate it.
+    with ThreadPoolExecutor(max_workers=min(args.jobs, 2)) as pool:
+        ground_future = pool.submit(per_tile, ground)
+        canopy_future = pool.submit(per_tile, canopy)
+        ground_tiles = ground_future.result()
+        canopy_tiles = canopy_future.result()
     missing = int(np.isnan(ground_tiles).sum())
     if missing:
         raise SystemExit(f"{missing} tiles have no DTM coverage -- move the window")
     metres = [float(m) for m in ground_tiles.ravel()]
-    terrain = [TERRAIN_FOREST if f >= FOREST_FRACTION else TERRAIN_GRASS
-               for f in per_tile(canopy).ravel()]
+    terrain = np.where(canopy_tiles.ravel() >= FOREST_FRACTION,
+                       TERRAIN_FOREST, TERRAIN_GRASS).tolist()
 
-    # Playability: the two starts get open ground, and the mark is recorded.
-    for sx, sy in STARTS:
+    # Playability: starts scale with boards larger than the original 120 tiles.
+    starts = [(round(width * 0.25), round(height * 0.5)),
+              (round(width * 0.75), round(height * 0.5))]
+    for sx, sy in starts:
         for ty in range(height):
             for tx in range(width):
                 if (tx - sx) ** 2 + (ty - sy) ** 2 <= START_CLEARING ** 2:
@@ -150,7 +169,7 @@ def main() -> None:
                 "coverageId": COVERAGES[kind][1],
                 "sha256": hashlib.sha256(paths[kind].read_bytes()).hexdigest(),
             } for kind in COVERAGES},
-            "clearedStarts": {"tiles": STARTS, "radius": START_CLEARING},
+            "clearedStarts": {"tiles": starts, "radius": START_CLEARING},
         },
         "attribution": ATTRIBUTION,
     }) + "\n")

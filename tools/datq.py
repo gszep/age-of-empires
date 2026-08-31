@@ -13,8 +13,8 @@ answers the questions that cause it, faster than guessing:
 ``dat.civs[1].units[128]`` or ``dat.graphics[2321]``. Run through the import
 venv, which has genieutils installed:
 
-  .tools/import-venv/bin/python tools/datq.py fields 'dat.civs[1].units[128]'
-  .tools/import-venv/bin/python tools/datq.py grep train 'dat.civs[1].units[128]'
+  uv run --locked python tools/datq.py fields 'dat.civs[1].units[128]'
+  uv run --locked python tools/datq.py grep train 'dat.civs[1].units[128]'
 
 When a field this repo needs is missing from the cheat-sheet, extend the
 table in tools/README.md with what this tool finds.

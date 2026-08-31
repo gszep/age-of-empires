@@ -45,8 +45,12 @@ function addNode(state: GameState, node: NodeKind, position: Point): Entity {
  */
 export const MAP_TILES = 120;
 
-/** Where a player's town center stands. The other player's mirrors across x. */
-const START = { x: 30, y: 60 };
+/** Default town-center position. Baked maps scale the same quarter-map
+ * placement to their own dimensions; the other player mirrors across x. */
+const startFor = (width: number, height: number): Point => ({
+  x: width / 4,
+  y: height / 2,
+});
 
 function addAnimal(state: GameState, kind: AnimalKind, position: Point): Entity {
   const rules = state.rules.units[kind];
@@ -70,8 +74,11 @@ export function createGame(
 ): GameState {
   const descriptor = MAPS[map];
   if (!descriptor) throw new Error(`unknown map type ${map}`);
+  const width = descriptor.baked?.width ?? MAP_TILES;
+  const height = descriptor.baked?.height ?? MAP_TILES;
+  const start = startFor(width, height);
   const state: GameState = {
-    rules, seed: seed || 1, tick: 0, nextId: 1, width: MAP_TILES, height: MAP_TILES,
+    rules, seed: seed || 1, tick: 0, nextId: 1, width, height,
     entities: [], projectiles: [], terrain: [],
     players: {
       1: {
@@ -90,15 +97,15 @@ export function createGame(
 
   for (const player of [1, 2] as PlayerId[]) {
     const at = (point: Point) => player === 1 ? point : mirror(point);
-    addEntity(state, 'town-center', player, at(START), rules.buildings['town-center']);
+    addEntity(state, 'town-center', player, at(start), rules.buildings['town-center']);
     for (const dy of [-1, 0, 1]) {
-      addEntity(state, 'villager', player, at({ x: START.x + 2.8, y: START.y + dy }), rules.units.villager);
+      addEntity(state, 'villager', player, at({ x: start.x + 2.8, y: start.y + dy }), rules.units.villager);
     }
     // `create_object SCOUT`, one per player at 7-9 tiles. On a board this size
     // it is not a luxury: a town center sees eight tiles and the nearest food
     // the script places is ten away, so without something to ride out and look
     // there is nothing known to gather from and the game never starts.
-    addEntity(state, 'scout-cavalry', player, at({ x: START.x + 8, y: START.y }), rules.units['scout-cavalry']);
+    addEntity(state, 'scout-cavalry', player, at({ x: start.x + 8, y: start.y }), rules.units['scout-cavalry']);
   }
   const { terrain } = generateMap(
     {
@@ -109,7 +116,7 @@ export function createGame(
         else addNode(state, kind as NodeKind, at);
       },
     },
-    descriptor, [START, mirror(START)], mirror,
+    descriptor, [start, mirror(start)], mirror,
   );
   state.terrain = terrain;
 

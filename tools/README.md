@@ -16,7 +16,10 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
 
 `npm run import:aoe2` (= `tools/import_aoe2.sh`) regenerates everything byte-identically:
 
-1. `bootstrap.sh` prepares `.tools/import-venv` (genieutils-py and Pillow only).
+1. `bootstrap.sh` runs `uv sync --locked` to prepare the pinned Python tool
+   environment from `pyproject.toml` and `uv.lock` (import, image, and
+   geospatial dependencies). Use `uv run --locked python tools/<tool>.py` for
+   direct invocations; do not install packages with pip.
 2. `import_content.py` reads the declarative `import-spec.json` and extracts the
    Dark Age slice (militia, villager + task variants, town center, barracks,
    house, berries, gold, oak tree) from the patch-matched DAT with
@@ -111,7 +114,7 @@ seconds. Asking it more than two or three questions is slower than writing a
 one-shot script that parses once and prints everything you want.
 
 When a needed field is missing here, look it up once —
-`.tools/import-venv/bin/python tools/datq.py fields 'dat.civs[1].units[128]'`
+`uv run --locked python tools/datq.py fields 'dat.civs[1].units[128]'`
 (or `grep <term> <expr>`, which also searches this table) — and extend this
 table. Do not trial-and-error attribute names.
 

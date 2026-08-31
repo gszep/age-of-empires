@@ -21,6 +21,7 @@
 import type { NodeKind } from './data';
 import paintedProof from './maps/painted-proof.json';
 import senlac from './maps/senlac.json';
+import windsor from './maps/windsor.json';
 import { random01 } from './random';
 import type { AnimalKind, Point } from './types';
 
@@ -165,6 +166,14 @@ export const MAPS: Record<string, MapDescriptor> = {
   senlac: {
     base: 'grass',
     baked: senlac,
+    opening: ARABIA.opening,
+  },
+  // Windsor Castle, the Long Walk and the Thames corridor in a 168-tile
+  // diamond whose south corner is the Copper Horse. Water is still classified
+  // as grass; this first pass exists to validate the real-world footprint.
+  windsor: {
+    base: 'grass',
+    baked: windsor,
     opening: ARABIA.opening,
   },
 };

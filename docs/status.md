@@ -897,7 +897,9 @@ plus the BC4 shadow and player-colour masks — and was verified byte-identical
 to the previously used openage decoder across all 29,783 imported frames
 before the swap. The openage checkout, its C++/Cython build, and the
 per-atlas subprocess isolation that guarded against its crashes are gone;
-`tools/requirements.txt` is down to genieutils-py and Pillow.
+The locked `uv` environment is defined by `pyproject.toml` and `uv.lock`; it
+contains the narrow sprite/UI import dependencies plus NumPy and rasterio for
+the offline geospatial importer.
 
 Two format facts discovered on the way, both violated by
 `b_west_stable_age2_x1.sld` (the file that crashed openage): the header field
@@ -951,10 +953,22 @@ construction-complete cue, so there is none rather than an approximation.
 
 ## The map
 
-The board is 120x120 tiles, square, which is AoE2's "tiny" — the size two
-players get. The game's own string table is where that number comes from: each
-size's key encodes its tile dimension, `MAPSIZE_TINY` being 25120 next to
+The playable board is 120x120 tiles, square, which is AoE2's "tiny" — the size
+two players get. The game's own string table is where that number comes from:
+each size's key encodes its tile dimension, `MAPSIZE_TINY` being 25120 next to
 `MAPSIZE_SMALL` 25144 and `MAPSIZE_NORMAL` 25200.
+
+`src/sim/maps/windsor.json` is a playable 168x168 real-ground descriptor for
+Windsor, selected with `?map=windsor`. Baked descriptors now set the state's
+actual dimensions while the generated maps remain 120x120. At 35 m per tile its
+8.316 km north-south diamond puts the south corner on the Copper Horse at Snow
+Hill (51.445102, -0.609320), the north corner in Slough, and the east/west
+corners beyond Datchet and Clewer, so the footprint contains Windsor Castle,
+the Long Walk, and a broad reach of the Thames. Its source is Environment Agency
+DTM/VOM under the OGL, not an Ordnance Survey raster. It currently records
+elevation and tree canopy only: the Thames is geographically inside the bounds
+but is grass because the geo importer and simulation do not yet classify/render
+water.
 
 The opening is laid out from `land_resources.inc`, the include every
 Arabia-family random-map script pulls in for its player start. Its

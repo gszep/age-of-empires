@@ -72,6 +72,13 @@ construction-complete cue, so that one has no owned source to draw on.
 
 ## Water
 
+- **The playable Windsor first pass has no water classification.**
+  `src/sim/maps/windsor.json` is the requested 168x168, 35 m/tile diamond with
+  its south corner on the Copper Horse and a broad Thames reach in bounds; it
+  is playable via `?map=windsor`. The EA importer currently classifies only
+  canopy and relief, so the river is grass. After the corner review, add a
+  licensed surface-water layer and verify continuous Thames terrain.
+
 Not started, and deliberately: it changes the board rather than adding to it.
 `docs/water-design.md` is the scope — the DAT's water terrain slots, the
 terrain-restriction rows that decide who floats and who wades, and the dock

@@ -52,7 +52,7 @@ try {
 } catch { /* open fallback rules */ }
 
 // Which map type the page deals: ?map=black-forest, ?map=senlac,
-// ?map=painted-proof, or nothing for arabia. An unknown name falls back
+// ?map=windsor, ?map=painted-proof, or nothing for arabia. An unknown name falls back
 // rather than killing the page, and asking for a map explicitly means a
 // fresh board of it -- not whatever match a dev-session snapshot resumes.
 const mapParam = new URLSearchParams(location.search).get('map');

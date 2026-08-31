@@ -7,7 +7,7 @@ slot -- but never says which frame a tile draws, which is engine behaviour. So
 the question is which of three mappings matches the installed game, and this
 draws all three at the reference's own 96x48 tile so a human can point at one.
 
-    .tools/import-venv/bin/python tools/probes/farm_mapping.py
+    uv run --locked python tools/probes/farm_mapping.py
 
 Writes farm_options.png beside the imported terrain it reads.
 """

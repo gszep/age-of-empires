@@ -2,9 +2,10 @@
 # One command regenerates every imported manifest/atlas/UI asset byte-identically.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+"$ROOT/tools/bootstrap.sh"
 # AOE2DE_DEPOT_ROOT, or the SteamCMD/Steam download locations tools/depot.py
 # knows about -- the same resolution the integration tests use.
-DEPOT_ROOT="$(python3 "$ROOT/tools/depot.py")"
+DEPOT_ROOT="$(uv run --project "$ROOT" --locked python "$ROOT/tools/depot.py")"
 DAT="$DEPOT_ROOT/depot_813781/resources/_common/dat/empires2_x2_p1.dat"
 SOUNDS="$DEPOT_ROOT/depot_813781/resources/_common/dat/sounds.json"
 PALETTES="$DEPOT_ROOT/depot_813781/resources/_common/palettes"
@@ -21,12 +22,11 @@ for required in "$DAT" "$SOUNDS" "$PALETTES" "$WIDGETUI" "$TERRAIN" "$GRAPHICS";
   fi
 done
 
-"$ROOT/tools/bootstrap.sh"
-"$ROOT/.tools/import-venv/bin/python" "$ROOT/tools/import_content.py" \
+uv run --project "$ROOT" --locked python "$ROOT/tools/import_content.py" \
   --dat "$DAT" --graphics "$GRAPHICS" --palettes "$PALETTES"
-"$ROOT/.tools/import-venv/bin/python" "$ROOT/tools/convert_sld.py" \
+uv run --project "$ROOT" --locked python "$ROOT/tools/convert_sld.py" \
   --graphics "$GRAPHICS" --terrain "$TERRAIN"
-"$ROOT/.tools/import-venv/bin/python" "$ROOT/tools/import_ui.py" \
+uv run --project "$ROOT" --locked python "$ROOT/tools/import_ui.py" \
   --widgetui "$WIDGETUI" --sounds "$SOUNDS"
 
 if [ -f "$AUDIO_PACK" ]; then
@@ -35,7 +35,7 @@ if [ -f "$AUDIO_PACK" ]; then
     echo "Install vgmstream (macOS: brew install vgmstream), then rerun." >&2
     exit 2
   fi
-  "$ROOT/.tools/import-venv/bin/python" "$ROOT/tools/import_audio.py" \
+  uv run --project "$ROOT" --locked python "$ROOT/tools/import_audio.py" \
     --pack "$AUDIO_PACK" --content "$ROOT/.local/aoe2de/content.json"
 else
   rm -rf "$ROOT/public/imported/aoe2/audio"

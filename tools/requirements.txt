@@ -1,3 +1,0 @@
-# Import-time tools only; never linked into the TypeScript runtime.
-genieutils-py==0.1.2
-pillow==12.3.0

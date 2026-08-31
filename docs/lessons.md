@@ -474,3 +474,11 @@ keeps the record.
   results on disk and no verdict. Rule: a job meant to outlive the command
   that starts it is started with `setsid` (its own process group) writing an
   exit-file, and waited on from a *separate* command via the file.
+
+- **Python tooling is a locked uv project, not an ad-hoc venv.** The first
+  Windsor terrain pass had to install NumPy and rasterio into the old import
+  venv by hand because its requirements file described only the sprite tools.
+  Rule: every Python tool dependency belongs in `pyproject.toml`/`uv.lock`, all
+  setup and execution goes through `uv sync/run --locked`, and independent
+  coverage fetches and NumPy reductions use bounded parallel workers rather
+  than serialising work on this many-core machine.

@@ -250,6 +250,32 @@ describe('a painted map', () => {
   });
 });
 
+describe('the Windsor footprint', () => {
+  const descriptor = JSON.parse(readFileSync('src/sim/maps/windsor.json', 'utf8')) as {
+    width: number; height: number; terrain: number[];
+    source: { clearedStarts: { tiles: [number, number][] } };
+  };
+
+  it('deals the full 168-tile baked board with starts in its recorded clearings', () => {
+    const state = createGame(42, FALLBACK_RULES, undefined, 'windsor');
+    expect([state.width, state.height]).toEqual([168, 168]);
+    expect(state.terrain).toEqual(descriptor.terrain);
+    const townCentres = state.entities
+      .filter(e => e.kind === 'town-center')
+      .map(e => [e.position.x, e.position.y]);
+    expect(townCentres).toEqual(descriptor.source.clearedStarts.tiles);
+  });
+
+  it('remains deterministic at the larger dimensions', () => {
+    const play = () => {
+      const state = createGame(17, FALLBACK_RULES, undefined, 'windsor');
+      for (let i = 0; i < 50; i++) stepGame(state);
+      return checksumState(state);
+    };
+    expect(play()).toBe(play());
+  });
+});
+
 describe('the ridge at senlac', () => {
   // C2: real ground. The descriptor was built offline from the Environment
   // Agency's 1m LIDAR and Vegetation Object Model over the registered
