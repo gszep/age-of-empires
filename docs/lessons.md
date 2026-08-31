@@ -494,3 +494,8 @@ keeps the record.
   cache spent fifteen minutes decoding unrelated SLDs before the harness killed
   it. Rule: use `convert_sld.py --terrain-only` when validating terrain slots
   against an existing manifest; the full pipeline remains the clean-build gate.
+- **Minimap dots scale with the board, not the UI panel.** A tree was always a
+  3-pixel square, which is right on 120x120 but makes one tree cover roughly ten
+  terrain cells on Windsor's 392x392 raster; 5,635 thinned trees therefore read
+  as much denser forest than exists. Rule: preserve the classic size at 120 and
+  scale resource dots down to a one-pixel floor as map resolution rises.

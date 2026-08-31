@@ -969,7 +969,9 @@ and a broad reach of the Thames. Relief and canopy come from the Environment
 Agency DTM/VOM; OS OpenMap Local's `SurfaceWater_Area` polygons and `Road`
 lines supply the Thames and roads, including the explicitly named Long Walk.
 All are OGL. Eight quantised elevation levels (14.0–87.2 m) raise the shared
-ground/fog vertices and every entity. The DAT's owned grass, forest, shallow
+ground/fog vertices and every entity by half a tile face per level; a restrained
+altitude tone and north-west hillshade make that geometry legible in the otherwise
+unlit orthographic view. The DAT's owned grass, forest, shallow
 water and road textures (`g_grs`, `g_for`, `g_wtr`, `g_rd1`) draw the four
 surveyed classes. Forest tree entities are deterministically thinned to one in
 four on this high-resolution board (5,635 in the measured match) while the

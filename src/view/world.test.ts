@@ -119,12 +119,16 @@ describe('meshes that lie on the ground', () => {
     state.elevation.fill(0);
     state.elevation[0] = 4;
     const ground = createGround(state);
-    const positions = (ground.getObjectByName('terrain-ground') as THREE.Mesh)
-      .geometry.getAttribute('position');
+    const mesh = ground.getObjectByName('terrain-ground') as THREE.Mesh;
+    const positions = mesh.geometry.getAttribute('position');
     expect(positions.getY(0)).toBeGreaterThan(0);
     // East corner of tile 0 is shared with west-side tiles through one averaged
     // vertex height rather than each tile inventing its own cliff edge.
     expect(positions.getY(1)).toBeGreaterThan(worldToIso(1, 0).y);
+    const colors = mesh.geometry.getAttribute('color');
+    const shades = Array.from({ length: colors.count }, (_, index) => colors.getX(index));
+    expect(Math.max(...shades) - Math.min(...shades)).toBeGreaterThan(0.1);
+    expect((mesh.material as THREE.MeshBasicMaterial).vertexColors).toBe(true);
   });
 
   it('never leaves a clockwise ground quad on the culled side', () => {

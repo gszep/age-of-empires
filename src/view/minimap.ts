@@ -18,6 +18,13 @@ const ROAD = [0xa8, 0x7d, 0x4e] as const;
 const FOREST = [0x31, 0x5f, 0x35] as const;
 const REMEMBERED_FACTOR = 0.55;
 
+/** Keep resources at roughly one map tile rather than a fixed three pixels.
+ * A fixed dot made each Windsor tree cover about 10 surveyed tiles and turned
+ * its minimap into an apparently solid forest. */
+export function minimapResourceDotSize(width: number, height: number): number {
+  return Math.max(1, Math.min(3, 360 / Math.max(width, height)));
+}
+
 export class Minimap {
   private context: CanvasRenderingContext2D;
 
@@ -100,6 +107,7 @@ export class Minimap {
     const ownerColor = (owner: number): string =>
       playerColorHex(assets, owner) ?? '#ffffff';
     const visibility = state.visibility[this.player];
+    const resourceDotSize = minimapResourceDotSize(state.width, state.height);
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     // Terrain and fog, as one image under the same mapping `toCanvas` applies:
@@ -127,7 +135,8 @@ export class Minimap {
         const color = entity.kind === 'resource'
           ? RESOURCE_COLORS[entity.resourceKind ?? 'wood']
           : ownerColor(entity.owner);
-        const size = entity.kind === 'town-center' ? 6 : entity.kind === 'resource' ? 3 : entity.radius > 0.5 ? 5 : 2.5;
+        const size = entity.kind === 'town-center' ? 6
+          : entity.kind === 'resource' ? resourceDotSize : entity.radius > 0.5 ? 5 : 2.5;
         drawDot(entity.position.x, entity.position.y, color, size);
       }
     }
@@ -137,7 +146,11 @@ export class Minimap {
       const color = remembered.kind === 'resource'
         ? RESOURCE_COLORS[remembered.resource ?? 'wood']
         : ownerColor(remembered.owner);
-      drawDot(remembered.x, remembered.y, color, remembered.kind === 'town-center' ? 6 : 3);
+      drawDot(
+        remembered.x, remembered.y, color,
+        remembered.kind === 'town-center' ? 6
+          : remembered.kind === 'resource' ? resourceDotSize : 3,
+      );
     }
 
     // Camera viewport diamond.

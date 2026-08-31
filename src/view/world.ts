@@ -9,7 +9,9 @@ import type { GameState } from '../sim/types';
  * authored `dimensions` tiles (10x10 for Grass) and the surface stays
  * continuous across tile edges. Without it, a two-tone diamond grid stands in.
  */
-export const ELEVATION_PIXELS = 8;
+// One terrain level uses the same vertical scale as one world-height unit for
+// projectiles: half a tile face in this dimetric projection.
+export const ELEVATION_PIXELS = TILE_H / 2;
 
 /** Height at a world point, in authored levels. Tile means are deliberately
  * sampled rather than invented slopes for entities; ground vertices average
@@ -45,7 +47,23 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
     { key: 'water', ids: new Set([1]), fallback: 0x4f91bd },
     { key: 'road', ids: new Set([24]), fallback: 0xb18a58 },
   ];
-  const buckets = classes.map(() => ({ positions: [] as number[], uvs: [] as number[] }));
+  const buckets = classes.map(() => ({
+    positions: [] as number[], uvs: [] as number[], colors: [] as number[],
+  }));
+  const maxElevation = state.elevation?.reduce((highest, level) => Math.max(highest, level), 0) ?? 0;
+  const shadeAt = (x: number, y: number): number => {
+    const sample = (px: number, py: number) => cornerElevation(
+      state, Math.max(0, Math.min(state.width, px)), Math.max(0, Math.min(state.height, py)),
+    );
+    const level = sample(x, y);
+    // Geometry provides the rise. This restrained north-west hillshade and
+    // altitude tone merely make broad slopes legible in an otherwise unlit,
+    // orthographic scene instead of letting the texture read as a flat sheet.
+    const across = sample(x - 1, y) - sample(x + 1, y);
+    const down = sample(x, y - 1) - sample(x, y + 1);
+    const altitude = maxElevation ? level / maxElevation * 0.16 : 0.16;
+    return Math.max(0.68, Math.min(1, 0.82 + altitude + (across + down) * 0.035));
+  };
   for (let y = 0; y < state.height; y++) {
     for (let x = 0; x < state.width; x++) {
       const terrain = state.terrain[y * state.width + x] ?? 0;
@@ -55,7 +73,7 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
       const point = (px: number, py: number) => {
         const iso = worldToIso(px, py);
         iso.y += cornerElevation(state, px, py) * ELEVATION_PIXELS;
-        return { iso, u: px / spanX, v: py / spanY };
+        return { iso, u: px / spanX, v: py / spanY, shade: shadeAt(px, py) };
       };
       const [north, east, south, west] = [
         point(x, y), point(x + 1, y), point(x + 1, y + 1), point(x, y + 1),
@@ -65,6 +83,7 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
         for (const corner of [a, b, c]) {
           bucket.positions.push(corner.iso.x, corner.iso.y, 0);
           bucket.uvs.push(corner.u, corner.v);
+          bucket.colors.push(corner.shade, corner.shade, corner.shade);
         }
       }
     }
@@ -75,10 +94,12 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(buckets[index].positions, 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(buckets[index].uvs, 2));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(buckets[index].colors, 3));
     const slot = assets?.terrain?.[entry.key];
     const texture = slot && assets?.textures.get(slot.image);
     const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-      ...(texture ? { map: texture } : { color: entry.fallback }), side: THREE.DoubleSide,
+      ...(texture ? { map: texture } : { color: entry.fallback }),
+      vertexColors: true, side: THREE.DoubleSide,
     }));
     mesh.renderOrder = 0;
     mesh.name = `terrain-${entry.key}`;
