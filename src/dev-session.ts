@@ -16,7 +16,7 @@ import type { GameRules } from './sim/data';
 import type { GameState } from './sim/types';
 
 const KEY = 'open-empires-lab:dev-session';
-const VERSION = 1;
+const VERSION = 2;
 
 interface Snapshot {
   version: number;

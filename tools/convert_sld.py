@@ -149,11 +149,27 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=root / "public/imported/aoe2")
     parser.add_argument("--cache", type=Path, default=root / ".local/aoe2de/atlas-cache.json")
     parser.add_argument("--fresh", action="store_true", help="ignore the atlas cache")
+    parser.add_argument("--terrain-only", action="store_true",
+                        help="update terrain textures in an existing manifest without decoding SLDs")
     args = parser.parse_args()
 
     imported = json.loads(args.content.read_text())
-    jobs = atlas_jobs(imported)
     source_hashes = imported["source"]["sha256"]
+    if args.terrain_only:
+        manifest_path = args.out / "manifest.json"
+        if not manifest_path.is_file():
+            raise FileNotFoundError("--terrain-only needs an existing manifest")
+        manifest = json.loads(manifest_path.read_text())
+        hashes = dict(manifest.get("source", {}).get("sha256", {}))
+        manifest["terrain"] = convert_terrain(
+            imported.get("terrain", {}), args.terrain, args.out, hashes,
+        )
+        manifest.setdefault("source", {})["sha256"] = hashes
+        manifest_path.write_text(json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n")
+        print(manifest_path)
+        return
+
+    jobs = atlas_jobs(imported)
 
     # Decoding every frame of every animation takes about twenty minutes, and
     # adding one unit re-decodes the other seventy-odd sources for nothing. An

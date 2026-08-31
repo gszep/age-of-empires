@@ -686,6 +686,11 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(ground["name"], "Grass")
         self.assertEqual(ground["texture"], "g_grs")
         self.assertEqual(ground["dimensions"], [10, 10])
+        self.assertEqual(
+            {key: (self.result["terrain"][key]["terrainId"], self.result["terrain"][key]["texture"])
+             for key in ("water", "road", "forest")},
+            {"water": (1, "g_wtr"), "road": (24, "g_rd1"), "forest": (10, "g_for")},
+        )
 
     def test_terrain_texture_converts_to_a_loadable_png(self):
         with tempfile.TemporaryDirectory() as directory:

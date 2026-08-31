@@ -581,11 +581,10 @@ descriptor; neither adds a runtime dependency.
   OS sheet without rotating either; the descriptor's `source.orientation`
   records this and `source.centre` the diamond's centre. Baked ground is deliberately unmirrored — DE's own Real
   World shape — while the object pass still mirrors.
-- **The relief is in the descriptor and not on the screen.** Elevation
-  renders nowhere yet (M5 stands deferred), so `senlac.json` carries the
-  ridge as quantised levels plus datum and metres-per-level, waiting. The
-  acceptance "the ridge is the real ridge" is met in the data and honestly
-  not in the picture; `status.md` says so.
+- **Surveyed relief now reaches the screen, but not gameplay.** `senlac.json`
+  and `windsor.json` carry quantised levels plus datum and metres-per-level;
+  shared terrain/fog vertices and entities draw those levels. M5 remains open
+  for slope-aware pathing, cliffs and the original's downhill combat rule.
 - **The global Copernicus/WorldCover backend is not built.** Both AWS COGs
   answer range reads (checked), so the fallback path is open; Britain-first
   consumed the night. Recorded in `backlog.md`.

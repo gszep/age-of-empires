@@ -482,3 +482,15 @@ keeps the record.
   setup and execution goes through `uv sync/run --locked`, and independent
   coverage fetches and NumPy reductions use bounded parallel workers rather
   than serialising work on this many-core machine.
+
+- **Map resolution and simulation density are separate decisions.** Windsor at
+  15 m/tile needs 153,664 terrain cells to preserve recognizable roads and
+  water, but turning all 22,401 canopy cells into entities would make the
+  browser pay for detail the ground texture already carries. Rule: retain the
+  complete authoritative terrain raster and deterministically thin repeated
+  scenery entities (`bakedTreeStride`), with tests for the resulting bound.
+- **A terrain-only import must not wait behind all sprite decoding.** Adding
+  three DAT terrain slots and invoking the full converter without an atlas
+  cache spent fifteen minutes decoding unrelated SLDs before the harness killed
+  it. Rule: use `convert_sld.py --terrain-only` when validating terrain slots
+  against an existing manifest; the full pipeline remains the clean-build gate.

@@ -15,7 +15,7 @@ import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
 import { createEntityView, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
-import { createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline } from './view/world';
+import { createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline, elevatedWorldToIso, elevationAt, ELEVATION_PIXELS } from './view/world';
 import { createCueWatcher, pollCues } from './view/cues';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 
@@ -152,7 +152,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x18140c);
 const camera = new THREE.OrthographicCamera(-innerWidth / 2, innerWidth / 2, innerHeight / 2, -innerHeight / 2, -1000, 1000);
 camera.position.z = 10;
-let cameraCenter = { ...worldToIso(8, 9) };
+let cameraCenter = { ...elevatedWorldToIso(game, 8, 9) };
 let zoom = 1;
 
 let ground = view.createGround(game, assets);
@@ -289,7 +289,7 @@ function createHud(): Hud {
     onCommand: id => runUiCommand(id),
     onMinimapNavigate: canvasPoint => {
       const world = hud.minimap.fromCanvas(game, canvasPoint.x, canvasPoint.y);
-      cameraCenter = worldToIso(world.x, world.y);
+      cameraCenter = elevatedWorldToIso(game, world.x, world.y);
     },
     onSelectIdleVillager: () => selectIdleVillager(),
     onSelectMember: id => {
@@ -320,7 +320,7 @@ if (import.meta.hot) {
     flashTarget: () => orderFlash?.entityId,
     apply: command => applyCommand(game, command),
     select: ids => { selectedIds = ids; },
-    lookAt: point => { cameraCenter = worldToIso(point.x, point.y); },
+    lookAt: point => { cameraCenter = elevatedWorldToIso(game, point.x, point.y); },
     renderer,
     scene,
     camera,
@@ -349,7 +349,7 @@ function selectIdleVillager(): void {
   const current = idle.findIndex(e => selectedIds.includes(e.id));
   const next = idle[(current + 1) % idle.length];
   selectedIds = [next.id];
-  cameraCenter = worldToIso(next.position.x, next.position.y);
+  cameraCenter = elevatedWorldToIso(game, next.position.x, next.position.y);
 }
 
 function runUiCommand(id: string): void {
@@ -419,7 +419,7 @@ function runUiCommand(id: string): void {
 /** Whether a world point is inside the visible canvas, for "on screen" rules. */
 function isOnScreen(point: Point): boolean {
   const rect = renderer.domElement.getBoundingClientRect();
-  const iso = worldToIso(point.x, point.y);
+  const iso = elevatedWorldToIso(game, point.x, point.y);
   const sx = (iso.x - cameraCenter.x) * zoom + rect.width / 2;
   const sy = -(iso.y - cameraCenter.y) * zoom + rect.height / 2;
   return sx >= 0 && sx <= rect.width && sy >= 0 && sy <= rect.height;
@@ -434,7 +434,14 @@ function screenToWorld(clientX: number, clientY: number): Point {
   const rect = renderer.domElement.getBoundingClientRect();
   const sx = (clientX - rect.left - rect.width / 2) / zoom + cameraCenter.x;
   const sy = -((clientY - rect.top - rect.height / 2) / zoom) + cameraCenter.y;
-  return isoToWorld(sx, sy);
+  let point = isoToWorld(sx, sy);
+  // Invert the raised terrain iteratively: the first pass finds the tile on
+  // the flat projection, the second removes that tile's surveyed screen lift.
+  for (let pass = 0; pass < 2; pass++) {
+    const raise = elevationAt(game, point.x, point.y) * ELEVATION_PIXELS;
+    point = isoToWorld(sx, sy - raise);
+  }
+  return point;
 }
 
 function pickEntity(point: Point): Entity | undefined {
@@ -701,7 +708,7 @@ addEventListener('keydown', event => {
     const tc = game.entities.find(e => e.owner === 1 && e.kind === 'town-center' && !e.dead);
     if (tc) {
       selectedIds = [tc.id];
-      cameraCenter = worldToIso(tc.position.x, tc.position.y);
+      cameraCenter = elevatedWorldToIso(game, tc.position.x, tc.position.y);
     }
     return;
   }
@@ -1027,6 +1034,9 @@ function syncScene(time: number): void {
       scene.add(flagView.group);
     }
     view.updateFlagView(flagView, assets, entity.owner, entity.rally.target, time);
+    flagView.body.mesh.position.y += elevationAt(
+      game, entity.rally.target.x, entity.rally.target.y,
+    ) * ELEVATION_PIXELS;
   }
 
   // Arrows in flight. They are simulation state, so they render from it
@@ -1066,7 +1076,7 @@ function syncScene(time: number): void {
     const art = shooterRules?.unpacked?.projectileArt ?? shooterRules?.projectileArt ?? 'arrow';
     view.updateProjectileView(
       entityView, assets, projectile.position, heading, progress, span, projectile.launchHeight,
-      art, time,
+      art, time, elevationAt(game, projectile.position.x, projectile.position.y) * ELEVATION_PIXELS,
     );
   }
 
@@ -1092,7 +1102,7 @@ function syncScene(time: number): void {
   let outlinesUsed = 0;
   const drawMarker = (entity: Entity): void => {
     const marker = selectionMarker(entity);
-    const iso = worldToIso(entity.position.x, entity.position.y);
+    const iso = elevatedWorldToIso(game, entity.position.x, entity.position.y);
     if (marker.shape === 'round') {
       if (ringsUsed === ringPool.length) {
         const ring = new THREE.Mesh(
@@ -1151,7 +1161,7 @@ function syncScene(time: number): void {
     const target = placementTarget();
     const legal = placementLegal(game, buildMode, target, orientationOf(buildMode, target)).ok;
     const tint = legal ? 0x7fff9e : 0xff5f5f;
-    const iso = worldToIso(target.x, target.y);
+    const iso = elevatedWorldToIso(game, target.x, target.y);
     ghostFootprint!.visible = true;
     ghostFootprint!.position.set(iso.x, iso.y, 0);
     (ghostFootprint!.material as THREE.MeshBasicMaterial).color.set(tint);
@@ -1202,7 +1212,7 @@ function updateWallPreview(): void {
     const tile = tiles[index];
     mesh.visible = tile !== undefined;
     if (!tile) continue;
-    const iso = worldToIso(tile.x, tile.y);
+    const iso = elevatedWorldToIso(game, tile.x, tile.y);
     mesh.position.set(iso.x, iso.y, 0);
     const legal = placementLegal(game, buildMode!, tile).ok;
     (mesh.material as THREE.MeshBasicMaterial).color.set(legal ? 0x7fff9e : 0xff5f5f);
@@ -1327,22 +1337,25 @@ renderer.setAnimationLoop(now => {
 // and fall through to Vite's default full reload: those either own or reshape
 // authoritative state, and hot-patching them risks a silent divergence from
 // what a deterministic replay of the same seed would produce.
-function disposeMesh(mesh: THREE.Mesh): void {
-  mesh.geometry.dispose();
-  const material = mesh.material;
-  if (Array.isArray(material)) material.forEach(entry => entry.dispose());
-  else material.dispose();
+function disposeObject(object: THREE.Object3D): void {
+  object.traverse(child => {
+    if (!(child instanceof THREE.Mesh)) return;
+    child.geometry.dispose();
+    const material = child.material;
+    if (Array.isArray(material)) material.forEach(entry => entry.dispose());
+    else material.dispose();
+  });
 }
 
 /** Recreate every view-owned object from the current simulation state. */
 function rebuildPresentation(): void {
   scene.remove(ground);
-  disposeMesh(ground);
+  disposeObject(ground);
   ground = view.createGround(game, assets);
   scene.add(ground);
 
   scene.remove(fog.mesh);
-  disposeMesh(fog.mesh);
+  disposeObject(fog.mesh);
   fog = view.createFog(game);
   scene.add(fog.mesh);
   fog.update(game);

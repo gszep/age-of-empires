@@ -13,7 +13,10 @@ const RESOURCE_COLORS: Record<string, string> = {
 /** Fog shades, as RGB triples so the per-tile buffer can be written directly. */
 const UNEXPLORED = [0x00, 0x00, 0x00] as const;
 const IN_SIGHT = [0x6f, 0x8f, 0x4a] as const;
-const REMEMBERED = [0x3c, 0x4d, 0x2c] as const;
+const WATER = [0x38, 0x78, 0xa8] as const;
+const ROAD = [0xa8, 0x7d, 0x4e] as const;
+const FOREST = [0x31, 0x5f, 0x35] as const;
+const REMEMBERED_FACTOR = 0.55;
 
 export class Minimap {
   private context: CanvasRenderingContext2D;
@@ -45,13 +48,16 @@ export class Minimap {
     const visibility = state.visibility[this.player];
     const pixels = this.tiles.image.data;
     for (let index = 0; index < state.width * state.height; index++) {
-      const shade = reveal ? IN_SIGHT
-        : visibility.explored[index] !== 1 ? UNEXPLORED
-        : visibility.visible[index] === 1 ? IN_SIGHT : REMEMBERED;
+      const terrain = state.terrain[index] ?? 0;
+      const base = terrain === 1 ? WATER : terrain === 24 ? ROAD : terrain === 10 ? FOREST : IN_SIGHT;
+      const unexplored = !reveal && visibility.explored[index] !== 1;
+      const remembered = !reveal && !unexplored && visibility.visible[index] !== 1;
+      const shade = unexplored ? UNEXPLORED : base;
+      const factor = remembered ? REMEMBERED_FACTOR : 1;
       const at = index * 4;
-      pixels[at] = shade[0];
-      pixels[at + 1] = shade[1];
-      pixels[at + 2] = shade[2];
+      pixels[at] = shade[0] * factor;
+      pixels[at + 1] = shade[1] * factor;
+      pixels[at + 2] = shade[2] * factor;
       pixels[at + 3] = 255;
     }
     this.tiles.canvas.getContext('2d')!.putImageData(this.tiles.image, 0, 0);

@@ -27,8 +27,8 @@ construction-complete cue, so that one has no owned source to draw on.
 
 ## Rendering
 
-- **Terrain blends/masks** are not consumed; terrain-to-terrain transitions
-  are absent (single-terrain maps hide this today). The blocker is a mapping,
+- **Terrain blends/masks** are not consumed; Windsor consequently shows hard
+  tile edges between grass, forest, roads and water. The blocker is a mapping,
   not the pipeline: nothing in the owned files says which `terrain/blends/`
   file a terrain's `blend_type` selects, nor how a 512x512 blend is indexed
   against a tile. See the note in `overnight.md` for what was measured.
@@ -72,12 +72,11 @@ construction-complete cue, so that one has no owned source to draw on.
 
 ## Water
 
-- **The playable Windsor first pass has no water classification.**
-  `src/sim/maps/windsor.json` is the requested 168x168, 35 m/tile diamond with
-  its south corner on the Copper Horse and a broad Thames reach in bounds; it
-  is playable via `?map=windsor`. The EA importer currently classifies only
-  canopy and relief, so the river is grass. After the corner review, add a
-  licensed surface-water layer and verify continuous Thames terrain.
+- **Windsor's surveyed water is visual terrain, not water gameplay.**
+  `src/sim/maps/windsor.json` uses OS OpenMap Local water polygons and the
+  renderer consumes the DAT's owned shallow-water texture, but those tiles
+  remain passable to land units and have hard unblended shores. Apply
+  terrain-restriction passability and blend-backed shores as W1-W2 require.
 
 Not started, and deliberately: it changes the board rather than adding to it.
 `docs/water-design.md` is the scope — the DAT's water terrain slots, the
@@ -244,12 +243,11 @@ terrain blends above.
   and attacks in threes, and that is the whole of it — no blacksmith, no
   market, no stable, and no choice among the sixty-six technologies it could
   research.
-- **The renderer cannot draw elevation, and Senlac is waiting on it.** The
-  `senlac` descriptor carries the real ridge as quantised levels (datum and
-  metres-per-level recorded); the board plays flat. Elevation is M5 in
-  `docs/map-generation-design.md` — a renderer, pathfinder, fog and combat
-  change together (the original's downhill bonus is in the DAT), staged and
-  deliberately not started mid-run.
+- **Elevation is visual but not yet gameplay.** Windsor and Senlac raise
+  shared terrain/fog vertices and entities from their quantised surveyed
+  levels. Pathfinding still treats every slope as level and combat has no
+  downhill bonus; finish those authoritative parts of M5 in
+  `docs/map-generation-design.md` before calling elevation complete.
 - **The global geo backend is not built.** `tools/import_terrain.py` speaks
   only to the Environment Agency's WCS (Britain, OGL). The Copernicus GLO-30
   and ESA WorldCover COGs on AWS both answer HTTP range reads (checked

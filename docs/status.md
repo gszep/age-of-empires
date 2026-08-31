@@ -958,17 +958,25 @@ two players get. The game's own string table is where that number comes from:
 each size's key encodes its tile dimension, `MAPSIZE_TINY` being 25120 next to
 `MAPSIZE_SMALL` 25144 and `MAPSIZE_NORMAL` 25200.
 
-`src/sim/maps/windsor.json` is a playable 168x168 real-ground descriptor for
-Windsor, selected with `?map=windsor`. Baked descriptors now set the state's
-actual dimensions while the generated maps remain 120x120. At 35 m per tile its
-8.316 km north-south diamond puts the south corner on the Copper Horse at Snow
-Hill (51.445102, -0.609320), the north corner in Slough, and the east/west
-corners beyond Datchet and Clewer, so the footprint contains Windsor Castle,
-the Long Walk, and a broad reach of the Thames. Its source is Environment Agency
-DTM/VOM under the OGL, not an Ordnance Survey raster. It currently records
-elevation and tree canopy only: the Thames is geographically inside the bounds
-but is grass because the geo importer and simulation do not yet classify/render
-water.
+`src/sim/maps/windsor.json` is a playable 392x392 real-ground descriptor for
+Windsor, selected with `?map=windsor`. Baked descriptors set the state's actual
+dimensions while generated maps remain 120x120. At 15 m per tile its 8.316 km
+north-south diamond puts the south corner about 350 m beyond the Copper Horse
+at Snow Hill (51.441956, -0.609415), the north corner in Slough, and the
+east/west corners beyond Datchet and Clewer. The footprint therefore contains
+Windsor Castle, the complete Long Walk and its continuation around Snow Hill,
+and a broad reach of the Thames. Relief and canopy come from the Environment
+Agency DTM/VOM; OS OpenMap Local's `SurfaceWater_Area` polygons and `Road`
+lines supply the Thames and roads, including the explicitly named Long Walk.
+All are OGL. Eight quantised elevation levels (14.0–87.2 m) raise the shared
+ground/fog vertices and every entity. The DAT's owned grass, forest, shallow
+water and road textures (`g_grs`, `g_for`, `g_wtr`, `g_rd1`) draw the four
+surveyed classes. Forest tree entities are deterministically thinned to one in
+four on this high-resolution board (5,635 in the measured match) while the
+forest floor remains complete. Surveyed points place a neutral owned-art castle
+at Windsor Castle and a static neutral mounted horse at the Copper Horse; these
+are representative AoE2 pieces, not reconstructions of the actual buildings or
+statue. Water remains passable and terrain blend masks are not yet consumed.
 
 The opening is laid out from `land_resources.inc`, the include every
 Arabia-family random-map script pulls in for its player start. Its

@@ -256,10 +256,18 @@ describe('the Windsor footprint', () => {
     source: { clearedStarts: { tiles: [number, number][] } };
   };
 
-  it('deals the full 168-tile baked board with starts in its recorded clearings', () => {
+  it('deals the full 392-tile baked board with starts in its recorded clearings', () => {
     const state = createGame(42, FALLBACK_RULES, undefined, 'windsor');
-    expect([state.width, state.height]).toEqual([168, 168]);
+    expect([state.width, state.height]).toEqual([392, 392]);
     expect(state.terrain).toEqual(descriptor.terrain);
+    expect(state.terrain.filter(id => id === 1).length).toBeGreaterThan(13_000);
+    expect(state.terrain.filter(id => id === 24).length).toBeGreaterThan(20_000);
+    expect(state.entities.filter(e => e.kind === 'resource' && e.resourceKind === 'wood').length)
+      .toBeLessThan(6_000);
+    const castle = state.entities.find(e => e.owner === 0 && e.kind === 'castle');
+    const horse = state.entities.find(e => e.owner === 0 && e.kind === 'scout-cavalry');
+    expect(castle?.position).toEqual({ x: 183.007, y: 158.543 });
+    expect(horse?.position).toEqual({ x: 375.012, y: 375.012 });
     const townCentres = state.entities
       .filter(e => e.kind === 'town-center')
       .map(e => [e.position.x, e.position.y]);
@@ -311,8 +319,7 @@ describe('the ridge at senlac', () => {
   });
 
   it('carries the relief and the licence it owes', () => {
-    // The renderer cannot draw elevation yet; the descriptor still carries
-    // the real ridge so nothing has to be re-surveyed when it can.
+    // The descriptor carries the real ridge consumed by the elevated renderer.
     expect(descriptor.elevation.length).toBe(descriptor.width * descriptor.height);
     expect(Math.max(...descriptor.elevation)).toBeGreaterThan(5);
     expect(descriptor.attribution).toContain('Environment Agency');

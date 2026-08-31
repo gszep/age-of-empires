@@ -23,7 +23,7 @@ import paintedProof from './maps/painted-proof.json';
 import senlac from './maps/senlac.json';
 import windsor from './maps/windsor.json';
 import { random01 } from './random';
-import type { AnimalKind, Point } from './types';
+import type { AnimalKind, BuildingKind, Point, UnitKind } from './types';
 
 /** DAT terrain ids the grid speaks. Grass is Arabia's base; forest carries
  * the wood. The grid is authoritative data ahead of the renderer knowing how
@@ -92,7 +92,16 @@ export interface MapDescriptor {
    * the object pass is. The descriptor records the hash of what it was
    * painted from.
    */
-  baked?: { width: number; height: number; terrain: number[] };
+  baked?: {
+    width: number;
+    height: number;
+    terrain: number[];
+    elevation?: number[];
+    landmarks?: { kind: BuildingKind | UnitKind; x: number; y: number; sourcePoint?: number[] }[];
+  };
+  /** High-resolution survey boards keep the forest ground but thin individual
+   * tree entities to this deterministic fraction for rendering/playability. */
+  bakedTreeStride?: number;
   opening: ObjectGroupSpec[];
 }
 
@@ -173,7 +182,8 @@ export const MAPS: Record<string, MapDescriptor> = {
   // as grass; this first pass exists to validate the real-world footprint.
   windsor: {
     base: 'grass',
-    baked: windsor,
+    baked: windsor as MapDescriptor['baked'],
+    bakedTreeStride: 4,
     opening: ARABIA.opening,
   },
 };
@@ -404,8 +414,9 @@ function clearAround(
 export function generateMap(
   ctx: MapgenContext, descriptor: MapDescriptor, starts: Point[],
   mirror: (p: Point) => Point,
-): { terrain: number[] } {
+): { terrain: number[]; elevation: number[] } {
   const terrain = new Array<number>(ctx.width * ctx.height).fill(TERRAIN_GRASS);
+  const elevation = new Array<number>(ctx.width * ctx.height).fill(0);
   const start = starts[0];
   const reserved = new Uint8Array(ctx.width * ctx.height);
   const freeBoth = (x: number, y: number): boolean => {
@@ -443,7 +454,11 @@ export function generateMap(
         const id = baked.terrain[y * baked.width + x];
         const tile = y * ctx.width + x;
         terrain[tile] = id;
+        elevation[tile] = baked.elevation?.[y * baked.width + x] ?? 0;
         if (id !== TERRAIN_FOREST) continue;
+        const stride = descriptor.bakedTreeStride ?? 1;
+        const hash = (Math.imul(x, 73_856_093) ^ Math.imul(y, 19_349_663)) >>> 0;
+        if (hash % stride !== 0) continue;
         const here = tileCentre(x, y);
         if (ctx.free(here)) ctx.place('tree', here);
       }
@@ -606,7 +621,7 @@ export function generateMap(
     }
   }
 
-  return { terrain };
+  return { terrain, elevation };
 }
 
 /** `set_tight_grouping`: flood outward on purely random costs -- a contiguous

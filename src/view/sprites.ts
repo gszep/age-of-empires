@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import { materialColor, materialOpacity, texture as textureNode, vec2 } from 'three/tsl';
 import type { ContentAssets, Atlas, AnimationInfo } from './assets';
 import { isAnimal, isBuilding, isUnit } from '../sim/data';
-import { createTerrainPatch } from './world';
+import { createTerrainPatch, elevationAt, ELEVATION_PIXELS, elevatedWorldToIso } from './world';
 import { worldToIso, isoDepth, TILE_H } from './iso';
 import type { Entity, GameState, Point } from '../sim/types';
 
@@ -589,6 +589,7 @@ export function updateProjectileView(
   projectileKey = 'arrow',
   /** Wall-clock seconds, for art whose frames are a timed tumble. */
   timeSeconds = 0,
+  groundHeightPixels = 0,
 ): void {
   const arrow = assets?.entities[projectileKey] ?? assets?.entities['arrow'];
   const atlas = arrow?.atlases['idle'];
@@ -624,7 +625,7 @@ export function updateProjectileView(
     : pitch;
 
   applyFrame(view.body, assets, atlas, direction * framesPerDirection + frame, position, 0xffffff);
-  view.body.mesh.position.y += height * HEIGHT_PIXELS;
+  view.body.mesh.position.y += height * HEIGHT_PIXELS + groundHeightPixels;
   view.body.mesh.renderOrder = 4000 + isoDepth(position.x, position.y);
 }
 
@@ -683,7 +684,9 @@ export function updateOcclusion(views: Map<string, EntityView>, state: GameState
 }
 
 /** Farms swap between the construction and grown terrain slots. */
-function updateFarmView(view: EntityView, assets: ContentAssets | undefined, entity: Entity): void {
+function updateFarmView(
+  view: EntityView, assets: ContentAssets | undefined, state: GameState, entity: Entity,
+): void {
   const slot = entity.buildProgress !== undefined ? 'farm-construction' : 'farm';
   if (view.patchSlot !== slot) {
     if (view.patch) { view.group.remove(view.patch); view.patch.geometry.dispose(); }
@@ -693,7 +696,7 @@ function updateFarmView(view: EntityView, assets: ContentAssets | undefined, ent
   }
   if (!view.patch) return;
   const iso = worldToIso(entity.position.x - entity.radius, entity.position.y - entity.radius);
-  view.patch.position.set(iso.x, iso.y, 0);
+  view.patch.position.set(iso.x, iso.y + elevationAt(state, entity.position.x, entity.position.y) * ELEVATION_PIXELS, 0);
   view.patch.renderOrder = 10 + isoDepth(entity.position.x, entity.position.y);
   view.patch.visible = !entity.dead;
 }
@@ -707,11 +710,11 @@ export function updateEntityView(
 ): void {
   const depth = isoDepth(entity.position.x, entity.position.y);
   if (entity.kind === 'farm') {
-    updateFarmView(view, assets, entity);
+    updateFarmView(view, assets, state, entity);
     return;
   }
   if (view.fallback || !assets) {
-    const iso = worldToIso(entity.position.x, entity.position.y);
+    const iso = elevatedWorldToIso(state, entity.position.x, entity.position.y);
     view.body.mesh.position.set(iso.x, iso.y + view.body.mesh.scale.y / 2, 0);
     view.body.mesh.renderOrder = 1000 + depth * 10;
     (view.body.mesh.material as THREE.MeshBasicMaterial).opacity = entity.dead ? 0.4 : 1;
@@ -890,4 +893,11 @@ export function updateEntityView(
       colorPiece.mesh.visible = false;
     }
   }
+
+  // `applyFrame` anchors every piece on the flat world point. Raise the whole
+  // assembled entity by the surveyed level after all body/mask/annex updates.
+  const raise = elevationAt(state, entity.position.x, entity.position.y) * ELEVATION_PIXELS;
+  for (const piece of [
+    view.shadow, view.body, view.color, view.outline, ...view.annexes, ...view.annexColors,
+  ]) piece.mesh.position.y += raise;
 }

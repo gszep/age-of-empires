@@ -9,44 +9,82 @@ import type { GameState } from '../sim/types';
  * authored `dimensions` tiles (10x10 for Grass) and the surface stays
  * continuous across tile edges. Without it, a two-tone diamond grid stands in.
  */
-export function createGround(state: GameState, assets?: ContentAssets): THREE.Mesh {
-  const ground = assets?.terrain?.ground;
-  const texture = ground && assets?.textures.get(ground.image);
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const uvs: number[] = [];
-  const light = new THREE.Color(0x6f8f4a);
-  const dark = new THREE.Color(0x66854a);
-  const [spanX, spanY] = ground?.dimensions ?? [1, 1];
+export const ELEVATION_PIXELS = 8;
+
+/** Height at a world point, in authored levels. Tile means are deliberately
+ * sampled rather than invented slopes for entities; ground vertices average
+ * their adjacent means so every tile shares exactly the same edge. */
+export function elevationAt(state: GameState, x: number, y: number): number {
+  const tx = Math.max(0, Math.min(state.width - 1, Math.floor(x)));
+  const ty = Math.max(0, Math.min(state.height - 1, Math.floor(y)));
+  return state.elevation?.[ty * state.width + tx] ?? 0;
+}
+
+export function elevatedWorldToIso(state: GameState, x: number, y: number) {
+  const iso = worldToIso(x, y);
+  return { x: iso.x, y: iso.y + elevationAt(state, x, y) * ELEVATION_PIXELS };
+}
+
+function cornerElevation(state: GameState, x: number, y: number): number {
+  let total = 0;
+  let count = 0;
+  for (const ty of [y - 1, y]) for (const tx of [x - 1, x]) {
+    if (tx < 0 || ty < 0 || tx >= state.width || ty >= state.height) continue;
+    total += state.elevation?.[ty * state.width + tx] ?? 0;
+    count++;
+  }
+  return count ? total / count : 0;
+}
+
+/** One mesh per terrain class, hence four draw calls regardless of board size.
+ * Each consumes the owned DAT texture for its surveyed OS class. */
+export function createGround(state: GameState, assets?: ContentAssets): THREE.Group {
+  const classes = [
+    { key: 'ground', ids: new Set([0]), fallback: 0x6f8f4a },
+    { key: 'forest', ids: new Set([10]), fallback: 0x315f35 },
+    { key: 'water', ids: new Set([1]), fallback: 0x4f91bd },
+    { key: 'road', ids: new Set([24]), fallback: 0xb18a58 },
+  ];
+  const buckets = classes.map(() => ({ positions: [] as number[], uvs: [] as number[] }));
   for (let y = 0; y < state.height; y++) {
     for (let x = 0; x < state.width; x++) {
-      const color = (x + y) % 2 === 0 ? light : dark;
-      const corners = {
-        north: { iso: worldToIso(x, y), u: x / spanX, v: y / spanY },
-        east: { iso: worldToIso(x + 1, y), u: (x + 1) / spanX, v: y / spanY },
-        south: { iso: worldToIso(x + 1, y + 1), u: (x + 1) / spanX, v: (y + 1) / spanY },
-        west: { iso: worldToIso(x, y + 1), u: x / spanX, v: (y + 1) / spanY },
+      const terrain = state.terrain[y * state.width + x] ?? 0;
+      const category = Math.max(0, classes.findIndex(entry => entry.ids.has(terrain)));
+      const slot = assets?.terrain?.[classes[category].key];
+      const [spanX, spanY] = slot?.dimensions ?? [1, 1];
+      const point = (px: number, py: number) => {
+        const iso = worldToIso(px, py);
+        iso.y += cornerElevation(state, px, py) * ELEVATION_PIXELS;
+        return { iso, u: px / spanX, v: py / spanY };
       };
-      const { north, east, south, west } = corners;
+      const [north, east, south, west] = [
+        point(x, y), point(x + 1, y), point(x + 1, y + 1), point(x, y + 1),
+      ];
+      const bucket = buckets[category];
       for (const [a, b, c] of [[north, east, south], [north, south, west]] as const) {
         for (const corner of [a, b, c]) {
-          positions.push(corner.iso.x, corner.iso.y, 0);
-          uvs.push(corner.u, corner.v);
-          colors.push(color.r, color.g, color.b);
+          bucket.positions.push(corner.iso.x, corner.iso.y, 0);
+          bucket.uvs.push(corner.u, corner.v);
         }
       }
     }
   }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  if (!texture) geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  const material = texture
-    ? new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
-    : new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.renderOrder = 0;
-  return mesh;
+  const group = new THREE.Group();
+  classes.forEach((entry, index) => {
+    if (!buckets[index].positions.length) return;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(buckets[index].positions, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(buckets[index].uvs, 2));
+    const slot = assets?.terrain?.[entry.key];
+    const texture = slot && assets?.textures.get(slot.image);
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+      ...(texture ? { map: texture } : { color: entry.fallback }), side: THREE.DoubleSide,
+    }));
+    mesh.renderOrder = 0;
+    mesh.name = `terrain-${entry.key}`;
+    group.add(mesh);
+  });
+  return group;
 }
 
 /**
@@ -202,10 +240,15 @@ export function createFog(state: GameState): FogLayer {
   let offset = 0;
   for (let y = 0; y < state.height; y++) {
     for (let x = 0; x < state.width; x++) {
-      const north = worldToIso(x, y);
-      const east = worldToIso(x + 1, y);
-      const south = worldToIso(x + 1, y + 1);
-      const west = worldToIso(x, y + 1);
+      const raised = (px: number, py: number) => {
+        const iso = worldToIso(px, py);
+        iso.y += cornerElevation(state, px, py) * ELEVATION_PIXELS;
+        return iso;
+      };
+      const north = raised(x, y);
+      const east = raised(x + 1, y);
+      const south = raised(x + 1, y + 1);
+      const west = raised(x, y + 1);
       for (const p of [north, east, south, north, south, west]) {
         positions[offset * 3] = p.x;
         positions[offset * 3 + 1] = p.y;

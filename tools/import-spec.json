@@ -1661,6 +1661,15 @@
     "ground": {
       "terrainId": 0
     },
+    "water": {
+      "terrainId": 1
+    },
+    "road": {
+      "terrainId": 24
+    },
+    "forest": {
+      "terrainId": 10
+    },
     "farm": {
       "terrainId": 7
     },

@@ -103,10 +103,35 @@ describe('meshes that lie on the ground', () => {
     } as unknown as ContentAssets;
   };
 
+  it('gives surveyed water and roads their own terrain meshes', () => {
+    const state = createGame(11);
+    state.terrain[0] = 1;
+    state.terrain[1] = 24;
+    const ground = createGround(state);
+    const water = ground.getObjectByName('terrain-water') as THREE.Mesh;
+    const road = ground.getObjectByName('terrain-road') as THREE.Mesh;
+    expect((water.material as THREE.MeshBasicMaterial).color.getHex()).toBe(0x4f91bd);
+    expect((road.material as THREE.MeshBasicMaterial).color.getHex()).toBe(0xb18a58);
+  });
+
+  it('raises a surveyed hill while keeping neighbouring tile edges joined', () => {
+    const state = createGame(11);
+    state.elevation.fill(0);
+    state.elevation[0] = 4;
+    const ground = createGround(state);
+    const positions = (ground.getObjectByName('terrain-ground') as THREE.Mesh)
+      .geometry.getAttribute('position');
+    expect(positions.getY(0)).toBeGreaterThan(0);
+    // East corner of tile 0 is shared with west-side tiles through one averaged
+    // vertex height rather than each tile inventing its own cliff edge.
+    expect(positions.getY(1)).toBeGreaterThan(worldToIso(1, 0).y);
+  });
+
   it('never leaves a clockwise ground quad on the culled side', () => {
     const assets = groundAssets();
+    const ground = createGround(createGame(11), assets);
     const meshes: [string, THREE.Mesh][] = [
-      ['ground', createGround(createGame(11), assets)],
+      ['ground', ground.children[0] as THREE.Mesh],
       ['farm patch', createTerrainPatch(assets, 'farm', 1.5)!],
       ['footprint', createFootprint(1.5)],
     ];

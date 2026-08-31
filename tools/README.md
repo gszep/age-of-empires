@@ -36,7 +36,9 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    fingerprint of the decoder's own code are unchanged — adding one unit costs
    under a minute, and editing the decoder still regenerates everything.
    `--fresh` ignores the cache; a fresh run was verified to produce
-   byte-identical atlases and manifest.
+   byte-identical atlases and manifest. When only DAT terrain slots changed,
+   `convert_sld.py --terrain-only` updates those DDS textures in an existing
+   manifest without needlessly decoding every SLD first.
 4. `import_ui.py` extracts the WEST widget-UI subset (resource/command/map/
    bottom/menu panels, materials, entity + action + stat icons, click-sound
    aliases from `sounds.json`) into `public/imported/aoe2/ui/`, converting DDS

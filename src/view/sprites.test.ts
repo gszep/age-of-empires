@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { applyCommand, createGame, stepGame } from '../sim/game';
 import type { Entity, GameState } from '../sim/types';
 import { RAMP_LEVELS, rampLut, type AnimationInfo, type Atlas, type ContentAssets } from './assets';
+import { worldToIso } from './iso';
+import { ELEVATION_PIXELS } from './world';
 import {
   PLAYER_COLORS, chooseAnimation, createEntityView, createFlagView, decayFraction, playerColorHex,
   gateBoxKey, treeIsFelled, updateEntityView, updateFlagView, updateOcclusion, wallShape,
@@ -16,6 +18,19 @@ const run = (state: GameState, ticks: number) => {
 
 const treeOf = (state: GameState) =>
   state.entities.find(e => e.kind === 'resource' && e.resourceKind === 'wood')!;
+
+describe('surveyed elevation', () => {
+  it('raises fallback entities onto their terrain level', () => {
+    const state = createGame();
+    const entity = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    state.elevation[Math.floor(entity.position.y) * state.width + Math.floor(entity.position.x)] = 3;
+    const view = createEntityView(undefined, entity);
+    updateEntityView(view, undefined, state, entity, 0);
+    const flat = worldToIso(entity.position.x, entity.position.y);
+    expect(view.body.mesh.position.y - view.body.mesh.scale.y / 2)
+      .toBeCloseTo(flat.y + 3 * ELEVATION_PIXELS);
+  });
+});
 
 describe('tree chopping stages', () => {
   it('stands until the first wood is taken', () => {

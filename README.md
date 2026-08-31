@@ -35,8 +35,8 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   override — the simulation's fog, the AI's observation and every checksum are
   untouched, so a revealed match replays identically to a fogged one.
 - `?map=` in the URL picks the board: `black-forest`, `senlac` (the real ground
-  at Battle, East Sussex), `windsor` (168x168 real ground around Windsor Castle
-  and the Long Walk), `painted-proof`, or nothing for Arabia. Real-ground maps
+  at Battle, East Sussex), `windsor` (392x392 real ground at 15 m/tile around
+  Windsor Castle, the Long Walk, Snow Hill and the Thames), `painted-proof`, or nothing for Arabia. Real-ground maps
   use Environment Agency LIDAR/VOM. Asking explicitly always deals a fresh board.
 - `+` and `-` step the game speed through the original's own four settings —
   Slow, Normal, Fast and Extra Fast — and then two fast-forward steps past them

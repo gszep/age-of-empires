@@ -79,7 +79,7 @@ export function createGame(
   const start = startFor(width, height);
   const state: GameState = {
     rules, seed: seed || 1, tick: 0, nextId: 1, width, height,
-    entities: [], projectiles: [], terrain: [],
+    entities: [], projectiles: [], terrain: [], elevation: [],
     players: {
       1: {
         id: 1, civilization: civilizations[1], ...rules.startingResources,
@@ -107,7 +107,17 @@ export function createGame(
     // there is nothing known to gather from and the game never starts.
     addEntity(state, 'scout-cavalry', player, at({ x: start.x + 8, y: start.y }), rules.units['scout-cavalry']);
   }
-  const { terrain } = generateMap(
+  // Real-world map landmarks are surveyed points in the baked descriptor,
+  // represented with existing owned art. Place them before terrain objects so
+  // a forest tile cannot grow a tree through Windsor Castle or the Copper Horse.
+  for (const landmark of descriptor.baked?.landmarks ?? []) {
+    if (isBuilding(landmark.kind)) {
+      addEntity(state, landmark.kind, 0, { x: landmark.x, y: landmark.y }, rules.buildings[landmark.kind]);
+    } else if (isUnit(landmark.kind)) {
+      addEntity(state, landmark.kind, 0, { x: landmark.x, y: landmark.y }, rules.units[landmark.kind]);
+    }
+  }
+  const { terrain, elevation } = generateMap(
     {
       rng: state, width: state.width, height: state.height,
       free: at => freeSpot(state, at),
@@ -119,6 +129,7 @@ export function createGame(
     descriptor, [start, mirror(start)], mirror,
   );
   state.terrain = terrain;
+  state.elevation = elevation;
 
   recalculatePopulation(state);
   updateVisibility(state);

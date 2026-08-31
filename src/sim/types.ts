@@ -175,6 +175,8 @@ export interface GameState {
   projectiles: Projectile[];
   /** Per-tile DAT terrain id, row-major width x height. Fixed at generation. */
   terrain: number[];
+  /** Surveyed height levels on the same grid; generated maps are level zero. */
+  elevation: number[];
   players: Record<PlayerId, PlayerState>;
   visibility: Record<PlayerId, PlayerVisibility>;
   winner?: PlayerId;

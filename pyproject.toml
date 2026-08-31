@@ -8,6 +8,7 @@ dependencies = [
   "numpy==1.26.4",
   "pillow==12.3.0",
   "rasterio==1.4.3",
+  "pyshp==3.0.3",
 ]
 
 [tool.uv]
