@@ -39,6 +39,17 @@ kill the litter, and state what is deliberately left running.
 newly tagged `bug` outruns everything in this file — check the issue list
 first.
 
+**The 2026-09-13 session** cleared the bugs filed after the last overnight run:
+#32 (a lumberjack going idle at the camp — the continuation remembered which
+*kind* it had worked but not which resource, and a spent node is swept up three
+seconds after it empties), #35 (the minimap and the command grid placed by eye
+rather than from the widget files, and the `Anchor` field the grid needs being
+stripped by the importer), and #33 (the spent-farm alert crying about every
+farm the auto-reseed option re-sowed). Each has its evidence on the issue and a
+section in `status.md`. **Still open and both blocked on the human, not on
+work: #22 (farm textures) and #5 (pathing)** — see Q0b below. The rest of the
+issue list is enhancements: #34, #36, #37, #38, #39.
+
 **The 2026-08-29 overnight run** closed three fresh bugs (#29 town watch, #30
 the trebuchet's oversized atlas and its rock, #31 the stuck-key camera), then
 built the whole of `docs/map-build-plan.md` — M1 through M4, C1 and C2: the

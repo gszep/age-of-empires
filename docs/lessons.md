@@ -499,3 +499,52 @@ keeps the record.
   terrain cells on Windsor's 392x392 raster; 5,635 thinned trees therefore read
   as much denser forest than exists. Rule: preserve the classic size at 120 and
   scale resource dots down to a one-pixel floor as map resolution rises.
+
+- **A memory kept because the thing can vanish has to cover everything read
+  off it.** `lastWorked` exists precisely because a spent node is swept out of
+  the entity list and the continuation still needs to know what the worker had
+  been doing — and it remembered the *kind* only, while the resource was still
+  read off the vanished node. So the half that had been fixed worked and the
+  half beside it failed, in the same two lines, for a year. It also could not
+  have been patched by remembering harder: every tree, bush, gold and stone
+  node is kind `resource`, so the kind cannot answer which resource it was.
+  Rule: when a field is added because an entity may be gone by the time it is
+  needed, walk every other field the same code reads off that entity and ask
+  the same question of each; a vanishing thing does not take away one property
+  at a time.
+
+- **A strategy that repairs its own units hides the bugs in the units' rules.**
+  The lumberjack going idle at the camp cost the built-in AI 0.4 idle
+  villager-seconds in 900 and not one banked resource, because the strategy
+  re-tasks its own idle villagers within a second or two. Sixteen-match batches
+  had run over that defect for weeks. The whole cost fell on the human playing
+  by hand, who has no such loop and simply watches a villager stand there.
+  Rule: a bug reported by somebody playing is measured at the level they meet
+  it; a headline metric that does not move is evidence about the *strategy*,
+  not about the fix, and a player-facing defect can be invisible to every
+  batch number the project has.
+
+- **A watcher polling faster than the simulation resolves will see the state
+  in between.** The spent-farm alert is raised by the view comparing this
+  frame's state to the last, and a farm is replaced one tick after it empties
+  — so a poll running every 16 ms across a 50 ms tick reliably caught the gap
+  and cried about every farm the auto-reseed option silently re-sowed. Nothing
+  was wrong with either side: the simulation resolves it correctly and the
+  watcher reports what it sees. Rule: when a watcher announces a change that
+  the simulation finishes over more than one tick, hold the announcement long
+  enough for the rest of it to arrive, and decide from the outcome rather than
+  from the first frame of it.
+
+- **An extractor's allow-list is a silent filter, and the code downstream
+  cannot tell an absent field from an absent widget.** `strip_widget` keeps a
+  tuple of field names; an `Anchor` widget carries its origin in a field of
+  that name rather than in a `ViewPort`, so the command grid's anchor never
+  reached the manifest and the HUD, finding nothing, quietly kept the
+  hand-tuned CSS that was wrong. Worth knowing alongside it: a panel's art and
+  the widget that draws it are the same rectangle — `map-panel.png` is 860x413
+  and so is `Background` — so a widget's box inside that panel is directly a
+  box inside our element, and every content position in a panel is a number
+  the shipped files already state rather than something to nudge until it
+  looks right. Rule: when an importer's output feeds a layout, assert the
+  specific fields the layout reads, in the import test; "the widget is
+  missing" and "the field was stripped" fail identically and neither says so.
