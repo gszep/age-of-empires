@@ -290,6 +290,72 @@ describe('carrying on after the work runs out', () => {
     expect(sheep.dead).toBeFalsy();
   });
 
+  it('takes the next tree after a walk back longer than the stump lasts', () => {
+    // Issue #32. Issue #19 gave "another of the same first" a memory of the
+    // *kind* it was working, so it survived the node itself being gone -- but
+    // which resource to ask for was still read off the load or off that same
+    // vanished node. A spent tree is killed the tick it empties and swept out
+    // of `state.entities` three seconds later, and a walk back to the drop
+    // site is longer than that: the lumberjack banked its load, found neither
+    // a load nor a tree to name what it wanted, and went idle at the camp.
+    const state = createGame(91);
+    parkScouts(state);
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    for (const wood of state.entities.filter(e => e.kind === 'resource' && e.resourceKind === 'wood')) {
+      wood.amount = 0;
+    }
+    // Two trees side by side, a walk away from the only thing that takes wood.
+    const [tree, neighbour] = state.entities
+      .filter(e => e.kind === 'resource' && e.resourceKind === 'wood');
+    tree.position = { x: tc.position.x + 9, y: tc.position.y };
+    neighbour.position = { x: tc.position.x + 10, y: tc.position.y };
+    neighbour.amount = 200;
+    // Exactly one load in it, so it runs out in the same breath as the
+    // villager fills up and the walk home starts with the tree already dead.
+    tree.amount = carryCapacityFor(state, 1);
+    const villager = villagerNear(state, { x: tc.position.x + 8, y: tc.position.y });
+
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [villager.id], target: tree.position, targetId: tree.id,
+    });
+    const banked = state.players[1].wood;
+    for (let i = 0; i < 4000 && state.players[1].wood === banked; i++) stepGame(state);
+    expect(state.players[1].wood).toBeGreaterThan(banked);
+    expect(villager.carrying).toBeUndefined();
+    // The tree is not merely empty by now: it is gone.
+    expect(state.entities.some(e => e.id === tree.id)).toBe(false);
+
+    stepGame(state);
+    expect(villager.order).toEqual({ kind: 'gather', targetId: neighbour.id });
+  });
+
+  it('carries the same memory down two runs of the same match', () => {
+    // The memory rides on the entity, so it is in the checksum: two runs of
+    // the same opening must still agree tick for tick across the point where
+    // the continuation fires.
+    const play = () => {
+      const state = createGame(91);
+      parkScouts(state);
+      const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+      for (const wood of state.entities.filter(e => e.kind === 'resource' && e.resourceKind === 'wood')) {
+        wood.amount = 0;
+      }
+      const [tree, neighbour] = state.entities
+        .filter(e => e.kind === 'resource' && e.resourceKind === 'wood');
+      tree.position = { x: tc.position.x + 9, y: tc.position.y };
+      neighbour.position = { x: tc.position.x + 10, y: tc.position.y };
+      neighbour.amount = 200;
+      tree.amount = carryCapacityFor(state, 1);
+      const villager = villagerNear(state, { x: tc.position.x + 8, y: tc.position.y });
+      applyCommand(state, {
+        kind: 'order', player: 1, entityIds: [villager.id], target: tree.position, targetId: tree.id,
+      });
+      run(state, 3000);
+      return checksumState(state);
+    };
+    expect(play()).toBe(play());
+  });
+
   it('builds on down a dragged line but not to a foundation out of sight', () => {
     const state = createGame(83);
     parkScouts(state);

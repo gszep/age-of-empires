@@ -1092,6 +1092,22 @@ wherever it is sent, and the example AI still tasks villagers onto nodes it
 remembers through fog — that is a decision it makes, not something the unit
 does on its own.
 
+Both halves of that question — which kind, and which resource — are remembered
+on the worker rather than read off the node, because the node is not there to
+read. A spent resource is killed the tick it empties and swept out of the
+entity list three seconds later, which is less than the walk to a drop site: a
+lumberjack that emptied its tree, walked back and banked the load then had
+neither a load nor a tree to say what it had been after, and went idle at the
+camp with a wood all around it (issue #32). The kind already survived this way
+for carcasses; the resource now does too.
+
+The built-in AI hid it completely. Measured on seed 7 over 900 game-seconds
+with both example AIs playing, the fix moves player 2 from 46.4 to 46.0 idle
+villager-seconds and removes one idle transition of nine, and leaves every
+banked resource identical — because the strategy re-tasks its own idle
+villagers within a second or two. The cost fell on whoever was playing by
+hand, and no batch metric could see it.
+
 ## A building wears its age
 
 Ageing up in AoE2 does not restyle a building, it replaces it: the Feudal Age

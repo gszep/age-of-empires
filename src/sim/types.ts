@@ -70,6 +70,13 @@ export interface Entity {
    * mattered.
    */
   lastWorked?: Entity['kind'];
+  /**
+   * And what that thing yielded. The kind alone does not say: every tree,
+   * bush, gold and stone node is kind `resource`, so a worker whose node has
+   * been swept away has nothing to name the resource it was after unless it
+   * kept it (issue #32).
+   */
+  lastResource?: ResourceKind;
   /** Buildings. */
   /** Half-extents in tiles when the footprint is not the square `radius` says:
    * a gate is two tiles by one, and which way round is its orientation. */

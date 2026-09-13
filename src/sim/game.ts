@@ -903,6 +903,7 @@ function becomeIdle(entity: Entity): void {
   entity.activity = 'idle';
   entity.gatherProgress = 0;
   entity.lastWorked = undefined;
+  entity.lastResource = undefined;
   entity.attackWindup = undefined;
   entity.path = undefined;
   entity.pathGoal = undefined;
@@ -998,10 +999,14 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
     // its hands at the mill is carrying nothing to ask for. Reading the want
     // off the load alone sent it idle the moment its bush ran out while it
     // was away banking, with the rest of the cluster a tile in front of it
-    // (issue #19).
+    // (issue #19). Reading it off the spent node only works while that node
+    // is still there, and it is swept up three seconds after it empties --
+    // less than the walk to the drop site, so a lumberjack banked its load
+    // and went idle at the camp with a wood all around it (issue #32). Both
+    // memories therefore outlive the node itself.
     const previous = state.entities.find(e => e.id === targetId);
     const was = previous?.kind ?? entity.lastWorked;
-    const wanted = carrying?.kind ?? previous?.resourceKind;
+    const wanted = carrying?.kind ?? previous?.resourceKind ?? entity.lastResource;
     node = wanted ? nextToWork(state, grid, entity, wanted, was) : undefined;
     if (node) entity.order = { kind: 'gather', targetId: node.id };
     else if (carrying && carrying.amount > 0) {
@@ -1044,6 +1049,7 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   entity.activity = 'gathering';
   entity.lastWorked = node.kind;
   const resource = node.resourceKind!;
+  entity.lastResource = resource;
   entity.gatherProgress = (entity.gatherProgress ?? 0)
     + gatherRateFor(state, entity.owner, resource) * TICK_SECONDS;
   while ((entity.gatherProgress ?? 0) >= 1 && (node.amount ?? 0) > 0 && (entity.carrying?.amount ?? 0) < capacity) {
