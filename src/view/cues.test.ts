@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { applyCommand, createGame, placementLegal, stepGame } from '../sim/game';
 import type { Entity, GameState } from '../sim/types';
-import { ALERT_INTERVAL, createCueWatcher, pollCues, type Cue } from './cues';
+import { ALERT_INTERVAL, RESEED_GRACE, createCueWatcher, pollCues, type Cue } from './cues';
 
 const run = (state: GameState, ticks: number) => {
   for (let i = 0; i < ticks; i++) stepGame(state);
@@ -181,7 +181,108 @@ describe('feedback cues', () => {
     pollCues(watcher, state, 1, seconds(state));
     farm.amount = 0;
     run(state, 2);
-    expect(pollCues(watcher, state, 1, seconds(state))).toContain('farm_depleted');
+    // Held briefly, in case a villager is about to sow it again.
+    const emptied = seconds(state);
+    expect(pollCues(watcher, state, 1, emptied)).not.toContain('farm_depleted');
+    expect(pollCues(watcher, state, 1, emptied + RESEED_GRACE)).toContain('farm_depleted');
+    // And said once, not on every frame after.
+    expect(pollCues(watcher, state, 1, emptied + RESEED_GRACE + 5)).not.toContain('farm_depleted');
+  });
+
+  it('says nothing when the farm is really sown again by a villager', () => {
+    // Issue #33, driven the way a player meets it: the mill's option on, a
+    // villager farming, and the farm worked out under it. `reseedFarm` puts a
+    // new foundation on the same ground on the next tick and the player is
+    // told nothing, because nothing needs doing.
+    const state = createGame(57);
+    state.players[1].wood = 2000;
+    state.players[1].food = 2000;
+    const builders = state.entities.filter(e => e.owner === 1 && e.kind === 'villager').map(e => e.id);
+    // A mill, so the option has somewhere to be asked for.
+    let millAt: { x: number; y: number } | undefined;
+    for (let x = 7; x < 20 && !millAt; x += 0.5) {
+      for (const y of [16, 15, 17, 14]) {
+        if (placementLegal(state, 'mill', { x, y }).ok) { millAt = { x, y }; break; }
+      }
+    }
+    expect(applyCommand(state, {
+      kind: 'build', player: 1, builderIds: builders, building: 'mill', target: millAt!,
+    }).ok).toBe(true);
+    for (let i = 0; i < 6000 && !state.entities.some(e => e.kind === 'mill' && e.buildProgress === undefined); i++) {
+      stepGame(state);
+    }
+    const mill = state.entities.find(e => e.kind === 'mill' && e.buildProgress === undefined)!;
+    expect(applyCommand(state, { kind: 'reseed', player: 1, buildingId: mill.id, enabled: true }).ok).toBe(true);
+
+    let farmAt: { x: number; y: number } | undefined;
+    for (let x = 7; x < 20 && !farmAt; x += 0.5) {
+      for (const y of [12, 11, 13, 10]) {
+        if (placementLegal(state, 'farm', { x, y }).ok) { farmAt = { x, y }; break; }
+      }
+    }
+    expect(applyCommand(state, {
+      kind: 'build', player: 1, builderIds: builders, building: 'farm', target: farmAt!,
+    }).ok).toBe(true);
+    for (let i = 0; i < 6000 && !state.entities.some(e => e.kind === 'farm' && e.buildProgress === undefined); i++) {
+      stepGame(state);
+    }
+    const farm = state.entities.find(e => e.kind === 'farm' && e.buildProgress === undefined)!;
+    // Put a villager on it and leave it almost empty, so it runs out shortly.
+    const worker = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    expect(applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [worker.id], target: farm.position, targetId: farm.id,
+    }).ok).toBe(true);
+    for (let i = 0; i < 4000 && worker.activity !== 'gathering'; i++) stepGame(state);
+    expect(worker.activity).toBe('gathering');
+    farm.amount = 2;
+    const emptiedId = farm.id;
+
+    const watcher = createCueWatcher();
+    pollCues(watcher, state, 1, seconds(state));
+    // Poll every tick, the way the frame loop does, right through the emptying
+    // and well past the grace.
+    const heard: Cue[] = [];
+    for (let i = 0; i < 400; i++) {
+      stepGame(state);
+      heard.push(...pollCues(watcher, state, 1, seconds(state)));
+    }
+    expect(state.entities.some(e => e.kind === 'farm' && e.id !== emptiedId && !e.dead)).toBe(true);
+    expect(heard).not.toContain('farm_depleted');
+  });
+
+  it('says nothing when the farm is sown again where it stood', () => {
+    // Issue #33. Auto-reseeding replaces the farm on the tick after it empties,
+    // so announcing the emptying cried about every farm the option exists to
+    // stop the player having to think about.
+    const state = createGame(57);
+    state.players[1].wood = 500;
+    const at = { x: 9, y: 12 };
+    expect(placementLegal(state, 'farm', at).ok).toBe(true);
+    const farm = state.entities.find(e => e.kind === 'farm')
+      ?? (() => {
+        const builders = state.entities.filter(e => e.owner === 1 && e.kind === 'villager').map(e => e.id);
+        applyCommand(state, { kind: 'build', player: 1, builderIds: builders, building: 'farm', target: at });
+        for (let i = 0; i < 4000 && !state.entities.some(e => e.kind === 'farm' && e.buildProgress === undefined); i++) {
+          stepGame(state);
+        }
+        return state.entities.find(e => e.kind === 'farm')!;
+      })();
+    const watcher = createCueWatcher();
+    pollCues(watcher, state, 1, seconds(state));
+
+    // The farm empties, and on the next poll a fresh foundation stands on the
+    // same ground -- which is exactly what `reseedFarm` builds.
+    const where = { ...farm.position };
+    farm.amount = 0;
+    const emptied = seconds(state);
+    expect(pollCues(watcher, state, 1, emptied)).not.toContain('farm_depleted');
+    farm.dead = true;
+    state.entities.push({
+      ...farm, id: 99001, dead: false, hp: 1, buildProgress: 0, amount: undefined, position: where,
+    });
+    // Long past the grace, and still nothing to say.
+    expect(pollCues(watcher, state, 1, emptied + RESEED_GRACE + 5)).not.toContain('farm_depleted');
+    expect(pollCues(watcher, state, 1, emptied + RESEED_GRACE + 30)).not.toContain('farm_depleted');
   });
 
   it('calls the end of the match for the side it is watching', () => {

@@ -682,6 +682,18 @@ in the schema alongside the other six. Verified in the running game: a mill's
 panel reads `Auto-reseed farms: off (60 wood each)`, and reads `on` after the
 button is clicked.
 
+A farm sown again says nothing (issue #33). The spent-farm alert is raised by
+the view watching state, and it fired the moment a farm's food ran out — which
+is one tick before the villager sows the next one, so the option that exists to
+stop the player thinking about farms announced every farm it re-sowed. Fallow
+ground is now held for `RESEED_GRACE`, half a game second, and the alert is
+raised only if nothing has taken that ground by then: ten times longer than the
+gap it has to cover, and imperceptible as a delay. A re-sowing that could not be
+paid for still alerts, which is the case where the player does need telling, and
+so does an ordinary farm running out with the option off. The grace is an
+approximation like the under-attack rearm above it — `sounds.json` names the cue
+and not when it fires.
+
 ### The mill's technologies, and the effect command that carries them
 
 Horse Collar and Heavy Plow were among the forty-eight skipped, recorded as
