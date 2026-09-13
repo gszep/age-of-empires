@@ -5,6 +5,7 @@
  * open skin when imported assets are absent.
  */
 import { materialUrl, iconUrl, type UiAssets } from './assets';
+import { widgetBox } from './layout';
 import { Minimap } from './minimap';
 import type { GameState, PlayerId, Point } from '../sim/types';
 
@@ -133,6 +134,7 @@ export class Hud {
     style('#command-panel', 'CivWestCommandPanelExtended');
     style('#selection-panel', 'CivWestSingleSelectionPanel');
     style('#map-panel', 'CivWestMapPanel');
+    this.placeFromWidgets();
     const resourceIcons: Record<string, string> = {
       wood: 'ResourceWood', food: 'ResourceFood', gold: 'ResourceGold', stone: 'ResourceStone',
       population: 'Population',
@@ -198,6 +200,40 @@ export class Hud {
   }
 
   /** Uniform HUD scale from the 3840x2160 widget reference space. */
+  /**
+   * Put a panel's contents where the shipped widget data says they go.
+   *
+   * Our panel elements are the panel art exactly — `map-panel.png` is 860x413
+   * and the `Background` widget that draws it is 860x413 — so a widget's box
+   * inside that background is a box inside our element. Centring the minimap
+   * in its panel by flexbox instead put it at 70 where the data says 112, over
+   * the left border decoration, and the command grid's hand-picked 36px of top
+   * padding sat 54 above the anchor the buttons actually hang off (issue #35).
+   *
+   * The open fallback draws no panel art and has no decorations to line up
+   * with, so it keeps the plain CSS composition.
+   */
+  private placeFromWidgets(): void {
+    const place = (selector: string, box: { left: number; top: number; width: number; height: number } | undefined, sized: boolean): void => {
+      if (!box) return;
+      const element = this.root.querySelector<HTMLElement>(selector);
+      if (!element) return;
+      const scaled = (value: number): string => `calc(${value}px * var(--ui-scale))`;
+      element.style.position = 'absolute';
+      element.style.left = scaled(box.left);
+      element.style.top = scaled(box.top);
+      if (sized) {
+        element.style.width = scaled(box.width);
+        element.style.height = scaled(box.height);
+      }
+    };
+    // The minimap's own window in the map panel, and the anchor the command
+    // grid's five-by-three block of buttons hangs off. The grid's 80px cells
+    // and 14px gaps already match the buttons' own 94px stride.
+    place('#minimap-canvas', widgetBox(this.ui?.layouts.mappanel, 'Background', 'MapView'), true);
+    place('#command-grid', widgetBox(this.ui?.layouts.commandpanel, 'BackgroundLeft', 'Buttons'), false);
+  }
+
   private applyScale(): void {
     const scale = Math.max(0.24, Math.min(0.62, innerWidth / REFERENCE_WIDTH));
     this.root.style.setProperty('--ui-scale', String(scale));

@@ -60,16 +60,22 @@ export interface ContentAssets {
 }
 
 interface UiMaterial { type: string; blend?: string | null; texture?: string; color?: { r: number; g: number; b: number; a: number } }
-interface UiLayoutWidget {
+export interface UiLayoutWidget {
   Name?: string;
   Type?: string;
   ViewPort?: { xorigin: number; yorigin: number; width: number; height: number; alignment?: string };
+  /** An `Anchor` widget carries a bare origin here instead of a ViewPort. */
+  Anchor?: { xorigin: number; yorigin: number };
   StateMaterials?: Record<string, { Material?: string }>;
   ChildWidgets?: UiLayoutWidget[];
 }
+export interface UiLayout {
+  viewPort: { width: number; height: number; xorigin: number; yorigin: number; alignment?: string };
+  widgets: UiLayoutWidget[];
+}
 export interface UiAssets {
   base: string;
-  layouts: Record<string, { viewPort: { width: number; height: number; xorigin: number; yorigin: number; alignment?: string }; widgets: UiLayoutWidget[] }>;
+  layouts: Record<string, UiLayout>;
   materials: Record<string, UiMaterial>;
   icons: Record<string, Record<string, string>>;
 }

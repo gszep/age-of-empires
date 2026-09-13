@@ -22,6 +22,11 @@ WIDGET_KEYS = (
     "Type",
     "Name",
     "ViewPort",
+    # An Anchor widget carries its geometry here instead of in a ViewPort, and
+    # it is the only thing that says where a group of children starts: the
+    # command grid's five-by-three block of buttons hangs off one, and their
+    # own ViewPorts are relative to it (issue #35).
+    "Anchor",
     "ZPlane",
     "ZPlaneLocalOffset",
     "Text",

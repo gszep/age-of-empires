@@ -1108,6 +1108,38 @@ banked resource identical — because the strategy re-tasks its own idle
 villagers within a second or two. The cost fell on whoever was playing by
 hand, and no batch metric could see it.
 
+## A panel's contents sit where the widget files put them
+
+`widgetui` lays its panels out in a 3840x2160 reference space, and every
+widget states an origin, a size and the corner that origin belongs to. Our
+panel elements are the panel art exactly — `map-panel.png` is 860x413 and the
+`Background` widget that draws it is 860x413 — so a widget's box inside that
+background is a box inside our element.
+
+Two of them were placed by eye instead, and both showed (issue #35). The
+minimap was flex-centred in its panel, which put it at left 70 where
+`MapView`'s own `CentreCentre` origin of (472, 216) at 720x400 puts it at 112
+— 42 reference pixels over the panel's left border decoration. The command
+grid was positioned by a hand-picked 36 pixels of top padding where the
+`Buttons` anchor its five-by-three block of buttons hangs off says (45, 90),
+leaving it 54 pixels high and 3 wide of the art behind it. Measured in a real
+browser before and after: minimap (70, 11.5) to (112, 16), grid (48, 36) to
+(45, 90). The 80-pixel cells and 14-pixel gaps already matched the buttons'
+own 94-pixel stride and did not move.
+
+The extractor had been dropping the field this depends on. `strip_widget`
+keeps an allow-list, and an `Anchor` widget carries its origin in a field of
+that name rather than in a `ViewPort`, so the anchor never reached the
+manifest — and the failure is silent, because a HUD that cannot find the
+widget simply falls back to the CSS that was wrong. `Anchor` is now in the
+allow-list and an import test asserts both boxes survive the strip.
+`src/view/layout.ts` resolves a widget's box within a named ancestor; the
+open fallback draws no panel art and keeps the plain CSS composition.
+
+Anyone with the owned files needs `npm run import:aoe2` (or `import_ui.py`
+alone, which takes seconds) to pick the anchor up, since the manifest is
+never committed.
+
 ## A building wears its age
 
 Ageing up in AoE2 does not restyle a building, it replaces it: the Feudal Age

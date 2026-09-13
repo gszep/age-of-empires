@@ -954,6 +954,38 @@ class UiImportIntegrationTest(unittest.TestCase):
         self.assertIn('"ResourceFood"', dumped)
         self.assertIn('"ResourceGold"', dumped)
 
+    def test_the_geometry_the_hud_positions_by_survives_the_strip(self):
+        """The two boxes issue #35 was about, read back from the extract.
+
+        `strip_widget` keeps an allow-list of fields, and dropping one of these
+        is silent: the HUD simply stops finding the widget and falls back to
+        the hand-tuned CSS that put the minimap over its own border. The
+        command grid hangs off an `Anchor`, which carries its origin in a field
+        of that name rather than in a ViewPort, and was the field missing.
+        """
+
+        def find(widgets, name):
+            for widget in widgets:
+                if widget.get("Name") == name:
+                    return widget
+                found = find(widget.get("ChildWidgets") or [], name)
+                if found:
+                    return found
+            return None
+
+        layouts = self.result["layouts"]
+        map_view = find(layouts["mappanel"]["widgets"], "MapView")
+        self.assertIsNotNone(map_view)
+        self.assertEqual(
+            map_view["ViewPort"],
+            {"alignment": "CentreCentre", "height": 400, "width": 720, "xorigin": 472, "yorigin": 216},
+        )
+        buttons = find(layouts["commandpanel"]["widgets"], "Buttons")
+        self.assertIsNotNone(buttons)
+        self.assertEqual(buttons["Anchor"], {"xorigin": 45, "yorigin": 90})
+        first = find(layouts["commandpanel"]["widgets"], "Button11")
+        self.assertEqual(first["ViewPort"]["width"], 80)
+
     def test_every_material_texture_was_converted(self):
         out = Path(self.directory.name)
         textured = 0
