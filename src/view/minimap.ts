@@ -42,7 +42,24 @@ export class Minimap {
     this.context = canvas.getContext('2d')!;
   }
 
-  private terrain(state: GameState, reveal: boolean): HTMLCanvasElement {
+  /**
+   * Minimap colour per terrain id, from the DAT's own `colors` field, built
+   * once per asset set. Three ids were hardcoded, which was fine while the
+   * board was grass, forest, water and road; a biome dresses the ground in a
+   * dozen terrains and every one of them drew as plain ground.
+   */
+  private terrainColors(assets?: ContentAssets): Map<number, readonly [number, number, number]> {
+    if (this.colors) return this.colors;
+    const colors = new Map<number, readonly [number, number, number]>();
+    for (const slot of Object.values(assets?.terrain ?? {})) {
+      if (slot.minimapColor) colors.set(slot.terrainId, slot.minimapColor);
+    }
+    this.colors = colors;
+    return colors;
+  }
+  private colors?: Map<number, readonly [number, number, number]>;
+
+  private terrain(state: GameState, reveal: boolean, assets?: ContentAssets): HTMLCanvasElement {
     if (this.tiles?.image.width !== state.width || this.tiles.image.height !== state.height) {
       const canvas = document.createElement('canvas');
       canvas.width = state.width;
@@ -53,10 +70,12 @@ export class Minimap {
       };
     }
     const visibility = state.visibility[this.player];
+    const palette = this.terrainColors(assets);
     const pixels = this.tiles.image.data;
     for (let index = 0; index < state.width * state.height; index++) {
       const terrain = state.terrain[index] ?? 0;
-      const base = terrain === 1 ? WATER : terrain === 24 ? ROAD : terrain === 10 ? FOREST : IN_SIGHT;
+      const base = palette.get(terrain)
+        ?? (terrain === 1 ? WATER : terrain === 24 ? ROAD : terrain === 10 ? FOREST : IN_SIGHT);
       const unexplored = !reveal && visibility.explored[index] !== 1;
       const remembered = !reveal && !unexplored && visibility.visible[index] !== 1;
       const shade = unexplored ? UNEXPLORED : base;
@@ -117,7 +136,7 @@ export class Minimap {
     const scaleY = this.canvas.height / (state.width + state.height);
     ctx.save();
     ctx.setTransform(scaleX, scaleY, -scaleX, scaleY, this.canvas.width / 2, 0);
-    ctx.drawImage(this.terrain(state, reveal), 0, 0);
+    ctx.drawImage(this.terrain(state, reveal, assets), 0, 0);
     ctx.restore();
 
     // Entities: live visible ones plus remembered snapshots.

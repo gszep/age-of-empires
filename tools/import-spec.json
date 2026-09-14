@@ -1675,6 +1675,54 @@
     },
     "farm-construction": {
       "terrainId": 29
+    },
+    "dirt-3": {
+      "terrainId": 3
+    },
+    "underbrush": {
+      "terrainId": 5
+    },
+    "dirt": {
+      "terrainId": 6
+    },
+    "grass-3": {
+      "terrainId": 9
+    },
+    "dirt-2": {
+      "terrainId": 11
+    },
+    "grass-2": {
+      "terrainId": 12
+    },
+    "palm-desert": {
+      "terrainId": 13
+    },
+    "desert": {
+      "terrainId": 14
+    },
+    "pine-forest": {
+      "terrainId": 19
+    },
+    "forest-mediterranean": {
+      "terrainId": 88
+    },
+    "forest-bush": {
+      "terrainId": 89
+    },
+    "dry-grass": {
+      "terrainId": 100
+    },
+    "forest-autumn": {
+      "terrainId": 104
+    },
+    "forest-birch": {
+      "terrainId": 110
+    },
+    "pasture-1": {
+      "terrainId": 117
+    },
+    "pasture-cnst-3": {
+      "terrainId": 121
     }
   }
 }

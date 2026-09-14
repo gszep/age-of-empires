@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { TILE_W, TILE_H, worldToIso } from './iso';
-import type { ContentAssets } from './assets';
+import type { ContentAssets, ImportedTerrain } from './assets';
 import type { GameState } from '../sim/types';
 
 /**
@@ -40,13 +40,44 @@ function cornerElevation(state: GameState, x: number, y: number): number {
 
 /** One mesh per terrain class, hence four draw calls regardless of board size.
  * Each consumes the owned DAT texture for its surveyed OS class. */
+/**
+ * Ground colours for a board with no imported art, and for any terrain the
+ * import does not carry. The open fallback has no textures at all, so these
+ * four are what it draws; a biome terrain nobody imported falls back to its
+ * family's colour rather than vanishing.
+ */
+const FALLBACK_GROUND: Record<number, number> = {
+  0: 0x6f8f4a, 10: 0x315f35, 1: 0x4f91bd, 24: 0xb18a58,
+};
+const FALLBACK_DEFAULT = 0x6f8f4a;
+/** Mesh names for the four the open fallback draws, so a board without any
+ * imported art still names its meshes what everything else calls them. */
+const FALLBACK_KEYS: Record<number, string> = {
+  0: 'ground', 10: 'forest', 1: 'water', 24: 'road',
+};
+
 export function createGround(state: GameState, assets?: ContentAssets): THREE.Group {
-  const classes = [
-    { key: 'ground', ids: new Set([0]), fallback: 0x6f8f4a },
-    { key: 'forest', ids: new Set([10]), fallback: 0x315f35 },
-    { key: 'water', ids: new Set([1]), fallback: 0x4f91bd },
-    { key: 'road', ids: new Set([24]), fallback: 0xb18a58 },
-  ];
+  // One mesh per terrain the board actually carries, rather than per hardcoded
+  // class. A biome dresses the ground in its own base, four blend terrains and
+  // three forest variations, so the four-class list drew every one of them as
+  // plain grass.
+  const byId = new Map<number, { key: string; slot: ImportedTerrain }>();
+  for (const [key, slot] of Object.entries(assets?.terrain ?? {})) byId.set(slot.terrainId, { key, slot });
+  const present: number[] = [];
+  const seen = new Set<number>();
+  for (const id of state.terrain) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    present.push(id);
+  }
+  // Deterministic order, so two runs build the same scene graph.
+  present.sort((a, b) => a - b);
+  const classes = present.map(id => ({
+    id,
+    key: byId.get(id)?.key ?? FALLBACK_KEYS[id] ?? String(id),
+    fallback: FALLBACK_GROUND[id] ?? FALLBACK_DEFAULT,
+  }));
+  const index = new Map(classes.map((entry, i) => [entry.id, i]));
   const buckets = classes.map(() => ({
     positions: [] as number[], uvs: [] as number[], colors: [] as number[],
   }));
@@ -67,8 +98,8 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
   for (let y = 0; y < state.height; y++) {
     for (let x = 0; x < state.width; x++) {
       const terrain = state.terrain[y * state.width + x] ?? 0;
-      const category = Math.max(0, classes.findIndex(entry => entry.ids.has(terrain)));
-      const slot = assets?.terrain?.[classes[category].key];
+      const category = index.get(terrain) ?? 0;
+      const slot = byId.get(classes[category].id)?.slot;
       const [spanX, spanY] = slot?.dimensions ?? [1, 1];
       const point = (px: number, py: number) => {
         const iso = worldToIso(px, py);
@@ -89,13 +120,13 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
     }
   }
   const group = new THREE.Group();
-  classes.forEach((entry, index) => {
-    if (!buckets[index].positions.length) return;
+  classes.forEach((entry, i) => {
+    if (!buckets[i].positions.length) return;
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(buckets[index].positions, 3));
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(buckets[index].uvs, 2));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(buckets[index].colors, 3));
-    const slot = assets?.terrain?.[entry.key];
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(buckets[i].positions, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(buckets[i].uvs, 2));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(buckets[i].colors, 3));
+    const slot = byId.get(entry.id)?.slot;
     const texture = slot && assets?.textures.get(slot.image);
     const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
       ...(texture ? { map: texture } : { color: entry.fallback }),

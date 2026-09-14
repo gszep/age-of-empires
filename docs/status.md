@@ -1120,6 +1120,41 @@ banked resource identical — because the strategy re-tasks its own idle
 villagers within a second or two. The cost fell on whoever was playing by
 hand, and no batch metric could see it.
 
+## Arabia deals a biome, and the ground is no longer one colour
+
+`Arabia.rms` is in the owned depot and rolls a **biome** per match — eleven of
+them at roughly nine percent each — where each names its own ground, its own
+forest, two forest variations and four "blend" terrains scattered over the
+ground in clumps. The board here was grass and forest and nothing else, which
+is why it read as a green sheet.
+
+Four of the eleven ship, chosen to span the script's range: the middle-eastern
+desert everyone pictures, two temperate greens and a Mediterranean. The other
+seven are twelve terrain ids apiece out of the same block and are left out only
+so the import does not carry textures no board deals — recorded in
+`backlog.md`. The passes are the script's own, in its order and with its
+percentages: `BASE_BLEND_A` at 8% in four clumps with a clumping factor of 80,
+then 4% in six, `BASE_BLEND_B` at 16% in twenty-four, and so on, each painting
+only over the terrain the pass names.
+
+**The dressing draws from its own stream.** Sharing the board's generator would
+shift every draw after it and deal a different board for the same seed, which
+is a large price for deciding what colour the ground is. Derived from the match
+seed, so it is still the same dressing every time; asserted by a test that the
+object layout for a seed is untouched.
+
+Two things fell out of it. The renderer bucketed the ground into four hardcoded
+terrain classes, so a biome's dozen terrains all drew as plain grass; it now
+builds one mesh per terrain the board actually carries and the minimap takes
+each terrain's colour from the DAT's own `colors` field instead of three
+hardcoded ids. And the biome roll came out identical for forty consecutive
+seeds, which turned out to be the match RNG's first draw being degenerate for
+any small seed — a real defect, filed as its own issue rather than fixed in
+passing, because mixing the match seed deals a different board for every seed
+that exists (see issue #44).
+
+Terrain-to-terrain edges are still hard lines; that is issue #42.
+
 ## Fog fades across a tile instead of stepping at its edge
 
 Every tile carried one alpha on both of its triangles, so the boundary between

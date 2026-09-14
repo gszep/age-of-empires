@@ -121,6 +121,9 @@ describe('meshes that lie on the ground', () => {
     const state = createGame(11);
     state.elevation.fill(0);
     state.elevation[0] = 4;
+    // One ground everywhere, so this stays a test about elevation: a board
+    // dressed in a biome puts tile 0 in whichever terrain the roll dealt.
+    state.terrain.fill(0);
     const ground = createGround(state);
     const mesh = ground.getObjectByName('terrain-ground') as THREE.Mesh;
     const positions = mesh.geometry.getAttribute('position');

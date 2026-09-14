@@ -119,6 +119,49 @@ describe('the grown map', () => {
     }
   });
 
+  it('dresses the board in a biome instead of one flat terrain', () => {
+    // Arabia rolls a biome per match and each names its own ground, forest,
+    // two forest variations and four blend terrains scattered in clumps. The
+    // board used to be grass and forest and nothing else.
+    const state = createGame(11, FALLBACK_RULES);
+    const counts = new Map<number, number>();
+    for (const id of state.terrain) counts.set(id, (counts.get(id) ?? 0) + 1);
+    expect(counts.size, 'a dressed board carries more than grass and wood').toBeGreaterThan(3);
+    // No single terrain is the whole board, and the base is still most of it.
+    const share = [...counts.values()].map(n => n / state.terrain.length).sort((a, b) => b - a);
+    expect(share[0]).toBeLessThan(0.95);
+    expect(share[0]).toBeGreaterThan(0.3);
+  });
+
+  it('rolls different biomes for different seeds', () => {
+    const bases = new Set<number>();
+    for (let seed = 1; seed <= 24; seed++) {
+      const state = createGame(seed, FALLBACK_RULES);
+      const counts = new Map<number, number>();
+      for (const id of state.terrain) counts.set(id, (counts.get(id) ?? 0) + 1);
+      bases.add([...counts.entries()].sort((a, b) => b[1] - a[1])[0][0]);
+    }
+    // The roll used to come off the generator's very first draw, which is
+    // degenerate for a small seed: forty consecutive seeds dealt one biome
+    // (issue #44). The dressing draws from a mixed stream of its own.
+    expect(bases.size, 'every seed dealt the same biome').toBeGreaterThan(1);
+  });
+
+  it('dresses without moving a single object', () => {
+    // The dressing draws from its own stream precisely so it cannot shift the
+    // board. Same seed, same everything a player can pick up or walk into.
+    const layout = (state: GameState) => state.entities
+      .filter(e => e.kind !== 'town-center')
+      .map(e => `${e.kind}:${e.position.x.toFixed(3)},${e.position.y.toFixed(3)}`)
+      .sort()
+      .join('|');
+    const a = createGame(11, FALLBACK_RULES);
+    const b = createGame(11, FALLBACK_RULES);
+    expect(layout(a)).toBe(layout(b));
+    // And the dressing itself is the same both times.
+    expect(a.terrain.join(',')).toBe(b.terrain.join(','));
+  });
+
   it('generates the same board and match for the same seed', () => {
     const play = () => {
       const state = createGame(29, FALLBACK_RULES);

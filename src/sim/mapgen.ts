@@ -22,7 +22,7 @@ import type { NodeKind } from './data';
 import paintedProof from './maps/painted-proof.json';
 import senlac from './maps/senlac.json';
 import windsor from './maps/windsor.json';
-import { random01 } from './random';
+import { random01, seedFrom } from './random';
 import type { AnimalKind, BuildingKind, Point, UnitKind } from './types';
 
 /** DAT terrain ids the grid speaks. Grass is Arabia's base; forest carries
@@ -30,6 +30,88 @@ import type { AnimalKind, BuildingKind, Point, UnitKind } from './types';
  * to draw more than one ground (docs/overnight.md, terrain blend edges). */
 export const TERRAIN_GRASS = 0;
 export const TERRAIN_FOREST = 10;
+
+/**
+ * The terrains one of Arabia's biomes dresses the board in.
+ *
+ * DE's Arabia rolls a biome per match — eleven of them at roughly nine percent
+ * each — and each names its own ground, its own forest, two forest variations
+ * and four "blend" terrains that are scattered over the ground in clumps. That
+ * scattering is what stops the board reading as one flat sheet of green, and
+ * it is the thing a terrain-blend pass has to have before it has anything to
+ * blend. Ids are the DAT's own terrain slots, read out of `Arabia.rms`'s
+ * `MAP_CONSTANTS` block.
+ */
+export interface BiomeSpec {
+  /** The script's own name for it, kept so a board can say what it dealt. */
+  name: string;
+  base: number;
+  blendA: number;
+  blendB: number;
+  blendC: number;
+  blendD: number;
+  forest: number;
+  forestEdge: number;
+  forestVariationA: number;
+  forestVariationB: number;
+  forestBlend: number;
+}
+
+type BiomeTerrain = Exclude<keyof BiomeSpec, 'name'>;
+
+/**
+ * Arabia's `<TERRAIN_GENERATION>` passes, in the script's own order, with its
+ * own percentages and clump counts. Each paints one terrain over tiles that
+ * are currently another, so the order matters: a later pass can sit on what an
+ * earlier one laid.
+ *
+ * `set_scale_by_groups` and `terrain_mask` are DE extensions this does not
+ * model; `land_percent` is read as a percentage of the board, which is what
+ * makes the numbers land at the script's own coverage.
+ */
+const BIOME_PASSES: {
+  paint: BiomeTerrain; over: BiomeTerrain; percent: number; clumps: number; clumping?: number;
+}[] = [
+  { paint: 'forestVariationA', over: 'forest', percent: 2, clumps: 128 },
+  { paint: 'forestVariationB', over: 'forest', percent: 1, clumps: 128 },
+  { paint: 'blendA', over: 'base', percent: 8, clumps: 4, clumping: 80 },
+  { paint: 'blendA', over: 'base', percent: 4, clumps: 6 },
+  { paint: 'blendB', over: 'base', percent: 16, clumps: 24 },
+  { paint: 'blendA', over: 'forest', percent: 4, clumps: 24 },
+  { paint: 'blendC', over: 'base', percent: 4, clumps: 24 },
+  { paint: 'blendD', over: 'base', percent: 6, clumps: 24 },
+  { paint: 'forestBlend', over: 'forest', percent: 4, clumps: 24 },
+];
+
+/**
+ * Four of the eleven biomes `Arabia.rms` rolls between, chosen to span its
+ * range: the desert everyone pictures, two temperate greens and a
+ * Mediterranean. The other seven are a data addition — each is twelve terrain
+ * ids out of the same block — and are left out only so the import does not
+ * carry textures no board deals; see `docs/backlog.md`.
+ */
+export const ARABIA_BIOMES: BiomeSpec[] = [
+  {
+    name: 'PALAEARCTIC_MIDDLE_EAST_DESERT',
+    base: 14, blendA: 11, blendB: 6, blendC: 14, blendD: 14,
+    forest: 13, forestEdge: 13, forestVariationA: 110, forestVariationB: 13, forestBlend: 3,
+  },
+  {
+    name: 'PALAEARCTIC_EUROPE_TEMPERATE',
+    base: 12, blendA: 5, blendB: 9, blendC: 12, blendD: 12,
+    forest: 10, forestEdge: 89, forestVariationA: 19, forestVariationB: 104, forestBlend: 12,
+  },
+  {
+    name: 'NEARCTIC_TEMPERATE',
+    base: 3, blendA: 0, blendB: 9, blendC: 12, blendD: 3,
+    forest: 19, forestEdge: 89, forestVariationA: 10, forestVariationB: 19, forestBlend: 0,
+  },
+  {
+    name: 'PALAEARCTIC_EUROPE_MEDITERRANEAN',
+    base: 9, blendA: 100, blendB: 117, blendC: 121, blendD: 3,
+    forest: 88, forestEdge: 89, forestVariationA: 19, forestVariationB: 104, forestBlend: 0,
+  },
+];
 
 export interface ObjectGroupSpec {
   kind: NodeKind | AnimalKind;
@@ -102,6 +184,12 @@ export interface MapDescriptor {
   /** High-resolution survey boards keep the forest ground but thin individual
    * tree entities to this deterministic fraction for rendering/playability. */
   bakedTreeStride?: number;
+  /**
+   * Biomes this map type rolls between, one per match. Absent means the board
+   * keeps the plain grass-and-forest pair, which is what a baked survey map
+   * wants: its ground is the geography, not a dressing.
+   */
+  biomes?: BiomeSpec[];
   opening: ObjectGroupSpec[];
 }
 
@@ -112,6 +200,7 @@ export interface MapDescriptor {
  */
 export const ARABIA: MapDescriptor = {
   base: 'grass',
+  biomes: ARABIA_BIOMES,
   // The spawn wood: two clumps sized as the 1999 include's smallest
   // PLAYER_FOREST (55 tiles x 2 clumps); spacing between them borrows the DE
   // script's forest spacing of 6, which the include does not state.
@@ -411,11 +500,68 @@ function clearAround(
  * independent draws (docs/status.md), kept because the paired evaluation
  * batch rests on it.
  */
+/**
+ * Dress the board in a biome: run Arabia's own `create_terrain` passes over
+ * ground that has already been grown.
+ *
+ * Each pass grows clumps with the same primitive the woods use and writes its
+ * terrain only where the tile is currently the one the pass names, so the
+ * script's ordering — a later pass sitting on what an earlier one laid — comes
+ * out of the data rather than out of special cases here.
+ *
+ * Deliberately not mirrored. The rest of the board is, because resources
+ * decide matches and a paired evaluation has to be fair; a dressing does not
+ * touch play (the terrain grid is read by the renderer and the minimap and by
+ * nothing in the rules), and mirroring it makes the two halves visibly the
+ * same picture, which no map in the reference looks like.
+ */
+function paintBiome(
+  ctx: MapgenContext, terrain: number[], biome: BiomeSpec, rng: { seed: number },
+): void {
+  // Grow against the dressing's own stream rather than the board's.
+  const dressed: MapgenContext = { ...ctx, rng };
+  const area = ctx.width * ctx.height;
+  for (const pass of BIOME_PASSES) {
+    const paint = biome[pass.paint];
+    const over = biome[pass.over];
+    // A pass whose two terrains are the same id would paint nothing; the
+    // script has several (a biome may set BLEND_C to its own base).
+    if (paint === over) continue;
+    const tiles = Math.round(area * pass.percent / 100);
+    if (tiles <= 0) continue;
+    const on = (x: number, y: number): boolean => terrain[y * ctx.width + x] === over;
+    const order = candidateOrderBox(dressed, 0, 0, ctx.width - 1, ctx.height - 1)
+      .filter(tile => on(tile % ctx.width, Math.floor(tile / ctx.width)));
+    if (!order.length) continue;
+    const seeds: { x: number; y: number }[] = [];
+    for (const tile of order) {
+      if (seeds.length >= pass.clumps) break;
+      seeds.push({ x: tile % ctx.width, y: Math.floor(tile / ctx.width) });
+    }
+    const mask = new Uint8Array(area);
+    growClumps(dressed, mask, seeds, tiles, on, pass.clumping);
+    for (let tile = 0; tile < area; tile++) if (mask[tile]) terrain[tile] = paint;
+  }
+}
+
 export function generateMap(
   ctx: MapgenContext, descriptor: MapDescriptor, starts: Point[],
   mirror: (p: Point) => Point,
 ): { terrain: number[]; elevation: number[] } {
-  const terrain = new Array<number>(ctx.width * ctx.height).fill(TERRAIN_GRASS);
+  // One biome per match, rolled before anything is laid so the base ground is
+  // already the biome's own. A baked survey board names no biomes: its ground
+  // is the geography.
+  //
+  // It draws from its own stream, not the board's. A dressing must not move a
+  // single sheep: sharing `ctx.rng` would shift every draw after it and deal a
+  // different board for the same seed, which is a large price for a change
+  // that only decides what colour the ground is. The stream is derived from
+  // the match seed, so it is still the same dressing every time.
+  const dressing = { seed: seedFrom(ctx.rng.seed ^ 0x5ee_d1) };
+  const biome = descriptor.biomes?.length
+    ? descriptor.biomes[randInt(dressing, descriptor.biomes.length)]
+    : undefined;
+  const terrain = new Array<number>(ctx.width * ctx.height).fill(biome?.base ?? TERRAIN_GRASS);
   const elevation = new Array<number>(ctx.width * ctx.height).fill(0);
   const start = starts[0];
   const reserved = new Uint8Array(ctx.width * ctx.height);
@@ -570,10 +716,14 @@ export function generateMap(
     const here = tileCentre(tile % ctx.width, Math.floor(tile / ctx.width));
     ctx.place('tree', here);
     ctx.place('tree', mirror(here));
-    terrain[tile] = TERRAIN_FOREST;
+    terrain[tile] = biome?.forest ?? TERRAIN_FOREST;
     const other = mirror(here);
-    terrain[Math.floor(other.y) * ctx.width + Math.floor(other.x)] = TERRAIN_FOREST;
+    terrain[Math.floor(other.y) * ctx.width + Math.floor(other.x)] = biome?.forest ?? TERRAIN_FOREST;
   }
+
+  // The dressing goes on once the woods are down, so a pass that paints over
+  // forest has forest to paint over.
+  if (biome) paintBiome(ctx, terrain, biome, dressing);
 
   // Lone trees over the open ground, the classic thirty oaks at map scale. A
   // straggler keeps two clear tiles from every other tree: one tile of gap

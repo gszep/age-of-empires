@@ -43,6 +43,8 @@ export interface PlayerColors {
 
 /** One DAT terrain slot: a tiling texture spanning `dimensions` tiles. */
 export interface ImportedTerrain {
+  /** The DAT slot this is, so the ground can be bucketed by what the map says. */
+  terrainId: number;
   name: string;
   texture: string;
   image: string;
