@@ -1147,6 +1147,16 @@ photographed through the debug protocol before and after, and the dominant
 stripe frequency inside the block falls to **0.611** of what it was, against
 the 0.600 the change predicts (the remainder is FFT bin quantisation).
 
+The sheet is also laid a quarter turn round. Its furrows run along one world
+axis and the reference ploughs across the other, so the patch samples `u` from
+world y and `v` from world x — a rotation rather than a transpose, so the art
+is not mirrored with it. Both farm spans are square, so turning it leaves the
+twelve furrows untouched; measured on the same staged block, the stripe
+direction moves from 116.6 to 63.4 degrees on screen at an unchanged pitch
+(ratio 1.000). Those two angles are the diamond's own axes, 90 degrees either
+side of vertical once the dimetric projection has halved y — a right angle in
+the world, which is not a right angle on screen.
+
 The other half of the issue is fixed with it. A patch sampled its texture in
 patch-local coordinates, so every farm on the map drew the identical corner of
 the sheet and the thirty-six authored frames came down to one arrangement.

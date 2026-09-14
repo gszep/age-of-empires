@@ -178,14 +178,44 @@ describe('meshes that lie on the ground', () => {
     const assets = groundAssets();
     const first = createTerrainPatch(assets, 'farm', 1.5, { x: 9, y: 12 })!.geometry.getAttribute('uv');
     const second = createTerrainPatch(assets, 'farm', 1.5, { x: 21, y: 30 })!.geometry.getAttribute('uv');
-    expect(first.getX(0)).toBeCloseTo(9 / FARM_TILES_PER_SPAN, 6);
-    expect(second.getX(0)).toBeCloseTo(21 / FARM_TILES_PER_SPAN, 6);
+    // The sheet is laid a quarter turn round, so u follows world y and v world x.
+    expect(first.getX(0)).toBeCloseTo(12 / FARM_TILES_PER_SPAN, 6);
+    expect(second.getX(0)).toBeCloseTo(30 / FARM_TILES_PER_SPAN, 6);
     const differs = Array.from({ length: first.count }, (_, i) =>
       Math.abs(first.getX(i) - second.getX(i)) > 1e-6 || Math.abs(first.getY(i) - second.getY(i)) > 1e-6);
     expect(differs.every(Boolean)).toBe(true);
     // Same ground, same picture: the patch is a function of where it stands.
     const again = createTerrainPatch(assets, 'farm', 1.5, { x: 9, y: 12 })!.geometry.getAttribute('uv');
     expect(again.getX(0)).toBeCloseTo(first.getX(0), 6);
+  });
+
+  it('ploughs the farm across the axis the reference ploughs', () => {
+    // The furrows in `g_fm1` run along one world axis and the reference runs
+    // them along the other, so the sheet is sampled a quarter turn round: u
+    // follows world y and v world x. On screen that swaps which diagonal of
+    // the diamond the furrows lie along -- a 90 degree turn in world space,
+    // which the dimetric projection shows as the other axis of the diamond
+    // rather than as a right angle.
+    const assets = groundAssets();
+    const uv = createTerrainPatch(assets, 'farm', 1.5, { x: 4, y: 7 })!.geometry.getAttribute('uv');
+    // North corner of the patch: world (4,7) -> u from y, v from x.
+    expect(uv.getX(0)).toBeCloseTo(7 / FARM_TILES_PER_SPAN, 6);
+    expect(uv.getY(0)).toBeCloseTo(-4 / FARM_TILES_PER_SPAN, 6);
+    // Read the first triangle of the first tile straight off the mesh: its
+    // three vertices are the tile corners (0,0), (1,0) and (1,1) in world
+    // tiles. Stepping one tile along world x must move v and leave u alone,
+    // and along world y the other way about. That is what makes it a turn
+    // rather than a scale, and it is read back rather than recomputed.
+    const corner = (i: number) => ({ u: uv.getX(i), v: uv.getY(i) });
+    const [origin, alongX, alongXY] = [corner(0), corner(1), corner(2)];
+    expect(alongX.u).toBeCloseTo(origin.u, 6);
+    expect(alongX.v).toBeCloseTo(origin.v - 1 / FARM_TILES_PER_SPAN, 6);
+    expect(alongXY.u).toBeCloseTo(origin.u + 1 / FARM_TILES_PER_SPAN, 6);
+    expect(alongXY.v).toBeCloseTo(alongX.v, 6);
+    // Turning it does not change how many furrows cross the farm: both spans
+    // are square, so the count is the same either way round.
+    const us = Array.from({ length: uv.count }, (_, i) => uv.getX(i));
+    expect(Math.max(...us) - Math.min(...us)).toBeCloseTo(3 / FARM_TILES_PER_SPAN, 6);
   });
 
   it('is wound clockwise at all, so the check above is not vacuous', () => {

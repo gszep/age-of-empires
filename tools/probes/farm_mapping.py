@@ -33,17 +33,31 @@ REFERENCE_FURROWS = 12            # what the owner of the game reports
 
 
 def furrows(image: Image.Image) -> int:
-    """Rows in a crop, by frequency rather than by eye."""
+    """Furrows across a crop, by frequency rather than by eye.
+
+    Measured on whichever axis actually carries them, so the answer does not
+    depend on which way round the sheet is being drawn.
+    """
     grey = np.asarray(image.convert("L"), dtype=np.float64)
-    profile = grey.mean(axis=1)
-    profile = (profile - profile.mean()) * np.hanning(len(profile))
-    return int(np.argmax(np.abs(np.fft.rfft(profile))[2:80]) + 2)
+    best, strength = 0, -1.0
+    for axis in (0, 1):
+        profile = grey.mean(axis=1 - axis)
+        profile = (profile - profile.mean()) * np.hanning(len(profile))
+        spectrum = np.abs(np.fft.rfft(profile))[2:80]
+        if spectrum.max() > strength:
+            best, strength = int(np.argmax(spectrum) + 2), float(spectrum.max())
+    return best
 
 
 def diamond(src: Image.Image, fraction: float) -> Image.Image:
-    """Sample `fraction` of the sheet across the farm, sheared to dimetric."""
+    """Sample `fraction` of the sheet across the farm, sheared to dimetric.
+
+    Turned a quarter turn first, as `createTerrainPatch` does: the furrows run
+    along one world axis and the reference ploughs across the other.
+    """
     n = max(2, int(src.size[0] * fraction))
-    patch = src.crop((0, 0, n, n)).resize((FARM_TILES * TILE_W, FARM_TILES * TILE_W), Image.LANCZOS)
+    turned = src.transpose(Image.ROTATE_90)
+    patch = turned.crop((0, 0, n, n)).resize((FARM_TILES * TILE_W, FARM_TILES * TILE_W), Image.LANCZOS)
     out = Image.new("RGBA", (FARM_TILES * TILE_W, FARM_TILES * TILE_H), (0, 0, 0, 0))
     px, op = patch.load(), out.load()
     span = FARM_TILES * TILE_W - 1

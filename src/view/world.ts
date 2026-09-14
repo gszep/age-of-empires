@@ -148,9 +148,9 @@ export function createTerrainPatch(
   const terrain = assets?.terrain?.[slot];
   const texture = terrain && assets?.textures.get(terrain.image);
   if (!terrain || !texture) return undefined;
-  const [spanX, spanY] = FARM_SLOTS.has(slot)
-    ? [FARM_TILES_PER_SPAN, FARM_TILES_PER_SPAN]
-    : terrain.dimensions;
+  const farm = FARM_SLOTS.has(slot);
+  const [spanX, spanY] = farm ? [FARM_TILES_PER_SPAN, FARM_TILES_PER_SPAN] : terrain.dimensions;
+  const turned = farm;
   const positions: number[] = [];
   const uvs: number[] = [];
   const tiles = Math.max(1, Math.round(half * 2));
@@ -159,7 +159,15 @@ export function createTerrainPatch(
       // Position is patch-local (the mesh is placed at its north corner);
       // the texture coordinate is absolute, so neighbouring farms show
       // neighbouring ground rather than the same corner twice.
-      const uv = (px: number, py: number) => ({ u: (at.x + px) / spanX, v: (at.y + py) / spanY });
+      // Farm sheets are laid the way the reference lays them: ten tiles to the
+      // span, and turned a quarter turn, because the furrows in `g_fm1` run
+      // along the world axis the game ploughs across. A rotation rather than a
+      // transpose -- (u, v) = (y, -x) -- so the art is not mirrored with it.
+      // Both farm spans are square, so the furrow count across a farm is the
+      // same either way round.
+      const uv = turned
+        ? (px: number, py: number) => ({ u: (at.y + py) / spanY, v: -(at.x + px) / spanX })
+        : (px: number, py: number) => ({ u: (at.x + px) / spanX, v: (at.y + py) / spanY });
       const corners = [
         { p: worldToIso(x, y), ...uv(x, y) },
         { p: worldToIso(x + 1, y), ...uv(x + 1, y) },
