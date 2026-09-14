@@ -913,6 +913,11 @@ def terrain_entry(dat: DatFile, terrain_id: int) -> dict[str, Any]:
         # Tiles covered by one repeat of the texture, so the view can lay it out
         # at the authored scale instead of guessing a tiling rate.
         "dimensions": [width, height],
+        # Which terrain wins where two meet, and which family of blend masks
+        # the edge is drawn with: the higher priority is painted over its
+        # neighbour. Both are the DAT's own fields.
+        "blendPriority": terrain.blend_priority,
+        "blendType": terrain.blend_type,
         "minimapColor": list(terrain.colors),
     }
 

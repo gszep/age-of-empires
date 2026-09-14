@@ -678,6 +678,22 @@ class ContentImportIntegrationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             effect_entry(_dat(), GRAPHICS, {"key": "x", "graphic": "no such graphic"}, {})
 
+    def test_terrain_carries_what_decides_a_blend(self):
+        """A blend needs to know which terrain wins and which masks to use."""
+        for key in ("ground", "forest", "farm"):
+            slot = self.result["terrain"][key]
+            self.assertIn("blendPriority", slot, key)
+            self.assertIn("blendType", slot, key)
+        # The farm is what the reported defect was about: it must out-rank the
+        # grass it sits in, or it would be the grass that bled over the farm.
+        self.assertGreater(
+            self.result["terrain"]["farm"]["blendPriority"],
+            self.result["terrain"]["ground"]["blendPriority"],
+        )
+        # Farms are their own blend family; ordinary ground is land-on-land.
+        self.assertEqual(self.result["terrain"]["farm"]["blendType"], 1)
+        self.assertEqual(self.result["terrain"]["ground"]["blendType"], 0)
+
     def test_ground_terrain_comes_from_the_dat(self):
         ground = self.result["terrain"]["ground"]
         # Grass is DAT terrain 0; its texture name and tile span drive the
@@ -985,6 +1001,47 @@ class UiImportIntegrationTest(unittest.TestCase):
         self.assertEqual(buttons["Anchor"], {"xorigin": 45, "yorigin": 90})
         first = find(layouts["commandpanel"]["widgets"], "Button11")
         self.assertEqual(first["ViewPort"]["width"], 80)
+
+    def test_blendomatic_walks_to_its_last_byte(self):
+        """The blend masks, proven by the file's own arithmetic.
+
+        Nothing about this format is guessed: the modes divide the file
+        exactly, the diamond holds exactly one `tile_size` of pixels, and the
+        chunks past the dither patterns number exactly the `nr_tiles` the
+        header states. If any of those stops being true the decode is wrong
+        and the masks would be silently misread rather than fail.
+        """
+        import numpy as np
+
+        from import_blends import (
+            DITHER_CHUNKS, MODE_BYTES, ROWS, TILE_SIZE, NEIGHBOURS,
+            coverages, read_modes, single_edge_groups,
+        )
+
+        path = ROOT / "depot_813781/resources/_common/dat/blendomatic_x1.dat"
+        raw = path.read_bytes()
+        modes, tiles = np.frombuffer(raw[:8], dtype="<u4")
+        self.assertEqual(len(raw), 8 + int(modes) * MODE_BYTES, "modes do not fill the file")
+        self.assertEqual(sum(ROWS), TILE_SIZE, "the diamond is not one tile_size of pixels")
+
+        decoded = read_modes(path)
+        self.assertEqual(len(decoded), int(modes))
+        for index, masks in enumerate(decoded):
+            self.assertEqual(len(masks), int(tiles), f"mode {index} is not nr_tiles masks")
+        # Alpha is the classic 0..128, not 0..255.
+        self.assertLessEqual(max(int(m.max()) for m in decoded[0]), 128)
+        self.assertEqual(DITHER_CHUNKS + int(tiles), 35)
+
+        # Each single-edge group must actually face its own neighbour: the
+        # grouping is measured, so this is the measurement holding.
+        groups = single_edge_groups(decoded[0])
+        cover = coverages(decoded[0])
+        self.assertEqual(sorted(groups), sorted(NEIGHBOURS))
+        for name, indexes in groups.items():
+            self.assertEqual(len(indexes), 4, name)
+            for i in indexes:
+                strongest = max(cover[i], key=cover[i].get)
+                self.assertEqual(strongest, name, f"mask {i} faces {strongest}, not {name}")
 
     def test_every_material_texture_was_converted(self):
         out = Path(self.directory.name)
