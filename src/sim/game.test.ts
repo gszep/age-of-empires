@@ -20,6 +20,61 @@ describe('simulation', () => {
     expect(digest(a)).toBe(digest(b));
   });
 
+  it('queues a shift-clicked order behind the one it is doing', () => {
+    // Issue #38. The reference's shift-click: a route laid without waiting for
+    // each leg, and each leg decided when the unit gets there.
+    const state = createGame();
+    const unit = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const first = { x: unit.position.x + 4, y: unit.position.y };
+    const second = { x: unit.position.x + 4, y: unit.position.y + 4 };
+    expect(applyCommand(state, { kind: 'order', player: 1, entityIds: [unit.id], target: first })).toEqual({ ok: true });
+    expect(applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [unit.id], target: second, queue: true,
+    })).toEqual({ ok: true });
+    // The first is what it is doing; the second is waiting.
+    expect(unit.order).toEqual({ kind: 'move', target: first });
+    expect(unit.orderQueue).toHaveLength(1);
+
+    // Walk until it takes the second leg of its own accord.
+    let took = false;
+    for (let i = 0; i < 2000 && !took; i++) {
+      stepGame(state);
+      took = unit.order.kind === 'move'
+        && Math.abs(unit.order.target.y - second.y) < 1e-9;
+    }
+    expect(took, 'never went on to the queued waypoint').toBe(true);
+    expect(unit.orderQueue).toBeUndefined();
+  });
+
+  it('throws the queue away on a fresh order or a stop', () => {
+    const state = createGame();
+    const unit = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const away = { x: unit.position.x + 4, y: unit.position.y };
+    const queue = () => applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [unit.id], target: away, queue: true,
+    });
+    applyCommand(state, { kind: 'order', player: 1, entityIds: [unit.id], target: away });
+    queue(); queue();
+    expect(unit.orderQueue).toHaveLength(2);
+    // An unshifted order replaces the whole plan, not just the current step.
+    applyCommand(state, { kind: 'order', player: 1, entityIds: [unit.id], target: away });
+    expect(unit.orderQueue).toBeUndefined();
+    queue();
+    applyCommand(state, { kind: 'stop', player: 1, entityIds: [unit.id] });
+    expect(unit.orderQueue).toBeUndefined();
+  });
+
+  it('gives an idle unit a shift-clicked order straight away', () => {
+    // Nothing to queue behind: the first click of a route must simply go.
+    const state = createGame();
+    const unit = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    applyCommand(state, { kind: 'stop', player: 1, entityIds: [unit.id] });
+    const away = { x: unit.position.x + 4, y: unit.position.y };
+    applyCommand(state, { kind: 'order', player: 1, entityIds: [unit.id], target: away, queue: true });
+    expect(unit.order).toEqual({ kind: 'move', target: away });
+    expect(unit.orderQueue).toBeUndefined();
+  });
+
   it('deletes your own things and nobody else\'s', () => {
     // Issue #37. The reference's Delete: your own, gone, nothing back.
     const state = createGame();

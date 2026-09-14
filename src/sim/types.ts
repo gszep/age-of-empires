@@ -77,6 +77,16 @@ export interface Entity {
    * kept it (issue #32).
    */
   lastResource?: ResourceKind;
+  /**
+   * Clicks waiting behind the current order, in the order they were given.
+   *
+   * What is kept is the click, not the order it became: what a right-click
+   * *means* depends on the target's state, and a waypoint's target may have
+   * been felled, eaten or finished by the time the unit reaches it. Deciding
+   * at the moment the unit takes the order is both simpler and more correct.
+   * Thrown away by `stop`, and by any order that is not itself queued.
+   */
+  orderQueue?: { target: Point; targetId?: number }[];
   /** Buildings. */
   /** Half-extents in tiles when the footprint is not the square `radius` says:
    * a gate is two tiles by one, and which way round is its orientation. */
@@ -190,7 +200,11 @@ export interface GameState {
 }
 
 export type Command =
-  | { kind: 'order'; player: PlayerId; entityIds: number[]; target: Point; targetId?: number }
+  | { kind: 'order'; player: PlayerId; entityIds: number[]; target: Point; targetId?: number;
+      /** Fall in behind what the unit is already doing instead of replacing
+       * it: the reference's shift-click, which is how a player lays a route
+       * or a sequence of jobs without waiting for each to finish. */
+      queue?: boolean }
   | { kind: 'train'; player: PlayerId; buildingId: number; unit: UnitKind }
   | { kind: 'build'; player: PlayerId; builderIds: number[]; building: BuildingKind; target: Point;
       /** Which way a building longer than it is wide lies. Defaults to `x`. */

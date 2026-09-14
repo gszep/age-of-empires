@@ -27,6 +27,9 @@
         },
         "targetId": {
           "type": "integer"
+        },
+        "queue": {
+          "type": "boolean"
         }
       },
       "required": [

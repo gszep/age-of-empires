@@ -533,7 +533,7 @@ renderer.domElement.addEventListener('pointerdown', event => {
     }
     dragStart = { x: event.clientX, y: event.clientY };
   } else if (event.button === 2) {
-    contextOrder(point, event.clientX, event.clientY);
+    contextOrder(point, event.clientX, event.clientY, event.shiftKey);
   }
 });
 addEventListener('pointermove', event => {
@@ -596,7 +596,7 @@ addEventListener('pointerup', event => {
   acknowledge();
 });
 
-function contextOrder(point: Point, _clientX: number, _clientY: number): void {
+function contextOrder(point: Point, _clientX: number, _clientY: number, queue = false): void {
   if (replay) return; // spectating: inputs must not perturb the command stream
   const selection = ownSelected();
   const target = pickEntity(point);
@@ -606,6 +606,8 @@ function contextOrder(point: Point, _clientX: number, _clientY: number): void {
     const result = applyCommand(game, {
       kind: 'order', player: 1, entityIds: units.map(e => e.id),
       target: point, targetId,
+      // Shift-click falls in behind what they are doing, as the reference does.
+      ...(queue ? { queue: true } : {}),
     });
     if (!result.ok) reject(result.reason);
     else {

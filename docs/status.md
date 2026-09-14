@@ -1120,6 +1120,25 @@ banked resource identical — because the strategy re-tasks its own idle
 villagers within a second or two. The cost fell on whoever was playing by
 hand, and no batch metric could see it.
 
+## Shift-click lays a route
+
+A right-click replaced whatever a unit was doing, so a player could give it
+only one thing at a time. Shift-click now falls in behind instead (issue #38),
+which is how the reference lets you lay a route or a sequence of jobs without
+waiting for each to finish. An unshifted order throws the whole plan away, not
+just the current step, and so does `stop`; a unit with nothing to queue behind
+takes the order straight away, which is what the first click of a route has to
+do.
+
+What a unit keeps is the **click**, not the order it became. What a right-click
+means depends on the target's state, and a waypoint's target may have been
+felled, eaten or finished by the time the unit arrives — so the decision is
+made when the order is taken, and a waypoint onto a tree somebody has since cut
+down becomes a walk to where it stood rather than an order to gather nothing.
+
+Shift-click for *selection* was already there: it adds to the selection, and a
+double-click still takes every one of that kind on screen.
+
 ## A tree stands on leaf litter, not on grass
 
 Trees stood on whatever the dressing had last painted, which was frequently

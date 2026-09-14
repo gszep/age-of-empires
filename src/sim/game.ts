@@ -455,6 +455,15 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       if (command.kind === 'stop') {
         entity.order = { kind: 'idle' };
         entity.activity = 'idle';
+        entity.orderQueue = undefined;
+      } else if (command.queue && entity.order.kind !== 'idle') {
+        // Shift-click: fall in behind what it is doing. Only a unit already
+        // busy has anything to queue behind -- an idle one takes the order
+        // now, which is what a player expects of the first click of a route.
+        entity.orderQueue = [
+          ...(entity.orderQueue ?? []),
+          { target: { ...command.target }, targetId: command.targetId },
+        ];
       } else if (defensive) {
         // A tower cannot be sent anywhere, so only a hostile target means
         // anything to it: pointing at the ground releases it back to
@@ -463,6 +472,8 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
           ? { kind: 'attack', targetId: targetEntity.id }
           : { kind: 'idle' };
       } else {
+        // A fresh order replaces the whole plan, not just the current step.
+        entity.orderQueue = undefined;
         assignOrder(state, entity, command.target, targetEntity);
       }
     }
@@ -1711,6 +1722,18 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
     entity.packingTicks = undefined;
     entity.unpacked = !entity.unpacked;
     return;
+  }
+  // A finished order hands over to whatever was queued behind it. The click
+  // is turned into an order here rather than when it was given, so a waypoint
+  // onto a tree that has since been felled becomes a walk to where it stood
+  // instead of an order to gather nothing.
+  if (entity.order.kind === 'idle' && entity.orderQueue?.length) {
+    const [next, ...rest] = entity.orderQueue;
+    entity.orderQueue = rest.length ? rest : undefined;
+    const target = next.targetId === undefined
+      ? undefined
+      : state.entities.find(e => e.id === next.targetId && (!e.dead || isCarcass(e)));
+    assignOrder(state, entity, next.target, target);
   }
   switch (entity.order.kind) {
     case 'move': {
