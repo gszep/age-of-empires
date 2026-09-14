@@ -158,6 +158,13 @@ export interface BuildingRules {
   footprint?: { x: number; y: number };
   /** A gate: its owner walks through it, everybody else has to knock it down. */
   passableForOwner?: boolean;
+  /**
+   * Nothing walks round it, whoever owns it. A farm has a collision box like
+   * any other building but no height to it and no obstruction class, and in
+   * the reference units walk straight over one (issue #40). Distinct from
+   * `passableForOwner`, which is a gate standing open for its own side.
+   */
+  passable?: boolean;
   /** Set for buildings that shoot: range in tiles plus the militia-style timing. */
   attack?: {
     range: number;
@@ -693,6 +700,9 @@ export const FALLBACK_RULES: GameRules = {
     },
     farm: {
       hp: 480, radius: 1.5, lineOfSight: 1, cost: cost(0, 60), buildSeconds: 15,
+      // Nothing walks round a farm: the DAT gives it no collision height and
+      // no obstruction class (issue #40).
+      passable: true,
       popSupport: 0, buildable: true, accepts: [], farmAmount: 175,
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
       buildButton: 6,
@@ -840,6 +850,9 @@ export const FALLBACK_RULES: GameRules = {
 interface ManifestEntity {
   hitPoints: number;
   collision: [number, number];
+  /** Nothing walks round it: no collision height, no obstruction class, and
+   * no annexes to carry one (issue #40). */
+  passable?: boolean;
   lineOfSight: number;
   speedTilesPerSecond?: number;
   cost?: Partial<Record<ResourceKind, number>>;
@@ -1000,6 +1013,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       // differ. Whether that footprint is a doorway is a role, not a field.
       footprint: fallback.footprint && { x: e[key].collision[0], y: e[key].collision[1] },
       passableForOwner: fallback.passableForOwner,
+      passable: e[key].passable ?? fallback.passable,
       attack: fallback.attack && {
         ...fallback.attack,
         range: e[key].combat?.maximumRange || fallback.attack.range,

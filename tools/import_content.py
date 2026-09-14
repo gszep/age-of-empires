@@ -239,6 +239,16 @@ def extract_entity(
         "hitPoints": unit.hit_points,
         "lineOfSight": rounded(unit.line_of_sight),
         "collision": [rounded(unit.collision_size_x), rounded(unit.collision_size_y)],
+        # Whether anything has to walk round it. A farm has a collision box
+        # like any building but no height to it and no obstruction class, and
+        # nothing walks round a farm in the reference. The town center reads
+        # the same way and must not: its four annexes carry its obstruction,
+        # which is why having none is part of the test (issue #40).
+        "passable": (
+            unit.collision_size_z == 0
+            and unit.obstruction_class == 0
+            and not [a for a in (unit.building.annexes or []) if a.unit_id and a.unit_id > 0]
+        ) if unit.building is not None else False,
         "clearance": [rounded(value) for value in unit.clearance_size],
         # What a selection draws on the ground: obstruction type 5 is the round
         # unit outline, everything else marks its outline box (buildings and

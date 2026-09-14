@@ -1120,6 +1120,25 @@ banked resource identical — because the strategy re-tasks its own idle
 villagers within a second or two. The cost fell on whoever was playing by
 hand, and no batch metric could see it.
 
+## A farm is walked over, not round
+
+A farm was a building like any other to the navigation grid, so nine tiles of
+it had to be walked around (issue #40). The DAT says otherwise, and says it
+without ambiguity: a farm's collision box is 1.5 by 1.5 like a barracks, but
+its collision *height* is 0 and its obstruction class is 0, where a house is 2
+and 3 and a palisade 4 and 4.
+
+The trap is that the town center reads exactly the same way — height 0, class 0
+— and plainly does obstruct. What separates them is that the town center has
+four annexes (618, 619, 620 and 890) which carry its obstruction, and a farm
+has none. So the rule the importer applies is all three together: no collision
+height, no obstruction class, and no annexes. Every other building in the
+imported set comes out false.
+
+It is not a gate's kind of passability. A gate stands open for its owner and
+shut for everybody else; a farm is walked over by both sides, and by anything
+crossing it while it is still being built.
+
 ## Terrain edges fade, from the owned masks
 
 Where two terrains met, the boundary was the tile edge. The reference fades it,

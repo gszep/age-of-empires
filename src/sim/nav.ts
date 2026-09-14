@@ -43,8 +43,13 @@ export function buildNavGrid(
   for (const entity of state.entities) {
     if (entity.dead || entity.id === ignoreEntityId) continue;
     if (!isBuilding(entity.kind) && entity.kind !== 'resource') continue;
+    const building = state.rules.buildings[entity.kind as keyof typeof state.rules.buildings];
+    // A farm is a building nothing walks round, for either side and whether or
+    // not it is finished — the DAT gives it no collision height and no
+    // obstruction class (issue #40).
+    if (building?.passable) continue;
     if (forOwner !== undefined && entity.owner === forOwner && entity.buildProgress === undefined
-      && state.rules.buildings[entity.kind as keyof typeof state.rules.buildings]?.passableForOwner) {
+      && building?.passableForOwner) {
       continue;
     }
     const half = halfExtent(entity);

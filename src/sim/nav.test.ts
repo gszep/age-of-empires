@@ -115,6 +115,47 @@ describe('navigation compatibility suite', () => {
     expect(south.id).toBeGreaterThan(0);
   });
 
+  it('farm: is walked over, not round, by either side', () => {
+    // Issue #40. A farm has a collision box like any other building, but the
+    // DAT gives it no collision height and no obstruction class -- and unlike
+    // the town center, which reads the same way, it has no annexes to carry
+    // one. Nothing walks round a farm in the reference.
+    const state = arena();
+    const farm = building(state, 'farm', { x: 20.5, y: 20.5 });
+    const grid = buildNavGrid(state);
+    for (let y = 19; y <= 21; y++) {
+      for (let x = 19; x <= 21; x++) {
+        expect(isBlocked(grid, x, y), `farm tile ${x},${y}`).toBe(false);
+      }
+    }
+    // Not the owner's privilege, the way a gate is: an enemy walks over it too.
+    expect(isBlocked(buildNavGrid(state, undefined, 2), 20, 20)).toBe(false);
+    expect(isBlocked(buildNavGrid(state, undefined, 1), 20, 20)).toBe(false);
+    // A farm still under construction is no more of an obstacle.
+    farm.buildProgress = 0.2;
+    expect(isBlocked(buildNavGrid(state), 20, 20)).toBe(false);
+  });
+
+  it('farm: a unit sent across one goes straight through it', () => {
+    // The shape the report describes: a villager walking the short way over a
+    // farm rather than the long way round a nine-tile block.
+    const state = arena();
+    building(state, 'farm', { x: 20.5, y: 20.5 });
+    const grid = buildNavGrid(state);
+    const path = findPath(grid, { x: 17.5, y: 20.5 }, { x: 23.5, y: 20.5 });
+    expect(path, 'no path across the farm').toBeDefined();
+    const crosses = path!.some(p =>
+      Math.floor(p.x) >= 19 && Math.floor(p.x) <= 21
+      && Math.floor(p.y) >= 19 && Math.floor(p.y) <= 21);
+    expect(crosses, 'walked round the farm instead of over it').toBe(true);
+  });
+
+  it('house: still has to be walked round, so the farm check is not vacuous', () => {
+    const state = arena();
+    building(state, 'house', { x: 20.5, y: 20.5 });
+    expect(isBlocked(buildNavGrid(state), 20, 20)).toBe(true);
+  });
+
   it('gate: is a doorway for its owner and a wall for everybody else', () => {
     const state = arena();
     const gate = wallWithGate(state, 1);
