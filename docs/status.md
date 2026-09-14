@@ -1150,10 +1150,18 @@ the mask in its second, and a variant picked by a hash of the tile so a long
 boundary does not repeat one silhouette. Measured on a dealt board: 9.6% of the
 world view changes, in bands along the boundaries and nowhere else.
 
-**What is not done.** A farm is an entity patch rather than a terrain tile, so
-it does not go through this pass and its own edge is still hard; the same masks
-apply and it is the obvious next step. Water is held out of the biomes
-deliberately, so water-to-shore blending is untested. The DE-era 512x512 masks
+A farm gets the same treatment by a different route. It is an entity patch
+rather than a terrain tile, so it never passes through the ground's edge
+detection; instead the patch itself is drawn one tile wider than the farm, with
+that ring masked toward the farm and the farm's own nine tiles left solid — one
+mesh and one material, which is what the atlas's extra solid column is for.
+That column is opaque across its whole rectangle rather than only the inscribed
+diamond: a quad samples the diamond's four extreme points, so a mask that falls
+off at the diamond's edge is filtered to half alpha along every tile seam, which
+drew a faint grid over the farm before it was fixed.
+
+**What is not done.** Water is held out of the biomes deliberately, so
+water-to-shore blending is untested. The DE-era 512x512 masks
 in `terrain/blends/` are higher resolution than blendomatic's 97x49 and are not
 used: their indexing lives in a compiled shader, and blendomatic needs no
 guess. At one mask per tile edge, 97x49 is the reference's own tile size.

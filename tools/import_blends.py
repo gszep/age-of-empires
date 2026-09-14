@@ -162,15 +162,28 @@ def main() -> None:
     # column by index, so the geometry is a multiply rather than a lookup.
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "blends").mkdir(exist_ok=True)
+    # One extra column past the owned masks: the diamond, solid. It is ours,
+    # not the DAT's, and it exists so a mesh that is mostly unmasked -- a
+    # farm's own tiles, against the fading ring around them -- can carry both
+    # in one material instead of needing a second draw.
+    #
+    # Opaque across the whole rectangle, not just the inscribed diamond: a
+    # quad's corners sample the diamond's four extreme points, so anything
+    # that falls off at the diamond's edge is filtered to half alpha exactly
+    # along every tile seam -- which drew a faint grid over the farm.
+    solid = np.full((TILE_H, TILE_W), 255, dtype=np.uint8)
+
     entries = []
     for index, masks in enumerate(modes):
-        sheet = np.zeros((TILE_H, TILE_W * len(masks)), dtype=np.uint8)
+        columns = len(masks) + 1
+        sheet = np.zeros((TILE_H, TILE_W * columns), dtype=np.uint8)
         for i, mask in enumerate(masks):
             # 0..128 is the file's range; stretch to 0..255 for an 8-bit image.
             sheet[:, i * TILE_W:(i + 1) * TILE_W] = np.minimum(mask.astype(np.uint16) * 2, 255)
+        sheet[:, len(masks) * TILE_W:] = solid
         name = f"blends/mode-{index}.png"
         Image.fromarray(sheet, mode="L").save(args.out / name, optimize=True)
-        entries.append({"image": name, "masks": len(masks)})
+        entries.append({"image": name, "masks": columns})
 
     manifest_path = args.out / "manifest.json"
     manifest = json.loads(manifest_path.read_text()) if manifest_path.is_file() else {}
@@ -181,6 +194,8 @@ def main() -> None:
         # interchangeable variants apiece: the reference varies them so a long
         # boundary does not repeat one silhouette.
         "edges": groups,
+        # The column past the owned masks: the whole diamond, opaque. Ours.
+        "solid": len(modes[0]),
     }
     manifest.setdefault("source", {}).setdefault("sha256", {})["blendomatic"] = hashlib.sha256(
         args.blendomatic.read_bytes()).hexdigest()

@@ -112,7 +112,9 @@ describe('meshes that lie on the ground', () => {
         modes: [new THREE.DataTexture(new Uint8Array(4), 1, 1)],
         // The four groups blendomatic's masks measure out to.
         edges: { '+x': [12, 13, 14, 15], '+y': [4, 5, 6, 7], '-x': [0, 1, 2, 3], '-y': [8, 9, 10, 11] },
-        masksPerMode: 31,
+        // Thirty-one owned masks and the solid column past them.
+        masksPerMode: 32,
+        solid: 31,
       },
     } as unknown as ContentAssets;
   };
@@ -173,7 +175,9 @@ describe('meshes that lie on the ground', () => {
     // construction at 3/3 (forty), halving the pitch the moment it completed.
     // The owner of the reference reports about twelve furrows across a farm,
     // which over three tiles against forty per span is ten tiles to the span.
-    const assets = groundAssets();
+    // No masks, so the patch is the farm's own tiles with no fading ring
+    // around them: this is a test about the furrow scale, not the edge.
+    const assets = { ...groundAssets(), blends: undefined } as unknown as ContentAssets;
     const uvSpan = (slot: string) => {
       const uv = createTerrainPatch(assets, slot, 1.5)!.geometry.getAttribute('uv');
       const us = Array.from({ length: uv.count }, (_, i) => uv.getX(i));
@@ -189,7 +193,7 @@ describe('meshes that lie on the ground', () => {
   it('samples a farm by where it stands, so two are not one picture twice', () => {
     // Every farm drew the identical corner of the sheet, bringing the
     // thirty-six authored frames down to one arrangement.
-    const assets = groundAssets();
+    const assets = { ...groundAssets(), blends: undefined } as unknown as ContentAssets;
     const first = createTerrainPatch(assets, 'farm', 1.5, { x: 9, y: 12 })!.geometry.getAttribute('uv');
     const second = createTerrainPatch(assets, 'farm', 1.5, { x: 21, y: 30 })!.geometry.getAttribute('uv');
     // The sheet is laid a quarter turn round, so u follows world y and v world x.
@@ -210,7 +214,7 @@ describe('meshes that lie on the ground', () => {
     // the diamond the furrows lie along -- a 90 degree turn in world space,
     // which the dimetric projection shows as the other axis of the diamond
     // rather than as a right angle.
-    const assets = groundAssets();
+    const assets = { ...groundAssets(), blends: undefined } as unknown as ContentAssets;
     const uv = createTerrainPatch(assets, 'farm', 1.5, { x: 4, y: 7 })!.geometry.getAttribute('uv');
     // North corner of the patch: world (4,7) -> u from y, v from x.
     expect(uv.getX(0)).toBeCloseTo(7 / FARM_TILES_PER_SPAN, 6);
@@ -333,6 +337,32 @@ describe('meshes that lie on the ground', () => {
     state.terrain.fill(10);
     expect(createGround(state, groundAssets()).children
       .some(child => child.name.startsWith('blend-'))).toBe(false);
+  });
+
+  it('bleeds a farm into the ground around it', () => {
+    // A farm out-ranks the ground it sits in (186 against grass's 111), so in
+    // the reference it fades outward through the same masks a terrain edge
+    // uses instead of stopping at its own footprint.
+    const assets = groundAssets();
+    const plain = { ...assets, blends: undefined } as unknown as ContentAssets;
+    const bare = createTerrainPatch(plain, 'farm', 1.5, { x: 9, y: 12 })!;
+    const fading = createTerrainPatch(assets, 'farm', 1.5, { x: 9, y: 12 })!;
+    const quads = (mesh: THREE.Mesh) => mesh.geometry.getAttribute('position').count / 6;
+    expect(quads(bare)).toBe(9);
+    // Nine tiles of farm, plus the four sides of the ring; the four diagonal
+    // tiles touch only at a corner and are left out.
+    expect(quads(fading)).toBe(9 + 4 * 3);
+    // The farm's own tiles stay solid and only the ring is masked, which is
+    // what the extra column in the atlas is for.
+    const uv1 = fading.geometry.getAttribute('uv1');
+    const columns = assets.blends!.masksPerMode;
+    const solid = assets.blends!.solid;
+    const us = Array.from({ length: uv1.count }, (_, i) => uv1.getX(i));
+    const solidVertices = us.filter(u => u >= solid / columns).length;
+    expect(solidVertices).toBe(9 * 6);
+    expect((fading.material as THREE.MeshBasicMaterial).alphaMap).toBeTruthy();
+    // And with no masks there is no ring and nothing to mask with.
+    expect((bare.material as THREE.MeshBasicMaterial).alphaMap).toBeFalsy();
   });
 
   it('is wound clockwise at all, so the check above is not vacuous', () => {

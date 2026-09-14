@@ -275,9 +275,33 @@ export function createTerrainPatch(
   const turned = farm;
   const positions: number[] = [];
   const uvs: number[] = [];
+  const uv1s: number[] = [];
   const tiles = Math.max(1, Math.round(half * 2));
-  for (let y = 0; y < tiles; y++) {
-    for (let x = 0; x < tiles; x++) {
+  // A farm out-ranks the ground it sits in (the DAT gives it 186 against
+  // grass's 111), so in the reference it bleeds outward through the same
+  // masks a terrain edge uses rather than stopping at its own footprint. The
+  // patch therefore draws one tile wider than the farm, with the ring masked
+  // toward the farm and the farm's own tiles left solid -- one mesh and one
+  // material, which is what the solid column in the mask atlas is for.
+  const blends = assets?.blends;
+  const ring = blends ? 1 : 0;
+  const columns = blends?.masksPerMode ?? 1;
+  const solidColumn = blends?.solid ?? 0;
+  const maskU = (column: number, t: number): number => (column + t) / columns;
+  for (let y = -ring; y < tiles + ring; y++) {
+    for (let x = -ring; x < tiles + ring; x++) {
+      const outside = x < 0 || y < 0 || x >= tiles || y >= tiles;
+      // A ring tile fades toward whichever side of it the farm lies on; a
+      // diagonal one touches the farm only at a corner and is left out.
+      let column = solidColumn;
+      if (outside) {
+        const towards = x < 0 ? '+x' : x >= tiles ? '-x' : y < 0 ? '+y' : '-y';
+        const offAxis = (x < 0 || x >= tiles) && (y < 0 || y >= tiles);
+        const variants = blends?.edges[towards];
+        if (offAxis || !variants?.length) continue;
+        const hash = (Math.imul(x + 97, 73_856_093) ^ Math.imul(y + 131, 19_349_663)) >>> 0;
+        column = variants[hash % variants.length];
+      }
       // Position is patch-local (the mesh is placed at its north corner);
       // the texture coordinate is absolute, so neighbouring farms show
       // neighbouring ground rather than the same corner twice.
@@ -290,6 +314,9 @@ export function createTerrainPatch(
       const uv = turned
         ? (px: number, py: number) => ({ u: (at.y + py) / spanY, v: -(at.x + px) / spanX })
         : (px: number, py: number) => ({ u: (at.x + px) / spanX, v: (at.y + py) / spanY });
+      // The mask's four points are the tile's four corners; the texture is
+      // flipped on load, so the north corner takes v = 1.
+      const mask: [number, number][] = [[0.5, 1], [1, 0.5], [0.5, 0], [0, 0.5]];
       const corners = [
         { p: worldToIso(x, y), ...uv(x, y) },
         { p: worldToIso(x + 1, y), ...uv(x + 1, y) },
@@ -300,6 +327,7 @@ export function createTerrainPatch(
         for (const index of [a, b, c]) {
           positions.push(corners[index].p.x, corners[index].p.y, 0);
           uvs.push(corners[index].u, corners[index].v);
+          uv1s.push(maskU(column, mask[index][0]), mask[index][1]);
         }
       }
     }
@@ -307,7 +335,10 @@ export function createTerrainPatch(
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setAttribute('uv1', new THREE.Float32BufferAttribute(uv1s, 2));
+  const maskTexture = blends && (blends.modes[terrain.blendType] ?? blends.modes[0]);
   const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+    ...(maskTexture ? { alphaMap: maskTexture } : {}),
     // Double-sided like the ground: `worldToIso` winds a tile quad clockwise,
     // so a ground-lying mesh left on the default FrontSide is back-face culled
     // and simply never appears (issue #2 -- every farm was invisible).
