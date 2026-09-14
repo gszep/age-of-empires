@@ -203,4 +203,10 @@ export type Command =
   /** Set a siege engine up to shoot, or pack it up to travel. */
   | { kind: 'pack'; player: PlayerId; entityIds: number[]; unpacked: boolean }
   /** Take the last unit off a building's queue and refund it. */
-  | { kind: 'cancel-train'; player: PlayerId; buildingId: number };
+  | { kind: 'cancel-train'; player: PlayerId; buildingId: number }
+  /**
+   * Destroy your own things, as the reference's Delete does: a unit you no
+   * longer want, or a building in the way. Nothing is refunded and nothing
+   * belonging to anybody else can be named.
+   */
+  | { kind: 'delete'; player: PlayerId; entityIds: number[] };

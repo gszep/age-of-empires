@@ -20,6 +20,37 @@ describe('simulation', () => {
     expect(digest(a)).toBe(digest(b));
   });
 
+  it('deletes your own things and nobody else\'s', () => {
+    // Issue #37. The reference's Delete: your own, gone, nothing back.
+    const state = createGame();
+    const mine = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const theirs = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
+    const before = state.players[1].population;
+
+    expect(applyCommand(state, { kind: 'delete', player: 1, entityIds: [theirs.id] }))
+      .toEqual({ ok: false, reason: 'nothing of yours was named' });
+    expect(theirs.dead).toBeFalsy();
+
+    expect(applyCommand(state, { kind: 'delete', player: 1, entityIds: [mine.id] })).toEqual({ ok: true });
+    expect(mine.dead).toBe(true);
+    // It frees the population it was using, as any other death does.
+    expect(state.players[1].population).toBe(before - 1);
+    // And leaves a corpse that decays rather than vanishing on the spot.
+    expect(mine.decayTicks).toBeGreaterThan(0);
+  });
+
+  it('deletes a building without giving anything back', () => {
+    // Deliberately not a refund: cancelling a queued unit is what refunds.
+    const state = createGame();
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const purse = { ...state.players[1] };
+    expect(applyCommand(state, { kind: 'delete', player: 1, entityIds: [tc.id] })).toEqual({ ok: true });
+    expect(tc.dead).toBe(true);
+    for (const resource of ['food', 'wood', 'gold', 'stone'] as const) {
+      expect(state.players[1][resource], resource).toBe(purse[resource]);
+    }
+  });
+
   it('trains a villager from a town center in the data-backed time', () => {
     const state = createGame();
     const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;

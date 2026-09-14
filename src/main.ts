@@ -703,6 +703,29 @@ addEventListener('keydown', event => {
     return;
   }
   if (key === 'F10') { hud.toggleMenu(); event.preventDefault(); return; }
+  if (key === 'Delete') {
+    // The reference's Delete: destroy what you have selected, of your own.
+    // Nothing comes back, so it asks first — and only about what it can
+    // actually destroy, since the selection may hold somebody else's.
+    const mine = game.entities.filter(e =>
+      selectedIds.includes(e.id) && e.owner === 1 && !e.dead);
+    // A building is asked about and a unit is not, which is the reference's
+    // own division: losing a soldier by a stray keypress costs a soldier,
+    // losing the town center loses the match.
+    const buildings = mine.filter(e => isBuilding(e.kind));
+    const doomed = buildings.length && !confirm(
+      buildings.length === 1
+        ? `Delete your ${displayName(buildings[0].kind)}? This cannot be undone.`
+        : `Delete ${buildings.length} of your buildings? This cannot be undone.`)
+      ? mine.filter(e => !isBuilding(e.kind))
+      : mine;
+    if (doomed.length) {
+      applyCommand(game, { kind: 'delete', player: 1, entityIds: doomed.map(e => e.id) });
+      selectedIds = selectedIds.filter(id => !doomed.some(e => e.id === id));
+    }
+    event.preventDefault();
+    return;
+  }
   if (key === '.') { selectIdleVillager(); return; }
   if (key === 'h' || key === 'H') {
     const tc = game.entities.find(e => e.owner === 1 && e.kind === 'town-center' && !e.dead);

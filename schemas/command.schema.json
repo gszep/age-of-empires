@@ -325,6 +325,33 @@
         "buildingId"
       ],
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "delete"
+        },
+        "player": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "entityIds": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "kind",
+        "player",
+        "entityIds"
+      ],
+      "additionalProperties": false
     }
   ],
   "definitions": {

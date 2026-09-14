@@ -49,6 +49,15 @@ describe('the public contract', () => {
     }
   });
 
+  it('validates a delete against the public schema', () => {
+    // A command the browser sends has to be one a strategy could send too, or
+    // the schema and the game have drifted apart (issue #37).
+    expect(validateCommand({ kind: 'delete', player: 1, entityIds: [3] }),
+      explain(validateCommand)).toBe(true);
+    expect(validateCommand({ kind: 'delete', player: 1, entityIds: [] })).toBe(false);
+    expect(validateCommand({ kind: 'delete', player: 1 })).toBe(false);
+  });
+
   it('answers to what it is for every kind the rules know', () => {
     // `isBuilding` and `isUnit` decide who is stepped, what obstructs, and
     // which art a thing draws. A kind missing from them is not a compile

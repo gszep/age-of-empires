@@ -503,6 +503,24 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     return { ok: true };
   }
 
+  if (command.kind === 'delete') {
+    // The reference's Delete: your own thing, gone, with nothing back. It is
+    // deliberately not a refund — that is what cancelling a queued unit is —
+    // and it cannot name anything that is not yours, which is the whole of the
+    // safety this command needs.
+    const doomed = state.entities.filter(e =>
+      command.entityIds.includes(e.id) && e.owner === command.player && !e.dead);
+    if (!doomed.length) return rejected('nothing of yours was named');
+    for (const entity of doomed) {
+      // Through the same door as any other death, so a corpse, its decay and
+      // the population it freed all behave as they would in a fight.
+      entity.hp = 0;
+      kill(state, entity);
+    }
+    recalculatePopulation(state);
+    return { ok: true };
+  }
+
   if (command.kind === 'cancel-train') {
     const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
     if (!building) return rejected(`building ${command.buildingId} is not owned`);
