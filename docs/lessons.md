@@ -548,3 +548,37 @@ keeps the record.
   looks right. Rule: when an importer's output feeds a layout, assert the
   specific fields the layout reads, in the import test; "the widget is
   missing" and "the field was stripped" fail identically and neither says so.
+
+- **A field that pins one thing is not thereby measuring another.** The farm's
+  `terrain_dimensions` really does pin the frame layout — `frame_count` is the
+  product of the dimensions for every slot in the file — and that was read as
+  though it also said how much ground a frame covers. The check that broke it
+  was free and never run: the *other* farm sheet has different dimensions (3x3
+  against 6x6) for the same forty furrows, so the reading implied a farm
+  re-ploughing itself at half the spacing the moment the crop came up, which
+  nobody had noticed in a year of looking at farms. Rule: when a field is used
+  for a second purpose it was not verified for, find the other rows that field
+  takes and check the second reading against them; a value that is right about
+  its own job can be silently wrong about the one next to it.
+
+- **Ask what a wrong answer would have to be, not only whether yours looks
+  right.** Three candidate farm mappings were rendered for the human to choose
+  between, and the answer they gave — twelve furrows — was none of the three.
+  Because the candidates were expressed as a measurable quantity rather than as
+  pictures, the reply converted straight into a scale (twelve over three tiles
+  against forty to the span is ten tiles to the span) and into the discovery
+  above. Rule: when putting a question to the human, ask for a number they can
+  read off the reference rather than a choice among your options; a count comes
+  back usable even when every option was wrong, and a picked option cannot tell
+  you that they all were.
+
+- **A rejected snapshot photographs the wrong thing and says nothing.**
+  `loadSession` declines a stale snapshot by design and starts a fresh match,
+  which is right for the browser and silent for a probe: `tools/probes/
+  snapshot.ts` had been writing `version: 1` since the version went to 2, so it
+  screenshotted an ordinary opening while claiming to show a staged scene. It
+  surfaced only because a farm id in the reply did not match one that had been
+  staged. Rule: a probe that stages state asserts the page actually resumed it
+  before reading anything back, and the version it writes is imported from the
+  loader rather than copied — a fixture that silently falls back is worse than
+  one that fails.
