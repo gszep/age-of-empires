@@ -1723,6 +1723,12 @@
     },
     "pasture-cnst-3": {
       "terrainId": 121
+    },
+    "dragon-forest": {
+      "terrainId": 48
+    },
+    "underbrush-leaves": {
+      "terrainId": 71
     }
   }
 }

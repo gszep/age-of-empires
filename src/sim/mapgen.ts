@@ -55,6 +55,9 @@ export interface BiomeSpec {
   forestVariationA: number;
   forestVariationB: number;
   forestBlend: number;
+  /** The leaf litter a lone tree stands on, and the patch inside that. */
+  stragglerForest: number;
+  stragglerForestVariation: number;
 }
 
 type BiomeTerrain = Exclude<keyof BiomeSpec, 'name'>;
@@ -93,21 +96,25 @@ const BIOME_PASSES: {
 export const ARABIA_BIOMES: BiomeSpec[] = [
   {
     name: 'PALAEARCTIC_MIDDLE_EAST_DESERT',
+    stragglerForest: 48, stragglerForestVariation: 110,
     base: 14, blendA: 11, blendB: 6, blendC: 14, blendD: 14,
     forest: 13, forestEdge: 13, forestVariationA: 110, forestVariationB: 13, forestBlend: 3,
   },
   {
     name: 'PALAEARCTIC_EUROPE_TEMPERATE',
+    stragglerForest: 19, stragglerForestVariation: 71,
     base: 12, blendA: 5, blendB: 9, blendC: 12, blendD: 12,
     forest: 10, forestEdge: 89, forestVariationA: 19, forestVariationB: 104, forestBlend: 12,
   },
   {
     name: 'NEARCTIC_TEMPERATE',
+    stragglerForest: 89, stragglerForestVariation: 110,
     base: 3, blendA: 0, blendB: 9, blendC: 12, blendD: 3,
     forest: 19, forestEdge: 89, forestVariationA: 10, forestVariationB: 19, forestBlend: 0,
   },
   {
     name: 'PALAEARCTIC_EUROPE_MEDITERRANEAN',
+    stragglerForest: 19, stragglerForestVariation: 71,
     base: 9, blendA: 100, blendB: 117, blendC: 121, blendD: 3,
     forest: 88, forestEdge: 89, forestVariationA: 19, forestVariationB: 104, forestBlend: 0,
   },
@@ -527,11 +534,18 @@ function paintBiome(
     // A pass whose two terrains are the same id would paint nothing; the
     // script has several (a biome may set BLEND_C to its own base).
     if (paint === over) continue;
-    const tiles = Math.round(area * pass.percent / 100);
-    if (tiles <= 0) continue;
     const on = (x: number, y: number): boolean => terrain[y * ctx.width + x] === over;
     const order = candidateOrderBox(dressed, 0, 0, ctx.width - 1, ctx.height - 1)
       .filter(tile => on(tile % ctx.width, Math.floor(tile / ctx.width)));
+    // `land_percent` is a share of the ground the pass is painting over, not
+    // of the whole board. The two readings barely differ for a pass over the
+    // base terrain, which is most of the map, and differ enormously for one
+    // over forest: at 4% of the *board*, two passes between them repainted
+    // half of every wood, and 674 of 1228 trees stood on grass instead of on
+    // leaf litter (issue #34).
+    const tiles = Math.round(order.length * pass.percent / 100);
+    if (tiles <= 0) continue;
+    void area;
     if (!order.length) continue;
     const seeds: { x: number; y: number }[] = [];
     for (const tile of order) {
@@ -750,6 +764,20 @@ export function generateMap(
     const here = tileCentre(x, y);
     ctx.place('tree', here);
     ctx.place('tree', mirror(here));
+    // Leaf litter under it. The script grows patches of STRAGGLER_FOREST and
+    // drops the lone trees onto them; painting the tile a tree has just taken
+    // reaches the same picture without the placement having to consult the
+    // dressing, which would move the trees themselves. A third of them take
+    // the variation, as the script's 24 tiles in 64 do -- and in two of the
+    // four biomes that variation is terrain 71, which the DAT calls
+    // "Underbrush, Leaves" (issue #34).
+    if (biome) {
+      const litter = randInt(dressing, 3) === 0
+        ? biome.stragglerForestVariation : biome.stragglerForest;
+      terrain[tile] = litter;
+      const other = mirror(here);
+      terrain[Math.floor(other.y) * ctx.width + Math.floor(other.x)] = litter;
+    }
     stragglers++;
   }
 

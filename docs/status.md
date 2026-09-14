@@ -1120,6 +1120,26 @@ banked resource identical — because the strategy re-tasks its own idle
 villagers within a second or two. The cost fell on whoever was playing by
 hand, and no batch metric could see it.
 
+## A tree stands on leaf litter, not on grass
+
+Trees stood on whatever the dressing had last painted, which was frequently
+plain grass (issue #34). Two things were wrong.
+
+`land_percent` is a share of the ground a pass is painting **over**, not of the
+whole board. The readings barely differ for a pass over the base terrain, which
+is most of the map, and differ enormously for one over forest: at 4% of the
+board, two passes between them repainted half of every wood, and on seed 11
+**674 of 1228 trees stood on grass or dry grass**. Read against the ground being
+painted, the same seed puts 1071 of them on the biome's own forest floor, with
+the script's sprinkling of variations over the rest.
+
+And a lone tree now brings its own litter. The script grows patches of
+`STRAGGLER_FOREST` and drops the stragglers onto them; painting the tile a tree
+has just taken reaches the same picture without the placement having to consult
+the dressing, which would move the trees themselves. A third take the variation,
+as the script's 24 tiles in 64 do — and in two of the four biomes that variation
+is terrain 71, which the DAT calls **"Underbrush, Leaves"**.
+
 ## A farm is walked over, not round
 
 A farm was a building like any other to the navigation grid, so nine tiles of
