@@ -97,8 +97,13 @@ export interface UiLayout {
   viewPort: { width: number; height: number; xorigin: number; yorigin: number; alignment?: string };
   widgets: UiLayoutWidget[];
 }
+/** A key the reference binds, as `hotkeys.json` gives it. */
+export interface ImportedHotkey { key: string; control?: boolean; shift?: boolean; alt?: boolean }
+
 export interface UiAssets {
   base: string;
+  /** Keys taken from the reference's own `hotkeys.json`, per action. */
+  hotkeys?: { goto?: Record<string, ImportedHotkey>; selectAll?: Record<string, ImportedHotkey> };
   layouts: Record<string, UiLayout>;
   materials: Record<string, UiMaterial>;
   icons: Record<string, Record<string, string>>;

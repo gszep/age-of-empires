@@ -729,6 +729,38 @@ addEventListener('keydown', event => {
     return;
   }
   if (key === '.') { selectIdleVillager(); return; }
+  // Ctrl+<key> walks the buildings of a kind one at a time; Ctrl+Shift+<key>
+  // takes the lot. Both the letters and the modifiers come from the
+  // reference's own `hotkeys.json` through the UI import, so "Ctrl+Shift+B is
+  // your barracks" is true of the reference rather than of whoever typed it.
+  if (event.ctrlKey || event.metaKey) {
+    const bindings = uiAssets?.hotkeys;
+    const wanted = event.shiftKey ? bindings?.selectAll : bindings?.goto;
+    const pressed = key.toUpperCase();
+    const kind = Object.entries(wanted ?? {}).find(([, binding]) =>
+      binding.key.toUpperCase() === pressed
+      && !!binding.control === (event.ctrlKey || event.metaKey)
+      && !!binding.shift === event.shiftKey)?.[0];
+    if (kind) {
+      const mine = game.entities.filter(e =>
+        e.owner === 1 && e.kind === kind && !e.dead && e.buildProgress === undefined);
+      if (mine.length) {
+        if (event.shiftKey) {
+          selectedIds = mine.map(e => e.id);
+        } else {
+          // Cycle: the one after whichever of them is selected now.
+          const at = mine.findIndex(e => selectedIds.includes(e.id));
+          const next = mine[(at + 1) % mine.length];
+          selectedIds = [next.id];
+          cameraCenter = elevatedWorldToIso(game, next.position.x, next.position.y);
+        }
+      } else {
+        reject(`no ${displayName(kind)} of yours`);
+      }
+      event.preventDefault();
+      return;
+    }
+  }
   if (key === 'h' || key === 'H') {
     const tc = game.entities.find(e => e.owner === 1 && e.kind === 'town-center' && !e.dead);
     if (tc) {

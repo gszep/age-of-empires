@@ -146,12 +146,57 @@ def material_entry(
     return entry
 
 
+#: Which of the reference's four shipped layouts we take our keys from. The
+#: others are the classic, high-definition and left-handed arrangements.
+HOTKEY_LAYOUT = "definitive"
+
+
+def extract_hotkeys(hotkeys_path: Path, wanted: dict[str, Any]) -> dict[str, Any]:
+    """The keys the reference binds, for the actions this interface offers.
+
+    `hotkeys.json` holds 457 bindings over 27 groups, each with the key and
+    modifiers for four shipped layouts. Only the handful named in the spec are
+    consumed; the rest are groups for units, buildings and campaigns this game
+    does not have. Taking them from the file rather than typing the letters is
+    what keeps "Ctrl+Shift+B selects your barracks" true of the reference
+    rather than true of whoever typed it.
+    """
+    data = json.loads(hotkeys_path.read_text())
+    by_name: dict[str, Any] = {}
+    for group in data.get("hotkey_group_list", []):
+        for binding in group.get("hotkey_list", []) or []:
+            if "data_name" in binding and "defaults_list" in binding:
+                by_name.setdefault(binding["data_name"], binding)
+
+    def resolve(data_name: str) -> dict[str, Any]:
+        binding = by_name.get(data_name)
+        if binding is None:
+            raise ValueError(f"no hotkey named {data_name} in the owned file")
+        defaults = binding["defaults_list"]
+        chosen = next(
+            (d for d in defaults if d.get("name") == HOTKEY_LAYOUT), defaults[0])
+        key = (chosen.get("key") or "").removeprefix("VK_")
+        if not key:
+            raise ValueError(f"{data_name} has no key in the {HOTKEY_LAYOUT} layout")
+        entry: dict[str, Any] = {"key": key}
+        for modifier in ("control", "shift", "alt"):
+            if chosen.get(modifier):
+                entry[modifier] = True
+        return entry
+
+    return {
+        action: {name: resolve(data_name) for name, data_name in mapping.items()}
+        for action, mapping in wanted.items()
+    }
+
+
 def extract_ui(
     widgetui: Path,
     sounds_path: Path,
     spec: dict[str, Any],
     content: dict[str, Any],
     out_root: Path,
+    hotkeys_path: Path | None = None,
 ) -> dict[str, Any]:
     ui_spec = spec["ui"]
     style = ui_spec["style"]
@@ -275,6 +320,8 @@ def extract_ui(
         "icons": icon_entries,
         "sounds": {alias: sounds[alias] for alias in sorted(used_sounds) if alias in sounds},
         "missingCues": sorted(alias for alias in spec.get("ui", {}).get("cues", []) if alias not in sounds),
+        "hotkeys": extract_hotkeys(hotkeys_path, ui_spec["hotkeys"])
+        if hotkeys_path and ui_spec.get("hotkeys") else {},
         "source": {"sha256": hashes},
     }
 
@@ -293,6 +340,11 @@ def main() -> None:
         type=Path,
         default=home / "Steam/steamapps/content/app_813780/depot_813781/resources/_common/dat/sounds.json",
     )
+    parser.add_argument(
+        "--hotkeys",
+        type=Path,
+        default=home / "Steam/steamapps/content/app_813780/depot_813781/resources/_common/dat/hotkeys.json",
+    )
     parser.add_argument("--spec", type=Path, default=Path(__file__).with_name("import-spec.json"))
     parser.add_argument("--content", type=Path, default=root / ".local/aoe2de/content.json")
     parser.add_argument("--out", type=Path, default=root / "public/imported/aoe2/ui")
@@ -304,6 +356,7 @@ def main() -> None:
         json.loads(args.spec.read_text()),
         json.loads(args.content.read_text()),
         args.out,
+        args.hotkeys if args.hotkeys.is_file() else None,
     )
     args.out.mkdir(parents=True, exist_ok=True)
     manifest_path = args.out / "manifest.json"

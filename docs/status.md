@@ -1120,6 +1120,37 @@ banked resource identical — because the strategy re-tasks its own idle
 villagers within a second or two. The cost fell on whoever was playing by
 hand, and no batch metric could see it.
 
+## Key bindings, audited against the reference's own file
+
+`hotkeys.json` in the owned depot holds **457 bindings over 27 groups**, each
+with the key and modifiers for four shipped layouts. Counted against it
+(issue #39):
+
+- **201** are in groups whose subject this game does not have at all — docks,
+  ports, shipyards, mule carts, donjons, settlements, forts and the two
+  campaign groups.
+- **29** are bound here.
+- **227** are applicable and unbound.
+
+The command grid was already right and did not need touching: its letters come
+from the DAT's own button slots, which is the same grid the reference lays out
+(`VILLAGER_BUILD_HOUSE` is Q, `..._FARM` is A, `..._BLACKSMITH` is S), so the
+build and train menus already agree with it by construction.
+
+What this pass added is the two families that were missing wholesale:
+**Ctrl+&lt;key&gt; walks the buildings of a kind one at a time** and
+**Ctrl+Shift+&lt;key&gt; takes the lot** — fourteen and fifteen bindings. The
+letters are imported rather than typed: `import_ui.py` resolves each action
+named in the spec through `hotkeys.json`'s definitive layout, so "Ctrl+Shift+B
+is your barracks" is true of the reference rather than of whoever wrote the
+line. An import test asserts the handful the interface consumes.
+
+Of the 227 left, the large remaining families are the per-building train and
+research keys (which the command grid already reaches by its own letters), unit
+stances and formations (not modelled), and garrison, patrol and attack-ground
+(not modelled). None is a letter somebody has to guess: they are all in the
+file, and adding one is a line in the spec once the thing it does exists.
+
 ## Shift-click lays a route
 
 A right-click replaced whatever a unit was doing, so a player could give it

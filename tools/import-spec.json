@@ -1655,7 +1655,42 @@
     ],
     "textureDirectories": [
       "textures/ingame/staticons"
-    ]
+    ],
+    "hotkeys": {
+      "goto": {
+        "town-center": "GOTO_TOWN_CENTER",
+        "barracks": "GOTO_BARRACKS",
+        "archery-range": "GOTO_ARCHERY_RANGE",
+        "stable": "GOTO_STABLE",
+        "siege-workshop": "GOTO_SIEGE_WORKSHOP",
+        "monastery": "GOTO_MONASTERY",
+        "market": "GOTO_MARKET",
+        "blacksmith": "GOTO_BLACKSMITH",
+        "mill": "GOTO_MILL",
+        "university": "GOTO_UNIVERSITY",
+        "castle": "GOTO_CASTLE",
+        "mining-camp": "GOTO_MINING_CAMP",
+        "lumber-camp": "GOTO_LUMBER_CAMP",
+        "wonder": "GOTO_WONDER"
+      },
+      "selectAll": {
+        "town-center": "SELECT_ALL_TOWN_CENTERS",
+        "barracks": "SELECT_ALL_BARRACKS",
+        "archery-range": "SELECT_ALL_ARCHERY_RANGES",
+        "stable": "SELECT_ALL_STABLES",
+        "siege-workshop": "SELECT_ALL_SIEGE_WORKSHOPS",
+        "monastery": "SELECT_ALL_MONASTERIES",
+        "market": "SELECT_ALL_MARKETS",
+        "blacksmith": "SELECT_ALL_BLACKSMITHS",
+        "mill": "SELECT_ALL_MILLS",
+        "university": "SELECT_ALL_UNIVERSITIES",
+        "castle": "SELECT_ALL_CASTLES",
+        "mining-camp": "SELECT_ALL_MINING_CAMPS",
+        "lumber-camp": "SELECT_ALL_LUMBER_CAMPS",
+        "wonder": "SELECT_ALL_WONDERS",
+        "outpost": "SELECT_ALL_OUTPOSTS"
+      }
+    }
   },
   "terrain": {
     "ground": {

@@ -21,6 +21,7 @@ SOUNDS = ROOT / "depot_813781/resources/_common/dat/sounds.json"
 GRAPHICS = ROOT / "depot_813784/resources/_common/drs/graphics"
 PALETTES = ROOT / "depot_813781/resources/_common/palettes"
 WIDGETUI = ROOT / "depot_813782/widgetui"
+HOTKEYS = ROOT / "depot_813781/resources/_common/dat/hotkeys.json"
 TERRAIN = ROOT / "depot_813782/resources/_common/terrain/textures/2x"
 AUDIO_PACK = ROOT / "depot_813783/wwise/Base.pck"
 SPEC = json.loads(Path(__file__).with_name("import-spec.json").read_text())
@@ -950,7 +951,7 @@ class UiImportIntegrationTest(unittest.TestCase):
     def setUpClass(cls):
         cls.directory = tempfile.TemporaryDirectory()
         cls.result = extract_ui(
-            WIDGETUI, SOUNDS, SPEC, extracted_content(), Path(cls.directory.name)
+            WIDGETUI, SOUNDS, SPEC, extracted_content(), Path(cls.directory.name), HOTKEYS
         )
 
     @classmethod
@@ -969,6 +970,28 @@ class UiImportIntegrationTest(unittest.TestCase):
         self.assertIn('"ResourceWood"', dumped)
         self.assertIn('"ResourceFood"', dumped)
         self.assertIn('"ResourceGold"', dumped)
+
+    def test_hotkeys_are_the_reference_s_own_keys(self):
+        """The letters come from the owned file, not from whoever typed them.
+
+        `hotkeys.json` gives four shipped layouts per binding; we take the
+        definitive one. If the import ever stops resolving these, the interface
+        silently binds nothing rather than binding something wrong -- so this
+        asserts the handful the interface actually consumes.
+        """
+        hotkeys = self.result["hotkeys"]
+        self.assertIn("goto", hotkeys)
+        self.assertIn("selectAll", hotkeys)
+        # Ctrl+Shift+B is the barracks, Ctrl+B walks to one.
+        self.assertEqual(
+            hotkeys["selectAll"]["barracks"], {"key": "B", "control": True, "shift": True})
+        self.assertEqual(hotkeys["goto"]["barracks"], {"key": "B", "control": True})
+        # The town centre is the one the reference gives an unmodified key.
+        self.assertEqual(hotkeys["goto"]["town-center"], {"key": "H"})
+        # Every action named in the spec resolved to a key.
+        for action, mapping in hotkeys.items():
+            for name, binding in mapping.items():
+                self.assertTrue(binding.get("key"), f"{action}.{name} has no key")
 
     def test_the_geometry_the_hud_positions_by_survives_the_strip(self):
         """The two boxes issue #35 was about, read back from the extract.
