@@ -296,6 +296,15 @@ export interface FogLayer {
 }
 
 /** Per-tile fog quad-grid: unexplored is black, explored-not-visible dimmed. */
+/**
+ * How dark explored-but-unseen ground and never-seen ground are.
+ *
+ * Exported so the fog tests can state the gradient in terms of the two levels
+ * rather than repeating the numbers.
+ */
+export const FOG_EXPLORED = 0.45;
+export const FOG_UNSEEN = 0.97;
+
 export function createFog(state: GameState): FogLayer {
   const size = state.width * state.height;
   const positions = new Float32Array(size * 6 * 3);
@@ -323,9 +332,18 @@ export function createFog(state: GameState): FogLayer {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   // Black overlay with per-vertex RGBA alpha: unexplored opaque, fogged dim.
+  // The RGB stays 0 for the life of the mesh, so only alpha is written per
+  // frame — three quarters of the writes on a board this size, saved.
   const colorAttribute = new THREE.BufferAttribute(new Float32Array(size * 6 * 4), 4);
   geometry.setAttribute('color', colorAttribute);
   void alphas;
+  // One alpha per tile *corner*, reused between frames. Shading a tile flat
+  // made every fog boundary a hard diamond edge, because both triangles of a
+  // tile carried its own single value; averaging the up-to-four tiles that
+  // meet at a corner lets the GPU interpolate across the quad instead, which
+  // is the gradient the reference shows. Same trick as `cornerElevation`.
+  const cornerAlphas = new Float32Array((state.width + 1) * (state.height + 1));
+  const tileAlphas = new Float32Array(size);
   const mesh = new THREE.Mesh(
     geometry,
     new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide }),
@@ -335,14 +353,61 @@ export function createFog(state: GameState): FogLayer {
   const update = (current: GameState) => {
     const visibility = current.visibility[1];
     const colors = colorAttribute.array as Float32Array;
+    const { width, height } = current;
+    // One alpha per tile first, in a single linear pass: the corner average
+    // below then reads four floats instead of eight typed-array probes, and
+    // this runs every frame on boards up to 392x392.
     for (let index = 0; index < size; index++) {
-      const alpha = visibility.visible[index] ? 0 : visibility.explored[index] ? 0.45 : 0.97;
-      for (let vertex = 0; vertex < 6; vertex++) {
-        const base = (index * 6 + vertex) * 4;
-        colors[base] = 0;
-        colors[base + 1] = 0;
-        colors[base + 2] = 0;
-        colors[base + 3] = alpha;
+      tileAlphas[index] = visibility.visible[index] ? 0
+        : visibility.explored[index] ? FOG_EXPLORED : FOG_UNSEEN;
+    }
+    // Corners next, each the mean of the tiles meeting there. The interior is
+    // always four tiles, so it is done without the bounds tests; the border
+    // rows and columns, where a corner has only two tiles or one, are clamped
+    // afterwards. Counting the void beyond the map as unseen instead would
+    // draw a dark rim round the whole board.
+    const stride = width + 1;
+    for (let cy = 1; cy < height; cy++) {
+      const above = (cy - 1) * width;
+      const here = cy * width;
+      let out = cy * stride + 1;
+      for (let cx = 1; cx < width; cx++, out++) {
+        cornerAlphas[out] = (tileAlphas[above + cx - 1] + tileAlphas[above + cx]
+          + tileAlphas[here + cx - 1] + tileAlphas[here + cx]) * 0.25;
+      }
+    }
+    // Border corners: clamp the missing neighbours onto the tiles that exist.
+    const edge = (cx: number, cy: number): number => {
+      const x0 = cx > 0 ? cx - 1 : 0;
+      const x1 = cx < width ? cx : width - 1;
+      const y0 = cy > 0 ? cy - 1 : 0;
+      const y1 = cy < height ? cy : height - 1;
+      return (tileAlphas[y0 * width + x0] + tileAlphas[y0 * width + x1]
+        + tileAlphas[y1 * width + x0] + tileAlphas[y1 * width + x1]) * 0.25;
+    };
+    for (let cx = 0; cx <= width; cx++) {
+      cornerAlphas[cx] = edge(cx, 0);
+      cornerAlphas[height * stride + cx] = edge(cx, height);
+    }
+    for (let cy = 1; cy < height; cy++) {
+      cornerAlphas[cy * stride] = edge(0, cy);
+      cornerAlphas[cy * stride + width] = edge(width, cy);
+    }
+    // The six vertices are north, east, south, north, south, west — the same
+    // order the positions were built in, so each takes its own corner.
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const north = cornerAlphas[y * stride + x];
+        const east = cornerAlphas[y * stride + x + 1];
+        const south = cornerAlphas[(y + 1) * stride + x + 1];
+        const west = cornerAlphas[(y + 1) * stride + x];
+        let base = ((y * width + x) * 6) * 4 + 3;
+        colors[base] = north; base += 4;
+        colors[base] = east; base += 4;
+        colors[base] = south; base += 4;
+        colors[base] = north; base += 4;
+        colors[base] = south; base += 4;
+        colors[base] = west;
       }
     }
     colorAttribute.needsUpdate = true;

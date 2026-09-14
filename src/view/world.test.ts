@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 import { worldToIso } from './iso';
-import { FARM_TILES_PER_SPAN, createFootprint, createGround, createSelectionOutline, createTerrainPatch, insetConvex, updateSelectionOutline } from './world';
+import { FARM_TILES_PER_SPAN, FOG_UNSEEN, createFog, createFootprint, createGround, createSelectionOutline, createTerrainPatch, insetConvex, updateSelectionOutline } from './world';
 import { createGame } from '../sim/game';
 import type { ContentAssets } from './assets';
 
@@ -216,6 +216,68 @@ describe('meshes that lie on the ground', () => {
     // are square, so the count is the same either way round.
     const us = Array.from({ length: uv.count }, (_, i) => uv.getX(i));
     expect(Math.max(...us) - Math.min(...us)).toBeCloseTo(3 / FARM_TILES_PER_SPAN, 6);
+  });
+
+  it('grades the fog across a boundary instead of stepping at the tile edge', () => {
+    // A tile shaded flat carries one alpha on both its triangles, so every
+    // fog boundary is a hard diamond edge. Averaging the up-to-four tiles that
+    // meet at a corner lets the GPU interpolate across the quad.
+    const state = createGame(11);
+    const visibility = state.visibility[1];
+    visibility.visible.fill(0);
+    visibility.explored.fill(0);
+    // A 3x3 block of seen tiles in a never-seen field, so there is an interior
+    // corner as well as a boundary.
+    const at = (x: number, y: number) => y * state.width + x;
+    for (let y = 4; y <= 6; y++) for (let x = 4; x <= 6; x++) {
+      visibility.visible[at(x, y)] = 1;
+      visibility.explored[at(x, y)] = 1;
+    }
+
+    const fog = createFog(state);
+    fog.update(state);
+    const colors = (fog.mesh.geometry.getAttribute('color') as THREE.BufferAttribute);
+    const alphasOf = (x: number, y: number) => {
+      const first = (y * state.width + x) * 6;
+      return Array.from({ length: 6 }, (_, i) => colors.getW(first + i));
+    };
+
+    // Every corner of the middle tile is surrounded by seen ground, so it is
+    // still completely clear -- the gradient must not wash into the interior.
+    const centre = alphasOf(5, 5);
+    for (const alpha of centre) expect(alpha).toBeCloseTo(0, 6);
+
+    // The tile on the block's edge is graded: its inner corners are clear and
+    // its outer ones carry some of the dark beyond.
+    const edge = alphasOf(6, 5);
+    expect(Math.min(...edge)).toBeCloseTo(0, 6);
+    expect(Math.max(...edge)).toBeGreaterThan(0.2);
+    // And the first unseen tile out is graded the other way, rather than
+    // snapping straight to full dark.
+    const beyond = alphasOf(7, 5);
+    expect(Math.min(...beyond)).toBeLessThan(FOG_UNSEEN - 0.05);
+    expect(Math.max(...beyond)).toBeCloseTo(FOG_UNSEEN, 6);
+    for (const alpha of [...centre, ...edge, ...beyond]) {
+      expect(alpha).toBeGreaterThanOrEqual(0);
+      expect(alpha).toBeLessThanOrEqual(FOG_UNSEEN + 1e-6);
+    }
+
+    // Far from anything seen it is still the flat unseen level, so the
+    // gradient is local to the boundary and the rest is untouched.
+    const far = alphasOf(state.width - 2, state.height - 2);
+    for (const alpha of far) expect(alpha).toBeCloseTo(FOG_UNSEEN, 6);
+  });
+
+  it('leaves the map border as dark as the tiles inside it', () => {
+    // Corners on the edge average only the tiles that exist; counting the
+    // void beyond as unseen would draw a dark rim round the whole board.
+    const state = createGame(11);
+    state.visibility[1].visible.fill(1);
+    state.visibility[1].explored.fill(1);
+    const fog = createFog(state);
+    fog.update(state);
+    const colors = fog.mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
+    for (let i = 0; i < colors.count; i++) expect(colors.getW(i)).toBeCloseTo(0, 6);
   });
 
   it('is wound clockwise at all, so the check above is not vacuous', () => {

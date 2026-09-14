@@ -293,12 +293,15 @@ test, because every stage changes the checksum.
 
 ## Blocked or deliberately not started
 
-- **Terrain blend edges.** Blocked on evidence, not effort. The DAT gives a
-  `blend_type` and `blend_priority` and `terrain/blends/` holds ten masks, but
-  nothing says which file a type selects or how a 512x512 mask indexes against
-  a tile. Picking one by name and anchoring it by eye would invent a visual,
-  which is what the download-first rule exists to prevent. Needs a mapping
-  found in the owned data or a side-by-side against the installed game.
+- **Terrain blend edges.** No longer blocked on evidence the way this said:
+  `blend_type` turns out to take 0..7 in coherent terrain families that map
+  one-to-one onto the names in `terrain/blends/` (farms are type 1 and there is
+  a `farmland.png`), and `blendomatic_x1.dat` — never opened until 2026-09-14 —
+  holds nine blending modes of 31 diamond masks and walks exactly to EOF. The
+  full measurement is in `backlog.md`. What is left is the index-to-file order,
+  which a blendomatic-against-PNG comparison settles without guessing, and the
+  atlas indexing inside the compiled shader. It is a real feature, not a
+  lookup: a second terrain pass with a mask, changing `createGround`.
 - **Water.** `docs/water-design.md` scopes it as W1–W5 from the owned DAT. It
   changes the board rather than adding to it; do not start it mid-run.
 - **The monk's occlusion contour.** Its idle and attack outline layers are the

@@ -1120,6 +1120,30 @@ banked resource identical — because the strategy re-tasks its own idle
 villagers within a second or two. The cost fell on whoever was playing by
 hand, and no batch metric could see it.
 
+## Fog fades across a tile instead of stepping at its edge
+
+Every tile carried one alpha on both of its triangles, so the boundary between
+seen and unseen ground was a hard diamond edge and the fog read as a staircase
+rather than as fog. The alpha is now averaged at each tile *corner*, over the
+up-to-four tiles that meet there, and the GPU interpolates across the quad —
+the same trick `cornerElevation` already used to keep neighbouring tiles' hills
+joined. Measured on the opening view: a horizontal scan across the boundary
+takes **118 pixels** to go from a tenth to nine tenths of the way dark where it
+took 45, over 64 distinct levels rather than 29.
+
+Corners on the map's own border clamp onto the tiles that exist rather than
+averaging in the void beyond, which would draw a dark rim round the whole
+board; a test asserts a fully-explored map is uniformly clear to its edges.
+
+It is also cheaper than what it replaced. The RGB of the overlay is black for
+the life of the mesh and was being rewritten every frame along with the alpha;
+writing only the alpha pays for the corner pass and more. On Windsor's 392x392
+board, `fog.update` went from **2.66 ms to 1.74 ms** a frame.
+
+What this is *not* is AoE2DE's own fog edge, which is drawn from art rather
+than interpolated. The reference's terrain blending is a separate mechanism and
+is still not implemented — see the note in `backlog.md`.
+
 ## A farm is twelve furrows across, and no two are the same
 
 `terrain_dimensions` is 6x6 for the grown farm (`g_fm1`) and 3x3 for the one
