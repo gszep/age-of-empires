@@ -1120,6 +1120,40 @@ banked resource identical — because the strategy re-tasks its own idle
 villagers within a second or two. The cost fell on whoever was playing by
 hand, and no batch metric could see it.
 
+## A farm is twelve furrows across, and no two are the same
+
+`terrain_dimensions` is 6x6 for the grown farm (`g_fm1`) and 3x3 for the one
+being built (`g_fc1`), and `frame_data[0].frame_count` is the product of the
+dimensions in both — which pins how each sheet is cut into frames, and says
+nothing about which frame a tile draws or how much ground it covers. That is
+engine behaviour, the same class of gap as the terrain blend masks.
+
+Reading the field as tiles-per-span, which is what the ground plane does for
+grass, drew a farm's three tiles across 3/6 of the grown sheet and 3/3 of the
+construction one. Both sheets carry the same forty furrows across their span
+(measured by frequency, not counted by eye), so a farm showed twenty furrows
+while growing and forty while being built: the same ground re-ploughed at half
+the spacing the moment the crop came up. Nobody had noticed the second half.
+
+The owner of the reference reports **about twelve furrows across one farm**
+(issue #22). Twelve over three tiles, against forty to the span, is ten tiles
+to the span — applied to both sheets, so the pitch no longer changes through
+construction. `FARM_TILES_PER_SPAN` in `src/view/world.ts` records the number
+and the reasoning. This is the human's observation of the installed game, not
+something the owned files state, and is recorded here as such.
+
+Measured end to end rather than argued: the same four staged farms
+photographed through the debug protocol before and after, and the dominant
+stripe frequency inside the block falls to **0.611** of what it was, against
+the 0.600 the change predicts (the remainder is FFT bin quantisation).
+
+The other half of the issue is fixed with it. A patch sampled its texture in
+patch-local coordinates, so every farm on the map drew the identical corner of
+the sheet and the thirty-six authored frames came down to one arrangement.
+Patches now sample by absolute world position exactly as the ground beneath
+them does, so neighbouring farms carry the furrows on across the boundary and
+a farm is a function of where it stands.
+
 ## A panel's contents sit where the widget files put them
 
 `widgetui` lays its panels out in a 3840x2160 reference space, and every

@@ -16,7 +16,17 @@ import type { GameRules } from './sim/data';
 import type { GameState } from './sim/types';
 
 const KEY = 'open-empires-lab:dev-session';
-const VERSION = 2;
+/**
+ * Bumped whenever a resumed snapshot would no longer be read correctly.
+ *
+ * Exported because the probes write snapshots too, and a probe that writes a
+ * stale version is not an error — `loadSession` simply declines it and the
+ * page starts a fresh match, so the probe photographs the wrong thing and says
+ * nothing. `tools/probes/snapshot.ts` had been doing exactly that since this
+ * went to 2.
+ */
+export const SNAPSHOT_VERSION = 2;
+const VERSION = SNAPSHOT_VERSION;
 
 interface Snapshot {
   version: number;

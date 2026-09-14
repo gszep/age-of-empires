@@ -1,29 +1,48 @@
 #!/usr/bin/env python3
-"""Render the candidate farm terrain mappings onto the real diamond.
+"""Check the farm's furrow pitch against the reference's own count.
 
-Issue #22 says the farm has "too many rows". The DAT pins the frame layout --
-`frame_data[0].frame_count` is the product of `terrain_dimensions` for every
-slot -- but never says which frame a tile draws, which is engine behaviour. So
-the question is which of three mappings matches the installed game, and this
-draws all three at the reference's own 96x48 tile so a human can point at one.
+Issue #22 said the farm had too many rows. `terrain_dimensions` pins how each
+sheet is cut into frames -- `frame_data[0].frame_count` is the product of the
+dimensions for every slot -- but never says which frame a tile draws or how
+much ground it covers, which is engine behaviour. It is also not readable as
+tiles-per-span: it is 6x6 for the grown farm and 3x3 for the one being built,
+and both sheets carry the same forty furrows across their span, so honouring it
+halved a farm's furrow pitch the moment the crop came up.
+
+The owner of the reference reports about twelve furrows across one farm, which
+over three tiles against forty to the span is FARM_TILES_PER_SPAN = 10. This
+draws that and measures it, so the claim stays checkable.
 
     uv run --locked python tools/probes/farm_mapping.py
 
-Writes farm_options.png beside the imported terrain it reads.
+Writes farm_pitch.png beside the imported terrain it reads.
 """
 from pathlib import Path
+
+import numpy as np
 from PIL import Image, ImageDraw
 
+Image.MAX_IMAGE_PIXELS = None
+
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "public/imported/aoe2/terrain/g_fm1.png"
-OUT = ROOT / ".local/probes/farm_options.png"
+OUT = ROOT / ".local/probes/farm_pitch.png"
 TILE_W, TILE_H = 96, 48          # src/view/iso.ts
-FARM_TILES = 3                    # a farm is 3x3
+FARM_TILES = 3                    # a farm is radius 1.5
+TILES_PER_SPAN = 10               # FARM_TILES_PER_SPAN in src/view/world.ts
+REFERENCE_FURROWS = 12            # what the owner of the game reports
+
+
+def furrows(image: Image.Image) -> int:
+    """Rows in a crop, by frequency rather than by eye."""
+    grey = np.asarray(image.convert("L"), dtype=np.float64)
+    profile = grey.mean(axis=1)
+    profile = (profile - profile.mean()) * np.hanning(len(profile))
+    return int(np.argmax(np.abs(np.fft.rfft(profile))[2:80]) + 2)
 
 
 def diamond(src: Image.Image, fraction: float) -> Image.Image:
-    """Sample `fraction` of the texture across the farm, then shear to dimetric."""
-    n = max(1, int(src.size[0] * fraction))
+    """Sample `fraction` of the sheet across the farm, sheared to dimetric."""
+    n = max(2, int(src.size[0] * fraction))
     patch = src.crop((0, 0, n, n)).resize((FARM_TILES * TILE_W, FARM_TILES * TILE_W), Image.LANCZOS)
     out = Image.new("RGBA", (FARM_TILES * TILE_W, FARM_TILES * TILE_H), (0, 0, 0, 0))
     px, op = patch.load(), out.load()
@@ -35,32 +54,45 @@ def diamond(src: Image.Image, fraction: float) -> Image.Image:
             fy = sy / (TILE_H / 2)
             x, y = (fy + fx) / 2, (fy - fx) / 2
             if 0 <= x < FARM_TILES and 0 <= y < FARM_TILES:
-                op[sx, sy] = px[int(x / FARM_TILES * span), int(y / FARM_TILES * span)]
+                op[sx, sy] = (*px[int(x / FARM_TILES * span), int(y / FARM_TILES * span)], 255)
     return out
 
 
 def main() -> None:
-    if not SOURCE.is_file():
-        raise SystemExit(f"no imported farm texture at {SOURCE}; run npm run import:aoe2")
-    src = Image.open(SOURCE).convert("RGBA")
-    options = [
-        (1.0, "whole texture over 3x3  (~40 rows)"),
-        (0.5, "half = one 3x3 of the 6x6 grid  (~20 rows) -- WHAT WE DRAW NOW"),
-        (1 / 6, "one frame cell stretched over 3x3  (~7 rows)"),
+    sheets = [
+        ("grown", ROOT / "public/imported/aoe2/terrain/g_fm1.png", (6, 6)),
+        ("being built", ROOT / "public/imported/aoe2/terrain/g_fc1.png", (3, 3)),
     ]
-    pad = 18
-    sheet = Image.new("RGB", (FARM_TILES * TILE_W + 2 * pad,
-                              len(options) * (FARM_TILES * TILE_H + 34) + pad), (70, 110, 55))
+    missing = [path for _, path, _ in sheets if not path.is_file()]
+    if missing:
+        raise SystemExit(f"no imported farm terrain at {missing[0]}; run npm run import:aoe2")
+
+    fraction = FARM_TILES / TILES_PER_SPAN
+    pad, gap = 20, 40
+    sheet = Image.new(
+        "RGB",
+        (FARM_TILES * TILE_W + 2 * pad, len(sheets) * (FARM_TILES * TILE_H + gap) + pad),
+        (70, 110, 55),
+    )
     draw = ImageDraw.Draw(sheet)
     y = pad
-    for fraction, label in options:
+    for label, path, dimensions in sheets:
+        src = Image.open(path).convert("RGB")
+        whole = furrows(src)
+        side = int(src.size[0] * fraction)
+        drawn = furrows(src.crop((0, 0, side, side)))
         tile = diamond(src, fraction)
         sheet.paste(tile, (pad, y), tile)
-        draw.text((pad, y + FARM_TILES * TILE_H + 4), label, fill=(255, 255, 255))
-        y += FARM_TILES * TILE_H + 34
-    sheet = sheet.resize((sheet.size[0] * 2, sheet.size[1] * 2), Image.NEAREST)
+        draw.text((pad, y + FARM_TILES * TILE_H + 6),
+                  f"{label}: dimensions {dimensions[0]}x{dimensions[1]}, "
+                  f"{whole} furrows per span, {drawn} across the farm", fill=(255, 255, 255))
+        print(f"{label:12} dimensions {dimensions}  {whole} furrows/span  -> {drawn} across the farm")
+        if abs(drawn - REFERENCE_FURROWS) > 2:
+            print(f"  WARNING: {drawn} is not the ~{REFERENCE_FURROWS} the reference shows")
+        y += FARM_TILES * TILE_H + gap
+
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    sheet.save(OUT)
+    sheet.resize((sheet.size[0] * 3, sheet.size[1] * 3), Image.LANCZOS).save(OUT)
     print(OUT)
 
 

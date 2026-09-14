@@ -46,8 +46,9 @@ seconds after it empties), #35 (the minimap and the command grid placed by eye
 rather than from the widget files, and the `Anchor` field the grid needs being
 stripped by the importer), and #33 (the spent-farm alert crying about every
 farm the auto-reseed option re-sowed). Each has its evidence on the issue and a
-section in `status.md`. **Still open and both blocked on the human, not on
-work: #22 (farm textures) and #5 (pathing)** — see Q0b below. The rest of the
+section in `status.md`. It then closed **#22 (farm textures)** once the human
+answered its open question. **Still open and blocked on the human, not on
+work: #5 (pathing)** — see Q0b below. The rest of the
 issue list is enhancements: #34, #36, #37, #38, #39.
 
 **The 2026-08-29 overnight run** closed three fresh bugs (#29 town watch, #30
@@ -101,19 +102,17 @@ section in `status.md`.
 `docs/pathing-review.md`), #6 (a group shown as its members, and double-click),
 #7 (a fifteen-deep training queue).
 
-**What is left is two questions to the human, not work.** Do not guess at
-either; both were left open deliberately, and picking an answer would be
-inventing a fact.
+**What is left is one question to the human, not work** (#22 was answered on
+2026-09-14 and is closed). Do not guess at it; it was left open deliberately,
+and picking an answer would be inventing a fact.
 
-- **#22, farm textures.** The DAT pins the frame layout — `frame_count` is the
-  product of `terrain_dimensions` for every slot, and Grass's slope frames
-  start at `shape_id` 100, so its flat frames really do occupy 0..99 — but it
-  never says *which* frame a tile draws, which is engine behaviour. What the
-  game draws today is the authored density at the reference's own 96x48 tile,
-  so it cannot be called wrong from the data. Three candidates were rendered
-  onto the real diamond by `tools/probes/farm_mapping.py`, which writes the
-  sheet to compare against, and the question is on the issue. Resume when the human
-  answers; nothing else in the farm work is blocked on it.
+- **#22, farm textures — answered and closed 2026-09-14.** The human's answer
+  was *about twelve furrows across one farm*, which against the forty each
+  sheet carries per span is ten tiles to the span. `terrain_dimensions` turned
+  out not to be readable as tiles-per-span at all: it is 6x6 for the grown farm
+  and 3x3 for the one being built, so honouring it halved a farm's furrow pitch
+  the moment it finished building. Every farm drawing the same arrangement went
+  with it. See `status.md`.
 - **#5, pathing.** Nine measurements failed to reproduce the defect the issue
   reports, and the review says so. The question — which units, doing what — is
   on the issue. Two adjacent things were noted and are in `backlog.md`: ragged

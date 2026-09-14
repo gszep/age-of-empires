@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import puppeteer from 'puppeteer';
 import { FALLBACK_RULES, rulesFromManifest, type ContentManifest } from '../../src/sim/data';
 import { createGame, stepGame } from '../../src/sim/game';
+import { SNAPSHOT_VERSION } from '../../src/dev-session';
 import type { BuildingKind, Entity, UnitKind } from '../../src/sim/types';
 
 const ROOT = join(import.meta.dirname, '../..');
@@ -47,7 +48,7 @@ for (let i = 0; i < 6; i++) stepGame(state);
 //    effect, and a snapshot taken under different content would resume against
 //    mismatched entities. See src/dev-session.ts.
 const { rules: _drop, ...rest } = state;
-const snapshot = JSON.stringify({ version: 1, rulesOrigin: rules.origin, state: rest });
+const snapshot = JSON.stringify({ version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: rest });
 
 const extraLibs = join(homedir(), '.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu');
 const launchEnv = existsSync(extraLibs)
@@ -87,6 +88,12 @@ try {
 
   // 4. Ask the protocol what it drew. `animation` and `frame` are the fields
   //    that answer "which art", without anybody squinting at a screenshot.
+  // A snapshot the page declined is not an error anywhere: it just starts a
+  // fresh match and everything below photographs that instead.
+  const staged = ((await query({ type: 'entities', kind: 'barracks' })) as { entities: { id: number }[] }).entities;
+  if (!staged.some(row => row.id > home.id)) {
+    throw new Error('the page declined the snapshot and is running a fresh match');
+  }
   await query({ type: 'look', entity: home.id });
   await sleep(1200);
   for (const kind of ['town-center', 'barracks', 'archery-range', 'university', 'man-at-arms']) {

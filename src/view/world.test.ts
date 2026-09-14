@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 import { worldToIso } from './iso';
-import { createFootprint, createGround, createSelectionOutline, createTerrainPatch, insetConvex, updateSelectionOutline } from './world';
+import { FARM_TILES_PER_SPAN, createFootprint, createGround, createSelectionOutline, createTerrainPatch, insetConvex, updateSelectionOutline } from './world';
 import { createGame } from '../sim/game';
 import type { ContentAssets } from './assets';
 
@@ -96,7 +96,10 @@ describe('meshes that lie on the ground', () => {
       entities: {},
       terrain: {
         ground: slot('Grass', 'terrain/g_grs.png', 0),
-        farm: slot('Farm1', 'terrain/g_fm1.png', 7),
+        // The DAT's own differing dimensions for the two farm sheets, which is
+        // the thing the farm scale must not be read from.
+        farm: { ...slot('Farm1', 'terrain/g_fm1.png', 7), dimensions: [6, 6] as [number, number] },
+        'farm-construction': { ...slot('Farm Cnst1', 'terrain/g_fc1.png', 29), dimensions: [3, 3] as [number, number] },
       },
       textures,
       playerRamps: new Map(),
@@ -146,6 +149,43 @@ describe('meshes that lie on the ground', () => {
       expect(material.side, `${name} is wound clockwise and would be culled`)
         .not.toBe(THREE.FrontSide);
     }
+  });
+
+  it('gives a farm the reference\'s own furrow scale, whatever the sheet says', () => {
+    // Issue #22: too many rows. `terrain_dimensions` is 6x6 for the grown farm
+    // and 3x3 for the one being built, and both sheets carry the same forty
+    // furrows across their span -- so reading it as tiles-per-span drew the
+    // grown farm at 3/6 of the span (twenty furrows) and the one under
+    // construction at 3/3 (forty), halving the pitch the moment it completed.
+    // The owner of the reference reports about twelve furrows across a farm,
+    // which over three tiles against forty per span is ten tiles to the span.
+    const assets = groundAssets();
+    const uvSpan = (slot: string) => {
+      const uv = createTerrainPatch(assets, slot, 1.5)!.geometry.getAttribute('uv');
+      const us = Array.from({ length: uv.count }, (_, i) => uv.getX(i));
+      return Math.max(...us) - Math.min(...us);
+    };
+    // Three tiles of a ten-tile span, so forty furrows to the span show twelve.
+    expect(uvSpan('farm')).toBeCloseTo(3 / FARM_TILES_PER_SPAN, 6);
+    expect(40 * uvSpan('farm')).toBeCloseTo(12, 6);
+    // And the ground does not change pitch when the crop comes up.
+    expect(uvSpan('farm-construction')).toBeCloseTo(uvSpan('farm'), 6);
+  });
+
+  it('samples a farm by where it stands, so two are not one picture twice', () => {
+    // Every farm drew the identical corner of the sheet, bringing the
+    // thirty-six authored frames down to one arrangement.
+    const assets = groundAssets();
+    const first = createTerrainPatch(assets, 'farm', 1.5, { x: 9, y: 12 })!.geometry.getAttribute('uv');
+    const second = createTerrainPatch(assets, 'farm', 1.5, { x: 21, y: 30 })!.geometry.getAttribute('uv');
+    expect(first.getX(0)).toBeCloseTo(9 / FARM_TILES_PER_SPAN, 6);
+    expect(second.getX(0)).toBeCloseTo(21 / FARM_TILES_PER_SPAN, 6);
+    const differs = Array.from({ length: first.count }, (_, i) =>
+      Math.abs(first.getX(i) - second.getX(i)) > 1e-6 || Math.abs(first.getY(i) - second.getY(i)) > 1e-6);
+    expect(differs.every(Boolean)).toBe(true);
+    // Same ground, same picture: the patch is a function of where it stands.
+    const again = createTerrainPatch(assets, 'farm', 1.5, { x: 9, y: 12 })!.geometry.getAttribute('uv');
+    expect(again.getX(0)).toBeCloseTo(first.getX(0), 6);
   });
 
   it('is wound clockwise at all, so the check above is not vacuous', () => {

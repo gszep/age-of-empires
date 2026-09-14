@@ -109,28 +109,62 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
 }
 
 /**
+ * How many tiles one span of a farm texture covers.
+ *
+ * `terrain_dimensions` is 6x6 for the grown farm (`g_fm1`) and 3x3 for the one
+ * being built (`g_fc1`), and both sheets carry the same forty furrows across
+ * their span. Reading that field as tiles-per-span therefore halved a farm's
+ * furrow pitch the moment it finished building — the same ground re-ploughed
+ * finer as the crop came up. It says how the sheet is cut into frames, not how
+ * much ground a frame covers, and which frame a tile draws is engine behaviour
+ * the DAT never states (issue #22).
+ *
+ * The reference settles the scale: a farm there shows about twelve furrows
+ * across its three tiles, reported by the owner of the game. Twelve over three
+ * tiles against forty to the span is ten tiles to the span, and applying it to
+ * both sheets keeps the pitch steady through construction. Recorded as the
+ * owner's observation in `docs/status.md`, because the owned files do not
+ * answer it.
+ */
+export const FARM_TILES_PER_SPAN = 10;
+const FARM_SLOTS = new Set(['farm', 'farm-construction']);
+
+/**
  * Farms are terrain in AoE2DE, not sprites: the DAT points at terrain slots
  * (`Farm1`, `Farm Cnst1`) and there is no farm SLD to import. Draw one as its
  * own patch of the isometric grid so it sits flat on the ground like the real
- * game, tiled at the slot's authored span.
+ * game.
+ *
+ * `at` is the patch's north corner in world tiles, so the texture is sampled by
+ * absolute position exactly as the ground beneath it is. Sampling in
+ * patch-local coordinates instead gave every farm on the map the identical
+ * corner of the sheet, which is what brought all thirty-six authored frames
+ * down to one arrangement.
  */
 export function createTerrainPatch(
   assets: ContentAssets | undefined, slot: string, half: number,
+  at: { x: number; y: number } = { x: 0, y: 0 },
 ): THREE.Mesh | undefined {
   const terrain = assets?.terrain?.[slot];
   const texture = terrain && assets?.textures.get(terrain.image);
   if (!terrain || !texture) return undefined;
-  const [spanX, spanY] = terrain.dimensions;
+  const [spanX, spanY] = FARM_SLOTS.has(slot)
+    ? [FARM_TILES_PER_SPAN, FARM_TILES_PER_SPAN]
+    : terrain.dimensions;
   const positions: number[] = [];
   const uvs: number[] = [];
   const tiles = Math.max(1, Math.round(half * 2));
   for (let y = 0; y < tiles; y++) {
     for (let x = 0; x < tiles; x++) {
+      // Position is patch-local (the mesh is placed at its north corner);
+      // the texture coordinate is absolute, so neighbouring farms show
+      // neighbouring ground rather than the same corner twice.
+      const uv = (px: number, py: number) => ({ u: (at.x + px) / spanX, v: (at.y + py) / spanY });
       const corners = [
-        { p: worldToIso(x, y), u: x / spanX, v: y / spanY },
-        { p: worldToIso(x + 1, y), u: (x + 1) / spanX, v: y / spanY },
-        { p: worldToIso(x + 1, y + 1), u: (x + 1) / spanX, v: (y + 1) / spanY },
-        { p: worldToIso(x, y + 1), u: x / spanX, v: (y + 1) / spanY },
+        { p: worldToIso(x, y), ...uv(x, y) },
+        { p: worldToIso(x + 1, y), ...uv(x + 1, y) },
+        { p: worldToIso(x + 1, y + 1), ...uv(x + 1, y + 1) },
+        { p: worldToIso(x, y + 1), ...uv(x, y + 1) },
       ];
       for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]] as const) {
         for (const index of [a, b, c]) {

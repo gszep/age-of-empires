@@ -690,7 +690,12 @@ function updateFarmView(
   const slot = entity.buildProgress !== undefined ? 'farm-construction' : 'farm';
   if (view.patchSlot !== slot) {
     if (view.patch) { view.group.remove(view.patch); view.patch.geometry.dispose(); }
-    view.patch = createTerrainPatch(assets, slot, entity.radius);
+    // The north corner in world tiles, so the patch samples its texture by
+    // absolute position like the ground does and two farms side by side are
+    // not the same picture twice.
+    view.patch = createTerrainPatch(assets, slot, entity.radius, {
+      x: entity.position.x - entity.radius, y: entity.position.y - entity.radius,
+    });
     view.patchSlot = slot;
     if (view.patch) view.group.add(view.patch);
   }

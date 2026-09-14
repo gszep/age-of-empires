@@ -22,9 +22,11 @@ Run them from the repo root: `npx tsx tools/probes/snapshot.ts`.
   one order to fifty units costs the tick it lands on. `docs/pathing-review.md`
   is the write-up of a run of it. Not throwaway — re-run it after anything
   that touches `nav.ts`, movement, or the cost of a tick.
-- **`farm_mapping.py`** — draws the candidate farm terrain mappings onto the
-  real diamond, for the question issue #22 is waiting on. Runs under the import
-  venv, because it reads the converted texture with PIL.
+- **`farm_mapping.py`** — draws the farm onto the real diamond and measures its
+  furrow pitch, which is the answer issue #22 settled: both sheets carry forty
+  furrows to the span and the farm shows about twelve across its three tiles.
+  Re-run it after anything that touches `FARM_TILES_PER_SPAN` or the terrain
+  import; it warns if the count has drifted from what the reference shows.
 
 `snapshot.ts` and `panel.mjs` start their **own** Vite server on their **own**
 port and open the only page attached to it (`pathing.ts` needs no browser and
