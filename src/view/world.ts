@@ -119,6 +119,77 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
       }
     }
   }
+  // Terrain-to-terrain edges. Where a tile's neighbour carries a terrain the
+  // DAT gives a higher `blend_priority`, that neighbour is drawn over this
+  // tile through one of the owned masks, which is what fades a boundary
+  // instead of stopping it at the tile edge. A tile with two such neighbours
+  // takes two blends; the masks compose, so nothing has to know what a
+  // combined mask would mean.
+  const blends = assets?.blends;
+  const priority = (id: number): number => byId.get(id)?.slot.blendPriority ?? 0;
+  const DIRECTIONS: { key: string; dx: number; dy: number }[] = [
+    { key: '+x', dx: 1, dy: 0 }, { key: '+y', dx: 0, dy: 1 },
+    { key: '-x', dx: -1, dy: 0 }, { key: '-y', dx: 0, dy: -1 },
+  ];
+  /** Blend quads per overlying terrain id. */
+  const overlays = new Map<number, { positions: number[]; uvs: number[]; uv1s: number[]; colors: number[] }>();
+  if (blends) {
+    const at = (x: number, y: number): number | undefined =>
+      x < 0 || y < 0 || x >= state.width || y >= state.height
+        ? undefined : state.terrain[y * state.width + x] ?? 0;
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        const here = at(x, y)!;
+        for (const direction of DIRECTIONS) {
+          const there = at(x + direction.dx, y + direction.dy);
+          if (there === undefined || there === here) continue;
+          if (priority(there) <= priority(here)) continue;
+          const variants = blends.edges[direction.key];
+          if (!variants?.length) continue;
+          const slot = byId.get(there)?.slot;
+          const texture = slot && assets?.textures.get(slot.image);
+          if (!texture) continue;
+          // A variant per tile and direction, so a long edge does not repeat
+          // one silhouette; hashed rather than random so two runs agree.
+          const hash = (Math.imul(x + 1, 73_856_093) ^ Math.imul(y + 1, 19_349_663)
+            ^ Math.imul(direction.dx * 3 + direction.dy * 7 + 11, 83_492_791)) >>> 0;
+          const column = variants[hash % variants.length];
+          let bucket = overlays.get(there);
+          if (!bucket) {
+            bucket = { positions: [], uvs: [], uv1s: [], colors: [] };
+            overlays.set(there, bucket);
+          }
+          const [spanX, spanY] = slot!.dimensions;
+          const width = blends.masksPerMode;
+          // The mask is one diamond in a row of them: its four points are the
+          // tile's four corners, so the column is a scale and an offset on u.
+          const mu = (t: number): number => (column + t) / width;
+          const point = (px: number, py: number, u1: number, v1: number) => {
+            const iso = worldToIso(px, py);
+            iso.y += cornerElevation(state, px, py) * ELEVATION_PIXELS;
+            const shade = shadeAt(px, py);
+            bucket!.positions.push(iso.x, iso.y, 0);
+            bucket!.uvs.push(px / spanX, py / spanY);
+            bucket!.uv1s.push(mu(u1), v1);
+            bucket!.colors.push(shade, shade, shade);
+          };
+          // North, east, south, west of the tile against the mask's own top,
+          // right, bottom and left points. The texture is flipped on load, so
+          // v runs up from the bottom and the north corner takes v = 1.
+          const corners: [number, number, number, number][] = [
+            [x, y, 0.5, 1], [x + 1, y, 1, 0.5], [x + 1, y + 1, 0.5, 0], [x, y + 1, 0, 0.5],
+          ];
+          for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]] as const) {
+            for (const index of [a, b, c]) {
+              const [px, py, u1, v1] = corners[index];
+              point(px, py, u1, v1);
+            }
+          }
+        }
+      }
+    }
+  }
+
   const group = new THREE.Group();
   classes.forEach((entry, i) => {
     if (!buckets[i].positions.length) return;
@@ -136,6 +207,26 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
     mesh.name = `terrain-${entry.key}`;
     group.add(mesh);
   });
+
+  for (const [id, bucket] of [...overlays].sort((a, b) => a[0] - b[0])) {
+    if (!bucket.positions.length) continue;
+    const slot = byId.get(id)!.slot;
+    const texture = assets!.textures.get(slot.image)!;
+    const mask = blends!.modes[slot.blendType] ?? blends!.modes[0];
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(bucket.positions, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(bucket.uvs, 2));
+    geometry.setAttribute('uv1', new THREE.Float32BufferAttribute(bucket.uv1s, 2));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(bucket.colors, 3));
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+      map: texture, alphaMap: mask, transparent: true, depthWrite: false,
+      vertexColors: true, side: THREE.DoubleSide,
+    }));
+    // Above every base terrain, below anything standing on the ground.
+    mesh.renderOrder = 1;
+    mesh.name = `blend-${byId.get(id)!.key}`;
+    group.add(mesh);
+  }
   return group;
 }
 

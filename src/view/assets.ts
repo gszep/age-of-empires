@@ -45,11 +45,30 @@ export interface PlayerColors {
 export interface ImportedTerrain {
   /** The DAT slot this is, so the ground can be bucketed by what the map says. */
   terrainId: number;
+  /** Which of two meeting terrains is painted over the other, and which
+   * family of blend masks the edge is drawn with. Both the DAT's own. */
+  blendPriority: number;
+  blendType: number;
   name: string;
   texture: string;
   image: string;
   dimensions: [number, number];
   minimapColor: [number, number, number];
+}
+
+/**
+ * The owned terrain blend masks, decoded from `blendomatic_x1.dat`.
+ *
+ * One atlas per blending mode, 31 masks laid left to right, each the
+ * reference's own 97x49 diamond. `edges` says which columns face which world
+ * neighbour — four interchangeable variants apiece, so a long boundary does
+ * not repeat one silhouette.
+ */
+export interface BlendMasks {
+  tile: [number, number];
+  modes: THREE.Texture[];
+  edges: Record<string, number[]>;
+  masksPerMode: number;
 }
 
 export interface ContentAssets {
@@ -59,6 +78,7 @@ export interface ContentAssets {
   playerColors?: PlayerColors;
   /** One 256-texel ramp per player, indexed by a sprite's own grey. */
   playerRamps: Map<number, THREE.DataTexture>;
+  blends?: BlendMasks;
 }
 
 interface UiMaterial { type: string; blend?: string | null; texture?: string; color?: { r: number; g: number; b: number; a: number } }
@@ -203,7 +223,31 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   for (const [player, color] of Object.entries(playerColors?.players ?? {})) {
     playerRamps.set(Number(player), rampTexture(color, playerColors!.shadeLevels));
   }
-  return { entities: manifest.entities, terrain, textures, playerColors, playerRamps };
+  // The blend masks. They are sampled per tile in the mesh's second UV set,
+  // so they must not repeat or filter across a column boundary: clamped, and
+  // linear only within a mask.
+  let blends: BlendMasks | undefined;
+  const blendSpec = (manifest as { blends?: { tile: [number, number]; modes: { image: string; masks: number }[]; edges: Record<string, number[]> } }).blends;
+  if (blendSpec?.modes?.length) {
+    const modes = await Promise.all(blendSpec.modes.map(mode =>
+      loader.loadAsync(CONTENT_BASE + mode.image).then(texture => {
+        texture.colorSpace = THREE.NoColorSpace;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.magFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearFilter;
+        texture.generateMipmaps = false;
+        // The mask rides in the mesh's second UV set; the terrain it fades
+        // keeps the first.
+        texture.channel = 1;
+        return texture;
+      })));
+    blends = {
+      tile: blendSpec.tile, modes, edges: blendSpec.edges,
+      masksPerMode: blendSpec.modes[0].masks,
+    };
+  }
+  return { entities: manifest.entities, terrain, textures, playerColors, playerRamps, blends };
 }
 
 export async function loadUiAssets(): Promise<UiAssets | undefined> {

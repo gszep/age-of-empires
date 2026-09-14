@@ -90,6 +90,10 @@ describe('meshes that lie on the ground', () => {
       texture.needsUpdate = true;
       textures.set(image, texture);
       return { name, terrainId: id, texture: name, image, dimensions: [6, 6] as [number, number],
+        // Priority decides which of two meeting terrains is painted over the
+        // other; grass (111) and forest (96) are the DAT's own numbers.
+        blendPriority: id === 0 ? 111 : id === 10 ? 96 : 100,
+        blendType: 0,
         minimapColor: [160, 159, 158] as [number, number, number] };
     };
     return {
@@ -103,6 +107,13 @@ describe('meshes that lie on the ground', () => {
       },
       textures,
       playerRamps: new Map(),
+      blends: {
+        tile: [97, 49] as [number, number],
+        modes: [new THREE.DataTexture(new Uint8Array(4), 1, 1)],
+        // The four groups blendomatic's masks measure out to.
+        edges: { '+x': [12, 13, 14, 15], '+y': [4, 5, 6, 7], '-x': [0, 1, 2, 3], '-y': [8, 9, 10, 11] },
+        masksPerMode: 31,
+      },
     } as unknown as ContentAssets;
   };
 
@@ -281,6 +292,47 @@ describe('meshes that lie on the ground', () => {
     fog.update(state);
     const colors = fog.mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
     for (let i = 0; i < colors.count; i++) expect(colors.getW(i)).toBeCloseTo(0, 6);
+  });
+
+  it('fades a terrain into its lower-priority neighbour', () => {
+    // Issue #42. A boundary used to stop at the tile edge. The higher
+    // `blend_priority` terrain is now drawn over its neighbour through one of
+    // blendomatic's own masks, in the mesh's second UV set.
+    const state = createGame(11);
+    state.terrain.fill(10);                       // forest, priority 96
+    const at = (x: number, y: number) => y * state.width + x;
+    state.terrain[at(5, 5)] = 0;                  // one tile of grass, priority 111
+    const ground = createGround(state, groundAssets());
+    const blend = ground.getObjectByName('blend-ground') as THREE.Mesh;
+    expect(blend, 'grass should bleed into the forest around it').toBeDefined();
+    // Four neighbours take the blend, two triangles each, three vertices.
+    expect(blend.geometry.getAttribute('position').count).toBe(4 * 2 * 3);
+    // The mask rides in uv1 while the terrain keeps uv.
+    const uv1 = blend.geometry.getAttribute('uv1');
+    expect(uv1).toBeDefined();
+    const us = Array.from({ length: uv1.count }, (_, i) => uv1.getX(i));
+    // Every mask column lies inside the atlas, and none spans the whole of it.
+    expect(Math.min(...us)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...us)).toBeLessThanOrEqual(1);
+    expect(Math.max(...us) - Math.min(...us)).toBeLessThan(0.5);
+    const material = blend.material as THREE.MeshBasicMaterial;
+    expect(material.alphaMap).toBeTruthy();
+    expect(material.transparent).toBe(true);
+    // Above the ground it fades into, below anything standing on it.
+    expect(blend.renderOrder).toBeGreaterThan(0);
+  });
+
+  it('draws no blend where nothing out-ranks anything', () => {
+    // One terrain everywhere, and a neighbour of equal priority, are both
+    // edges with nothing to fade: the pass must not emit geometry for them.
+    const state = createGame(11);
+    state.terrain.fill(0);
+    const flat = createGround(state, groundAssets());
+    expect(flat.children.some(child => child.name.startsWith('blend-'))).toBe(false);
+    // Forest beside forest is the same terrain; still nothing.
+    state.terrain.fill(10);
+    expect(createGround(state, groundAssets()).children
+      .some(child => child.name.startsWith('blend-'))).toBe(false);
   });
 
   it('is wound clockwise at all, so the check above is not vacuous', () => {

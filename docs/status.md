@@ -1120,6 +1120,44 @@ banked resource identical — because the strategy re-tasks its own idle
 villagers within a second or two. The cost fell on whoever was playing by
 hand, and no batch metric could see it.
 
+## Terrain edges fade, from the owned masks
+
+Where two terrains met, the boundary was the tile edge. The reference fades it,
+and the docs here recorded that as blocked because nothing said which
+`terrain/blends/` file a `blend_type` selects. `blendomatic_x1.dat` says, and
+had never been opened.
+
+**The decode is proven, not assumed.** Nine modes of exactly 82,390 bytes, the
+ninth ending on the file's last byte; each states `tile_size` 2353, which is
+the pixel count of a 97x49 diamond whose rows run 1, 5, 9 … 97 … 5, 1 and of
+nothing else; and each holds 35 chunks, four dither patterns and then exactly
+the 31 masks the header's `nr_tiles` states. Alpha is the classic 0..128.
+
+**Which mask faces which neighbour is measured.** Coverage is summed over the
+diamond's four quadrants — each quadrant the tile's neighbour along one world
+axis, since `worldToIso` sends +x down-right and +y down-left — and sorting the
+masks by how far their strongest quadrant stands above their second splits the
+first sixteen into four groups of four: one group per direction, four
+interchangeable variants apiece, which is where the reference gets its variety.
+The other fifteen are combinations and are unused: a tile with two differing
+neighbours is drawn as two single-direction blends, which composes the same
+edge without anyone having to guess what a combined mask means.
+
+The renderer draws a neighbour over a tile when the DAT gives that neighbour
+the higher `blend_priority` — the farm's 186 over grass's 111 is the case the
+defect was reported against — with the terrain in the mesh's first UV set and
+the mask in its second, and a variant picked by a hash of the tile so a long
+boundary does not repeat one silhouette. Measured on a dealt board: 9.6% of the
+world view changes, in bands along the boundaries and nowhere else.
+
+**What is not done.** A farm is an entity patch rather than a terrain tile, so
+it does not go through this pass and its own edge is still hard; the same masks
+apply and it is the obvious next step. Water is held out of the biomes
+deliberately, so water-to-shore blending is untested. The DE-era 512x512 masks
+in `terrain/blends/` are higher resolution than blendomatic's 97x49 and are not
+used: their indexing lives in a compiled shader, and blendomatic needs no
+guess. At one mask per tile edge, 97x49 is the reference's own tile size.
+
 ## Arabia deals a biome, and the ground is no longer one colour
 
 `Arabia.rms` is in the owned depot and rolls a **biome** per match — eleven of
