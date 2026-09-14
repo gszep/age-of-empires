@@ -370,7 +370,7 @@ export const FALLBACK_RULES: GameRules = {
     // `trainedAt` matters only for what the barracks offers afterwards.
     'man-at-arms': {
       age: 1,
-      hp: 45, radius: 0.2, speed: 0.9, lineOfSight: 4, cost: cost(50, 0, 20), trainSeconds: 21,
+      hp: 45, radius: 0.2, speed: 0.96, lineOfSight: 4, cost: cost(50, 0, 20), trainSeconds: 21,
       trainedAt: 'barracks', popCost: 1,
       attacks: [{ class: 4, amount: 6 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 1 }],
@@ -378,7 +378,7 @@ export const FALLBACK_RULES: GameRules = {
     },
     spearman: {
       age: 1,
-      hp: 45, radius: 0.2, speed: 0.9, lineOfSight: 4, cost: cost(35, 25), trainSeconds: 22,
+      hp: 45, radius: 0.2, speed: 1, lineOfSight: 4, cost: cost(35, 25), trainSeconds: 22,
       trainedAt: 'barracks', popCost: 1,
       attacks: [{ class: 4, amount: 3 }, { class: 8, amount: 15 }, { class: 21, amount: 1 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
@@ -552,7 +552,7 @@ export const FALLBACK_RULES: GameRules = {
      */
     trebuchet: {
       age: 3,
-      hp: 150, radius: 0.5, speed: 0.8, lineOfSight: 18,
+      hp: 150, radius: 0.5, speed: 0.8, lineOfSight: 19,
       cost: cost(0, 200, 200, 0), trainSeconds: 50,
       trainedAt: 'castle', popCost: 1,
       attacks: [],

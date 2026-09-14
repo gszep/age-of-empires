@@ -1120,6 +1120,25 @@ banked resource identical — because the strategy re-tasks its own idle
 villagers within a second or two. The cost fell on whoever was playing by
 hand, and no batch metric could see it.
 
+## Every modelled unit's stats, checked against the DAT
+
+Issue #36 asked whether the numbers are the reference's. In imported mode they
+are, all of them: **487 values across 67 units — hit points, line of sight,
+collision, speed, reload, range, and every attack and armour class — read back
+from the DAT independently of the importer, with no mismatches.** An import
+test does that walk now, so a stat that is ever quietly hand-written instead of
+imported shows up as a mismatch rather than as a number nobody checked. It also
+asserts it checked more than four hundred values, so it cannot pass vacuously
+if the spec stops naming units.
+
+The open fallback is hand-written by definition, and it turns out to have been
+nearly right: 122 of its 128 unit numbers already matched. Three that did not
+are now corrected from the file — the man-at-arms walks at 0.96 rather than
+0.9, the spearman at 1, and the trebuchet sees 19 tiles rather than 18. The
+three left are the training times of sheep, deer and boar, which the fallback
+records as 0 because nothing trains them; the DAT's 15, 25 and 25 are the times
+a scenario editor would use.
+
 ## Key bindings, audited against the reference's own file
 
 `hotkeys.json` in the owned depot holds **457 bindings over 27 groups**, each

@@ -679,6 +679,58 @@ class ContentImportIntegrationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             effect_entry(_dat(), GRAPHICS, {"key": "x", "graphic": "no such graphic"}, {})
 
+    def test_every_modelled_unit_matches_the_dat(self):
+        """Issue #36: the numbers are the reference's, all of them.
+
+        Read back from the DAT independently of the importer -- hit points,
+        line of sight, collision, speed, reload, range, and every attack and
+        armour class -- for every unit the spec names. A unit whose stats are
+        quietly hand-written instead of imported shows up here as a mismatch.
+        """
+        from genieutils.datfile import DatFile
+
+        dat = DatFile.parse(str(DAT))
+        spec = SPEC
+        mismatches = []
+        checked = 0
+        for entry in spec["entities"]:
+            if "unitId" not in entry:
+                continue
+            ours = self.result["entities"].get(entry["key"])
+            civ = dat.civs[spec["gaiaIndex"] if entry.get("civ") == "gaia" else spec["civIndex"]]
+            theirs = civ.units[entry["unitId"]]
+            if ours is None or theirs is None:
+                continue
+            rows = [
+                ("hitPoints", ours.get("hitPoints"), theirs.hit_points),
+                ("lineOfSight", ours.get("lineOfSight"), round(theirs.line_of_sight, 3)),
+                ("collision", (ours.get("collision") or [None])[0], round(theirs.collision_size_x, 3)),
+            ]
+            if ours.get("speedTilesPerSecond") is not None:
+                rows.append(("speed", ours["speedTilesPerSecond"], round(theirs.speed, 3)))
+            combat = ours.get("combat")
+            if combat and theirs.type_50 is not None:
+                rows.append(("reload", combat.get("reloadSeconds"), round(theirs.type_50.reload_time, 3)))
+                rows.append(("range", combat.get("maximumRange"), round(theirs.type_50.max_range, 3)))
+                rows.append((
+                    "attacks",
+                    sorted((a["class"], a["amount"]) for a in combat.get("attacks") or []),
+                    sorted((a.class_, a.amount) for a in (theirs.type_50.attacks or [])),
+                ))
+                rows.append((
+                    "armors",
+                    sorted((a["class"], a["amount"]) for a in combat.get("armors") or []),
+                    sorted((a.class_, a.amount) for a in (theirs.type_50.armours or [])),
+                ))
+            for name, mine, reference in rows:
+                checked += 1
+                if mine != reference:
+                    mismatches.append(f"{entry['key']}.{name}: imported {mine!r}, DAT {reference!r}")
+        self.assertEqual(mismatches, [], "\n".join(mismatches))
+        # Guard the guard: if the spec ever stops naming units, this passes
+        # vacuously and says nothing.
+        self.assertGreater(checked, 400, "too few stats checked to mean anything")
+
     def test_terrain_carries_what_decides_a_blend(self):
         """A blend needs to know which terrain wins and which masks to use."""
         for key in ("ground", "forest", "farm"):
