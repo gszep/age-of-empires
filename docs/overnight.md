@@ -300,12 +300,13 @@ been read:
   test per stage, the evidence still to be gathered, and an explicit licence to
   deviate from all of it when the ground says otherwise.
 
-The two blockers named when this item was written both still stand and are
-handled in the plan rather than absorbed: terrain-to-terrain **blend edges** are
-blocked on a mapping nobody has found, so a multi-terrain map ships with hard
-seams and says so; and **elevation** is a change the renderer, pathfinder, fog
-and checksum all have to agree on, which is why it is staged late and behind a
-question about what adjacency the original actually permits.
+Of the two blockers named when this item was written, one is gone and one
+stands. **Blend edges** were called blocked on a mapping nobody had found;
+`blendomatic_x1.dat` had the mapping and nobody had opened it, so edges now fade
+(issue #42) and a multi-terrain board no longer ships with hard seams. **Elevation**
+still stands: it is a change the renderer, pathfinder, fog and checksum all have
+to agree on, which is why it is staged late and behind a question about what
+adjacency the original actually permits.
 
 *Verify:* stated per stage in `docs/map-build-plan.md`, each with a determinism
 test, because every stage changes the checksum.
