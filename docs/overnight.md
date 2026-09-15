@@ -39,6 +39,17 @@ kill the litter, and state what is deliberately left running.
 newly tagged `bug` outruns everything in this file — check the issue list
 first.
 
+**The 2026-09-14/15 overnight run emptied the issue list.** The human
+reordered the queue for it — map generation first, then terrain blending, then
+the issues in order — so Q3 was not reached and is still where a fresh session
+starts. Closed: #42 terrain blending (from `blendomatic_x1.dat`, which had
+never been opened, so the "blocked on a mapping nobody has found" note in this
+file was simply wrong), #43 Arabia's biomes, #34 leaf litter under trees, #40
+farms walked over rather than round, #37 delete, #38 shift-click routes, #39 the
+key-binding audit, #36 every unit's stats checked against the DAT, and #44 the
+degenerate match seed. Only **#5 (pathing)** is left, still blocked on the human
+for which units doing what, and **#41**, which the human tagged invalid.
+
 **The 2026-09-13 session** cleared the bugs filed after the last overnight run:
 #32 (a lumberjack going idle at the camp — the continuation remembered which
 *kind* it had worked but not which resource, and a spent node is swept up three

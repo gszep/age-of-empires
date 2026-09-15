@@ -27,34 +27,19 @@ construction-complete cue, so that one has no owned source to draw on.
 
 ## Rendering
 
-- **Terrain blends/masks** are not consumed; Windsor consequently shows hard
-  tile edges between grass, forest, roads and water, and a farm's edge is a
-  hard line against the grass where the reference fades it. **The "no mapping
-  exists" blocker was wrong** — measured 2026-09-14:
-  - `blend_type` takes only 0..7 across all 200 terrain slots, and the slots
-    using each value are one coherent family: 0 is grass/dirt/underbrush/forest,
-    **1 is every farm slot**, 2 the beaches, 3 the waters, 4 the shallows, 5
-    road and rock, 6 the ices, 7 the snows. Those eight families map one-to-one
-    onto eight of the ten names in `terrain/blends/` — `landland`, `farmland`,
-    `watershore`, `waterwater`, `shallowswater`, `roadland`, `icewater`,
-    `snowland` — leaving `herbwatershore` and `reserved`.
-  - `resources/_common/dat/blendomatic_x1.dat` was never opened. It holds
-    **9 blending modes of 31 tiles**, each mode exactly 82,390 bytes, walking
-    from the 8-byte header to the last byte of the file; `tile_size` is 2353,
-    which is the pixel count of the reference's own 97x49 isometric diamond,
-    and the values run 0..128, the classic alpha range. Nine modes against nine
-    named blends plus a `reserved` is the count agreeing.
-  - The DE masks are 512x512 greyscale atlases of soft-edged shapes — a frame,
-    bars, a centred diamond — i.e. one mask per neighbour configuration, and
-    the soft edges are the gradient the reference shows.
-
-  What is genuinely still open is the **index-to-file order** (inferred above
-  from the family names, not proven) and **how a tile's neighbour configuration
-  selects a region of the 512x512 atlas**, which lives in the compiled
-  `TerrainBlend_ps.so`. The order can be settled without guessing by decoding
-  blendomatic mode N and comparing its 31 shapes against the PNG of the same
-  index — a structural check rather than a name match. Doing the feature means
-  a second terrain pass with a mask, which is a real change to `createGround`.
+- **Terrain blending is in, and water is the gap.** Edges fade through
+  blendomatic's own masks (issue #42): the higher `blend_priority` terrain is
+  drawn over its neighbour, a farm bleeds into the ground around it, and the
+  decode is proven by the file's own arithmetic. What is untested is water to
+  shore, because water is deliberately out of the biomes — it arrives with
+  `docs/water-design.md`. The DE-era 512x512 masks in `terrain/blends/` are
+  higher resolution than blendomatic's 97x49 and are unused: their indexing
+  lives in a compiled shader, and at one mask per tile edge 97x49 is the
+  reference's own tile size anyway.
+- **Seven of Arabia's eleven biomes are not shipped.** Each is twelve terrain
+  ids out of the same `MAP_CONSTANTS` block — a data addition, not work — and
+  they are left out only so the import does not carry textures no board deals.
+  The four that ship span the script's range.
 - **Fire delta overlays** on damaged buildings are not imported.
 - **The monk draws no occlusion contour.** Its idle and attack outline layers
   are the only consumed sources that fail `tools/sld_layers.py`'s walk

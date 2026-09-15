@@ -582,3 +582,46 @@ keeps the record.
   before reading anything back, and the version it writes is imported from the
   loader rather than copied — a fixture that silently falls back is worse than
   one that fails.
+
+- **The file that answers a "blocked on evidence" question may simply never
+  have been opened.** Terrain blending sat in `backlog.md` and `overnight.md`
+  for weeks as blocked because "nothing says which `terrain/blends/` file a
+  `blend_type` selects". `blendomatic_x1.dat` says, sits beside the DAT in the
+  same depot directory the importer already reads, and nobody had looked at it.
+  Ten minutes of `ls` over `resources/_common/dat/` was the whole cost. Rule:
+  before recording something as blocked on missing evidence, enumerate the
+  owned files you have *not* read and say why each cannot answer it; "I could
+  not find it in the files I looked at" is a different claim from "the files do
+  not contain it", and only the second is a blocker.
+
+- **A cosmetic feature must not draw on the stream that decides the game.**
+  Dressing the board in a biome needed random numbers, and taking them from the
+  match's own generator shifted every draw after it — so choosing what colour
+  the ground is dealt a different board for every existing seed, broke three
+  strategy fixtures and moved the AI from winning at 1957 seconds to 2350 of a
+  2400-second cap. Giving the dressing its own stream, derived from the match
+  seed, made the change invisible to everything but the eye: same seed, same
+  sheep, same trees, different colour. Rule: a feature that only affects how
+  something *looks* gets its own derived random stream, and a test asserts the
+  object layout for a seed is byte-identical across the change.
+
+- **Improving a distribution surfaces the bugs its old bias was hiding.**
+  Mixing the match seed — a plainly correct fix to an xorshift whose first draw
+  was 0.0001 for seed 1 — immediately failed a map invariant that had passed
+  for months: two trees on one square. The generator plants each mask tile at
+  its own position and again at its mirror, and `cleanMask` mends pinholes
+  without regard for which half it is in, so a tile that is itself the mirror of
+  another took two trees. The old degenerate distribution simply never grew a
+  wood onto the centre line. Rule: when a randomness fix breaks tests, read each
+  failure as a find before reading it as fixture churn — the new boards are the
+  first honest sample of the space the generator always claimed to cover.
+
+- **A fixture that assumes a board tests the board, not the behaviour.** A
+  regression test for "a lumberjack carries on to the next tree" placed its two
+  trees at a hardcoded offset from the town center. On a re-dealt board that
+  offset landed outside the player's sight — where going idle is the *correct*
+  answer — so the test failed while the code was right, and the obvious repair
+  (nudge the numbers until it passes) would have left it asserting nothing. Rule:
+  a fixture establishes the preconditions its behaviour needs — clear ground,
+  within sight, far enough to outlast the timer — by searching for them and
+  asserting it found them, never by trusting a seed to provide them.
