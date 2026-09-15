@@ -17,6 +17,13 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 
 ### Controls
 
+- Every match deals one of Arabia's own biomes — the middle-eastern desert,
+  two temperate greens or a Mediterranean — each with its own ground, forest,
+  two forest variations and four blend terrains scattered over it in clumps, at
+  the script's own percentages. Where two terrains meet the edge fades rather
+  than stopping at the tile, through the reference's own blend masks; a farm
+  bleeds into the ground around it the same way, and a lone tree stands on a
+  patch of leaf litter.
 - The map is 120x120 tiles, AoE2's "tiny", with each player's opening laid out
   at the distances the original's own random-map include uses: berries and
   sheep at ten tiles, gold and stone further out, and two forests of fifty-odd
@@ -24,11 +31,24 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   round, or to wall with, until you have cut into it. You start with a scout,
   and you will need it: the town center sees eight tiles and your food is ten
   away.
-- Left-click selects; drag-select chooses multiple units.
+- Left-click selects; drag-select chooses multiple units; shift-click adds to
+  the selection and double-click takes every unit of that kind on screen.
 - Right-click ground/resources/enemies issues context-sensitive move, gather, or attack orders; right-click with a production building selected sets its rally point.
+- **Shift + right-click** falls in behind what a unit is already doing rather
+  than replacing it, so you can lay a route or a run of jobs in one go. What is
+  queued is the click, not the order it became: a waypoint onto a tree somebody
+  fells meanwhile becomes a walk to where it stood.
 - Select a watch tower and right-click an enemy to make it concentrate fire there; right-click bare ground to release it back to choosing its own targets.
 - Move the camera with arrow keys or screen edges; mouse wheel zooms; click/drag the minimap to navigate.
 - `H` selects and centers the town center; `.` cycles idle villagers.
+- `Ctrl` + a letter walks your buildings of that kind one at a time, and
+  `Ctrl+Shift` + the same letter selects the lot — `B` barracks, `A` archery
+  range, `L` stable, `S` blacksmith, `M` market, `I` mill, `U` university,
+  `V` castle, `Y` monastery, `K` siege workshop, `G` mining camp, `Z` lumber
+  camp, `H` town centers, `W` wonder. The letters are the reference's own,
+  imported from its `hotkeys.json` rather than chosen here.
+- `Delete` destroys what you have selected, of your own. A unit goes without
+  asking and a building asks first, which is the reference's own division.
 - Command-grid hotkeys are shown on buttons (`Q`, `W`, `E`… across the grid, `S` to stop). `V` turns the villager's build menu between its economic and military pages.
 - `Esc` cancels placement or opens the menu; `F3` pauses; `F10` toggles the menu.
 - `F4` toggles a debug reveal of the whole map. It is strictly a view-side
@@ -82,6 +102,11 @@ Imported Microsoft content is generated under ignored `public/imported/` and is 
 - `src/protocol/` and `schemas/` — versioned observations/actions/results and JSON Schemas
 - `src/headless/` — JSONL/MCP/WebSocket strategies, match/replay runner, concurrent paired batches, and opt-in live-agent check
 - `src/view/` and `src/main.ts` — observation-driven WEST HUD, dimetric renderer, fog, minimap, interactions, and replay playback
-- `tools/` — deterministic local DAT/SLD/widgetui import pipeline
+- `src/sim/mapgen.ts` — the original's own two generator primitives, the
+  biomes `Arabia.rms` rolls between, and the terrain passes that dress a board
+- `tools/import_blends.py` — the terrain blend masks, decoded from
+  `blendomatic_x1.dat` and grouped by the neighbour each one faces
+- `tools/` — deterministic local DAT/SLD/widgetui/blendomatic/hotkey import
+  pipeline, run in that order by `tools/import_aoe2.sh`
 - `deploy/` — legally isolated open-content Cloud Run deployment and operations notes
 - `docs/status.md` — delivered scope, measurements, discrepancies, and verification evidence

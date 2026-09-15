@@ -104,12 +104,18 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | a terrain slot | `dat.terrain_block.terrains[i]` — `.name_2` is the texture, `.terrain_dimensions` the frame grid, `.frame_data[0].frame_count` the flat-tile frames (always the product of the dimensions), `.blend_type`/`.blend_priority`, `.colors` the minimap colour |
 | a task's numbers | `bird.tasks[*].work_value_1/_2` and `.work_range` — note the underscores; there is no `work_value1` or `target_diff` |
 | a unit's class | `unit.class_` with the trailing underscore; `unit.unit_class` does not exist |
+| an attack or armour | `unit.type_50.attacks[*]` / `.armours[*]` — `.class_` and `.amount`; there is no `.type`, and `armours` is British-spelled |
+| whether anything walks round a building | `unit.collision_size_z` (0 means no height to walk into) **and** `unit.obstruction_class` (0) **and** no annexes. All three: the town center reads 0 and 0 like a farm, and obstructs through its four annexes (see `status.md`, issue #40) |
+| a building's annexes | `unit.building.annexes[*].unit_id`, with 0 meaning an empty slot |
+| the terrain blend masks | not in the DAT at all: `resources/_common/dat/blendomatic_x1.dat`, decoded by `tools/import_blends.py`. Nine modes of 82,390 bytes, each 31 masks of `tile_size` 2353 — the pixel count of a 97x49 diamond whose rows run 1, 5, 9 … 97 … 5, 1 |
+| the reference's key bindings | not in the DAT either: `resources/_common/dat/hotkeys.json`, 457 bindings over 27 groups, four layouts apiece. `import_ui.py --hotkeys` resolves the ones the spec names |
 
 Fields that do **not** exist, and cost a failed call each time somebody assumes
 they do: `unit.clearance_size_x` (it is the tuple `clearance_size`),
 `unit.collision_size` (it is `collision_size_x`/`_y` — the opposite convention
 to clearance), `unit.transform_unit_id` (a packed and unpacked siege engine are
-two units and the DAT does not say which is the other; see `status.md`).
+two units and the DAT does not say which is the other; see `status.md`),
+`unit.type_50.attacks[*].type` (it is `.class_`).
 
 `tools/datq.py` reloads the whole DAT on every invocation, which takes tens of
 seconds. Asking it more than two or three questions is slower than writing a

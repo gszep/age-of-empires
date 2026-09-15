@@ -75,14 +75,22 @@ board (in `status.md`, beside the old figures).
 
 Two things a fresh session needs before touching anything:
 
-1. **Re-run the importer.** `npm run import:aoe2`. The atlas packer changed on
-   2026-08-29 (sheets capped at the GPU's 8192 limit), which invalidates the
-   whole atlas cache: the first regeneration takes the best part of an hour,
-   single-threaded, and is normal — do not restart it.
-2. **Read `docs/lessons.md`.** The last three entries are from the overnight
-   run: the tail-pipe trap reproduced one layer up against the gate script
-   itself, a vitest run that fails with every test green, and background jobs
-   dying with the shell that spawned them.
+1. **Re-run the importer if the tree is older than 2026-09-15.** The
+   2026-09-14/15 run regenerated all of it — the atlas cache was invalidated by
+   the 8192 cap and had to be rebuilt from scratch, which took about an hour
+   single-threaded and is normal; do not restart it if you see it running. That
+   run also added terrain slots, the blend masks and the hotkeys, so the
+   pipeline is now `import_content` → `convert_sld` → `import_ui` →
+   `import_blends`, in that order. Two traps met there: `convert_sld` rewrites
+   the whole manifest, so anything merged into it afterwards (blends) is lost if
+   you re-run it and stop; and `convert_sld --terrain-only` refreshes terrain
+   without touching entities, which is minutes rather than an hour when all you
+   changed is a terrain slot.
+2. **Read `docs/lessons.md`.** The last four entries are from that run: a
+   "blocked on evidence" note that meant nobody had opened the file; a cosmetic
+   feature that must not draw on the stream deciding the board; improving a
+   distribution surfacing the bugs its old bias hid; and a fixture that assumes
+   a board testing the board rather than the behaviour.
 
 What the run before this one left (combat, the tree, the ages, the board) is
 in `status.md`; what this run added, in one paragraph. **The board is a
