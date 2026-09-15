@@ -4,7 +4,7 @@ import type {
 } from './data';
 import { MAPS, generateMap } from './mapgen';
 import { buildNavGrid, findPath, halfExtent, isBlocked, separateUnits, tileOf, type NavGrid } from './nav';
-import { random01 } from './random';
+import { random01, seedFrom } from './random';
 import { buildingRulesFor, combine, unitRulesFor } from './rules';
 import { createVisibility, isEntityVisible, updateVisibility } from './visibility';
 import type {
@@ -78,7 +78,7 @@ export function createGame(
   const height = descriptor.baked?.height ?? MAP_TILES;
   const start = startFor(width, height);
   const state: GameState = {
-    rules, seed: seed || 1, tick: 0, nextId: 1, width, height,
+    rules, seed: seedFrom(seed || 1), tick: 0, nextId: 1, width, height,
     entities: [], projectiles: [], terrain: [], elevation: [],
     players: {
       1: {

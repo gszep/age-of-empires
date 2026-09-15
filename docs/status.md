@@ -1120,6 +1120,35 @@ banked resource identical — because the strategy re-tasks its own idle
 villagers within a second or two. The cost fell on whoever was playing by
 hand, and no batch metric could see it.
 
+## The match seed is mixed before anything draws on it
+
+`random01` is an xorshift, and an xorshift seeded with a small integer needs
+several rounds to reach full entropy. Its first output was 0.0001 for seed 1,
+0.0001 for 2, 0.0004 for 7, 0.0026 for 42 and 0.0062 for 101 — every one at the
+bottom of the range, so **the first decision any seed made was effectively the
+same decision** (issue #44). It surfaced because a biome rolled from that first
+draw came out identical for forty consecutive seeds, but map generation makes
+several early draws before anything perturbs the state, so the first candidate
+orderings and seed placements were drawn from the same degenerate region too.
+
+`seedFrom` — SplitMix32's finalising mix — is now applied to the match seed
+itself, so no part of a match makes its first decision from the bottom of the
+range. That deals a different board for every existing seed, which is why it
+was filed rather than done in passing.
+
+**It found a real defect on the way.** Each tile of the forest mask is planted
+where it is and again at its mirror, and `cleanMask` mends pinholes without
+regard for which half it is in — so a tile that is itself the mirror of another
+mask tile took two trees on one square. The old distribution simply never grew a
+wood onto the centre line; the new one did, on seed 7, and the map test caught
+it. Planting now refuses to fill a square twice.
+
+Measured after both: the whole suite passes, and the built-in AI beats a passive
+opponent on seed 7 at **2085 game-seconds** of the 2400-second clock, in 37
+seconds of wall time. On the first attempt — before the double-planting fix —
+the same match took 2350 seconds and 410 of wall time, and three strategy
+fixtures failed on their new boards; all three pass now without being touched.
+
 ## Every modelled unit's stats, checked against the DAT
 
 Issue #36 asked whether the numbers are the reference's. In imported mode they

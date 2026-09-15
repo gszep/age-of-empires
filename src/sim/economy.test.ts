@@ -304,11 +304,28 @@ describe('carrying on after the work runs out', () => {
     for (const wood of state.entities.filter(e => e.kind === 'resource' && e.resourceKind === 'wood')) {
       wood.amount = 0;
     }
-    // Two trees side by side, a walk away from the only thing that takes wood.
+    // Two trees side by side on ground that is actually clear, a walk away
+    // from the only thing that takes wood. Hunting for the spot rather than
+    // assuming one keeps this a test about the walk back and not about which
+    // board the seed happened to deal.
     const [tree, neighbour] = state.entities
       .filter(e => e.kind === 'resource' && e.resourceKind === 'wood');
-    tree.position = { x: tc.position.x + 9, y: tc.position.y };
-    neighbour.position = { x: tc.position.x + 10, y: tc.position.y };
+    // Near enough that the player can still see the neighbour when the
+    // villager banks its load -- the continuation only considers what its
+    // owner presently sees, so a tree beyond the town center's eight tiles
+    // makes idle the *correct* answer and tests nothing. Far enough that the
+    // walk back outlasts the three-second window a spent tree lingers for.
+    let spot: { x: number; y: number } | undefined;
+    for (let dx = 6; dx <= 8 && !spot; dx++) {
+      for (const dy of [0, 2, -2, 4, -4]) {
+        const at = { x: tc.position.x + dx, y: tc.position.y + dy };
+        if (placementLegal(state, 'farm', at).ok
+          && placementLegal(state, 'farm', { x: at.x + 1, y: at.y }).ok) { spot = at; break; }
+      }
+    }
+    expect(spot, 'no clear ground for the two trees').toBeDefined();
+    tree.position = { ...spot! };
+    neighbour.position = { x: spot!.x + 1, y: spot!.y };
     neighbour.amount = 200;
     // Exactly one load in it, so it runs out in the same breath as the
     // villager fills up and the walk home starts with the tree already dead.
@@ -344,6 +361,8 @@ describe('carrying on after the work runs out', () => {
         .filter(e => e.kind === 'resource' && e.resourceKind === 'wood');
       tree.position = { x: tc.position.x + 9, y: tc.position.y };
       neighbour.position = { x: tc.position.x + 10, y: tc.position.y };
+      // (The determinism twin does not need clear ground: it compares two
+      // runs of whatever this is, not what the villager manages to do.)
       neighbour.amount = 200;
       tree.amount = carryCapacityFor(state, 1);
       const villager = villagerNear(state, { x: tc.position.x + 8, y: tc.position.y });

@@ -10,10 +10,8 @@
  * counter-like input across the whole word in one step, so the first draw is
  * already as good as the thousandth.
  *
- * It is used where a stream is *derived* rather than where a match is seeded.
- * Mixing the match seed itself would be the better fix and is not done here:
- * it deals a different board for every existing seed, which is a large change
- * to make in passing. Recorded as its own issue instead.
+ * Applied both where a stream is derived and to the match seed itself, so no
+ * part of a match makes its first decision from the bottom of the range.
  */
 export function seedFrom(value: number): number {
   let x = (value | 0) >>> 0;

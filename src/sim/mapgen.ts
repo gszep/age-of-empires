@@ -725,11 +725,24 @@ export function generateMap(
   }
 
   cleanMask(mask, ctx.width, ctx.height, freeBoth);
+  // Each mask tile is planted here and again at its mirror, so a tile that is
+  // *itself* the mirror of another mask tile would take two trees on one
+  // square. `cleanMask` mends pinholes without regard for which half it is in,
+  // which is how a tile on the far side of the centre line got into the mask
+  // at all; rather than constrain the mend and leave a pinhole at the seam,
+  // the planting refuses to fill a square twice.
+  const planted = new Set<number>();
+  const plant = (at: Point): void => {
+    const tile = Math.floor(at.y) * ctx.width + Math.floor(at.x);
+    if (planted.has(tile)) return;
+    planted.add(tile);
+    ctx.place('tree', at);
+  };
   for (let tile = 0; tile < mask.length; tile++) {
     if (!mask[tile]) continue;
     const here = tileCentre(tile % ctx.width, Math.floor(tile / ctx.width));
-    ctx.place('tree', here);
-    ctx.place('tree', mirror(here));
+    plant(here);
+    plant(mirror(here));
     terrain[tile] = biome?.forest ?? TERRAIN_FOREST;
     const other = mirror(here);
     terrain[Math.floor(other.y) * ctx.width + Math.floor(other.x)] = biome?.forest ?? TERRAIN_FOREST;
