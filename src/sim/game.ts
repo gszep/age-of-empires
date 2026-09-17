@@ -443,6 +443,14 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (command.kind === 'order' && command.targetId && !targetEntity) {
       return rejected(`target ${command.targetId} does not exist`);
     }
+    // A point with no numbers in it is refused here, at the one entry every
+    // caller shares. The schema keeps it from a strategy; the debug bridge
+    // does not, and an order to NaN sent the pathfinder round a parent chain
+    // that never ends -- every tick after it threw, and the match was gone.
+    if (command.kind === 'order'
+      && !(Number.isFinite(command.target?.x) && Number.isFinite(command.target?.y))) {
+      return rejected('target is not a point');
+    }
     let matched = 0;
     for (const entity of state.entities) {
       if (entity.dead || !command.entityIds.includes(entity.id) || entity.owner !== command.player) continue;

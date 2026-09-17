@@ -20,6 +20,20 @@ describe('simulation', () => {
     expect(digest(a)).toBe(digest(b));
   });
 
+  it('refuses an order whose target is not a point, and keeps ticking', () => {
+    // The debug bridge once relayed `target: {}` -- an entity's coordinates
+    // sit under `position`, and a probe read them off the top -- and the
+    // pathfinder followed a NaN goal round a parent chain that never ends.
+    const state = createGame();
+    const unit = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const bad = { kind: 'order', player: 1, entityIds: [unit.id], target: {} } as unknown as Parameters<typeof applyCommand>[1];
+    expect(applyCommand(state, bad).ok).toBe(false);
+    expect(unit.order.kind).toBe('idle');
+    const nan = { kind: 'order' as const, player: 1 as const, entityIds: [unit.id], target: { x: Number.NaN, y: 3 } };
+    expect(applyCommand(state, nan).ok).toBe(false);
+    run(state, 20);
+  });
+
   it('queues a shift-clicked order behind the one it is doing', () => {
     // Issue #38. The reference's shift-click: a route laid without waiting for
     // each leg, and each leg decided when the unit gets there.
