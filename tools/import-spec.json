@@ -470,7 +470,8 @@
           },
           "graphic": "working"
         }
-      }
+      },
+      "repairer": 156
     },
     {
       "key": "villager-female-builder",
@@ -506,7 +507,8 @@
           },
           "graphic": "working"
         }
-      }
+      },
+      "repairer": 222
     },
     {
       "key": "villager-forager",

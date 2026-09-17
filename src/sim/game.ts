@@ -413,6 +413,9 @@ function assignOrder(state: GameState, entity: Entity, target: Point, targetEnti
     isBuilding(targetEntity.kind) && targetEntity.buildProgress !== undefined && entity.kind === 'villager'
   ) {
     entity.order = { kind: 'build', targetId: targetEntity.id };
+  } else if (targetEntity && isRepairable(state, entity, targetEntity)) {
+    entity.order = { kind: 'repair', targetId: targetEntity.id };
+    entity.repaired = 0;
   } else if (targetEntity && targetEntity.owner !== 0 && targetEntity.owner !== entity.owner && armed) {
     entity.order = { kind: 'attack', targetId: targetEntity.id };
   } else {
@@ -1416,6 +1419,76 @@ function updateHealer(state: GameState, grid: NavGrid, entity: Entity): void {
 }
 
 /**
+ * What a villager will mend: its own side's finished building, or a unit of
+ * a class the repairer's task table names (siege, and ships when there are
+ * any) -- and only while there is something to mend (issue #74).
+ */
+export function isRepairable(state: GameState, repairer: Entity, target: Entity): boolean {
+  const repair = state.rules.units[repairer.kind as UnitKind]?.repair;
+  if (!repair || target.dead || target.owner !== repairer.owner || target.id === repairer.id) return false;
+  if (target.hp >= target.maxHp) return false;
+  if (isBuilding(target.kind)) return target.buildProgress === undefined;
+  if (!isUnit(target.kind)) return false;
+  const datClass = state.rules.units[target.kind as UnitKind].datClass;
+  return datClass !== undefined && String(datClass) in repair.classFactors;
+}
+
+/** The DAT's rate for mending this target: a building whole, siege by its class. */
+export function repairRateFor(state: GameState, repairer: Entity, target: Entity): number {
+  const repair = state.rules.units[repairer.kind as UnitKind].repair!;
+  if (isBuilding(target.kind)) return repair.hitPointsPerSecond;
+  const datClass = state.rules.units[target.kind as UnitKind].datClass;
+  return repair.hitPointsPerSecond * (repair.classFactors[String(datClass)] ?? 1);
+}
+
+/**
+ * A villager mends a building at the repairer's rate and pays for it as it
+ * goes: a full repair costs the DAT's fraction of the price (0.5 for a
+ * building and for a unit alike), so each hit point put back is that
+ * fraction of the price over the hit points, and every resource is charged
+ * the moment a whole unit of it falls due. When the player cannot pay the
+ * next unit the work stops where it is, as the reference's does.
+ */
+function updateRepairer(state: GameState, grid: NavGrid, entity: Entity): void {
+  if (entity.order.kind !== 'repair') return;
+  const rules = state.rules.units[entity.kind as UnitKind];
+  const target = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
+  if (!rules.repair || !target || !isRepairable(state, entity, target)) {
+    entity.repaired = undefined;
+    becomeIdle(entity);
+    return;
+  }
+  if (!inRange(entity, target, 0.4)) {
+    entity.activity = 'moving';
+    moveAlong(state, grid, entity, target.position, rules.speed, interactionRange(target));
+    return;
+  }
+  clearPath(entity);
+  entity.activity = 'repairing';
+  entity.gatherProgress = (entity.gatherProgress ?? 0) + repairRateFor(state, entity, target) * TICK_SECONDS;
+  const whole = Math.min(Math.floor(entity.gatherProgress), target.maxHp - target.hp);
+  if (whole < 1) return;
+  const price = isBuilding(target.kind)
+    ? state.rules.buildings[target.kind as BuildingKind].cost
+    : state.rules.units[target.kind as UnitKind].cost;
+  const fraction = isBuilding(target.kind)
+    ? state.rules.repairCostFraction.building : state.rules.repairCostFraction.unit;
+  const before = entity.repaired ?? 0;
+  const after = before + whole;
+  const due = (amount: number): number =>
+    Math.floor(after * amount * fraction / target.maxHp) - Math.floor(before * amount * fraction / target.maxHp);
+  const bill: Cost = { food: due(price.food), wood: due(price.wood), gold: due(price.gold), stone: due(price.stone) };
+  if (!spendCost(state, entity.owner as PlayerId, bill).ok) {
+    entity.repaired = undefined;
+    becomeIdle(entity);
+    return;
+  }
+  entity.gatherProgress -= whole;
+  entity.repaired = after;
+  target.hp = Math.min(target.maxHp, target.hp + whole);
+}
+
+/**
  * A monk works on somebody else's soldier until it changes sides. The DAT
  * gives the window rather than the odds — the earliest second a conversion may
  * succeed and the second by which it must — so the roll is spread uniformly
@@ -1821,6 +1894,7 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
     case 'build': return updateBuilder(state, grid, entity, builderCounts);
     case 'attack': return updateAttacker(state, grid, entity);
     case 'heal': return updateHealer(state, grid, entity);
+    case 'repair': return updateRepairer(state, grid, entity);
     case 'convert': return updateConverter(state, grid, entity);
     default:
       entity.activity = 'idle';

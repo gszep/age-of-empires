@@ -66,6 +66,15 @@ export interface UnitRules {
   /** Monks: hit points restored a second, and how close they must come. */
   heal?: { hitPointsPerSecond: number; range: number };
   /**
+   * Villagers: hit points mended a second on a building, and the DAT's
+   * factor for each class of unit they will mend at all -- siege and ships
+   * at a quarter (issue #74). A unit of a class not named here is a monk's
+   * work, not a villager's.
+   */
+  repair?: { hitPointsPerSecond: number; classFactors: Record<string, number> };
+  /** The DAT's unit class, which is what the repair table is keyed by. */
+  datClass?: number;
+  /**
    * A siege engine that travels packed and shoots unpacked. The DAT keeps the
    * two as separate units -- the trebuchet is 331 packed and 42 unpacked --
    * and states everything about each except which is the other, so the pairing
@@ -274,6 +283,12 @@ export interface GameRules {
   nodes: Record<NodeKind, ResourceNodeRules>;
   gatherRatePerSecond: Record<ResourceKind, number>;
   carryCapacity: number;
+  /**
+   * What a full repair costs, as a fraction of the price: the DAT's player
+   * attributes 271 (buildings) and 270 (units), both 0.5, charged as the
+   * hit points come back (issue #74).
+   */
+  repairCostFraction: { building: number; unit: number };
   technologies: Record<TechKey, TechRules>;
 }
 
@@ -384,7 +399,7 @@ export interface TechEffect {
  * resource 36 in the DAT, where civ 1 starts it at 175 -- the number the open
  * fallback had hand-written before anybody looked.
  */
-export type PlayerAttribute = 'farmFoodAmount';
+export type PlayerAttribute = 'farmFoodAmount' | 'unitRepairCost' | 'buildingRepairCost';
 
 export type TechAttribute =
   | 'hitPoints' | 'lineOfSight' | 'speed' | 'armor' | 'attack'
@@ -411,14 +426,17 @@ export const FALLBACK_RULES: GameRules = {
     villager: {
       hp: 25, radius: 0.2, speed: 0.8, lineOfSight: 4, cost: cost(50), trainSeconds: 25,
       trainedAt: 'town-center', popCost: 1, trainButton: 1,
+      datClass: 4,
       attacks: [{ class: 11, amount: 3 }, { class: 4, amount: 3 }, { class: 13, amount: 6 }],
       armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
       hunt: { range: 3, projectileSpeed: 7, launchHeight: 1.5, releaseSeconds: 0.5 },
+      repair: { hitPointsPerSecond: 12.5, classFactors: { 13: 0.25, 51: 0.25, 54: 0.25 } },
     },
     militia: {
       hp: 40, radius: 0.2, speed: 0.9, lineOfSight: 4, cost: cost(50, 0, 20), trainSeconds: 21,
       trainedAt: 'barracks', popCost: 1, trainButton: 1,
+      datClass: 6,
       attacks: [{ class: 4, amount: 4 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 1 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
@@ -430,6 +448,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 1,
       hp: 45, radius: 0.2, speed: 0.96, lineOfSight: 4, cost: cost(50, 0, 20), trainSeconds: 21,
       trainedAt: 'barracks', popCost: 1, trainButton: 1,
+      datClass: 6,
       attacks: [{ class: 4, amount: 6 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 1 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
@@ -438,6 +457,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 1,
       hp: 45, radius: 0.2, speed: 1, lineOfSight: 4, cost: cost(35, 25), trainSeconds: 22,
       trainedAt: 'barracks', popCost: 1, trainButton: 2,
+      datClass: 6,
       attacks: [{ class: 4, amount: 3 }, { class: 8, amount: 15 }, { class: 21, amount: 1 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 3, attackReleaseSeconds: 0.5,
@@ -447,6 +467,7 @@ export const FALLBACK_RULES: GameRules = {
     sheep: {
       hp: 7, radius: 0.3, speed: 0.7, lineOfSight: 3, cost: cost(), trainSeconds: 0,
       trainedAt: 'town-center', popCost: 0,
+      datClass: 58,
       attacks: [], armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 0, attackReleaseSeconds: 0,
       foodAmount: 100, herdRange: 2.5,
@@ -455,6 +476,7 @@ export const FALLBACK_RULES: GameRules = {
     deer: {
       hp: 5, radius: 0.3, speed: 0.737, lineOfSight: 2, cost: cost(), trainSeconds: 0,
       trainedAt: 'town-center', popCost: 0,
+      datClass: 9,
       attacks: [], armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 0, attackReleaseSeconds: 0,
       foodAmount: 140,
@@ -464,6 +486,7 @@ export const FALLBACK_RULES: GameRules = {
     boar: {
       hp: 75, radius: 0.5, speed: 0.8, lineOfSight: 4, cost: cost(), trainSeconds: 0,
       trainedAt: 'town-center', popCost: 0,
+      datClass: 10,
       attacks: [{ class: 4, amount: 7 }, { class: 29, amount: 4 }, { class: 8, amount: 3 }, { class: 30, amount: 8 }],
       armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }, { class: 24, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0,
@@ -474,6 +497,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 1,
       hp: 30, radius: 0.2, speed: 0.96, lineOfSight: 6, cost: cost(25, 35), trainSeconds: 26,
       trainedAt: 'archery-range', popCost: 1, trainButton: 2,
+      datClass: 0,
       attacks: [{ class: 27, amount: 3 }, { class: 15, amount: 3 }, { class: 3, amount: 2 }, { class: 35, amount: 2 }],
       armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 3 }, { class: 31, amount: 0 }, { class: 38, amount: 0 }],
       attackReloadSeconds: 3, attackReleaseSeconds: 0.63,
@@ -485,6 +509,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 2,
       hp: 35, radius: 0.2, speed: 0.96, lineOfSight: 7, cost: cost(0, 25, 45), trainSeconds: 27,
       trainedAt: 'archery-range', popCost: 1, trainButton: 1,
+      datClass: 0,
       attacks: [{ class: 27, amount: 3 }, { class: 21, amount: 0 }, { class: 3, amount: 5 }, { class: 17, amount: 0 }, { class: 13, amount: 0 }],
       armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.35,
@@ -494,6 +519,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 2,
       hp: 35, radius: 0.2, speed: 0.96, lineOfSight: 7, cost: cost(25, 35), trainSeconds: 22,
       trainedAt: 'archery-range', popCost: 1, trainButton: 2,
+      datClass: 0,
       attacks: [{ class: 28, amount: 2 }, { class: 27, amount: 4 }, { class: 15, amount: 4 }, { class: 3, amount: 3 }, { class: 35, amount: 2 }],
       armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 4 }, { class: 31, amount: 0 }, { class: 38, amount: 0 }],
       attackReloadSeconds: 3, attackReleaseSeconds: 0.63,
@@ -503,6 +529,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 2,
       hp: 55, radius: 0.2, speed: 1, lineOfSight: 4, cost: cost(35, 25), trainSeconds: 22,
       trainedAt: 'barracks', popCost: 1, trainButton: 2,
+      datClass: 6,
       attacks: [{ class: 29, amount: 1 }, { class: 21, amount: 1 }, { class: 5, amount: 25 }, { class: 4, amount: 4 }, { class: 8, amount: 22 }, { class: 16, amount: 16 }, { class: 30, amount: 18 }, { class: 35, amount: 7 }],
       armors: [{ class: 27, amount: 0 }, { class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 3, attackReleaseSeconds: 0.5,
@@ -511,6 +538,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 2,
       hp: 60, radius: 0.25, speed: 1.5, lineOfSight: 4, cost: cost(80), trainSeconds: 30,
       trainedAt: 'stable', popCost: 1, trainButton: 1,
+      datClass: 12,
       attacks: [{ class: 25, amount: 10 }, { class: 4, amount: 7 }, { class: 11, amount: 0 }, { class: 21, amount: 0 }],
       armors: [{ class: 4, amount: 0 }, { class: 8, amount: 0 }, { class: 3, amount: 2 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
@@ -523,6 +551,7 @@ export const FALLBACK_RULES: GameRules = {
       hp: 60, radius: 0.2, speed: 0.96, lineOfSight: 4.0,
       cost: cost(50, 0, 20, 0), trainSeconds: 21,
       trainedAt: 'barracks', popCost: 1, trainButton: 1,
+      datClass: 6,
       attacks: [{ class: 29, amount: 6 }, { class: 21, amount: 3 }, { class: 4, amount: 9 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 1 }, { class: 3, amount: 1 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 2.0, attackReleaseSeconds: 0.0,
@@ -532,6 +561,7 @@ export const FALLBACK_RULES: GameRules = {
       hp: 65, radius: 0.2, speed: 0.96, lineOfSight: 5.0,
       cost: cost(50, 0, 20, 0), trainSeconds: 21,
       trainedAt: 'barracks', popCost: 1, trainButton: 1,
+      datClass: 6,
       attacks: [{ class: 29, amount: 8 }, { class: 21, amount: 4 }, { class: 4, amount: 12 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 1 }, { class: 3, amount: 1 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 2.0, attackReleaseSeconds: 0.0,
@@ -541,6 +571,7 @@ export const FALLBACK_RULES: GameRules = {
       hp: 70, radius: 0.2, speed: 0.96, lineOfSight: 5.0,
       cost: cost(50, 0, 20, 0), trainSeconds: 21,
       trainedAt: 'barracks', popCost: 1, trainButton: 1,
+      datClass: 6,
       attacks: [{ class: 29, amount: 8 }, { class: 21, amount: 4 }, { class: 4, amount: 14 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 1 }, { class: 3, amount: 1 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 2.0, attackReleaseSeconds: 0.0,
@@ -550,6 +581,7 @@ export const FALLBACK_RULES: GameRules = {
       hp: 60, radius: 0.2, speed: 1.0, lineOfSight: 4.0,
       cost: cost(35, 25, 0, 0), trainSeconds: 22,
       trainedAt: 'barracks', popCost: 1, trainButton: 2,
+      datClass: 6,
       attacks: [{ class: 29, amount: 1 }, { class: 21, amount: 1 }, { class: 5, amount: 28 }, { class: 4, amount: 6 }, { class: 8, amount: 32 }, { class: 16, amount: 17 }, { class: 30, amount: 26 }, { class: 35, amount: 7 }],
       armors: [{ class: 27, amount: 0 }, { class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 3.0, attackReleaseSeconds: 0.0,
@@ -559,6 +591,7 @@ export const FALLBACK_RULES: GameRules = {
       hp: 40, radius: 0.2, speed: 0.96, lineOfSight: 7.0,
       cost: cost(0, 25, 45, 0), trainSeconds: 27,
       trainedAt: 'archery-range', popCost: 1, trainButton: 1,
+      datClass: 0,
       attacks: [{ class: 27, amount: 3 }, { class: 3, amount: 6 }],
       armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 2.0, attackReleaseSeconds: 1.0,
@@ -569,6 +602,7 @@ export const FALLBACK_RULES: GameRules = {
       hp: 120, radius: 0.25, speed: 1.35, lineOfSight: 4.0,
       cost: cost(60, 0, 75, 0), trainSeconds: 30,
       trainedAt: 'stable', popCost: 1, trainButton: 2,
+      datClass: 12,
       attacks: [{ class: 4, amount: 12 }, { class: 39, amount: -3 }],
       armors: [{ class: 4, amount: 2 }, { class: 8, amount: 0 }, { class: 3, amount: 2 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 1.8, attackReleaseSeconds: 1.3,
@@ -578,6 +612,7 @@ export const FALLBACK_RULES: GameRules = {
       hp: 60, radius: 0.25, speed: 1.4, lineOfSight: 6.0,
       cost: cost(0, 40, 60, 0), trainSeconds: 30,
       trainedAt: 'archery-range', popCost: 1, trainButton: 3,
+      datClass: 36,
       attacks: [{ class: 27, amount: 4 }, { class: 3, amount: 7 }, { class: 39, amount: -3 }],
       armors: [{ class: 28, amount: 0 }, { class: 4, amount: 1 }, { class: 15, amount: 0 }, { class: 8, amount: 0 }, { class: 3, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 2.0, attackReleaseSeconds: 2.3,
@@ -588,6 +623,7 @@ export const FALLBACK_RULES: GameRules = {
       hp: 40, radius: 0.2, speed: 0.96, lineOfSight: 8.0,
       cost: cost(0, 35, 40, 0), trainSeconds: 18,
       trainedAt: 'castle', popCost: 1, trainButton: 1,
+      datClass: 0,
       attacks: [{ class: 27, amount: 2 }, { class: 3, amount: 7 }],
       armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 1 }, { class: 19, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 2.0, attackReleaseSeconds: 0.5,
@@ -598,6 +634,7 @@ export const FALLBACK_RULES: GameRules = {
       hp: 60, radius: 0.5, speed: 0.6, lineOfSight: 10.0,
       cost: cost(0, 160, 135, 0), trainSeconds: 46,
       trainedAt: 'siege-workshop', popCost: 1, trainButton: 2,
+      datClass: 13,
       attacks: [{ class: 11, amount: 45 }, { class: 4, amount: 50 }, { class: 20, amount: 12 }, { class: 37, amount: 50 }],
       armors: [{ class: 4, amount: 0 }, { class: 3, amount: 7 }, { class: 20, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 6.0, attackReleaseSeconds: 0.0,
@@ -613,6 +650,7 @@ export const FALLBACK_RULES: GameRules = {
       hp: 150, radius: 0.5, speed: 0.8, lineOfSight: 19,
       cost: cost(0, 200, 200, 0), trainSeconds: 50,
       trainedAt: 'castle', popCost: 1, trainButton: 2,
+      datClass: 51,
       attacks: [],
       armors: [{ class: 4, amount: 1 }, { class: 3, amount: 8 }, { class: 20, amount: 0 }, { class: 31, amount: 1 }],
       attackReloadSeconds: 10, attackReleaseSeconds: 0,
@@ -630,6 +668,7 @@ export const FALLBACK_RULES: GameRules = {
       hp: 200, radius: 0.45, speed: 0.6, lineOfSight: 3.0,
       cost: cost(0, 160, 75, 0), trainSeconds: 36,
       trainedAt: 'siege-workshop', popCost: 1, trainButton: 1,
+      datClass: 13,
       attacks: [{ class: 11, amount: 160 }, { class: 4, amount: 3 }, { class: 20, amount: 50 }],
       armors: [{ class: 4, amount: -2 }, { class: 3, amount: 190 }, { class: 17, amount: 1 }, { class: 20, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 5.0, attackReleaseSeconds: 0.0,
@@ -639,6 +678,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 1,
       hp: 45, radius: 0.25, speed: 1.2, lineOfSight: 4, cost: cost(80), trainSeconds: 30,
       trainedAt: 'stable', popCost: 1, trainButton: 1,
+      datClass: 47,
       attacks: [{ class: 25, amount: 6 }, { class: 4, amount: 3 }, { class: 39, amount: -3 }],
       armors: [{ class: 4, amount: 0 }, { class: 8, amount: 0 }, { class: 3, amount: 2 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.4,
@@ -647,6 +687,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 1,
       hp: 70, radius: 0.25, speed: 1.25, lineOfSight: 7, cost: cost(0, 100, 50), trainSeconds: 51,
       trainedAt: 'market', popCost: 1, trainButton: 1,
+      datClass: 19,
       attacks: [],
       armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 0, attackReleaseSeconds: 0,
@@ -656,6 +697,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 1,
       hp: 30, radius: 0.2, speed: 0.96, lineOfSight: 6, cost: cost(0, 25, 45), trainSeconds: 35,
       trainedAt: 'archery-range', popCost: 1, trainButton: 1,
+      datClass: 0,
       attacks: [{ class: 3, amount: 4 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.35,
@@ -665,6 +707,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 2,
       hp: 100, radius: 0.25, speed: 1.35, lineOfSight: 4, cost: cost(60, 0, 75), trainSeconds: 30,
       trainedAt: 'stable', popCost: 1, trainButton: 2,
+      datClass: 12,
       attacks: [{ class: 4, amount: 10 }, { class: 39, amount: -3 }],
       armors: [{ class: 4, amount: 2 }, { class: 8, amount: 0 }, { class: 3, amount: 2 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 1.8, attackReleaseSeconds: 0.67,
@@ -673,6 +716,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 2,
       hp: 50, radius: 0.25, speed: 1.4, lineOfSight: 5, cost: cost(0, 40, 60), trainSeconds: 37,
       trainedAt: 'archery-range', popCost: 1, trainButton: 3,
+      datClass: 36,
       attacks: [{ class: 27, amount: 2 }, { class: 3, amount: 6 }, { class: 39, amount: -3 }],
       armors: [{ class: 28, amount: 0 }, { class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.91,
@@ -683,6 +727,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 2,
       hp: 35, radius: 0.2, speed: 0.96, lineOfSight: 7, cost: cost(0, 35, 40), trainSeconds: 18,
       trainedAt: 'castle', popCost: 1, trainButton: 1,
+      datClass: 0,
       attacks: [{ class: 27, amount: 2 }, { class: 3, amount: 6 }],
       armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 0 }, { class: 19, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
@@ -694,6 +739,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 2,
       hp: 175, radius: 0.45, speed: 0.6, lineOfSight: 3, cost: cost(0, 160, 75), trainSeconds: 36,
       trainedAt: 'siege-workshop', popCost: 1, trainButton: 1,
+      datClass: 13,
       attacks: [{ class: 11, amount: 150 }, { class: 4, amount: 2 }, { class: 20, amount: 40 }],
       armors: [{ class: 4, amount: -3 }, { class: 3, amount: 180 }, { class: 17, amount: 0 }, { class: 20, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 5, attackReleaseSeconds: 0.5,
@@ -702,6 +748,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 2,
       hp: 50, radius: 0.5, speed: 0.6, lineOfSight: 9, cost: cost(0, 160, 135), trainSeconds: 46,
       trainedAt: 'siege-workshop', popCost: 1, trainButton: 2,
+      datClass: 13,
       attacks: [{ class: 11, amount: 35 }, { class: 4, amount: 40 }, { class: 20, amount: 12 }, { class: 37, amount: 40 }],
       armors: [{ class: 4, amount: 0 }, { class: 3, amount: 6 }, { class: 20, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 6, attackReleaseSeconds: 0.5,
@@ -714,6 +761,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 2,
       hp: 30, radius: 0.2, speed: 0.7, lineOfSight: 11, cost: cost(0, 0, 100), trainSeconds: 51,
       trainedAt: 'monastery', popCost: 1, trainButton: 1,
+      datClass: 18,
       attacks: [],
       armors: [{ class: 25, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 1.6, attackReleaseSeconds: 0,
@@ -890,6 +938,7 @@ export const FALLBACK_RULES: GameRules = {
   },
   gatherRatePerSecond: { food: 0.31, wood: 0.39, gold: 0.38, stone: 0.36 },
   carryCapacity: 10,
+  repairCostFraction: { building: 0.5, unit: 0.5 },
   technologies: {
     loom: {
       techId: 22, name: 'Loom', cost: cost(0, 0, 50), researchSeconds: 25,
@@ -944,6 +993,8 @@ interface ManifestEntity {
   /** The DAT's `hero_mode` bit 32: Delete asks first. */
   confirmDelete?: boolean;
   heal?: { hitPointsPerSecond: number; range: number };
+  repair?: { hitPointsPerSecond: number; classFactors: Record<string, number> };
+  class?: number;
   convert?: { minSeconds: number; maxSeconds: number; range: number };
   searchRadius?: number;
   gather?: { resource: ResourceKind; ratePerSecond: number; capacity: number };
@@ -1041,6 +1092,9 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       blastAttackLevel: e[key].combat?.blastAttackLevel ?? fallback?.blastAttackLevel,
       blastDefenseLevel: e[key].blastDefenseLevel ?? fallback?.blastDefenseLevel,
       heal: e[key].heal ?? fallback?.heal,
+      // The repairer is the builder's own task unit; the villager carries it.
+      repair: (key === 'villager' ? e['villager-builder']?.repair : undefined) ?? fallback?.repair,
+      datClass: e[key].class ?? fallback?.datClass,
       convert: e[key].convert ?? fallback?.convert,
       fogVisibility: e[key].fogVisibility ?? fallback?.fogVisibility,
       accuracyPercent: e[key].combat?.accuracyPercent ?? fallback?.accuracyPercent,
@@ -1298,6 +1352,10 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       stone: e['villager-stonemason']?.gather?.ratePerSecond ?? FALLBACK_RULES.gatherRatePerSecond.stone,
     },
     carryCapacity: e['villager-forager']?.gather?.capacity ?? FALLBACK_RULES.carryCapacity,
+    repairCostFraction: {
+      building: manifest.playerAttributes?.buildingRepairCost ?? FALLBACK_RULES.repairCostFraction.building,
+      unit: manifest.playerAttributes?.unitRepairCost ?? FALLBACK_RULES.repairCostFraction.unit,
+    },
     technologies: technologies(manifest, e),
   };
 }

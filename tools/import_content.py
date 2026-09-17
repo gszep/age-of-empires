@@ -153,6 +153,8 @@ def find_task(unit: Any, selector: dict[str, Any]) -> Any:
 
 # The resource a corpse stores is its remaining lifetime, not a stockpile.
 CORPSE_LIFETIME_RESOURCE = 12
+# Constants.xs: cTaskTypeRepair.
+TASK_REPAIR = 106
 
 
 def corpse_seconds(corpse: Any) -> float | None:
@@ -540,6 +542,22 @@ def extract_entity(
             "buildingId": task.unit_id,
         }
 
+    if "repairer" in spec:
+        # Repair is its own task unit in the DAT -- VMREP (156) beside the
+        # builder -- whose work rate is hit points a second, and whose repair
+        # tasks (action 106) say by class what takes it slower: the default
+        # row at 1.0 is a building, and siege and ships are named at 0.25.
+        # The classes it names are also the only units it will mend at all;
+        # everything else is a monk's work (issue #74).
+        repairer = civ_units[spec["repairer"]]
+        tasks = [t for t in repairer.bird.tasks if t.action_type == TASK_REPAIR]
+        entity["repair"] = {
+            "hitPointsPerSecond": rounded(repairer.bird.work_rate),
+            "classFactors": {
+                str(t.class_id): rounded(t.work_value_1) for t in tasks if t.class_id >= 0
+            },
+        }
+
     if "heal" in spec:
         # A monk mends what it stands beside. The rate is the unit's work rate;
         # the task's own range is how close it has to come.
@@ -827,7 +845,13 @@ OPERATION_NAMES = {0: "set", 4: "add", 5: "multiply"}
 # stated: a farm's food is resource 36 and civ 1 starts it at 175, exactly the
 # figure the open fallback had hand-written. Horse Collar adds 75 to it and
 # Heavy Plow 125, which is the whole of what those technologies do here.
-RESOURCE_ATTRIBUTES = {36: "farmFoodAmount"}
+RESOURCE_ATTRIBUTES = {
+    36: "farmFoodAmount",
+    # Constants.xs: cAttributeUnitRepairCost 270, cAttributeBuildingRepairCost
+    # 271 -- the fraction of the price a full repair costs (issue #74).
+    270: "unitRepairCost",
+    271: "buildingRepairCost",
+}
 # `b` on a type 1 command: 0 writes the value, 1 adds to it.
 RESOURCE_OPERATIONS = {0: "set", 1: "add"}
 

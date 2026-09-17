@@ -27,7 +27,9 @@ export type EntityKind = UnitKind | BuildingKind | 'resource';
 export type Activity =
   | 'idle' | 'moving' | 'gathering' | 'carrying' | 'building' | 'attacking' | 'dying'
   /** A monk's two works: mending its own side, and preaching at somebody else's. */
-  | 'healing' | 'converting';
+  | 'healing' | 'converting'
+  /** A villager mending a building or a siege engine. */
+  | 'repairing';
 
 export interface Point { x: number; y: number }
 
@@ -42,7 +44,9 @@ export type Order =
   /** A monk restoring a wounded ally's hit points. */
   | { kind: 'heal'; targetId: number }
   /** A monk working on somebody else's unit until it changes sides. */
-  | { kind: 'convert'; targetId: number };
+  | { kind: 'convert'; targetId: number }
+  /** A villager mending its own side's building or siege engine. */
+  | { kind: 'repair'; targetId: number };
 
 export interface Entity {
   id: number;
@@ -62,6 +66,9 @@ export interface Entity {
   /** Fractional progress towards the next whole unit: a villager's gathering,
    * or a trade cart's goods earned on the road. */
   gatherProgress?: number;
+  /** Hit points this repairer has put back on its target, so the price is
+   * charged whole resource by whole resource as they come. */
+  repaired?: number;
   /**
    * What this worker last put its hands on, so "another of the same first"
    * survives the thing itself being gone. A carcass is removed once it is

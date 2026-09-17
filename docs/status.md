@@ -1397,6 +1397,31 @@ hunter. Verified in the running game through the debug protocol: a villager
 sent to build a farm reports `villager-builder/work-farm`, and at work on
 it `villager-farmer/work`.
 
+## A villager repairs
+
+Villagers could not repair (issue #74). The DAT has a repairer task unit
+beside the builder — VMREP (156) and VFREP (222), the builder's own art —
+whose `work_rate` is **12.5** hit points a second and whose repair tasks
+(action 106, `cTaskTypeRepair` in Constants.xs) say by class what it will
+mend and how fast: the default row at 1.0 is a building, and classes 13, 51
+and 54 (siege, packed and unpacked) with the ship classes at **0.25**. The
+price is two player attributes, `cAttributeBuildingRepairCost` (271) and
+`cAttributeUnitRepairCost` (270), both **0.5**: a full repair costs half the
+price, charged as the hit points come back — each restored hit point is that
+fraction of the cost over the maximum, and every resource is charged the
+moment a whole unit of it falls due; when the player cannot pay the next
+unit the work stops where it is. A right-click on a damaged building or
+siege engine of one's own repairs it (a foundation is still built, a farm
+still gathered, an enemy's still attacked), and the villager's grid has the
+reference's Repair button at cell 3 (hotkey E, `hotkeys.json`'s definitive
+`REPAIR`; action icon 33, the hammer and mallet), a cursor mode like the
+build pages. A wounded soldier is a monk's work and a villager sent at one
+walks over. Which targets the engine excludes beyond the class table — a
+farm, for one — is not in the owned files, so a damaged farm repairs at the
+building rate; recorded as the approximation it is. `repair.test.ts`
+measures the outcome: 125 hit points in ten seconds on a house, 50 in
+sixteen on a ram, the wood banked, and a byte-identical replay.
+
 ## A portrait wears its owner's colour
 
 The unit icons in the command grid and the selection panel had no player

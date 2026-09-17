@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
 import { observe } from './sim/observe';
-import { TRAINING_QUEUE_LIMIT, applyCommand, buildingFootprint, createGame, gameTimeSeconds, isCarcass, placementLegal, queuedCount, stepGame, upgradedAway, notYetUpgradedInto } from './sim/game';
+import { TRAINING_QUEUE_LIMIT, applyCommand, buildingFootprint, createGame, gameTimeSeconds, isCarcass, isRepairable, placementLegal, queuedCount, stepGame, upgradedAway, notYetUpgradedInto } from './sim/game';
 import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, rulesFromManifest, type AttackValue, type ContentManifest, type Cost, type GameRules, type TechKey, type UnitRules } from './sim/data';
 import { MAPS } from './sim/mapgen';
 import { isTileVisible } from './sim/visibility';
@@ -70,6 +70,8 @@ let game = restored ?? createGame(42, rules, undefined, mapType);
 if (restored) console.info(`[dev] resumed match at tick ${restored.tick}; menu restart starts a new one`);
 let selectedIds: number[] = [];
 let buildMode: BuildingKind | undefined;
+/** The villager's Repair button is down: the next click names what to mend. */
+let repairMode = false;
 let paused = false;
 /**
  * Debug: draw the whole board as if seen. Strictly a view-side override --
@@ -102,7 +104,8 @@ let revealMap = false;
  * farm-reseed ring lit and unlit.
  */
 const ACTION_ICON = {
-  cancel: 0, stop: 3, pack: 12, unpack: 13, buildEconomic: 30, buildMilitary: 31, reseedOn: 70, reseedOff: 71,
+  cancel: 0, stop: 3, pack: 12, unpack: 13, buildEconomic: 30, buildMilitary: 31, repair: 33,
+  reseedOn: 70, reseedOff: 71,
 } as const;
 
 const GAME_SPEEDS: { label: string; multiplier: number }[] = [
@@ -150,6 +153,7 @@ function startReplay(raw: unknown): void {
   cameraCenter = homeCamera(game);
   selectedIds = [];
   buildMode = undefined;
+  repairMode = false;
   paused = false;
   hud.hideEnd();
   for (const entityView of views.values()) scene.remove(entityView.group);
@@ -371,6 +375,7 @@ function restart(): void {
   cameraCenter = homeCamera(game);
   selectedIds = [];
   buildMode = undefined;
+  repairMode = false;
   paused = false;
   hud.hideEnd();
   for (const entityView of views.values()) scene.remove(entityView.group);
@@ -462,7 +467,8 @@ function runUiCommand(id: string, shift = false): void {
   if (id === 'page-economic') { buildPage = 'economic'; return; }
   if (id === 'page-military') { buildPage = 'military'; return; }
   if (id === 'page-back') { buildPage = undefined; return; }
-  if (id === 'cancel') buildMode = undefined;
+  if (id === 'cancel') { buildMode = undefined; repairMode = false; }
+  if (id === 'repair') { repairMode = true; return; }
 }
 
 /** Screen pixel -> world tile point under the current camera. */
@@ -579,6 +585,17 @@ renderer.domElement.addEventListener('pointerdown', event => {
       // Commit exactly where the preview showed it, not the raw cursor point.
       placeBuilding(buildMode, [placementTarget()]);
       buildMode = undefined;
+      return;
+    }
+    if (repairMode && !replay) {
+      repairMode = false;
+      const target = pickEntity(point);
+      const villagers = ownSelected().filter(e => e.kind === 'villager');
+      if (!target || !villagers.some(v => isRepairable(game, v, target))) {
+        reject('nothing to repair there');
+        return;
+      }
+      contextOrder(point, event.clientX, event.clientY, event.shiftKey);
       return;
     }
     dragStart = { x: event.clientX, y: event.clientY };
@@ -725,6 +742,7 @@ addEventListener('keydown', event => {
   if (key.startsWith('Arrow')) { heldKeys.add(key); event.preventDefault(); return; }
   if (key === 'Escape') {
     if (buildMode) { buildMode = undefined; wallStart = undefined; }
+    else if (repairMode) repairMode = false;
     else if (hud.menuOpen) hud.toggleMenu(false);
     else hud.toggleMenu(true);
     return;
@@ -867,6 +885,12 @@ function currentCommands(): CommandButton[] {
       icon: hud.actionIcon(ACTION_ICON.cancel), slot: GRID_SLOT.cancel,
     }];
   }
+  if (repairMode) {
+    return [{
+      id: 'cancel', label: 'Cancel repair', hotkey: 'escape', enabled: true, active: true,
+      icon: hud.actionIcon(ACTION_ICON.cancel), slot: GRID_SLOT.cancel,
+    }];
+  }
   if (selection.some(e => e.kind === 'villager')) {
     if (!buildPage) {
       // AoE2 gives a villager two build buttons and opens neither until one is
@@ -878,6 +902,12 @@ function currentCommands(): CommandButton[] {
       buttons.push({
         id: 'page-military', label: 'Build military buildings', icon: hud.actionIcon(ACTION_ICON.buildMilitary),
         slot: GRID_SLOT.buildMilitary, enabled: true,
+      });
+      // The reference's third cell (issue #74): the next click names what
+      // to mend, as a right-click on it would.
+      buttons.push({
+        id: 'repair', label: 'Repair', icon: hud.actionIcon(ACTION_ICON.repair),
+        slot: GRID_SLOT.repair, enabled: true,
       });
     } else {
       for (const kind of buildMenu(rules, player.age, buildPage)) {
@@ -1002,7 +1032,7 @@ const queuedPopulation = (building: Entity): number =>
  * Q and W, Stop at G, Unpack at Q and Pack at W. Cancel and Back have no
  * letter of their own there (they are Escape) and take the last cell.
  */
-const GRID_SLOT = { buildEconomic: 1, buildMilitary: 2, stop: 10, unpack: 1, pack: 2, cancel: 15 } as const;
+const GRID_SLOT = { buildEconomic: 1, buildMilitary: 2, repair: 3, stop: 10, unpack: 1, pack: 2, cancel: 15 } as const;
 
 /**
  * Which page of the villager's build menu is open, or none: selecting a

@@ -299,7 +299,11 @@
               "gathering",
               "carrying",
               "building",
-              "attacking"
+              "attacking",
+              "dying",
+              "healing",
+              "converting",
+              "repairing"
             ]
           },
           "order": {
@@ -308,7 +312,11 @@
               "move",
               "gather",
               "build",
-              "attack"
+              "attack",
+              "trade",
+              "heal",
+              "convert",
+              "repair"
             ]
           },
           "carrying": {

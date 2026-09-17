@@ -417,7 +417,8 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
   }
   // Villager task variants follow the DAT task units.
   let variant = 'villager';
-  if (entity.order.kind === 'build') variant = 'villager-builder';
+  // The repairer is the DAT's own task unit (156) and draws the builder's art.
+  if (entity.order.kind === 'build' || entity.order.kind === 'repair') variant = 'villager-builder';
   else if (entity.order.kind === 'gather' || entity.carrying) {
     // Working an animal is not foraging, and the DAT splits it in two: the
     // shepherd's crook (unit 592, task class 58) is for a herdable standing
@@ -442,6 +443,7 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
     // `working` is the farmer's seed-sowing, which is what a farm going up
     // gets (issue #71).
     case 'building': return { key: variant, name: buildTarget(state, entity)?.kind === 'farm' ? 'work-farm' : 'work' };
+    case 'repairing': return { key: variant, name: 'work' };
     case 'carrying': return { key: variant, name: 'carry' };
     // A villager shooting at game draws the bow it is actually using; against
     // anything that can hit back it swings the tool in its hands.
