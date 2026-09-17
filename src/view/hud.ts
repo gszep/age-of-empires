@@ -114,7 +114,7 @@ export class Hud {
       </div>
       <div id="bottombar-strip" class="panel"></div>
       <div id="command-panel" class="panel"><div id="command-grid"></div></div>
-      <div id="selection-panel" class="panel"><div id="selection-content"></div></div>
+      <div id="selection-panel" class="panel"><div id="civ-emblem"></div><div id="selection-content"></div></div>
       <div id="map-panel" class="panel"><canvas id="minimap-canvas" width="240" height="130"></canvas></div>
       <div id="game-message"></div>
       <div id="menu-dialog" class="dialog hidden">
@@ -237,6 +237,11 @@ export class Hud {
     // and 14px gaps already match the buttons' own 94px stride.
     place('#minimap-canvas', widgetBox(this.ui?.layouts.mappanel, 'Background', 'MapView'), true);
     place('#command-grid', widgetBox(this.ui?.layouts.commandpanel, 'BackgroundLeft', 'Buttons'), false);
+    // The faded emblem on the empty parchment: the `CivEmblem` widget, whose
+    // material the engine picks per civilisation (`CivEmblemBritons`).
+    place('#civ-emblem', widgetBox(this.ui?.layouts.commandpanel, 'BackgroundRight', 'CivEmblem'), true);
+    const emblem = this.root.querySelector<HTMLElement>('#civ-emblem');
+    if (emblem) emblem.style.backgroundImage = this.texture('CivEmblemBritons');
   }
 
   private applyScale(): void {
@@ -294,9 +299,27 @@ export class Hud {
     }
   }
 
+  /**
+   * Inline placement for one of the selection panel's widgets, measured from
+   * `BackgroundRight`'s top-left -- which is our `#selection-panel` element,
+   * because its art is that widget's own (issue #64). Nothing when there is
+   * no widget data: the open fallback keeps its flex layout.
+   */
+  private placedStyle(name: string): string {
+    const box = widgetBox(this.ui?.layouts.commandpanel, 'BackgroundRight', name);
+    if (!box) return '';
+    const scaled = (value: number): string => `calc(${value}px * var(--ui-scale))`;
+    return `left:${scaled(box.left)};top:${scaled(box.top)};`
+      + (box.width ? `width:${scaled(box.width)};` : '') + (box.height ? `height:${scaled(box.height)};` : '');
+  }
+
   setSelection(info: SelectionInfo | undefined): void {
+    // The parchment is always there in the reference; only what is written
+    // on it comes and goes. The open fallback, with no art, hides the panel.
     const panel = this.root.querySelector<HTMLElement>('#selection-panel')!;
-    panel.style.display = info ? '' : 'none';
+    const placed = widgetBox(this.ui?.layouts.commandpanel, 'BackgroundRight', 'Clipped') !== undefined;
+    panel.classList.toggle('placed', placed);
+    panel.style.display = info || placed ? '' : 'none';
     if (!info) {
       this.selectionPanel.innerHTML = '';
       return;
@@ -305,6 +328,7 @@ export class Hud {
     // first: one portrait per selected unit, each with what is left of it.
     if (info.members && info.members.length > 1) {
       this.selectionPanel.innerHTML = `
+        <div class="placed-box" style="${this.placedStyle('Clipped')}">
         <div class="object-name">${info.members.length} selected</div>
         <div class="selection-grid">
           ${info.members.map(member => `
@@ -314,6 +338,7 @@ export class Hud {
                 (Math.max(0, Math.min(1, member.maxHp > 0 ? member.hp / member.maxHp : 0)) * 100).toFixed(1)
               }%"></span></span>
             </button>`).join('')}
+        </div>
         </div>`;
       for (const button of this.selectionPanel.querySelectorAll<HTMLElement>('.selection-member')) {
         button.addEventListener('click', () => {
@@ -325,18 +350,37 @@ export class Hud {
     }
     const health = info.hp !== undefined && info.maxHp !== undefined && info.maxHp > 0;
     const fraction = health ? Math.max(0, Math.min(1, info.hp! / info.maxHp!)) : 0;
+    if (!placed) {
+      this.selectionPanel.innerHTML = `
+        <div class="portrait" style="background-image:${info.icon ?? 'none'}"></div>
+        <div class="object-info">
+          <div class="object-name">${info.name}</div>
+          ${health ? `
+          <div class="hp-bar"><div class="hp-fill" style="width:${(fraction * 100).toFixed(1)}%"></div></div>
+          <div class="object-hp">${Math.ceil(info.hp!)} / ${info.maxHp}</div>` : ''}
+          ${info.details.map(line => `<div class="object-detail">${line}</div>`).join('')}
+          ${info.progress ? `
+            <div class="progress-label">${info.progress.label}</div>
+            <div class="progress-bar"><div class="progress-fill" style="width:${(info.progress.fraction * 100).toFixed(1)}%"></div></div>` : ''}
+        </div>`;
+      return;
+    }
+    // Each piece where the reference's `Clipped` area puts it: the name above
+    // the portrait, the hit-point bar under it with the number beneath, the
+    // owner's line to the right, and the training or research bar where
+    // `StatusLabel` and `Progress` sit.
+    const at = (name: string): string => `class="placed-box" style="${this.placedStyle(name)}`;
     this.selectionPanel.innerHTML = `
-      <div class="portrait" style="background-image:${info.icon ?? 'none'}"></div>
-      <div class="object-info">
-        <div class="object-name">${info.name}</div>
-        ${health ? `
-        <div class="hp-bar"><div class="hp-fill" style="width:${(fraction * 100).toFixed(1)}%"></div></div>
-        <div class="object-hp">${Math.ceil(info.hp!)} / ${info.maxHp}</div>` : ''}
-        ${info.details.map(line => `<div class="object-detail">${line}</div>`).join('')}
-        ${info.progress ? `
-          <div class="progress-label">${info.progress.label}</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:${(info.progress.fraction * 100).toFixed(1)}%"></div></div>` : ''}
-      </div>`;
+      <div ${at('ObjectName')}"><div class="object-name">${info.name}</div></div>
+      <div ${at('ObjectImage')}"><div class="portrait" style="background-image:${info.icon ?? 'none'}"></div></div>
+      ${health ? `
+      <div ${at('HPProgress')}"><div class="hp-bar"><div class="hp-fill" style="width:${(fraction * 100).toFixed(1)}%"></div></div></div>
+      <div ${at('ObjectHealth')}"><div class="object-hp">${Math.ceil(info.hp!)} / ${info.maxHp}</div></div>` : ''}
+      ${info.details.length ? `<div ${at('ObjectOwnerNameCulture')}"><div class="object-detail">${info.details.join(' · ')}</div></div>` : ''}
+      ${info.progress ? `
+        <div ${at('StatusLabel')}"><div class="progress-label">${info.progress.label}</div></div>
+        <div ${at('Progress')}"><div class="progress-bar"><div class="progress-fill" style="width:${(info.progress.fraction * 100).toFixed(1)}%"></div></div></div>` : ''}
+    `;
   }
 
   updateResources(state: GameState, player: PlayerId): void {

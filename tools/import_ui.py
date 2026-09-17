@@ -278,6 +278,12 @@ def extract_ui(
         for name in materials:
             if name.startswith(prefix):
                 used_materials.add(name)
+    # Materials the widget files reach only through the executable: the
+    # `CivEmblem` widget names a material the engine substitutes per
+    # civilisation (`CivEmblemBritons`), and the shield beside the menu is an
+    # `InGameCivEmblem` icon. Named in the spec, for the civilisation imported.
+    for name in ui_spec.get("materials", []):
+        used_materials.add(name)
 
     resolved_materials: dict[str, Any] = {}
     missing: list[str] = []

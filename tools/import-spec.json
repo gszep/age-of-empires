@@ -1991,7 +1991,10 @@
         "wonder": "SELECT_ALL_WONDERS",
         "outpost": "SELECT_ALL_OUTPOSTS"
       }
-    }
+    },
+    "materials": [
+      "CivEmblemBritons"
+    ]
   },
   "terrain": {
     "ground": {

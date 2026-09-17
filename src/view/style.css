@@ -63,8 +63,16 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
   background-repeat: repeat-x; background-size: auto 100%;
   pointer-events: none;
 }
+/*
+ * The bottom panel is one collection in the reference (commandpanel.json):
+ * 2404 wide open, the black grid (BackgroundLeft, 660x413, ZPlane 7) at its
+ * left, and the parchment (BackgroundRight, 1888 wide, TopRight, so from
+ * x=516; its art is 1368 wide) underneath it -- the grid overlaps the
+ * parchment's first 144 px (issue #63). The parchment is always there; only
+ * its contents come and go.
+ */
 #command-panel {
-  left: 0; bottom: 0;
+  left: 0; bottom: 0; z-index: 2;
   width: calc(660px * var(--ui-scale)); height: calc(413px * var(--ui-scale));
   padding: calc(36px * var(--ui-scale)) 0 0 calc(48px * var(--ui-scale));
 }
@@ -92,11 +100,21 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 }
 
 #selection-panel {
-  left: 50%; bottom: 0; transform: translateX(-50%);
-  width: calc(1300px * var(--ui-scale)); height: calc(413px * var(--ui-scale));
+  left: calc(516px * var(--ui-scale)); bottom: 0; z-index: 1;
+  width: calc(1368px * var(--ui-scale)); height: calc(413px * var(--ui-scale));
   padding: calc(56px * var(--ui-scale)) 0 0 calc(60px * var(--ui-scale));
 }
 #selection-content { display: flex; gap: calc(30px * var(--ui-scale)); }
+#civ-emblem { background-size: 100% 100%; background-repeat: no-repeat; pointer-events: none; }
+/* Placed contents: each box is the widget's own (Clipped's children). */
+#selection-panel.placed { padding: 0; }
+#selection-panel.placed #selection-content { display: block; position: absolute; inset: 0; }
+#selection-panel.placed .placed-box { position: absolute; }
+#selection-panel.placed .placed-box > * { width: 100%; height: 100%; }
+#selection-panel.placed .object-name { white-space: nowrap; line-height: 1; display: flex; align-items: center; }
+#selection-panel.placed .hp-bar, #selection-panel.placed .progress-bar { margin: 0; }
+#selection-panel.placed .object-detail, #selection-panel.placed .object-hp,
+#selection-panel.placed .progress-label { white-space: nowrap; display: flex; align-items: center; margin: 0; }
 .portrait {
   width: calc(120px * var(--ui-scale)); height: calc(120px * var(--ui-scale));
   background-size: cover; background-color: rgba(0, 0, 0, 0.35);

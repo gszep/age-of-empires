@@ -1175,6 +1175,25 @@ three left are the training times of sheep, deer and boar, which the fallback
 records as 0 because nothing trains them; the DAT's 15, 25 and 25 are the times
 a scenario editor would use.
 
+## The bottom panel is one collection
+
+`commandpanel.json` is a single collection: `xopen` 2404 wide, the black grid
+(`BackgroundLeft`, 660x413, ZPlane 7) at the left and the parchment
+(`BackgroundRight`, 1888 wide, TopRight — so from x = 2404 − 1888 = 516, its
+art 1368 wide) underneath it, the grid overlapping the parchment's first 144
+px. The HUD drew the two as separate floating panels with the parchment
+centred on the screen and shown only with a selection (issue #63). It is now
+placed at 516 and always drawn, with the `CivEmblem` widget's faded emblem
+(450x280 at 403,93; the engine substitutes `CivEmblemBritons`) on the empty
+parchment, and the selection's pieces sit where `Clipped`'s children put
+them: `ObjectName`, `ObjectImage`, `HPProgress`, `ObjectHealth`, the owner
+line at `ObjectOwnerNameCulture`, the training bar at `StatusLabel`/`Progress`.
+The geometry was checked against a 2000x1125 screenshot of the reference at
+the same 0.52 scale: the parchment's left edge lands at 521 reference px
+there, which is what settled `xopen` as the collection's width rather than
+2246. The stat row (`ObjectStats`) and the queue portraits are still to do
+(#64).
+
 ## A command keeps its cell
 
 Buttons were laid into the grid in list order, so researching Loom slid the
