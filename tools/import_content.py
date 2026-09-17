@@ -230,6 +230,16 @@ def animation_entry(
     }
 
 
+def dead_standing_graphic(civ_units: Any, unit: Any) -> int:
+    """The art of what a unit leaves behind, or -1 when it leaves nothing."""
+    if unit.dying_graphic is None or unit.dying_graphic < 0:
+        return -1
+    if unit.dead_unit_id is None or unit.dead_unit_id < 0:
+        return -1
+    dead = civ_units[unit.dead_unit_id]
+    return dead.standing_graphic[0] if dead is not None else -1
+
+
 def costs_of(creatable: Any) -> tuple[dict[str, int], int]:
     paid: dict[str, int] = {}
     population = 0
@@ -530,10 +540,17 @@ def extract_entity(
     }
 
     # Ageing up replaces the building with the next age's unit, so the art for
-    # each age is that unit's standing graphic (issue #13). The hit points the
-    # variants also carry are a simulation change and are not read here; see
-    # docs/backlog.md.
+    # each age is that unit's standing graphic (issue #13) -- and its own
+    # collapse and rubble, because the variant carries its own `dying_graphic`
+    # and names its own rubble unit (`House Age2 (Rubble)`), so a razed Feudal
+    # house falls as a Feudal house (issue #61). A collapse is a hundred-frame
+    # sheet, so an age whose art is the previous age's (the Imperial house is
+    # the Castle one) is left to the renderer's age chain rather than decoded
+    # twice. The hit points the variants also carry are a simulation change
+    # and are not read here; see docs/backlog.md.
     if category == "building":
+        last_death = unit.dying_graphic
+        last_decay = dead_standing_graphic(civ_units, unit)
         for age, variant_id in age_variants(dat, unit.id).items():
             variant = civ_units[variant_id]
             if variant is None or variant.standing_graphic[0] < 0:
@@ -541,6 +558,18 @@ def extract_entity(
             entity["animations"][f"idle-{age}"] = animation_entry(
                 dat, graphics_dir, variant.standing_graphic[0], hashes
             )
+            if "death" in spec["animations"] and variant.dying_graphic >= 0 \
+                    and variant.dying_graphic != last_death:
+                entity["animations"][f"death-{age}"] = animation_entry(
+                    dat, graphics_dir, variant.dying_graphic, hashes
+                )
+                last_death = variant.dying_graphic
+            decay = dead_standing_graphic(civ_units, variant)
+            if "decay" in spec["animations"] and decay >= 0 and decay != last_decay:
+                entity["animations"][f"decay-{age}"] = animation_entry(
+                    dat, graphics_dir, decay, hashes
+                )
+                last_decay = decay
 
     # How long the death graphic runs, so the simulation can keep the corpse
     # until it has played out. A building's collapse is 8.3 seconds where a

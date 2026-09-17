@@ -323,29 +323,37 @@ export function gateIsOpen(state: GameState, entity: Entity): boolean {
  */
 const AGE_NAMES = ['dark', 'feudal', 'castle', 'imperial'] as const;
 
-/** The idle animation name for the age this building's owner has reached. */
-export function ageIdle(state: GameState, entity: Entity): string {
+/**
+ * The animation name for the age this building's owner has reached: `idle`
+ * in the Dark Age, `idle-feudal` after. The same rule names the collapse and
+ * the rubble, because the variant unit an age upgrades a building into has
+ * its own `dying_graphic` and its own rubble unit (issue #61).
+ */
+export function ageIdle(state: GameState, entity: Entity, base = 'idle'): string {
   const age = entity.owner === 0 ? 0 : state.players[entity.owner]?.age ?? 0;
   const index = Math.max(0, Math.min(age, AGE_NAMES.length - 1));
-  return index === 0 ? 'idle' : `idle-${AGE_NAMES[index]}`;
+  return index === 0 ? base : `${base}-${AGE_NAMES[index]}`;
 }
 
 /**
- * The names to try for an age-varying idle, newest first, ending at plain
- * `idle`. Not every building changes in every age -- a market first exists in
- * the Feudal Age and is restyled only in the Castle -- so a Feudal market has
- * to fall back to its base art rather than to nothing, and a Castle-age one
- * that had a Feudal variant must not skip past it to the base.
+ * The names to try for an age-varying animation, newest first, ending at the
+ * plain base. Not every building changes in every age -- a market first
+ * exists in the Feudal Age and is restyled only in the Castle -- so a Feudal
+ * market has to fall back to its base art rather than to nothing, and a
+ * Castle-age one that had a Feudal variant must not skip past it to the base.
  */
-export function ageIdleChain(state: GameState, entity: Entity): string[] {
+export function ageChain(state: GameState, entity: Entity, base = 'idle'): string[] {
   const age = entity.owner === 0 ? 0 : state.players[entity.owner]?.age ?? 0;
   const names: string[] = [];
   for (let index = Math.min(age, AGE_NAMES.length - 1); index > 0; index--) {
-    names.push(`idle-${AGE_NAMES[index]}`);
+    names.push(`${base}-${AGE_NAMES[index]}`);
   }
-  names.push('idle');
+  names.push(base);
   return names;
 }
+
+/** The suffix an age-varying name carries, so a miss can walk the chain. */
+const AGED_NAME = /^(.+)-(feudal|castle|imperial)$/;
 
 /**
  * Whether a graphic's frames are alternative versions of one object rather
@@ -373,7 +381,7 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
     // A gate is two units in the DAT, one per axis, each with a closed leaf and
     // an open one; which of the four to draw is the footprint and who is near.
     const key = kind === 'palisade-gate' ? gateArtKey(entity) : kind;
-    if (entity.dead) return { key, name: 'death' };
+    if (entity.dead) return { key, name: ageIdle(state, entity, 'death') };
     if (entity.buildProgress !== undefined) return { key, name: 'construction' };
     if (kind === 'palisade-gate' && gateIsOpen(state, entity)) return { key, name: 'open' };
     return { key, name: ageIdle(state, entity) };
@@ -762,9 +770,11 @@ export function updateEntityView(
   // reduced to its stump. Switch when the first has played out.
   if (entity.dead) {
     view.diedAt ??= time;
-    const dying = imported?.animations['death'];
+    const dying = imported?.animations[choice.name]
+      ?? imported?.animations[ageChain(state, entity, 'death').find(name => imported.animations[name]) ?? 'death'];
     const played = dying ? dying.frames * dying.frameSeconds : 0;
-    if (imported?.atlases['decay'] && time - view.diedAt >= played) choice.name = 'decay';
+    const decay = ageChain(state, entity, 'decay').find(name => imported?.atlases[name]);
+    if (decay && time - view.diedAt >= played) choice.name = decay;
   } else {
     view.diedAt = undefined;
   }
@@ -783,9 +793,11 @@ export function updateEntityView(
   let atlas: Atlas | undefined = imported?.atlases[choice.name];
   // An age's idle falls back through the older ages before the base art, so a
   // building the DAT restyles only at the Castle Age keeps its Dark Age
-  // picture through the Feudal one instead of losing it (issue #13).
-  if ((!animation || !atlas) && choice.name.startsWith('idle-')) {
-    for (const name of ageIdleChain(state, entity)) {
+  // picture through the Feudal one instead of losing it (issue #13). Its
+  // collapse falls back the same way (issue #61).
+  const aged = (!animation || !atlas) ? AGED_NAME.exec(choice.name) : null;
+  if (aged) {
+    for (const name of ageChain(state, entity, aged[1])) {
       if (imported?.animations[name] && imported?.atlases[name]) {
         choice.name = name;
         animation = imported.animations[name];
@@ -898,7 +910,7 @@ export function updateEntityView(
   const annexes = imported?.annexes ?? [];
   // The town center's four annex pieces are upgraded by the same age
   // technology as the building itself, so each follows the same chain.
-  const annexAge = isBuilding(entity.kind) ? ageIdleChain(state, entity) : ['idle'];
+  const annexAge = isBuilding(entity.kind) ? ageChain(state, entity) : ['idle'];
   for (const [index, piece] of view.annexes.entries()) {
     const annex = annexes[index];
     const annexName = annexAge.find(name => annex?.atlases[`annex${index}-${name}`]) ?? 'idle';

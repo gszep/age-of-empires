@@ -64,13 +64,6 @@ construction-complete cue, so that one has no owned source to draw on.
   stamped when the view is created and a corpse coming back out of fog gets a
   new view. Wants the death's age carried on the entity or the view keyed
   through the gap.
-- **Building rubble is one spec line away, and would not show.** Every
-  building's `dead_unit_id` names its rubble art (`b_*_rubble_x1`), which the
-  importer's `dead` slot already knows how to reach — but a building's death
-  graphic runs 8.3 s while `kill()` gives every corpse a 3 s window, so the
-  building vanishes mid-collapse and the rubble would never draw. Adding the
-  spec line means making the corpse window follow the death animation's length
-  first, which is a simulation change (and a checksum change).
 
 ## Water
 
@@ -157,11 +150,10 @@ terrain blends above.
   DAT's age technologies replace each building with the next age's unit, and
   those units carry more hit points as well as different art: a barracks goes
   1200 -> 1500 in the Feudal Age, a house 550 -> 750, a mill 600 -> 800. The
-  art is imported and drawn (issue #13); the hit points are not applied,
-  because doing so is a simulation change and belongs with the technology
-  effects rather than with the renderer. Each age's variant also has its own
-  rubble unit (`Barracks Age2 (Rubble)` and friends), so a razed Feudal
-  barracks still leaves the Dark Age rubble.
+  art is imported and drawn (issue #13), and so are each age's own collapse
+  and rubble (issue #61); the hit points are not applied, because doing so
+  is a simulation change and belongs with the technology effects rather than
+  with the renderer.
 - **The naval and scorpion upgrade lines are absent.** Every land unit
   upgrade the Britons have is researchable; what is left is the dock's ships
   and the scorpion, which are units this slice does not have at all rather

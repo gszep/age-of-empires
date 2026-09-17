@@ -870,6 +870,32 @@ class ContentImportIntegrationTest(unittest.TestCase):
             self.assertIn(f"idle-{age}", annex)
         self.assertNotEqual(annex["idle"]["source"], annex["idle-feudal"]["source"])
 
+    def test_each_age_falls_as_itself(self):
+        # A razed Feudal house played the Dark Age collapse and left Dark Age
+        # rubble (issue #61). The variant unit the age technology upgrades it
+        # into has its own `dying_graphic` and names its own rubble unit
+        # (`House Age2 (Rubble)`), so both follow the age. Where an age reuses
+        # the previous age's sheet -- the Imperial house is the Castle one --
+        # nothing is emitted and the renderer's age chain falls back.
+        house = self.result["entities"]["house"]["animations"]
+        for age in ("feudal", "castle"):
+            self.assertIn(f"death-{age}", house)
+            self.assertIn(f"decay-{age}", house)
+        self.assertNotIn("death-imperial", house)
+        self.assertNotIn("decay-imperial", house)
+        sources = {house[name]["source"] for name in ("death", "death-feudal", "death-castle")}
+        self.assertEqual(len(sources), 3)
+        self.assertEqual(house["death-feudal"]["source"], "b_west_house_age2_destruction_x1.sld")
+        self.assertEqual(house["decay-feudal"]["source"], "b_west_house_age2_rubble_x1.sld")
+        # A collapse is the same length in every age, so the corpse window the
+        # simulation keeps from the base art holds for the variants too.
+        for name in ("death", "death-feudal", "death-castle"):
+            self.assertEqual(house[name]["frames"], house["death"]["frames"])
+            self.assertEqual(house[name]["frameSeconds"], house["death"]["frameSeconds"])
+        # A building whose Feudal self is its Dark Age self gets no duplicate.
+        self.assertNotIn("death-feudal", self.result["entities"]["blacksmith"]["animations"])
+        self.assertIn("death-castle", self.result["entities"]["blacksmith"]["animations"])
+
     def test_only_something_that_can_die_leaves_anything_behind(self):
         # A forage bush names STUMP (415) in `dead_unit_id`, exactly as the oak
         # does, but it has zero hit points and no dying graphic — it cannot

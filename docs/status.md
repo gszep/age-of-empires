@@ -1741,8 +1741,25 @@ rather than dropping straight to it and losing an age the content does have.
 What is *not* taken from those units is their hit points, which also rise with
 the age (barracks 1200 to 1500, house 550 to 750, mill 600 to 800). That is a
 simulation change and belongs with the technology effects; it is recorded in
-`backlog.md`. Each age's variant likewise has its own rubble unit, so a razed
-Feudal barracks still leaves the Dark Age rubble.
+`backlog.md`.
+### It falls as its age, too
+
+A razed Feudal house played the Dark Age collapse and left Dark Age rubble
+(issue #61). The variant unit is the whole answer: HOUS2 has its own
+`dying_graphic` (`b_west_house_age2_destruction_x1`) and names its own rubble
+unit, `House Age2 (Rubble)` (1434), whose standing graphic is
+`b_west_house_age2_rubble_x1`; the same holds for every building the age
+technologies upgrade. The importer now follows both from each variant, as
+`death-{age}` and `decay-{age}`, and the renderer resolves a dead building's
+collapse and rubble through the same age chain as its standing art — newest
+at or below the owner's age, then older ages, then the base. An age whose
+sheet is the previous age's (the Imperial house is the Castle one; the
+Feudal blacksmith is the Dark Age one) is not imported twice, and the chain
+falls back to it. Every collapse in the DAT runs 100 frames at 0.083 s, so
+the corpse window the simulation keeps from the base art (`deathSeconds`,
+8.33 s) holds for the variants and nothing in the checksum moves. Verified
+in the running game through the debug protocol: a Feudal house razed draws
+`house/death-feudal` and then `house/decay-feudal`.
 
 ## The DAT's axes are mirrored against this projection
 

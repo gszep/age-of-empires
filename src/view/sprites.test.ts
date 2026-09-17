@@ -249,6 +249,47 @@ describe('what a building wears in each age', () => {
     expect(b.animationState).toBe('barracks/idle-feudal');
   });
 
+  it('falls as the age it stands in, and leaves that age\'s rubble', () => {
+    // A razed Feudal house played the Dark Age collapse whatever the age
+    // (issue #61). The variant the age technology upgrades a building into
+    // carries its own dying graphic and rubble unit, so both follow the
+    // owner's age -- and fall back through the older ages exactly as the
+    // standing art does, because an age that reuses the previous sheet is
+    // not imported twice.
+    const state = createGame(72);
+    const barracks = barracksOf(state);
+    const assets = agedAssets(['idle', 'idle-feudal', 'death', 'death-feudal', 'decay', 'decay-feudal']);
+    assets.entities['barracks'].animations['death'] = { frames: 2, directions: 1, frameSeconds: 1, mirroringMode: 0 };
+    assets.entities['barracks'].animations['death-feudal'] = { frames: 2, directions: 1, frameSeconds: 1, mirroringMode: 0 };
+    barracks.dead = true;
+    barracks.activity = 'dying';
+
+    state.players[1].age = 1;
+    expect(chooseAnimation(state, barracks).name).toBe('death-feudal');
+    const feudal = createEntityView(assets, barracks);
+    updateEntityView(feudal, assets, state, barracks, 10);
+    expect(feudal.animationState).toBe('barracks/death-feudal');
+    updateEntityView(feudal, assets, state, barracks, 12.5);
+    expect(feudal.animationState).toBe('barracks/decay-feudal');
+
+    // Castle Age with no Castle collapse: the Feudal one, not the Dark Age one.
+    state.players[1].age = 2;
+    expect(chooseAnimation(state, barracks).name).toBe('death-castle');
+    const castle = createEntityView(assets, barracks);
+    updateEntityView(castle, assets, state, barracks, 20);
+    expect(castle.animationState).toBe('barracks/death-feudal');
+    updateEntityView(castle, assets, state, barracks, 22.5);
+    expect(castle.animationState).toBe('barracks/decay-feudal');
+
+    // And in the Dark Age, the Dark Age art.
+    state.players[1].age = 0;
+    const dark = createEntityView(assets, barracks);
+    updateEntityView(dark, assets, state, barracks, 30);
+    expect(dark.animationState).toBe('barracks/death');
+    updateEntityView(dark, assets, state, barracks, 32.5);
+    expect(dark.animationState).toBe('barracks/decay');
+  });
+
   /**
    * A house as the DAT gives it: three models in every age, and no frame
    * duration, because they are alternatives rather than a sequence.
