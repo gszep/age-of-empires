@@ -554,6 +554,45 @@ class ContentImportIntegrationTest(unittest.TestCase):
                     f"{key}/{name} is {width}x{height}, over the 8192 device limit",
                 )
 
+    def test_a_miss_lands_the_dat_dispersion_away(self):
+        # Issue #45: the DAT states how far a shot that fails its accuracy
+        # roll lands from the aim. Everything that can miss carries it, and
+        # nothing that cannot does -- a 0 here would leave a shooter missing
+        # onto its own target.
+        entities = self.result["entities"]
+        for key in ("archer", "crossbowman", "arbalester", "skirmisher", "elite-skirmisher",
+                    "cavalry-archer", "heavy-cavalry-archer", "longbowman", "elite-longbowman"):
+            self.assertEqual(entities[key]["combat"]["accuracyDispersion"], 0.33, key)
+        self.assertEqual(entities["trebuchet-unpacked"]["combat"]["accuracyDispersion"], 0.2)
+        self.assertEqual(entities["trebuchet-unpacked"]["combat"]["accuracyPercent"], 15)
+        for key in entities:
+            combat = entities[key].get("combat")
+            if not combat or "accuracyPercent" not in combat:
+                continue
+            # The packed trebuchet reads 92 with no dispersion, and never
+            # shoots: it is the set-up unit's numbers that a shot carries.
+            if combat["accuracyPercent"] < 100 and combat["attacks"] and key != "trebuchet":
+                self.assertIn("accuracyDispersion", combat, key)
+            if combat["accuracyPercent"] >= 100:
+                self.assertNotIn("accuracyDispersion", combat, key)
+
+    def test_blast_levels_decide_what_a_stone_reaches(self):
+        # Issue #46: a target is caught when its `blast_defense_level` is at
+        # least the shooter's `blast_attack_level`. The rows are the rule:
+        # mangonel 2 reaches units (3) and buildings (2), onager 1 reaches
+        # trees (1) as well, nothing reaches a bush or a mine (0).
+        entities = self.result["entities"]
+        self.assertEqual(entities["mangonel"]["combat"]["blastAttackLevel"], 2)
+        self.assertEqual(entities["onager"]["combat"]["blastAttackLevel"], 1)
+        self.assertNotIn("blastAttackLevel", entities["archer"]["combat"])
+        for key in ("militia", "villager", "knight", "monk", "sheep", "mangonel"):
+            self.assertEqual(entities[key]["blastDefenseLevel"], 3, key)
+        for key in ("town-center", "house", "barracks", "palisade-wall", "watch-tower", "castle"):
+            self.assertEqual(entities[key]["blastDefenseLevel"], 2, key)
+        self.assertEqual(entities["tree-oak"]["blastDefenseLevel"], 1)
+        for key in ("berries", "gold", "stone"):
+            self.assertEqual(entities[key]["blastDefenseLevel"], 0, key)
+
     def test_accuracy_and_ballistics_are_attributes_the_dat_states(self):
         # Both halves of how a shot lands are in the DAT and neither was read
         # before (issue #3). Accuracy varies widely enough that a constant
@@ -712,6 +751,11 @@ class ContentImportIntegrationTest(unittest.TestCase):
             if combat and theirs.type_50 is not None:
                 rows.append(("reload", combat.get("reloadSeconds"), round(theirs.type_50.reload_time, 3)))
                 rows.append(("range", combat.get("maximumRange"), round(theirs.type_50.max_range, 3)))
+                rows.append(("accuracyDispersion", combat.get("accuracyDispersion", 0),
+                             round(theirs.type_50.accuracy_dispersion, 6)))
+                if combat.get("blastRadius"):
+                    rows.append(("blastAttackLevel", combat.get("blastAttackLevel"),
+                                 theirs.type_50.blast_attack_level))
                 rows.append((
                     "attacks",
                     sorted((a["class"], a["amount"]) for a in combat.get("attacks") or []),
@@ -722,6 +766,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
                     sorted((a["class"], a["amount"]) for a in combat.get("armors") or []),
                     sorted((a.class_, a.amount) for a in (theirs.type_50.armours or [])),
                 ))
+            rows.append(("blastDefenseLevel", ours.get("blastDefenseLevel"), theirs.blast_defense_level))
             for name, mine, reference in rows:
                 checked += 1
                 if mine != reference:

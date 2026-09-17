@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES, TICKS_PER_SECOND, rulesFromManifest, type ContentManifest, type GameRules } from './data';
-import { applyCommand, createGame, placementLegal, stepGame } from './game';
+import { addNode, applyCommand, createGame, placementLegal, stepGame } from './game';
 import { checksumState } from './checksum';
 import type { BuildingKind, Entity, GameState, UnitKind } from './types';
 
@@ -206,6 +206,114 @@ describe('siege', () => {
     for (let i = 0; i < 400 && !state.projectiles.length; i++) stepGame(state);
     expect(state.projectiles.length).toBeGreaterThan(0);
     expect(state.projectiles[0].blastRadius).toBe(state.rules.units.mangonel.blastRadius);
+    expect(state.projectiles[0].blastAttackLevel).toBe(state.rules.units.mangonel.blastAttackLevel);
+  });
+
+  /**
+   * Who a blast catches is the DAT's `blast_defense_level` against the
+   * shooter's `blast_attack_level` (issue #46): a thing is hit when its
+   * defense level is at least the attack level. Units are 3, buildings 2,
+   * trees 1, bushes and mines 0; the mangonel shoots at level 2, the onager
+   * at 1. So a mangonel's stone reaches the house beside its target and not
+   * the tree, and an onager's fells the tree as well.
+   */
+  const stoneBeside = (state: GameState, engine: UnitKind) => {
+    state.players[1].age = 3;
+    const shooter = spawn(state, engine, 1, { x: 30, y: 30 });
+    const target = spawn(state, 'militia', 2, { x: 35, y: 30 });
+    const house = place(state, 'house', 2);
+    house.position = { x: 35.6, y: 30.9 };
+    const tree = addNode(state, 'tree', { x: 35.4, y: 29.6 });
+    const bush = addNode(state, 'berries', { x: 34.6, y: 30.5 });
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [shooter.id], target: target.position, targetId: target.id,
+    });
+    for (let i = 0; i < 400 && target.hp === target.maxHp; i++) stepGame(state);
+    expect(target.hp).toBeLessThan(target.maxHp);
+    return { house, tree, bush };
+  };
+
+  it("lands a mangonel's stone on the house beside its target, and leaves the tree", () => {
+    const state = createGame(60);
+    const { house, tree, bush } = stoneBeside(state, 'mangonel');
+    expect(house.hp).toBeLessThan(house.maxHp);
+    expect(tree.amount).toBe(state.rules.nodes.tree.amount);
+    expect(bush.amount).toBe(state.rules.nodes.berries.amount);
+  });
+
+  it("fells the tree with an onager's stone, and the tree yields nothing", () => {
+    const state = createGame(61);
+    const { house, tree, bush } = stoneBeside(state, 'onager');
+    expect(house.hp).toBeLessThan(house.maxHp);
+    expect(tree.amount).toBe(0);
+    expect(tree.dead).toBe(true);
+    expect(bush.amount).toBe(state.rules.nodes.berries.amount);
+  });
+
+  it("does not reach anything with an archer's arrow: level 3 catches nothing", () => {
+    const state = createGame(62);
+    state.players[1].age = 2;
+    // No archer carries a blast radius, so nothing is spread at all. The
+    // guard is on the rule rather than the roster: whatever the manifest
+    // gives an archer, its arrow lands on one head.
+    expect(state.rules.units.archer.blastRadius).toBeUndefined();
+    const archer = spawn(state, 'archer', 1, { x: 30, y: 30 });
+    const target = spawn(state, 'militia', 2, { x: 33, y: 30 });
+    const beside = spawn(state, 'militia', 2, { x: 33.4, y: 30 });
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [archer.id], target: target.position, targetId: target.id,
+    });
+    for (let i = 0; i < 400 && target.hp === target.maxHp; i++) stepGame(state);
+    expect(target.hp).toBeLessThan(target.maxHp);
+    expect(beside.hp).toBe(beside.maxHp);
+  });
+
+  it.skipIf(!importedRules)('carries the DAT blast levels: mangonel 2, onager 1, units 3, buildings 2, trees 1', () => {
+    const rules = importedRules!;
+    expect(rules.units.mangonel.blastAttackLevel).toBe(2);
+    expect(rules.units.onager.blastAttackLevel).toBe(1);
+    expect(rules.units.militia.blastDefenseLevel).toBe(3);
+    expect(rules.buildings.house.blastDefenseLevel).toBe(2);
+    expect(rules.nodes.tree.blastDefenseLevel).toBe(1);
+    expect(rules.nodes.berries.blastDefenseLevel).toBe(0);
+  });
+});
+
+describe('a shot that goes wide', () => {
+  /**
+   * The DAT states how far a miss lands from the aim (`accuracy_dispersion`,
+   * issue #45): 0.33 tiles for the archer line, 0.2 for the trebuchet. The
+   * one-tile scatter this replaced is now only the hand-written rules' stand-in.
+   */
+  it.skipIf(!importedRules)('lands the archer\'s own dispersion from the aim, not a whole tile', () => {
+    const rules = importedRules!;
+    expect(rules.units.archer.accuracyPercent).toBe(80);
+    expect(rules.units.archer.accuracyDispersion).toBe(0.33);
+    expect(rules.units.trebuchet.unpacked?.accuracyPercent).toBe(15);
+    expect(rules.units.trebuchet.unpacked?.accuracyDispersion).toBe(0.2);
+    const state = createGame(63, rules);
+    state.players[1].age = 2;
+    const archer = spawn(state, 'archer', 1, { x: 30, y: 30 });
+    // Something that stands still to be shot at, so the aim is measured
+    // against where the target actually is: a soldier would walk at the archer.
+    const target = place(state, 'house', 2);
+    target.position = { x: 33, y: 30 };
+    target.hp = target.maxHp = 100000; // stands there for the whole sample
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [archer.id], target: target.position, targetId: target.id,
+    });
+    const offsets: number[] = [];
+    for (let i = 0; i < 4000 && offsets.length < 40; i++) {
+      stepGame(state);
+      for (const shot of state.projectiles) {
+        if (shot.shooterId !== archer.id) continue;
+        const off = Math.hypot(shot.aim.x - target.position.x, shot.aim.y - target.position.y);
+        if (!offsets.some((o, k) => k === offsets.length - 1 && o === off)) offsets.push(off);
+      }
+    }
+    const misses = offsets.filter(o => o > 1e-9);
+    expect(misses.length).toBeGreaterThan(0);
+    for (const off of misses) expect(off).toBeCloseTo(0.33, 5);
   });
 });
 

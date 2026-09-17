@@ -173,6 +173,12 @@ export interface Projectile {
   /** Tiles around the impact that also take the hit, for a siege shot. */
   blastRadius?: number;
   /**
+   * The DAT's `blast_attack_level`: what the blast may hurt. A thing is caught
+   * when its own defense level is at least this -- 2 reaches soldiers and
+   * buildings, 1 fells trees as well.
+   */
+  blastAttackLevel?: number;
+  /**
    * Where it is actually going. Fixed at release: a shot is aimed once and
    * then flies, so a target that walks away is missed. Ballistics moves this
    * to where the target will be; a failed accuracy roll moves it off the

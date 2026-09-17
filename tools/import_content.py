@@ -266,6 +266,12 @@ def extract_entity(
         # in the fog -- buildings are remembered by the engine's separate
         # last-seen memory, which no DAT field states.
         "fogVisibility": int(unit.fog_visibility),
+        # What a siege shot may hurt. A target is caught in a blast when its
+        # defense level is at least the shooter's `blast_attack_level`: every
+        # unit is 3, every building 2, a tree 1, a bush or a mine 0 -- so a
+        # mangonel (2) reaches soldiers and buildings, an onager (1) fells
+        # trees as well, and nothing harvests a bush by shooting it (issue #46).
+        "blastDefenseLevel": int(unit.blast_defense_level),
     }
     # What is left behind is its own unit in the DAT with its own obstruction:
     # a carcass stops being a body in the way and marks a flat box on the
@@ -330,6 +336,11 @@ def extract_entity(
             # classes, so it is a real attribute rather than a constant.
             "accuracyPercent": combat.accuracy_percent,
         }
+        # ...and how far a shot that fails that roll lands from where it was
+        # aimed, in tiles. Archers are 0.33, the trebuchet 0.2, everything
+        # that cannot miss 0 (issue #45).
+        if combat.accuracy_dispersion and combat.accuracy_dispersion > 0:
+            entity["combat"]["accuracyDispersion"] = rounded(combat.accuracy_dispersion)
         # Ranged shooters name the projectile they launch; the arrow's own
         # entry carries its travel speed and art.
         if combat.projectile_unit_id is not None and combat.projectile_unit_id >= 0:
@@ -341,6 +352,7 @@ def extract_entity(
         # A mangonel's stone hurts what it lands beside, not only what it hit.
         if combat.blast_width and combat.blast_width > 0:
             entity["combat"]["blastRadius"] = rounded(combat.blast_width)
+            entity["combat"]["blastAttackLevel"] = int(combat.blast_attack_level)
 
     if category == "projectile" and unit.projectile is not None:
         # `projectile_arc` is a fraction of the shot's distance. Its sign varies

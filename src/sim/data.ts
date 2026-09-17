@@ -46,6 +46,17 @@ export interface UnitRules {
   /** Tiles around the point of impact that also take the hit: a mangonel's
    * stone hurts what it lands beside, not only what it was aimed at. */
   blastRadius?: number;
+  /**
+   * The DAT's `blast_attack_level`, read against each bystander's
+   * `blastDefenseLevel`: a thing is caught in the blast when its defense level
+   * is at least this. The mangonel is 2, the onager line and the trebuchet 1.
+   */
+  blastAttackLevel?: number;
+  /**
+   * The DAT's `blast_defense_level`: every unit is 3, so a unit is caught by
+   * any blast of level 3 or below. See `BuildingRules.blastDefenseLevel`.
+   */
+  blastDefenseLevel?: number;
   /** Monks: hit points restored a second, and how close they must come. */
   heal?: { hitPointsPerSecond: number; range: number };
   /**
@@ -65,6 +76,12 @@ export interface UnitRules {
     projectileArt?: string;
     launchHeight?: number;
     blastRadius?: number;
+    blastAttackLevel?: number;
+    /** The set-up engine's own odds and scatter: a trebuchet is 15 and 0.2
+     * where the packed unit reads 92 and nothing, and it is the set-up one
+     * that shoots. */
+    accuracyPercent?: number;
+    accuracyDispersion?: number;
     /** Seconds to set up or pack away. The DAT's own work rate for the pair. */
     seconds: number;
   };
@@ -92,6 +109,12 @@ export interface UnitRules {
    * 100, which is what that technology is.
    */
   accuracyPercent?: number;
+  /**
+   * The DAT's `accuracy_dispersion`: how far a shot that fails the roll lands
+   * from where it was aimed, in tiles. Archers are 0.33, the trebuchet 0.2;
+   * anything that cannot miss carries none.
+   */
+  accuracyDispersion?: number;
   /**
    * Villagers: the bow they hunt with. The DAT keeps the hunter as its own
    * unit (122, `VMHUN`) with a reach and a projectile the plain villager has
@@ -165,6 +188,12 @@ export interface BuildingRules {
    * `passableForOwner`, which is a gate standing open for its own side.
    */
   passable?: boolean;
+  /**
+   * The DAT's `blast_defense_level`: every building is 2, so a mangonel's
+   * stone (attack level 2) reaches a house it lands beside, and an archer's
+   * arrow (3) never does. Trees are 1 and bushes and mines 0 (issue #46).
+   */
+  blastDefenseLevel?: number;
   /** Set for buildings that shoot: range in tiles plus the militia-style timing. */
   attack?: {
     range: number;
@@ -189,6 +218,8 @@ export interface ResourceNodeRules {
   amount: number;
   /** As `UnitRules.fogVisibility`: gaia's nodes are all 1. */
   fogVisibility?: number;
+  /** As `BuildingRules.blastDefenseLevel`: a tree is 1, a bush or mine 0. */
+  blastDefenseLevel?: number;
 }
 
 /**
@@ -543,7 +574,7 @@ export const FALLBACK_RULES: GameRules = {
       attacks: [{ class: 11, amount: 45 }, { class: 4, amount: 50 }, { class: 20, amount: 12 }, { class: 37, amount: 50 }],
       armors: [{ class: 4, amount: 0 }, { class: 3, amount: 7 }, { class: 20, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 6.0, attackReleaseSeconds: 0.0,
-      range: 8.0, minRange: 3.0, projectileSpeed: 5, launchHeight: 1.5, blastRadius: 1.25,
+      range: 8.0, minRange: 3.0, projectileSpeed: 5, launchHeight: 1.5, blastRadius: 1.25, blastAttackLevel: 1,
       projectileArt: 'mangonel-stone',
     },
     /**
@@ -563,6 +594,7 @@ export const FALLBACK_RULES: GameRules = {
         range: 16, minRange: 4,
         attackReloadSeconds: 10, attackReleaseSeconds: 0.88,
         projectileSpeed: 3.5, projectileArt: 'trebuchet-rock', launchHeight: 1.5,
+        accuracyPercent: 15, accuracyDispersion: 0.2,
         seconds: 4.5,
       },
     },
@@ -574,7 +606,7 @@ export const FALLBACK_RULES: GameRules = {
       attacks: [{ class: 11, amount: 160 }, { class: 4, amount: 3 }, { class: 20, amount: 50 }],
       armors: [{ class: 4, amount: -2 }, { class: 3, amount: 190 }, { class: 17, amount: 1 }, { class: 20, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 5.0, attackReleaseSeconds: 0.0,
-      blastRadius: 1.5,
+      blastRadius: 1.5, blastAttackLevel: 2,
     },
     'scout-cavalry': {
       age: 1,
@@ -646,7 +678,7 @@ export const FALLBACK_RULES: GameRules = {
       attacks: [{ class: 11, amount: 35 }, { class: 4, amount: 40 }, { class: 20, amount: 12 }, { class: 37, amount: 40 }],
       armors: [{ class: 4, amount: 0 }, { class: 3, amount: 6 }, { class: 20, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 6, attackReleaseSeconds: 0.5,
-      range: 7, minRange: 3, projectileSpeed: 3.5, launchHeight: 1.8, blastRadius: 1,
+      range: 7, minRange: 3, projectileSpeed: 3.5, launchHeight: 1.8, blastRadius: 1, blastAttackLevel: 2,
       projectileArt: 'mangonel-stone',
     },
     // No attack at all: a monk's work is mending its own side and preaching at
@@ -819,10 +851,10 @@ export const FALLBACK_RULES: GameRules = {
     },
   },
   nodes: {
-    berries: { resource: 'food', radius: 0.5, amount: 125, fogVisibility: 1 },
-    tree: { resource: 'wood', radius: 0.5, amount: 100, fogVisibility: 1 },
-    gold: { resource: 'gold', radius: 0.5, amount: 800, fogVisibility: 1 },
-    stone: { resource: 'stone', radius: 0.5, amount: 350, fogVisibility: 1 },
+    berries: { resource: 'food', radius: 0.5, amount: 125, fogVisibility: 1, blastDefenseLevel: 0 },
+    tree: { resource: 'wood', radius: 0.5, amount: 100, fogVisibility: 1, blastDefenseLevel: 1 },
+    gold: { resource: 'gold', radius: 0.5, amount: 800, fogVisibility: 1, blastDefenseLevel: 0 },
+    stone: { resource: 'stone', radius: 0.5, amount: 350, fogVisibility: 1, blastDefenseLevel: 0 },
   },
   gatherRatePerSecond: { food: 0.31, wood: 0.39, gold: 0.38, stone: 0.36 },
   carryCapacity: 10,
@@ -867,11 +899,16 @@ interface ManifestEntity {
     projectileUnitId?: number;
     launchOffset?: number[];
     blastRadius?: number;
+    blastAttackLevel?: number;
     /** The DAT's `accuracy_percent`: how often a shot is aimed true. */
     accuracyPercent?: number;
+    /** ...and `accuracy_dispersion`: how far a miss lands from the aim, in tiles. */
+    accuracyDispersion?: number;
     attacks: AttackValue[];
     armors: AttackValue[];
   };
+  /** The DAT's `blast_defense_level`: units 3, buildings 2, trees 1, else 0. */
+  blastDefenseLevel?: number;
   heal?: { hitPointsPerSecond: number; range: number };
   convert?: { minSeconds: number; maxSeconds: number; range: number };
   searchRadius?: number;
@@ -963,10 +1000,13 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       projectileArt: projectileArt(key) ?? fallback?.projectileArt,
       launchHeight: e[key].combat?.launchOffset?.[2] ?? fallback?.launchHeight,
       blastRadius: e[key].combat?.blastRadius ?? fallback?.blastRadius,
+      blastAttackLevel: e[key].combat?.blastAttackLevel ?? fallback?.blastAttackLevel,
+      blastDefenseLevel: e[key].blastDefenseLevel ?? fallback?.blastDefenseLevel,
       heal: e[key].heal ?? fallback?.heal,
       convert: e[key].convert ?? fallback?.convert,
       fogVisibility: e[key].fogVisibility ?? fallback?.fogVisibility,
       accuracyPercent: e[key].combat?.accuracyPercent ?? fallback?.accuracyPercent,
+      accuracyDispersion: e[key].combat?.accuracyDispersion ?? fallback?.accuracyDispersion,
       deathSeconds: e[key].deathSeconds ?? fallback?.deathSeconds,
       corpseSeconds: e[key].corpseSeconds ?? fallback?.corpseSeconds,
       datId: e[key].id,
@@ -1014,6 +1054,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       footprint: fallback.footprint && { x: e[key].collision[0], y: e[key].collision[1] },
       passableForOwner: fallback.passableForOwner,
       passable: e[key].passable ?? fallback.passable,
+      blastDefenseLevel: e[key].blastDefenseLevel ?? fallback.blastDefenseLevel,
       attack: fallback.attack && {
         ...fallback.attack,
         range: e[key].combat?.maximumRange || fallback.attack.range,
@@ -1034,6 +1075,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       radius: e[key].collision[0],
       amount: e[key].storage?.[resource] ?? FALLBACK_RULES.nodes[fallbackKey].amount,
       fogVisibility: e[key].fogVisibility ?? FALLBACK_RULES.nodes[fallbackKey].fogVisibility,
+      blastDefenseLevel: e[key].blastDefenseLevel ?? FALLBACK_RULES.nodes[fallbackKey].blastDefenseLevel,
     };
   };
   return {
@@ -1151,6 +1193,14 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
             ?? FALLBACK_RULES.units.trebuchet.unpacked!.projectileArt,
           launchHeight: e['trebuchet-unpacked']?.combat?.launchOffset?.[2]
             ?? FALLBACK_RULES.units.trebuchet.unpacked!.launchHeight,
+          blastRadius: e['trebuchet-unpacked']?.combat?.blastRadius
+            ?? FALLBACK_RULES.units.trebuchet.unpacked!.blastRadius,
+          blastAttackLevel: e['trebuchet-unpacked']?.combat?.blastAttackLevel
+            ?? FALLBACK_RULES.units.trebuchet.unpacked!.blastAttackLevel,
+          accuracyPercent: e['trebuchet-unpacked']?.combat?.accuracyPercent
+            ?? FALLBACK_RULES.units.trebuchet.unpacked!.accuracyPercent,
+          accuracyDispersion: e['trebuchet-unpacked']?.combat?.accuracyDispersion
+            ?? FALLBACK_RULES.units.trebuchet.unpacked!.accuracyDispersion,
         },
       },
       sheep: animal('sheep'),

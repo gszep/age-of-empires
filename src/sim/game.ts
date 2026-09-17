@@ -29,7 +29,8 @@ function addEntity(
   return entity;
 }
 
-function addNode(state: GameState, node: NodeKind, position: Point): Entity {
+/** Gaia's node of this kind at this spot: the one constructor every tree, bush and mine goes through. */
+export function addNode(state: GameState, node: NodeKind, position: Point): Entity {
   const rules = state.rules.nodes[node];
   return addEntity(state, 'resource', 0, position, { hp: 1, radius: rules.radius }, {
     resourceKind: rules.resource,
@@ -761,8 +762,8 @@ const inRange = (entity: Entity, target: Entity, margin = 0.15): boolean =>
 function combatOf(state: GameState, entity: Entity): {
   attacks: AttackValue[]; range: number; minRange: number;
   reloadSeconds: number; releaseSeconds: number;
-  projectileSpeed?: number; launchHeight?: number; blastRadius?: number;
-} {
+  projectileSpeed?: number; launchHeight?: number;
+} & Shot {
   const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
   const setup = rules.unpacked;
   if (setup) {
@@ -782,7 +783,22 @@ function combatOf(state: GameState, entity: Entity): {
     projectileSpeed: rules.projectileSpeed,
     launchHeight: rules.launchHeight,
     blastRadius: rules.blastRadius,
+    blastAttackLevel: rules.blastAttackLevel,
+    accuracyPercent: rules.accuracyPercent,
+    accuracyDispersion: rules.accuracyDispersion,
   };
+}
+
+/**
+ * What a shooter's shot carries besides its damage: how likely it is to be
+ * aimed true, how far off it lands when it is not, and what its blast may
+ * hurt. All four are the DAT's own fields on the shooter.
+ */
+interface Shot {
+  blastRadius?: number;
+  blastAttackLevel?: number;
+  accuracyPercent?: number;
+  accuracyDispersion?: number;
 }
 
 /** Melee units close to contact; ranged ones stop at their weapon range. */
@@ -1320,7 +1336,7 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
     const combat = combatOf(state, entity);
     releaseAttack(
       state, entity, target, combat.attacks,
-      profile.projectileSpeed, profile.launchHeight, combat.blastRadius,
+      profile.projectileSpeed, profile.launchHeight, combat,
     );
     entity.attackWindup = undefined;
     entity.attackCooldown = Math.max(1, Math.round(combat.reloadSeconds * TICKS_PER_SECOND) - Math.max(1, Math.round(releaseSeconds * TICKS_PER_SECOND)));
@@ -1425,14 +1441,10 @@ function applyDamage(
 }
 
 /**
- * How far a shot that goes wide lands from where it was aimed.
- *
- * The DAT states the odds (`accuracy_percent`) but not what a miss looks like,
- * so this is an approximation and is recorded as one in `docs/status.md`. One
- * tile is the board's own unit and the smallest distance that means anything
- * here; it is also comfortably wider than any unit and comfortably narrower
- * than a building, which is why an arrow that goes wide of a villager still
- * lands inside the town center behind it -- as it does in AoE2.
+ * How far a shot that goes wide lands from where it was aimed, when the rules
+ * say nothing. The DAT states it per shooter (`accuracy_dispersion`, issue
+ * #45) and every imported shooter that can miss carries it; this stands in
+ * only for hand-written rules, where one tile is the board's own unit.
  */
 const MISS_TILES = 1;
 
@@ -1467,7 +1479,7 @@ function velocityOf(state: GameState, entity: Entity): Point {
 function releaseAttack(
   state: GameState, shooter: Entity, target: Entity,
   attacks: AttackValue[], projectileSpeed: number | undefined, launchHeight = 0,
-  blastRadius?: number,
+  shot: Shot = {},
 ): void {
   if (!projectileSpeed) {
     applyDamage(state, target, attacks, shooter.id);
@@ -1480,12 +1492,15 @@ function releaseAttack(
   const aim = leads
     ? leadPoint(state, shooter, target, projectileSpeed)
     : { ...target.position };
-  // ...and whether it was aimed true at all is the DAT's own accuracy.
-  const accuracy = accuracyOf(state, shooter);
+  // ...and whether it was aimed true at all is the DAT's own accuracy, read
+  // through the owner's research because Thumb Ring is exactly a change to
+  // it. A miss lands the shooter's own dispersion away, in a random direction.
+  const accuracy = shot.accuracyPercent ?? 100;
   if (accuracy < 100 && random01(state) * 100 >= accuracy) {
     const angle = random01(state) * Math.PI * 2;
-    aim.x += Math.cos(angle) * MISS_TILES;
-    aim.y += Math.sin(angle) * MISS_TILES;
+    const scatter = shot.accuracyDispersion ?? MISS_TILES;
+    aim.x += Math.cos(angle) * scatter;
+    aim.y += Math.sin(angle) * scatter;
   }
   state.projectiles.push({
     id: state.nextId++,
@@ -1498,20 +1513,8 @@ function releaseAttack(
     speed: projectileSpeed,
     launchHeight,
     aim,
-    ...(blastRadius ? { blastRadius } : {}),
+    ...(shot.blastRadius ? { blastRadius: shot.blastRadius, blastAttackLevel: shot.blastAttackLevel } : {}),
   });
-}
-
-/**
- * The shooter's `accuracy_percent`, or 100 for anything the DAT gives none.
- * Read through the owner's research, because Thumb Ring is exactly a change to
- * this number.
- */
-function accuracyOf(state: GameState, shooter: Entity): number {
-  if (isBuilding(shooter.kind)) {
-    return buildingRulesFor(state, shooter.owner, shooter.kind).attack?.accuracyPercent ?? 100;
-  }
-  return unitRulesFor(state, shooter.owner, shooter.kind as UnitKind)?.accuracyPercent ?? 100;
 }
 
 /**
@@ -1534,20 +1537,45 @@ function shooterLeadsTarget(state: GameState, shooter: Entity): boolean {
 /**
  * A siege shot hurts what it lands beside. AoE2's mangonel is no respecter of
  * sides — its own army takes the same stone — which is what makes one a
- * decision rather than free damage. The DAT gives the radius; the falloff its
- * `blast_attack_level` implies is not in the owned files, so everything inside
- * takes the full hit (recorded in `docs/status.md`).
+ * decision rather than free damage. The DAT gives the radius, and its
+ * `blast_attack_level` against each bystander's `blast_defense_level` decides
+ * who is caught: a thing is hit when its defense level is at least the
+ * attack level. Units are 3, buildings 2, trees 1, bushes and mines 0, so a
+ * mangonel (2) reaches soldiers and the house they stand beside, and an
+ * onager (1) fells the trees as well (issue #46). Everything caught takes the
+ * full hit; the DAT states no falloff.
  */
 function applyBlast(
-  state: GameState, at: Point, radius: number, attacks: AttackValue[], directHitId: number,
+  state: GameState, at: Point, radius: number, attackLevel: number, attacks: AttackValue[],
+  directHitId: number,
 ): void {
   for (const other of [...state.entities]) {
-    if (other.dead || other.id === directHitId || other.kind === 'resource') continue;
-    if (isBuilding(other.kind)) continue; // a stone lands among soldiers, not through walls
+    if (other.dead || other.id === directHitId) continue;
+    if (blastDefenseLevelOf(state, other) < attackLevel) continue;
     if (distance(other.position, at) - other.radius > radius) continue;
+    if (other.kind === 'resource') {
+      // A tree caught by an onager's stone comes down and yields nothing, as
+      // in AoE2: a felled node is a spent one.
+      other.amount = 0;
+      continue;
+    }
     other.hp -= computeDamage(attacks, armorsOf(state, other));
     if (other.hp <= 0) kill(state, other);
   }
+}
+
+/**
+ * How resistant a thing is to a blast that lands beside it, from its rules.
+ * Where the rules say nothing, the DAT's own division stands in: every unit
+ * 3, every building 2, a tree 1 and any other node 0.
+ */
+function blastDefenseLevelOf(state: GameState, entity: Entity): number {
+  if (isBuilding(entity.kind)) return state.rules.buildings[entity.kind].blastDefenseLevel ?? 2;
+  if (entity.kind === 'resource') {
+    const node = Object.values(state.rules.nodes).find(n => n.resource === entity.resourceKind);
+    return node?.blastDefenseLevel ?? (entity.resourceKind === 'wood' ? 1 : 0);
+  }
+  return state.rules.units[entity.kind as UnitKind]?.blastDefenseLevel ?? 3;
 }
 
 /** Closest approach of the segment a->b to a point, for a swept hit test. */
@@ -1595,7 +1623,8 @@ function updateProjectiles(state: GameState): void {
       const at = { ...intended.position };
       applyDamage(state, intended, projectile.attacks, projectile.shooterId);
       if (projectile.blastRadius) {
-        applyBlast(state, at, projectile.blastRadius, projectile.attacks, intended.id);
+        applyBlast(state, at, projectile.blastRadius, projectile.blastAttackLevel ?? 0,
+          projectile.attacks, intended.id);
       }
       continue;
     }
@@ -1608,7 +1637,8 @@ function updateProjectiles(state: GameState): void {
     const struck = struckBy(state, projectile, at);
     if (struck) applyDamage(state, struck, projectile.attacks, projectile.shooterId);
     if (projectile.blastRadius) {
-      applyBlast(state, at, projectile.blastRadius, projectile.attacks, struck?.id ?? -1);
+      applyBlast(state, at, projectile.blastRadius, projectile.blastAttackLevel ?? 0,
+        projectile.attacks, struck?.id ?? -1);
     }
   }
   state.projectiles = remaining;
@@ -1703,7 +1733,8 @@ function updateTower(state: GameState, entity: Entity): void {
   }
   entity.attackWindup -= 1;
   if (entity.attackWindup <= 0) {
-    releaseAttack(state, entity, target, attack.attacks, attack.projectileSpeed, attack.launchHeight);
+    releaseAttack(state, entity, target, attack.attacks, attack.projectileSpeed, attack.launchHeight,
+      { accuracyPercent: attack.accuracyPercent });
     entity.attackWindup = undefined;
     entity.attackCooldown = Math.max(
       1,

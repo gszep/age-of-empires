@@ -208,9 +208,15 @@ numbers but not the rules that use them:
   off loses the progress.
 - **Blast falloff.** `blast_width` (1 tile for the mangonel) is imported and
   everything inside it takes the full hit, including the shooter's own side, as
-  in AoE2. What the neighbouring `blast_attack_level` implies about damage
-  falling off with distance is not stated in the owned data, so there is none.
-  Blast does not reach buildings.
+  in AoE2; the DAT states no falloff with distance, so there is none. Who is
+  *caught* is no longer approximated (issue #46): a thing is hit when its
+  `blast_defense_level` is at least the shooter's `blast_attack_level`, and
+  the file's own rows settle the reading — every unit is 3, every building 2,
+  a tree 1, a bush or a mine 0; the mangonel shoots at 2, the onager line and
+  the trebuchet at 1. So a mangonel's stone reaches the house its target
+  stands beside and not the tree, an onager's fells the tree as well (and it
+  yields nothing, as in AoE2), and nothing harvests a bush by shooting it.
+  `castle-age.test.ts` asserts all three rows.
 - **The villager's build menu is split into an economic and a military page.**
   Seventeen buildings do not fit AoE2's fifteen-slot command panel, and the
   original splits them the same way; the DAT's `interface_kind` is a different
@@ -518,11 +524,12 @@ have** — their tree marks it `NotAvailable`, which is the real tech tree. So
 accuracy is what the DAT gives each shooter and nothing in a Britons match
 raises it.
 
-**What a miss looks like is approximated.** The DAT states the odds but not the
-scatter, so a shot that fails its accuracy roll is aimed one tile off in a
-random direction. One tile is the board's own unit, and it is wider than any
-unit and narrower than any building — which is why an arrow that goes wide of a
-villager still lands inside the town center behind him, as in AoE2.
+**What a miss looks like is the DAT's own number** (issue #45): a shot that
+fails its accuracy roll is aimed `accuracy_dispersion` tiles off in a random
+direction — 0.33 for the archer line, 0.2 for the trebuchet, which is the
+set-up unit's own 15 % accuracy rather than the packed unit's 92. The one-tile
+scatter this replaced stands in only for hand-written rules that state odds and
+no dispersion, which none of the open fallback's do.
 
 ### The pathing was reviewed, and one tick was halved
 
