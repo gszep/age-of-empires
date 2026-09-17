@@ -707,6 +707,76 @@ class ContentImportIntegrationTest(unittest.TestCase):
             for effect in tech.get("effects", []):
                 self.assertNotIn(effect.get("unit"), skins, f"{key} reaches {effect.get('unit')}")
 
+    def test_a_building_names_its_fires_and_the_particles_they_are(self):
+        # Issue #73: `damage_graphics` are, per threshold of hit points lost,
+        # a composite whose deltas are the reference's fire particles at
+        # their places on the picture. The Dark Age house lights four small
+        # fires past 25 percent, and the Feudal house -- another picture --
+        # has its own places for them.
+        entities = self.result["entities"]
+        house = entities["house"]["damageStages"]
+        self.assertEqual([stage["percent"] for stage in house["idle"]], [25, 50, 75])
+        self.assertEqual(len(house["idle"][0]["flames"]), 4)
+        self.assertEqual(house["idle"][0]["flames"][0], {"effect": "fire_small_left", "offset": [-27, 15]})
+        self.assertEqual({f["effect"] for f in house["idle"][2]["flames"]},
+                         {"fire_large_left", "fire_medium_right", "fire_small_left"})
+        self.assertIn("idle-feudal", house)
+        self.assertNotEqual(house["idle-feudal"], house["idle"])
+        # A building whose Feudal picture is its Dark Age one has one list.
+        self.assertEqual(list(entities["lumber-camp"]["damageStages"]), ["idle"])
+        for key, entity in entities.items():
+            if entity["category"] == "building" and key != "farm":
+                self.assertIn("damageStages", entity, key)
+        # The particles: six flipbooks of sixty frames from the fire atlas,
+        # at half scale, the right-handed ones mirrored, cycling about three
+        # seconds and fading in over three quarters of one.
+        particles = self.result["particles"]
+        self.assertEqual(sorted(particles), [
+            "fire_large_left", "fire_large_right", "fire_medium_left",
+            "fire_medium_right", "fire_small_left", "fire_small_right",
+        ])
+        for name, effect in particles.items():
+            self.assertEqual(len(effect["frames"]), 60, name)
+            self.assertEqual(effect["scale"], 0.5, name)
+            self.assertEqual(effect["flipHorizontal"], name.endswith("_right"), name)
+            self.assertTrue(effect["loop"], name)
+            self.assertEqual(effect["fadeInSeconds"], 0.75, name)
+        self.assertEqual(particles["fire_small_left"]["cycleSeconds"], [2.9, 3.1])
+        self.assertEqual(particles["fire_small_left"]["frames"],
+                         particles["fire_small_right"]["frames"])
+        self.assertIn("particles/textures/atlases/fire.png", self.result["source"]["sha256"])
+
+    def test_the_published_manifest_carries_the_fires_and_the_soot(self):
+        # The converter cuts each flipbook into an atlas of its own, upright
+        # and at scale, and packs a building's SLD damage layer as a fourth
+        # mask over its standing art.
+        manifest = Path("public/imported/aoe2/manifest.json")
+        if not manifest.is_file():
+            self.skipTest("no published manifest to check")
+        published = json.loads(manifest.read_text())
+        if "particles" not in published:
+            self.skipTest("published manifest predates the fires")
+        for name in self.result["particles"]:
+            effect = published["particles"][name]
+            atlas = effect["atlas"]
+            self.assertEqual(atlas["framesInFile"], 60, name)
+            self.assertEqual(len(atlas["frames"]), 60, name)
+            self.assertTrue((manifest.parent / atlas["image"]).is_file(), name)
+            # Half scale of a 512 canvas: nothing taller than 256.
+            for frame in atlas["frames"]:
+                self.assertLessEqual(frame["h"], 256, name)
+                self.assertLessEqual(frame["w"], 256, name)
+                self.assertGreater(frame["w"], 0, name)
+            self.assertEqual(effect["cycleSeconds"], self.result["particles"][name]["cycleSeconds"])
+        house = published["entities"]["house"]["atlases"]
+        self.assertIn("idle-damage", house)
+        self.assertIn("idle-feudal-damage", house)
+        self.assertNotIn("death-damage", house)
+        self.assertNotIn("idle-damage", published["entities"]["villager"]["atlases"])
+        with Image.open(manifest.parent / house["idle-damage"]["image"]) as sheet:
+            self.assertEqual(sheet.getchannel("R").getextrema(), (255, 255))
+            self.assertGreater(sheet.getchannel("A").getextrema()[1], 200)
+
     def test_names_and_tooltips_are_the_reference_strings(self):
         # Issue #48: what the panel calls a thing is the DAT's own string,
         # not the slug spelled out. The rows are the ones the slug got wrong.

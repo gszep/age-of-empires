@@ -40,7 +40,7 @@ def convert(source: Path, output: Path, expected_frames: int) -> dict[str, Any]:
     return {"image": output.name, **atlas}
 
 
-MASK_LAYERS = ("shadow", "playercolor", "outline")
+MASK_LAYERS = ("shadow", "playercolor", "outline", "damage")
 
 
 def convert_mask(source: Path, output: Path, expected_frames: int, layer: str) -> dict[str, Any]:
@@ -55,16 +55,19 @@ def convert_mask(source: Path, output: Path, expected_frames: int, layer: str) -
     colour through them, black for a shadow and the DAT's outline colour for a
     contour. A player-colour sheet keeps the coverage in alpha but carries the
     main layer's grey in RGB, because that grey is the shade the renderer looks
-    up in the player's palette ramp.
+    up in the player's palette ramp. A damage sheet is white with the layer's
+    per-pixel weight as alpha: how much of the soot a pixel takes as the
+    building loses hit points (issue #73).
     """
-    from sld_layers import (LAYER_PLAYERCOLOR, LAYER_SHADOW, decode_colors, decode_masks,
-                            decode_outlines, pack_mask_atlas, pack_playercolor_atlas)
+    from sld_layers import (LAYER_DAMAGE, LAYER_PLAYERCOLOR, LAYER_SHADOW, decode_colors,
+                            decode_masks, decode_outlines, pack_mask_atlas, pack_playercolor_atlas)
 
     data = source.read_bytes()
     if layer == "outline":
         frames = decode_outlines(data)
     else:
-        frames = decode_masks(data, LAYER_PLAYERCOLOR if layer == "playercolor" else LAYER_SHADOW)
+        wanted = {"playercolor": LAYER_PLAYERCOLOR, "damage": LAYER_DAMAGE}.get(layer, LAYER_SHADOW)
+        frames = decode_masks(data, wanted)
     playable = min(expected_frames, len(frames))
     if playable == 0 or not any(f is not None and not f.empty for f in frames[:playable]):
         return {}
@@ -104,31 +107,99 @@ def decoder_fingerprint() -> str:
 
     The cache below reuses an atlas only when its source, its frame count and
     this fingerprint all match, so any edit to the decoder or the packing
-    regenerates everything rather than leaving stale art behind.
+    regenerates everything rather than leaving stale art behind. It covers
+    the decoder module and the two functions here that turn a source into an
+    atlas -- not this whole file, which used to cost a twenty-minute
+    re-decode for adding one key to the manifest dict below.
     """
+    import inspect
+
     digest = hashlib.sha256()
-    for name in ("sld_layers.py", "convert_sld.py"):
-        digest.update(Path(__file__).with_name(name).read_bytes())
+    digest.update(Path(__file__).with_name("sld_layers.py").read_bytes())
+    for function in (convert, convert_mask):
+        digest.update(inspect.getsource(function).encode())
+    digest.update(repr(MASK_LAYERS).encode())
     return digest.hexdigest()
+
+
+def convert_particles(particles: dict[str, Any], out_dir: Path) -> dict[str, Any]:
+    """Cut each particle flipbook out of the reference's TexturePacker atlas.
+
+    A frame is trimmed art inside a `sourceW` x `sourceH` canvas, packed
+    rotated 90 degrees clockwise when `rotated`, and the effect draws it at
+    `scale` about its pivot, mirrored when `flipHorizontal`. All of that is
+    applied here, so the game draws a flame frame exactly as it draws a
+    sprite frame: an atlas rectangle with a hotspot, at 1:1.
+    """
+    from PIL import Image
+
+    from sld_layers import ColorFrame, pack_color_atlas
+
+    converted: dict[str, Any] = {}
+    sheets: dict[str, Any] = {}
+    for name, effect in sorted(particles.items()):
+        atlas_path = Path(effect["atlas"])
+        if atlas_path.name not in sheets:
+            sheets[atlas_path.name] = Image.open(atlas_path).convert("RGBA")
+        sheet = sheets[atlas_path.name]
+        scale = float(effect["scale"])
+        frames: list[ColorFrame] = []
+        for frame in effect["frames"]:
+            width, height = frame["w"], frame["h"]
+            if frame["rotated"]:
+                cut = sheet.crop((frame["x"], frame["y"], frame["x"] + height, frame["y"] + width))
+                cut = cut.transpose(Image.Transpose.ROTATE_90)
+            else:
+                cut = sheet.crop((frame["x"], frame["y"], frame["x"] + width, frame["y"] + height))
+            # The pivot is a fraction of the untrimmed canvas; the hotspot is
+            # where it lands inside the trimmed art.
+            hotspot_x = frame["pivotX"] * frame["sourceW"] - frame["sourceX"]
+            hotspot_y = frame["pivotY"] * frame["sourceH"] - frame["sourceY"]
+            if effect["flipHorizontal"]:
+                cut = cut.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                hotspot_x = width - hotspot_x
+            if scale != 1.0:
+                cut = cut.resize((max(1, round(width * scale)), max(1, round(height * scale))), Image.LANCZOS)
+                hotspot_x *= scale
+                hotspot_y *= scale
+            frames.append(ColorFrame(cut.width, cut.height, round(hotspot_x), round(hotspot_y),
+                                     bytearray(cut.tobytes())))
+        image, atlas = pack_color_atlas(frames, len(frames))
+        relative = f"particles/{name}.png"
+        target = out_dir / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        image.save(target, optimize=True)
+        converted[name] = {
+            "atlas": {**atlas, "image": relative},
+            "loop": effect["loop"],
+            "cycleSeconds": effect["cycleSeconds"],
+            "fadeInSeconds": effect["fadeInSeconds"],
+            "fadeOutSeconds": effect["fadeOutSeconds"],
+        }
+    return converted
 
 
 def atlas_jobs(imported: dict[str, Any]) -> list[dict[str, Any]]:
     """Every main-layer atlas to produce."""
     jobs: list[dict[str, Any]] = []
 
-    def add(key: str, animations: dict[str, Any], prefix: str = "") -> None:
+    def add(key: str, animations: dict[str, Any], category: str, prefix: str = "") -> None:
         for state, animation in animations.items():
             jobs.append({
                 "key": key,
                 "name": f"{prefix}{state}",
                 "source": animation["source"],
                 "expected": animation["frames"] * animation["directions"],
+                # The damage layer is soot on a standing building; nothing
+                # else asks for it, and a unit's sheet carries one too.
+                "layers": MASK_LAYERS if category == "building" and state.startswith("idle")
+                          else tuple(layer for layer in MASK_LAYERS if layer != "damage"),
             })
 
     for key, entity in imported["entities"].items():
-        add(key, entity["animations"])
+        add(key, entity["animations"], entity["category"])
         for index, annex in enumerate(entity.get("annexes", [])):
-            add(key, annex["animations"], prefix=f"annex{index}-")
+            add(key, annex["animations"], entity["category"], prefix=f"annex{index}-")
     return jobs
 
 
@@ -219,7 +290,7 @@ def main() -> None:
     # A mask failure costs that entity one mask and is recorded, never fatal.
     mask_skipped: list[str] = []
     for job in jobs:
-        for layer in MASK_LAYERS:
+        for layer in job["layers"]:
             identifier = f"{job['key']}:{job['name']}:{layer}"
             image = f"{job['key']}/{job['name']}-{layer}.png"
             atlas = cached(identifier, job, image)
@@ -270,6 +341,7 @@ def main() -> None:
     source = dict(imported["source"])
     hashes = dict(source.get("sha256", {}))
     terrain = convert_terrain(imported.get("terrain", {}), args.terrain, args.out, hashes)
+    particles = convert_particles(imported.get("particles", {}), args.out)
     source["sha256"] = hashes
 
     manifest = {
@@ -293,6 +365,10 @@ def main() -> None:
         "playerAttributes": imported.get("playerAttributes", {}),
         "ages": imported.get("ages", []),
         "terrain": terrain,
+        # The fires a damaged building burns with (issue #73).
+        "particles": particles,
+        # The reference's words for a refused order (issue #70).
+        "strings": imported.get("strings", {}),
         "skippedAtlases": sorted(skipped),
         "skippedMasks": sorted(mask_skipped),
     }

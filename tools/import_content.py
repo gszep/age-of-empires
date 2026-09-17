@@ -240,6 +240,92 @@ def dead_standing_graphic(civ_units: Any, unit: Any) -> int:
     return dead.standing_graphic[0] if dead is not None else -1
 
 
+def damage_stages(dat: DatFile, unit: Any) -> list[dict[str, Any]]:
+    """The fires a building shows past each fraction of hit points lost.
+
+    `damage_graphics` names, per `damage_percent`, a composite graphic with
+    no file of its own whose deltas are the flame graphics -- FLM1A_NN and
+    kin, HD-era sprites that DE draws instead as the particle effect each
+    names (`particle_effect_name`, `fire_small_left` and so on) -- at an
+    offset from the building's hotspot in sprite pixels, y down. Thresholds
+    come out ascending, and the delta order is the file's.
+    """
+    stages: list[dict[str, Any]] = []
+    for entry in unit.damage_graphics or []:
+        if entry.graphic_id is None or entry.graphic_id < 0:
+            continue
+        composite = dat.graphics[entry.graphic_id]
+        if composite is None:
+            continue
+        flames = []
+        for delta in composite.deltas or []:
+            if delta.graphic_id < 0:
+                continue
+            flame = dat.graphics[delta.graphic_id]
+            if flame is None or not flame.particle_effect_name:
+                continue
+            flames.append({
+                "effect": flame.particle_effect_name,
+                "offset": [int(delta.offset_x), int(delta.offset_y)],
+            })
+        if flames:
+            stages.append({"percent": int(entry.damage_percent), "flames": flames})
+    stages.sort(key=lambda stage: stage["percent"])
+    return stages
+
+
+def particle_effects(
+    particles_dir: Path, names: set[str], hashes: dict[str, str]
+) -> dict[str, Any]:
+    """The reference's particle definitions, for the effects the content names.
+
+    A fire is not a physics system: `particles/<name>.json` is a flipbook --
+    `ImageCount` frames from `ImageFirst` in the TexturePacker atlas
+    `AtlasFile` names, at `Scale`, looping over `Duration1`..`Duration2`
+    seconds and fading in and out over `StartDuration`/`StopDuration`, with
+    `FlipH` on the right-handed variants. The frames' rectangles are read
+    here from the atlas's own table; the converter cuts them out.
+    """
+    effects: dict[str, Any] = {}
+    tables: dict[str, dict[str, Any]] = {}
+    for name in sorted(names):
+        path = particles_dir / f"{name}.json"
+        definition = json.loads(path.read_text())
+        hashes[f"particles/{name}.json"] = sha256(path)
+        atlas = Path(definition["AtlasFile"].replace("\\", "/"))
+        table_path = particles_dir / atlas.with_suffix(".json")
+        image_path = particles_dir / atlas.with_suffix(".png")
+        if atlas.name not in tables:
+            tables[atlas.name] = json.loads(table_path.read_text())
+            hashes[f"particles/{atlas.with_suffix('.json').as_posix()}"] = sha256(table_path)
+            hashes[f"particles/{atlas.with_suffix('.png').as_posix()}"] = sha256(image_path)
+        table = tables[atlas.name]
+        first, count = int(definition["ImageFirst"]), int(definition["ImageCount"])
+        frames = table["frames"][first:first + count]
+        if len(frames) != count:
+            raise ValueError(f"particle {name}: {count} frames from {first} outrun the atlas table")
+        effects[name] = {
+            "atlas": str(image_path),
+            "scale": rounded(definition.get("Scale", 1.0)),
+            "flipHorizontal": bool(definition.get("FlipH", False)),
+            "loop": definition.get("Type") == "Loop",
+            "cycleSeconds": [rounded(definition["Duration1"]), rounded(definition["Duration2"])],
+            "fadeInSeconds": rounded(definition.get("StartDuration", 0.0)),
+            "fadeOutSeconds": rounded(definition.get("StopDuration", 0.0)),
+            "frames": [
+                {
+                    "x": f["frame"]["x"], "y": f["frame"]["y"], "w": f["frame"]["w"], "h": f["frame"]["h"],
+                    "rotated": bool(f["rotated"]),
+                    "sourceX": f["spriteSourceSize"]["x"], "sourceY": f["spriteSourceSize"]["y"],
+                    "sourceW": f["sourceSize"]["w"], "sourceH": f["sourceSize"]["h"],
+                    "pivotX": f["pivot"]["x"], "pivotY": f["pivot"]["y"],
+                }
+                for f in frames
+            ],
+        }
+    return effects
+
+
 def costs_of(creatable: Any) -> tuple[dict[str, int], int]:
     paid: dict[str, int] = {}
     population = 0
@@ -549,6 +635,13 @@ def extract_entity(
     # twice. The hit points the variants also carry are a simulation change
     # and are not read here; see docs/backlog.md.
     if category == "building":
+        # What it burns with as it loses hit points (issue #73): the DAT's
+        # `damage_graphics` are one composite per threshold whose deltas are
+        # the reference's fire particles at their places on this picture, so
+        # each age's picture has its own, keyed by the idle art it belongs to.
+        stages = damage_stages(dat, unit)
+        if stages:
+            entity["damageStages"] = {"idle": stages}
         last_death = unit.dying_graphic
         last_decay = dead_standing_graphic(civ_units, unit)
         for age, variant_id in age_variants(dat, unit.id).items():
@@ -558,6 +651,10 @@ def extract_entity(
             entity["animations"][f"idle-{age}"] = animation_entry(
                 dat, graphics_dir, variant.standing_graphic[0], hashes
             )
+            variant_stages = damage_stages(dat, variant)
+            if variant_stages and variant_stages != stages:
+                entity.setdefault("damageStages", {})[f"idle-{age}"] = variant_stages
+                stages = variant_stages
             if "death" in spec["animations"] and variant.dying_graphic >= 0 \
                     and variant.dying_graphic != last_death:
                 entity["animations"][f"death-{age}"] = animation_entry(
@@ -1149,6 +1246,16 @@ def extract(
         )
     for effect_spec in spec.get("effects", []):
         entities[effect_spec["key"]] = effect_entry(dat, graphics_dir, effect_spec, hashes)
+    # The particle definitions the buildings' fires name, from the directory
+    # beside the DAT's.
+    flame_names = {
+        flame["effect"]
+        for entity in entities.values()
+        for stages in entity.get("damageStages", {}).values()
+        for stage in stages
+        for flame in stage["flames"]
+    }
+    particles = particle_effects(dat_path.parent.parent / "particles", flame_names, hashes)
     skin_chances(dat_path, entities, hashes)
     civilization = civilization_entry(dat, dat_path, spec, hashes, strings)
     technologies, skipped_technologies = technologies_from_tree(
@@ -1173,6 +1280,7 @@ def extract(
             for resource_id, name in sorted(RESOURCE_ATTRIBUTES.items())
         },
         "technologies": technologies,
+        "particles": particles,
         # What the civilisation's tree offers that this game cannot represent,
         # and why. Recorded rather than dropped, so the gap is visible.
         "skippedTechnologies": skipped_technologies,

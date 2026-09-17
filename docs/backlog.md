@@ -40,7 +40,6 @@ construction-complete cue, so that one has no owned source to draw on.
   ids out of the same `MAP_CONSTANTS` block — a data addition, not work — and
   they are left out only so the import does not carry textures no board deals.
   The four that ship span the script's range.
-- **Fire delta overlays** on damaged buildings are not imported.
 - **The monk draws no occlusion contour.** Its idle and attack outline layers
   are the only consumed sources that fail `tools/sld_layers.py`'s walk
   invariant (`outline row 13: covered 0 of 7 blocks, consumed 11 of 11 bytes`,

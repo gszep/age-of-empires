@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { materialColor, materialOpacity, texture as textureNode, vec2 } from 'three/tsl';
 import { skinnedKey } from './skins';
-import type { ContentAssets, Atlas, AnimationInfo } from './assets';
+import type { ContentAssets, Atlas, AnimationInfo, ImportedEntity } from './assets';
 import { isAnimal, isBuilding, isUnit } from '../sim/data';
 import { swingSeconds } from '../sim/game';
 import { createTerrainPatch, elevationAt, ELEVATION_PIXELS, elevatedWorldToIso } from './world';
@@ -55,6 +55,13 @@ export interface EntityView {
   /** Contour drawn in the owner's colour while a building hides the unit. */
   outline: Piece;
   outlineColor?: number;
+  /** Soot over a building, from the SLD damage layer, by hit points lost. */
+  damage?: Piece;
+  /** The fires a damaged building burns with, one piece per flame. */
+  flames: Piece[];
+  /** Which damage stage the flames are lit for, and since when: they fade in. */
+  flameStage?: number;
+  flameStageSince?: number;
   annexes: Piece[];
   /** Player-colour mask over each annex, in the same order. */
   annexColors: Piece[];
@@ -158,10 +165,15 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
   }
   const view: EntityView = {
     group, owner: entity.owner, shadow, body, color, outline, annexes, annexColors, fallback: !imported,
+    flames: [],
     facing: entity.owner === 2 ? Math.PI : 0,
     playerColor: playerColorHex(assets, entity.owner),
     outlineColor: outlineColorOf(assets, entity.owner),
   };
+  if (imported && isBuilding(entity.kind)) {
+    view.damage = makePiece();
+    group.add(view.damage.mesh);
+  }
   if (entity.kind === 'farm') {
     view.fallback = false;
     return view;
@@ -507,6 +519,76 @@ function applyFrame(
 }
 
 /**
+ * A building's damage, two ways the reference shows it (issue #73). The SLD
+ * damage layer is soot: a per-pixel weight over the standing art, drawn
+ * black at the fraction of hit points lost, so a building blackens as it
+ * goes. And the DAT's `damage_graphics` are the fires: past each threshold
+ * of hit points lost, the reference's flame particles at their places on
+ * this age's picture, each a flipbook cycling on its own clock and fading
+ * in over its own seconds when the stage begins. Neither shows on a
+ * foundation, a corpse or an undamaged building.
+ */
+function updateDamage(
+  view: EntityView, assets: ContentAssets, state: GameState, entity: Entity,
+  imported: ImportedEntity | undefined, animationName: string, frameIndex: number, depth: number, time: number,
+): void {
+  const lost = entity.maxHp > 0 ? 1 - entity.hp / entity.maxHp : 0;
+  const standing = isBuilding(entity.kind) && !entity.dead && entity.buildProgress === undefined && lost > 0;
+  const damageAtlas = standing ? imported?.atlases[`${animationName}-damage`] : undefined;
+  if (view.damage && damageAtlas) {
+    applyFrame(view.damage, assets, damageAtlas, frameIndex, entity.position, 0x000000);
+    view.damage.mesh.renderOrder = 1000 + depth * 10 + 1.5;
+    (view.damage.mesh.material as THREE.MeshBasicMaterial).opacity = lost;
+  } else if (view.damage) {
+    view.damage.mesh.visible = false;
+  }
+
+  // The stage: the DAT lists them ascending, and the one that shows is the
+  // last whose threshold has been passed. The age's own picture has its own
+  // list, found through the same chain as the art.
+  const stages = standing
+    ? ageChain(state, entity, 'idle').map(name => imported?.damageStages?.[name]).find(Boolean)
+    : undefined;
+  let stageIndex = -1;
+  for (const [index, stage] of (stages ?? []).entries()) {
+    if (lost * 100 >= stage.percent) stageIndex = index;
+  }
+  if (stageIndex !== view.flameStage) {
+    view.flameStage = stageIndex;
+    view.flameStageSince = time;
+  }
+  const flames = stageIndex >= 0 ? stages![stageIndex].flames : [];
+  while (view.flames.length < flames.length) {
+    const piece = makePiece();
+    view.group.add(piece.mesh);
+    view.flames.push(piece);
+  }
+  const iso = worldToIso(entity.position.x, entity.position.y);
+  for (const [index, piece] of view.flames.entries()) {
+    const flame = flames[index];
+    const effect = flame ? assets.particles?.[flame.effect] : undefined;
+    if (!flame || !effect) { piece.mesh.visible = false; continue; }
+    // Each fire runs its own cycle, drawn from the reference's range by the
+    // flame's place in the list, and starts its loop at its own phase.
+    const [shortest, longest] = effect.cycleSeconds;
+    const cycle = shortest + (longest - shortest) * ((index * 7919) % 97) / 97;
+    const phase = ((index * 104729) % 89) / 89;
+    const frames = effect.atlas.framesInFile;
+    const frame = Math.floor(((time / cycle) + phase) * frames) % Math.max(1, frames);
+    applyFrame(piece, assets, effect.atlas, frame,
+      { x: 0, y: 0 }, 0xffffff);
+    // Placed by hand: the offset is in sprite pixels from the hotspot, y
+    // down, and applyFrame anchored the hotspot at the origin.
+    piece.mesh.position.x += iso.x + flame.offset[0];
+    piece.mesh.position.y += iso.y - flame.offset[1];
+    piece.mesh.renderOrder = 1000 + depth * 10 + 9;
+    const lit = time - (view.flameStageSince ?? time);
+    (piece.mesh.material as THREE.MeshBasicMaterial).opacity =
+      effect.fadeInSeconds > 0 ? Math.min(1, lit / effect.fadeInSeconds) : 1;
+  }
+}
+
+/**
  * DE sprite frame 0 faces screen-east; frames rotate clockwise as the index
  * increases (openage's DE exporter encodes this as start_angle=270 with
  * degree 0 = south/front-facing, degree increasing clockwise; see
@@ -538,7 +620,7 @@ export function createFlagView(assets: ContentAssets | undefined, owner: number)
   const color = ramp ? makeRampPiece(ramp) : makePiece();
   group.add(color.mesh);
   return {
-    group, owner, shadow, body, color, outline: makePiece(), annexes: [], annexColors: [],
+    group, owner, shadow, body, color, outline: makePiece(), annexes: [], annexColors: [], flames: [],
     fallback: false, facing: 0, playerColor: playerColorHex(assets, owner),
   };
 }
@@ -595,7 +677,7 @@ export function createProjectileView(): EntityView {
   group.add(body.mesh);
   return {
     group, owner: 0, shadow, body, color: makePiece(), outline: makePiece(),
-    annexes: [], annexColors: [], fallback: false, facing: 0,
+    annexes: [], annexColors: [], flames: [], fallback: false, facing: 0,
   };
 }
 
@@ -894,6 +976,8 @@ export function updateEntityView(
   }
   (view.body.mesh.material as THREE.MeshBasicMaterial).opacity =
     entity.buildProgress !== undefined ? 0.85 : 1;
+
+  updateDamage(view, assets, state, entity, imported, choice.name, frameIndex, depth, time);
 
   // The contour AoE2 shows through a building that hides a unit. It is
   // positioned every frame but stays hidden until `updateOcclusion` finds

@@ -383,6 +383,122 @@ describe('what a building wears in each age', () => {
   });
 });
 
+describe('a building on fire', () => {
+  /** A barracks with a soot layer and the DAT's three stages of flames. */
+  function burningAssets(): ContentAssets {
+    const assets = fakeAssets();
+    const frames = [{ x: 0, y: 0, w: 4, h: 4, cx: 2, cy: 2 }];
+    const atlas = (image: string): Atlas => ({ image, size: [4, 4], framesInFile: 1, frames });
+    for (const image of ['barracks/idle.png', 'barracks/idle-damage.png', 'particles/fire_small_left.png']) {
+      const texture = new THREE.DataTexture(new Uint8Array(4 * 4 * 4), 4, 4);
+      texture.needsUpdate = true;
+      assets.textures.set(image, texture);
+    }
+    const still = { frames: 1, directions: 1, frameSeconds: 0, mirroringMode: 0 };
+    assets.entities['barracks'] = {
+      category: 'building',
+      animations: { idle: still },
+      atlases: { idle: atlas('barracks/idle.png'), 'idle-damage': atlas('barracks/idle-damage.png') },
+      damageStages: {
+        idle: [
+          { percent: 25, flames: [{ effect: 'fire_small_left', offset: [10, -20] }] },
+          { percent: 50, flames: [{ effect: 'fire_small_left', offset: [10, -20] }, { effect: 'fire_small_left', offset: [-30, 5] }] },
+          { percent: 75, flames: [{ effect: 'fire_small_left', offset: [0, 0] }, { effect: 'fire_small_left', offset: [1, 1] }, { effect: 'fire_small_left', offset: [2, 2] }] },
+        ],
+      },
+    };
+    assets.particles = {
+      fire_small_left: {
+        atlas: { image: 'particles/fire_small_left.png', size: [4, 4], framesInFile: 1, frames },
+        loop: true, cycleSeconds: [2.9, 3.1], fadeInSeconds: 0.75, fadeOutSeconds: 0.75,
+      },
+    };
+    return assets;
+  }
+
+  const barracksOf = (state: GameState): Entity => {
+    const entity: Entity = {
+      id: state.nextId++, kind: 'barracks', owner: 1, position: { x: 30.5, y: 30.5 },
+      hp: 1200, maxHp: 1200, radius: 1.5, activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(entity);
+    return entity;
+  };
+  const lit = (view: EntityView) => view.flames.filter(piece => piece.mesh.visible).length;
+  const soot = (view: EntityView) => view.damage!.mesh.visible
+    ? (view.damage!.mesh.material as THREE.MeshBasicMaterial).opacity : 0;
+
+  it('blackens by the hit points lost and lights the stage the DAT names', () => {
+    // Issue #73: the SLD damage layer is soot drawn at the fraction lost;
+    // `damage_graphics` light flames past 25, 50 and 75 percent lost.
+    const assets = burningAssets();
+    const state = createGame(75);
+    const barracks = barracksOf(state);
+    const view = createEntityView(assets, barracks);
+
+    updateEntityView(view, assets, state, barracks, 0);
+    expect(soot(view)).toBe(0);
+    expect(lit(view)).toBe(0);
+
+    barracks.hp = 840;   // 30% lost
+    updateEntityView(view, assets, state, barracks, 1);
+    expect(soot(view)).toBeCloseTo(0.3, 6);
+    expect(lit(view)).toBe(1);
+    // The flame sits where the DAT puts it: its offset from the hotspot in
+    // sprite pixels, y down, so -20 is twenty pixels up the screen.
+    const at = view.flames[0].mesh.position;
+    const iso = worldToIso(barracks.position.x, barracks.position.y);
+    expect(at.x - iso.x).toBeCloseTo(10, 6);
+    expect(at.y - iso.y).toBeCloseTo(20, 6);
+
+    barracks.hp = 500;   // 58% lost
+    updateEntityView(view, assets, state, barracks, 2);
+    expect(lit(view)).toBe(2);
+    barracks.hp = 100;   // 92% lost
+    updateEntityView(view, assets, state, barracks, 3);
+    expect(lit(view)).toBe(3);
+    expect(soot(view)).toBeCloseTo(1 - 100 / 1200, 6);
+  });
+
+  it('fades a new stage in over the effect\'s own seconds', () => {
+    const assets = burningAssets();
+    const state = createGame(76);
+    const barracks = barracksOf(state);
+    const view = createEntityView(assets, barracks);
+    barracks.hp = 840;
+    updateEntityView(view, assets, state, barracks, 10);
+    const opacity = () => (view.flames[0].mesh.material as THREE.MeshBasicMaterial).opacity;
+    expect(opacity()).toBe(0);
+    updateEntityView(view, assets, state, barracks, 10.375);
+    expect(opacity()).toBeCloseTo(0.5, 6);
+    updateEntityView(view, assets, state, barracks, 11);
+    expect(opacity()).toBe(1);
+  });
+
+  it('shows nothing on a foundation, a corpse, or after repair', () => {
+    const assets = burningAssets();
+    const state = createGame(77);
+    const barracks = barracksOf(state);
+    const view = createEntityView(assets, barracks);
+    barracks.hp = 300;
+    barracks.buildProgress = 0.25;
+    updateEntityView(view, assets, state, barracks, 0);
+    expect(lit(view)).toBe(0);
+    expect(soot(view)).toBe(0);
+    barracks.buildProgress = undefined;
+    updateEntityView(view, assets, state, barracks, 1);
+    expect(lit(view)).toBe(3);
+    barracks.hp = 1200;
+    updateEntityView(view, assets, state, barracks, 2);
+    expect(lit(view)).toBe(0);
+    expect(soot(view)).toBe(0);
+    barracks.hp = 300;
+    barracks.dead = true;
+    updateEntityView(view, assets, state, barracks, 3);
+    expect(lit(view)).toBe(0);
+  });
+});
+
 describe('what a death leaves behind', () => {
   /** A villager and an oak with the DAT's death-then-decay chain. */
   function corpseAssets(): ContentAssets {

@@ -1333,6 +1333,46 @@ and computed from the research-applied rules so an upgrade shows. A building
 that does not shoot here (the town center: its arrows are garrison-driven,
 #54) shows no attack. The queue portraits (`QueueButtons`) are still to do.
 
+## A building burns as it is razed
+
+Buildings took damage with no sign of it (issue #73). The reference shows
+it two ways, and both are in the owned files.
+
+**Soot.** Every SLD carries a fourth layer (`0x08`, `LAYER_DAMAGE`) beside
+the shadow, outline and player-colour masks: a per-pixel weight over the
+standing art, noisy and skewed dark (mean 85–100 of 255 on a house, a
+barracks and a castle; 13% zeros; a bump at the top), and the sprite shader
+binds `g_damageAtlases`. The converter packs it as a fourth mask atlas
+(`idle-damage`, buildings' standing art only — a unit's sheet carries one
+too and nothing asks for it) and the renderer draws it black over the body
+at the fraction of hit points lost, so a pixel darkens by `lost × weight`.
+The exact curve the shader applies is not read; this linear one is the
+chosen part.
+
+**Fire.** The DAT's `damage_graphics` are, per building and per
+`damage_percent` (25, 50, 75 — the fraction lost), a composite graphic with
+no file of its own whose deltas are the flames at their offsets from the
+hotspot: FLM1A_NN and kin, HD-era sprites that DE draws instead as the
+particle effect each names in `particle_effect_name` — `fire_small_left`,
+`fire_medium_right`, `fire_large_left`. Each age's picture has its own
+composite (HOUS2's fires sit on HOUS2's roof), keyed here by the idle art it
+belongs to and resolved through the same age chain. The particles are not a
+physics system: `particles/<name>.json` is a flipbook — 60 frames from
+`ImageFirst` in the TexturePacker atlas `textures/atlases/fire.png` (whose
+own table gives each frame's rectangle, trim and pivot, and which lies
+rotated 90° clockwise where `rotated`), at `Scale` 0.5, looping over
+`Duration1`..`Duration2` seconds (2.9–3.1, and 1.9–2.1 for one), fading in
+and out over 0.75, `FlipH` on the right-handed ones (which share the left
+ones' frames). The converter cuts each effect's frames out upright, mirrored
+and at scale, hotspot at the pivot, into an atlas of its own, and the
+renderer lights the stage whose threshold has been passed: each flame a
+frame of its flipbook on a cycle drawn from the reference's range, fading in
+when the stage begins. Six effects are referenced by the imported roster.
+Neither soot nor fire shows on a foundation, a corpse or a whole building.
+The atlas cache fingerprint now covers the decoder and the two conversion
+functions rather than the whole of `convert_sld.py`, so adding a key to the
+manifest no longer re-decodes every sheet.
+
 ## A portrait wears its owner's colour
 
 The unit icons in the command grid and the selection panel had no player

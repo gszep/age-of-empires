@@ -35,7 +35,34 @@ export interface ImportedEntity {
   animations: Record<string, AnimationInfo>;
   atlases: Record<string, Atlas>;
   annexes?: { unitId: number; misplacement: [number, number]; animations: Record<string, AnimationInfo>; atlases: Record<string, Atlas> }[];
+  /**
+   * A building's fires (issue #73): per standing animation (the age's own
+   * picture has its own), the DAT's `damage_graphics` thresholds ascending,
+   * each the particle effects it lights and where, in sprite pixels from the
+   * hotspot, y down.
+   */
+  damageStages?: Record<string, DamageStage[]>;
 }
+
+export interface DamageStage {
+  /** The fraction of hit points lost, in percent, past which this stage shows. */
+  percent: number;
+  flames: { effect: string; offset: [number, number] }[];
+}
+
+/**
+ * One of the reference's particle effects, as the flipbook it is: frames cut
+ * from its atlas at its own scale and pivot, cycling over a length drawn
+ * between `cycleSeconds`, fading in and out over its own seconds.
+ */
+export interface ParticleEffect {
+  atlas: Atlas;
+  loop: boolean;
+  cycleSeconds: [number, number];
+  fadeInSeconds: number;
+  fadeOutSeconds: number;
+}
+
 
 /** One player's block of the game palette, found at the DAT's own colour base. */
 export interface PlayerColor {
@@ -102,6 +129,8 @@ export interface ContentAssets {
   /** One 256-texel ramp per player, indexed by a sprite's own grey. */
   playerRamps: Map<number, THREE.DataTexture>;
   blends?: BlendMasks;
+  /** The reference's particle effects the content names, by name. */
+  particles?: Record<string, ParticleEffect>;
 }
 
 interface UiMaterial {
@@ -208,6 +237,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     ages?: ImportedAge[];
     terrain?: Record<string, ImportedTerrain>;
     playerColors?: PlayerColors;
+    particles?: Record<string, ParticleEffect>;
   }>(`${CONTENT_BASE}manifest.json`);
   if (!manifest) return undefined;
   const textures = new Map<string, THREE.Texture>();
@@ -237,6 +267,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     loadAtlases(entity.atlases);
     for (const annex of entity.annexes ?? []) loadAtlases(annex.atlases);
   }
+  for (const effect of Object.values(manifest.particles ?? {})) loadAtlases({ flipbook: effect.atlas });
   const terrain = manifest.terrain ?? {};
   for (const slot of Object.values(terrain)) {
     jobs.push(loader.loadAsync(CONTENT_BASE + slot.image).then(texture => {
@@ -289,7 +320,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   }
   return {
     entities: manifest.entities, skins: skinFamilies(manifest.entities), ages: manifest.ages ?? [],
-    terrain, textures, playerColors, playerRamps, blends,
+    terrain, textures, playerColors, playerRamps, blends, particles: manifest.particles,
   };
 }
 

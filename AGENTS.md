@@ -64,9 +64,11 @@ model-provider tests opt-in.
   `~/Steam/steamapps/content/app_813780`), the SteamCMD depot tree — not a
   normal game install. Pinned depot/manifest IDs live in
   `tools/aoe2-source.json`; setup guide in `docs/owned-assets-setup.md`.
-- **The atlas cache is keyed on `convert_sld.py`'s own source:** any edit to
-  that file — the manifest dict included — re-decodes every sprite, about
-  twenty minutes. Batch such edits, and never restart the run.
+- **The atlas cache is keyed on the decoder's source:** `sld_layers.py` and
+  the `convert`/`convert_mask` functions in `convert_sld.py`. Any edit to
+  those re-decodes every sprite — about an hour, masks included; editing the
+  manifest dict or anything else in the converter does not. Batch decoder
+  edits, and never restart the run.
 - **A tester's tab goes stale across re-imports:** the manifest is fetched
   once per load. After regenerating `public/imported/`, ask for a reload
   before investigating a report from an old tab.

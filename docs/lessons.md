@@ -647,11 +647,14 @@ keeps the record.
   numbers happening to agree. Rule: a new content key is three edits —
   `import_content.py`, the dict in `convert_sld.py`, and the publish test's
   list of rule-bearing keys — and the test is the one that matters.
-- **Editing the atlas converter for anything invalidates the whole cache.**
-  `decoder_fingerprint` hashes `convert_sld.py` itself, so adding one key to
-  the manifest dict re-decoded 1,500 atlases for twenty minutes. Rule: know
-  that before touching the file, batch such edits, and never restart the run
-  (three at once look like a hang — see above).
+- **Editing the atlas decoder invalidates the whole cache.**
+  `decoder_fingerprint` used to hash `convert_sld.py` itself, so adding one
+  key to the manifest dict re-decoded 1,500 atlases for twenty minutes; it
+  now hashes `sld_layers.py` and the two conversion functions, so only a
+  decoding change costs the hour (structure, not prose — the lesson recurred
+  the day the fires needed a manifest key). Rule: know that before touching
+  the decoder, batch such edits, and never restart the run (three at once
+  look like a hang — see above).
 - **Check a panel against a screenshot of the reference at the same scale,
   not against the widget file alone.** `commandpanel.json` says the parchment
   is anchored TopRight in a 2246-wide collection, which put it 358 in; the
