@@ -316,8 +316,14 @@
               "trade",
               "heal",
               "convert",
-              "repair"
+              "repair",
+              "garrison"
             ]
+          },
+          "garrisoned": {
+            "type": "integer",
+            "minimum": 0,
+            "$comment": "Units sheltering inside this building of yours; they are not in the entity list while they are."
           },
           "carrying": {
             "type": "object",

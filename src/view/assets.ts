@@ -63,7 +63,6 @@ export interface ParticleEffect {
   fadeOutSeconds: number;
 }
 
-
 /** One player's block of the game palette, found at the DAT's own colour base. */
 export interface PlayerColor {
   name: string;

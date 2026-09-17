@@ -1,4 +1,5 @@
-import { FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isAnimal, isBuilding, isMilitary, isUnit } from './data';
+import {
+  GARRISON_CATEGORY, FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isAnimal, isBuilding, isMilitary, isUnit } from './data';
 import type {
   AttackValue, BuildingRules, Cost, GameRules, NodeKind, TechEffect, TechKey, UnitRules,
 } from './data';
@@ -143,7 +144,12 @@ function recalculatePopulation(state: GameState): void {
   for (const player of [1, 2] as PlayerId[]) {
     state.players[player].population = state.entities
       .filter(e => !e.dead && e.owner === player && isUnit(e.kind))
-      .reduce((sum, e) => sum + state.rules.units[e.kind as UnitKind].popCost, 0);
+      .reduce((sum, e) => sum + state.rules.units[e.kind as UnitKind].popCost, 0)
+      // A unit inside a building is out of the list and still a person.
+      + state.entities
+        .filter(e => !e.dead && e.owner === player && e.garrison?.length)
+        .reduce((sum, e) => sum + e.garrison!.reduce(
+          (inner, unit) => inner + state.rules.units[unit.kind as UnitKind].popCost, 0), 0);
     state.players[player].populationCap = state.rules.startingPopulationCap + state.entities
       .filter(e => !e.dead && e.owner === player && isBuilding(e.kind) && e.buildProgress === undefined)
       .reduce((sum, e) => sum + state.rules.buildings[e.kind as BuildingKind].popSupport, 0);
@@ -164,7 +170,6 @@ function spendCost(state: GameState, player: PlayerId, cost: Cost): CommandResul
   // Named, as the reference names it: "Not enough wood." (issue #70).
   const short = shortfall(state, player, cost);
   if (short) return rejected(`not enough ${short}`);
-
   p.food -= cost.food;
   p.wood -= cost.wood;
   p.gold -= cost.gold;
@@ -426,6 +431,8 @@ function assignOrder(state: GameState, entity: Entity, target: Point, targetEnti
   } else if (targetEntity && isRepairable(state, entity, targetEntity)) {
     entity.order = { kind: 'repair', targetId: targetEntity.id };
     entity.repaired = 0;
+  } else if (targetEntity && canGarrison(state, entity, targetEntity)) {
+    entity.order = { kind: 'garrison', targetId: targetEntity.id };
   } else if (targetEntity && targetEntity.owner !== 0 && targetEntity.owner !== entity.owner && armed) {
     entity.order = { kind: 'attack', targetId: targetEntity.id };
   } else {
@@ -574,6 +581,14 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     const player = state.players[command.player];
     player.food += cost.food; player.wood += cost.wood;
     player.gold += cost.gold; player.stone += cost.stone;
+    return { ok: true };
+  }
+
+  if (command.kind === 'ungarrison') {
+    const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
+    if (!building) return rejected(`building ${command.buildingId} is not owned`);
+    if (!building.garrison?.length) return rejected('nobody is garrisoned');
+    ungarrisonAll(state, building);
     return { ok: true };
   }
 
@@ -1038,6 +1053,9 @@ function armorsOf(state: GameState, entity: Entity): AttackValue[] {
 const FALLBACK_CORPSE_SECONDS = 3;
 
 function kill(state: GameState, entity: Entity): void {
+  // Whoever was sheltering inside comes out as it falls, as the reference's
+  // do from a razed town center or castle.
+  if (entity.garrison?.length) ungarrisonAll(state, entity);
   entity.dead = true;
   entity.activity = 'dying';
   entity.order = { kind: 'idle' };
@@ -1498,6 +1516,133 @@ function updateRepairer(state: GameState, grid: NavGrid, entity: Entity): void {
   target.hp = Math.min(target.maxHp, target.hp + whole);
 }
 
+/** The garrison category a unit falls in, from the editor's table by DAT class. */
+function garrisonCategory(state: GameState, unit: Entity): number {
+  const datClass = state.rules.units[unit.kind as UnitKind]?.datClass;
+  return datClass === undefined ? 0 : GARRISON_CATEGORY[datClass] ?? 0;
+}
+
+/**
+ * Whether this unit may shelter in that building (issue #75): its own side's,
+ * finished, with a garrison the DAT gives a capacity and a type mask that
+ * names the unit's category, and room left.
+ */
+export function canGarrison(state: GameState, unit: Entity, building: Entity): boolean {
+  if (!isUnit(unit.kind) || !isBuilding(building.kind) || building.dead) return false;
+  if (building.owner !== unit.owner || building.buildProgress !== undefined) return false;
+  const garrison = state.rules.buildings[building.kind as BuildingKind].garrison;
+  if (!garrison || garrison.capacity <= 0) return false;
+  if (!(garrison.types & garrisonCategory(state, unit))) return false;
+  return (building.garrison?.length ?? 0) < garrison.capacity;
+}
+
+/**
+ * How many arrows a building's volley has: the DAT's base plus what those
+ * inside add, capped at its maximum. An archer adds its `garrison_firepower`
+ * of 1.0; a villager's is the DAT's -2.5, an encoding the owned files do not
+ * explain, and it counts here as the one arrow the reference's rule gives
+ * it (recorded in docs/status.md).
+ */
+export function volleyArrows(state: GameState, building: Entity): number {
+  const volley = state.rules.buildings[building.kind as BuildingKind].garrison?.volley;
+  if (!volley) return 1;
+  let arrows = volley.base;
+  for (const unit of building.garrison ?? []) {
+    const firepower = state.rules.units[unit.kind as UnitKind].garrisonFirepower ?? 0;
+    arrows += firepower < 0 ? 1 : firepower;
+  }
+  return Math.min(volley.max, Math.floor(arrows));
+}
+
+/**
+ * A town center with nobody inside has one arrow on paper and no projectile
+ * to fire it with -- the DAT's `projectile_unit_id` is -1 -- so it holds its
+ * fire until the garrison gives it one. A tower and a castle carry their own.
+ */
+function volleyFires(state: GameState, building: Entity): boolean {
+  const volley = state.rules.buildings[building.kind as BuildingKind].garrison?.volley;
+  if (!volley || volley.ownProjectile) return true;
+  return (building.garrison?.length ?? 0) > 0 && volleyArrows(state, building) >= 1;
+}
+
+function updateGarrisoner(state: GameState, grid: NavGrid, entity: Entity): void {
+  if (entity.order.kind !== 'garrison') return;
+  const rules = state.rules.units[entity.kind as UnitKind];
+  const building = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
+  if (!building || !canGarrison(state, entity, building)) { becomeIdle(entity); return; }
+  if (!inRange(entity, building, 0.4)) {
+    entity.activity = 'moving';
+    moveAlong(state, grid, entity, building.position, rules.speed, interactionRange(building));
+    return;
+  }
+  // In: off the map and into the building. A villager's load is banked on
+  // the way, as the reference banks it.
+  clearPath(entity);
+  if (entity.carrying) {
+    state.players[entity.owner as PlayerId][entity.carrying.kind] += entity.carrying.amount;
+    entity.carrying = undefined;
+  }
+  becomeIdle(entity);
+  entity.orderQueue = undefined;
+  entity.path = undefined;
+  entity.position = { ...building.position };
+  state.entities = state.entities.filter(e => e.id !== entity.id);
+  (building.garrison ??= []).push(entity);
+}
+
+/**
+ * Those inside mend at the building's `garrison_heal_rate`, a hit point at a
+ * time; the fraction rides on each unit's own progress counter.
+ */
+function updateGarrison(state: GameState, building: Entity): void {
+  const garrison = state.rules.buildings[building.kind as BuildingKind].garrison;
+  if (!garrison || !building.garrison?.length || garrison.healRate <= 0) return;
+  for (const unit of building.garrison) {
+    if (unit.hp >= unit.maxHp) continue;
+    unit.gatherProgress = (unit.gatherProgress ?? 0) + garrison.healRate * TICK_SECONDS;
+    const whole = Math.floor(unit.gatherProgress);
+    if (whole >= 1) {
+      unit.gatherProgress -= whole;
+      unit.hp = Math.min(unit.maxHp, unit.hp + whole);
+    }
+  }
+}
+
+/**
+ * Everybody out, onto the ground around the building: the nearest free
+ * places round its footprint, in a fixed order so a replay agrees.
+ */
+export function ungarrisonAll(state: GameState, building: Entity): Entity[] {
+  const inside = building.garrison ?? [];
+  building.garrison = undefined;
+  if (!inside.length) return [];
+  const half = halfExtent(building);
+  const spots: Point[] = [];
+  for (let ring = 0; ring < 4 && spots.length < inside.length * 2; ring++) {
+    const rx = half.x + 0.5 + ring;
+    const ry = half.y + 0.5 + ring;
+    const steps = 8 + ring * 8;
+    for (let step = 0; step < steps; step++) {
+      const angle = step * 2 * Math.PI / steps;
+      const spot = { x: building.position.x + Math.cos(angle) * rx, y: building.position.y + Math.sin(angle) * ry };
+      if (spot.x < 0.5 || spot.y < 0.5 || spot.x > state.width - 0.5 || spot.y > state.height - 0.5) continue;
+      const blocked = state.entities.some(e => !e.dead && e.id !== building.id
+        && (isBuilding(e.kind) || e.kind === 'resource')
+        && footprintsOverlap(spot, { x: 0.3, y: 0.3 }, e.position, halfExtent(e)));
+      if (!blocked) spots.push(spot);
+    }
+  }
+  for (const [index, unit] of inside.entries()) {
+    const spot = spots[index % Math.max(1, spots.length)] ?? building.position;
+    unit.position = { x: spot.x, y: spot.y };
+    unit.gatherProgress = 0;
+    unit.activity = 'idle';
+    unit.order = { kind: 'idle' };
+    state.entities.push(unit);
+  }
+  return inside;
+}
+
 /**
  * A monk works on somebody else's soldier until it changes sides. The DAT
  * gives the window rather than the odds — the earliest second a conversion may
@@ -1815,6 +1960,7 @@ function autoAcquire(state: GameState, entity: Entity): void {
 function updateTower(state: GameState, entity: Entity): void {
   const attack = buildingRulesFor(state, entity.owner, entity.kind as BuildingKind).attack;
   if (!attack || entity.buildProgress !== undefined) return;
+  if (!volleyFires(state, entity)) { entity.attackWindup = undefined; return; }
   let target: Entity | undefined;
   let bestDistance = Infinity;
 
@@ -1859,8 +2005,23 @@ function updateTower(state: GameState, entity: Entity): void {
   }
   entity.attackWindup -= 1;
   if (entity.attackWindup <= 0) {
-    releaseAttack(state, entity, target, attack.attacks, attack.projectileSpeed, attack.launchHeight,
-      { accuracyPercent: attack.accuracyPercent });
+    const volley = state.rules.buildings[entity.kind as BuildingKind].garrison?.volley;
+    // The building's own arrow first, where it has one...
+    if (!volley || volley.ownProjectile) {
+      releaseAttack(state, entity, target, attack.attacks, attack.projectileSpeed, attack.launchHeight,
+        { accuracyPercent: attack.accuracyPercent });
+    }
+    // ...then the rest of the volley (issue #75): the DAT's base arrows and
+    // those the garrison adds, each the secondary projectile's own shot at
+    // the same target. A town center's are all of this kind.
+    if (volley) {
+      const extra = volleyArrows(state, entity) - (volley.ownProjectile ? 1 : 0);
+      for (let arrow = 0; arrow < extra; arrow++) {
+        releaseAttack(state, entity, target, volley.arrowAttacks ?? attack.attacks,
+          volley.arrowSpeed ?? attack.projectileSpeed, attack.launchHeight,
+          { accuracyPercent: attack.accuracyPercent });
+      }
+    }
     entity.attackWindup = undefined;
     entity.attackCooldown = Math.max(
       1,
@@ -1905,6 +2066,7 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
     case 'attack': return updateAttacker(state, grid, entity);
     case 'heal': return updateHealer(state, grid, entity);
     case 'repair': return updateRepairer(state, grid, entity);
+    case 'garrison': return updateGarrisoner(state, grid, entity);
     case 'convert': return updateConverter(state, grid, entity);
     default:
       entity.activity = 'idle';
@@ -2082,7 +2244,7 @@ function isDefeated(state: GameState, player: PlayerId): boolean {
   for (const entity of state.entities) {
     if (entity.dead || entity.owner !== player || isAnimal(entity.kind)) continue;
     if (entity.kind === 'town-center') townCenter = true;
-    if (isUnit(entity.kind)) unit = true;
+    if (isUnit(entity.kind) || entity.garrison?.length) unit = true;
     // "Can still produce" is asked of the rules, not of a list of building
     // names: a player left with only a stable or a castle is not beaten.
     if (entity.buildProgress === undefined && trainsAnything(state, entity.kind)) production = true;
@@ -2192,6 +2354,7 @@ export function stepGame(state: GameState): void {
     } else if (isBuilding(entity.kind) && entity.buildProgress === undefined) {
       updateBuildingProduction(state, entity);
       updateBuildingResearch(state, entity);
+      updateGarrison(state, entity);
       updateTower(state, entity);
     }
   }

@@ -20,6 +20,8 @@ export interface ObservedEntity {
   training?: { kind: UnitKind; remainingSeconds: number };
   /** What it is researching; own buildings only, like `training`. */
   researching?: { tech: string; remainingSeconds: number };
+  /** How many shelter inside; own buildings only. They are not in the list. */
+  garrisoned?: number;
 }
 
 export interface PlayerObservation {

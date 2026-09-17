@@ -22,6 +22,7 @@ function observeEntity(entity: Entity, player: PlayerId): ObservedEntity {
     observed.activity = entity.activity;
     observed.order = entity.order.kind;
     if (entity.carrying) observed.carrying = { ...entity.carrying };
+    if (entity.garrison?.length) observed.garrisoned = entity.garrison.length;
     if (entity.training) {
       observed.training = {
         kind: entity.training.kind,

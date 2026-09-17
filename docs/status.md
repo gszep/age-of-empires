@@ -1422,6 +1422,51 @@ building rate; recorded as the approximation it is. `repair.test.ts`
 measures the outcome: 125 hit points in ten seconds on a house, 50 in
 sixteen on a ram, the wood banked, and a byte-identical replay.
 
+## Units garrison
+
+Garrison was not modelled (issue #75). The DAT gives all of it. A building
+says how many it holds (`garrison_capacity`: town center 15, castle 20,
+watch tower 5, production buildings 10), who may enter
+(`building.garrison_type`, a flag field over the editor's categories — 1
+villagers, 2 infantry and foot archers, 4 cavalry, 8 monks, 16 livestock,
+32 siege — 11 for the town center and tower, 15 for the castle, **0** for
+the production buildings, which is why nothing walks into a barracks here),
+and how fast those inside mend (`garrison_heal_rate`: 0.1 on the town
+center, 0.2 on the castle, read as hit points a second because the file
+gives it no unit — that reading is the chosen part). What it shoots is
+`creatable.total_projectiles` (1, castle 5) up to `max_total_projectiles`
+(11, castle 21, tower 5), the extra arrows being `secondary_projectile_unit`
+(54 for the town center, 746 the castle) with that unit's own damage (5
+pierce, 11); and the town center's own `projectile_unit_id` is **−1**, so
+an empty town center fires nothing and a garrisoned one fires only the
+garrison's arrows. What a unit adds is `type_50.garrison_firepower`: 1.0
+for every foot archer, 0 for everything else that can enter — and **−2.5**
+for every villager (and −1.0 fishing ships, −7.5 and −4.5 two heroes), an
+encoding the owned files do not explain. The simulation reads a negative
+value as the one arrow the reference's rule gives a garrisoned villager,
+recorded here as the approximation it is. Which DAT class falls in which
+category is the editor's table (`GARRISON_CATEGORY`), not a file.
+
+A right-click on a building of one's own that has room and admits the
+unit's category garrisons it (repair and construction take precedence, as
+in the reference); the unit walks in, banks whatever it carries, and leaves
+the entity list — nothing sees, hits or walks round it, it still counts
+toward the population, and a player whose whole army shelters is not
+beaten. The building's panel says `3/15 garrisoned` and offers the
+reference's "Ungarrison All Units" (`buttons.json`: action 78, cell 9,
+icon 2), which sets everybody down on the nearest free ground round the
+footprint in a fixed order; a building that falls lets them out the same
+way. A garrisoned town center shoots a volley of one arrow per villager or
+archer inside at 5 pierce each, a castle its five and one more per archer,
+capped at the DAT's maximum. Not done, and in `backlog.md`: the town bell,
+the garrison flag the DAT names (`creatable.garrison_graphic`), rams
+carrying infantry, and production buildings holding their own trainees.
+`garrison.test.ts` measures it: a villager in, banked, counted, observed
+by its owner and not its opponent, out again idle beside the building; a
+knight refused at the town center and admitted at the castle; no arrows
+from an empty town center and four from three villagers; 0.1 a second
+inside; and a byte-identical replay.
+
 ## A button you cannot afford is pressed, and told why
 
 Buttons for anything the bank could not pay for, or the housing could not

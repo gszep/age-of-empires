@@ -518,6 +518,43 @@ def extract_entity(
             entity["combat"]["blastRadius"] = rounded(combat.blast_width)
             entity["combat"]["blastAttackLevel"] = int(combat.blast_attack_level)
 
+    # Garrison (issue #75). A building says how many it holds
+    # (`garrison_capacity`), who may enter (`building.garrison_type`, a flag
+    # field over the editor's categories: 1 villagers, 2 infantry and foot
+    # archers, 4 cavalry, 8 monks, 16 livestock, 32 siege -- 11 for a town
+    # center and a tower, 15 for a castle, 0 for a production building) and
+    # how fast those inside mend (`garrison_heal_rate`). What it shoots when
+    # they are in is `creatable.total_projectiles` to `max_total_projectiles`
+    # -- the town center's own projectile is -1, so it fires only the
+    # garrison's arrows, which are `secondary_projectile_unit` (54) and deal
+    # that unit's own damage.
+    if category == "building" and unit.garrison_capacity > 0 and unit.building is not None:
+        entity["garrison"] = {
+            "capacity": int(unit.garrison_capacity),
+            "types": int(unit.building.garrison_type),
+            "healRate": rounded(unit.building.garrison_heal_rate),
+        }
+        if unit.creatable is not None and unit.creatable.max_total_projectiles > 0:
+            volley = {
+                "base": rounded(unit.creatable.total_projectiles),
+                "max": int(unit.creatable.max_total_projectiles),
+            }
+            secondary = unit.creatable.secondary_projectile_unit
+            if secondary is not None and secondary >= 0 and civ_units[secondary] is not None:
+                arrow = civ_units[secondary]
+                volley["arrowUnitId"] = int(secondary)
+                volley["arrowSpeed"] = rounded(arrow.speed)
+                volley["arrowAttacks"] = [
+                    {"class": a.class_, "amount": a.amount} for a in arrow.type_50.attacks
+                ] if arrow.type_50 is not None else []
+            entity["garrison"]["volley"] = volley
+    # What a unit adds to the volley of the building it sits in: the
+    # archers' 1.0 is the reference's arrow apiece. The villagers' -2.5 (and
+    # the fishing ships' -1.0, two heroes' -7.5 and -4.5) is an encoding the
+    # owned files do not explain; it is carried as the number it is.
+    if category in ("unit", "unit-variant") and unit.type_50 is not None:
+        entity["garrisonFirepower"] = rounded(unit.type_50.garrison_firepower)
+
     if category == "projectile" and unit.projectile is not None:
         # `projectile_arc` is a fraction of the shot's distance. Its sign varies
         # between units in ways this import does not interpret; the renderer

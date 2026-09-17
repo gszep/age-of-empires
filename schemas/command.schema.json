@@ -333,6 +333,30 @@
       "type": "object",
       "properties": {
         "kind": {
+          "const": "ungarrison"
+        },
+        "player": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "buildingId": {
+          "type": "integer",
+          "$comment": "Everybody sheltering in this building of the player's comes out onto the ground round it."
+        }
+      },
+      "required": [
+        "kind",
+        "player",
+        "buildingId"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
           "const": "delete"
         },
         "player": {

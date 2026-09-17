@@ -270,12 +270,13 @@ terrain blends above.
 
 ## Interface
 
-- **Garrison is not modelled, and the town center does not shoot.** The DAT
-  gives `garrison_capacity` (town center 15, castle 20, towers 5, rams 6),
-  `garrison_type`, a heal rate, and the town center's arrows as
-  garrison-driven (`projectile_unit_id` −1, `secondary_projectile_unit` 54,
-  `max_total_projectiles` 11); issue #54 catalogues the fields and #75 asks
-  for it. A simulation feature with a checksum change.
+- **Garrison's edges.** Units shelter, heal, come out and the building
+  shoots for them (issue #75); left: the town bell (`buttons.json` action
+  163/165, cell 14, icons 49 and 61), the flag a garrisoned building flies
+  (`creatable.garrison_graphic`), rams carrying infantry (`garrison_capacity`
+  6 on a unit), production buildings holding the units they train (type 0,
+  capacity 10), and what the villagers' `garrison_firepower` of −2.5 encodes
+  — read as one arrow, the reference's rule, until the owned files say.
 - **Four HUD buttons wear their Disabled art because nothing is behind them:**
   the tech tree, objectives, chat and diplomacy on the menu panel, and the
   minimap's colour and filter modes (player stats toggles the score panel;

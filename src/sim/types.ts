@@ -46,7 +46,9 @@ export type Order =
   /** A monk working on somebody else's unit until it changes sides. */
   | { kind: 'convert'; targetId: number }
   /** A villager mending its own side's building or siege engine. */
-  | { kind: 'repair'; targetId: number };
+  | { kind: 'repair'; targetId: number }
+  /** A unit walking into its own side's building to shelter there. */
+  | { kind: 'garrison'; targetId: number };
 
 export interface Entity {
   id: number;
@@ -69,6 +71,12 @@ export interface Entity {
   /** Hit points this repairer has put back on its target, so the price is
    * charged whole resource by whole resource as they come. */
   repaired?: number;
+  /**
+   * Buildings: the units sheltering inside, whole, and out of the entity
+   * list while they are -- nothing sees, hits or walks round a garrisoned
+   * unit, and the building shoots for them (issue #75).
+   */
+  garrison?: Entity[];
   /**
    * What this worker last put its hands on, so "another of the same first"
    * survives the thing itself being gone. A carcass is removed once it is
@@ -238,6 +246,8 @@ export type Command =
   | { kind: 'pack'; player: PlayerId; entityIds: number[]; unpacked: boolean }
   /** Take the last unit off a building's queue and refund it. */
   | { kind: 'cancel-train'; player: PlayerId; buildingId: number }
+  /** Everybody sheltering in this building comes out onto the ground round it. */
+  | { kind: 'ungarrison'; player: PlayerId; buildingId: number }
   /**
    * Destroy your own things, as the reference's Delete does: a unit you no
    * longer want, or a building in the way. Nothing is refunded and nothing

@@ -75,6 +75,14 @@ export interface UnitRules {
   /** The DAT's unit class, which is what the repair table is keyed by. */
   datClass?: number;
   /**
+   * What this unit adds to the volley of a building it sits in (issue #75):
+   * the DAT's `garrison_firepower`, an arrow apiece for the archers. The
+   * villagers' -2.5 is an encoding the owned files do not explain; the
+   * simulation reads any negative value as the one arrow the reference's
+   * rule gives a garrisoned villager.
+   */
+  garrisonFirepower?: number;
+  /**
    * A siege engine that travels packed and shoots unpacked. The DAT keeps the
    * two as separate units -- the trebuchet is 331 packed and 42 unpacked --
    * and states everything about each except which is the other, so the pairing
@@ -167,6 +175,8 @@ export interface UnitRules {
 export interface BuildingRules {
   /** The DAT unit id; see `UnitRules.datId`. */
   datId?: number;
+  /** Who it holds and what it does with them; absent, nothing goes in. */
+  garrison?: GarrisonRules;
   /** As `UnitRules.deathSeconds`: how long its collapse runs. */
   deathSeconds?: number;
   /** As `UnitRules.corpseSeconds`: how long its rubble lies there. */
@@ -271,6 +281,44 @@ export const OPEN_CIVILIZATION: CivilizationRules = {
   key: 'open',
   name: 'Open content',
   unavailable: { technologies: [], units: [], buildings: [] },
+};
+
+/**
+ * A building's garrison, as the DAT states it (issue #75). `types` is the
+ * `garrison_type` flag field over the editor's categories -- 1 villagers, 2
+ * infantry and foot archers, 4 cavalry, 8 monks, 16 livestock, 32 siege --
+ * so a town center and a tower (11) take villagers, foot soldiers and monks
+ * and a castle (15) cavalry too. `healRate` is `garrison_heal_rate`, read
+ * as hit points a second because the file gives it no unit. `volley` is
+ * what it shoots: `base` arrows empty (the town center's own projectile is
+ * -1, so its one is fired only once something inside adds to it), up to
+ * `max`, the extra arrows being the secondary projectile unit's, with that
+ * unit's own damage.
+ */
+export interface GarrisonRules {
+  capacity: number;
+  types: number;
+  healRate: number;
+  volley?: {
+    base: number;
+    max: number;
+    /** Whether the building has a projectile of its own for the first
+     * arrow; the town center's is -1, so all of its come from the garrison. */
+    ownProjectile: boolean;
+    arrowSpeed?: number;
+    arrowAttacks?: AttackValue[];
+    arrowArt?: string;
+  };
+}
+
+/** Which garrison category a DAT unit class falls in: the editor's table. */
+export const GARRISON_CATEGORY: Record<number, number> = {
+  4: 1,                       // villagers
+  0: 2, 6: 2,                 // foot archers and infantry
+  12: 4, 36: 4, 47: 4,        // cavalry, cavalry archers, scouts
+  18: 8,                      // monks
+  58: 16, 9: 16, 10: 16,      // herdables and game
+  13: 32, 51: 32, 54: 32,     // siege
 };
 
 export interface GameRules {
@@ -426,7 +474,7 @@ export const FALLBACK_RULES: GameRules = {
     villager: {
       hp: 25, radius: 0.2, speed: 0.8, lineOfSight: 4, cost: cost(50), trainSeconds: 25,
       trainedAt: 'town-center', popCost: 1, trainButton: 1,
-      datClass: 4,
+      datClass: 4, garrisonFirepower: -2.5,
       attacks: [{ class: 11, amount: 3 }, { class: 4, amount: 3 }, { class: 13, amount: 6 }],
       armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
@@ -497,7 +545,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 1,
       hp: 30, radius: 0.2, speed: 0.96, lineOfSight: 6, cost: cost(25, 35), trainSeconds: 26,
       trainedAt: 'archery-range', popCost: 1, trainButton: 2,
-      datClass: 0,
+      datClass: 0, garrisonFirepower: 1,
       attacks: [{ class: 27, amount: 3 }, { class: 15, amount: 3 }, { class: 3, amount: 2 }, { class: 35, amount: 2 }],
       armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 3 }, { class: 31, amount: 0 }, { class: 38, amount: 0 }],
       attackReloadSeconds: 3, attackReleaseSeconds: 0.63,
@@ -509,7 +557,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 2,
       hp: 35, radius: 0.2, speed: 0.96, lineOfSight: 7, cost: cost(0, 25, 45), trainSeconds: 27,
       trainedAt: 'archery-range', popCost: 1, trainButton: 1,
-      datClass: 0,
+      datClass: 0, garrisonFirepower: 1,
       attacks: [{ class: 27, amount: 3 }, { class: 21, amount: 0 }, { class: 3, amount: 5 }, { class: 17, amount: 0 }, { class: 13, amount: 0 }],
       armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.35,
@@ -519,7 +567,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 2,
       hp: 35, radius: 0.2, speed: 0.96, lineOfSight: 7, cost: cost(25, 35), trainSeconds: 22,
       trainedAt: 'archery-range', popCost: 1, trainButton: 2,
-      datClass: 0,
+      datClass: 0, garrisonFirepower: 1,
       attacks: [{ class: 28, amount: 2 }, { class: 27, amount: 4 }, { class: 15, amount: 4 }, { class: 3, amount: 3 }, { class: 35, amount: 2 }],
       armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 4 }, { class: 31, amount: 0 }, { class: 38, amount: 0 }],
       attackReloadSeconds: 3, attackReleaseSeconds: 0.63,
@@ -591,7 +639,7 @@ export const FALLBACK_RULES: GameRules = {
       hp: 40, radius: 0.2, speed: 0.96, lineOfSight: 7.0,
       cost: cost(0, 25, 45, 0), trainSeconds: 27,
       trainedAt: 'archery-range', popCost: 1, trainButton: 1,
-      datClass: 0,
+      datClass: 0, garrisonFirepower: 1,
       attacks: [{ class: 27, amount: 3 }, { class: 3, amount: 6 }],
       armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 2.0, attackReleaseSeconds: 1.0,
@@ -623,7 +671,7 @@ export const FALLBACK_RULES: GameRules = {
       hp: 40, radius: 0.2, speed: 0.96, lineOfSight: 8.0,
       cost: cost(0, 35, 40, 0), trainSeconds: 18,
       trainedAt: 'castle', popCost: 1, trainButton: 1,
-      datClass: 0,
+      datClass: 0, garrisonFirepower: 1,
       attacks: [{ class: 27, amount: 2 }, { class: 3, amount: 7 }],
       armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 1 }, { class: 19, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 2.0, attackReleaseSeconds: 0.5,
@@ -697,7 +745,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 1,
       hp: 30, radius: 0.2, speed: 0.96, lineOfSight: 6, cost: cost(0, 25, 45), trainSeconds: 35,
       trainedAt: 'archery-range', popCost: 1, trainButton: 1,
-      datClass: 0,
+      datClass: 0, garrisonFirepower: 1,
       attacks: [{ class: 3, amount: 4 }],
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.35,
@@ -727,7 +775,7 @@ export const FALLBACK_RULES: GameRules = {
       age: 2,
       hp: 35, radius: 0.2, speed: 0.96, lineOfSight: 7, cost: cost(0, 35, 40), trainSeconds: 18,
       trainedAt: 'castle', popCost: 1, trainButton: 1,
-      datClass: 0,
+      datClass: 0, garrisonFirepower: 1,
       attacks: [{ class: 27, amount: 2 }, { class: 3, amount: 6 }],
       armors: [{ class: 4, amount: 0 }, { class: 15, amount: 0 }, { class: 3, amount: 0 }, { class: 19, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0.5,
@@ -775,6 +823,16 @@ export const FALLBACK_RULES: GameRules = {
       popSupport: 5, buildable: false, accepts: ['food', 'wood', 'gold', 'stone'],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 3 }, { class: 3, amount: 5 }],
       confirmDelete: true,
+      garrison: {
+        capacity: 15, types: 11, healRate: 0.1,
+        volley: { base: 1, max: 11, ownProjectile: false, arrowSpeed: 8, arrowAttacks: [{ class: 3, amount: 5 }] },
+      },
+      // The DAT's: 5 pierce at range 6 every 2 s, from 4 tiles up -- with
+      // no projectile of its own, so it fires only the garrison's (#75).
+      attack: {
+        range: 6, attacks: [{ class: 3, amount: 5 }], reloadSeconds: 2, releaseSeconds: 0.35,
+        projectileSpeed: 8, launchHeight: 4,
+      },
     },
     barracks: {
       hp: 1200, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
@@ -832,6 +890,10 @@ export const FALLBACK_RULES: GameRules = {
       },
       buildButton: 9,
       confirmDelete: true,
+      garrison: {
+        capacity: 5, types: 11, healRate: 0.1,
+        volley: { base: 1, max: 5, ownProjectile: true, arrowSpeed: 7, arrowAttacks: [{ class: 3, amount: 5 }] },
+      },
     },
     'archery-range': {
       age: 1,
@@ -928,6 +990,10 @@ export const FALLBACK_RULES: GameRules = {
       },
       buildButton: 13,
       confirmDelete: true,
+      garrison: {
+        capacity: 20, types: 15, healRate: 0.2,
+        volley: { base: 5, max: 21, ownProjectile: true, arrowSpeed: 7, arrowAttacks: [{ class: 3, amount: 11 }] },
+      },
     },
   },
   nodes: {
@@ -995,6 +1061,11 @@ interface ManifestEntity {
   heal?: { hitPointsPerSecond: number; range: number };
   repair?: { hitPointsPerSecond: number; classFactors: Record<string, number> };
   class?: number;
+  garrison?: {
+    capacity: number; types: number; healRate: number;
+    volley?: { base: number; max: number; arrowUnitId?: number; arrowSpeed?: number; arrowAttacks?: AttackValue[] };
+  };
+  garrisonFirepower?: number;
   convert?: { minSeconds: number; maxSeconds: number; range: number };
   searchRadius?: number;
   gather?: { resource: ResourceKind; ratePerSecond: number; capacity: number };
@@ -1095,6 +1166,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       // The repairer is the builder's own task unit; the villager carries it.
       repair: (key === 'villager' ? e['villager-builder']?.repair : undefined) ?? fallback?.repair,
       datClass: e[key].class ?? fallback?.datClass,
+      garrisonFirepower: e[key].garrisonFirepower ?? fallback?.garrisonFirepower,
       convert: e[key].convert ?? fallback?.convert,
       fogVisibility: e[key].fogVisibility ?? fallback?.fogVisibility,
       accuracyPercent: e[key].combat?.accuracyPercent ?? fallback?.accuracyPercent,
@@ -1148,6 +1220,22 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       passable: e[key].passable ?? fallback.passable,
       blastDefenseLevel: e[key].blastDefenseLevel ?? fallback.blastDefenseLevel,
       confirmDelete: e[key].confirmDelete ?? fallback.confirmDelete,
+      garrison: e[key].garrison
+        ? {
+          capacity: e[key].garrison.capacity,
+          types: e[key].garrison.types,
+          healRate: e[key].garrison.healRate,
+          volley: e[key].garrison.volley && {
+            base: e[key].garrison.volley.base,
+            max: e[key].garrison.volley.max,
+            ownProjectile: e[key].combat?.projectileUnitId !== undefined,
+            arrowSpeed: e[key].garrison.volley.arrowSpeed ?? fallback.garrison?.volley?.arrowSpeed,
+            arrowAttacks: e[key].garrison.volley.arrowAttacks ?? fallback.garrison?.volley?.arrowAttacks,
+            arrowArt: e[key].garrison.volley.arrowUnitId === undefined
+              ? undefined : projectileArtById.get(e[key].garrison.volley.arrowUnitId),
+          },
+        }
+        : fallback.garrison,
       attack: fallback.attack && {
         ...fallback.attack,
         range: e[key].combat?.maximumRange || fallback.attack.range,

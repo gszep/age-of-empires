@@ -110,7 +110,7 @@ let revealMap = false;
  * farm-reseed ring lit and unlit.
  */
 const ACTION_ICON = {
-  cancel: 0, stop: 3, pack: 12, unpack: 13, buildEconomic: 30, buildMilitary: 31, repair: 33,
+  cancel: 0, ungarrison: 2, stop: 3, pack: 12, unpack: 13, buildEconomic: 30, buildMilitary: 31, repair: 33,
   reseedOn: 70, reseedOff: 71,
 } as const;
 
@@ -447,6 +447,13 @@ function runUiCommand(id: string, shift = false): void {
         if (queued === 0) reject(result.reason);
         return;
       }
+    }
+    return;
+  }
+  if (id === 'ungarrison') {
+    for (const building of selection.filter(e => isBuilding(e.kind) && e.garrison?.length)) {
+      const result = applyCommand(game, { kind: 'ungarrison', player: 1, buildingId: building.id });
+      if (!result.ok) reject(result.reason);
     }
     return;
   }
@@ -964,6 +971,14 @@ function currentCommands(): CommandButton[] {
       enabled: !packing,
     });
   }
+  // A building with somebody inside offers the reference's "Ungarrison All
+  // Units" (`buttons.json`: action 78, cell 9, icon 2) (issue #75).
+  if (selection.some(e => isBuilding(e.kind) && e.garrison?.length)) {
+    buttons.push({
+      id: 'ungarrison', label: 'Ungarrison all units', icon: hud.actionIcon(ACTION_ICON.ungarrison),
+      slot: GRID_SLOT.ungarrison, enabled: true,
+    });
+  }
   // Every completed production building offers the units the rules train there.
   const producer = selection.find(e => isBuilding(e.kind) && e.buildProgress === undefined
     && trainableAt(e.kind as BuildingKind).length > 0);
@@ -1045,7 +1060,7 @@ function currentCommands(): CommandButton[] {
  * Q and W, Stop at G, Unpack at Q and Pack at W. Cancel and Back have no
  * letter of their own there (they are Escape) and take the last cell.
  */
-const GRID_SLOT = { buildEconomic: 1, buildMilitary: 2, repair: 3, stop: 10, unpack: 1, pack: 2, cancel: 15 } as const;
+const GRID_SLOT = { buildEconomic: 1, buildMilitary: 2, repair: 3, ungarrison: 9, stop: 10, unpack: 1, pack: 2, cancel: 15 } as const;
 
 /**
  * Which page of the villager's build menu is open, or none: selecting a
@@ -1219,6 +1234,10 @@ function selectionInfo(): SelectionInfo | undefined {
     : undefined;
   if (entity.kind === 'town-center' && entity.owner === 1) details.push(AGE_NAMES[game.players[1].age]);
   if (entity.amount !== undefined) details.push(`${Math.floor(entity.amount)} ${entity.resourceKind}`);
+  if (entity.garrison?.length) {
+    const capacity = rules.buildings[entity.kind as BuildingKind]?.garrison?.capacity;
+    details.push(`${entity.garrison.length}${capacity ? `/${capacity}` : ''} garrisoned`);
+  }
   if (entity.carrying) details.push(`Carrying ${entity.carrying.amount} ${entity.carrying.kind}`);
   let progress: SelectionInfo['progress'];
   if (entity.buildProgress !== undefined) {
