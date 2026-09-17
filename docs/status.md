@@ -1422,6 +1422,21 @@ building rate; recorded as the approximation it is. `repair.test.ts`
 measures the outcome: 125 hit points in ten seconds on a house, 50 in
 sixteen on a ram, the wood banked, and a byte-identical replay.
 
+## A button you cannot afford is pressed, and told why
+
+Buttons for anything the bank could not pay for, or the housing could not
+hold, were greyed out. The reference does not do that (issue #70): the
+press goes through and a line says what is short. Build, train and
+research buttons are now enabled whatever the bank holds (a full queue and
+research in progress still disable, as before), the simulation names the
+first resource a price cannot be met in — in the reference's own order,
+food, wood, stone, gold — and the message shown is the reference's own
+line from its strings file: 3001 "Not enough food." through 3004, and
+3005 "You need to build more houses." for the population cap, imported as
+`strings` on the manifest. Without the imported strings the simulation's
+reason is shown as it is. Pressed in a real page with no food: the
+villager button answers "Not enough food." and queues nothing.
+
 ## A portrait wears its owner's colour
 
 The unit icons in the command grid and the selection panel had no player

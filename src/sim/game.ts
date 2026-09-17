@@ -150,11 +150,21 @@ function recalculatePopulation(state: GameState): void {
   }
 }
 
+/** The first resource a price cannot be met in, in the reference's own order. */
+export function shortfall(state: GameState, player: PlayerId, cost: Cost): ResourceKind | undefined {
+  const p = state.players[player];
+  for (const resource of ['food', 'wood', 'stone', 'gold'] as ResourceKind[]) {
+    if (p[resource] < cost[resource]) return resource;
+  }
+  return undefined;
+}
+
 function spendCost(state: GameState, player: PlayerId, cost: Cost): CommandResult {
   const p = state.players[player];
-  if (p.food < cost.food || p.wood < cost.wood || p.gold < cost.gold || p.stone < cost.stone) {
-    return rejected('not enough resources');
-  }
+  // Named, as the reference names it: "Not enough wood." (issue #70).
+  const short = shortfall(state, player, cost);
+  if (short) return rejected(`not enough ${short}`);
+
   p.food -= cost.food;
   p.wood -= cost.wood;
   p.gold -= cost.gold;

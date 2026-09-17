@@ -283,6 +283,6 @@ describe('simulation', () => {
       .toEqual({ ok: false, reason: `building ${tc.id} is not owned` });
     state.players[1].food = 0;
     expect(applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' }))
-      .toEqual({ ok: false, reason: 'not enough resources' });
+      .toEqual({ ok: false, reason: 'not enough food' });
   });
 });

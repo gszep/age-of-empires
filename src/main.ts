@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
 import { observe } from './sim/observe';
-import { TRAINING_QUEUE_LIMIT, applyCommand, buildingFootprint, createGame, gameTimeSeconds, isCarcass, isRepairable, placementLegal, queuedCount, stepGame, upgradedAway, notYetUpgradedInto } from './sim/game';
+import { TRAINING_QUEUE_LIMIT, applyCommand, buildingFootprint, createGame, gameTimeSeconds, isCarcass, isRepairable, placementLegal, queuedCount, shortfall, stepGame, upgradedAway, notYetUpgradedInto } from './sim/game';
 import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, rulesFromManifest, type AttackValue, type ContentManifest, type Cost, type GameRules, type TechKey, type UnitRules } from './sim/data';
 import { MAPS } from './sim/mapgen';
 import { isTileVisible } from './sim/visibility';
@@ -50,9 +50,15 @@ let [assets, uiAssets, audioAssets] = await Promise.all([
   loadContentAssets(), loadUiAssets(), loadAudioAssets(),
 ]);
 let rules: GameRules = FALLBACK_RULES;
+/** The reference's own words for a refused order, from its strings file (issue #70). */
+let messages: Record<string, string> = {};
 try {
   const response = await fetch('/imported/aoe2/manifest.json');
-  if (response.ok) rules = rulesFromManifest(await response.json() as ContentManifest);
+  if (response.ok) {
+    const manifest = await response.json() as ContentManifest & { strings?: Record<string, string> };
+    rules = rulesFromManifest(manifest);
+    messages = manifest.strings ?? {};
+  }
 } catch { /* open fallback rules */ }
 
 // Which map type the page deals: ?map=black-forest, ?map=senlac,
@@ -312,8 +318,17 @@ function disposeGhost(): void {
 }
 
 /** A rejected command, reported and sounded the way the game does. */
+/**
+ * Say why an order was refused. The simulation's reasons are its own words;
+ * where the reference has a line for the same refusal -- "Not enough wood.",
+ * "You need to build more houses." -- that line is shown instead (issue #70).
+ */
 function reject(reason: string): void {
-  hud.showMessage(reason);
+  const short = /^not enough (food|wood|stone|gold)$/.exec(reason)?.[1];
+  const said = short
+    ? messages[`notEnough${short[0].toUpperCase()}${short.slice(1)}`]
+    : reason === 'population cap reached' ? messages.needMoreHouses : undefined;
+  hud.showMessage(said ?? reason);
   playSound('error');
 }
 
@@ -402,6 +417,10 @@ function runUiCommand(id: string, shift = false): void {
   const selection = ownSelected();
   if (id.startsWith('build-')) {
     const kind = id.slice('build-'.length) as BuildingKind;
+    // The reference lets the press through and says what is short rather
+    // than greying the button (issue #70); nothing is placed until it is paid.
+    const short = shortfall(game, 1, rules.buildings[kind].cost);
+    if (short) { reject(`not enough ${short}`); return; }
     if (kind === buildMode && rules.buildings[kind].footprint) {
       gateOrientation = gateOrientation === 'x' ? 'y' : 'x';
     }
@@ -917,7 +936,7 @@ function currentCommands(): CommandButton[] {
           label: `${createLabel(kind, 'Build')} (${costLabel(building.cost)})`,
           help: helpFor(kind, building.cost),
           slot: building.buildButton,
-          enabled: affordable(building.cost),
+          enabled: true,
           icon: hud.iconFor('Buildings', assets?.entities[kind]?.iconId, 1),
         });
       }
@@ -956,11 +975,10 @@ function currentCommands(): CommandButton[] {
         label: `${createLabel(kind, 'Train')} (${costLabel(unitRules.cost)})`,
         help: helpFor(kind, unitRules.cost),
         slot: unitRules.trainButton,
-        // Not "is it already training" -- that is what the queue is for. What
-        // stops another is a full queue, the price, or no room for what is
-        // already spoken for (issue #7).
-        enabled: queuedCount(producer) < TRAINING_QUEUE_LIMIT && affordable(unitRules.cost)
-          && player.population + queuedPopulation(producer) + unitRules.popCost <= player.populationCap,
+        // Not "is it already training" -- that is what the queue is for
+        // (issue #7). Nor the price or the housing: the reference lets the
+        // press through and says what is short (issue #70).
+        enabled: queuedCount(producer) < TRAINING_QUEUE_LIMIT,
         icon: hud.iconFor('Units', assets?.entities[kind]?.iconId, 1),
       });
     }
@@ -995,7 +1013,7 @@ function currentCommands(): CommandButton[] {
       label: `Research ${tech.name} (${costLabel(tech.cost)})`,
       help: tech.help ? plainHelp(tech.help, tech.cost) : undefined,
       slot: tech.button,
-      enabled: !building.researching && affordable(tech.cost),
+      enabled: !building.researching,
       icon: hud.iconFor('Techs', tech.iconId, 1),
     });
   }
@@ -1021,11 +1039,6 @@ function currentCommands(): CommandButton[] {
     : []);
 }
 
-/** The population everything queued at this building will take when it lands. */
-const queuedPopulation = (building: Entity): number =>
-  [...(building.training ? [building.training.kind] : []), ...(building.trainingQueue ?? [])]
-    .reduce((total, kind) => total + rules.units[kind].popCost, 0);
-
 /**
  * Cells for the buttons the DAT does not place, from the reference's own grid
  * layout in `hotkeys.json` (the second of its four): the two build pages at
@@ -1050,12 +1063,6 @@ const trainableAt = (building: BuildingKind): UnitKind[] =>
     // out: the barracks offers the man-at-arms in place of the militia.
     && !upgradedAway(game, 1, kind)
     && !notYetUpgradedInto(game, 1, kind));
-
-function affordable(cost: Cost): boolean {
-  const player = game.players[1];
-  return player.food >= cost.food && player.wood >= cost.wood
-    && player.gold >= cost.gold && player.stone >= cost.stone;
-}
 
 /**
  * What the reference calls this entity key: its own string where the manifest

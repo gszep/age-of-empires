@@ -1305,6 +1305,18 @@ def extract(
         },
         "technologies": technologies,
         "particles": particles,
+        # The reference's own words for a refused order (issue #70): the
+        # strings file's 3001-3005, shown when a button is pressed that the
+        # bank or the housing cannot meet -- the reference lets the click
+        # through and says why rather than greying the button.
+        "strings": {
+            name: strings[string_id]
+            for name, string_id in (
+                ("notEnoughFood", 3001), ("notEnoughWood", 3002), ("notEnoughStone", 3003),
+                ("notEnoughGold", 3004), ("needMoreHouses", 3005),
+            )
+            if strings is not None and string_id in strings
+        },
         # What the civilisation's tree offers that this game cannot represent,
         # and why. Recorded rather than dropped, so the gap is visible.
         "skippedTechnologies": skipped_technologies,
