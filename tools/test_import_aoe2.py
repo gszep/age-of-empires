@@ -1302,6 +1302,45 @@ class UiImportIntegrationTest(unittest.TestCase):
         self.assertIn('"ResourceFood"', dumped)
         self.assertIn('"ResourceGold"', dumped)
 
+    def test_player_coloured_icons_ship_opaque_with_their_weight_beside_them(self):
+        # Every unit, building and technology icon material declares
+        # `AlphaPlayerColor`: the DDS is opaque except the owner's cloth, whose
+        # alpha is how much of the icon's own colour stays and whose RGB is the
+        # shading the owner's colour takes (issue #77). A browser canvas
+        # premultiplies and would lose that shading, so the importer ships the
+        # picture opaque and the weight as a grey mask, white where all of it.
+        materials = self.result["materials"]
+        icons = self.result["icons"]
+        for category in ("Units", "Buildings", "Techs"):
+            for material in icons[category].values():
+                self.assertEqual(materials[material]["blend"], "AlphaPlayerColor", material)
+                self.assertTrue(materials[material]["playerColorMask"].endswith("-playercolor.png"))
+        # The stat and menu sheets are plain pictures (a few of the stat icons
+        # resolve to no material at all and are recorded as missing).
+        for category in ("StatIcons", "MenuIcons"):
+            for material in icons[category].values():
+                self.assertNotIn("playerColorMask", materials.get(material, {}))
+        villager = extracted_content()["entities"]["villager"]["iconId"]
+        entry = materials[icons["Units"][f"{villager:03d}"]]
+        root = Path(self.directory.name)
+        with Image.open(root / entry["texture"]) as picture, Image.open(root / entry["playerColorMask"]) as mask:
+            self.assertEqual(picture.size, mask.size)
+            self.assertEqual(picture.getchannel("A").getextrema(), (255, 255))
+            self.assertEqual(mask.mode, "L")
+            weights = mask.histogram()
+            # The villager's trousers: a few thousand pixels wholly the
+            # owner's, the rest of the portrait none of it.
+            self.assertGreater(weights[255], 3000)
+            self.assertGreater(weights[0], 50000)
+            # Where the weight is whole the picture still carries the shading.
+            shaded = [
+                picture.getpixel((x, y))[:3]
+                for y in range(0, mask.height, 4) for x in range(0, mask.width, 4)
+                if mask.getpixel((x, y)) == 255
+            ]
+            self.assertGreater(len({p for p in shaded}), 50)
+            self.assertGreater(max(sum(p) for p in shaded), 300)
+
     def test_hotkeys_are_the_reference_s_own_keys(self):
         """The letters come from the owned file, not from whoever typed them.
 

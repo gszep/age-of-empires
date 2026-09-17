@@ -4,7 +4,7 @@
  * selection panel bottom-centre, minimap panel bottom-right. Falls back to an
  * open skin when imported assets are absent.
  */
-import { materialUrl, iconUrl, type UiAssets } from './assets';
+import { materialUrl, iconUrl, ownedIconUrl, type PlayerColors, type UiAssets } from './assets';
 import { placeCommands } from './command-grid';
 import { widgetBox } from './layout';
 import { Minimap } from './minimap';
@@ -112,6 +112,9 @@ export class Hud {
   /** Whether the score panel is up; the player-stats ribbon toggles it. */
   private scoresShown = true;
   private onResize = (): void => this.applyScale();
+
+  /** The imported palette, so a portrait can wear its owner's colour. */
+  playerColors: PlayerColors | undefined;
 
   constructor(
     parent: HTMLElement,
@@ -632,9 +635,16 @@ export class Hud {
     return url ? `url('${url}')` : undefined;
   }
 
-  iconFor(category: 'Units' | 'Buildings' | 'Techs', index: number | undefined): string | undefined {
+  /**
+   * A portrait, worn in its owner's colour where the reference's material
+   * says so (issue #77): the grid's train and research buttons are the
+   * human's, a selected unit's is its owner's.
+   */
+  iconFor(category: 'Units' | 'Buildings' | 'Techs', index: number | undefined, owner?: number): string | undefined {
     if (index === undefined) return undefined;
-    const url = iconUrl(this.ui, category, index);
+    const url = owner === undefined
+      ? iconUrl(this.ui, category, index)
+      : ownedIconUrl(this.ui, this.playerColors, category, index, owner);
     return url ? `url('${url}')` : undefined;
   }
 }

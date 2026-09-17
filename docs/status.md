@@ -1333,6 +1333,35 @@ and computed from the research-applied rules so an upgrade shows. A building
 that does not shoot here (the town center: its arrows are garrison-driven,
 #54) shows no attack. The queue portraits (`QueueButtons`) are still to do.
 
+## A portrait wears its owner's colour
+
+The unit icons in the command grid and the selection panel had no player
+colour (issue #77): the villager's trousers were a hole in the button. The
+reference says how in two places. Every unit, building and technology icon
+material in `materials.json` declares `"Blend": "AlphaPlayerColor"`, and the
+DDS behind it is opaque everywhere but the owner's cloth, where the alpha
+is how much of the icon's own colour stays (0 on the villager's 4,909
+trouser pixels) and the RGB is the shading that colour takes. Twelve of the
+sixty-nine technology icons carry such a region too — an upgrade's icon is
+the unit it makes. The shipped `ImGui_SLD_ps` shader names the model:
+`g_TeamColor`, `g_TeamLuminance` and `g_bTeamColorLegacyMode`.
+
+A browser cannot be trusted with that alpha — a canvas premultiplies, so an
+alpha-0 pixel loses its shading the moment it is drawn — so the importer
+splits each such icon into an opaque picture and a `-playercolor.png` weight
+mask, white where the owner's colour is all of the pixel. The HUD then
+colours a portrait for its owner on first use: each weighted pixel takes the
+owner's palette ramp read at its own luminance — the same ramp a sprite's
+player-colour layer resolves through, so a unit and its portrait wear the
+one colour — blended by its weight. The grid's train and research buttons
+are the human's; a selected unit's portrait is its owner's, so an enemy
+villager selected is red. The exact arithmetic of the reference's blend is
+in a compiled shader and is not read; luminance through the palette ramp is
+the choice, and it is recorded here as one. Measured in the running page:
+the human's villager button averages (27,58,158) over the trouser pixels,
+an enemy villager's portrait (167,14,2), from a plain shading of
+(112,109,105).
+
 ## Shift on a train button asks for five
 
 A Shift-click on a train button, or Shift with its hotkey, queues five

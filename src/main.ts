@@ -314,7 +314,7 @@ function reject(reason: string): void {
 }
 
 function createHud(): Hud {
-  return new view.Hud(app, uiAssets, {
+  const created = new view.Hud(app, uiAssets, {
     onCommand: (id, shift) => runUiCommand(id, shift),
     onMinimapNavigate: canvasPoint => {
       const world = hud.minimap.fromCanvas(game, canvasPoint.x, canvasPoint.y);
@@ -338,6 +338,8 @@ function createHud(): Hud {
     onReplayFile: record => startReplay(record),
     onSound: alias => playSound(alias),
   });
+  created.playerColors = assets?.playerColors;
+  return created;
 }
 
 let hud = createHud();
@@ -886,7 +888,7 @@ function currentCommands(): CommandButton[] {
           help: helpFor(kind, building.cost),
           slot: building.buildButton,
           enabled: affordable(building.cost),
-          icon: hud.iconFor('Buildings', assets?.entities[kind]?.iconId),
+          icon: hud.iconFor('Buildings', assets?.entities[kind]?.iconId, 1),
         });
       }
       buttons.push({
@@ -929,7 +931,7 @@ function currentCommands(): CommandButton[] {
         // already spoken for (issue #7).
         enabled: queuedCount(producer) < TRAINING_QUEUE_LIMIT && affordable(unitRules.cost)
           && player.population + queuedPopulation(producer) + unitRules.popCost <= player.populationCap,
-        icon: hud.iconFor('Units', assets?.entities[kind]?.iconId),
+        icon: hud.iconFor('Units', assets?.entities[kind]?.iconId, 1),
       });
     }
   }
@@ -964,7 +966,7 @@ function currentCommands(): CommandButton[] {
       help: tech.help ? plainHelp(tech.help, tech.cost) : undefined,
       slot: tech.button,
       enabled: !building.researching && affordable(tech.cost),
-      icon: hud.iconFor('Techs', tech.iconId),
+      icon: hud.iconFor('Techs', tech.iconId, 1),
     });
   }
   // The mill's one standing option: whether a fallow farm is sown again where
@@ -1173,7 +1175,7 @@ function selectionInfo(): SelectionInfo | undefined {
       id: member.id,
       name: assets ? nameOf(member) : fallbackName(member),
       icon: hud.iconFor(isUnit(member.kind) ? 'Units' : 'Buildings',
-        assets?.entities[view.entityKey(member)]?.iconId),
+        assets?.entities[view.entityKey(member)]?.iconId, member.owner),
       hp: member.hp,
       maxHp: member.maxHp,
     }))
@@ -1208,7 +1210,7 @@ function selectionInfo(): SelectionInfo | undefined {
     members,
     name,
     stats: selectionStats(entity),
-    icon: entity.kind !== 'resource' ? hud.iconFor(category, iconIndex) : undefined,
+    icon: entity.kind !== 'resource' ? hud.iconFor(category, iconIndex, entity.owner) : undefined,
     // A carcass shows no health: the DAT's corpse unit has none, and what a
     // player wants off it is the food still on it, which `details` carries.
     ...(isCarcass(entity) ? {} : { hp: entity.hp, maxHp: entity.maxHp }),

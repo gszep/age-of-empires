@@ -121,6 +121,35 @@ def convert_texture(widgetui: Path, relative: str, out_root: Path) -> str:
     return target_relative
 
 
+# The blend the icon materials declare, and what their alpha then means.
+PLAYER_COLOR_BLEND = "AlphaPlayerColor"
+
+
+def convert_player_color_texture(widgetui: Path, relative: str, out_root: Path) -> tuple[str, str]:
+    """Split a player-coloured icon into its picture and its colour weight.
+
+    An `AlphaPlayerColor` texture is opaque everywhere but the owner's cloth,
+    where the alpha is how much of the icon's own colour stays and the RGB is
+    the shading the owner's colour takes (issue #77). A browser cannot be
+    trusted to hand that back: a canvas premultiplies, so an alpha-0 pixel
+    loses its shading the moment it is drawn, and as a plain image the cloth
+    is a hole. So the picture ships opaque, and the weight ships beside it as
+    a grey mask -- white where the owner's colour is all of the pixel.
+    """
+    source = resolve_texture(widgetui, relative)
+    stem = Path(relative).with_suffix("")
+    picture_relative = f"{stem}.png"
+    mask_relative = f"{stem}-playercolor.png"
+    (out_root / picture_relative).parent.mkdir(parents=True, exist_ok=True)
+    with Image.open(source) as image:
+        rgba = image.convert("RGBA")
+        alpha = rgba.getchannel("A")
+        rgba.putalpha(255)
+        rgba.save(out_root / picture_relative, optimize=True)
+        alpha.point(lambda value: 255 - value).save(out_root / mask_relative, optimize=True)
+    return picture_relative, mask_relative
+
+
 def material_entry(
     name: str,
     materials: dict[str, Any],
@@ -142,7 +171,12 @@ def material_entry(
             entry["unresolvedTexture"] = reference
         else:
             hashes[relative] = sha256(resolve_texture(widgetui, relative))
-            entry["texture"] = convert_texture(widgetui, relative, out_root)
+            if definition.get("Blend") == PLAYER_COLOR_BLEND and relative.lower().endswith(".dds"):
+                entry["texture"], entry["playerColorMask"] = convert_player_color_texture(
+                    widgetui, relative, out_root
+                )
+            else:
+                entry["texture"] = convert_texture(widgetui, relative, out_root)
     return entry
 
 

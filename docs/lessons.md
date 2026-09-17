@@ -698,3 +698,15 @@ keeps the record.
   under the right rule and large under the wrong one — not against how the
   short cases look; and when a sheet has both a moving box and a long run,
   it is the sheet to test on.
+
+- **A canvas premultiplies, so alpha is not a channel you can carry data
+  in.** The reference's icons keep the owner's colour weight in the PNG's
+  alpha with the shading in the RGB, and the first tint read them back
+  through `drawImage`/`getImageData` — which had already multiplied every
+  alpha-0 pixel's colour to black, so every portrait came out the darkest
+  shade of blue. Nothing errored; the probe that measured the colour lost
+  the same data the same way and agreed. Rule: a browser will hand back only
+  what it would draw; anything a texture encodes in its alpha beyond
+  coverage is split out by the importer into its own opaque mask (as the
+  sprite masks already are), and a probe that measures a colour reads the
+  mask, not the alpha.

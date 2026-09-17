@@ -104,7 +104,14 @@ export interface ContentAssets {
   blends?: BlendMasks;
 }
 
-interface UiMaterial { type: string; blend?: string | null; texture?: string; color?: { r: number; g: number; b: number; a: number } }
+interface UiMaterial {
+  type: string;
+  blend?: string | null;
+  texture?: string;
+  /** For a player-coloured icon: the owner's weight per pixel, white where all of it. */
+  playerColorMask?: string;
+  color?: { r: number; g: number; b: number; a: number };
+}
 export interface UiLayoutWidget {
   Name?: string;
   Type?: string;
@@ -309,4 +316,94 @@ export function iconUrl(ui: UiAssets | undefined, category: string, index: numbe
   if (!ui) return undefined;
   const material = ui.icons[category]?.[String(index).padStart(3, '0')];
   return material ? materialUrl(ui, material) : undefined;
+}
+
+/**
+ * The blend the reference's icon materials declare. The shipped icon is
+ * opaque everywhere but the owner's cloth, where its alpha is how much of
+ * the icon's own colour stays and the RGB the shading the owner's colour
+ * takes (issue #77). The importer splits that into an opaque picture and a
+ * weight mask, because a canvas premultiplies and would lose the shading.
+ */
+export const PLAYER_COLOR_BLEND = 'AlphaPlayerColor';
+
+/** The rec.601 luminance of a pixel, as a grey the ramp can be indexed by. */
+export function luminance(red: number, green: number, blue: number): number {
+  return Math.round(red * 0.299 + green * 0.587 + blue * 0.114);
+}
+
+/**
+ * Colour one icon's RGBA bytes for an owner, in place. A pixel takes the
+ * owner's shade by its weight in the mask and keeps its own colour for the
+ * rest, the shade being the owner's palette ramp read at the pixel's own
+ * luminance -- the same ramp a sprite's player-colour layer resolves through,
+ * so a unit and its portrait wear the one colour.
+ */
+export function tintIconPixels(data: Uint8ClampedArray, mask: Uint8ClampedArray, lut: Uint8Array): void {
+  for (let at = 0; at < data.length; at += 4) {
+    const weight = mask[at] / 255;
+    if (weight === 0) continue;
+    const grey = luminance(data[at], data[at + 1], data[at + 2]);
+    for (let channel = 0; channel < 3; channel++) {
+      data[at + channel] = Math.round(data[at + channel] * (1 - weight) + lut[grey * 4 + channel] * weight);
+    }
+  }
+}
+
+/** Icons coloured for an owner, by material and owner; filled as asked for. */
+const tintedIcons = new Map<string, string>();
+const tintingIcons = new Set<string>();
+
+/**
+ * The icon url for `owner`'s copy of a player-coloured icon. Colouring takes
+ * a decode, so the first request for a pair answers with the untinted icon
+ * and starts the work; the HUD redraws often enough that the coloured one is
+ * up within a frame or two. Without imported palettes, or in a page with no
+ * canvas, the plain icon stands.
+ */
+export function ownedIconUrl(
+  ui: UiAssets | undefined, colors: PlayerColors | undefined, category: string, index: number, owner: number,
+): string | undefined {
+  const base = iconUrl(ui, category, index);
+  if (!ui || !base || !colors) return base;
+  const material = ui.icons[category]?.[String(index).padStart(3, '0')];
+  const mask = material ? ui.materials[material]?.playerColorMask : undefined;
+  if (!material || !mask || ui.materials[material]?.blend !== PLAYER_COLOR_BLEND) return base;
+  const color = colors.players[String(owner)];
+  if (!color) return base;
+  const key = `${material}:${owner}`;
+  const tinted = tintedIcons.get(key);
+  if (tinted) return tinted;
+  if (!tintingIcons.has(key) && typeof document !== 'undefined') {
+    tintingIcons.add(key);
+    tintIcon(base, `${ui.base}${mask}`, rampLut(color.ramp, colors.shadeLevels))
+      .then(url => tintedIcons.set(key, url))
+      .catch(() => tintedIcons.set(key, base));
+  }
+  return base;
+}
+
+async function readPixels(url: string): Promise<ImageData> {
+  const image = new Image();
+  image.decoding = 'async';
+  image.src = url;
+  await image.decode();
+  const canvas = document.createElement('canvas');
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) throw new Error('no 2d canvas');
+  context.drawImage(image, 0, 0);
+  return context.getImageData(0, 0, canvas.width, canvas.height);
+}
+
+async function tintIcon(pictureUrl: string, maskUrl: string, lut: Uint8Array): Promise<string> {
+  const [picture, mask] = await Promise.all([readPixels(pictureUrl), readPixels(maskUrl)]);
+  if (picture.width !== mask.width || picture.height !== mask.height) throw new Error('mask does not fit');
+  tintIconPixels(picture.data, mask.data, lut);
+  const canvas = document.createElement('canvas');
+  canvas.width = picture.width;
+  canvas.height = picture.height;
+  canvas.getContext('2d')!.putImageData(picture, 0, 0);
+  return canvas.toDataURL('image/png');
 }
