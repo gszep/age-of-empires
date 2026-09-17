@@ -48,6 +48,14 @@ export interface SelectionInfo {
   hp?: number;
   maxHp?: number;
   details: string[];
+  /**
+   * The stat row the reference draws beside the portrait (`ObjectStats`):
+   * each is one of the `staticons/` textures and a value. The DAT's own
+   * `displayed_attack`/`_melee_armour`/`_pierce_armour`/`_range` are the
+   * class-4 attack (else class-3), armour classes 4 and 3, and the range,
+   * which is what these carry -- read through research, so an upgrade shows.
+   */
+  stats?: { icon: string; value: string; title: string }[];
   progress?: { label: string; fraction: number };
   /**
    * One entry per selected entity, when more than one is. AoE2 shows the
@@ -491,6 +499,8 @@ export class Hud {
       <div ${at('HPProgress')}"><div class="hp-bar"><div class="hp-fill" style="width:${(fraction * 100).toFixed(1)}%"></div></div></div>
       <div ${at('ObjectHealth')}"><div class="object-hp">${Math.ceil(info.hp!)} / ${info.maxHp}</div></div>` : ''}
       ${info.details.length ? `<div ${at('ObjectOwnerNameCulture')}"><div class="object-detail">${info.details.join(' · ')}</div></div>` : ''}
+      ${info.stats?.length ? `<div ${at('ObjectStats')}"><div class="object-stats">${info.stats.map(stat => `
+        <div class="stat" title="${stat.title}"><span class="stat-icon" style="background-image:url('${this.ui!.base}${stat.icon}')"></span><span class="stat-value">${stat.value}</span></div>`).join('')}</div></div>` : ''}
       ${info.progress ? `
         <div ${at('StatusLabel')}"><div class="progress-label">${info.progress.label}</div></div>
         <div ${at('Progress')}"><div class="progress-bar"><div class="progress-fill" style="width:${(info.progress.fraction * 100).toFixed(1)}%"></div></div></div>` : ''}

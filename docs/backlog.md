@@ -277,6 +277,13 @@ terrain blends above.
 
 ## Interface
 
+- **The training queue has no portraits.** The reference draws each queued
+  unit as a portrait along the parchment (`commandpanel.json`'s
+  `QueueButtons` anchor, laid out by the engine), clickable to cancel that
+  one; here the progress bar's label says "+N queued" and the last is
+  cancelled from the grid. The anchor states only its origin, so the row's
+  pitch is the 80x80 command button's.
+
 - **Game speed does not survive a reload.** `+` and `-` step the original's
   four settings plus two fast-forward steps, and it resets to Normal on refresh,
   because the speed is a view preference and the saved session holds game state.

@@ -3,7 +3,7 @@ import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
 import { observe } from './sim/observe';
 import { TRAINING_QUEUE_LIMIT, applyCommand, buildingFootprint, createGame, gameTimeSeconds, isCarcass, placementLegal, queuedCount, stepGame, upgradedAway, notYetUpgradedInto } from './sim/game';
-import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, rulesFromManifest, type ContentManifest, type Cost, type GameRules, type TechKey, type UnitRules } from './sim/data';
+import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, rulesFromManifest, type AttackValue, type ContentManifest, type Cost, type GameRules, type TechKey, type UnitRules } from './sim/data';
 import { MAPS } from './sim/mapgen';
 import { isTileVisible } from './sim/visibility';
 import { checksumState } from './sim/checksum';
@@ -14,6 +14,7 @@ import { sameKindOnScreen } from './view/selection';
 import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
+import { buildingRulesFor, unitRulesFor } from './sim/rules';
 import { gridKey, placeCommands } from './view/command-grid';
 import type { ResourceStatus } from './view/hud';
 import { costLabel, displayName as nameFrom, plainHelp } from './view/names';
@@ -1049,6 +1050,40 @@ function resourceStatus(): ResourceStatus {
   return { workers, villagers, idle, ageName: imported?.name ?? AGE_NAMES[age], ageShield: shield, ageProgress };
 }
 
+/**
+ * The stat row beside the portrait, as the reference shows it: attack (the
+ * class-4 amount, else class-3 -- the DAT's own `displayed_attack`), armour
+ * as melee/pierce (classes 4 and 3), range when there is one, and what a
+ * villager is carrying. Read through research, so Forging shows as +1.
+ */
+function selectionStats(entity: Entity): SelectionInfo['stats'] {
+  if (entity.kind === 'resource' || isCarcass(entity)) return undefined;
+  const icons = 'textures/ingame/staticons/';
+  const stats: NonNullable<SelectionInfo['stats']> = [];
+  const attacksOf = (attacks: AttackValue[]) => attacks.find(a => a.class === 4)?.amount ?? attacks.find(a => a.class === 3)?.amount;
+  const armourOf = (armors: AttackValue[], cls: number) => armors.find(a => a.class === cls)?.amount ?? 0;
+  if (isUnit(entity.kind)) {
+    const unit = unitRulesFor(game, entity.owner, entity.kind as UnitKind);
+    const attacks = entity.unpacked && unit.unpacked ? unit.unpacked.attacks : unit.attacks;
+    const attack = attacksOf(attacks);
+    const pierce = attacks.length && !attacks.some(a => a.class === 4);
+    if (attack !== undefined && attack > 0) stats.push({ icon: `${icons}${pierce ? 'pierceAttack' : 'damage'}.png`, value: String(attack), title: 'Attack' });
+    stats.push({ icon: `${icons}armor.png`, value: `${armourOf(unit.armors, 4)}/${armourOf(unit.armors, 3)}`, title: 'Armor (melee/pierce)' });
+    const range = entity.unpacked && unit.unpacked ? unit.unpacked.range : unit.range;
+    if (range) stats.push({ icon: `${icons}range.png`, value: String(range), title: 'Range' });
+    if (entity.carrying) stats.push({ icon: `${icons}${entity.carrying.kind}.png`, value: String(entity.carrying.amount), title: 'Carrying' });
+  } else if (isBuilding(entity.kind)) {
+    const building = buildingRulesFor(game, entity.owner, entity.kind as BuildingKind);
+    if (building.attack) {
+      const attack = attacksOf(building.attack.attacks);
+      if (attack) stats.push({ icon: `${icons}pierceAttack.png`, value: String(attack), title: 'Attack' });
+    }
+    stats.push({ icon: `${icons}armor.png`, value: `${armourOf(building.armors, 4)}/${armourOf(building.armors, 3)}`, title: 'Armor (melee/pierce)' });
+    if (building.attack) stats.push({ icon: `${icons}range.png`, value: String(building.attack.range), title: 'Range' });
+  }
+  return stats;
+}
+
 function displayName(key: string): string {
   return nameFrom(key, assets?.entities[key]?.text?.name);
 }
@@ -1128,6 +1163,7 @@ function selectionInfo(): SelectionInfo | undefined {
   return {
     members,
     name,
+    stats: selectionStats(entity),
     icon: entity.kind !== 'resource' ? hud.iconFor(category, iconIndex) : undefined,
     // A carcass shows no health: the DAT's corpse unit has none, and what a
     // player wants off it is the food still on it, which `details` carries.

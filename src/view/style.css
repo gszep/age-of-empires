@@ -136,6 +136,12 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 #selection-panel.placed #selection-content { display: block; position: absolute; inset: 0; }
 #selection-panel.placed .placed-box { position: absolute; }
 #selection-panel.placed .placed-box > * { width: 100%; height: 100%; }
+/* The stat rows: each StatIcon box is 50 tall with its icon at the left and
+   its label at 60, stacked down from the ObjectStats anchor. */
+#selection-panel.placed .object-stats { display: flex; flex-direction: column; }
+#selection-panel.placed .stat { position: relative; height: calc(50px * var(--ui-scale)); width: calc(200px * var(--ui-scale)); }
+#selection-panel.placed .stat-icon { position: absolute; left: 0; top: 0; width: calc(50px * var(--ui-scale)); height: calc(50px * var(--ui-scale)); background-size: contain; background-repeat: no-repeat; background-position: center; }
+#selection-panel.placed .stat-value { position: absolute; left: calc(60px * var(--ui-scale)); top: 0; height: 100%; display: flex; align-items: center; font-size: calc(30px * var(--ui-scale)); color: #f3ead2; white-space: nowrap; }
 #selection-panel.placed .object-name { white-space: nowrap; line-height: 1; display: flex; align-items: center; }
 #selection-panel.placed .hp-bar, #selection-panel.placed .progress-bar { margin: 0; }
 #selection-panel.placed .object-detail, #selection-panel.placed .object-hp,

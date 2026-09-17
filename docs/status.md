@@ -1242,8 +1242,16 @@ line at `ObjectOwnerNameCulture`, the training bar at `StatusLabel`/`Progress`.
 The geometry was checked against a 2000x1125 screenshot of the reference at
 the same 0.52 scale: the parchment's left edge lands at 521 reference px
 there, which is what settled `xopen` as the collection's width rather than
-2246. The stat row (`ObjectStats`) and the queue portraits are still to do
-(#64).
+2246. The stat row (`ObjectStats`, at 190,60 in `Clipped`) followed (issue #64):
+attack, armour as melee/pierce, range, and what a villager carries, each a
+`staticons/` texture and a number, stacked down from the anchor as the
+reference stacks them. The numbers are the DAT's own `displayed_attack`,
+`displayed_melee_armour`, `displayed_pierce_armour` and `displayed_range`
+read the way the file defines them — the class-4 attack (else class-3),
+armour classes 4 and 3, the range — checked across every unit and building,
+and computed from the research-applied rules so an upgrade shows. A building
+that does not shoot here (the town center: its arrows are garrison-driven,
+#54) shows no attack. The queue portraits (`QueueButtons`) are still to do.
 
 ## A command keeps its cell
 
