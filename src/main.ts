@@ -145,6 +145,7 @@ function startReplay(raw: unknown): void {
   // A record from before civilisations were written down replays as whatever
   // the content is for, which is what it was played as.
   game = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia');
+  cameraCenter = homeCamera(game);
   selectedIds = [];
   buildMode = undefined;
   paused = false;
@@ -166,7 +167,18 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x18140c);
 const camera = new THREE.OrthographicCamera(-innerWidth / 2, innerWidth / 2, innerHeight / 2, -innerHeight / 2, -1000, 1000);
 camera.position.z = 10;
-let cameraCenter = { ...elevatedWorldToIso(game, 8, 9) };
+/**
+ * Where a match opens: on the player's own town center, as the reference
+ * does, and where the `H` key returns to. Tile (8, 9) was the top corner of
+ * the board, which on a full-size map is fog and the map's edge with nothing
+ * of the player's in sight (issue #62). A restored dev session opens there
+ * too; the camera is a view preference and the snapshot holds game state.
+ */
+function homeCamera(state: GameState): Point {
+  const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center' && !e.dead);
+  return elevatedWorldToIso(state, tc?.position.x ?? state.width / 2, tc?.position.y ?? state.height / 2);
+}
+let cameraCenter = homeCamera(game);
 let zoom = 1;
 
 let ground = view.createGround(game, assets);
@@ -347,6 +359,7 @@ function restart(): void {
   replay = undefined;
   clearSession();
   game = createGame((Date.now() >>> 0) || 1, rules, undefined, mapType);
+  cameraCenter = homeCamera(game);
   selectedIds = [];
   buildMode = undefined;
   paused = false;
