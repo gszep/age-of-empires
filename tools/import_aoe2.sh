@@ -10,13 +10,14 @@ DAT="$DEPOT_ROOT/depot_813781/resources/_common/dat/empires2_x2_p1.dat"
 SOUNDS="$DEPOT_ROOT/depot_813781/resources/_common/dat/sounds.json"
 BLENDOMATIC="$DEPOT_ROOT/depot_813781/resources/_common/dat/blendomatic_x1.dat"
 HOTKEYS="$DEPOT_ROOT/depot_813781/resources/_common/dat/hotkeys.json"
+STRINGS="$DEPOT_ROOT/depot_813781/resources/en/strings/key-value/key-value-strings-utf8.txt"
 PALETTES="$DEPOT_ROOT/depot_813781/resources/_common/palettes"
 WIDGETUI="$DEPOT_ROOT/depot_813782/widgetui"
 TERRAIN="$DEPOT_ROOT/depot_813782/resources/_common/terrain/textures/2x"
 GRAPHICS="$DEPOT_ROOT/depot_813784/resources/_common/drs/graphics"
 AUDIO_PACK="$DEPOT_ROOT/depot_813783/wwise/Base.pck"
 
-for required in "$DAT" "$SOUNDS" "$BLENDOMATIC" "$HOTKEYS" "$PALETTES" "$WIDGETUI" "$TERRAIN" "$GRAPHICS"; do
+for required in "$DAT" "$SOUNDS" "$BLENDOMATIC" "$HOTKEYS" "$STRINGS" "$PALETTES" "$WIDGETUI" "$TERRAIN" "$GRAPHICS"; do
   if [ ! -e "$required" ]; then
     echo "Missing owned AoE2DE depot content: $required" >&2
     echo "Set AOE2DE_DEPOT_ROOT to app_813780; see tools/README.md." >&2
@@ -25,7 +26,7 @@ for required in "$DAT" "$SOUNDS" "$BLENDOMATIC" "$HOTKEYS" "$PALETTES" "$WIDGETU
 done
 
 uv run --project "$ROOT" --locked python "$ROOT/tools/import_content.py" \
-  --dat "$DAT" --graphics "$GRAPHICS" --palettes "$PALETTES"
+  --dat "$DAT" --graphics "$GRAPHICS" --palettes "$PALETTES" --strings "$STRINGS"
 uv run --project "$ROOT" --locked python "$ROOT/tools/convert_sld.py" \
   --graphics "$GRAPHICS" --terrain "$TERRAIN"
 uv run --project "$ROOT" --locked python "$ROOT/tools/import_ui.py" \

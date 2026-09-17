@@ -299,7 +299,10 @@ export type TechKey = string;
 /** One researchable technology, as the DAT records it. */
 export interface TechRules {
   techId: number;
+  /** What the reference calls it, from its own string table where imported. */
   name: string;
+  /** The reference's tooltip, with its own markup (`<b>`, `<cost>`, `\n`). */
+  help?: string;
   cost: Cost;
   researchSeconds: number;
   researchedAt: BuildingKind;
@@ -944,6 +947,8 @@ interface ManifestEntity {
 interface ManifestTech {
   techId: number;
   name: string;
+  /** The reference's strings for it: name, button description and tooltip. */
+  text?: { name?: string; description?: string; help?: string };
   cost?: Partial<Record<ResourceKind, number>>;
   researchSeconds: number;
   researchedAt: number;
@@ -1302,6 +1307,7 @@ function technologies(
     result[key] = {
       techId: tech.techId,
       name: tech.name,
+      help: tech.text?.help,
       cost: cost(tech.cost?.food ?? 0, tech.cost?.wood ?? 0, tech.cost?.gold ?? 0, tech.cost?.stone ?? 0),
       researchSeconds: tech.researchSeconds,
       researchedAt,

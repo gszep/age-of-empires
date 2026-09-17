@@ -12,6 +12,8 @@ import type { GameState, PlayerId, Point } from '../sim/types';
 export interface CommandButton {
   id: string;
   label: string;
+  /** The reference's tooltip for it, already plain text, shown under the label. */
+  help?: string;
   hotkey?: string;
   icon?: string; // css background url
   enabled: boolean;
@@ -266,7 +268,8 @@ export class Hud {
       element.className = 'command-button';
       element.dataset.command = button.id;
       element.disabled = !button.enabled;
-      element.title = `${button.label}${button.hotkey ? ` (${button.hotkey.toUpperCase()})` : ''}`;
+      element.title = `${button.label}${button.hotkey ? ` (${button.hotkey.toUpperCase()})` : ''}`
+        + (button.help ? `\n\n${button.help}` : '');
       if (button.active) element.classList.add('active');
       element.style.backgroundImage = button.icon ? `${button.icon}, ${blank}` : blank;
       if (button.hotkey) {

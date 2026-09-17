@@ -22,6 +22,7 @@ GRAPHICS = ROOT / "depot_813784/resources/_common/drs/graphics"
 PALETTES = ROOT / "depot_813781/resources/_common/palettes"
 WIDGETUI = ROOT / "depot_813782/widgetui"
 HOTKEYS = ROOT / "depot_813781/resources/_common/dat/hotkeys.json"
+STRINGS = ROOT / "depot_813781/resources/en/strings/key-value/key-value-strings-utf8.txt"
 TERRAIN = ROOT / "depot_813782/resources/_common/terrain/textures/2x"
 AUDIO_PACK = ROOT / "depot_813783/wwise/Base.pck"
 SPEC = json.loads(Path(__file__).with_name("import-spec.json").read_text())
@@ -30,7 +31,7 @@ SOURCE = Path(__file__).with_name("aoe2-source.json")
 
 @lru_cache(maxsize=1)
 def extracted_content():
-    return extract(DAT, GRAPHICS, PALETTES, SPEC, json.loads(SOURCE.read_text()))
+    return extract(DAT, GRAPHICS, PALETTES, SPEC, json.loads(SOURCE.read_text()), STRINGS)
 
 
 @lru_cache(maxsize=1)
@@ -554,6 +555,38 @@ class ContentImportIntegrationTest(unittest.TestCase):
                     f"{key}/{name} is {width}x{height}, over the 8192 device limit",
                 )
 
+    def test_names_and_tooltips_are_the_reference_strings(self):
+        # Issue #48: what the panel calls a thing is the DAT's own string,
+        # not the slug spelled out. The rows are the ones the slug got wrong.
+        entities = self.result["entities"]
+        self.assertEqual(entities["man-at-arms"]["text"]["name"], "Man-at-Arms")
+        self.assertEqual(entities["two-handed-swordsman"]["text"]["name"], "Two-Handed Swordsman")
+        self.assertEqual(entities["villager-goldminer"]["text"]["name"], "Gold Miner")
+        self.assertEqual(entities["villager-stonemason"]["text"]["name"], "Stone Miner")
+        self.assertEqual(entities["villager-lumberjack"]["text"]["name"], "Lumberjack")
+        self.assertEqual(entities["villager"]["text"]["name"], "Villager (Male)")
+        self.assertEqual(entities["villager"]["text"]["create"], "Create Villager")
+        self.assertEqual(entities["town-center"]["text"]["create"], "Build Town Center")
+        self.assertTrue(entities["villager"]["text"]["help"].startswith("Create <b>Villager<b> (<cost>)"))
+        # Everything with a unit behind it has a name; what a player creates
+        # has the button text and the tooltip too. The gate's directional
+        # leaves carry no help of their own (the buildable gate, DAT unit 792,
+        # does), and gaia's animals carry none. Flight art and the flag have
+        # no strings at all and get none rather than somebody else's.
+        for key, entity in entities.items():
+            if entity.get("category") in ("projectile", "effect") or "id" not in entity:
+                self.assertNotIn("text", entity, key)
+                continue
+            self.assertIn("name", entity["text"], key)
+            if entity.get("category") in ("unit", "unit-variant", "building") and not key.startswith("palisade-gate"):
+                self.assertEqual(sorted(entity["text"]), ["create", "help", "name"], key)
+        technologies = self.result["technologies"]
+        self.assertEqual(technologies["loom"]["text"]["name"], "Loom")
+        self.assertEqual(technologies["loom"]["name"], "Loom")
+        self.assertEqual(technologies["man-at-arms"]["name"], "Man-at-Arms")
+        self.assertTrue(technologies["loom"]["text"]["help"].startswith("Research <b>Loom<b> (<cost>)"))
+        self.assertIn("strings", self.result["source"]["sha256"])
+
     def test_delete_asks_where_the_dat_flags_it(self):
         # Issue #47: `hero_mode` bit 32 is the safe-delete confirmation, and
         # it is on five buildings -- not on "buildings". A house goes on the
@@ -959,7 +992,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(len(self.result["source"]["sha256"]["palettes/original.pal"]), 64)
 
     def test_regeneration_is_deterministic(self):
-        again = extract(DAT, GRAPHICS, PALETTES, SPEC, json.loads(SOURCE.read_text()))
+        again = extract(DAT, GRAPHICS, PALETTES, SPEC, json.loads(SOURCE.read_text()), STRINGS)
         self.assertEqual(
             json.dumps(self.result, sort_keys=True), json.dumps(again, sort_keys=True)
         )

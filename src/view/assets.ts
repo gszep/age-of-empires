@@ -7,6 +7,14 @@ export type AnimationInfo = { frames: number; directions: number; frameSeconds: 
 export interface ImportedEntity {
   category: string;
   iconId?: number;
+  /**
+   * The reference's own strings for it (issue #48): `name` is the DAT's
+   * `language_dll_name` verbatim -- "Man-at-Arms", "Lumberjack", and for the
+   * base villager "Villager (Male)", the editor's qualifier included --
+   * `create` the button text ("Create Villager") and `help` the tooltip
+   * with the reference's markup (`<b>`, `<cost>`, a literal `\n`).
+   */
+  text?: { name?: string; create?: string; help?: string };
   /** What a selection draws on the ground: the DAT's obstruction shape —
    * round under a unit, the outline box (half-extents in tiles, can exceed
    * the collision box) under a building or resource. `dead` is the corpse

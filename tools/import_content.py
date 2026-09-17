@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,13 @@ POPULATION_TYPE = 4
 # `creatable.hero_mode` bit: the unit asks before it is deleted.
 HERO_CONFIRM_DELETE = 32
 
+# The DAT names its strings by id into `key-value-strings-utf8.txt`. A unit's
+# and a technology's `language_dll_name` and `language_dll_creation` index the
+# file directly; `language_dll_help` is offset by this much (105121 on the
+# villager is string 26121, the tooltip), which is the convention every
+# community tool uses and the file itself bears out (issue #48).
+HELP_STRING_OFFSET = 79000
+
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -36,6 +44,28 @@ def sha256(path: Path) -> str:
 
 def rounded(value: float) -> float:
     return round(value, 6)
+
+
+def read_strings(path: Path) -> dict[int, str]:
+    """The reference's string table: `<id> "<text>"` per line, `\\n` kept as-is."""
+    strings: dict[int, str] = {}
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        match = re.match(r'^(\d+)\s+"(.*)"\s*$', line)
+        if match:
+            strings[int(match.group(1))] = match.group(2)
+    return strings
+
+
+def text_of(strings: dict[int, str], name_id: int, creation_id: int, help_id: int) -> dict[str, str]:
+    """What the reference calls a thing, and what its tooltip says."""
+    text: dict[str, str] = {}
+    if name_id in strings:
+        text["name"] = strings[name_id]
+    if creation_id in strings:
+        text["create"] = strings[creation_id]
+    if help_id - HELP_STRING_OFFSET in strings:
+        text["help"] = strings[help_id - HELP_STRING_OFFSET]
+    return text
 
 
 def read_jasc_pal(path: Path) -> list[tuple[int, int, int]]:
@@ -230,6 +260,7 @@ def extract_entity(
     spec: dict[str, Any],
     graphics_dir: Path,
     hashes: dict[str, str],
+    strings: dict[int, str] | None = None,
 ) -> dict[str, Any]:
     unit = civ_units[spec["unitId"]]
     if unit is None:
@@ -277,6 +308,16 @@ def extract_entity(
         # trees as well, and nothing harvests a bush by shooting it (issue #46).
         "blastDefenseLevel": int(unit.blast_defense_level),
     }
+    # What the reference calls it, verbatim from its own string table -- the
+    # DAT's `language_dll_name` is "Man-at-Arms", not the slug's "Man At
+    # Arms" -- with the create-button text and the tooltip beside it.
+    # Flight art gets none: a projectile's string ids are leftovers (the
+    # trebuchet's rock points at the Kipchak's tooltip), and a wrong name is
+    # worse than no name.
+    if strings and category != "projectile":
+        text = text_of(strings, unit.language_dll_name, unit.language_dll_creation, unit.language_dll_help)
+        if text:
+            entity["text"] = text
     # What is left behind is its own unit in the DAT with its own obstruction:
     # a carcass stops being a body in the way and marks a flat box on the
     # ground instead of the live animal's ring.
@@ -738,7 +779,9 @@ def effects_of(
     return effects, sorted(unmodelled), sorted(unreached)
 
 
-def technology_entry(dat: DatFile, spec: dict[str, Any], hashes: dict[str, str]) -> dict[str, Any]:
+def technology_entry(
+    dat: DatFile, spec: dict[str, Any], hashes: dict[str, str], strings: dict[int, str] | None = None,
+) -> dict[str, Any]:
     """One researchable technology: what it costs, where, and what it changes."""
     tech = dat.techs[spec["techId"]]
     effect = dat.effects[tech.effect_id]
@@ -758,6 +801,14 @@ def technology_entry(dat: DatFile, spec: dict[str, Any], hashes: dict[str, str])
     }
     if tech.icon_id is not None and tech.icon_id >= 0:
         entry["iconId"] = tech.icon_id
+    if strings:
+        text = text_of(strings, tech.language_dll_name, tech.language_dll_description, tech.language_dll_help)
+        if "create" in text:
+            # A technology's second string is its description, the button
+            # text: "Research Loom (Villagers +15 HP and +1 melee/+2 pierce armor)".
+            text["description"] = text.pop("create")
+        if text:
+            entry["text"] = text
     if spec["techId"] in AGE_TECHS:
         entry["grantsAge"] = AGE_TECHS.index(spec["techId"])
 
@@ -838,6 +889,7 @@ def technologies_from_tree(
     entities: dict[str, Any],
     civilization: dict[str, Any],
     hashes: dict[str, str],
+    strings: dict[int, str] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
     """Every technology the civilisation's tree offers that this game can hold.
 
@@ -881,7 +933,7 @@ def technologies_from_tree(
                             "reason": f"researched at DAT unit {node['Building ID']}, not imported"})
             continue
         entry = technology_entry(
-            dat, {"techId": tech_id, "entities": entities}, hashes
+            dat, {"techId": tech_id, "entities": entities}, hashes, strings
         )
         if upgrade:
             # What it turns into, from the DAT's own `upgrade unit` command --
@@ -910,7 +962,9 @@ def technologies_from_tree(
                             "reason": f"none of its effects reach anything imported ({detail})"})
             continue
         entry.pop("_unreached", None)
-        entry["name"] = name
+        # The tree's own name keys the technology; the reference's display
+        # name, where the strings file has one, is what the panel shows.
+        entry["name"] = entry.get("text", {}).get("name", name)
         keep[slug(name)] = entry
 
     # A second pass for prerequisites, now that the set is known. The DAT lists
@@ -962,20 +1016,25 @@ def extract(
     palettes_dir: Path,
     spec: dict[str, Any],
     source: dict[str, Any],
+    strings_path: Path | None = None,
 ) -> dict[str, Any]:
     dat = DatFile.parse(dat_path)
     hashes: dict[str, str] = {"dat": sha256(dat_path)}
+    strings: dict[int, str] | None = None
+    if strings_path is not None and strings_path.is_file():
+        strings = read_strings(strings_path)
+        hashes["strings"] = sha256(strings_path)
     entities: dict[str, Any] = {}
     for entity_spec in spec["entities"]:
         civ_index = spec["gaiaIndex"] if entity_spec.get("civ") == "gaia" else spec["civIndex"]
         entities[entity_spec["key"]] = extract_entity(
-            dat, dat.civs[civ_index].units, entity_spec, graphics_dir, hashes
+            dat, dat.civs[civ_index].units, entity_spec, graphics_dir, hashes, strings
         )
     for effect_spec in spec.get("effects", []):
         entities[effect_spec["key"]] = effect_entry(dat, graphics_dir, effect_spec, hashes)
     civilization = civilization_entry(dat, dat_path, spec, hashes)
     technologies, skipped_technologies = technologies_from_tree(
-        dat, dat_path, spec, entities, civilization, hashes
+        dat, dat_path, spec, entities, civilization, hashes, strings
     )
     terrain = {
         key: terrain_entry(dat, slot["terrainId"])
@@ -1017,6 +1076,8 @@ def main() -> None:
     parser.add_argument("--dat", type=Path, default=content / "resources/_common/dat/empires2_x2_p1.dat")
     parser.add_argument("--graphics", type=Path, default=resources / "resources/_common/drs/graphics")
     parser.add_argument("--palettes", type=Path, default=content / "resources/_common/palettes")
+    parser.add_argument("--strings", type=Path,
+                        default=content / "resources/en/strings/key-value/key-value-strings-utf8.txt")
     parser.add_argument("--spec", type=Path, default=Path(__file__).with_name("import-spec.json"))
     parser.add_argument("--source", type=Path, default=Path(__file__).with_name("aoe2-source.json"))
     parser.add_argument("--out", type=Path, default=Path(".local/aoe2de/content.json"))
@@ -1028,6 +1089,7 @@ def main() -> None:
         args.palettes,
         json.loads(args.spec.read_text()),
         json.loads(args.source.read_text()),
+        args.strings,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")

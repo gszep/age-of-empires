@@ -1175,6 +1175,45 @@ three left are the training times of sheep, deer and boar, which the fallback
 records as 0 because nothing trains them; the DAT's 15, 25 and 25 are the times
 a scenario editor would use.
 
+## Names and tooltips are the reference's own strings
+
+The panel used to spell out the entity's slug — "Man At Arms", "Villager
+Goldminer" — and the reference's names were never read (issue #48). They are
+in `resources/en/strings/key-value/key-value-strings-utf8.txt`, indexed by
+four DAT fields the importer now resolves: `language_dll_name` and
+`language_dll_creation` directly, and `language_dll_help` at an offset of
+79000 (the villager's 105121 is string 26121, its tooltip), which is the
+convention every community tool uses and the file bears out. Each entity and
+technology carries `text.name`, `text.create` (or `description` for a
+technology) and `text.help`; a technology's display name is the string and its
+key stays the tree node's own slug, so nothing that names a technology moved.
+
+What shows: the selection panel names an entity by the string of the variant
+its art already picks, so a villager working wood reads **Lumberjack** and one
+with a bow **Hunter**, as the reference does; the command grid's buttons read
+"Create Villager (50 food)" and "Build Town Center (275 wood)" from the
+reference's own button text, with its tooltip rendered as plain text beneath
+(`<b>` and colour toggles dropped, `<cost>` spelled out, the stat placeholders
+left to the panel that shows them). Verified in the running page: "Town
+Center", "Villager", "Lumberjack" once sent to a tree, "Tree", and the
+villager button's title beginning `Create Villager (50 food) (Q)` followed by
+"Gathers resources. Builds and repairs buildings…".
+
+One rule is chosen rather than read: the DAT's names carry the scenario
+editor's qualifiers in parentheses — "Villager (Male)", "Trade Cart (Empty)",
+"Palisade Gate (up.)" — and the panel drops a trailing parenthetical. The file
+itself argues for it: the buildable gate (unit 792) is plain "Palisade Gate"
+where its directional leaves are "(up.)" and "(down.)". It costs "Tree (Oak)"
+its species, which the reference's panel also does not show.
+
+Flight art carries no strings: a projectile's ids are leftovers (the
+trebuchet's rock points at the Kipchak's tooltip), so the importer resolves
+none for it — a wrong name being worse than no name — and the import test
+asserts it. The unit hotkey letters the same file names
+(`language_dll_hotkey_text` − 139000, "A" for the villager) are not imported:
+the grid keys come from `hotkeys.json` and the two schemes are the reference's
+classic and grid layouts, a choice this game has not made.
+
 ## Key bindings, audited against the reference's own file
 
 `hotkeys.json` in the owned depot holds **457 bindings over 27 groups**, each

@@ -14,7 +14,8 @@ import { sameKindOnScreen } from './view/selection';
 import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
-import { createEntityView, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
+import { costLabel, displayName as nameFrom, plainHelp } from './view/names';
+import { chooseAnimation, createEntityView, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline, elevatedWorldToIso, elevationAt, ELEVATION_PIXELS } from './view/world';
 import { createCueWatcher, pollCues } from './view/cues';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
@@ -831,7 +832,8 @@ function currentCommands(): CommandButton[] {
         const building = rules.buildings[kind];
         buttons.push({
           id: `build-${kind}`,
-          label: `Build ${displayName(kind)} (${costLabel(building.cost)})`,
+          label: `${createLabel(kind, 'Build')} (${costLabel(building.cost)})`,
+          help: helpFor(kind, building.cost),
           hotkey: BUILD_HOTKEYS[index],
           enabled: affordable(building.cost),
           icon: hud.iconFor('Buildings', assets?.entities[kind]?.iconId),
@@ -866,7 +868,8 @@ function currentCommands(): CommandButton[] {
       const unitRules = rules.units[kind];
       buttons.push({
         id: `train-${kind}`,
-        label: `Train ${displayName(kind)} (${costLabel(unitRules.cost)})`,
+        label: `${createLabel(kind, 'Train')} (${costLabel(unitRules.cost)})`,
+        help: helpFor(kind, unitRules.cost),
         hotkey: TRAIN_HOTKEYS[index],
         // Not "is it already training" -- that is what the queue is for. What
         // stops another is a full queue, the price, or no room for what is
@@ -904,6 +907,7 @@ function currentCommands(): CommandButton[] {
     buttons.push({
       id: `research-${key}`,
       label: `Research ${tech.name} (${costLabel(tech.cost)})`,
+      help: tech.help ? plainHelp(tech.help, tech.cost) : undefined,
       enabled: !building.researching && affordable(tech.cost),
       icon: hud.iconFor('Techs', tech.iconId),
     });
@@ -956,15 +960,34 @@ function affordable(cost: Cost): boolean {
     && player.gold >= cost.gold && player.stone >= cost.stone;
 }
 
-function costLabel(cost: Cost): string {
-  const parts = (['food', 'wood', 'gold', 'stone'] as const)
-    .filter(resource => cost[resource] > 0)
-    .map(resource => `${cost[resource]} ${resource}`);
-  return parts.length ? parts.join(', ') : 'free';
+/**
+ * What the reference calls this entity key: its own string where the manifest
+ * carries one (issue #48), the slug spelled out otherwise.
+ */
+function displayName(key: string): string {
+  return nameFrom(key, assets?.entities[key]?.text?.name);
 }
 
-function displayName(kind: string): string {
-  return kind.split('-').map(part => part[0].toUpperCase() + part.slice(1)).join(' ');
+/**
+ * What the panel calls this entity right now. The reference names a villager
+ * by its task -- "Lumberjack", "Forager", "Hunter" -- and the art already
+ * picks that variant, so the name follows the same choice.
+ */
+function nameOf(entity: Entity): string {
+  const variant = chooseAnimation(game, entity).key;
+  const text = assets?.entities[variant]?.text?.name ?? assets?.entities[entityKey(entity)]?.text?.name;
+  return nameFrom(entityKey(entity), text);
+}
+
+/** The reference's button text ("Create Villager", "Build Mill"), or ours. */
+function createLabel(key: string, verb: 'Build' | 'Train'): string {
+  return assets?.entities[key]?.text?.create ?? `${verb} ${displayName(key)}`;
+}
+
+/** The reference's tooltip for a build or train button, as plain text. */
+function helpFor(key: string, cost: Cost): string | undefined {
+  const help = assets?.entities[key]?.text?.help;
+  return help ? plainHelp(help, cost) : undefined;
 }
 
 function selectionInfo(): SelectionInfo | undefined {
@@ -973,16 +996,18 @@ function selectionInfo(): SelectionInfo | undefined {
     : game.entities.filter(e => selectedIds.includes(e.id) && (!e.dead || isCarcass(e)));
   const entity = selection[0];
   if (!entity) return undefined;
-  const names: Record<string, string> = { resource: 'Resource', boar: 'Wild Boar' };
-  const name = entity.kind === 'resource'
-    ? entity.resourceKind === 'food' ? 'Forage Bush' : entity.resourceKind === 'gold' ? 'Gold Mine' : 'Tree'
-    : names[entity.kind] ?? displayName(entity.kind);
+  // Without the imported strings, the few names the slug cannot spell.
+  const names: Record<string, string> = {
+    berries: 'Forage Bush', gold: 'Gold Mine', stone: 'Stone Mine', 'tree-oak': 'Tree', boar: 'Wild Boar',
+  };
+  const fallbackName = (member: Entity) => names[entityKey(member)] ?? displayName(entityKey(member));
+  const name = assets ? nameOf(entity) : fallbackName(entity);
   const details: string[] = [];
   if (selection.length > 1) details.push(`${selection.length} selected`);
   const members = selection.length > 1
     ? selection.map(member => ({
       id: member.id,
-      name: names[member.kind] ?? displayName(member.kind),
+      name: assets ? nameOf(member) : fallbackName(member),
       icon: hud.iconFor(isUnit(member.kind) ? 'Units' : 'Buildings',
         assets?.entities[view.entityKey(member)]?.iconId),
       hp: member.hp,
