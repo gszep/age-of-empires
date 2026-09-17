@@ -277,6 +277,26 @@ terrain blends above.
 
 ## Interface
 
+- **Garrison is not modelled, and the town center does not shoot.** The DAT
+  gives `garrison_capacity` (town center 15, castle 20, towers 5, rams 6),
+  `garrison_type`, a heal rate, and the town center's arrows as
+  garrison-driven (`projectile_unit_id` −1, `secondary_projectile_unit` 54,
+  `max_total_projectiles` 11); issue #54 catalogues the fields and #75 asks
+  for it. A simulation feature with a checksum change.
+- **Four HUD buttons wear their Disabled art because nothing is behind them:**
+  the tech tree, objectives, chat and diplomacy on the menu panel, and the
+  minimap's colour and filter modes (player stats toggles the score panel;
+  the flare works). `screentechtree.json` and `techtreepreviewpanel.json`
+  specify the tech tree screen; the rest are #58.
+- **The score panel shows no score.** The reference's is military + economy +
+  technology + society (the post-game table's `ScoreStatsAnchor` headers in
+  `commandpanel.json` name the columns); nothing computes it, so the row is
+  number, name, civilisation and age.
+- **The reference's per-unit hotkey letters are imported and unused.** The
+  strings file carries each unit's letter (`language_dll_hotkey_text` −
+  139000, "A" for the villager); the grid uses the cell's own letter, which
+  is the reference's grid layout. Offering the classic layout too is a
+  choice `hotkeys.json` supports with its four default sets.
 - **The training queue has no portraits.** The reference draws each queued
   unit as a portrait along the parchment (`commandpanel.json`'s
   `QueueButtons` anchor, laid out by the engine), clickable to cancel that

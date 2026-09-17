@@ -11,7 +11,7 @@ npm run dev
 
 - Public open-content build: <https://empires.gszep.com/>
 - Desktop development: <http://localhost:5173/>
-- Tailnet imported-content verification: <https://calcifer.tail6e864b.ts.net:5173/>
+- Tailnet imported-content verification: <https://calcifer.tail6e864b.ts.net:5173/> (or `ysgramor` on the same tailnet; both hosts are in `vite.config.ts`'s `allowedHosts`)
 
 The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the same complete composition for remote QA.
 
@@ -118,7 +118,7 @@ Imported Microsoft content is generated under ignored `public/imported/` and is 
   biomes `Arabia.rms` rolls between, and the terrain passes that dress a board
 - `tools/import_blends.py` — the terrain blend masks, decoded from
   `blendomatic_x1.dat` and grouped by the neighbour each one faces
-- `tools/` — deterministic local DAT/SLD/widgetui/blendomatic/hotkey import
-  pipeline, run in that order by `tools/import_aoe2.sh`
+- `tools/` — deterministic local DAT/SLD/widgetui/blendomatic/hotkey/strings/
+  font import pipeline, run in that order by `tools/import_aoe2.sh`
 - `deploy/` — legally isolated open-content Cloud Run deployment and operations notes
 - `docs/status.md` — delivered scope, measurements, discrepancies, and verification evidence

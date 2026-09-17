@@ -64,6 +64,12 @@ model-provider tests opt-in.
   `~/Steam/steamapps/content/app_813780`), the SteamCMD depot tree — not a
   normal game install. Pinned depot/manifest IDs live in
   `tools/aoe2-source.json`; setup guide in `docs/owned-assets-setup.md`.
+- **The atlas cache is keyed on `convert_sld.py`'s own source:** any edit to
+  that file — the manifest dict included — re-decodes every sprite, about
+  twenty minutes. Batch such edits, and never restart the run.
+- **A tester's tab goes stale across re-imports:** the manifest is fetched
+  once per load. After regenerating `public/imported/`, ask for a reload
+  before investigating a report from an old tab.
 - **DAT field navigation:** see the genieutils cheat-sheet in
   `tools/README.md` before touching `import_content.py` — do not guess
   attribute names. When the sheet lacks a field, ask the DAT itself:

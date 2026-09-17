@@ -637,3 +637,50 @@ keeps the record.
   "because the owned files do not say". Rule: before writing "not in the
   owned files", run the inventory; the cost is minutes, and the phrase is only
   true of files somebody has listed.
+
+- **The publish step copies keys by name, and a key it does not name is
+  silently gone.** `convert_sld.py` assembles `manifest.json` from a literal
+  dict; `technologies` was once left out of it and the game ran on the
+  fallback rules without a failure, and `playerAttributes` was left out from
+  the day it was added — the DAT's farm food never reached the game, which
+  ran on the fallback's identical 175 for a month. Both were caught by the
+  numbers happening to agree. Rule: a new content key is three edits —
+  `import_content.py`, the dict in `convert_sld.py`, and the publish test's
+  list of rule-bearing keys — and the test is the one that matters.
+- **Editing the atlas converter for anything invalidates the whole cache.**
+  `decoder_fingerprint` hashes `convert_sld.py` itself, so adding one key to
+  the manifest dict re-decoded 1,500 atlases for twenty minutes. Rule: know
+  that before touching the file, batch such edits, and never restart the run
+  (three at once look like a hang — see above).
+- **Check a panel against a screenshot of the reference at the same scale,
+  not against the widget file alone.** `commandpanel.json` says the parchment
+  is anchored TopRight in a 2246-wide collection, which put it 358 in; the
+  reference screenshot at 0.52 scale put its left edge at 521, which is
+  2404 − 1888 — the file's `xopen`, the collection's real width. Nothing in
+  the JSON says which of `xclosed`/`xopen` is normal play. Rule: when a
+  widget's position has two readings, measure the reference; a pixel run
+  along one row of a screenshot settles it in a minute.
+- **A material the widget file names may be a placeholder the engine swaps.**
+  `CivEmblem`, the tech-tree button's `IconsMenuTechtreeAztecs`, the resource
+  panel's `AgeupCastleAge`, the map panel's shared `MinimapFilterEconomy` on
+  two buttons: each is substituted per civilisation, per age or per mode at
+  runtime, and the real one (`CivEmblemBritons`, `IconsMenuTechtreeBritons`,
+  `ButtonsShieldDark-AgeNormal`, `MinimapColorFullNormal`) is in the material
+  table under a name the file never uses. Rule: when a widget's art looks
+  wrong or missing, search the material and texture tables for the thing you
+  expect to see, name it in the spec's `ui.materials`, and record the
+  substitution.
+- **A tester's tab is a snapshot of the day it was opened.** View edits
+  hot-swap, sim edits reload and resume the saved session, and the manifest is
+  fetched once per load — after six re-imports a tab has run a mix of all of
+  them, and a report from it (a longbowman that would not promote) reproduced
+  nowhere. Rule: after regenerating anything under `public/imported/`, ask for
+  a reload before investigating a report, and say so when handing over a test
+  server.
+- **The debug protocol's `entities` puts coordinates under `position`, and
+  takes no resource filter.** A probe that read `x`/`y` off the top level sent
+  an order to `{}`; one that passed `resourceKind` got every entity back and
+  picked the town center as the nearest tree. The first is now refused at
+  `applyCommand`; the second is filtered client-side. Rule: read a query's
+  answer once before writing the loop that trusts it.
+

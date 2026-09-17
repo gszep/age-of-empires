@@ -21,6 +21,11 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    geospatial dependencies). Use `uv run --locked python tools/<tool>.py` for
    direct invocations; do not install packages with pip.
 2. `import_content.py` reads the declarative `import-spec.json` and extracts the
+   entities, technologies, ages, civilisation and player attributes from the
+   patch-matched DAT and the JSON beside it (`eras.json`, `objreplacement.json`,
+   `civilizations.json`), with the reference's names, button text and tooltips
+   from `--strings` (`resources/en/strings/key-value/key-value-strings-utf8.txt`).
+   Historically it extracted the
    Dark Age slice (militia, villager + task variants, town center, barracks,
    house, berries, gold, oak tree) from the patch-matched DAT with
    `genieutils-py`, resolving graphic IDs from semantic slots/task fields and
@@ -40,9 +45,10 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    `convert_sld.py --terrain-only` updates those DDS textures in an existing
    manifest without needlessly decoding every SLD first.
 4. `import_ui.py` extracts the WEST widget-UI subset (resource/command/map/
-   bottom/menu panels, materials, entity + action + stat icons, click-sound
-   aliases from `sounds.json`) into `public/imported/aoe2/ui/`, converting DDS
-   through Pillow and copying PNG byte-identically.
+   bottom/menu/score panels, materials, entity + action + stat icons,
+   click-sound aliases from `sounds.json`, `UIColors.json`, and the faces the
+   spec names from `--fonts`) into `public/imported/aoe2/ui/`, converting DDS
+   through Pillow and copying PNG and TTF byte-identically.
 5. When sound depot 813783 and `vgmstream-cli` are available,
    `import_audio.py` follows consumed cues through the owned PCK/BNK HIRC
    graph, extracts only referenced DIDX media, and writes deterministic

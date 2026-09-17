@@ -94,6 +94,6 @@ export default defineConfig({
     // No hmr override: Vite's client already matches the page protocol, so
     // localhost gets ws:// and the Tailscale-served HTTPS URL gets wss://.
     // Forcing wss here broke the websocket (HMR and /__debug) on plain HTTP.
-    allowedHosts: ['calcifer.tail6e864b.ts.net'],
+    allowedHosts: ['calcifer.tail6e864b.ts.net', 'ysgramor.tail6e864b.ts.net'],
   },
 });

@@ -35,9 +35,52 @@ kill the litter, and state what is deliberately left running.
 
 ## Where this queue stands
 
-**Start at Q3** (herdables that follow). The standing priority holds: anything
-newly tagged `bug` outruns everything in this file — check the issue list
-first.
+**Start with the open issues, bugs first.** The standing priority holds:
+anything tagged `bug` outruns everything in this file. After the human's
+playtest of 2026-09-17 the list is: **#61** (a razed house plays the Dark Age
+collapse whatever the age), **#70** (two buildings of a kind can research the
+same technology at once), **#71** (building a farm should use the seed-sowing
+animation), **#73** (damage stages on buildings — the DAT's
+`damage_graphics` at 25/50/75 %, and the fire particles, see #49), **#74**
+(villagers cannot repair), **#75** (garrison — not modelled at all; the
+DAT's fields are catalogued in #54), **#76** (shift-click trains five),
+**#77** (unit portraits in the grid wear no player colour), **#78** (a Feudal
+mill's animation). #70, #76 and #77 are small; #75 and #74 are simulation
+features with checksum consequences. Then Q3 below.
+
+**The 2026-09-17 session** (18 commits, `cebb47b`..`37a191a`) did three
+things. First an audit of the owned reference material — every file basename
+under the depot's `dat/`, `xs/`, `widgetui/`, `particles/` and every DAT unit
+field, grepped against the repo — which found sixteen unread things and filed
+them as **#45–#60**; five were bugs and are fixed (a miss lands the DAT's
+`accuracy_dispersion`; a blast catches by `blast_defense_level ≥
+blast_attack_level`, so mangonels hit buildings and onagers fell trees;
+Delete asks only where `hero_mode` bit 32 says; names, tooltips and button
+text come from the strings file; half the villagers are women). Then the
+HUD, from a screenshot of the reference at the same 0.52 scale: **#62–#69**
+all closed — the match opens on the town center, the bottom panel is the
+one 2404-wide collection it is, the selection panel's contents and stat
+row sit in `Clipped`'s boxes, the resource panel has gatherer counts and
+the age bar, the menu panel has its six buttons and the civ shield, the
+minimap has its four buttons with a working flare, a score panel (toggled
+by the player-stats ribbon), Georgia Bold and `UIColors.json`. Then **#72**:
+the attack animation runs on the simulation's swing (`swingSeconds`), so a
+trebuchet's rock leaves at the DAT's `frame_delay` frame and the engine
+stands through the rest of its reload. Also on the way: every command has
+a fixed grid cell from the DAT's `button_id` (hotkeys are now the cell's
+letter: build pages Q/W, Stop G), the grid's own buttons wear the action
+sheet, an order to a non-point is refused, and `playerAttributes` — never
+published since #23 — reaches the manifest. Every item has a section in
+`status.md`, and the cheat-sheet in `tools/README.md` grew nine rows.
+
+**Two things a fresh session needs to know from that day**, beyond the
+lessons: the import pipeline now takes the strings file and the fonts
+directory (`import_aoe2.sh` passes both; `--strings` on `import_content.py`,
+`--fonts` on `import_ui.py`), and editing `convert_sld.py` for any reason
+invalidates the whole atlas cache — its own source is in the fingerprint —
+so a one-line change to the manifest dict costs a twenty-minute re-decode.
+Do not restart it. And a tester's browser tab goes stale across re-imports:
+after regenerating the manifest, ask for a reload before believing a report.
 
 **The 2026-09-14/15 overnight run emptied the issue list.** The human
 reordered the queue for it — map generation first, then terrain blending, then
