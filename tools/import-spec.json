@@ -1952,7 +1952,8 @@
       "defeat"
     ],
     "materialPrefixes": [
-      "IconAction"
+      "IconAction",
+      "ButtonsShield"
     ],
     "textureDirectories": [
       "textures/ingame/staticons"

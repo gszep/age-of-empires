@@ -285,6 +285,13 @@ def main() -> None:
         "civilization": imported["civilization"],
         "skippedTechnologies": imported["skippedTechnologies"],
         "playerColors": imported["playerColors"],
+        # Neither of these has art either, and `playerAttributes` was left
+        # out of this list from the day it was added: the farm's food read
+        # off the DAT never reached the game, which ran on the fallback's
+        # identical 175. `test_the_published_manifest_carries_the_technologies`
+        # now asserts every rule-bearing key.
+        "playerAttributes": imported.get("playerAttributes", {}),
+        "ages": imported.get("ages", []),
         "terrain": terrain,
         "skippedAtlases": sorted(skipped),
         "skippedMasks": sorted(mask_skipped),

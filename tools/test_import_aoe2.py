@@ -539,6 +539,13 @@ class ContentImportIntegrationTest(unittest.TestCase):
         for key, tech in self.result["technologies"].items():
             self.assertIn(key, published["technologies"])
             self.assertEqual(published["technologies"][key], tech)
+        # ...and it happened again with `playerAttributes` (issue #23's farm
+        # food), which the game read off the fallback's identical 175 for a
+        # month. Every key the game reads rules from, not only the one that
+        # bit first.
+        for key in ("playerAttributes", "civilization", "ages", "playerColors"):
+            self.assertIn(key, published, key)
+            self.assertEqual(published[key], self.result[key], key)
 
     def test_every_atlas_fits_a_webgpu_texture(self):
         # A sheet over the device's maxTextureDimension2D (8192 by default)

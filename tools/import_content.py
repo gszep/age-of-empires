@@ -1031,6 +1031,29 @@ def terrain_entry(dat: DatFile, terrain_id: int) -> dict[str, Any]:
     }
 
 
+def ages_of(dat_path: Path, strings: dict[int, str] | None) -> list[dict[str, Any]]:
+    """The base era's ages: name (from the string table) and shield material.
+
+    `eras.json` lists each age's `NameId` (4201 "Dark Age" ...) and
+    `ShieldMaterialName` (`ShieldDarkAge` ...); the panel's `AgeUp` button
+    draws the material `ButtonsShieldDark-AgeNormal`, which is that name
+    spelled the way the material table spells it.
+    """
+    path = dat_path.parent / "eras.json"
+    if not path.is_file():
+        return []
+    base = next((era for era in json.loads(path.read_text()) if era.get("Name") == "base"), None)
+    ages: list[dict[str, Any]] = []
+    for age in (base or {}).get("Ages", []):
+        if "ShieldMaterialName" not in age:
+            continue
+        entry: dict[str, Any] = {"shield": age["ShieldMaterialName"]}
+        if strings and age.get("NameId") in strings:
+            entry["name"] = strings[age["NameId"]]
+        ages.append(entry)
+    return ages
+
+
 def skin_chances(dat_path: Path, entities: dict[str, Any], hashes: dict[str, str]) -> None:
     """How often a skin is drawn instead of the unit it skins.
 
@@ -1089,6 +1112,9 @@ def extract(
     }
     return {
         "terrain": terrain,
+        # The ages, from `eras.json` beside the DAT: each names its string and
+        # the shield the resource panel's `AgeUp` button shows for it.
+        "ages": ages_of(dat_path, strings),
         "audio": spec.get("audio", {}),
         "civilization": civilization,
         # Where a player-level attribute starts, from the civ's own resource

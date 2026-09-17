@@ -87,8 +87,13 @@ export interface BlendMasks {
   solid: number;
 }
 
+/** One age as `eras.json` states it: its name and the shield it wears. */
+export interface ImportedAge { name?: string; shield: string }
+
 export interface ContentAssets {
   entities: Record<string, ImportedEntity>;
+  /** The base era's ages in order, Dark to Imperial. */
+  ages: ImportedAge[];
   /** Skin families by the base key they stand in for. */
   skins: Map<string, SkinFamily[]>;
   terrain: Record<string, ImportedTerrain>;
@@ -189,6 +194,7 @@ function rampTexture(color: PlayerColor, shadeLevels: number[]): THREE.DataTextu
 export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   const manifest = await fetchJson<{
     entities: Record<string, ImportedEntity>;
+    ages?: ImportedAge[];
     terrain?: Record<string, ImportedTerrain>;
     playerColors?: PlayerColors;
   }>(`${CONTENT_BASE}manifest.json`);
@@ -271,7 +277,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     };
   }
   return {
-    entities: manifest.entities, skins: skinFamilies(manifest.entities),
+    entities: manifest.entities, skins: skinFamilies(manifest.entities), ages: manifest.ages ?? [],
     terrain, textures, playerColors, playerRamps, blends,
   };
 }

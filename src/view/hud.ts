@@ -10,6 +10,23 @@ import { widgetBox } from './layout';
 import { Minimap } from './minimap';
 import type { GameState, PlayerId, Point } from '../sim/types';
 
+/**
+ * What the resource panel shows beside the stockpiles: who is gathering what,
+ * how many stand idle, and the age -- its name, its shield, and how far the
+ * next one has come.
+ */
+export interface ResourceStatus {
+  workers: Record<'wood' | 'food' | 'gold' | 'stone', number>;
+  /** How many villagers there are, the number under the population icon. */
+  villagers: number;
+  idle: number;
+  ageName: string;
+  /** The material of the age's shield, `ButtonsShield<Age>-AgeNormal`. */
+  ageShield: string;
+  /** 0..1 of the way to the next age, 0 when none is being researched. */
+  ageProgress: number;
+}
+
 export interface CommandButton {
   id: string;
   label: string;
@@ -99,14 +116,17 @@ export class Hud {
       <div id="resource-panel" class="panel">
         ${['wood', 'food', 'gold', 'stone'].map(resource => `
           <div class="resource-slot" data-resource="${resource}">
-            <span class="resource-icon" data-icon="${resource}"></span>
+            <span class="resource-icon" data-icon="${resource}"><span class="workers" data-workers="${resource}"></span></span>
             <span class="resource-value" data-value="${resource}">0</span>
           </div>`).join('')}
         <div class="resource-slot" data-resource="population">
-          <span class="resource-icon" data-icon="population"></span>
+          <span class="resource-icon" data-icon="population"><span class="workers" data-workers="villagers"></span></span>
           <span class="resource-value" data-value="population">0/0</span>
         </div>
+        <span class="workers idle-count" data-workers="idle"></span>
         <button class="idle-villager" data-command="idle-villager" title="Select idle villager (.)"></button>
+        <div class="age-shield" data-age-shield></div>
+        <div class="age-bar"><div class="age-fill"></div><div class="age-text" data-age-text></div></div>
       </div>
       <div id="menu-panel" class="panel">
         <button data-menu="pause" class="menu-button" data-icon="settings" title="Pause (F3)"></button>
@@ -237,6 +257,41 @@ export class Hud {
     // and 14px gaps already match the buttons' own 94px stride.
     place('#minimap-canvas', widgetBox(this.ui?.layouts.mappanel, 'Background', 'MapView'), true);
     place('#command-grid', widgetBox(this.ui?.layouts.commandpanel, 'BackgroundLeft', 'Buttons'), false);
+    // The resource panel's own boxes (resourcepanel.json): each icon 84x84,
+    // its `Workers` count inside it, the storage label beside it, the idle
+    // button with its count, the age shield (`AgeUp`) and the age bar with
+    // its text (issue #65). The workers count is anchored TopRight in a
+    // 60x32 label at (16,55) inside the icon.
+    const resources = this.ui?.layouts.resourcepanel;
+    if (resources) this.root.querySelector('#resource-panel')!.classList.add('placed');
+    for (const [resource, widget] of [['wood', 'Wood'], ['food', 'Food'], ['gold', 'Gold'], ['stone', 'Stone'], ['population', 'Population']] as const) {
+      const slot = this.root.querySelector<HTMLElement>(`.resource-slot[data-resource="${resource}"]`);
+      const icon = widgetBox(resources, 'Background', widget);
+      if (slot && icon) {
+        place(`.resource-slot[data-resource="${resource}"]`, icon, true);
+        const workers = widgetBox(resources, widget, 'Workers');
+        const count = slot.querySelector<HTMLElement>('.workers');
+        if (workers && count) {
+          count.style.left = `calc(${workers.left}px * var(--ui-scale))`;
+          count.style.top = `calc(${workers.top}px * var(--ui-scale))`;
+          count.style.width = `calc(${workers.width}px * var(--ui-scale))`;
+          count.style.height = `calc(${workers.height}px * var(--ui-scale))`;
+        }
+        const storage = widgetBox(resources, 'Background', resource === 'population' ? 'PopulationCount' : `${widget}Storage`);
+        const value = slot.querySelector<HTMLElement>('.resource-value');
+        if (storage && value) {
+          value.style.left = `calc(${storage.left - icon.left}px * var(--ui-scale))`;
+          value.style.top = `calc(${storage.top - icon.top}px * var(--ui-scale))`;
+          value.style.height = `calc(${storage.height}px * var(--ui-scale))`;
+        }
+      }
+    }
+    place('.idle-villager', widgetBox(resources, 'Background', 'Idle'), true);
+    place('.idle-count', widgetBox(resources, 'Background', 'IdleWorkers'), true);
+    place('.age-shield', widgetBox(resources, 'Background', 'AgeUp'), true);
+    place('.age-bar', widgetBox(resources, 'Background', 'AgeBar'), true);
+    const ageBar = this.root.querySelector<HTMLElement>('.age-bar');
+    if (ageBar && resources) ageBar.querySelector<HTMLElement>('.age-fill')!.style.backgroundImage = this.texture('AgeBar');
     // The faded emblem on the empty parchment: the `CivEmblem` widget, whose
     // material the engine picks per civilisation (`CivEmblemBritons`).
     place('#civ-emblem', widgetBox(this.ui?.layouts.commandpanel, 'BackgroundRight', 'CivEmblem'), true);
@@ -383,13 +438,30 @@ export class Hud {
     `;
   }
 
-  updateResources(state: GameState, player: PlayerId): void {
+  updateResources(state: GameState, player: PlayerId, status?: ResourceStatus): void {
     const p = state.players[player];
     this.resourceValues.wood.textContent = String(p.wood);
     this.resourceValues.food.textContent = String(p.food);
     this.resourceValues.gold.textContent = String(p.gold);
     this.resourceValues.stone.textContent = String(p.stone);
-    this.resourceValues.population.textContent = `${p.population} / ${p.populationCap}`;
+    this.resourceValues.population.textContent = `${p.population}/${p.populationCap}`;
+    if (!status) return;
+    // The reference writes a 0 rather than leaving the corner blank, and
+    // under the population icon it writes how many villagers there are.
+    for (const resource of ['wood', 'food', 'gold', 'stone'] as const) {
+      const count = this.root.querySelector<HTMLElement>(`[data-workers="${resource}"]`);
+      if (count) count.textContent = String(status.workers[resource]);
+    }
+    const villagers = this.root.querySelector<HTMLElement>('[data-workers="villagers"]');
+    if (villagers) villagers.textContent = String(status.villagers);
+    const idle = this.root.querySelector<HTMLElement>('[data-workers="idle"]');
+    if (idle) idle.textContent = status.idle ? String(status.idle) : '';
+    const shield = this.root.querySelector<HTMLElement>('[data-age-shield]');
+    if (shield) shield.style.backgroundImage = this.texture(status.ageShield);
+    const text = this.root.querySelector<HTMLElement>('[data-age-text]');
+    if (text) text.textContent = status.ageName;
+    const fill = this.root.querySelector<HTMLElement>('.age-fill');
+    if (fill) fill.style.width = `${(Math.max(0, Math.min(1, status.ageProgress)) * 100).toFixed(1)}%`;
   }
 
   showEnd(victory: boolean): void {

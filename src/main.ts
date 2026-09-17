@@ -15,8 +15,9 @@ import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
 import { gridKey, placeCommands } from './view/command-grid';
+import type { ResourceStatus } from './view/hud';
 import { costLabel, displayName as nameFrom, plainHelp } from './view/names';
-import { artKey, chooseAnimation, createEntityView, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
+import { artKey, chooseAnimation, createEntityView, gatherTargetResource, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline, elevatedWorldToIso, elevationAt, ELEVATION_PIXELS } from './view/world';
 import { createCueWatcher, pollCues } from './view/cues';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
@@ -1009,6 +1010,40 @@ function affordable(cost: Cost): boolean {
  * What the reference calls this entity key: its own string where the manifest
  * carries one (issue #48), the slug spelled out otherwise.
  */
+/**
+ * What the resource panel shows beside the stockpiles (issue #65): how many
+ * villagers work each resource -- what they are gathering or carrying, a
+ * hunter and a shepherd counted as food -- how many stand idle, and the age
+ * with its shield and how far the next one has come.
+ */
+function resourceStatus(): ResourceStatus {
+  const workers = { wood: 0, food: 0, gold: 0, stone: 0 };
+  let idle = 0;
+  let villagers = 0;
+  for (const entity of game.entities) {
+    if (entity.owner !== 1 || entity.dead || entity.kind !== 'villager') continue;
+    villagers += 1;
+    const resource = entity.carrying?.kind ?? gatherTargetResource(game, entity);
+    if (resource) workers[resource] += 1;
+    else if (entity.order.kind === 'idle') idle += 1;
+  }
+  const age = game.players[1].age;
+  const imported = assets?.ages[age];
+  // `eras.json` names the shield `ShieldDarkAge`; the material table spells
+  // the button's normal state `ButtonsShieldDark-AgeNormal`.
+  const shield = (imported?.shield ?? `Shield${['Dark', 'Feudal', 'Castle', 'Imperial'][age] ?? 'Dark'}Age`)
+    .replace(/^Shield(.*)Age$/, 'ButtonsShield$1-AgeNormal');
+  let ageProgress = 0;
+  for (const entity of game.entities) {
+    if (entity.owner !== 1 || !entity.researching) continue;
+    const tech = rules.technologies[entity.researching.tech as TechKey];
+    if (tech?.grantsAge === undefined) continue;
+    const total = tech.researchSeconds / TICK_SECONDS;
+    ageProgress = total > 0 ? 1 - entity.researching.remainingTicks / total : 0;
+  }
+  return { workers, villagers, idle, ageName: imported?.name ?? AGE_NAMES[age], ageShield: shield, ageProgress };
+}
+
 function displayName(key: string): string {
   return nameFrom(key, assets?.entities[key]?.text?.name);
 }
@@ -1440,7 +1475,7 @@ renderer.setAnimationLoop(now => {
   hudClock += elapsed;
   if (hudClock > 0.15) {
     hudClock = 0;
-    hud.updateResources(game, 1);
+    hud.updateResources(game, 1, resourceStatus());
     hud.setCommands(currentCommands());
     hud.setSelection(selectionInfo());
     hud.minimap.draw(game, isoToWorld(cameraCenter.x, cameraCenter.y), {
@@ -1497,7 +1532,7 @@ function rebuildPresentation(): void {
   hud.destroy();
   hud = createHud();
   if (menuWasOpen) hud.toggleMenu(true);
-  hud.updateResources(game, 1);
+  hud.updateResources(game, 1, resourceStatus());
   hud.setCommands(currentCommands());
   hud.setSelection(selectionInfo());
   if (game.winner) hud.showEnd(game.winner === 1);

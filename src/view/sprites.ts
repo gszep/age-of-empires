@@ -448,7 +448,7 @@ function gatherTarget(state: GameState, entity: Entity): Entity | undefined {
   return state.entities.find(e => e.id === targetId);
 }
 
-function gatherTargetResource(state: GameState, entity: Entity) {
+export function gatherTargetResource(state: GameState, entity: Entity) {
   return gatherTarget(state, entity)?.resourceKind;
 }
 

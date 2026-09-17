@@ -1175,6 +1175,30 @@ three left are the training times of sheep, deer and boar, which the fallback
 records as 0 because nothing trains them; the DAT's 15, 25 and 25 are the times
 a scenario editor would use.
 
+## The resource panel says who is gathering what, and which age it is
+
+`resourcepanel.json` places, inside each 84x84 resource icon, a `Workers`
+label (60x32 at 16,55, TopRight-anchored text): how many villagers gather
+that resource. Beside the population it puts the `Idle` button (70x70) with
+`IdleWorkers`, then the `AgeUp` button (141x122 at 1200,62) — the age's
+shield — and `AgeBar` (378x52 progress bar at 1250,57) with `AgeTextLabel`
+in it, the age's name in a bar that fills while the next age is researched.
+None of that was drawn (issue #65). Every box is now placed from the file;
+the counts are a fold over the player's villagers (what each is gathering or
+carrying, a hunter and a shepherd counted as food; idle is an idle order);
+the age's name and shield come from `eras.json` beside the DAT, which names
+each age's string (4201 "Dark Age" …) and `ShieldMaterialName`
+(`ShieldDarkAge`, drawn by the material `ButtonsShieldDark-AgeNormal`), both
+now imported as `ages`; and the bar's fill is the town center's research of
+an age technology, over `AgeBar`'s own `loadingbar_full.png`.
+
+Found on the way: `playerAttributes` — the farm's food read off the DAT in
+issue #23 — never reached `manifest.json`. `convert_sld.py` assembles the
+published manifest key by key, and that key was never added, so the game has
+run on the fallback's identical 175 since. It passes through now, and the
+publish test asserts every rule-bearing key rather than the one that bit
+first.
+
 ## The bottom panel is one collection
 
 `commandpanel.json` is a single collection: `xopen` 2404 wide, the black grid

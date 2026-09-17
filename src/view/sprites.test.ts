@@ -114,6 +114,7 @@ function fakeAssets(): ContentAssets {
       },
     },
     skins: new Map(),
+    ages: [],
     terrain: {},
     textures,
     playerColors: {
