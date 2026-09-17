@@ -1191,8 +1191,13 @@ class UiImportIntegrationTest(unittest.TestCase):
         layouts = self.result["layouts"]
         self.assertEqual(
             set(layouts),
-            {"blanktoppanel", "resourcepanel", "commandpanel", "mappanel", "blankbottompanel", "menupanel"},
+            {"blanktoppanel", "resourcepanel", "commandpanel", "mappanel", "blankbottompanel", "menupanel", "scorepanel"},
         )
+        # The score panel is a Surround anchored at the bottom right, its
+        # bottom edge at y=1800 (issue #67).
+        score = layouts["scorepanel"]["widgets"][0]
+        self.assertEqual(score["Name"], "Background")
+        self.assertEqual(score["ViewPort"], {"xorigin": 3840, "yorigin": 1800, "width": 400, "height": 400, "alignment": "BottomRight"})
         resource = layouts["resourcepanel"]
         self.assertEqual(resource["viewPort"]["width"], 1935)
         dumped = json.dumps(resource)

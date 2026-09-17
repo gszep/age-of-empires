@@ -1930,7 +1930,8 @@
       "commandpanel",
       "mappanel",
       "blankbottompanel",
-      "menupanel"
+      "menupanel",
+      "scorepanel"
     ],
     "iconCategories": {
       "Buildings": "entities",
@@ -1955,7 +1956,9 @@
     "materialPrefixes": [
       "IconAction",
       "ButtonsShield",
-      "MinimapColorFull"
+      "MinimapColorFull",
+      "PlayerAge",
+      "BlackPanel_"
     ],
     "textureDirectories": [
       "textures/ingame/staticons"
@@ -1999,7 +2002,8 @@
       "CivEmblemBritons",
       "IconsMenuTechtreeBritons",
       "IconsMenuTechtreeBritonsHover",
-      "IconsMenuTechtreeBritonsPressed"
+      "IconsMenuTechtreeBritonsPressed",
+      "BritonsIcon"
     ]
   },
   "terrain": {

@@ -1175,6 +1175,22 @@ three left are the training times of sheep, deer and boar, which the fallback
 records as 0 because nothing trains them; the DAT's 15, 25 and 25 are the times
 a scenario editor would use.
 
+## The score panel lists the players
+
+`scorepanel.json` is a 400x400 `Surround` of `BlackPanel_*` slices whose
+bottom edge sits at y=1800, with a `FontsHolder` anchor 20 in from the right
+and 30 up from the bottom in a 48pt face; the rows stack upward from it,
+just above the map panel (issue #67). Each row is the player's number and
+name in the player's colour, the civilisation's small icon (`BritonsIcon`)
+and the age (`PlayerAge<n>Icon`). The human is "Player 1", having no profile
+here; the computer takes one of the sixteen names the reference gives a
+computer player of its civilisation — `civilizations.json` names the table
+(`computer_name_string_table_offset` 4400, whose string is the count, then
+"Henry V" … "Richard the Lionheart"), imported with the civilisation's own
+display name ("Britons", string 10271) — dealt by the match seed. No score
+yet: the reference's is military + economy + technology + society and nothing
+here computes it, so the row ends at the name rather than inventing one.
+
 ## The minimap panel's four buttons
 
 `mappanel.json` places `ButtonFlare` (185,129), `ButtonPlayer` (776,129),

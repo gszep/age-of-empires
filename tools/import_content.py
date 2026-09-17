@@ -851,7 +851,8 @@ def technology_entry(
 
 
 def civilization_entry(
-    dat: DatFile, dat_path: Path, spec: dict[str, Any], hashes: dict[str, str]
+    dat: DatFile, dat_path: Path, spec: dict[str, Any], hashes: dict[str, str],
+    strings: dict[int, str] | None = None,
 ) -> dict[str, Any]:
     """The civilisation this content is imported for, and what its tree lacks.
 
@@ -885,7 +886,7 @@ def civilization_entry(
             unavailable[bucket].append(node_id)
     for name in unavailable:
         unavailable[name].sort()
-    return {
+    entry: dict[str, Any] = {
         "key": civ_spec["key"],
         "datIndex": spec["civIndex"],
         # The DAT's own name for the civilisation, which is not always the
@@ -894,6 +895,24 @@ def civilization_entry(
         "treeFile": civ_spec["treeFile"],
         "unavailable": unavailable,
     }
+    # What the reference calls it, and what it calls a computer player of it.
+    # `civilizations.json` beside the DAT names the civilisation's string
+    # (10271 "Britons") and the offset of its computer-name table: the string
+    # at the offset is the count, and the names follow (4401 "Henry V" ...).
+    civ_list = dat_path.parent / "civilizations.json"
+    if strings and civ_list.is_file():
+        hashes["civilizations.json"] = sha256(civ_list)
+        for civ in json.loads(civ_list.read_text())["civilization_list"]:
+            if civ.get("tech_tree_name") != civ_spec["treeFile"].removesuffix(".json"):
+                continue
+            if civ.get("name_string_id") in strings:
+                entry["displayName"] = strings[civ["name_string_id"]]
+            offset = civ.get("computer_name_string_table_offset")
+            if offset is not None and offset in strings and strings[offset].isdigit():
+                count = int(strings[offset])
+                entry["computerNames"] = [strings[offset + i] for i in range(1, count + 1) if offset + i in strings]
+            break
+    return entry
 
 
 def tree_nodes(dat_path: Path, spec: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1102,7 +1121,7 @@ def extract(
     for effect_spec in spec.get("effects", []):
         entities[effect_spec["key"]] = effect_entry(dat, graphics_dir, effect_spec, hashes)
     skin_chances(dat_path, entities, hashes)
-    civilization = civilization_entry(dat, dat_path, spec, hashes)
+    civilization = civilization_entry(dat, dat_path, spec, hashes, strings)
     technologies, skipped_technologies = technologies_from_tree(
         dat, dat_path, spec, entities, civilization, hashes, strings
     )

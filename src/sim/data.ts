@@ -246,6 +246,10 @@ export interface CivilizationRules {
   key: string;
   /** The DAT's own name for it, which is not always the modern one. */
   name: string;
+  /** What the reference calls it ("Britons"), from its string table. */
+  displayName?: string;
+  /** What the reference calls a computer player of it ("Henry V" ...). */
+  computerNames?: string[];
   unavailable: {
     technologies: number[];
     units: number[];
@@ -1121,6 +1125,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       ? {
         key: manifest.civilization.key,
         name: manifest.civilization.name,
+        displayName: manifest.civilization.displayName,
+        computerNames: manifest.civilization.computerNames,
         unavailable: {
           technologies: [...manifest.civilization.unavailable.technologies],
           units: [...manifest.civilization.unavailable.units],

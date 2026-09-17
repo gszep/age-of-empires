@@ -169,6 +169,23 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 .map-button:disabled { filter: grayscale(0.7) brightness(0.7); cursor: default; }
 .map-button.active { filter: brightness(1.3); outline: calc(3px * var(--ui-scale)) solid #ffd966; border-radius: 50%; }
 #hud.fallback .map-button { display: none; }
+/* Score panel: rows stacked upward from 20 in and 30 up of (3840, 1800). */
+#score-panel {
+  position: absolute; right: calc(20px * var(--ui-scale)); bottom: calc(390px * var(--ui-scale));
+  display: flex; flex-direction: column; align-items: flex-end;
+  padding: calc(8px * var(--ui-scale)) calc(12px * var(--ui-scale));
+  background-size: 100% 100%; pointer-events: none;
+}
+#score-panel:empty { display: none; }
+.score-row { display: flex; align-items: center; gap: calc(10px * var(--ui-scale)); height: calc(56px * var(--ui-scale)); }
+.score-badge {
+  width: calc(40px * var(--ui-scale)); height: calc(40px * var(--ui-scale));
+  display: flex; align-items: center; justify-content: center;
+  font-size: calc(34px * var(--ui-scale)); font-weight: bold; color: #fff; text-shadow: 0 0 2px #000;
+}
+.score-name { font-size: calc(48px * var(--ui-scale)); font-weight: bold; white-space: nowrap; text-shadow: 0 0 2px #000, 1px 1px 1px #000; }
+.score-civ, .score-age { width: calc(48px * var(--ui-scale)); height: calc(48px * var(--ui-scale)); background-size: contain; background-repeat: no-repeat; background-position: center; }
+#hud.fallback #score-panel { display: none; }
 #map-panel {
   right: 0; bottom: 0;
   width: calc(860px * var(--ui-scale)); height: calc(413px * var(--ui-scale));

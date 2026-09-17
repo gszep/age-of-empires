@@ -16,9 +16,9 @@ import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets'
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
 import { buildingRulesFor, unitRulesFor } from './sim/rules';
 import { gridKey, placeCommands } from './view/command-grid';
-import type { ResourceStatus } from './view/hud';
+import type { ResourceStatus, ScoreRow } from './view/hud';
 import { costLabel, displayName as nameFrom, plainHelp } from './view/names';
-import { artKey, chooseAnimation, createEntityView, gatherTargetResource, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
+import { artKey, chooseAnimation, createEntityView, gatherTargetResource, playerColorHex, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline, elevatedWorldToIso, elevationAt, ELEVATION_PIXELS } from './view/world';
 import { createCueWatcher, pollCues } from './view/cues';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
@@ -1084,6 +1084,30 @@ function selectionStats(entity: Entity): SelectionInfo['stats'] {
   return stats;
 }
 
+/**
+ * The score panel's rows (issue #67): each player's number and name in the
+ * player's colour, the civilisation's icon and the age. The human is
+ * "Player 1", having no profile here; the computer takes one of the names
+ * the reference gives a computer player of its civilisation
+ * (`civilizations.json`'s table, "Henry V" ... "Richard the Lionheart"),
+ * dealt by the match seed so it holds for the match. No score yet: the
+ * reference's is military + economy + technology + society, which nothing
+ * here computes, so the row ends at the name rather than inventing one.
+ */
+function scoreRows(): ScoreRow[] {
+  const names = rules.civilization.computerNames ?? [];
+  const computer = names.length ? names[(game.matchSeed ?? 0) % names.length] : 'Computer';
+  return ([1, 2] as const).map(player => ({
+    number: player,
+    name: player === 1 ? 'Player 1' : computer,
+    color: playerColorHex(assets, player) ?? (player === 1 ? '#3b64ff' : '#ff3b3b'),
+    // The civilisation's small icon is the material `<Name>Icon`, by the
+    // reference's own name for it (`BritonsIcon`).
+    civIcon: assets && rules.civilization.displayName ? `${rules.civilization.displayName}Icon` : undefined,
+    age: game.players[player].age,
+  }));
+}
+
 function displayName(key: string): string {
   return nameFrom(key, assets?.entities[key]?.text?.name);
 }
@@ -1517,6 +1541,7 @@ renderer.setAnimationLoop(now => {
   if (hudClock > 0.15) {
     hudClock = 0;
     hud.updateResources(game, 1, resourceStatus());
+    hud.updateScore(scoreRows());
     hud.setCommands(currentCommands());
     hud.setSelection(selectionInfo());
     hud.minimap.draw(game, isoToWorld(cameraCenter.x, cameraCenter.y), {
@@ -1574,6 +1599,7 @@ function rebuildPresentation(): void {
   hud = createHud();
   if (menuWasOpen) hud.toggleMenu(true);
   hud.updateResources(game, 1, resourceStatus());
+  hud.updateScore(scoreRows());
   hud.setCommands(currentCommands());
   hud.setSelection(selectionInfo());
   if (game.winner) hud.showEnd(game.winner === 1);

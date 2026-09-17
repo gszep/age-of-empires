@@ -27,6 +27,19 @@ export interface ResourceStatus {
   ageProgress: number;
 }
 
+/** One line of the score panel. */
+export interface ScoreRow {
+  number: number;
+  name: string;
+  /** The player's colour as CSS. */
+  color: string;
+  /** Material of the civilisation's small icon, when imported. */
+  civIcon?: string;
+  /** 0 Dark .. 3 Imperial. */
+  age: number;
+  score?: number;
+}
+
 export interface CommandButton {
   id: string;
   label: string;
@@ -158,6 +171,7 @@ export class Hud {
         <button class="map-button" data-widget="ButtonColor" data-map="color" title="Minimap colours (not yet available)" disabled></button>
         <button class="map-button" data-widget="ButtonFilter" data-map="filter" title="Minimap filter (not yet available)" disabled></button>
       </div>
+      <div id="score-panel"></div>
       <div id="game-message"></div>
       <div id="menu-dialog" class="dialog hidden">
         <h2>Menu</h2>
@@ -505,6 +519,27 @@ export class Hud {
         <div ${at('StatusLabel')}"><div class="progress-label">${info.progress.label}</div></div>
         <div ${at('Progress')}"><div class="progress-bar"><div class="progress-fill" style="width:${(info.progress.fraction * 100).toFixed(1)}%"></div></div></div>` : ''}
     `;
+  }
+
+  /**
+   * The score panel (scorepanel.json): one row per player, anchored to the
+   * bottom-right of a 400x400 `Surround` whose bottom edge is at y=1800 and
+   * whose `FontsHolder` anchor sits 20 in from the right and 30 up from the
+   * bottom, in a 48pt face (issue #67). The rows stack upward from there.
+   */
+  updateScore(rows: ScoreRow[]): void {
+    const panel = this.root.querySelector<HTMLElement>('#score-panel')!;
+    const signature = JSON.stringify(rows);
+    if (panel.dataset.signature === signature) return;
+    panel.dataset.signature = signature;
+    panel.style.backgroundImage = this.texture('BlackPanel_CC');
+    panel.innerHTML = rows.map(row => `
+      <div class="score-row">
+        <span class="score-badge" style="background:${row.color}">${row.number}</span>
+        <span class="score-name" style="color:color-mix(in srgb, ${row.color} 65%, white)">${row.name}${row.score !== undefined ? `: ${row.score}` : ''}</span>
+        ${row.civIcon ? `<span class="score-civ" style="background-image:${this.texture(row.civIcon)}"></span>` : ''}
+        <span class="score-age" style="background-image:${this.texture(`PlayerAge${row.age + 1}Icon`)}"></span>
+      </div>`).join('');
   }
 
   updateResources(state: GameState, player: PlayerId, status?: ResourceStatus): void {
