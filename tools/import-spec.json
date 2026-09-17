@@ -1994,7 +1994,10 @@
       }
     },
     "materials": [
-      "CivEmblemBritons"
+      "CivEmblemBritons",
+      "IconsMenuTechtreeBritons",
+      "IconsMenuTechtreeBritonsHover",
+      "IconsMenuTechtreeBritonsPressed"
     ]
   },
   "terrain": {

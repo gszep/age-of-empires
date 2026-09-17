@@ -77,6 +77,9 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
   padding: calc(24px * var(--ui-scale)) calc(48px * var(--ui-scale)) 0 0;
 }
 .menu-button { width: calc(64px * var(--ui-scale)); height: calc(64px * var(--ui-scale)); background-size: 100% 100%; }
+.menu-button:disabled { cursor: default; }
+#hud:not(.fallback) #menu-panel { display: block; padding: 0; }
+#hud.fallback #menu-panel .menu-button:disabled { display: none; }
 
 /* Bottom frame: command grid left, selection centre, minimap right. */
 #bottombar-strip {

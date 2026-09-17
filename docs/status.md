@@ -1175,6 +1175,19 @@ three left are the training times of sheep, deer and boar, which the fallback
 records as 0 because nothing trains them; the DAT's 15, 25 and 25 are the times
 a scenario editor would use.
 
+## The menu panel's six buttons, and the shield that says who you are
+
+`menupanel.json` places six buttons — `Techtree` (104x104 at 166,56) and
+`Objectives`, `Chat`, `Diplomacy`, `Settings`, `Menu` (64x64 at 325/413/500/
+586/673) — and the HUD drew two (issue #66). All six are placed from the file.
+The shield on the wooden board, which `backlog.md` had down as "the HUD does
+not say who you are playing", is the tech-tree button: its material is
+`IconsMenuTechtree<Civ>`, the engine's per-civilisation substitute for the
+file's Aztecs placeholder, and `IconsMenuTechtreeBritons` is the three lions.
+Settings pauses and Menu opens the menu, as before; the tech tree, objectives,
+chat and diplomacy have nothing behind them yet and wear the file's own
+`Disabled` materials, greyed, until they do.
+
 ## The resource panel says who is gathering what, and which age it is
 
 `resourcepanel.json` places, inside each 84x84 resource icon, a `Workers`

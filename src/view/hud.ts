@@ -129,8 +129,12 @@ export class Hud {
         <div class="age-bar"><div class="age-fill"></div><div class="age-text" data-age-text></div></div>
       </div>
       <div id="menu-panel" class="panel">
-        <button data-menu="pause" class="menu-button" data-icon="settings" title="Pause (F3)"></button>
-        <button data-menu="open" class="menu-button" data-icon="menu" title="Menu (F10)"></button>
+        <button class="menu-button" data-icon="techtree" data-widget="Techtree" title="Technology tree (not yet available)" disabled></button>
+        <button class="menu-button" data-icon="objectives" data-widget="Objectives" title="Objectives (not yet available)" disabled></button>
+        <button class="menu-button" data-icon="chat" data-widget="Chat" title="Chat (not yet available)" disabled></button>
+        <button class="menu-button" data-icon="diplomacy" data-widget="Diplomacy" title="Diplomacy (not yet available)" disabled></button>
+        <button data-menu="pause" class="menu-button" data-icon="settings" data-widget="Settings" title="Pause (F3)"></button>
+        <button data-menu="open" class="menu-button" data-icon="menu" data-widget="Menu" title="Menu (F10)"></button>
       </div>
       <div id="bottombar-strip" class="panel"></div>
       <div id="command-panel" class="panel"><div id="command-grid"></div></div>
@@ -170,10 +174,20 @@ export class Hud {
     }
     const idle = this.root.querySelector<HTMLElement>('.idle-villager')!;
     idle.style.backgroundImage = this.texture('IdleVillagerNormal');
-    const pauseButton = this.root.querySelector<HTMLElement>('[data-icon="settings"]')!;
-    pauseButton.style.backgroundImage = this.texture('MenuSettingsNormal');
-    const menuButton = this.root.querySelector<HTMLElement>('[data-icon="menu"]')!;
-    menuButton.style.backgroundImage = this.texture('MenuMenuNormal');
+    // The menu panel's six buttons (menupanel.json), each in its own box
+    // (issue #66). The tech tree's is the civilisation's shield -- the
+    // material is `IconsMenuTechtree<Civ>`, the engine's per-civ substitute
+    // for the file's Aztecs placeholder -- and it is what says who you are
+    // playing. What has nothing behind it yet wears its Disabled state.
+    const menuArt: Record<string, string> = {
+      techtree: 'IconsMenuTechtreeBritons', objectives: 'MenuObjectives', chat: 'MenuChat',
+      diplomacy: 'MenuDiplomacy', settings: 'MenuSettings', menu: 'MenuMenu',
+    };
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>('#menu-panel .menu-button')) {
+      const base = menuArt[button.dataset.icon!];
+      const state = button.dataset.icon === 'techtree' ? '' : (button.disabled ? 'Disabled' : 'Normal');
+      button.style.backgroundImage = this.texture(base + state);
+    }
 
     for (const resource of ['wood', 'food', 'gold', 'stone', 'population']) {
       this.resourceValues[resource] = this.root.querySelector(`[data-value="${resource}"]`)!;
@@ -285,6 +299,10 @@ export class Hud {
           value.style.height = `calc(${storage.height}px * var(--ui-scale))`;
         }
       }
+    }
+    for (const button of this.root.querySelectorAll<HTMLElement>('#menu-panel [data-widget]')) {
+      place(`#menu-panel [data-widget="${button.dataset.widget}"]`,
+        widgetBox(this.ui?.layouts.menupanel, 'Background', button.dataset.widget!), true);
     }
     place('.idle-villager', widgetBox(resources, 'Background', 'Idle'), true);
     place('.idle-count', widgetBox(resources, 'Background', 'IdleWorkers'), true);

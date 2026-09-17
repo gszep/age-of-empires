@@ -99,8 +99,6 @@ terrain blends above.
   cost full wood from the Castle Age, and Yeomen is not free. These live in the
   DAT as civ-specific effect commands rather than in the tech tree, and were
   deliberately left out of the tech-tree work.
-- **The HUD does not say who you are playing.** The civilisation is in the
-  observation and the match record but no panel shows it.
 
 ## Simulation
 
