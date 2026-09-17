@@ -909,6 +909,33 @@ brushing a tree's bounding box would otherwise light up. On a small sprite the
 contour is most of the silhouette (86% of a villager's lit pixels), so a hidden
 villager reads as a coloured shape, exactly as it does in the game.
 
+### A delta frame inherits from its keyframe, not the frame before
+
+The Feudal mill drew its sails at every position at once — a fan of slivers
+trailing the real ones (issue #78). An SLD layer flagged `0x80` is a delta:
+its skipped blocks are inherited rather than left empty, and the decoder had
+been inheriting them from the *previous* frame. The reference is the
+layer's last **keyframe** — the most recent frame whose flag is clear. The
+two readings agree on the short two- and three-frame runs most sheets use
+(304 of the 385 consumed sources have many keyframes) and diverge on a long
+one: `b_west_mill_age2_x1` is one keyframe and ninety deltas whose box moves
+from frame to frame, so every sail position the previous frame had was
+carried forward as the sliver its successor did not overwrite. The Dark Age
+mill has the same defect more subtly, and every long delta run — the
+destruction sheets, the trebuchet's attack — had some of it.
+
+The proof is the encoder's own economy, not a picture: an encoder never
+draws a block it could have skipped, so no drawn block in a delta frame
+should equal the reference's block at that place. Against the keyframe,
+none does in the mill, the Dark mill, the sheep's walk, the militia's walk
+or the Feudal house's collapse, and three in a million in the trebuchet's
+attack; against the previous frame, 30,181 of the mill's 114,226 drawn
+blocks would have been wasted. The decoded mill's opaque pixel count now
+holds within 4% across the sweep (26,500–27,451) where it used to climb to
+30,463 by the last frame. `test_import_aoe2.py` runs the economy check and
+the count on the mill. The fix is in `sld_layers.py`, so it re-decoded the
+entire atlas cache.
+
 ### The import pipeline is openage-free
 
 `tools/sld_layers.py` decodes every consumed SLD layer — BC1 main graphics

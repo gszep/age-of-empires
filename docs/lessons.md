@@ -684,3 +684,17 @@ keeps the record.
   `applyCommand`; the second is filtered client-side. Rule: read a query's
   answer once before writing the loop that trusts it.
 
+- **A decoder that draws plausible pictures on short runs can be wrong on
+  the long one, and the format's own economy is the test.** SLD delta
+  frames were inherited from the previous frame for a year; on the two- and
+  three-frame runs most sheets use that is indistinguishable from the truth
+  (inherit from the last keyframe), and on the Feudal mill's ninety-frame
+  run it left every sail position behind as a sliver. Rendering candidates
+  and looking settled it, but the *proof* was arithmetic: an encoder never
+  draws a block it could have skipped, so under the right reference no drawn
+  block equals the inherited one, and under the wrong one thirty thousand
+  do. Rule: when a format has an inheritance or prediction rule, test the
+  reading against what an encoder would never do — a count that is zero
+  under the right rule and large under the wrong one — not against how the
+  short cases look; and when a sheet has both a moving box and a long run,
+  it is the sheet to test on.

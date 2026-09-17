@@ -82,6 +82,77 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual((frame.width, frame.height), (316, 212))
         self.assertTrue(any(frame.alpha))
 
+    def test_delta_frames_inherit_from_the_keyframe_not_the_frame_before(self):
+        # The Feudal mill is one keyframe and ninety delta frames, and reading
+        # each delta against the frame before it left every earlier sail
+        # position behind as a fan of slivers (issue #78). Two proofs that the
+        # reference is the last keyframe. First the encoder's own economy: it
+        # never draws a block it could have inherited, so no drawn block in a
+        # delta frame may equal the keyframe's block at that place -- against
+        # the previous frame, thirty thousand of them would.
+        from sld_layers import (COMMAND_COUNT, FILE_HEADER, FLAG_DELTA, FRAME_HEADER,
+                                GRAPHICS_HEADER, LAYER_LENGTH, LAYER_MAIN, _decode_bc1_block,
+                                decode_colors)
+        data = (GRAPHICS / "b_west_mill_age2_x1.sld").read_bytes()
+        frames = decode_colors(data)
+        _sig, _ver, count, _u1, frame_start, _u3 = FILE_HEADER.unpack_from(data, 0)
+        offset = frame_start
+        keyframe = None
+        keyframes = deltas = drawn = 0
+        for index in range(count):
+            _cw, _ch, _hx, _hy, frame_type, _u, _i = FRAME_HEADER.unpack_from(data, offset)
+            offset += FRAME_HEADER.size
+            for layer in (0x01, 0x02, 0x04, 0x08, 0x10):
+                if not frame_type & layer:
+                    continue
+                start = offset
+                length = LAYER_LENGTH.unpack_from(data, offset)[0]
+                cursor = offset + LAYER_LENGTH.size
+                if layer == LAYER_MAIN:
+                    x1, y1, x2, y2, flags, _ = GRAPHICS_HEADER.unpack_from(data, cursor)
+                    cursor += GRAPHICS_HEADER.size
+                    commands = COMMAND_COUNT.unpack_from(data, cursor)[0]
+                    blocks = cursor + COMMAND_COUNT.size + commands * 2
+                    if not flags & FLAG_DELTA:
+                        keyframe = (frames[index], x1, y1)
+                        keyframes += 1
+                    else:
+                        deltas += 1
+                        reference, kx, ky = keyframe
+                        block = 0
+                        columns = (x2 - x1 + 3) // 4
+                        for command in range(commands):
+                            skip, draw = data[cursor + 2 + command * 2:cursor + 4 + command * 2]
+                            block += skip
+                            for _ in range(draw):
+                                values = _decode_bc1_block(data, blocks)
+                                blocks += 8
+                                if any(values[3::4]):
+                                    cx = x1 + (block % columns) * 4 - kx
+                                    cy = y1 + (block // columns) * 4 - ky
+                                    inherited = []
+                                    for row in range(4):
+                                        for col in range(4):
+                                            px, py = cx + col, cy + row
+                                            if 0 <= px < reference.width and 0 <= py < reference.height:
+                                                at = (py * reference.width + px) * 4
+                                                inherited.extend(reference.rgba[at:at + 4])
+                                            else:
+                                                inherited.extend((0, 0, 0, 0))
+                                    self.assertNotEqual(values, inherited, f"frame {index} block {block}")
+                                    drawn += 1
+                                block += 1
+                offset = start + length
+                offset += (4 - (offset - frame_start)) % 4
+        self.assertEqual(keyframes, 1)
+        self.assertEqual(deltas, 90)
+        self.assertGreater(drawn, 100000)
+        # Then the picture: the sails sweep round but the mill does not grow.
+        # Chained, the opaque count climbed from 27,408 to 30,463 by the end.
+        opaque = [sum(1 for alpha in frame.rgba[3::4] if alpha) for frame in frames]
+        for index, pixels in enumerate(opaque):
+            self.assertLess(abs(pixels - opaque[0]) / opaque[0], 0.05, f"frame {index}: {pixels}")
+
     def test_playercolor_layer_marks_the_owner_cloth(self):
         from sld_layers import LAYER_PLAYERCOLOR, decode_masks
         source = GRAPHICS / "u_vil_male_lumberjack_walkA_x1.sld"

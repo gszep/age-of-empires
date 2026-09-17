@@ -42,9 +42,16 @@ LAYER_OUTLINE = 0x04
 LAYER_DAMAGE = 0x08
 LAYER_PLAYERCOLOR = 0x10
 
-# flag1 bit 0: blocks this frame skips are inherited from the previous frame
-# rather than left empty.
-FLAG_REUSE_PREVIOUS = 0x80
+# flag1 bit 7: this frame is a delta. The blocks it skips are inherited from
+# the layer's last *keyframe* -- the most recent frame whose flag is clear --
+# not from the frame before it. The two readings agree on the short two- and
+# three-frame runs most sheets use and diverge on a long one: the Feudal mill
+# is one keyframe and ninety deltas, and chaining them left every earlier
+# sail position behind as a fan of slivers (issue #78). The proof is the
+# encoder's own economy: against the keyframe it never once draws a block it
+# could have skipped; against the previous frame it would have "wasted"
+# thirty thousand in that sheet alone.
+FLAG_DELTA = 0x80
 
 BLOCK = 4
 
@@ -153,9 +160,9 @@ def _decode_layer(
     height: int,
     command_offset: int,
     command_count: int,
-    reuse_previous: bool,
-    previous: MaskFrame | ColorFrame | None,
-    previous_offset: tuple[int, int],
+    delta: bool,
+    keyframe: MaskFrame | ColorFrame | None,
+    keyframe_offset: tuple[int, int],
     layer_offset: tuple[int, int],
     channels: int = 1,
     decode_block: Any = _decode_block,
@@ -179,35 +186,35 @@ def _decode_layer(
             pixels[start:start + span] = bytes(values[source:source + span])
 
     def inherit(index: int) -> None:
-        """Copy a skipped block from the previous frame, which may sit at a
+        """Copy a skipped block from the keyframe, which may sit at a
         different position in the canvas."""
-        if previous is None:
+        if keyframe is None:
             return
         canvas_x = (index % blocks_x) * BLOCK + layer_offset[0]
         canvas_y = (index // blocks_x) * BLOCK + layer_offset[1]
-        src_x = canvas_x - previous_offset[0]
-        src_y = canvas_y - previous_offset[1]
+        src_x = canvas_x - keyframe_offset[0]
+        src_y = canvas_y - keyframe_offset[1]
         for row in range(BLOCK):
             y = canvas_y - layer_offset[1] + row
             sy = src_y + row
-            if y >= height or not (0 <= sy < previous.height):
+            if y >= height or not (0 <= sy < keyframe.height):
                 continue
             for column in range(BLOCK):
                 x = canvas_x - layer_offset[0] + column
                 sx = src_x + column
-                if x >= width or not (0 <= sx < previous.width):
+                if x >= width or not (0 <= sx < keyframe.width):
                     continue
                 destination = (y * width + x) * channels
-                source = (sy * previous.width + sx) * channels
+                source = (sy * keyframe.width + sx) * channels
                 pixels[destination:destination + channels] = \
-                    previous.pixels[source:source + channels]
+                    keyframe.pixels[source:source + channels]
 
     index = 0
     cursor = block_data
     for command in range(command_count):
         skip, draw = data[command_offset + COMMAND_COUNT.size + command * 2:
                           command_offset + COMMAND_COUNT.size + command * 2 + 2]
-        if reuse_previous:
+        if delta:
             for _ in range(skip):
                 if index >= total_blocks:
                     break
@@ -303,8 +310,10 @@ def _decode_wanted(
         raise ValueError(f"not an SLD file: {signature!r}")
 
     frames: list[Any] = []
-    previous: MaskFrame | ColorFrame | None = None
-    previous_offset = (0, 0)
+    # The reference a delta frame inherits from: the last frame of this layer
+    # that was not itself a delta, and where its box sat in the canvas.
+    keyframe: MaskFrame | ColorFrame | None = None
+    keyframe_offset = (0, 0)
     # The field the format documentation records as "unknown, always 0x10" is
     # where the frame data starts: 16 in almost every file, but 14 in
     # b_west_stable_age2_x1.sld. Decoders that hardcode 16 read that file two
@@ -342,10 +351,10 @@ def _decode_wanted(
                     cursor += MASK_HEADER.size
 
             if mask == wanted == LAYER_OUTLINE and box is not None:
-                if flags & FLAG_REUSE_PREVIOUS:
+                if flags & FLAG_DELTA:
                     # Never seen; the outline stream has no way to inherit
                     # blocks, so a file that asks would decode wrong in silence.
-                    raise ValueError("outline layer asks to reuse the previous frame")
+                    raise ValueError("outline layer asks to inherit from a keyframe")
                 x1, y1, x2, y2 = box
                 width, height = x2 - x1, y2 - y1
                 found = factory(
@@ -358,11 +367,13 @@ def _decode_wanted(
                 count = COMMAND_COUNT.unpack_from(data, cursor)[0]
                 pixels = _decode_layer(
                     data, width, height, cursor, count,
-                    bool(flags & FLAG_REUSE_PREVIOUS), previous, previous_offset, (x1, y1),
+                    bool(flags & FLAG_DELTA), keyframe, keyframe_offset, (x1, y1),
                     channels, decode_block,
                 )
                 found = factory(width, height, hotspot_x - x1, hotspot_y - y1, pixels)
-                previous_offset = (x1, y1)
+                if not flags & FLAG_DELTA:
+                    keyframe = found
+                    keyframe_offset = (x1, y1)
 
             # Remaining layer kinds are skipped wholesale via the length
             # field. The 4-byte padding is relative to the frame data start:
@@ -372,8 +383,6 @@ def _decode_wanted(
             offset += (BLOCK - (offset - frame_start)) % BLOCK
 
         frames.append(found)
-        if found is not None:
-            previous = found
     return frames
 
 
