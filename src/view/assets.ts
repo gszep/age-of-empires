@@ -123,6 +123,10 @@ export interface ImportedHotkey { key: string; control?: boolean; shift?: boolea
 
 export interface UiAssets {
   base: string;
+  /** The reference's faces, copied as they ship: file name -> path under `base`. */
+  fonts?: Record<string, string>;
+  /** `UIColors.json`: per player colour name, the tints its text and bars use. */
+  colors?: { PresetColors?: Record<string, number[]>; ColorTables?: Record<string, Record<string, number[]>> };
   /** Keys taken from the reference's own `hotkeys.json`, per action. */
   hotkeys?: { goto?: Record<string, ImportedHotkey>; selectAll?: Record<string, ImportedHotkey> };
   layouts: Record<string, UiLayout>;

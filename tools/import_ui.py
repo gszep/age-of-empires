@@ -197,6 +197,7 @@ def extract_ui(
     content: dict[str, Any],
     out_root: Path,
     hotkeys_path: Path | None = None,
+    fonts_dir: Path | None = None,
 ) -> dict[str, Any]:
     ui_spec = spec["ui"]
     style = ui_spec["style"]
@@ -316,9 +317,37 @@ def extract_ui(
                 entries.append(convert_texture(widgetui, relative, out_root))
         raw_textures[directory] = entries
 
+    # The faces the HUD's labels are set in, copied as they ship (issue #69).
+    # The widget files index a font (0 on nearly every label, 2 and 3 on a
+    # handful) and ship the faces in `fonts/`; nothing in the files names
+    # which index is which face, so the spec names the faces to carry and
+    # the HUD's choice among them is recorded in `docs/status.md`.
+    fonts: dict[str, str] = {}
+    if fonts_dir is not None:
+        for name in ui_spec.get("fonts", []):
+            source = fonts_dir / name
+            if not source.is_file():
+                continue
+            hashes[f"fonts/{name}"] = sha256(source)
+            target = out_root / "fonts" / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(source.read_bytes())
+            fonts[name] = f"fonts/{name}"
+
+    # The reference's own UI colours: per player colour, the tint its text
+    # and health bars use (`UIColors.json`), which is lighter than the
+    # palette block the sprites wear.
+    colors: dict[str, Any] = {}
+    colors_path = widgetui / "UIColors.json"
+    if colors_path.is_file():
+        hashes["UIColors.json"] = sha256(colors_path)
+        colors = json.loads(colors_path.read_text())
+
     return {
         "schemaVersion": spec["schemaVersion"],
         "style": style,
+        "fonts": fonts,
+        "colors": colors,
         "rawTextures": raw_textures,
         "layouts": layouts,
         "materials": resolved_materials,
@@ -351,6 +380,11 @@ def main() -> None:
         type=Path,
         default=home / "Steam/steamapps/content/app_813780/depot_813781/resources/_common/dat/hotkeys.json",
     )
+    parser.add_argument(
+        "--fonts",
+        type=Path,
+        default=home / "Steam/steamapps/content/app_813780/depot_813781/resources/_common/fonts",
+    )
     parser.add_argument("--spec", type=Path, default=Path(__file__).with_name("import-spec.json"))
     parser.add_argument("--content", type=Path, default=root / ".local/aoe2de/content.json")
     parser.add_argument("--out", type=Path, default=root / "public/imported/aoe2/ui")
@@ -363,6 +397,7 @@ def main() -> None:
         json.loads(args.content.read_text()),
         args.out,
         args.hotkeys if args.hotkeys.is_file() else None,
+        args.fonts if args.fonts.is_dir() else None,
     )
     args.out.mkdir(parents=True, exist_ok=True)
     manifest_path = args.out / "manifest.json"

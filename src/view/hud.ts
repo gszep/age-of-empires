@@ -31,8 +31,10 @@ export interface ResourceStatus {
 export interface ScoreRow {
   number: number;
   name: string;
-  /** The player's colour as CSS. */
+  /** The player's colour as CSS, for the badge. */
   color: string;
+  /** The tint the reference writes the name in, from `UIColors.json`. */
+  textColor: string;
   /** Material of the civilisation's small icon, when imported. */
   civIcon?: string;
   /** 0 Dark .. 3 Imperial. */
@@ -117,11 +119,39 @@ export class Hud {
     this.root.id = 'hud';
     if (!ui) this.root.classList.add('fallback');
     parent.appendChild(this.root);
+    this.installFonts();
     this.build();
     const canvas = this.root.querySelector<HTMLCanvasElement>('#minimap-canvas')!;
     this.minimap = new Minimap(canvas);
     this.applyScale();
     addEventListener('resize', this.onResize);
+  }
+
+  /**
+   * The reference's own faces for the HUD's labels (issue #69). `fonts/`
+   * ships Georgia in four styles beside the Century and Lucida families, and
+   * the widget files index a face without naming it; the HUD's labels are a
+   * bold serif in the reference, which is Georgia Bold here -- recorded as
+   * the choice it is in `docs/status.md`. A `@font-face` per imported file,
+   * once per page.
+   */
+  private installFonts(): void {
+    const fonts = this.ui?.fonts;
+    if (!fonts || document.getElementById('aoe2-fonts')) return;
+    const style = document.createElement('style');
+    style.id = 'aoe2-fonts';
+    style.textContent = Object.entries(fonts).map(([name, path]) => {
+      const bold = /b\.ttf$/.test(name);
+      return `@font-face { font-family: 'AoE2 HUD'; src: url('${this.ui!.base}${path}'); font-weight: ${bold ? 'bold' : 'normal'}; font-display: swap; }`;
+    }).join('\n');
+    document.head.appendChild(style);
+    this.root.classList.add('reference-fonts');
+  }
+
+  /** The tint the reference gives a player colour's text, from `UIColors.json`. */
+  textColor(colorName: string | undefined, fallback: string): string {
+    const rgba = colorName ? this.ui?.colors?.ColorTables?.[colorName]?.Text : undefined;
+    return rgba ? `rgb(${rgba[0]}, ${rgba[1]}, ${rgba[2]})` : fallback;
   }
 
   /** Detach every DOM node and listener this HUD owns (hot reload rebuilds it). */
@@ -536,7 +566,7 @@ export class Hud {
     panel.innerHTML = rows.map(row => `
       <div class="score-row">
         <span class="score-badge" style="background:${row.color}">${row.number}</span>
-        <span class="score-name" style="color:color-mix(in srgb, ${row.color} 65%, white)">${row.name}${row.score !== undefined ? `: ${row.score}` : ''}</span>
+        <span class="score-name" style="color:${row.textColor}">${row.name}${row.score !== undefined ? `: ${row.score}` : ''}</span>
         ${row.civIcon ? `<span class="score-civ" style="background-image:${this.texture(row.civIcon)}"></span>` : ''}
         <span class="score-age" style="background-image:${this.texture(`PlayerAge${row.age + 1}Icon`)}"></span>
       </div>`).join('');

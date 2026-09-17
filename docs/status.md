@@ -1175,6 +1175,20 @@ three left are the training times of sheep, deer and boar, which the fallback
 records as 0 because nothing trains them; the DAT's 15, 25 and 25 are the times
 a scenario editor would use.
 
+## The HUD is set in the reference's own face and colours
+
+`fonts/` ships the faces the widget files index — Georgia in four styles
+beside the Century and Lucida families and two bitmap atlases — and nothing
+in the files names which `FontIndex` is which face (0 on six thousand labels,
+2 on ninety, 3 on eight). The HUD's labels in the reference are a bold serif,
+and Georgia Bold is that (issue #69): `georgia.ttf` and `georgiab.ttf` are
+imported under `ui/fonts/` and installed as one `@font-face` family, bold on
+every label. The index-to-face mapping is inferred from the look, not read,
+and is the one chosen part of this. `UIColors.json` beside the widget files
+is imported too: per player colour, the tint the reference writes text in
+(Blue 110,166,235; Red 255,100,100 — lighter than the palette block the
+sprites wear), which is what the score panel's names now use.
+
 ## The score panel lists the players
 
 `scorepanel.json` is a 400x400 `Surround` of `BlackPanel_*` slices whose

@@ -14,6 +14,8 @@ html, body, #app {
 canvas.battlefield { display: block; position: absolute; inset: 0; }
 
 #hud { position: absolute; inset: 0; pointer-events: none; --ui-scale: 0.5; }
+/* The reference's own faces once imported: a bold serif on every label. */
+#hud.reference-fonts { font-family: 'AoE2 HUD', Georgia, 'Times New Roman', serif; font-weight: bold; }
 #hud .panel { position: absolute; pointer-events: auto; background-repeat: no-repeat; background-size: 100% 100%; }
 #hud button { pointer-events: auto; cursor: pointer; border: 0; background-color: transparent; color: inherit; font-family: inherit; }
 

@@ -8,7 +8,7 @@ import { MAPS } from './sim/mapgen';
 import { isTileVisible } from './sim/visibility';
 import { checksumState } from './sim/checksum';
 import type { MatchRecord } from './protocol/types';
-import type { BuildingKind, Entity, GameState, Point, UnitKind } from './sim/types';
+import type { BuildingKind, Entity, GameState, PlayerId, Point, UnitKind } from './sim/types';
 import { buildMenu, type BuildPage } from './view/build-menu';
 import { sameKindOnScreen } from './view/selection';
 import { clearSession, loadSession, saveSession } from './dev-session';
@@ -1094,6 +1094,12 @@ function selectionStats(entity: Entity): SelectionInfo['stats'] {
  * reference's is military + economy + technology + society, which nothing
  * here computes, so the row ends at the name rather than inventing one.
  */
+/** The reference's name for a player's colour ("Blue", "Red"), as `UIColors.json` keys it. */
+function playerColorName(player: PlayerId): string | undefined {
+  const name = assets?.playerColors?.players?.[player]?.name;
+  return name ? name[0].toUpperCase() + name.slice(1) : undefined;
+}
+
 function scoreRows(): ScoreRow[] {
   const names = rules.civilization.computerNames ?? [];
   const computer = names.length ? names[(game.matchSeed ?? 0) % names.length] : 'Computer';
@@ -1101,6 +1107,7 @@ function scoreRows(): ScoreRow[] {
     number: player,
     name: player === 1 ? 'Player 1' : computer,
     color: playerColorHex(assets, player) ?? (player === 1 ? '#3b64ff' : '#ff3b3b'),
+    textColor: hud.textColor(playerColorName(player), playerColorHex(assets, player) ?? '#ffffff'),
     // The civilisation's small icon is the material `<Name>Icon`, by the
     // reference's own name for it (`BritonsIcon`).
     civIcon: assets && rules.civilization.displayName ? `${rules.civilization.displayName}Icon` : undefined,

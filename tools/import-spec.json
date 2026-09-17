@@ -2004,6 +2004,10 @@
       "IconsMenuTechtreeBritonsHover",
       "IconsMenuTechtreeBritonsPressed",
       "BritonsIcon"
+    ],
+    "fonts": [
+      "georgia.ttf",
+      "georgiab.ttf"
     ]
   },
   "terrain": {

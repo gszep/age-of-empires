@@ -13,6 +13,7 @@ HOTKEYS="$DEPOT_ROOT/depot_813781/resources/_common/dat/hotkeys.json"
 STRINGS="$DEPOT_ROOT/depot_813781/resources/en/strings/key-value/key-value-strings-utf8.txt"
 PALETTES="$DEPOT_ROOT/depot_813781/resources/_common/palettes"
 WIDGETUI="$DEPOT_ROOT/depot_813782/widgetui"
+FONTS="$DEPOT_ROOT/depot_813781/resources/_common/fonts"
 TERRAIN="$DEPOT_ROOT/depot_813782/resources/_common/terrain/textures/2x"
 GRAPHICS="$DEPOT_ROOT/depot_813784/resources/_common/drs/graphics"
 AUDIO_PACK="$DEPOT_ROOT/depot_813783/wwise/Base.pck"
@@ -30,7 +31,7 @@ uv run --project "$ROOT" --locked python "$ROOT/tools/import_content.py" \
 uv run --project "$ROOT" --locked python "$ROOT/tools/convert_sld.py" \
   --graphics "$GRAPHICS" --terrain "$TERRAIN"
 uv run --project "$ROOT" --locked python "$ROOT/tools/import_ui.py" \
-  --widgetui "$WIDGETUI" --sounds "$SOUNDS" --hotkeys "$HOTKEYS"
+  --widgetui "$WIDGETUI" --sounds "$SOUNDS" --hotkeys "$HOTKEYS" --fonts "$FONTS"
 uv run --project "$ROOT" --locked python "$ROOT/tools/import_blends.py" \
   --blendomatic "$BLENDOMATIC"
 
