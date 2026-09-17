@@ -411,6 +411,34 @@
       }
     },
     {
+      "key": "villager-female",
+      "skin": "female",
+      "skinOf": "villager",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 293,
+      "category": "unit",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
       "key": "villager-builder",
       "unitId": 118,
       "category": "unit-variant",
@@ -439,8 +467,77 @@
       }
     },
     {
+      "key": "villager-female-builder",
+      "skin": "female",
+      "skinOf": "villager-builder",
+      "unitId": 212,
+      "category": "unit-variant",
+      "task": {
+        "actionType": 101
+      },
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 101
+          },
+          "graphic": "proceeding"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
       "key": "villager-forager",
       "unitId": 120,
+      "category": "unit-variant",
+      "task": {
+        "actionType": 5,
+        "classId": 7
+      },
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 5,
+            "classId": 7
+          },
+          "graphic": "proceeding"
+        },
+        "carry": {
+          "task": {
+            "actionType": 5,
+            "classId": 7
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "villager-female-forager",
+      "skin": "female",
+      "skinOf": "villager-forager",
+      "unitId": 354,
       "category": "unit-variant",
       "task": {
         "actionType": 5,
@@ -513,6 +610,45 @@
       }
     },
     {
+      "key": "villager-female-lumberjack",
+      "skin": "female",
+      "skinOf": "villager-lumberjack",
+      "unitId": 218,
+      "category": "unit-variant",
+      "task": {
+        "actionType": 110,
+        "classId": 15
+      },
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 110,
+            "classId": 15
+          },
+          "graphic": "working"
+        },
+        "carry": {
+          "task": {
+            "actionType": 110,
+            "classId": 15
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
       "key": "villager-goldminer",
       "unitId": 579,
       "category": "unit-variant",
@@ -550,8 +686,86 @@
       }
     },
     {
+      "key": "villager-female-goldminer",
+      "skin": "female",
+      "skinOf": "villager-goldminer",
+      "unitId": 581,
+      "category": "unit-variant",
+      "task": {
+        "actionType": 5,
+        "unitId": 66
+      },
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 5,
+            "unitId": 66
+          },
+          "graphic": "proceeding"
+        },
+        "carry": {
+          "task": {
+            "actionType": 5,
+            "unitId": 66
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
       "key": "villager-stonemason",
       "unitId": 124,
+      "category": "unit-variant",
+      "task": {
+        "actionType": 5,
+        "unitId": 102
+      },
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 5,
+            "unitId": 102
+          },
+          "graphic": "proceeding"
+        },
+        "carry": {
+          "task": {
+            "actionType": 5,
+            "unitId": 102
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "villager-female-stonemason",
+      "skin": "female",
+      "skinOf": "villager-stonemason",
+      "unitId": 220,
       "category": "unit-variant",
       "task": {
         "actionType": 5,
@@ -846,8 +1060,89 @@
       }
     },
     {
+      "key": "villager-female-hunter",
+      "skin": "female",
+      "skinOf": "villager-hunter",
+      "unitId": 216,
+      "category": "unit-variant",
+      "task": {
+        "actionType": 110,
+        "classId": 9
+      },
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "attack": {
+          "slot": "attack"
+        },
+        "work": {
+          "task": {
+            "actionType": 110,
+            "classId": 9
+          },
+          "graphic": "working"
+        },
+        "carry": {
+          "task": {
+            "actionType": 110,
+            "classId": 9
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
       "key": "villager-shepherd",
       "unitId": 592,
+      "category": "unit-variant",
+      "task": {
+        "actionType": 110,
+        "classId": 58
+      },
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 110,
+            "classId": 58
+          },
+          "graphic": "working"
+        },
+        "carry": {
+          "task": {
+            "actionType": 110,
+            "classId": 58
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "villager-female-shepherd",
+      "skin": "female",
+      "skinOf": "villager-shepherd",
+      "unitId": 590,
       "category": "unit-variant",
       "task": {
         "actionType": 110,

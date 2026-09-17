@@ -311,6 +311,13 @@ def extract_entity(
     # What the reference calls it, verbatim from its own string table -- the
     # DAT's `language_dll_name` is "Man-at-Arms", not the slug's "Man At
     # Arms" -- with the create-button text and the tooltip beside it.
+    # A skin is another DAT unit with the same rules and its own art and voice
+    # -- the female villager (293) beside the male (83), and a counterpart for
+    # every task unit. It is drawn instead of the unit it skins, at the odds
+    # `objreplacement.json` states, and is nothing on the simulation's side.
+    if "skinOf" in spec:
+        entity["skinOf"] = spec["skinOf"]
+        entity["skin"] = spec["skin"]
     # Flight art gets none: a projectile's string ids are leftovers (the
     # trebuchet's rock points at the Kipchak's tooltip), and a wrong name is
     # worse than no name.
@@ -720,6 +727,10 @@ def effects_of(
     by_id: dict[int, list[str]] = {}
     by_class: dict[int, list[str]] = {}
     for key, entity in entities.items():
+        # A skin has no rules of its own to change: what lands on the unit it
+        # skins lands on it.
+        if "skinOf" in entity:
+            continue
         if "id" in entity:
             by_id.setdefault(entity["id"], []).append(key)
         if "class" in entity:
@@ -907,7 +918,7 @@ def technologies_from_tree(
     units = {
         entity["id"]: key
         for key, entity in entities.items()
-        if entity.get("category") in ("unit", "animal") and "id" in entity
+        if entity.get("category") in ("unit", "animal") and "id" in entity and "skinOf" not in entity
     }
     keep: dict[str, Any] = {}
     skipped: list[dict[str, str]] = []
@@ -1010,6 +1021,31 @@ def terrain_entry(dat: DatFile, terrain_id: int) -> dict[str, Any]:
     }
 
 
+def skin_chances(dat_path: Path, entities: dict[str, Any], hashes: dict[str, str]) -> None:
+    """How often a skin is drawn instead of the unit it skins.
+
+    `objreplacement.json` sits beside the DAT and states it per unit: the
+    villager (83) is replaced by the female villager (293) with `chance` 50,
+    and she by him with the same. Only the base unit has a row -- a trained
+    villager is unit 83 -- so the chance lands on the skin of the base unit,
+    and the task variants of the same `skin` family follow it in the view.
+    """
+    path = dat_path.parent / "objreplacement.json"
+    if not path.is_file():
+        return
+    hashes["objreplacement.json"] = sha256(path)
+    replaced_by: dict[int, int] = {}
+    for row in json.loads(path.read_text()).get("objects", []):
+        override = row.get("object_override", {})
+        # Only a chance-driven row is a skin; the rest of the file swaps a
+        # building for another under a technology or a civilisation attribute.
+        if "replacement_object" in override and "chance" in override:
+            replaced_by[override["replacement_object"]] = override["chance"]
+    for entity in entities.values():
+        if "skinOf" in entity and entity["id"] in replaced_by:
+            entity["chance"] = replaced_by[entity["id"]]
+
+
 def extract(
     dat_path: Path,
     graphics_dir: Path,
@@ -1032,6 +1068,7 @@ def extract(
         )
     for effect_spec in spec.get("effects", []):
         entities[effect_spec["key"]] = effect_entry(dat, graphics_dir, effect_spec, hashes)
+    skin_chances(dat_path, entities, hashes)
     civilization = civilization_entry(dat, dat_path, spec, hashes)
     technologies, skipped_technologies = technologies_from_tree(
         dat, dat_path, spec, entities, civilization, hashes, strings

@@ -113,6 +113,7 @@ function fakeAssets(): ContentAssets {
         atlases: { idle: atlas('villager/idle.png'), 'idle-playercolor': atlas('villager/idle-playercolor.png') },
       },
     },
+    skins: new Map(),
     terrain: {},
     textures,
     playerColors: {

@@ -625,3 +625,15 @@ keeps the record.
   a fixture establishes the preconditions its behaviour needs — clear ground,
   within sight, far enough to outlast the timer — by searching for them and
   asserting it found them, never by trusting a seed to provide them.
+
+- **Audit the reference by listing its files, not by remembering them.** A
+  session that asked "which owned files has nobody opened?" answered it in
+  an hour with two greps: every basename under the depot's `dat/`, `xs/`,
+  `widgetui/` and `particles/` against every reference in `tools/`, `src/` and
+  `docs/`, and every DAT unit field against the names the importers use. It
+  turned up sixteen things — a miss radius the DAT states, the blast rule its
+  rows settle, the strings file, the female villager, a 683 MB audio pack the
+  pipeline never opens — and five of them had been recorded as approximations
+  "because the owned files do not say". Rule: before writing "not in the
+  owned files", run the inventory; the cost is minutes, and the phrase is only
+  true of files somebody has listed.

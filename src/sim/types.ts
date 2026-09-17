@@ -190,6 +190,13 @@ export interface Projectile {
 export interface GameState {
   rules: GameRules;
   seed: number;
+  /**
+   * The seed the match was dealt from, kept as it was before anything drew
+   * on it. Nothing in the simulation reads it back: it is for streams that
+   * must vary between matches without touching this one -- a villager's
+   * face is rolled from it and her id in the view (`skins.ts`).
+   */
+  matchSeed: number;
   tick: number;
   nextId: number;
   width: number;

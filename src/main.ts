@@ -15,7 +15,7 @@ import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
 import { costLabel, displayName as nameFrom, plainHelp } from './view/names';
-import { chooseAnimation, createEntityView, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
+import { artKey, chooseAnimation, createEntityView, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline, elevatedWorldToIso, elevationAt, ELEVATION_PIXELS } from './view/world';
 import { createCueWatcher, pollCues } from './view/cues';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
@@ -242,14 +242,15 @@ function playSound(alias: string): void {
  * and an order with the same voice set, and the DAT carries one voice set for
  * the unit, so this plays for both.
  */
-function playUnitSound(kind: string, cue: 'select' | 'train'): void {
-  playSound(`${kind}-${cue}`);
+function playUnitSound(unit: Entity, cue: 'select' | 'train'): void {
+  // Her own voice: the skin that draws a villager speaks for her too.
+  playSound(`${artKey(assets, unit, unit.kind, game.matchSeed ?? 0)}-${cue}`);
 }
 
 /** One voice for a selection or an order, from the first owned unit in it. */
 function acknowledge(): void {
   const unit = ownSelected().find(e => isUnit(e.kind));
-  if (unit) playUnitSound(unit.kind, 'select');
+  if (unit) playUnitSound(unit, 'select');
 }
 
 /** A stand-in entity so the preview reuses the normal building rendering. */
@@ -664,7 +665,7 @@ function announceTrained(): void {
   for (const entity of game.entities) {
     if (entity.dead || entity.owner !== 1 || !isUnit(entity.kind)) continue;
     current.add(entity.id);
-    if (knownOwnUnits.size && !knownOwnUnits.has(entity.id)) playUnitSound(entity.kind, 'train');
+    if (knownOwnUnits.size && !knownOwnUnits.has(entity.id)) playUnitSound(entity, 'train');
   }
   knownOwnUnits = current;
 }

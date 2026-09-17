@@ -244,8 +244,10 @@ class ContentImportIntegrationTest(unittest.TestCase):
             (e["unit"], e["attribute"], e.get("armorClass")): (e["operation"], e["amount"])
             for e in loom["effects"]
         }
+        # ...and a skin gets nothing of its own: what lands on the villager
+        # lands on the woman wearing his rules (issue #50).
         variants = [key for key, entity in self.result["entities"].items()
-                    if entity.get("class") == 4]
+                    if entity.get("class") == 4 and "skinOf" not in entity]
         self.assertIn("villager", variants)
         self.assertGreater(len(variants), 1)
         for variant in variants:
@@ -554,6 +556,52 @@ class ContentImportIntegrationTest(unittest.TestCase):
                     max(width, height), 8192,
                     f"{key}/{name} is {width}x{height}, over the 8192 device limit",
                 )
+
+    def test_a_skin_is_the_same_unit_in_other_clothes(self):
+        # Issue #50: the female villager is DAT unit 293 beside the male 83,
+        # and each task unit has its counterpart. The rule: a skin carries
+        # exactly its base's numbers and tasks, differs in art and voice, and
+        # takes the odds `objreplacement.json` states -- on the base only.
+        entities = self.result["entities"]
+        dat = _dat()
+        civ = dat.civs[SPEC["civIndex"]]
+        skins = {key: e for key, e in entities.items() if "skinOf" in e}
+        self.assertEqual(len(skins), 8)
+        for key, skin in skins.items():
+            base = entities[skin["skinOf"]]
+            self.assertEqual(skin["skin"], "female", key)
+            self.assertEqual(skin.get("category"), base.get("category"), key)
+            for field in ("hitPoints", "lineOfSight", "collision", "speedTilesPerSecond",
+                          "gather", "class", "cost", "populationCost", "dropSites"):
+                self.assertEqual(skin.get(field), base.get(field), f"{key}.{field}")
+            # Combat too, less the two numbers that belong to the art: the
+            # hunter's bow leaves her hands at frame 15 and 1.2 tiles up where
+            # his is frame 10 and 1.5 -- her own sheets, her own timing. The
+            # simulation reads the base's, so a skin never changes a shot.
+            art_timing = {"frameDelay", "launchOffset"}
+            self.assertEqual(
+                {k: v for k, v in (skin.get("combat") or {}).items() if k not in art_timing},
+                {k: v for k, v in (base.get("combat") or {}).items() if k not in art_timing}, key)
+            mine, theirs = civ.units[skin["id"]], civ.units[base["id"]]
+            self.assertEqual(
+                sorted((t.action_type, t.class_id, t.unit_id) for t in mine.bird.tasks),
+                sorted((t.action_type, t.class_id, t.unit_id) for t in theirs.bird.tasks), key)
+            self.assertEqual(sorted(skin["animations"]), sorted(base["animations"]), key)
+            for name in skin["animations"]:
+                self.assertNotEqual(skin["animations"][name]["source"], base["animations"][name]["source"],
+                                    f"{key}.{name} draws the base's art")
+                self.assertIn("female", skin["animations"][name]["source"], f"{key}.{name}")
+        # The odds, from the file, on the base unit's skin and nowhere else.
+        self.assertEqual(skins["villager-female"]["chance"], 50)
+        self.assertEqual([k for k, e in skins.items() if "chance" in e], ["villager-female"])
+        self.assertIn("objreplacement.json", self.result["source"]["sha256"])
+        # Her own voice, and the town center's one cue for a villager made.
+        self.assertNotEqual(skins["villager-female"]["sounds"]["select"], entities["villager"]["sounds"]["select"])
+        self.assertEqual(skins["villager-female"]["sounds"]["train"], entities["villager"]["sounds"]["train"])
+        # Nothing on the simulation's side: no technology addresses a skin.
+        for key, tech in self.result["technologies"].items():
+            for effect in tech.get("effects", []):
+                self.assertNotIn(effect.get("unit"), skins, f"{key} reaches {effect.get('unit')}")
 
     def test_names_and_tooltips_are_the_reference_strings(self):
         # Issue #48: what the panel calls a thing is the DAT's own string,

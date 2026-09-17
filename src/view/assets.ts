@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { skinFamilies, type SkinFamily } from './skins';
 
 export type Frame = { x: number; y: number; w: number; h: number; cx: number; cy: number };
 export type Atlas = { image: string; size: [number, number]; framesInFile: number; frames: Frame[] };
@@ -15,6 +16,11 @@ export interface ImportedEntity {
    * with the reference's markup (`<b>`, `<cost>`, a literal `\n`).
    */
   text?: { name?: string; create?: string; help?: string };
+  /** A skin: drawn in place of `skinOf` at `chance` percent (on the base's
+   * skin only), one of the family `skin`. See `skins.ts`. */
+  skinOf?: string;
+  skin?: string;
+  chance?: number;
   /** What a selection draws on the ground: the DAT's obstruction shape —
    * round under a unit, the outline box (half-extents in tiles, can exceed
    * the collision box) under a building or resource. `dead` is the corpse
@@ -83,6 +89,8 @@ export interface BlendMasks {
 
 export interface ContentAssets {
   entities: Record<string, ImportedEntity>;
+  /** Skin families by the base key they stand in for. */
+  skins: Map<string, SkinFamily[]>;
   terrain: Record<string, ImportedTerrain>;
   textures: Map<string, THREE.Texture>;
   playerColors?: PlayerColors;
@@ -262,7 +270,10 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
       masksPerMode: blendSpec.modes[0].masks, solid: blendSpec.solid,
     };
   }
-  return { entities: manifest.entities, terrain, textures, playerColors, playerRamps, blends };
+  return {
+    entities: manifest.entities, skins: skinFamilies(manifest.entities),
+    terrain, textures, playerColors, playerRamps, blends,
+  };
 }
 
 export async function loadUiAssets(): Promise<UiAssets | undefined> {

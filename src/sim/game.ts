@@ -79,7 +79,7 @@ export function createGame(
   const height = descriptor.baked?.height ?? MAP_TILES;
   const start = startFor(width, height);
   const state: GameState = {
-    rules, seed: seedFrom(seed || 1), tick: 0, nextId: 1, width, height,
+    rules, seed: seedFrom(seed || 1), matchSeed: seedFrom(seed || 1), tick: 0, nextId: 1, width, height,
     entities: [], projectiles: [], terrain: [], elevation: [],
     players: {
       1: {

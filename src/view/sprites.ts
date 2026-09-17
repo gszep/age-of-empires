@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { materialColor, materialOpacity, texture as textureNode, vec2 } from 'three/tsl';
+import { skinnedKey } from './skins';
 import type { ContentAssets, Atlas, AnimationInfo } from './assets';
 import { isAnimal, isBuilding, isUnit } from '../sim/data';
 import { createTerrainPatch, elevationAt, ELEVATION_PIXELS, elevatedWorldToIso } from './world';
@@ -177,6 +178,18 @@ function buildFallback(view: EntityView, entity: Entity): void {
   (mesh.material as THREE.MeshBasicMaterial).color.set(color);
   const size = entity.radius * 2 * 48;
   mesh.scale.set(Math.max(18, size), Math.max(18, size * (entity.kind === 'resource' ? 0.5 : 1)), 1);
+}
+
+/**
+ * The imported entity this one draws and speaks with: its own key, or the
+ * skin's counterpart when the entity's roll says so (issue #50 -- half the
+ * villagers are female). The odds are stated on the base kind; `key` may be
+ * a task variant of it.
+ */
+export function artKey(
+  assets: ContentAssets | undefined, entity: Entity, key: string, salt = 0,
+): string {
+  return skinnedKey(assets?.skins, entity, entityKey(entity), key, salt);
 }
 
 export function entityKey(entity: Entity): string {
@@ -739,7 +752,10 @@ export function updateEntityView(
   }
 
   const choice = chooseAnimation(state, entity);
-  const imported = assets.entities[choice.key] ?? assets.entities[entityKey(entity)];
+  // A snapshot from before the seed was kept has none; the roll still holds.
+  const salt = state.matchSeed ?? 0;
+  choice.key = artKey(assets, entity, choice.key, salt);
+  const imported = assets.entities[choice.key] ?? assets.entities[artKey(assets, entity, entityKey(entity), salt)];
   // What is left behind is a chain in the DAT: the dying graphic plays once,
   // then the dead unit's own art lies there — a corpse rotting, a felled tree
   // reduced to its stump. Switch when the first has played out.

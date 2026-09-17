@@ -1175,6 +1175,39 @@ three left are the training times of sheep, deer and boar, which the fallback
 records as 0 because nothing trains them; the DAT's 15, 25 and 25 are the times
 a scenario editor would use.
 
+## Half the villagers are women
+
+The DAT keeps the female villager as unit 293 beside the male 83 — the same
+numbers, the same tasks, her own art and her own voice — and a counterpart for
+every task unit (builder 212, forager 354, lumberjack 218, gold miner 581,
+stone miner 220, hunter 216, shepherd 590), and `objreplacement.json` beside
+the DAT states the odds: 83 is replaced by 293 with `chance` 50, and she by him
+with the same (issue #50). All eight are imported as *skins* — entities
+marked `skinOf` and a family `skin`, with the file's `chance` on the base
+unit's skin — and the import test asserts each carries exactly its base's
+rules and tasks, draws from sheets of its own, and is addressed by no
+technology.
+
+Which villager is which is decided in the view and nowhere else: a hash of
+the entity's id and the match seed, so the simulation never sees it, a replay
+is byte-identical, and a villager keeps her face across a reload. The match
+seed is kept on the state as `matchSeed` for that purpose alone — the same
+three ids open every match, and an id-only roll would have dealt the opening
+trio the same faces in every game. The roll follows the base kind into the
+task variant, so the woman who walks to the wood is the woman who chops it,
+and she answers a selection in her own voice (`villager-female-select`, four
+lines the import resolves from her Wwise id; the town center's "villager made"
+cue is the same for both, as the DAT says). Verified in the running page: a
+trained villager reported `animation: villager-female/idle` through the debug
+protocol and "Villager" on the panel.
+
+Two things the skin does not carry. The hunter's bow leaves her hands at
+frame 15 and 1.2 tiles up where his is frame 10 and 1.5 — her own sheets, her
+own timing — and the simulation reads the base's for both, so a skin never
+changes when or where a shot starts. And `StartingScoutID` (the scout row of
+the same file, player attribute 263) is not read: the Britons' is 448, which
+is the scout this game already deals.
+
 ## Names and tooltips are the reference's own strings
 
 The panel used to spell out the entity's slug — "Man At Arms", "Villager
