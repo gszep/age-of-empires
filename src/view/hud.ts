@@ -81,7 +81,8 @@ export interface SelectionInfo {
 }
 
 export interface HudCallbacks {
-  onCommand(id: string): void;
+  /** A grid button was pressed; `shift` is the reference's batch modifier. */
+  onCommand(id: string, shift?: boolean): void;
   /** A portrait in the group grid was clicked: select that one entity. */
   onSelectMember(id: number): void;
   onMinimapNavigate(point: Point): void;
@@ -267,7 +268,7 @@ export class Hud {
       const target = event.target as HTMLElement;
       const command = target.closest<HTMLElement>('[data-command]')?.dataset.command;
       if (command === 'idle-villager') this.callbacks.onSelectIdleVillager();
-      else if (command) this.callbacks.onCommand(command);
+      else if (command) this.callbacks.onCommand(command, event.shiftKey);
       const map = target.closest<HTMLElement>('[data-map]')?.dataset.map;
       if (map === 'flare') {
         this.flareArmed = !this.flareArmed;

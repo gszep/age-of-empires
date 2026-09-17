@@ -315,7 +315,7 @@ function reject(reason: string): void {
 
 function createHud(): Hud {
   return new view.Hud(app, uiAssets, {
-    onCommand: id => runUiCommand(id),
+    onCommand: (id, shift) => runUiCommand(id, shift),
     onMinimapNavigate: canvasPoint => {
       const world = hud.minimap.fromCanvas(game, canvasPoint.x, canvasPoint.y);
       cameraCenter = elevatedWorldToIso(game, world.x, world.y);
@@ -387,7 +387,10 @@ function selectIdleVillager(): void {
   cameraCenter = elevatedWorldToIso(game, next.position.x, next.position.y);
 }
 
-function runUiCommand(id: string): void {
+/** How many a Shift-click on a train button asks for, as the reference does. */
+const BATCH_TRAIN_COUNT = 5;
+
+function runUiCommand(id: string, shift = false): void {
   if (replay) return;
   const selection = ownSelected();
   if (id.startsWith('build-')) {
@@ -407,8 +410,18 @@ function runUiCommand(id: string): void {
     const building = selection.find(e => isBuilding(e.kind) && e.buildProgress === undefined
       && rules.units[unit]?.trainedAt === e.kind);
     if (!building) return;
-    const result = applyCommand(game, { kind: 'train', player: 1, buildingId: building.id, unit });
-    if (!result.ok) reject(result.reason);
+    // Shift asks for five, or as many of the five as the queue, the price and
+    // the housing allow (issue #76): each goes through the same command a
+    // single click sends, and the first refusal ends the batch. The refusal
+    // is only news when nothing at all was queued.
+    const wanted = shift ? BATCH_TRAIN_COUNT : 1;
+    for (let queued = 0; queued < wanted; queued++) {
+      const result = applyCommand(game, { kind: 'train', player: 1, buildingId: building.id, unit });
+      if (!result.ok) {
+        if (queued === 0) reject(result.reason);
+        return;
+      }
+    }
     return;
   }
   if (id === 'cancel-train') {
@@ -808,7 +821,7 @@ addEventListener('keydown', event => {
   }
   const commands = currentCommands();
   const match = commands.find(c => c.hotkey === key.toLowerCase() && c.enabled);
-  if (match) runUiCommand(match.id);
+  if (match) runUiCommand(match.id, event.shiftKey);
 });
 addEventListener('keyup', event => heldKeys.delete(event.key));
 // A keyup that never arrives is a camera that never stops: alt-tabbing or

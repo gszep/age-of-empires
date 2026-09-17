@@ -1333,6 +1333,18 @@ and computed from the research-applied rules so an upgrade shows. A building
 that does not shoot here (the town center: its arrows are garrison-driven,
 #54) shows no attack. The queue portraits (`QueueButtons`) are still to do.
 
+## Shift on a train button asks for five
+
+A Shift-click on a train button, or Shift with its hotkey, queues five
+(issue #76), or as many of the five as the queue, the price and the housing
+allow: each goes through the same `train` command a single click sends, and
+the first refusal ends the batch — the refusal is only reported when nothing
+at all was queued. Five is the reference's own count; nothing in
+`hotkeys.json` binds it, so it is the engine's constant and recorded as
+such. Pressed in a real page: with 320 food and room, a Shift-click took
+the town center from 320 to 70 food, and a Shift-hotkey with 70 left queued
+one more.
+
 ## A command keeps its cell
 
 Buttons were laid into the grid in list order, so researching Loom slid the
