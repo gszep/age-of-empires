@@ -346,6 +346,18 @@ export class Hud {
     this.endDialog.classList.add('hidden');
   }
 
+  /**
+   * One of the reference's action icons, by the index its own files use:
+   * `buttons.json` says the town bell is 49 and the gather-point flag 45,
+   * and the sheet agrees. 0 is the red cross, 3 the open palm, 30 and 31
+   * the economic and military hammers, 12 and 13 pack and unpack, 70 and 71
+   * the farm-reseed toggle lit and unlit.
+   */
+  actionIcon(index: number): string | undefined {
+    const url = materialUrl(this.ui, `IconAction${String(index).padStart(3, '0')}`);
+    return url ? `url('${url}')` : undefined;
+  }
+
   iconFor(category: 'Units' | 'Buildings' | 'Techs', index: number | undefined): string | undefined {
     if (index === undefined) return undefined;
     const url = iconUrl(this.ui, category, index);

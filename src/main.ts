@@ -90,6 +90,18 @@ let revealMap = false;
  * files do settle is that there are four, and that the *second* is the
  * default — which is why the game no longer starts at 1x, the Slow setting.
  */
+/**
+ * Indices into the reference's action-icon sheet (`IconAction###`), which its
+ * own `buttons.json` numbers -- the town bell is 49, the gather-point flag 45
+ * -- and which laying the imported `ui/textures/ingame/actions/` sheet out
+ * with its numbers confirms: the red cross, the open palm, the economic and
+ * military hammers, the packed wagon and the set-up engine, and the
+ * farm-reseed ring lit and unlit.
+ */
+const ACTION_ICON = {
+  cancel: 0, stop: 3, pack: 12, unpack: 13, buildEconomic: 30, buildMilitary: 31, reseedOn: 70, reseedOff: 71,
+} as const;
+
 const GAME_SPEEDS: { label: string; multiplier: number }[] = [
   { label: 'Slow', multiplier: 1 },
   { label: 'Normal', multiplier: 1.5 },
@@ -814,18 +826,21 @@ function currentCommands(): CommandButton[] {
   const player = game.players[1];
   const buttons: CommandButton[] = [];
   if (buildMode) {
-    return [{ id: 'cancel', label: 'Cancel placement', hotkey: 'escape', enabled: true, active: true }];
+    return [{
+      id: 'cancel', label: 'Cancel placement', hotkey: 'escape', enabled: true, active: true,
+      icon: hud.actionIcon(ACTION_ICON.cancel),
+    }];
   }
   if (selection.some(e => e.kind === 'villager')) {
     if (!buildPage) {
       // AoE2 gives a villager two build buttons and opens neither until one is
       // clicked, which is what selecting a villager shows (issue #25).
       buttons.push({
-        id: 'page-economic', label: 'Build economic buildings',
+        id: 'page-economic', label: 'Build economic buildings', icon: hud.actionIcon(ACTION_ICON.buildEconomic),
         hotkey: BUILD_PAGE_HOTKEYS.economic, enabled: true,
       });
       buttons.push({
-        id: 'page-military', label: 'Build military buildings',
+        id: 'page-military', label: 'Build military buildings', icon: hud.actionIcon(ACTION_ICON.buildMilitary),
         hotkey: BUILD_PAGE_HOTKEYS.military, enabled: true,
       });
     } else {
@@ -841,12 +856,12 @@ function currentCommands(): CommandButton[] {
         });
       }
       buttons.push({
-        id: 'page-back', label: 'Back', hotkey: 'escape', enabled: true,
+        id: 'page-back', label: 'Back', hotkey: 'escape', enabled: true, icon: hud.actionIcon(ACTION_ICON.cancel),
       });
     }
   }
   if (selection.some(e => isUnit(e.kind))) {
-    buttons.push({ id: 'stop', label: 'Stop', hotkey: 's', enabled: true });
+    buttons.push({ id: 'stop', label: 'Stop', hotkey: 's', enabled: true, icon: hud.actionIcon(ACTION_ICON.stop) });
   }
   // A siege engine that has to be set up before it can shoot.
   const engines = selection.filter(e => isUnit(e.kind)
@@ -857,6 +872,7 @@ function currentCommands(): CommandButton[] {
     buttons.push({
       id: anyPacked ? 'unpack' : 'pack',
       label: anyPacked ? 'Unpack (set up to shoot)' : 'Pack (fold up to move)',
+      icon: hud.actionIcon(anyPacked ? ACTION_ICON.unpack : ACTION_ICON.pack),
       hotkey: 'p',
       enabled: !packing,
     });
@@ -923,6 +939,7 @@ function currentCommands(): CommandButton[] {
     buttons.push({
       id: 'reseed',
       label: `Auto-reseed farms: ${on ? 'on' : 'off'} (${costLabel(rules.buildings.farm.cost)} each)`,
+      icon: hud.actionIcon(on ? ACTION_ICON.reseedOn : ACTION_ICON.reseedOff),
       enabled: true,
     });
   }

@@ -1208,6 +1208,12 @@
       }
     },
     {
+      "key": "farm",
+      "unitId": 50,
+      "category": "building",
+      "animations": {}
+    },
+    {
       "key": "lumber-camp",
       "unitId": 562,
       "category": "building",

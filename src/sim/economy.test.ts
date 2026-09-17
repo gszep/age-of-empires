@@ -2633,6 +2633,12 @@ describe('what a razing leaves behind', () => {
       if (!rules.datId) continue;
       const entity = manifest.entities[key];
       if (!entity) continue;
+      // The farm is the one building that leaves no rubble, and the DAT says
+      // so: its dead unit (357, FARM_D) draws the same FARM0NNG sheet as the
+      // living one, with no dying and no rubble graphic -- a dead farm is a
+      // fallow farm. It is imported for its portrait and strings and drawn
+      // as terrain, so it carries no animations at all.
+      if (key === 'farm') { expect(entity.animations ?? {}).toEqual({}); continue; }
       expect(Object.keys(entity.animations ?? {}), `${key} leaves nothing`).toContain('decay');
     }
   });

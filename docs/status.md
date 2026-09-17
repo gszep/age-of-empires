@@ -1175,6 +1175,26 @@ three left are the training times of sheep, deer and boar, which the fallback
 records as 0 because nothing trains them; the DAT's 15, 25 and 25 are the times
 a scenario editor would use.
 
+## The command grid's own buttons wear the reference's action icons
+
+Stop, Back, Cancel, the two build pages, pack and unpack, and the mill's
+reseed toggle had no art, or the wrong art, where the reference's action sheet
+was already imported (`IconAction000`–`104`, from `widgetui/textures/ingame/
+actions/`) and nothing indexed it. The sheet's numbering is the reference's
+own: `buttons.json` says the town bell is 49 and the gather-point flag 45, and
+those are the bell and the flag. Laid out with its numbers, the rest read off
+directly — 0 the red cross (Back and Cancel), 3 the open palm (Stop), 30 and
+31 the hammer with coins and the hammer with a sword (economic and military
+building pages), 12 and 13 the packed wagon and the set-up engine, 70 and 71
+the farm-reseed ring lit and unlit (72/73 and 102/103 are the same ring for
+fish traps and pastures). The farm itself had no icon because it was never an
+entity — it is drawn as terrain — so DAT unit 50 is now imported for its
+portrait (`BuildingIcons035Farm`), name and tooltip alone; its numbers (480
+hit points, 60 wood, 15 seconds, build slot 6) match what was hand-written.
+Verified in the running page: the villager's grid reads `actions/030`,
+`actions/031`, `actions/003`, and the economic page `buildings/035_farm.png`
+and `actions/000` for Back.
+
 ## Half the villagers are women
 
 The DAT keeps the female villager as unit 293 beside the male 83 — the same
