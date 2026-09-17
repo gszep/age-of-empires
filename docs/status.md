@@ -1373,6 +1373,30 @@ The atlas cache fingerprint now covers the decoder and the two conversion
 functions rather than the whole of `convert_sld.py`, so adding a key to the
 manifest no longer re-decodes every sheet.
 
+## A farm is sown, and worked, in the farmer's own art
+
+Building a farm played the builder's hammer (issue #71). The DAT's build
+task (action 101) on the builder unit (118, 212) carries two graphics and
+names them: `proceeding` is `u_vil_male_builder_taskA` — the hammer — and
+`working` is `u_vil_male_farmer_seedA`, the seed-sowing. The importer now
+takes both (`work` and `work-farm`), and a villager whose build target is a
+farm draws the sowing; anything else, the hammer. Which targets take the
+second graphic is not stated by the file — it is the engine's rule that the
+farm does — and that is the one chosen part. Content without the sowing
+sheet falls back to the hammer.
+
+Working a farm drew the forager's berry-picking, because no farmer variant
+had been imported: farming is its own task unit (259 VMFAR, 214 VFFAR for
+her; task unit 50), with its own scythe (`u_vil_male_farmer_taskA`), carry
+walk, rate (0.53 a second against the forager's 0.31) and carry (10). Both
+are imported now, as `villager-farmer` and its skin, and a villager whose
+gather target is a farm wears them. The rate is imported and not yet
+applied: the simulation has one food rate, the forager's, and giving each
+task unit its own is the per-variant change `backlog.md` records under the
+hunter. Verified in the running game through the debug protocol: a villager
+sent to build a farm reports `villager-builder/work-farm`, and at work on
+it `villager-farmer/work`.
+
 ## A portrait wears its owner's colour
 
 The unit icons in the command grid and the selection panel had no player

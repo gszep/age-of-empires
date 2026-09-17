@@ -670,7 +670,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
         dat = _dat()
         civ = dat.civs[SPEC["civIndex"]]
         skins = {key: e for key, e in entities.items() if "skinOf" in e}
-        self.assertEqual(len(skins), 8)
+        self.assertEqual(len(skins), 9)
         for key, skin in skins.items():
             base = entities[skin["skinOf"]]
             self.assertEqual(skin["skin"], "female", key)
@@ -776,6 +776,27 @@ class ContentImportIntegrationTest(unittest.TestCase):
         with Image.open(manifest.parent / house["idle-damage"]["image"]) as sheet:
             self.assertEqual(sheet.getchannel("R").getextrema(), (255, 255))
             self.assertGreater(sheet.getchannel("A").getextrema()[1], 200)
+
+    def test_a_farm_is_sown_and_worked_in_the_farmer_s_own_art(self):
+        # Issue #71: the build task (action 101) carries two graphics, and
+        # the DAT names them -- `proceeding` is the builder's hammer and
+        # `working` is the farmer's seed-sowing, so a farm going up is sown.
+        # The farmer is a task unit of its own (259, task unit 50; 214 for
+        # her) with its own scythe, rate and carry.
+        entities = self.result["entities"]
+        builder = entities["villager-builder"]["animations"]
+        self.assertEqual(builder["work"]["source"], "u_vil_male_builder_taskA_x1.sld")
+        self.assertEqual(builder["work-farm"]["source"], "u_vil_male_farmer_seedA_x1.sld")
+        self.assertEqual(entities["villager-female-builder"]["animations"]["work-farm"]["source"],
+                         "u_vil_female_farmer_seedA_x1.sld")
+        farmer = entities["villager-farmer"]
+        self.assertEqual(farmer["id"], 259)
+        self.assertEqual(farmer["animations"]["work"]["source"], "u_vil_male_farmer_taskA_x1.sld")
+        self.assertEqual(farmer["animations"]["carry"]["source"], "u_vil_male_farmer_carrywalkA_x1.sld")
+        self.assertEqual(farmer["gather"], {"resource": "food", "ratePerSecond": 0.53, "capacity": 10,
+                                            "task": {"actionType": 5, "unitId": 50}})
+        self.assertEqual(entities["villager-female-farmer"]["skinOf"], "villager-farmer")
+        self.assertEqual(entities["villager-female-farmer"]["id"], 214)
 
     def test_names_and_tooltips_are_the_reference_strings(self):
         # Issue #48: what the panel calls a thing is the DAT's own string,

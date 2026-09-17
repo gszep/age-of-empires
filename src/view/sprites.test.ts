@@ -499,6 +499,83 @@ describe('a building on fire', () => {
   });
 });
 
+describe('what a villager wears at a farm', () => {
+  /** A builder with both of the build task's graphics, and a farmer. */
+  function farmAssets(present: string[]): ContentAssets {
+    const assets = fakeAssets();
+    const frames = [{ x: 0, y: 0, w: 4, h: 4, cx: 2, cy: 2 }];
+    const atlas = (image: string): Atlas => ({ image, size: [4, 4], framesInFile: 1, frames });
+    const still = { frames: 1, directions: 1, frameSeconds: 0.1, mirroringMode: 0 };
+    for (const key of ['villager-builder', 'villager-farmer', 'villager-forager']) {
+      const animations: Record<string, typeof still> = {};
+      const atlases: Record<string, Atlas> = {};
+      for (const name of present) {
+        const image = `${key}/${name}.png`;
+        const texture = new THREE.DataTexture(new Uint8Array(4 * 4 * 4), 4, 4);
+        texture.needsUpdate = true;
+        assets.textures.set(image, texture);
+        animations[name] = still;
+        atlases[name] = atlas(image);
+      }
+      assets.entities[key] = { category: 'unit-variant', animations, atlases };
+    }
+    return assets;
+  }
+
+  const stage = (state: GameState) => {
+    const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const farm: Entity = {
+      id: state.nextId++, kind: 'farm', owner: 1, resourceKind: 'food', amount: 175,
+      position: { x: villager.position.x + 2, y: villager.position.y },
+      hp: 480, maxHp: 480, radius: 1.5, activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(farm);
+    return { villager, farm };
+  };
+
+  it('sows seed while a farm goes up, and hammers at anything else', () => {
+    // The DAT's build task carries two graphics: `proceeding` is the hammer
+    // and `working` is the farmer's seed-sowing (issue #71).
+    const state = createGame(73);
+    const { villager, farm } = stage(state);
+    farm.buildProgress = 0.2;
+    villager.order = { kind: 'build', targetId: farm.id };
+    villager.activity = 'building';
+    expect(chooseAnimation(state, villager)).toEqual({ key: 'villager-builder', name: 'work-farm' });
+
+    const barracks = state.entities.find(e => e.kind === 'town-center' && e.owner === 1)!;
+    villager.order = { kind: 'build', targetId: barracks.id };
+    expect(chooseAnimation(state, villager)).toEqual({ key: 'villager-builder', name: 'work' });
+
+    // Content without the sowing sheet still shows a building going up.
+    villager.order = { kind: 'build', targetId: farm.id };
+    const sparse = farmAssets(['idle', 'work']);
+    const view = createEntityView(sparse, villager);
+    updateEntityView(view, sparse, state, villager, 0);
+    expect(view.animationState).toBe('villager-builder/work');
+    const full = farmAssets(['idle', 'work', 'work-farm']);
+    const sown = createEntityView(full, villager);
+    updateEntityView(sown, full, state, villager, 0);
+    expect(sown.animationState).toBe('villager-builder/work-farm');
+  });
+
+  it('works a farm as a farmer, not a forager', () => {
+    // Farming is its own task unit in the DAT (259, task unit 50) with its
+    // own art; food from a bush is the forager's (issue #71).
+    const state = createGame(74);
+    const { villager, farm } = stage(state);
+    villager.order = { kind: 'gather', targetId: farm.id };
+    villager.activity = 'gathering';
+    expect(chooseAnimation(state, villager)).toEqual({ key: 'villager-farmer', name: 'work' });
+    villager.activity = 'moving';
+    expect(chooseAnimation(state, villager)).toEqual({ key: 'villager-farmer', name: 'walk' });
+    const bush = state.entities.find(e => e.kind === 'resource' && e.resourceKind === 'food')!;
+    villager.order = { kind: 'gather', targetId: bush.id };
+    villager.activity = 'gathering';
+    expect(chooseAnimation(state, villager)).toEqual({ key: 'villager-forager', name: 'work' });
+  });
+});
+
 describe('what a death leaves behind', () => {
   /** A villager and an oak with the DAT's death-then-decay chain. */
   function corpseAssets(): ContentAssets {

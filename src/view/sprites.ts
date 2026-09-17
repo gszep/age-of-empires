@@ -424,8 +424,12 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
     // still, the hunter's bow (122) for game that has to be brought down.
     variant = animalVariant(state, entity) ?? variant;
     if (variant === 'villager') {
-      const resource = entity.carrying?.kind ?? gatherTargetResource(state, entity);
-      if (resource === 'food') variant = 'villager-forager';
+      // A farm is its own task unit too (259, task unit 50): the farmer's
+      // scythe rather than the forager's basket (issue #71).
+      const target = gatherTarget(state, entity);
+      const resource = entity.carrying?.kind ?? target?.resourceKind;
+      if (target?.kind === 'farm') variant = 'villager-farmer';
+      else if (resource === 'food') variant = 'villager-forager';
       else if (resource === 'wood') variant = 'villager-lumberjack';
       else if (resource === 'gold') variant = 'villager-goldminer';
       else if (resource === 'stone') variant = 'villager-stonemason';
@@ -434,7 +438,10 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
   if (entity.dead) return { key: variant, name: 'death' };
   switch (entity.activity) {
     case 'gathering': return { key: variant, name: 'work' };
-    case 'building': return { key: variant, name: 'work' };
+    // The build task carries two graphics: `proceeding` is the hammer, and
+    // `working` is the farmer's seed-sowing, which is what a farm going up
+    // gets (issue #71).
+    case 'building': return { key: variant, name: buildTarget(state, entity)?.kind === 'farm' ? 'work-farm' : 'work' };
     case 'carrying': return { key: variant, name: 'carry' };
     // A villager shooting at game draws the bow it is actually using; against
     // anything that can hit back it swings the tool in its hands.
@@ -465,6 +472,12 @@ function huntingTarget(state: GameState, entity: Entity): boolean {
 
 function gatherTarget(state: GameState, entity: Entity): Entity | undefined {
   if (entity.order.kind !== 'gather') return undefined;
+  const targetId = entity.order.targetId;
+  return state.entities.find(e => e.id === targetId);
+}
+
+function buildTarget(state: GameState, entity: Entity): Entity | undefined {
+  if (entity.order.kind !== 'build') return undefined;
   const targetId = entity.order.targetId;
   return state.entities.find(e => e.id === targetId);
 }
@@ -887,6 +900,13 @@ export function updateEntityView(
         break;
       }
     }
+  }
+  // A task's second graphic falls back to its first: a farm going up under
+  // content without the sowing sheet is still a building going up.
+  if ((!animation || !atlas) && choice.name === 'work-farm') {
+    choice.name = 'work';
+    animation = imported?.animations['work'];
+    atlas = imported?.atlases['work'];
   }
   if (!animation || !atlas) {
     // Idle is the right stand-in for a missing walk or attack. It is the wrong

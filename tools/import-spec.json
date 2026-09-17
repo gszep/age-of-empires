@@ -463,6 +463,12 @@
         },
         "decay": {
           "slot": "dead"
+        },
+        "work-farm": {
+          "task": {
+            "actionType": 101
+          },
+          "graphic": "working"
         }
       }
     },
@@ -493,6 +499,12 @@
         },
         "decay": {
           "slot": "dead"
+        },
+        "work-farm": {
+          "task": {
+            "actionType": 101
+          },
+          "graphic": "working"
         }
       }
     },
@@ -561,6 +573,82 @@
           "task": {
             "actionType": 5,
             "classId": 7
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "villager-farmer",
+      "unitId": 259,
+      "category": "unit-variant",
+      "task": {
+        "actionType": 5,
+        "unitId": 50
+      },
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 5,
+            "unitId": 50
+          },
+          "graphic": "proceeding"
+        },
+        "carry": {
+          "task": {
+            "actionType": 5,
+            "unitId": 50
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "villager-female-farmer",
+      "skin": "female",
+      "skinOf": "villager-farmer",
+      "unitId": 214,
+      "category": "unit-variant",
+      "task": {
+        "actionType": 5,
+        "unitId": 50
+      },
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 5,
+            "unitId": 50
+          },
+          "graphic": "proceeding"
+        },
+        "carry": {
+          "task": {
+            "actionType": 5,
+            "unitId": 50
           },
           "graphic": "carrying"
         },

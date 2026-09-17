@@ -209,11 +209,13 @@ terrain blends above.
   are both trained there now (issue #28); the petard is the third thing the
   DAT lists at unit 82, and every other civilisation's unique unit is out of
   scope because the importer reads civ 1.
-- **Hunting pays the forager's wage.** The DAT gives the hunter villager its
-  own work rate (0.41 a second) and carry capacity (35); the simulation has one
-  rate per resource and one global capacity, so hunting banks at the forager's
-  0.31 into 10. Per-task rates would need `gatherRatePerSecond` to become
-  per-variant, which touches every gatherer.
+- **Hunting and farming pay the forager's wage.** The DAT gives the hunter
+  villager its own work rate (0.41 a second) and carry capacity (35), and the
+  farmer (259) 0.53 into 10; the simulation has one rate per resource and one
+  global capacity, so both bank at the forager's 0.31 into 10. The farmer's
+  rate is imported (`villager-farmer.gather`, issue #71) and not applied.
+  Per-task rates would need `gatherRatePerSecond` to become per-variant,
+  which touches every gatherer.
 - **The built-in AI stops at the Feudal Age.** It researches now — Loom in all
   32 player-slots of the paired batch, the Feudal Age in 28 — but the Castle
   Age in none, because matches decide before the food is banked. Everything
