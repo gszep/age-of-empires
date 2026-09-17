@@ -1203,7 +1203,10 @@ computer player of its civilisation — `civilizations.json` names the table
 "Henry V" … "Richard the Lionheart"), imported with the civilisation's own
 display name ("Britons", string 10271) — dealt by the match seed. No score
 yet: the reference's is military + economy + technology + society and nothing
-here computes it, so the row ends at the name rather than inventing one.
+here computes it, so the row ends at the name rather than inventing one. The
+ribbon beside the minimap — `ButtonPlayer`, the player-stats button — shows
+and hides it, as in the reference, wearing `MinimapPlayerStatsActive` while
+the panel is up; it starts up.
 
 ## The minimap panel's four buttons
 
@@ -1217,7 +1220,8 @@ current mode's, and full colour and show-all are what the reference shows at
 rest. The flare works: pressing it arms the next minimap click, which drops a
 pulsing ring there for four seconds and plays `Play_Flare`, the cue
 `sounds.json` names — the four seconds are chosen, not read. Player
-statistics and the two modes have nothing behind them yet and are greyed.
+statistics toggles the score panel; the two modes have nothing behind them
+yet and are greyed.
 
 ## The menu panel's six buttons, and the shield that says who you are
 

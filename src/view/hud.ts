@@ -108,6 +108,8 @@ export class Hud {
   private lastCommandSignature = '';
   /** The flare button was pressed: the next minimap click drops one. */
   private flareArmed = false;
+  /** Whether the score panel is up; the player-stats ribbon toggles it. */
+  private scoresShown = true;
   private onResize = (): void => this.applyScale();
 
   constructor(
@@ -197,7 +199,7 @@ export class Hud {
       <div id="map-panel" class="panel">
         <canvas id="minimap-canvas" width="240" height="130"></canvas>
         <button class="map-button" data-widget="ButtonFlare" data-map="flare" title="Flare: click the minimap to signal a spot"></button>
-        <button class="map-button" data-widget="ButtonPlayer" data-map="players" title="Player statistics (not yet available)" disabled></button>
+        <button class="map-button active" data-widget="ButtonPlayer" data-map="players" title="Show or hide the player scores"></button>
         <button class="map-button" data-widget="ButtonColor" data-map="color" title="Minimap colours (not yet available)" disabled></button>
         <button class="map-button" data-widget="ButtonFilter" data-map="filter" title="Minimap filter (not yet available)" disabled></button>
       </div>
@@ -270,6 +272,16 @@ export class Hud {
       if (map === 'flare') {
         this.flareArmed = !this.flareArmed;
         target.closest<HTMLElement>('[data-map]')!.classList.toggle('active', this.flareArmed);
+        return;
+      }
+      // The ribbon beside the minimap (`ButtonPlayer`, the player-stats
+      // button) shows and hides the score panel above it, as in the reference.
+      if (map === 'players') {
+        this.scoresShown = !this.scoresShown;
+        const button = target.closest<HTMLElement>('[data-map]')!;
+        button.classList.toggle('active', this.scoresShown);
+        button.style.backgroundImage = this.texture(this.scoresShown ? 'MinimapPlayerStatsActive' : 'MinimapPlayerStatsNormal');
+        this.root.querySelector<HTMLElement>('#score-panel')!.classList.toggle('hidden', !this.scoresShown);
         return;
       }
       const menu = target.closest<HTMLElement>('[data-menu]')?.dataset.menu;
@@ -385,7 +397,7 @@ export class Hud {
     // swaps in the current mode's, so the full-colour and show-all icons are
     // what the reference shows at rest.
     const mapArt: Record<string, string> = {
-      flare: 'MinimapFlareNormal', players: 'MinimapPlayerStatsNormal',
+      flare: 'MinimapFlareNormal', players: 'MinimapPlayerStatsActive',
       color: 'MinimapColorFullNormal', filter: 'MinimapFilterAllNormal',
     };
     for (const button of this.root.querySelectorAll<HTMLButtonElement>('#map-panel .map-button')) {
