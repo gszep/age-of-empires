@@ -1175,6 +1175,32 @@ three left are the training times of sheep, deer and boar, which the fallback
 records as 0 because nothing trains them; the DAT's 15, 25 and 25 are the times
 a scenario editor would use.
 
+## A command keeps its cell
+
+Buttons were laid into the grid in list order, so researching Loom slid the
+Feudal Age one cell to the left and a unit upgrade reshuffled a barracks. The
+DAT places every one of them: `train_locations[*].button_id` and
+`research_locations[*].button_id` are cells 1–15, across then down, and a line
+shares its cell — the militia and everything it becomes at the barracks' 1,
+the spearman line at 2, Forging/Iron Casting/Blast Furnace at the blacksmith's
+1 and the armour lines at 2 and 3, Loom at the town center's 6, Wheelbarrow
+and Hand Cart at 7, the three ages at 11. Both fields are imported
+(`train.button`, technology `button`), the open fallback carries the same
+numbers, and `placeCommands` (`src/view/command-grid.ts`) renders all fifteen
+cells with spacers so a button's cell is its place on screen. Whatever the
+DAT does not place — the two build pages, Stop, Pack/Unpack — takes the cell
+the reference's own grid layout in `hotkeys.json` gives it (Q, W, G, Q/W), and
+Back/Cancel the last cell; anything else takes the first free one.
+
+The hotkey is now the cell's letter (Q W E R T / A S D F G / Z X C V B), so
+the letter on the button is the key that presses it; that moves the build
+pages from B/V to Q/W and Stop from S to G, which is the reference's grid
+layout rather than a mix of its classic and grid ones. Verified in the running
+page: the town center reads `1:villager(Q) 6:loom(A) 11:feudal-age(Z)` before,
+during and after Loom — the age stays at 11 when Loom goes — and a villager's
+economic page reads house 1, mill 2, mining camp 3, lumber camp 4, farm 6,
+with cell 5 empty where the reference keeps the dock.
+
 ## The command grid's own buttons wear the reference's action icons
 
 Stop, Back, Cancel, the two build pages, pack and unpack, and the mill's

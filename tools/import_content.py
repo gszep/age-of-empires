@@ -373,6 +373,12 @@ def extract_entity(
                 entity["build"]["button"] = train.button_id
         elif train.unit_id >= 0:
             entity["train"] = {"buildingId": train.unit_id, "seconds": train.train_time}
+            # Its cell in the building's command grid, 1-15 across then down.
+            # A line shares one: the militia and everything it upgrades into
+            # sit at the barracks' slot 1, which is why a button never moves
+            # when a technology lands.
+            if train.button_id > 0:
+                entity["train"]["button"] = train.button_id
 
     combat = unit.type_50
     # Armour is imported even for something that never attacks. Damage is
@@ -812,6 +818,10 @@ def technology_entry(
     }
     if tech.icon_id is not None and tech.icon_id >= 0:
         entry["iconId"] = tech.icon_id
+    # Its cell in the grid, as for a unit: Forging, Iron Casting and Blast
+    # Furnace all sit at the blacksmith's slot 1, the three ages at 11.
+    if location.button_id > 0:
+        entry["button"] = location.button_id
     if strings:
         text = text_of(strings, tech.language_dll_name, tech.language_dll_description, tech.language_dll_help)
         if "create" in text:

@@ -51,7 +51,14 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   watch tower, the monastery, the castle and the wonder ask first; everything
   else — a house, a barracks, a soldier — goes on the keypress. The list is
   the reference's own, a flag the DAT sets on exactly those five.
-- Command-grid hotkeys are shown on buttons (`Q`, `W`, `E`… across the grid, `S` to stop). `V` turns the villager's build menu between its economic and military pages.
+- Every command has a fixed cell in the fifteen-cell grid — the one the
+  reference's own data gives it — and a line keeps its cell: the militia and
+  the champion are both the barracks' first, Forging and Blast Furnace the
+  blacksmith's first, the three ages the town center's eleventh, so nothing
+  moves when a technology lands. The hotkey is the cell's letter, `Q W E R T`
+  / `A S D F G` / `Z X C V B`, shown on the button: `Q` and `W` open a
+  villager's economic and military build pages, `G` is stop, `Esc` is back —
+  the reference's own grid layout.
 - `Esc` cancels placement or opens the menu; `F3` pauses; `F10` toggles the menu.
 - `F4` toggles a debug reveal of the whole map. It is strictly a view-side
   override — the simulation's fog, the AI's observation and every checksum are

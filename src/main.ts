@@ -14,6 +14,7 @@ import { sameKindOnScreen } from './view/selection';
 import { clearSession, loadSession, saveSession } from './dev-session';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
+import { gridKey, placeCommands } from './view/command-grid';
 import { costLabel, displayName as nameFrom, plainHelp } from './view/names';
 import { artKey, chooseAnimation, createEntityView, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline, elevatedWorldToIso, elevationAt, ELEVATION_PIXELS } from './view/world';
@@ -828,7 +829,7 @@ function currentCommands(): CommandButton[] {
   if (buildMode) {
     return [{
       id: 'cancel', label: 'Cancel placement', hotkey: 'escape', enabled: true, active: true,
-      icon: hud.actionIcon(ACTION_ICON.cancel),
+      icon: hud.actionIcon(ACTION_ICON.cancel), slot: GRID_SLOT.cancel,
     }];
   }
   if (selection.some(e => e.kind === 'villager')) {
@@ -837,31 +838,32 @@ function currentCommands(): CommandButton[] {
       // clicked, which is what selecting a villager shows (issue #25).
       buttons.push({
         id: 'page-economic', label: 'Build economic buildings', icon: hud.actionIcon(ACTION_ICON.buildEconomic),
-        hotkey: BUILD_PAGE_HOTKEYS.economic, enabled: true,
+        slot: GRID_SLOT.buildEconomic, enabled: true,
       });
       buttons.push({
         id: 'page-military', label: 'Build military buildings', icon: hud.actionIcon(ACTION_ICON.buildMilitary),
-        hotkey: BUILD_PAGE_HOTKEYS.military, enabled: true,
+        slot: GRID_SLOT.buildMilitary, enabled: true,
       });
     } else {
-      for (const [index, kind] of buildMenu(rules, player.age, buildPage).entries()) {
+      for (const kind of buildMenu(rules, player.age, buildPage)) {
         const building = rules.buildings[kind];
         buttons.push({
           id: `build-${kind}`,
           label: `${createLabel(kind, 'Build')} (${costLabel(building.cost)})`,
           help: helpFor(kind, building.cost),
-          hotkey: BUILD_HOTKEYS[index],
+          slot: building.buildButton,
           enabled: affordable(building.cost),
           icon: hud.iconFor('Buildings', assets?.entities[kind]?.iconId),
         });
       }
       buttons.push({
         id: 'page-back', label: 'Back', hotkey: 'escape', enabled: true, icon: hud.actionIcon(ACTION_ICON.cancel),
+        slot: GRID_SLOT.cancel,
       });
     }
   }
   if (selection.some(e => isUnit(e.kind))) {
-    buttons.push({ id: 'stop', label: 'Stop', hotkey: 's', enabled: true, icon: hud.actionIcon(ACTION_ICON.stop) });
+    buttons.push({ id: 'stop', label: 'Stop', slot: GRID_SLOT.stop, enabled: true, icon: hud.actionIcon(ACTION_ICON.stop) });
   }
   // A siege engine that has to be set up before it can shoot.
   const engines = selection.filter(e => isUnit(e.kind)
@@ -873,6 +875,7 @@ function currentCommands(): CommandButton[] {
       id: anyPacked ? 'unpack' : 'pack',
       label: anyPacked ? 'Unpack (set up to shoot)' : 'Pack (fold up to move)',
       icon: hud.actionIcon(anyPacked ? ACTION_ICON.unpack : ACTION_ICON.pack),
+      slot: anyPacked ? GRID_SLOT.unpack : GRID_SLOT.pack,
       hotkey: 'p',
       enabled: !packing,
     });
@@ -881,13 +884,13 @@ function currentCommands(): CommandButton[] {
   const producer = selection.find(e => isBuilding(e.kind) && e.buildProgress === undefined
     && trainableAt(e.kind as BuildingKind).length > 0);
   if (producer) {
-    for (const [index, kind] of trainableAt(producer.kind as BuildingKind).entries()) {
+    for (const kind of trainableAt(producer.kind as BuildingKind)) {
       const unitRules = rules.units[kind];
       buttons.push({
         id: `train-${kind}`,
         label: `${createLabel(kind, 'Train')} (${costLabel(unitRules.cost)})`,
         help: helpFor(kind, unitRules.cost),
-        hotkey: TRAIN_HOTKEYS[index],
+        slot: unitRules.trainButton,
         // Not "is it already training" -- that is what the queue is for. What
         // stops another is a full queue, the price, or no room for what is
         // already spoken for (issue #7).
@@ -908,6 +911,7 @@ function currentCommands(): CommandButton[] {
         ? `Cancel last of ${waiting + 1} queued (refund)`
         : `Cancel ${displayName(producing.training!.kind)} (refund)`,
       hotkey: 'escape',
+      slot: GRID_SLOT.cancel,
       enabled: true,
     });
   }
@@ -925,6 +929,7 @@ function currentCommands(): CommandButton[] {
       id: `research-${key}`,
       label: `Research ${tech.name} (${costLabel(tech.cost)})`,
       help: tech.help ? plainHelp(tech.help, tech.cost) : undefined,
+      slot: tech.button,
       enabled: !building.researching && affordable(tech.cost),
       icon: hud.iconFor('Techs', tech.iconId),
     });
@@ -943,7 +948,12 @@ function currentCommands(): CommandButton[] {
       enabled: true,
     });
   }
-  return buttons;
+  // Settle every button into its cell and give it that cell's letter, so the
+  // key on the button is the key that presses it. A stated cell holds against
+  // whatever else is on the panel; the rest take the first free ones.
+  return placeCommands(buttons).flatMap((button, index) => button
+    ? [{ ...button, slot: index + 1, hotkey: button.hotkey ?? gridKey(index + 1) }]
+    : []);
 }
 
 /** The population everything queued at this building will take when it lands. */
@@ -951,9 +961,13 @@ const queuedPopulation = (building: Entity): number =>
   [...(building.training ? [building.training.kind] : []), ...(building.trainingQueue ?? [])]
     .reduce((total, kind) => total + rules.units[kind].popCost, 0);
 
-const BUILD_HOTKEYS = ['q', 'w', 'e', 'r', 't', 'a', 'd', 'f', 'g', 'z', 'x', 'c'];
-const BUILD_PAGE_HOTKEYS = { economic: 'b', military: 'v' } as const;
-const TRAIN_HOTKEYS = ['q', 'w', 'e', 'r', 't'];
+/**
+ * Cells for the buttons the DAT does not place, from the reference's own grid
+ * layout in `hotkeys.json` (the second of its four): the two build pages at
+ * Q and W, Stop at G, Unpack at Q and Pack at W. Cancel and Back have no
+ * letter of their own there (they are Escape) and take the last cell.
+ */
+const GRID_SLOT = { buildEconomic: 1, buildMilitary: 2, stop: 10, unpack: 1, pack: 2, cancel: 15 } as const;
 
 /**
  * Which page of the villager's build menu is open, or none: selecting a

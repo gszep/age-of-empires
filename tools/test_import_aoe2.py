@@ -309,7 +309,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
                               ("attack", "u_arc_skirmisher_attackA_x1.sld")):
             self.assertEqual(skirmisher["animations"][state]["source"], source)
         self.assertEqual(skirmisher["cost"], {"food": 25, "wood": 35})
-        self.assertEqual(skirmisher["train"], {"buildingId": 87, "seconds": 26})
+        self.assertEqual(skirmisher["train"], {"buildingId": 87, "seconds": 26, "button": 2})
         # Minimum range is what makes it a skirmisher rather than a small archer.
         self.assertEqual(skirmisher["combat"]["minimumRange"], 1.0)
         self.assertEqual(skirmisher["combat"]["maximumRange"], 4.0)
@@ -325,7 +325,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
         scout = entities["scout-cavalry"]
         self.assertEqual(scout["id"], 448)
         self.assertEqual(scout["cost"], {"food": 80})
-        self.assertEqual(scout["train"], {"buildingId": stable["id"], "seconds": 30})
+        self.assertEqual(scout["train"], {"buildingId": stable["id"], "seconds": 30, "button": 1})
         self.assertEqual(scout["animations"]["idle"]["source"], "u_cav_scout_idleA_x1.sld")
 
     def test_gate_leaves_and_axes_come_from_the_dat_units_that_hold_them(self):
@@ -377,7 +377,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
         cart = self.result["entities"]["trade-cart"]
         self.assertEqual(cart["id"], 128)
         self.assertEqual(cart["cost"], {"wood": 100, "gold": 50})
-        self.assertEqual(cart["train"], {"buildingId": 84, "seconds": 51})
+        self.assertEqual(cart["train"], {"buildingId": 84, "seconds": 51, "button": 1})
         # The route's economics come from the unit, not from a constant: its
         # work rate is what the road pays per second and its capacity the cap.
         self.assertEqual(cart["trade"], {
@@ -556,6 +556,32 @@ class ContentImportIntegrationTest(unittest.TestCase):
                     max(width, height), 8192,
                     f"{key}/{name} is {width}x{height}, over the 8192 device limit",
                 )
+
+    def test_a_line_keeps_its_cell_in_the_grid(self):
+        # The DAT places every train and research button (`button_id`, 1-15),
+        # and a line shares its cell: that is what keeps a button where the
+        # hand expects it when a technology lands. Assert the rule on every
+        # upgrade line the tree carries, and the three cells everyone knows.
+        entities = self.result["entities"]
+        technologies = self.result["technologies"]
+        for tech in technologies.values():
+            for step in tech.get("upgrades", []):
+                self.assertEqual(entities[step["from"]]["train"]["button"],
+                                 entities[step["to"]]["train"]["button"], step)
+        self.assertEqual(entities["militia"]["train"]["button"], 1)
+        self.assertEqual(entities["spearman"]["train"]["button"], 2)
+        self.assertEqual(technologies["loom"]["button"], 6)
+        self.assertEqual({technologies[k]["button"] for k in ("feudal-age", "castle-age", "imperial-age")}, {11})
+        self.assertEqual({technologies[k]["button"] for k in ("forging", "iron-casting", "blast-furnace")}, {1})
+        for key, tech in technologies.items():
+            self.assertIn("button", tech, key)
+            self.assertTrue(1 <= tech["button"] <= 15, key)
+        # Task variants and the set-up trebuchet are never on a button, and the
+        # DAT gives them cell 0; everything a player actually trains has one.
+        for key, entity in entities.items():
+            if entity.get("category") == "unit" and "train" in entity and "skinOf" not in entity \
+                    and key != "trebuchet-unpacked":
+                self.assertTrue(1 <= entity["train"]["button"] <= 15, key)
 
     def test_a_skin_is_the_same_unit_in_other_clothes(self):
         # Issue #50: the female villager is DAT unit 293 beside the male 83,
@@ -924,14 +950,14 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(unit["hitPoints"], 40)
         self.assertEqual(unit["cost"], {"food": 50, "gold": 20})
         self.assertEqual(unit["populationCost"], 1)
-        self.assertEqual(unit["train"], {"buildingId": 12, "seconds": 21})
+        self.assertEqual(unit["train"], {"buildingId": 12, "seconds": 21, "button": 1})
         self.assertIn({"class": 4, "amount": 4}, unit["combat"]["attacks"])
         self.assertIn({"class": 3, "amount": 1}, unit["combat"]["armors"])
         self.assertEqual(unit["combat"]["reloadSeconds"], 2.0)
 
     def test_economy_entities_carry_dat_backed_rules(self):
         entities = self.result["entities"]
-        self.assertEqual(entities["villager"]["train"], {"buildingId": 109, "seconds": 25})
+        self.assertEqual(entities["villager"]["train"], {"buildingId": 109, "seconds": 25, "button": 1})
         self.assertEqual(entities["villager-forager"]["gather"]["resource"], "food")
         self.assertEqual(entities["villager-forager"]["gather"]["ratePerSecond"], 0.31)
         self.assertEqual(entities["villager-lumberjack"]["gather"]["resource"], "wood")

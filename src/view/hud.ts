@@ -5,6 +5,7 @@
  * open skin when imported assets are absent.
  */
 import { materialUrl, iconUrl, type UiAssets } from './assets';
+import { placeCommands } from './command-grid';
 import { widgetBox } from './layout';
 import { Minimap } from './minimap';
 import type { GameState, PlayerId, Point } from '../sim/types';
@@ -12,6 +13,8 @@ import type { GameState, PlayerId, Point } from '../sim/types';
 export interface CommandButton {
   id: string;
   label: string;
+  /** Its cell in the grid, 1-15 across then down, where the DAT states one. */
+  slot?: number;
   /** The reference's tooltip for it, already plain text, shown under the label. */
   help?: string;
   hotkey?: string;
@@ -263,7 +266,15 @@ export class Hud {
     this.commandGrid.innerHTML = '';
     this.buttons.clear();
     const blank = this.texture('ButtonCmdIconNormal');
-    for (const button of buttons.slice(0, 15)) {
+    // Every cell is rendered, empty ones as a spacer, so a button's cell is
+    // its position on screen and not its rank in the list.
+    for (const button of placeCommands(buttons)) {
+      if (!button) {
+        const spacer = document.createElement('div');
+        spacer.className = 'command-cell';
+        this.commandGrid.appendChild(spacer);
+        continue;
+      }
       const element = document.createElement('button');
       element.className = 'command-button';
       element.dataset.command = button.id;
