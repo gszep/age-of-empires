@@ -189,6 +189,13 @@ export interface BuildingRules {
    */
   passable?: boolean;
   /**
+   * Whether Delete asks first. The DAT's `hero_mode` bit 32, set on the town
+   * center, watch tower, monastery, castle and wonder and on nothing else --
+   * a house or a barracks goes on the keypress, as in the reference (issue
+   * #47).
+   */
+  confirmDelete?: boolean;
+  /**
    * The DAT's `blast_defense_level`: every building is 2, so a mangonel's
    * stone (attack level 2) reaches a house it lands beside, and an archer's
    * arrow (3) never does. Trees are 1 and bushes and mines 0 (issue #46).
@@ -699,6 +706,7 @@ export const FALLBACK_RULES: GameRules = {
       hp: 2400, radius: 2, lineOfSight: 8, cost: cost(0, 275), buildSeconds: 100,
       popSupport: 5, buildable: false, accepts: ['food', 'wood', 'gold', 'stone'],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 3 }, { class: 3, amount: 5 }],
+      confirmDelete: true,
     },
     barracks: {
       hp: 1200, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
@@ -755,6 +763,7 @@ export const FALLBACK_RULES: GameRules = {
         projectileSpeed: 7, launchHeight: 5,
       },
       buildButton: 9,
+      confirmDelete: true,
     },
     'archery-range': {
       age: 1,
@@ -802,6 +811,7 @@ export const FALLBACK_RULES: GameRules = {
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
       buildButton: 9,
+      confirmDelete: true,
     },
     'siege-workshop': {
       age: 2,
@@ -835,6 +845,7 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 0, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 3 },
                { class: 3, amount: 10 }, { class: 31, amount: 3 }],
       buildButton: 12,
+      confirmDelete: true,
     },
     // Stone, slow to raise, and the only building besides the town center that
     // both shoots and houses people: the DAT gives it 20 population support.
@@ -848,6 +859,7 @@ export const FALLBACK_RULES: GameRules = {
         reloadSeconds: 2, releaseSeconds: 0.35, projectileSpeed: 7, launchHeight: 4,
       },
       buildButton: 13,
+      confirmDelete: true,
     },
   },
   nodes: {
@@ -909,6 +921,8 @@ interface ManifestEntity {
   };
   /** The DAT's `blast_defense_level`: units 3, buildings 2, trees 1, else 0. */
   blastDefenseLevel?: number;
+  /** The DAT's `hero_mode` bit 32: Delete asks first. */
+  confirmDelete?: boolean;
   heal?: { hitPointsPerSecond: number; range: number };
   convert?: { minSeconds: number; maxSeconds: number; range: number };
   searchRadius?: number;
@@ -1055,6 +1069,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       passableForOwner: fallback.passableForOwner,
       passable: e[key].passable ?? fallback.passable,
       blastDefenseLevel: e[key].blastDefenseLevel ?? fallback.blastDefenseLevel,
+      confirmDelete: e[key].confirmDelete ?? fallback.confirmDelete,
       attack: fallback.attack && {
         ...fallback.attack,
         range: e[key].combat?.maximumRange || fallback.attack.range,

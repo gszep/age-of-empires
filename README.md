@@ -47,8 +47,10 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   `V` castle, `Y` monastery, `K` siege workshop, `G` mining camp, `Z` lumber
   camp, `H` town centers, `W` wonder. The letters are the reference's own,
   imported from its `hotkeys.json` rather than chosen here.
-- `Delete` destroys what you have selected, of your own. A unit goes without
-  asking and a building asks first, which is the reference's own division.
+- `Delete` destroys what you have selected, of your own. The town center, a
+  watch tower, the monastery, the castle and the wonder ask first; everything
+  else — a house, a barracks, a soldier — goes on the keypress. The list is
+  the reference's own, a flag the DAT sets on exactly those five.
 - Command-grid hotkeys are shown on buttons (`Q`, `W`, `E`… across the grid, `S` to stop). `V` turns the villager's build menu between its economic and military pages.
 - `Esc` cancels placement or opens the menu; `F3` pauses; `F10` toggles the menu.
 - `F4` toggles a debug reveal of the whole map. It is strictly a view-side

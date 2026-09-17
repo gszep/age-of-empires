@@ -711,15 +711,17 @@ addEventListener('keydown', event => {
     // actually destroy, since the selection may hold somebody else's.
     const mine = game.entities.filter(e =>
       selectedIds.includes(e.id) && e.owner === 1 && !e.dead);
-    // A building is asked about and a unit is not, which is the reference's
-    // own division: losing a soldier by a stray keypress costs a soldier,
-    // losing the town center loses the match.
-    const buildings = mine.filter(e => isBuilding(e.kind));
-    const doomed = buildings.length && !confirm(
-      buildings.length === 1
-        ? `Delete your ${displayName(buildings[0].kind)}? This cannot be undone.`
-        : `Delete ${buildings.length} of your buildings? This cannot be undone.`)
-      ? mine.filter(e => !isBuilding(e.kind))
+    // What is asked about is the DAT's own list, not "buildings": its
+    // `hero_mode` bit 32 is set on the town center, watch tower, monastery,
+    // castle and wonder and on nothing else, so a house or a barracks goes on
+    // the keypress as a soldier does (issue #47).
+    const asked = mine.filter(e =>
+      isBuilding(e.kind) && game.rules.buildings[e.kind as BuildingKind].confirmDelete);
+    const doomed = asked.length && !confirm(
+      asked.length === 1
+        ? `Delete your ${displayName(asked[0].kind)}? This cannot be undone.`
+        : `Delete ${asked.length} of your buildings? This cannot be undone.`)
+      ? mine.filter(e => !asked.includes(e))
       : mine;
     if (doomed.length) {
       applyCommand(game, { kind: 'delete', player: 1, entityIds: doomed.map(e => e.id) });

@@ -554,6 +554,24 @@ class ContentImportIntegrationTest(unittest.TestCase):
                     f"{key}/{name} is {width}x{height}, over the 8192 device limit",
                 )
 
+    def test_delete_asks_where_the_dat_flags_it(self):
+        # Issue #47: `hero_mode` bit 32 is the safe-delete confirmation, and
+        # it is on five buildings -- not on "buildings". A house goes on the
+        # keypress as in the reference.
+        entities = self.result["entities"]
+        flagged = sorted(key for key, entity in entities.items() if entity.get("confirmDelete"))
+        self.assertEqual(flagged, ["castle", "monastery", "town-center", "watch-tower", "wonder"])
+        dat = _dat()
+        civ = dat.civs[SPEC["civIndex"]]
+        for entry in SPEC["entities"]:
+            if entry.get("civ") == "gaia":
+                continue
+            unit = civ.units[entry["unitId"]]
+            if unit is None or unit.creatable is None:
+                continue
+            self.assertEqual(bool(unit.creatable.hero_mode & 32),
+                             bool(entities[entry["key"]].get("confirmDelete")), entry["key"])
+
     def test_a_miss_lands_the_dat_dispersion_away(self):
         # Issue #45: the DAT states how far a shot that fails its accuracy
         # roll lands from the aim. Everything that can miss carries it, and

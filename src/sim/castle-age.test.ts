@@ -279,6 +279,22 @@ describe('siege', () => {
   });
 });
 
+describe('what Delete asks about', () => {
+  /**
+   * The DAT's `hero_mode` bit 32 (issue #47): set on the town center, watch
+   * tower, monastery, castle and wonder, and on nothing else. The rule is
+   * asserted on both rule sets so the open fallback cannot drift from it.
+   */
+  const asks = ['town-center', 'watch-tower', 'monastery', 'castle', 'wonder'];
+  for (const [label, rules] of [['fallback', FALLBACK_RULES], ['imported', importedRules]] as const) {
+    it.skipIf(!rules)(`is exactly five buildings in the ${label} rules`, () => {
+      const flagged = Object.entries(rules!.buildings)
+        .filter(([, b]) => b.confirmDelete).map(([kind]) => kind).sort();
+      expect(flagged).toEqual([...asks].sort());
+    });
+  }
+});
+
 describe('a shot that goes wide', () => {
   /**
    * The DAT states how far a miss lands from the aim (`accuracy_dispersion`,

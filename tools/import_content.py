@@ -22,6 +22,10 @@ PROJECTILE_LEADS_TARGET = 1
 POPULATION_TYPE = 4
 
 
+# `creatable.hero_mode` bit: the unit asks before it is deleted.
+HERO_CONFIRM_DELETE = 32
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as source:
@@ -294,6 +298,14 @@ def extract_entity(
         entity["speedTilesPerSecond"] = rounded(unit.speed)
 
     if unit.creatable is not None:
+        # `hero_mode` is a flag field: 1 full heal, 2 cannot be converted, 4
+        # regenerates, 8 defensive stance, 16 protected formation, 32 asks
+        # before Delete, 64 hero glow. Across this roster it reads 0, 32 or
+        # 34: the town center, watch tower, monastery, castle and wonder ask,
+        # and the rest go on the keypress -- which is the reference's own
+        # division, not "buildings ask" (issue #47).
+        if unit.creatable.hero_mode & HERO_CONFIRM_DELETE:
+            entity["confirmDelete"] = True
         cost, population = costs_of(unit.creatable)
         if cost:
             entity["cost"] = cost
