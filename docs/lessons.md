@@ -687,6 +687,7 @@ keeps the record.
   `applyCommand`; the second is filtered client-side. Rule: read a query's
   answer once before writing the loop that trusts it.
 
+
 - **A decoder that draws plausible pictures on short runs can be wrong on
   the long one, and the format's own economy is the test.** SLD delta
   frames were inherited from the previous frame for a year; on the two- and
@@ -713,3 +714,22 @@ keeps the record.
   coverage is split out by the importer into its own opaque mask (as the
   sprite masks already are), and a probe that measures a colour reads the
   mask, not the alpha.
+
+- **A zero-context patch places a pure insertion wherever the line numbers
+  say, and says nothing.** Splitting one working tree into per-item commits
+  with `git diff -U0` and `git apply --cached --unidiff-zero` put a module
+  constant inside the function above it (valid syntax, wrong scope — a
+  `ReferenceError` at run time) and a test method inside the body of another.
+  The gate caught both; a `py_compile` of the staged file would have caught
+  one for free. Rule: stage a subset by rebuilding the file from the index
+  with content anchors (the same old/new edits that made the change), never
+  by line-numbered hunks; and gate what is staged by saving the working
+  tree to a tarball, checking the index out, and restoring — a `stash pop`
+  merges, and merged against a subset of itself it conflicts on the docs.
+
+- **A test suite run beside a CPU-bound job fails on its timeouts, not on
+  its assertions.** Two tests that pass alone in 22 s and 61 s failed the
+  full run at 33 s and 96 s against 30 s and 90 s limits while the atlas
+  decode and a browser probe were running. Rule: the gate runs on an idle
+  machine; when a long job is going, wait for it, and read a timeout under
+  load as contention before reading it as a regression.

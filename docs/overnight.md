@@ -36,17 +36,35 @@ kill the litter, and state what is deliberately left running.
 ## Where this queue stands
 
 **Start with the open issues, bugs first.** The standing priority holds:
-anything tagged `bug` outruns everything in this file. After the human's
-playtest of 2026-09-17 the list is: **#61** (a razed house plays the Dark Age
-collapse whatever the age), **#70** (two buildings of a kind can research the
-same technology at once), **#71** (building a farm should use the seed-sowing
-animation), **#73** (damage stages on buildings — the DAT's
-`damage_graphics` at 25/50/75 %, and the fire particles, see #49), **#74**
-(villagers cannot repair), **#75** (garrison — not modelled at all; the
-DAT's fields are catalogued in #54), **#76** (shift-click trains five),
-**#77** (unit portraits in the grid wear no player colour), **#78** (a Feudal
-mill's animation). #70, #76 and #77 are small; #75 and #74 are simulation
-features with checksum consequences. Then Q3 below.
+anything tagged `bug` outruns everything in this file. **The 2026-09-17
+overnight run closed the playtest's list**: #78 (the Feudal mill — an SLD
+decoder defect, a delta frame inherits from its keyframe, not the frame
+before; every long delta run was re-decoded), #61 (a razed building falls as
+its age and leaves its age's rubble), #76 (Shift queues five), #77
+(portraits in the owner's colour, through the sprites' palette ramp), #71
+(a farm is sown with the seed-sowing graphic and worked in the farmer's own
+art), #73 (soot from the SLD damage layer and the DAT's fires from the
+reference's own particle flipbooks), #74 (repair, from the repairer task
+unit: 12.5 a second, siege at a quarter, half price), #75 (garrison: in,
+banked, healed, out, and the town center shoots for those inside), and the
+note on #70 (an unaffordable press goes through and is told why in the
+reference's words). Each has a section in `status.md` and the DAT rows are
+in `tools/README.md`. What is still open: **#5** (pathing, blocked on the
+human), **#41** (invalid), and the reference-audit enhancements #49–#60.
+Then Q3 below.
+
+**Three things a fresh session needs from that run.** The atlas cache
+fingerprint now covers only the decoder (`sld_layers.py`) and the two
+conversion functions, so editing the manifest dict in `convert_sld.py` no
+longer costs the hour — but a decoder edit still does, masks included (this
+run paid it twice). Reading a PNG's alpha back through a canvas loses the
+RGB of every alpha-0 pixel (premultiplication): anything a texture encodes
+in alpha beyond coverage is split out by the importer into its own mask.
+And zero-context patch splitting (`git apply --unidiff-zero`) places a pure
+insertion at the wrong offset with no error — this run's commits were
+staged by rebuilding files by content from the index, and gated with the
+working tree saved to a tarball and restored, never stashed (a stash pop
+conflicted on the docs).
 
 **The 2026-09-17 session** (18 commits, `cebb47b`..`37a191a`) did three
 things. First an audit of the owned reference material — every file basename
@@ -307,17 +325,16 @@ order.
 *Verify:* the same 900-second single-match measurement on seed 102, recorded
 beside the old figures rather than replacing them.
 
-### Q7. Building rubble per age, and the hit points an age gives
+### Q7. The hit points an age gives — rubble done, hit points left
 
-Two loose ends left by the age work, both small and both in `backlog.md`. Each
-age variant has its own rubble unit (`Barracks Age2 (Rubble)`), so a razed
-Feudal barracks leaves Dark Age rubble. And those variants carry more hit
-points than the Dark Age original — a barracks goes 1200 to 1500, a house 550
-to 750 — which is a real effect of ageing up that is not applied.
+The rubble half closed with issue #61 on 2026-09-17: each age's collapse and
+rubble follow the variant unit. What is left is that those variants carry
+more hit points than the Dark Age original — a barracks goes 1200 to 1500, a
+house 550 to 750 — which is a real effect of ageing up that is not applied.
 
-*Verify:* a razed Feudal barracks leaves the Feudal rubble, and a house built
-after the Feudal Age has 750 hit points where one built before has 550 — with
-a determinism test across the change, because it is a checksum change.
+*Verify:* a house built after the Feudal Age has 750 hit points where one
+built before has 550 — with a determinism test across the change, because it
+is a checksum change.
 
 ### Q8. A map that looks like Age of Empires — now scoped, and next
 
