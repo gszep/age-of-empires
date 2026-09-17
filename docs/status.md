@@ -1175,6 +1175,20 @@ three left are the training times of sheep, deer and boar, which the fallback
 records as 0 because nothing trains them; the DAT's 15, 25 and 25 are the times
 a scenario editor would use.
 
+## The minimap panel's four buttons
+
+`mappanel.json` places `ButtonFlare` (185,129), `ButtonPlayer` (776,129),
+`ButtonColor` (185,318) and `ButtonFilter` (776,318), 69x69 each, and the HUD
+drew four empty circles (issue #68). They now wear the file's materials —
+`MinimapFlareNormal`, `MinimapPlayerStatsNormal`, and for the two modes
+`MinimapColorFullNormal` and `MinimapFilterAllNormal`: the file gives both
+mode buttons one shared placeholder material and the engine swaps in the
+current mode's, and full colour and show-all are what the reference shows at
+rest. The flare works: pressing it arms the next minimap click, which drops a
+pulsing ring there for four seconds and plays `Play_Flare`, the cue
+`sounds.json` names — the four seconds are chosen, not read. Player
+statistics and the two modes have nothing behind them yet and are greyed.
+
 ## The menu panel's six buttons, and the shield that says who you are
 
 `menupanel.json` places six buttons — `Techtree` (104x104 at 166,56) and

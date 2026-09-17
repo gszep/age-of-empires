@@ -319,6 +319,11 @@ function createHud(): Hud {
       const world = hud.minimap.fromCanvas(game, canvasPoint.x, canvasPoint.y);
       cameraCenter = elevatedWorldToIso(game, world.x, world.y);
     },
+    onFlare: canvasPoint => {
+      const world = hud.minimap.fromCanvas(game, canvasPoint.x, canvasPoint.y);
+      hud.minimap.flare(world.x, world.y);
+      playSound('flare');
+    },
     onSelectIdleVillager: () => selectIdleVillager(),
     onSelectMember: id => {
       if (game.entities.some(e => e.id === id && !e.dead)) selectedIds = [id];

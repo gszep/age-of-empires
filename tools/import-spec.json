@@ -1949,11 +1949,13 @@
       "age_up",
       "tech_researched",
       "victory",
-      "defeat"
+      "defeat",
+      "flare"
     ],
     "materialPrefixes": [
       "IconAction",
-      "ButtonsShield"
+      "ButtonsShield",
+      "MinimapColorFull"
     ],
     "textureDirectories": [
       "textures/ingame/staticons"

@@ -62,6 +62,8 @@ export interface HudCallbacks {
   /** A portrait in the group grid was clicked: select that one entity. */
   onSelectMember(id: number): void;
   onMinimapNavigate(point: Point): void;
+  /** The flare button, then a minimap click: signal that spot (canvas point). */
+  onFlare(point: Point): void;
   onSelectIdleVillager(): void;
   onMenu(action: 'resume' | 'restart' | 'pause'): void;
   onReplayFile(record: unknown): void;
@@ -81,6 +83,8 @@ export class Hud {
   private endDialog!: HTMLElement;
   private buttons = new Map<string, HTMLButtonElement>();
   private lastCommandSignature = '';
+  /** The flare button was pressed: the next minimap click drops one. */
+  private flareArmed = false;
   private onResize = (): void => this.applyScale();
 
   constructor(
@@ -139,7 +143,13 @@ export class Hud {
       <div id="bottombar-strip" class="panel"></div>
       <div id="command-panel" class="panel"><div id="command-grid"></div></div>
       <div id="selection-panel" class="panel"><div id="civ-emblem"></div><div id="selection-content"></div></div>
-      <div id="map-panel" class="panel"><canvas id="minimap-canvas" width="240" height="130"></canvas></div>
+      <div id="map-panel" class="panel">
+        <canvas id="minimap-canvas" width="240" height="130"></canvas>
+        <button class="map-button" data-widget="ButtonFlare" data-map="flare" title="Flare: click the minimap to signal a spot"></button>
+        <button class="map-button" data-widget="ButtonPlayer" data-map="players" title="Player statistics (not yet available)" disabled></button>
+        <button class="map-button" data-widget="ButtonColor" data-map="color" title="Minimap colours (not yet available)" disabled></button>
+        <button class="map-button" data-widget="ButtonFilter" data-map="filter" title="Minimap filter (not yet available)" disabled></button>
+      </div>
       <div id="game-message"></div>
       <div id="menu-dialog" class="dialog hidden">
         <h2>Menu</h2>
@@ -204,6 +214,12 @@ export class Hud {
       const command = target.closest<HTMLElement>('[data-command]')?.dataset.command;
       if (command === 'idle-villager') this.callbacks.onSelectIdleVillager();
       else if (command) this.callbacks.onCommand(command);
+      const map = target.closest<HTMLElement>('[data-map]')?.dataset.map;
+      if (map === 'flare') {
+        this.flareArmed = !this.flareArmed;
+        target.closest<HTMLElement>('[data-map]')!.classList.toggle('active', this.flareArmed);
+        return;
+      }
       const menu = target.closest<HTMLElement>('[data-menu]')?.dataset.menu;
       if (command || menu) this.callbacks.onSound('button_ui');
       if (menu === 'open') this.toggleMenu(true);
@@ -230,6 +246,17 @@ export class Hud {
       this.callbacks.onMinimapNavigate({ x, y });
     };
     minimapCanvas.addEventListener('pointerdown', event => {
+      // An armed flare takes the click instead of the camera.
+      if (this.flareArmed) {
+        this.flareArmed = false;
+        this.root.querySelector('[data-map="flare"]')?.classList.remove('active');
+        const rect = minimapCanvas.getBoundingClientRect();
+        this.callbacks.onFlare({
+          x: (event.clientX - rect.left) / rect.width * minimapCanvas.width,
+          y: (event.clientY - rect.top) / rect.height * minimapCanvas.height,
+        });
+        return;
+      }
       navigate(event);
       const move = (moveEvent: PointerEvent) => navigate(moveEvent);
       const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); };
@@ -299,6 +326,20 @@ export class Hud {
           value.style.height = `calc(${storage.height}px * var(--ui-scale))`;
         }
       }
+    }
+    // The map panel's four buttons (mappanel.json): flare, player stats, and
+    // the colour and filter modes (issue #68). Only the flare does anything
+    // yet; the file gives the two modes one shared material and the engine
+    // swaps in the current mode's, so the full-colour and show-all icons are
+    // what the reference shows at rest.
+    const mapArt: Record<string, string> = {
+      flare: 'MinimapFlareNormal', players: 'MinimapPlayerStatsNormal',
+      color: 'MinimapColorFullNormal', filter: 'MinimapFilterAllNormal',
+    };
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>('#map-panel .map-button')) {
+      button.style.backgroundImage = this.texture(mapArt[button.dataset.map!]);
+      place(`#map-panel [data-widget="${button.dataset.widget}"]`,
+        widgetBox(this.ui?.layouts.mappanel, 'Background', button.dataset.widget!), true);
     }
     for (const button of this.root.querySelectorAll<HTMLElement>('#menu-panel [data-widget]')) {
       place(`#menu-panel [data-widget="${button.dataset.widget}"]`,

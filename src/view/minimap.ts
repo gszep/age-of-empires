@@ -27,6 +27,8 @@ export function minimapResourceDotSize(width: number, height: number): number {
 
 export class Minimap {
   private context: CanvasRenderingContext2D;
+  /** Flares dropped on the map: where, and when they were lit (ms). */
+  private flares: { x: number; y: number; at: number }[] = [];
 
   /**
    * Terrain and fog, one pixel per tile on an axis-aligned buffer. Drawing a
@@ -186,5 +188,27 @@ export class Minimap {
     for (const corner of corners.slice(1)) ctx.lineTo(corner.x, corner.y);
     ctx.closePath();
     ctx.stroke();
+
+    // Flares: a ring that pulses for a few seconds where somebody pointed.
+    const now = performance.now();
+    this.flares = this.flares.filter(flare => now - flare.at < FLARE_MS);
+    for (const flare of this.flares) {
+      const age = (now - flare.at) / FLARE_MS;
+      const p = this.toCanvas(state, flare.x, flare.y);
+      const radius = 3 + 6 * (0.5 + 0.5 * Math.sin(age * Math.PI * 8));
+      ctx.strokeStyle = `rgba(255, 255, 255, ${(1 - age).toFixed(2)})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  /** Drop a flare at a world point; it shows for `FLARE_MS`. */
+  flare(x: number, y: number): void {
+    this.flares.push({ x, y, at: performance.now() });
   }
 }
+
+/** How long a flare stays lit. Not in the owned files; a few seconds, as played. */
+const FLARE_MS = 4000;
