@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { FALLBACK_RULES, TICKS_PER_SECOND, rulesFromManifest, type ContentManifest, type GameRules } from './data';
-import { addNode, applyCommand, createGame, placementLegal, stepGame } from './game';
+import { FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, rulesFromManifest, type ContentManifest, type GameRules } from './data';
+import { addNode, applyCommand, createGame, placementLegal, stepGame, swingSeconds } from './game';
 import { checksumState } from './checksum';
 import type { BuildingKind, Entity, GameState, UnitKind } from './types';
 
@@ -568,6 +568,44 @@ describe('the trebuchet', () => {
     expect(enemy.hp).toBeLessThan(untouched);
     // And it never moved an inch to do it.
     expect(engine.position).toEqual(where);
+  });
+
+  it.skipIf(!importedRules)('times its swing so the rock leaves at the DAT frame, then stands until the next', () => {
+    // Issue #72: the view runs the attack art off `swingSeconds`, so the
+    // art and the shot agree. At the tick the rock appears the swing reads
+    // the release time -- `frame_delay` frames into the animation -- and it
+    // then climbs through the whole reload before the next swing resets it.
+    const state = createGame(124, importedRules);
+    imperial(state);
+    const enemy = state.entities.find(e => e.owner === 2 && e.kind === 'town-center')!;
+    const engine = engineFor(state, { x: enemy.position.x - 12, y: enemy.position.y });
+    applyCommand(state, { kind: 'pack', player: 1, entityIds: [engine.id], unpacked: true });
+    run(state, Math.round(state.rules.units.trebuchet.unpacked!.seconds * TICKS_PER_SECOND));
+    applyCommand(state, {
+      kind: 'order', player: 1, entityIds: [engine.id], target: enemy.position, targetId: enemy.id,
+    });
+    const unpacked = state.rules.units.trebuchet.unpacked!;
+    const release = Math.max(1, Math.round(unpacked.attackReleaseSeconds * TICKS_PER_SECOND)) * TICK_SECONDS;
+    const readings: number[] = [];
+    let shots = 0;
+    let atRelease: number | undefined;
+    for (let i = 0; i < 600 && shots < 2; i++) {
+      const before = state.projectiles.length;
+      stepGame(state);
+      const swing = swingSeconds(state, engine);
+      if (swing !== undefined) readings.push(swing);
+      if (state.projectiles.length > before) { shots++; atRelease ??= swing; }
+    }
+    expect(shots).toBe(2);
+    expect(atRelease).toBeCloseTo(release, 5);
+    // 24 frames of 0.0367 s: the DAT's own release frame, and what release is.
+    expect(release).toBeCloseTo(0.9, 1);
+    // Between the shots the reading climbs through the whole reload, one tick
+    // at a time, and never past it.
+    const between = readings.slice(readings.indexOf(atRelease!) + 1);
+    const peak = Math.max(...between);
+    expect(peak).toBeCloseTo(unpacked.attackReloadSeconds, 1);
+    for (let i = 1; i < between.indexOf(peak); i++) expect(between[i] - between[i - 1]).toBeCloseTo(TICK_SECONDS, 5);
   });
 
   it('packs itself away when it is told to go somewhere', () => {

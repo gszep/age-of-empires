@@ -798,6 +798,41 @@ function combatOf(state: GameState, entity: Entity): {
 }
 
 /**
+ * How far into its current swing an attacker is, in seconds, or undefined when
+ * it is not mid-swing or mid-reload. The view runs the attack animation off
+ * this rather than its own clock, so the arm and the stone agree: the
+ * projectile leaves at `releaseSeconds`, which is the DAT's `frame_delay`
+ * frames into the animation, and a trebuchet's 2.2 seconds of art are
+ * followed by 7.8 of standing rather than four more swings (issue #72). The
+ * numbers are the same ones the swing itself uses above.
+ */
+export function swingSeconds(state: GameState, entity: Entity): number | undefined {
+  if (entity.activity !== 'attacking') return undefined;
+  let releaseSeconds: number;
+  let reloadSeconds: number;
+  if (isBuilding(entity.kind)) {
+    const attack = buildingRulesFor(state, entity.owner, entity.kind as BuildingKind).attack;
+    if (!attack) return undefined;
+    releaseSeconds = attack.releaseSeconds;
+    reloadSeconds = attack.reloadSeconds;
+  } else {
+    const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
+    const target = 'targetId' in entity.order
+      ? state.entities.find(e => e.id === (entity.order as { targetId: number }).targetId)
+      : undefined;
+    releaseSeconds = attackProfile(state, entity, target).releaseSeconds ?? rules.attackReleaseSeconds;
+    reloadSeconds = combatOf(state, entity).reloadSeconds;
+  }
+  const releaseTicks = Math.max(1, Math.round(releaseSeconds * TICKS_PER_SECOND));
+  const cooldownTicks = Math.max(1, Math.round(reloadSeconds * TICKS_PER_SECOND) - releaseTicks);
+  if (entity.attackWindup !== undefined) return (releaseTicks - entity.attackWindup) * TICK_SECONDS;
+  if (entity.attackCooldown !== undefined) {
+    return (releaseTicks + cooldownTicks - entity.attackCooldown) * TICK_SECONDS;
+  }
+  return undefined;
+}
+
+/**
  * What a shooter's shot carries besides its damage: how likely it is to be
  * aimed true, how far off it lands when it is not, and what its blast may
  * hurt. All four are the DAT's own fields on the shooter.

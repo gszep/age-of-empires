@@ -3,6 +3,7 @@ import { materialColor, materialOpacity, texture as textureNode, vec2 } from 'th
 import { skinnedKey } from './skins';
 import type { ContentAssets, Atlas, AnimationInfo } from './assets';
 import { isAnimal, isBuilding, isUnit } from '../sim/data';
+import { swingSeconds } from '../sim/game';
 import { createTerrainPatch, elevationAt, ELEVATION_PIXELS, elevatedWorldToIso } from './world';
 import { worldToIso, isoDepth, TILE_H } from './iso';
 import type { Entity, GameState, Point } from '../sim/types';
@@ -767,6 +768,17 @@ export function updateEntityView(
   } else {
     view.diedAt = undefined;
   }
+  // An attack plays once per swing, on the simulation's own clock: the frame
+  // is where the swing is, so the stone leaves the arm at the DAT's frame,
+  // and once the art has played out the unit stands until the next swing
+  // (issue #72). Without swing timing -- a fallback unit mid-order -- the
+  // view's clock stands in as before.
+  let swing = choice.name === 'attack' ? swingSeconds(state, entity) : undefined;
+  if (swing !== undefined) {
+    const attack = imported?.animations['attack'];
+    const length = attack ? attack.frames * (attack.frameSeconds > 0 ? attack.frameSeconds : 0.1) : 0;
+    if (swing >= length) { choice.name = 'idle'; swing = undefined; }
+  }
   let animation: AnimationInfo | undefined = imported?.animations[choice.name];
   let atlas: Atlas | undefined = imported?.atlases[choice.name];
   // An age's idle falls back through the older ages before the base art, so a
@@ -824,9 +836,10 @@ export function updateEntityView(
     const eaten = choice.name === 'decay' ? decayFraction(state, entity) : undefined;
     let frameInDirection = eaten !== undefined
       ? Math.floor(eaten * framesPerDirection)
-      : Math.floor(elapsed / frameSeconds);
-    // Neither a death nor a corpse loops: both hold their last frame.
-    if (choice.name === 'death' || choice.name === 'decay') {
+      : Math.floor((swing ?? elapsed) / frameSeconds);
+    // Neither a death nor a corpse loops: both hold their last frame. Nor
+    // does a swing the simulation is timing.
+    if (choice.name === 'death' || choice.name === 'decay' || swing !== undefined) {
       frameInDirection = Math.min(frameInDirection, framesPerDirection - 1);
     }
     else frameInDirection %= framesPerDirection;

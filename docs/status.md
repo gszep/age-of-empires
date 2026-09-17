@@ -1175,6 +1175,25 @@ three left are the training times of sheep, deer and boar, which the fallback
 records as 0 because nothing trains them; the DAT's 15, 25 and 25 are the times
 a scenario editor would use.
 
+## A swing is drawn on the simulation's clock
+
+The attack animation ran on the view's own clock from the moment a unit
+became `attacking`, looping, while the simulation fired once per reload at
+its own windup tick — so a trebuchet's arm swung four or five times per rock
+and the rock left at whatever frame the loop happened to be on (issue #72).
+`swingSeconds` in `game.ts` now reports how far into its swing an attacker
+is, from the same `attackWindup`/`attackCooldown` counters and the same
+release and reload numbers the swing itself uses, and the view plays the
+attack art once from that: the frame is where the swing is, the projectile
+leaves at `releaseSeconds`, which is `frame_delay` frames in, and once the
+art has played out the unit stands until the next swing. Verified in the
+running game through the debug protocol: the trebuchet's swing runs frames
+0–59 over 2.2 s, the rock appears at frame **24** — the DAT's `frame_delay`
+— and the engine stands for the remaining 7.8 s of its 10 s reload before
+the next swing; `castle-age.test.ts` asserts the same tick arithmetic. It
+also means the art follows the game speed, since it follows the tick. A
+fallback unit without swing timing keeps the view's clock.
+
 ## The HUD is set in the reference's own face and colours
 
 `fonts/` ships the faces the widget files index — Georgia in four styles
