@@ -29,13 +29,17 @@ Built, in `src/sim` and the importer:
   wood. This is the visual check: a pond in a wood, drawn through the
   blend masks, with a villager that will not wade in.
 
-Not built: **W2's coast** (a water *map*; Arabia's ponds are enclosed and
-carry no fish), **W4 the dock** and **W5 the fishing ship and fish** -- the
-DAT reading for all three is below and still holds. And the water *surface*:
-the DAT's `g_wtr` texture is what is drawn, where the reference renders water
-through a shader driven by `terrain/water_json/water_def.json` (normal maps,
-a sky dome, a sea floor; preset 3 "Calm" or 6 "Dimmed" for ponds, waves
-off). That is the next visual step and is in `backlog.md`.
+- **W2, the coast** -- `?map=islands` (2026-09-19): one island per player
+  from the owned `Islands.rms`, the engine's beach on every shore, water a
+  land unit cannot cross. The engine's beach sweep is the generator's, on
+  every board.
+- **The surface** -- `src/view/water.ts` is the reference's `Water_ps`
+  reconstructed from its inputs and `water_def.json`'s presets; see
+  `status.md` for the one calibrated constant.
+
+Not built: **W4 the dock** and **W5 the fishing ship and fish** -- the DAT
+reading for both is below and still holds, and Islands is now a board they
+can be verified on.
 
 ## Why it was a subsystem and not an item
 
@@ -114,21 +118,17 @@ gate green, and to leave the game playable if the next stage never happens.
 
 **W1. A terrain grid in the simulation.** Done -- see above.
 
-**W2. Water on the map and off the pathfinder.** The pathfinder half is done:
-`buildNavGrid` takes the walker's restriction row and blocks what the row
-refuses, with the terrain layer cached per row for the match and rows that
-agree over the board's terrains sharing one layer. What remains is a water
-*map*: a coast along one edge is the smallest thing that is still a real
-coast, and it needs the automatic beach (the engine turns any land tile with
-a water tile among its eight neighbours into `Beach`, terrain 2 -- restriction
-rows 7 and 4 differ on exactly that shore family, which is why the table was
-imported whole).
-*Acceptance:* a batch run still decides 16 of 16 and replays clean with a
-coast on the board.
+**W2. Water on the map and off the pathfinder.** Done. `buildNavGrid` takes
+the walker's restriction row and blocks what the row refuses, with the
+terrain layer cached per row for the match; Islands puts a sea between the
+players and the beach sweep (`beachify`) paints `Beach` on every land tile
+with open water among its eight neighbours -- row 7 walks it, row 4 refuses
+it, which is why the table was imported whole.
 
-**W3. Terrain rendering that does not embarrass the shore.** Done with issue
-#42: blendomatic mode 3 is the water family's own mask set, and a pond's edge
-bleeds into the wood around it. What is not done is the surface -- see above.
+**W3. Terrain rendering that does not embarrass the shore.** Done: the blend
+pass is the engine's eight-neighbour algorithm with the mode table, the
+beach is one tile of sand, and the water is drawn through the reference's
+own shader inputs (`status.md`, "Water").
 
 **W4. The dock.** A building whose placement rule is new: it must sit on the
 shore, straddling land and water. In the DAT that is restriction 6 plus a
@@ -156,9 +156,7 @@ is `enabled 0` in this DAT and is a Feudal technology's business); the
 non-navigable beach family; ice; and any map script. Water is a coast on a
 generated map, not a map type.
 
-## The one thing to decide before continuing
+## What is next
 
-Which map carries the coast. Arabia's ponds are enclosed by design and its
-aquatic includes are never reached, so W2/W4/W5 need a second generated map
-type with `base_terrain WATER` lands or a coast band -- and that is a
-descriptor, not code, once the beach sweep exists.
+The dock on Islands' shore (W4), then the fishing ship and the fish (W5).
+Both are entities on a board that now exists; neither changes the board.

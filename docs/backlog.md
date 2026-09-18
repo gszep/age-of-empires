@@ -27,25 +27,20 @@ construction-complete cue, so that one has no owned source to draw on.
 
 ## Rendering
 
-- **Terrain blending is in; the blend quads show a faint dotted seam.** Edges
-  fade through blendomatic's own masks (issue #42), water to wood included
-  now that Arabia deals ponds. Along a blended tile's diamond edge a faint
-  dotted line shows where two blend quads meet -- visible on a pond's edge
-  at 2x. Likely the mask atlas's neighbouring columns bleeding under
-  bilinear filtering at the diamond's tips; a texel of padding between
-  columns in `import_blends.py`, or clamping u inside the column, is the
-  first thing to try. The DE-era 512x512 masks in `terrain/blends/` are
-  higher resolution than blendomatic's 97x49 and are unused: their indexing
-  lives in a compiled shader, and at one mask per tile edge 97x49 is the
-  reference's own tile size anyway.
-- **Water is drawn as the DAT's flat `g_wtr` texture.** The reference
-  renders it through a shader: `terrain/water_json/water_def.json` names,
-  per preset, a normal map (`water/waterSurfaceFE.dds`), its drift, a sky
-  dome to reflect, a sea-floor texture and wave amplitude; ponds take preset
-  3 "Calm" or 6 "Dimmed" with waves off (`includes/water_preset.inc`). The
-  shader constants are readable off `Water_ps.so`/`WaterBlend_ps.so` with
-  `strings`. A node material over the water tiles with the owned normal map
-  scrolling at the preset's velocity is the whole first step.
+- **Terrain blending is the engine's algorithm; the DE-era masks are not
+  used.** Edges are blendomatic's 31 masks over the eight-neighbour
+  configuration with the mode table (`status.md`, "Terrain edges fade").
+  What DE itself draws with is `terrain/masks/*.png` (one per slot, the
+  DAT's `overlay_mask_name`) and `terrain/blends/*.png` (per family), which
+  `TerrainBlend_ps` names as `g_MaskTexture` and `g_BlendTexture`; how it
+  indexes a 512x512 mask against a tile is in the compiled shader. Worth a
+  look only if the classic edge ever reads as too soft against DE.
+- **The water shader's combination is calibrated, not read.** Every input
+  is the preset's own; how `Water_ps` combines them is compiled, so the
+  open-water colour is a measured constant (`src/view/water.ts`,
+  `OPEN_WATER`). The shore-foam waves (`WaveAnim_ps`, `atlas_v1_*`, off for
+  ponds and on for `WATER_DEFAULT`) and the vertex wave displacement
+  (`wave_amplitude`) are not drawn.
 - **The fog has no clouds.** AoE2DE's "Animate Fog" option ("animate the fog
   of war with clouds") draws never-seen ground as a slowly drifting brown-grey
   cloud instead of flat black, and "Animate Fog Border" moves the edge between
@@ -84,20 +79,17 @@ construction-complete cue, so that one has no owned source to draw on.
 
 ## Water
 
-Ponds are on Arabia and the DAT's passability table decides who walks where
+Ponds are on Arabia, Islands is a map, the beach and the passability table
+are the engine's and the surface is the reference's shader
 (`docs/water-design.md`, "Where it stands"). What is left is the naval half:
 
-- **No coast, no dock, no fishing ship.** Arabia's ponds are enclosed by
-  design and its aquatic includes are never reached, so W2, W4 and W5 in
-  `docs/water-design.md` need a second generated map type with water lands
-  -- a descriptor, once the engine's automatic beach sweep exists (any land
-  tile with a water tile among its eight neighbours becomes `Beach`, 2;
-  rows 7 and 4 differ on exactly that family, and the table is already
-  imported whole). The DAT reading for the dock (45), fishing ship (13) and
-  fish is in the design note and still holds.
-- **Windsor's Thames is water now, by the same table,** and no longer walked
-  across; it still has no beach and no shallow-water gameplay beyond being a
-  wall.
+- **No dock, no fishing ship, no fish.** W4 and W5 in `docs/water-design.md`;
+  the DAT reading is there and Islands is the board to verify them on. The
+  dock's placement rule (restriction 6: it must straddle the shore) is a
+  `placementLegal` case the terrain table already answers.
+- **Islands deals no resource islets and no depth chain.** The 2023 script's
+  four 1% `create_land`s (`land_id 20-23`) and their neritic fish are not
+  dealt; DE's water is one terrain, so there is no depth chain to deal.
 
 ## Civilisations
 

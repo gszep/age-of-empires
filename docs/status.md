@@ -1762,38 +1762,56 @@ the pixel count of a 97x49 diamond whose rows run 1, 5, 9 … 97 … 5, 1 and of
 nothing else; and each holds 35 chunks, four dither patterns and then exactly
 the 31 masks the header's `nr_tiles` states. Alpha is the classic 0..128.
 
-**Which mask faces which neighbour is measured.** Coverage is summed over the
-diamond's four quadrants — each quadrant the tile's neighbour along one world
-axis, since `worldToIso` sends +x down-right and +y down-left — and sorting the
-masks by how far their strongest quadrant stands above their second splits the
-first sixteen into four groups of four: one group per direction, four
-interchangeable variants apiece, which is where the reference gets its variety.
-The other fifteen are combinations and are unused: a tile with two differing
-neighbours is drawn as two single-direction blends, which composes the same
-edge without anyone having to guess what a combined mask means.
+**A byte is how much of the base tile to keep.** Read as overlay alpha it
+looked right for a day: the mask that is opaque along the north-west edge was
+taken for "the north-west neighbour floods in", when it is "keep the
+north-west, the *south-east* neighbour floods in" -- the inverse of the
+opposite direction's mask, symmetric enough to pass a screenshot. Mask 30,
+the one for a tile out-ranked on every side, settles it: it keeps its centre
+and gives up its edges, which is the only reading under which all 31 masks
+fit the engine's table. The atlas is published as overlay alpha (255 minus
+twice the byte), and the single-edge groups are the engine's -- 0-3 for a
+neighbour across the south-east edge (+x), 4-7 north-east (-y), 8-11
+south-west (+y), 12-15 north-west (-x) -- verified per mode against the
+bytes: each must keep least of the quadrant it faces and most of the one
+opposite, or the import refuses.
 
-The renderer draws a neighbour over a tile when the DAT gives that neighbour
-the higher `blend_priority` — the farm's 186 over grass's 111 is the case the
-defect was reported against — with the terrain in the mesh's first UV set and
-the mask in its second, and a variant picked by a hash of the tile so a long
-boundary does not repeat one silhouette. Measured on a dealt board: 9.6% of the
-world view changes, in bands along the boundaries and nowhere else.
+**The blend pass is the engine's algorithm**, as the openage project
+documents it from the original (doc/media/blendomatic.md; reimplemented
+here, their code is GPL and none of it is copied). Every tile reads its
+eight neighbours, clockwise from the north tip. Each higher-priority terrain
+among them is one influence, a bit per neighbour, with a corner neighbour
+ignored when either edge beside it already influences the tile. Each
+influence is drawn through *one* mask for the whole configuration: 0-15 one
+edge (four variants, picked by the tile's coordinates), 16-19 one corner,
+20-25 two edges, 26-29 three, 30 all four -- and influences are drawn lowest
+priority first, so the dominant terrain advances over the rest. The mask
+family (mode) is the engine's 8x8 table over the two terrains' `blend_type`s,
+so water on sand, grass on dirt and a farm in a field each get their own
+edge. The previous one-mask-per-edge composite left a discontinuity along
+every seam where the neighbour had no overlay of its own, which showed as a
+hard diamond on any tile out-ranked on two sides.
 
-A farm gets the same treatment by a different route. It is an entity patch
+**The atlas carries each mask out to a gutter.** Outside the diamond the file
+has nothing, and along a quad's edge bilinear filtering mixed the mask with
+that nothing: a stair-stepped dotted line of the terrain underneath, along
+every blended edge, at every zoom. Each row's first and last byte now run
+out to the column's edge and every column has two pixels of gutter either
+side, so a seam sample is the mask's own edge value.
+
+A farm gets the same masks by a different route. It is an entity patch
 rather than a terrain tile, so it never passes through the ground's edge
-detection; instead the patch itself is drawn one tile wider than the farm, with
-that ring masked toward the farm and the farm's own nine tiles left solid — one
-mesh and one material, which is what the atlas's extra solid column is for.
-That column is opaque across its whole rectangle rather than only the inscribed
-diamond: a quad samples the diamond's four extreme points, so a mask that falls
-off at the diamond's edge is filtered to half alpha along every tile seam, which
-drew a faint grid over the farm before it was fixed.
+detection; instead the patch itself is drawn one tile wider than the farm,
+with that ring masked toward the farm and the farm's own nine tiles left
+solid -- one mesh and one material, which is what the atlas's extra solid
+column is for.
 
-**What is not done.** Water is held out of the biomes deliberately, so
-water-to-shore blending is untested. The DE-era 512x512 masks
-in `terrain/blends/` are higher resolution than blendomatic's 97x49 and are not
-used: their indexing lives in a compiled shader, and blendomatic needs no
-guess. At one mask per tile edge, 97x49 is the reference's own tile size.
+**Not done.** The DE-era 512x512 masks in `terrain/blends/` and the per-slot
+`overlay_mask_name` textures in `terrain/masks/` are what `TerrainBlend_ps`
+names (`g_MaskTexture`, `g_BlendTexture`); how it indexes them is in the
+compiled shader, and blendomatic's 97x49 is the reference's own tile size, so
+the classic masks stand. They are what AoK and HD drew with, and the shore
+they make is the one in every screenshot up to DE's.
 
 ## Arabia deals a biome, and the ground is no longer one colour
 
@@ -1919,13 +1937,53 @@ A consequence worth knowing: Windsor's Thames was `Water, Shallow` all along
 and was walked across; it is now water, and a route between the two town
 centers still exists (204 steps, checked).
 
-**The shore is the blend.** Water's `blend_priority` 166 out-ranks every land
-slot and its `blend_type` 3 is blendomatic's water family, so a pond bleeds
-into the wood around it through the same pass issue #42 built. Nothing was
-added for it. The surface is the DAT's `g_wtr` texture as-is; the reference
-renders water through a shader (`water_def.json`: normal maps, sky dome, sea
-floor, preset "Calm"/"Dimmed" for ponds, waves off) and that is not
-implemented -- `backlog.md`.
+**The shore is the engine's beach and the blend.** Every land tile with open
+water among its eight neighbours becomes Beach (2) once the ground is laid --
+the one tile of sand between sea and grass on every reference map, and the
+rim of an Arabia pond, whose ring of trees stood in painted water until the
+sweep put sand under them (Beach carries no tree and takes no object). DE's
+scripts confirm the sweep is the engine's: `beach_terrain` on a
+`create_terrain` only *overrides* which terrain it paints (Islands sets
+`ICY_SHORE` for its frozen season and nothing otherwise). It applies to a
+survey board too: Windsor's banks are sand now, which is what took 700 of its
+20,000 road tiles. Water's `blend_priority` 166 then out-ranks the sand and
+its `blend_type` 3 against beach's 2 looks up mode 1 in the engine's table,
+so the water laps onto the sand through the short smooth masks, and the sand
+fades into the grass through mode 2's.
+
+**The surface is the reference's shader, reconstructed.** `Water_ps` takes
+`g_WaterSurfaceTexture`, `g_SeaFloorTexture`, `g_SkyDomeTexture`,
+`g_WaterDepthTexture` and the sun; the classic `g_wtr` tile is never drawn.
+`water_def.json` states, per preset, the normal map and its drift, the sky
+dome, the sea floor and its intensity, the colours and the specular power.
+The importer carries the three presets the shipped maps roll -- 0 Default
+(Islands names none), 3 Calm and 6 Dimmed (Arabia's `WATER_POND`, 65/35 in
+`includes/water_preset.inc`) -- and converts their DDS. `src/view/water.ts`
+drifts the normal map at the preset's velocity and azimuth, bends the view
+ray with it, looks up the fisheye sky dome rotated and scaled as the preset
+says, shows the floor through the water in proportion to the preset's
+intensity and far more where a per-vertex depth says the water is shallow
+(the light band along every reference coast), and lays a Blinn glint at the
+preset's power on top. **The one approximation:** how the compiled shader
+combines these terms. It is calibrated to the reference: open water in the
+official Islands screenshots measures (56, 124, 192) and ours (52, 115, 176)
+with the same ripple spread; a grey-blue dome and a green floor do not
+multiply to that blue by any obvious formula, so the open-water colour is a
+constant the preset's `water_color` and the reflected light vary from.
+
+**Islands is a descriptor.** `?map=islands` is Arabia with the base
+terrain set to water, from the owned `Islands.rms` (2023): one land per
+player at `land_percent 35` shared, `base_size 15`, borders 7,
+`border_fuzziness 11`, `other_zone_avoidance_distance 11`,
+`clumping_factor 22`; one water terrain, `VODA` (1) -- the modern script
+deals no depth chain; woods three tiles inside the coast
+(`spacing_to_other_terrain_types 3`); the same biomes and the same opening.
+The island carve is the Black Forest clearing with the roles reversed, and
+the land fades out over the script's fuzziness where it meets the map's
+border or the other land's zone, so a coast is ragged; a hard limit cut
+every facing coast dead straight. Nothing is dealt on the water and a land
+unit cannot reach the other island (checked over three seeds). The script's
+resource islets are not dealt.
 
 **Minimap colours were palette indices.** A terrain slot's `colors` is three
 indices into the game palette, not an RGB triple. Read raw, grass came out

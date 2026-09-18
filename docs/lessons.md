@@ -627,6 +627,20 @@ keeps the record.
   pipeline, re-run the pipeline (`tools/import_aoe2.sh`), not the step; and
   a key the game reads gets a presence guard the day it is added.
 
+- **A mask byte's meaning is settled by the mask that has only one
+  reading.** Blendomatic's bytes were taken as overlay alpha for a day, and
+  every screenshot passed, because a mask opaque along one edge is the
+  mirror of the mask for the opposite neighbour -- the wrong reading is the
+  right shape from the other side. Mask 30, for a tile out-ranked on every
+  side, keeps its centre and gives up its edges under one reading and the
+  reverse under the other, and only one of those is a thing an engine would
+  draw. Rule: when a decode has a symmetry that lets two readings both look
+  right, find the one input the symmetry does not cover and test that.
+- **Pillow reads the DDS.** `waterSurfaceFE.dds`, the sky domes and the sea
+  floors open with `Image.open` and convert like any PNG; no DirectX
+  tooling is needed for the water textures, and `convert_water` in
+  `tools/convert_sld.py` is twenty lines.
+
 - **A cosmetic feature must not draw on the stream that decides the game.**
   Dressing the board in a biome needed random numbers, and taking them from the
   match's own generator shifted every draw after it — so choosing what colour
