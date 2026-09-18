@@ -53,6 +53,17 @@ in `tools/README.md`. What is still open: **#5** (pathing, blocked on the
 human), **#41** (invalid), and the reference-audit enhancements #49–#60.
 Then Q3 below.
 
+**The morning after (2026-09-18), from the human's look at it:** a
+selected group's "3 selected" sat over the parchment's frame and its
+portraits were out of sight — the group now shows its portraits alone,
+from `ObjectImage`'s corner at the button pitch, as the reference does
+(`4d407cb`, `1acf10f`); and every HUD label looked too big — the widget
+files say `Style: Normal` on all of them and the reference's own glyph
+atlas measures as Georgia *Regular* at the file's PointSize, so the bold
+the last session inferred by eye is gone, the parchment's text is the
+files' dark brown, and the outlines are the files' (`1acf10f`). Both are
+in `status.md`.
+
 **Three things a fresh session needs from that run.** The atlas cache
 fingerprint now covers only the decoder (`sld_layers.py`) and the two
 conversion functions, so editing the manifest dict in `convert_sld.py` no

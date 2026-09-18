@@ -733,3 +733,15 @@ keeps the record.
   decode and a browser probe were running. Rule: the gate runs on an idle
   machine; when a long job is going, wait for it, and read a timeout under
   load as contention before reading it as a regression.
+
+- **A weight, a face or a size inferred "from the look" is a measurement
+  not taken.** The HUD was set in Georgia Bold because the reference's
+  labels looked bold, and every label came out about a fifth too wide; the
+  human called them too big. Two strings measured in the reference
+  screenshots against the widget files' PointSize — "Dark Age" 172 design
+  px wide at 44, "Frazzle: 241/241" 309 at 48 — fit Georgia Regular (181,
+  321) and not Bold (209, 369), and the files had said `Style: Normal` on
+  every label all along. Rule: when a widget file states a property, use
+  it, and when the face is unnamed, measure a string's width against the
+  reference before choosing; a glyph atlas the reference ships
+  (`fonts/combined.txt`, rasterised at 64 px) is the face itself.
