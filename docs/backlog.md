@@ -49,6 +49,14 @@ construction-complete cue, so that one has no owned source to draw on.
   shader's `g_Time`/`g_FogScreenULOffsets` -- but no cloud texture was found
   under a searchable name in the depot, so the noise may be procedural. Flat
   black is the option-off look and is what ships.
+- **The nearctic biome's snow dusting is not dealt.** `Arabia.rms` runs
+  `POWDER_LIGHT` (125, Snow Soft Light) over the base at 6% in 24 clumps with
+  `clumping_factor -10` for `NEARCTIC_TEMPERATE` only. Tried 2026-09-19 and
+  reverted: `growClumps` keeps a clump contiguous whatever the sign of the
+  factor, so the pass came out as 20-40-tile blobs of white that read as
+  frozen lakes beside the real ponds. What the engine does with a negative
+  factor -- thin tendrils, or a scatter -- needs measuring against a DE
+  nearctic board before it is worth painting.
 - **Seven of Arabia's eleven biomes are not shipped.** Each is twelve terrain
   ids out of the same `MAP_CONSTANTS` block — a data addition, not work — and
   they are left out only so the import does not carry textures no board deals.
