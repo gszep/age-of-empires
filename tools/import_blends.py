@@ -16,16 +16,24 @@ its own `tile_size` (2353), `nr_tiles` flag bytes, and then 35 chunks of
 remaining **31 are the masks, and 31 is the `nr_tiles` the header states**.
 Alpha runs 0..128, the classic range.
 
-**Which mask for which neighbour.** The masks carry no labels, so rather than
-matching names this measures them: each mask's coverage is summed over the
-diamond's four quadrants, and each quadrant is the tile's neighbour along one
-world axis (+x draws down-right, +y down-left). Grouping the masks by the
-quadrant each covers most sorts the first sixteen into four groups of four --
-one group per direction, four interchangeable variants apiece, which is where
-the reference gets its variety from. The remaining fifteen are combinations
-(halves, corners, three-quadrant) and are not needed: a tile with two
-differing neighbours is drawn as two single-direction blends, which composes
-the same edge without having to guess which combined mask means what.
+**What a byte means.** A mask byte is how much of the *base* tile to keep,
+not how much of the neighbour to draw: mask 30, the one for a tile with a
+higher terrain on all four sides, keeps its centre and gives up its edges,
+and every other mask reads the same way once that is known. The atlas is
+published as overlay alpha -- 255 minus twice the byte -- because that is
+what a renderer multiplies the neighbour's texture by.
+
+**Which mask for which neighbour.** The 31 masks are the reference's own
+table, as documented by the openage project's reverse engineering of the
+engine (doc/media/blendomatic.md; the table is the engine's, reimplemented
+here, not their code): ids 0-15 are four interchangeable variants apiece
+for a single higher neighbour across one edge, 16-19 across one corner,
+20-25 two edges, 26-29 three, 30 all four. Their orientation in this
+decode is *measured* rather than trusted -- each single-edge group must keep
+least of the quadrant that faces its neighbour -- and it comes out with the
+neighbour across the south-east edge (world +x) for masks 0-3, the
+north-east (-y) for 4-7, the south-west (+y) for 8-11 and the north-west
+(-x) for 12-15.
 
     uv run --locked python tools/import_blends.py
 """
@@ -45,6 +53,11 @@ MODE_BYTES = 82_390
 TILE_SIZE = 2353
 DITHER_CHUNKS = 4
 TILE_W, TILE_H = 97, 49
+#: Pixels of gutter either side of each mask column in the atlas. A quad's
+#: west and east corners sample the very edge of a column, and bilinear
+#: filtering there mixes in the neighbouring column's edge; the gutter is
+#: the mask's own edge value carried outward, so the sample is the mask's.
+GUTTER = 2
 #: Quadrant order is the world neighbour each one faces.
 NEIGHBOURS = ("+x", "+y", "-x", "-y")
 
@@ -67,6 +80,24 @@ def unpack(buffer: np.ndarray) -> np.ndarray:
         image[row, left:left + width] = buffer[at:at + width]
         at += width
     return image
+
+
+def extend(diamond: np.ndarray) -> np.ndarray:
+    """The diamond's edge values carried out to the rectangle's edges.
+
+    Outside the diamond the file has nothing, and a zero there is not "no
+    opinion": the quad's edges run exactly along the diamond's, so bilinear
+    filtering at every tile seam mixed the mask with the transparent outside
+    and drew a stair-stepped dotted line of the underlying terrain along
+    every blended edge. Each row's first and last pixel now continue to the
+    rectangle's edge, so a sample on the seam is the mask's own edge value.
+    """
+    out = diamond.copy()
+    for row, width in enumerate(ROWS):
+        left = (TILE_W - width) // 2
+        out[row, :left] = diamond[row, left]
+        out[row, left + width:] = diamond[row, left + width - 1]
+    return out
 
 
 def quadrant_masks() -> dict[str, np.ndarray]:
@@ -118,28 +149,29 @@ def coverages(masks: list[np.ndarray]) -> list[dict[str, float]]:
     return out
 
 
-def single_edge_groups(masks: list[np.ndarray]) -> dict[str, list[int]]:
-    """The masks that face one neighbour, grouped by which.
+#: The reference's single-edge masks per world neighbour, in this decode's
+#: orientation (see the module docstring). Verified against the pixels by
+#: `single_edge_groups`, never assumed.
+EDGE_GROUPS: dict[str, list[int]] = {
+    "+x": [0, 1, 2, 3], "-y": [4, 5, 6, 7], "+y": [8, 9, 10, 11], "-x": [12, 13, 14, 15],
+}
 
-    A single-edge mask is one whose coverage is concentrated in a single
-    quadrant; the combination masks cover two or more about equally. Sorting
-    every mask by how far its best quadrant stands above its second sorts the
-    first sixteen cleanly into four groups of four.
-    """
-    scored: list[tuple[float, str, int]] = []
-    for index, total in enumerate(coverages(masks)):
-        ranked = sorted(total.items(), key=lambda kv: kv[1], reverse=True)
-        scored.append((ranked[0][1] - ranked[1][1], ranked[0][0], index))
-    scored.sort(reverse=True)
-    groups: dict[str, list[int]] = {name: [] for name in NEIGHBOURS}
-    for _, name, index in scored:
-        if len(groups[name]) < 4:
-            groups[name].append(index)
-    for name, found in groups.items():
-        if len(found) != 4:
-            raise ValueError(f"{name} found {len(found)} single-edge masks, not 4")
-        found.sort()
-    return groups
+
+def single_edge_groups(masks: list[np.ndarray]) -> dict[str, list[int]]:
+    """The masks that face one neighbour, grouped by which -- the reference's
+    table, checked against the bytes: a mask facing a neighbour keeps the
+    least of the quadrant on that neighbour's side and the most of the
+    quadrant opposite, or the decode is misread."""
+    cover = coverages(masks)
+    opposite = {"+x": "-x", "-x": "+x", "+y": "-y", "-y": "+y"}
+    for name, indexes in EDGE_GROUPS.items():
+        for index in indexes:
+            ranked = sorted(cover[index].items(), key=lambda kv: kv[1])
+            if ranked[0][0] != name or ranked[-1][0] != opposite[name]:
+                raise ValueError(
+                    f"mask {index} keeps least of {ranked[0][0]} and most of {ranked[-1][0]}, "
+                    f"not a {name} edge")
+    return {name: list(indexes) for name, indexes in EDGE_GROUPS.items()}
 
 
 def main() -> None:
@@ -171,16 +203,21 @@ def main() -> None:
     # quad's corners sample the diamond's four extreme points, so anything
     # that falls off at the diamond's edge is filtered to half alpha exactly
     # along every tile seam -- which drew a faint grid over the farm.
-    solid = np.full((TILE_H, TILE_W), 255, dtype=np.uint8)
-
     entries = []
+    pitch = TILE_W + 2 * GUTTER
     for index, masks in enumerate(modes):
         columns = len(masks) + 1
-        sheet = np.zeros((TILE_H, TILE_W * columns), dtype=np.uint8)
+        sheet = np.zeros((TILE_H, pitch * columns), dtype=np.uint8)
         for i, mask in enumerate(masks):
-            # 0..128 is the file's range; stretch to 0..255 for an 8-bit image.
-            sheet[:, i * TILE_W:(i + 1) * TILE_W] = np.minimum(mask.astype(np.uint16) * 2, 255)
-        sheet[:, len(masks) * TILE_W:] = solid
+            # 0..128 is the file's range, and it is how much base to keep:
+            # stretched to 8 bits and inverted, so the atlas is overlay alpha.
+            stretched = (255 - np.minimum(extend(mask).astype(np.uint16) * 2, 255)).astype(np.uint8)
+            column = np.zeros((TILE_H, pitch), dtype=np.uint8)
+            column[:, GUTTER:GUTTER + TILE_W] = stretched
+            column[:, :GUTTER] = stretched[:, :1]
+            column[:, GUTTER + TILE_W:] = stretched[:, -1:]
+            sheet[:, i * pitch:(i + 1) * pitch] = column
+        sheet[:, len(masks) * pitch:] = 255
         name = f"blends/mode-{index}.png"
         Image.fromarray(sheet, mode="L").save(args.out / name, optimize=True)
         entries.append({"image": name, "masks": columns})
@@ -189,6 +226,9 @@ def main() -> None:
     manifest = json.loads(manifest_path.read_text()) if manifest_path.is_file() else {}
     manifest["blends"] = {
         "tile": [TILE_W, TILE_H],
+        # Each column is the tile plus this many pixels of gutter each side,
+        # so a column's u range is (column * pitch + gutter .. + tile) / width.
+        "gutter": GUTTER,
         "modes": entries,
         # Mask columns to sample for a neighbour in this direction. Four
         # interchangeable variants apiece: the reference varies them so a long

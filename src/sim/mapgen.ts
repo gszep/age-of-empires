@@ -30,8 +30,17 @@ import type { AnimalKind, BuildingKind, Point, UnitKind } from './types';
  * to draw more than one ground (docs/overnight.md, terrain blend edges). */
 export const TERRAIN_GRASS = 0;
 export const TERRAIN_FOREST = 10;
-/** `Water, Shallow`: the `POND_TERRAIN` every one of Arabia's biomes names. */
+/** `Water, Shallow`: the `POND_TERRAIN` every one of Arabia's biomes names,
+ * and the one water DE's Islands deals (`VODA`). */
 export const TERRAIN_WATER = 1;
+/** `Beach`: what the engine paints on land that touches water. */
+export const TERRAIN_BEACH = 2;
+/**
+ * Which terrains are water for the shore sweep: the DAT's `is_water` flag is
+ * 1 (medium), 2 (deep) or 4 (shallow water) for open water, 8 for shallows,
+ * 16 for beach and 32 for land. Only open water makes a beach.
+ */
+const OPEN_WATER = new Set([TERRAIN_WATER, 22, 23, 15, 96, 97, 98]);
 
 /**
  * The terrains one of Arabia's biomes dresses the board in.
@@ -177,13 +186,19 @@ export interface NeutralSpec {
 
 export interface MapDescriptor {
   /** What the board is before anything is carved. This one line decides the
-   * genre: grass makes Arabia, forest makes Black Forest. */
-  base: 'grass' | 'forest';
-  /** Carved out of a forest base for each player: the clearing. `clearance`
-   * is `other_zone_avoidance_distance` -- how far the land must stay from
-   * the mirrored land, which under exact mirroring is a margin off the
-   * centreline. */
-  land?: { tiles: number; baseSize: number; clearance: number; clumping?: number };
+   * genre: grass makes Arabia, forest makes Black Forest, water makes
+   * Islands. */
+  base: 'grass' | 'forest' | 'water';
+  /** Carved out of a forest or water base for each player: the clearing, or
+   * the island. `clearance` is `other_zone_avoidance_distance` -- how far
+   * the land must stay from the mirrored land, which under exact mirroring
+   * is a margin off the centreline; `border` is the script's
+   * `left/right/top/bottom_border`, a percentage of the map the land keeps
+   * from every edge. */
+  land?: { tiles: number; baseSize: number; clearance: number; clumping?: number; border?: number };
+  /** Woods on an island keep this many tiles from the coast
+   * (`spacing_to_other_terrain_types` on the script's wood passes). */
+  woodShoreSpacing?: number;
   /** The connection between the two clearings, cut through the wood. */
   road?: { width: number };
   playerForest?: ForestSpec;
@@ -277,10 +292,34 @@ export const BLACK_FOREST: MapDescriptor = {
   opening: ARABIA.opening,
 };
 
+/**
+ * Islands is Arabia with the base terrain set to water: one land per player
+ * carved out of the sea, dressed in a biome, wooded, and shored by the
+ * engine's beach. The owned `Islands.rms` (2023): `create_player_lands` at
+ * `land_percent 35` shared across the players, `base_size 15`, borders 7,
+ * `border_fuzziness 11`, `other_zone_avoidance_distance 11`,
+ * `clumping_factor 22`; one water terrain, `VODA` (1); woods
+ * (`WOODIES`) at `spacing_to_other_terrain_types 3` from anything else, so
+ * they stand back from the coast; the opening from the same include. The
+ * script's resource islets (`land_id 20-23`, 1% each) are not dealt.
+ */
+export const ISLANDS: MapDescriptor = {
+  base: 'water',
+  biomes: ARABIA_BIOMES,
+  land: { tiles: 2520, baseSize: 15, clearance: 11, clumping: 22, border: 7 },
+  woodShoreSpacing: 3,
+  playerForest: { tiles: 55, groups: 2, near: 14, far: 26, groupSpacing: 6 },
+  // The script's island woods: 450-550 tiles in 9-10 clumps at map scale,
+  // avoiding the start areas; halved here because every placement mirrors.
+  neutral: { forest: { tiles: 250, clumps: 5 }, stragglers: 8, avoid: { radius: 18, fade: 10 } },
+  opening: ARABIA.opening,
+};
+
 /** The map types a match can name. A map type is data, not code. */
 export const MAPS: Record<string, MapDescriptor> = {
   arabia: ARABIA,
   'black-forest': BLACK_FOREST,
+  islands: ISLANDS,
   // The proof that a painted image is a playable board: a wooded river with
   // one ford, from tools/maps/painted-proof.png through tools/paint_map.py.
   'painted-proof': {
@@ -602,7 +641,8 @@ export function generateMap(
   const biome = descriptor.biomes?.length
     ? descriptor.biomes[randInt(dressing, descriptor.biomes.length)]
     : undefined;
-  const terrain = new Array<number>(ctx.width * ctx.height).fill(biome?.base ?? TERRAIN_GRASS);
+  const terrain = new Array<number>(ctx.width * ctx.height).fill(
+    descriptor.base === 'water' ? TERRAIN_WATER : biome?.base ?? TERRAIN_GRASS);
   const elevation = new Array<number>(ctx.width * ctx.height).fill(0);
   const start = starts[0];
   const reserved = new Uint8Array(ctx.width * ctx.height);
@@ -657,14 +697,20 @@ export function generateMap(
   // is wood and the player's clearing and the road are carved out of it.
   const mask = new Uint8Array(ctx.width * ctx.height);
   const halfWidth = Math.floor(ctx.width / 2);
+  // On a water base, the island: 1 where the player's land is, for both
+  // halves once mirrored. Everything else stays sea.
+  const island = new Uint8Array(ctx.width * ctx.height);
 
-  if (!descriptor.baked && descriptor.base === 'forest' && descriptor.land) {
-    // The clearing: one land grown from the player's origin, kept off the
-    // centreline by half the avoidance distance -- under exact mirroring
-    // that *is* the distance to the other land's zone.
+  if (!descriptor.baked && descriptor.base !== 'grass' && descriptor.land) {
+    // The clearing, or the island: one land grown from the player's origin,
+    // kept off the centreline by half the avoidance distance -- under exact
+    // mirroring that *is* the distance to the other land's zone -- and, on a
+    // water base, inside the script's border box.
     const margin = Math.ceil(descriptor.land.clearance / 2);
+    const border = Math.ceil((descriptor.land.border ?? 0) / 100 * Math.min(ctx.width, ctx.height));
     const land = new Uint8Array(ctx.width * ctx.height);
-    const inLand = (x: number, y: number): boolean => x < halfWidth - margin;
+    const inLand = (x: number, y: number): boolean => x < halfWidth - margin
+      && x >= border && y >= border && y < ctx.height - border;
     // The circular base the script asks for (`base_size N, set_circular_base`)
     // is stamped whole, then the rest grows from the ring around it -- each
     // ring tile its own round-robin frontier, so the fringe advances evenly
@@ -688,24 +734,57 @@ export function generateMap(
     growClumps(ctx, land, ring, Math.max(0, descriptor.land.tiles - stamped),
       inLand, descriptor.land.clumping ?? 20);
     cleanMask(land, ctx.width, ctx.height);
-    for (let y = 0; y < ctx.height; y++) {
-      for (let x = 0; x < halfWidth; x++) {
-        if (!land[y * ctx.width + x]) mask[y * ctx.width + x] = 1;
+    if (descriptor.base === 'forest') {
+      for (let y = 0; y < ctx.height; y++) {
+        for (let x = 0; x < halfWidth; x++) {
+          if (!land[y * ctx.width + x]) mask[y * ctx.width + x] = 1;
+        }
       }
-    }
-    // The road, the script's own three-wide corridor: with uniform wood and
-    // mirrored origins the cheapest path between them is the straight line.
-    // Its tiles are reserved against objects -- a gold lump square in the one
-    // corridor between the clearings would be a wall until somebody mined it.
-    const roadHalf = Math.floor((descriptor.road?.width ?? 3) / 2);
-    for (let x = Math.floor(start.x); x < ctx.width - Math.floor(start.x); x++) {
-      for (let dy = -roadHalf; dy <= roadHalf; dy++) {
-        const tile = (Math.floor(start.y) + dy) * ctx.width + x;
-        if (x < halfWidth) mask[tile] = 0; // the mirror carves the other half
-        reserved[tile] = 1;
+      // The road, the script's own three-wide corridor: with uniform wood and
+      // mirrored origins the cheapest path between them is the straight line.
+      // Its tiles are reserved against objects -- a gold lump square in the one
+      // corridor between the clearings would be a wall until somebody mined it.
+      const roadHalf = Math.floor((descriptor.road?.width ?? 3) / 2);
+      for (let x = Math.floor(start.x); x < ctx.width - Math.floor(start.x); x++) {
+        for (let dy = -roadHalf; dy <= roadHalf; dy++) {
+          const tile = (Math.floor(start.y) + dy) * ctx.width + x;
+          if (x < halfWidth) mask[tile] = 0; // the mirror carves the other half
+          reserved[tile] = 1;
+        }
       }
+    } else {
+      // The island, and its mirror, painted in the biome's ground; the sea
+      // stays what the board was filled with, and takes no object.
+      const ground = biome?.base ?? TERRAIN_GRASS;
+      for (let y = 0; y < ctx.height; y++) {
+        for (let x = 0; x < halfWidth; x++) {
+          if (!land[y * ctx.width + x]) continue;
+          const here = tileCentre(x, y);
+          const other = mirror(here);
+          for (const tile of [y * ctx.width + x, Math.floor(other.y) * ctx.width + Math.floor(other.x)]) {
+            island[tile] = 1;
+            terrain[tile] = ground;
+          }
+        }
+      }
+      for (let tile = 0; tile < island.length; tile++) if (!island[tile]) reserved[tile] = 1;
     }
   }
+  // Where a wood may stand: on land, and on an island back from the coast
+  // by the script's spacing, so the trees never stand on the beach.
+  const shoreSpacing = descriptor.woodShoreSpacing ?? 0;
+  const onDryLand = (x: number, y: number): boolean => {
+    if (descriptor.base !== 'water') return true;
+    for (let dy = -shoreSpacing; dy <= shoreSpacing; dy++) {
+      for (let dx = -shoreSpacing; dx <= shoreSpacing; dx++) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= ctx.width || ny >= ctx.height) return false;
+        if (!island[ny * ctx.width + nx]) return false;
+      }
+    }
+    return true;
+  };
 
   // The avoid-start-areas field: `(radius - distance) * fade` per start,
   // capped at 101, rolled against random(100) -- so a wood thins out towards
@@ -733,14 +812,14 @@ export function generateMap(
   if (forest) {
     const playerSeeds = pickSeeds(
       candidateOrder(ctx, start, forest.far), forest.groups, forest.groupSpacing,
-      (x, y) => !tooClose(starts, x, y, forest.near) && freeBoth(x, y));
+      (x, y) => !tooClose(starts, x, y, forest.near) && freeBoth(x, y) && onDryLand(x, y));
     growClumps(ctx, mask, playerSeeds, forest.tiles * forest.groups,
-      (x, y) => freeBoth(x, y) && !tooClose(starts, x, y, forest.near));
+      (x, y) => freeBoth(x, y) && onDryLand(x, y) && !tooClose(starts, x, y, forest.near));
   }
 
   const neutral = descriptor.neutral;
   const inHalf = (x: number, y: number): boolean =>
-    x < halfWidth && freeBoth(x, y)
+    x < halfWidth && freeBoth(x, y) && onDryLand(x, y)
     && startField[y * ctx.width + x] <= randInt(ctx.rng, 100);
   if (neutral) {
     const separation = Math.floor(2 * Math.sqrt(neutral.forest.tiles / neutral.forest.clumps));
@@ -751,7 +830,7 @@ export function generateMap(
     growClumps(ctx, mask, neutralSeeds, neutral.forest.tiles, inHalf);
   }
 
-  cleanMask(mask, ctx.width, ctx.height, freeBoth);
+  cleanMask(mask, ctx.width, ctx.height, (x, y) => freeBoth(x, y) && onDryLand(x, y));
 
   // Ponds, carved out of the woods before the trees go in. They decide play
   // -- a pond is ground nothing walks on and a wood with fewer trees -- so
@@ -807,6 +886,19 @@ export function generateMap(
       reserved[mirrored] = 1;
       terrain[mirrored] = TERRAIN_WATER;
     }
+  }
+
+  // The engine's beach: once the water is laid, every land tile with open
+  // water among its eight neighbours becomes Beach -- the one tile of sand
+  // between the sea and the grass on every reference map. It applies to a
+  // survey board too: a river bank is a bank. Beach carries no trees and
+  // takes no object, so a wood tile that became shore is struck from the
+  // mask before anything is planted (a survey's trees are its own).
+  beachify(terrain, ctx.width, ctx.height);
+  for (let tile = 0; tile < terrain.length; tile++) {
+    if (terrain[tile] !== TERRAIN_BEACH) continue;
+    mask[tile] = 0;
+    reserved[tile] = 1;
   }
 
   // Each mask tile is planted here and again at its mirror, so a tile that is
@@ -897,6 +989,32 @@ export function generateMap(
   }
 
   return { terrain, elevation };
+}
+
+/**
+ * Paint Beach on every land tile touching open water (eight neighbours),
+ * in place. Shallows and beach itself are not land for this purpose and do
+ * not become beach again; the sea keeps its own tiles.
+ */
+export function beachify(terrain: number[], width: number, height: number): void {
+  const shore: number[] = [];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const here = terrain[y * width + x];
+      if (OPEN_WATER.has(here) || here === TERRAIN_BEACH || here === 4 || here === 59) continue;
+      let wet = false;
+      for (let dy = -1; dy <= 1 && !wet; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          if (OPEN_WATER.has(terrain[ny * width + nx])) { wet = true; break; }
+        }
+      }
+      if (wet) shore.push(y * width + x);
+    }
+  }
+  for (const tile of shore) terrain[tile] = TERRAIN_BEACH;
 }
 
 /** `set_tight_grouping`: flood outward on purely random costs -- a contiguous

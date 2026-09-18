@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { checksumState } from './checksum';
 import { FALLBACK_RULES } from './data';
 import { createGame, stepGame } from './game';
-import { TERRAIN_WATER } from './mapgen';
+import { TERRAIN_BEACH, TERRAIN_WATER, beachify } from './mapgen';
 import { buildNavGrid, findPath } from './nav';
 import type { Entity, GameState } from './types';
 
@@ -137,11 +137,16 @@ describe('the grown map', () => {
         expect(occupiedTiles(state).has(tile), `object on water at ${tile}`).toBe(false);
         const x = tile % state.width;
         const y = Math.floor(tile / state.width);
+        // Ringed by the engine's beach, which carries no tree, inside the
+        // wood: the script's spacing keeps the water a tile off open ground
+        // and the sweep makes that tile sand.
         for (let dy = -1; dy <= 1; dy++) {
           for (let dx = -1; dx <= 1; dx++) {
             const other = (y + dy) * state.width + x + dx;
-            expect(state.terrain[other] === TERRAIN_WATER || trees.has(other),
-              `pond at ${x},${y} touches open ground`).toBe(true);
+            const id = state.terrain[other];
+            expect(id === TERRAIN_WATER || id === TERRAIN_BEACH,
+              `pond at ${x},${y} touches ${id}`).toBe(true);
+            if (id === TERRAIN_BEACH) expect(trees.has(other), `tree on the beach at ${other}`).toBe(false);
           }
         }
         // Mirrored across x like the wood it sits in.
@@ -337,9 +342,15 @@ describe('the Windsor footprint', () => {
   it('deals the full 392-tile baked board with starts in its recorded clearings', () => {
     const state = createGame(42, FALLBACK_RULES, undefined, 'windsor');
     expect([state.width, state.height]).toEqual([392, 392]);
-    expect(state.terrain).toEqual(descriptor.terrain);
+    // The survey's ground, tile for tile, plus the engine's beach on every
+    // bank: the sweep is the one thing the generator adds to a baked board.
+    const banked = [...descriptor.terrain];
+    beachify(banked, 392, 392);
+    expect(state.terrain).toEqual(banked);
+    expect(state.terrain.filter(id => id === TERRAIN_BEACH).length).toBeGreaterThan(5_000);
     expect(state.terrain.filter(id => id === 1).length).toBeGreaterThan(13_000);
-    expect(state.terrain.filter(id => id === 24).length).toBeGreaterThan(20_000);
+    // Fewer road tiles than the survey has, by the ones on a bank.
+    expect(state.terrain.filter(id => id === 24).length).toBeGreaterThan(19_000);
     expect(state.entities.filter(e => e.kind === 'resource' && e.resourceKind === 'wood').length)
       .toBeLessThan(6_000);
     const castle = state.entities.find(e => e.owner === 0 && e.kind === 'castle');

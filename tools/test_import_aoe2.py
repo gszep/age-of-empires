@@ -1566,16 +1566,51 @@ class UiImportIntegrationTest(unittest.TestCase):
         self.assertLessEqual(max(int(m.max()) for m in decoded[0]), 128)
         self.assertEqual(DITHER_CHUNKS + int(tiles), 35)
 
-        # Each single-edge group must actually face its own neighbour: the
-        # grouping is measured, so this is the measurement holding.
+        # Each single-edge group must actually face its own neighbour. A byte
+        # is how much *base* to keep, so the mask for a neighbour across an
+        # edge keeps least of that edge's quadrant; `single_edge_groups`
+        # raises if the reference's table and the bytes disagree.
         groups = single_edge_groups(decoded[0])
         cover = coverages(decoded[0])
         self.assertEqual(sorted(groups), sorted(NEIGHBOURS))
         for name, indexes in groups.items():
             self.assertEqual(len(indexes), 4, name)
             for i in indexes:
-                strongest = max(cover[i], key=cover[i].get)
-                self.assertEqual(strongest, name, f"mask {i} faces {strongest}, not {name}")
+                weakest = min(cover[i], key=cover[i].get)
+                self.assertEqual(weakest, name, f"mask {i} faces {weakest}, not {name}")
+        # And the one mask for a tile out-ranked on every side keeps its
+        # centre and gives up its edges -- the reading everything above
+        # rests on.
+        surrounded = decoded[0][30]
+        self.assertGreater(int(surrounded[24, 44:53].mean()), 120)
+        self.assertLess(int(surrounded[24, 0:4].mean()), 20)
+
+    def test_blend_atlas_carries_each_mask_out_to_its_gutter(self):
+        """Outside the diamond the file has nothing, and a zero there drew a
+        dotted line of the terrain underneath along every blended edge:
+        the quad's edges run along the diamond's, so the seam sample was
+        half mask, half nothing. Each row's edge value now runs out to the
+        column's edge, and every column has a gutter of it either side."""
+        import numpy as np
+
+        from import_blends import GUTTER, ROWS, TILE_W, extend, read_modes
+
+        path = ROOT / "depot_813781/resources/_common/dat/blendomatic_x1.dat"
+        mask = read_modes(path)[0][0]
+        wide = extend(mask)
+        for row, width in enumerate(ROWS):
+            left = (TILE_W - width) // 2
+            self.assertTrue((wide[row, :left] == mask[row, left]).all(), row)
+            self.assertTrue((wide[row, left + width:] == mask[row, left + width - 1]).all(), row)
+            # The diamond itself is untouched.
+            self.assertTrue((wide[row, left:left + width] == mask[row, left:left + width]).all(), row)
+        self.assertGreaterEqual(GUTTER, 1)
+        published = Path("public/imported/aoe2/manifest.json")
+        if published.is_file():
+            blends = json.loads(published.read_text()).get("blends", {})
+            self.assertEqual(blends.get("gutter"), GUTTER)
+            sheet = np.asarray(Image.open(published.parent / blends["modes"][0]["image"]))
+            self.assertEqual(sheet.shape[1], (TILE_W + 2 * GUTTER) * blends["modes"][0]["masks"])
 
     def test_every_material_texture_was_converted(self):
         out = Path(self.directory.name)

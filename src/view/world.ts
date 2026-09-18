@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { floor, fract, smoothstep as smoothstepNode, texture as textureNode, uv, vec2 } from 'three/tsl';
 import { TILE_W, TILE_H, worldToIso } from './iso';
-import type { ContentAssets, ImportedTerrain } from './assets';
+import { maskU, type ContentAssets, type ImportedTerrain } from './assets';
 import type { GameState } from '../sim/types';
 
 /**
@@ -120,20 +120,22 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
       }
     }
   }
-  // Terrain-to-terrain edges. Where a tile's neighbour carries a terrain the
-  // DAT gives a higher `blend_priority`, that neighbour is drawn over this
-  // tile through one of the owned masks, which is what fades a boundary
-  // instead of stopping it at the tile edge. A tile with two such neighbours
-  // takes two blends; the masks compose, so nothing has to know what a
-  // combined mask would mean.
+  // Terrain-to-terrain edges, the reference's own way (see `blendInfluences`
+  // and `blendMasksFor`): every tile looks at its eight neighbours, and each
+  // higher-priority terrain among them is drawn over the tile through the one
+  // mask that fits the whole configuration -- an edge, a corner, two edges,
+  // three, or all four -- rather than one mask per edge composited. Higher
+  // priorities are drawn last, so the dominant terrain advances over the
+  // rest, and the mode (the family of mask shapes) is looked up from the two
+  // terrains' blend types, so water on sand and grass on dirt each get their
+  // own edge.
   const blends = assets?.blends;
   const priority = (id: number): number => byId.get(id)?.slot.blendPriority ?? 0;
-  const DIRECTIONS: { key: string; dx: number; dy: number }[] = [
-    { key: '+x', dx: 1, dy: 0 }, { key: '+y', dx: 0, dy: 1 },
-    { key: '-x', dx: -1, dy: 0 }, { key: '-y', dx: 0, dy: -1 },
-  ];
-  /** Blend quads per overlying terrain id. */
-  const overlays = new Map<number, { positions: number[]; uvs: number[]; uv1s: number[]; colors: number[] }>();
+  const blendType = (id: number): number => byId.get(id)?.slot.blendType ?? 0;
+  /** Blend quads per (overlying terrain id, mode), drawn in priority order. */
+  const overlays = new Map<string, {
+    id: number; mode: number; positions: number[]; uvs: number[]; uv1s: number[]; colors: number[];
+  }>();
   if (blends) {
     const at = (x: number, y: number): number | undefined =>
       x < 0 || y < 0 || x >= state.width || y >= state.height
@@ -141,49 +143,45 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
     for (let y = 0; y < state.height; y++) {
       for (let x = 0; x < state.width; x++) {
         const here = at(x, y)!;
-        for (const direction of DIRECTIONS) {
-          const there = at(x + direction.dx, y + direction.dy);
-          if (there === undefined || there === here) continue;
-          if (priority(there) <= priority(here)) continue;
-          const variants = blends.edges[direction.key];
-          if (!variants?.length) continue;
+        const influences = blendInfluences(here, priority, (dx, dy) => at(x + dx, y + dy));
+        for (const [there, bits] of influences) {
           const slot = byId.get(there)?.slot;
           const texture = slot && assets?.textures.get(slot.image);
           if (!texture) continue;
-          // A variant per tile and direction, so a long edge does not repeat
-          // one silhouette; hashed rather than random so two runs agree.
-          const hash = (Math.imul(x + 1, 73_856_093) ^ Math.imul(y + 1, 19_349_663)
-            ^ Math.imul(direction.dx * 3 + direction.dy * 7 + 11, 83_492_791)) >>> 0;
-          const column = variants[hash % variants.length];
-          let bucket = overlays.get(there);
+          const mode = blendModeFor(blendType(here), blendType(there));
+          const key = `${there}:${mode}`;
+          let bucket = overlays.get(key);
           if (!bucket) {
-            bucket = { positions: [], uvs: [], uv1s: [], colors: [] };
-            overlays.set(there, bucket);
+            bucket = { id: there, mode, positions: [], uvs: [], uv1s: [], colors: [] };
+            overlays.set(key, bucket);
           }
-          const [spanX, spanY] = slot!.dimensions;
-          const width = blends.masksPerMode;
-          // The mask is one diamond in a row of them: its four points are the
-          // tile's four corners, so the column is a scale and an offset on u.
-          const mu = (t: number): number => (column + t) / width;
-          const point = (px: number, py: number, u1: number, v1: number) => {
-            const iso = worldToIso(px, py);
-            iso.y += cornerElevation(state, px, py) * ELEVATION_PIXELS;
-            const shade = shadeAt(px, py);
-            bucket!.positions.push(iso.x, iso.y, 0);
-            bucket!.uvs.push(px / spanX, py / spanY);
-            bucket!.uv1s.push(mu(u1), v1);
-            bucket!.colors.push(shade, shade, shade);
-          };
-          // North, east, south, west of the tile against the mask's own top,
-          // right, bottom and left points. The texture is flipped on load, so
-          // v runs up from the bottom and the north corner takes v = 1.
-          const corners: [number, number, number, number][] = [
-            [x, y, 0.5, 1], [x + 1, y, 1, 0.5], [x + 1, y + 1, 0.5, 0], [x, y + 1, 0, 0.5],
-          ];
-          for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]] as const) {
-            for (const index of [a, b, c]) {
-              const [px, py, u1, v1] = corners[index];
-              point(px, py, u1, v1);
+          const [spanX, spanY] = slot.dimensions;
+          for (const column of blendMasksFor(bits, x, y)) {
+            // The mask is one diamond in a row of them: its four points are
+            // the tile's four corners, so the column is a scale and an
+            // offset on u.
+            const mu = (t: number): number => maskU(blends, column, t);
+            const point = (px: number, py: number, u1: number, v1: number) => {
+              const iso = worldToIso(px, py);
+              iso.y += cornerElevation(state, px, py) * ELEVATION_PIXELS;
+              const shade = shadeAt(px, py);
+              bucket!.positions.push(iso.x, iso.y, 0);
+              bucket!.uvs.push(px / spanX, py / spanY);
+              bucket!.uv1s.push(mu(u1), v1);
+              bucket!.colors.push(shade, shade, shade);
+            };
+            // North, east, south, west of the tile against the mask's own
+            // top, right, bottom and left points. The texture is flipped on
+            // load, so v runs up from the bottom and the north corner takes
+            // v = 1.
+            const corners: [number, number, number, number][] = [
+              [x, y, 0.5, 1], [x + 1, y, 1, 0.5], [x + 1, y + 1, 0.5, 0], [x, y + 1, 0, 0.5],
+            ];
+            for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]] as const) {
+              for (const index of [a, b, c]) {
+                const [px, py, u1, v1] = corners[index];
+                point(px, py, u1, v1);
+              }
             }
           }
         }
@@ -209,11 +207,16 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
     group.add(mesh);
   });
 
-  for (const [id, bucket] of [...overlays].sort((a, b) => a[0] - b[0])) {
-    if (!bucket.positions.length) continue;
-    const slot = byId.get(id)!.slot;
+  // Lowest priority first, so where two terrains both out-rank a tile the
+  // higher of the two is painted over the other's edge, as the reference
+  // draws them.
+  const ordered = [...overlays.values()]
+    .sort((a, b) => priority(a.id) - priority(b.id) || a.id - b.id || a.mode - b.mode);
+  ordered.forEach((bucket, order) => {
+    if (!bucket.positions.length) return;
+    const slot = byId.get(bucket.id)!.slot;
     const texture = assets!.textures.get(slot.image)!;
-    const mask = blends!.modes[slot.blendType] ?? blends!.modes[0];
+    const mask = blends!.modes[bucket.mode] ?? blends!.modes[0];
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(bucket.positions, 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(bucket.uvs, 2));
@@ -223,12 +226,108 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
       map: texture, alphaMap: mask, transparent: true, depthWrite: false,
       vertexColors: true, side: THREE.DoubleSide,
     }));
-    // Above every base terrain, below anything standing on the ground.
-    mesh.renderOrder = 1;
-    mesh.name = `blend-${byId.get(id)!.key}`;
+    // Above every base terrain, below anything standing on the ground, and
+    // in priority order among themselves.
+    mesh.renderOrder = 1 + order;
+    mesh.name = `blend-${byId.get(bucket.id)!.key}`;
     group.add(mesh);
-  }
+  });
   return group;
+}
+
+/**
+ * The eight neighbours as the reference numbers them, clockwise from the
+ * tile's north tip on screen: 0 north tip, 1 north-east edge, 2 east tip,
+ * 3 south-east edge, 4 south tip, 5 south-west edge, 6 west tip, 7
+ * north-west edge -- as world offsets (dx, dy). Even numbers are corners,
+ * odd numbers edges.
+ */
+const NEIGHBOURS: [number, number][] = [
+  [-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0],
+];
+
+/**
+ * Which higher-priority terrains draw over a tile, and from which of its
+ * eight neighbours, as a bit per neighbour. A corner neighbour is ignored
+ * when either edge beside it already influences the tile -- the edge's mask
+ * covers the corner. The map is in ascending priority order.
+ *
+ * This is the engine's algorithm as the openage project documents it
+ * (doc/media/blendomatic.md), reimplemented.
+ */
+export function blendInfluences(
+  here: number, priority: (id: number) => number,
+  neighbour: (dx: number, dy: number) => number | undefined,
+): Map<number, number> {
+  const ids = NEIGHBOURS.map(([dx, dy]) => neighbour(dx, dy));
+  const mine = priority(here);
+  const influences = new Map<number, number>();
+  const edgeInfluences = (i: number): boolean => {
+    const id = ids[i];
+    return id !== undefined && id !== here && priority(id) > mine;
+  };
+  for (let i = 0; i < 8; i++) {
+    if (!edgeInfluences(i)) continue;
+    if (i % 2 === 0 && (edgeInfluences((i + 7) % 8) || edgeInfluences((i + 1) % 8))) continue;
+    const id = ids[i]!;
+    influences.set(id, (influences.get(id) ?? 0) | (1 << i));
+  }
+  return new Map([...influences].sort((a, b) => priority(a[0]) - priority(b[0]) || a[0] - b[0]));
+}
+
+/**
+ * The reference's mask for each edge configuration, keyed by the edge bits
+ * (neighbours 1, 3, 5, 7): one mask covers any combination of edges. Ids
+ * 0-15 are four variants for a single edge, chosen per tile so a long
+ * boundary does not repeat one silhouette.
+ */
+const EDGE_MASKS: Record<number, number | [number, number, number, number]> = {
+  0b00001000: [0, 1, 2, 3],       // south-east edge, +x
+  0b00000010: [4, 5, 6, 7],       // north-east edge, -y
+  0b00100000: [8, 9, 10, 11],     // south-west edge, +y
+  0b10000000: [12, 13, 14, 15],   // north-west edge, -x
+  0b00100010: 20, 0b10001000: 21,
+  0b10100000: 22, 0b10000010: 23, 0b00101000: 24, 0b00001010: 25,
+  0b00101010: 26, 0b10101000: 27, 0b10100010: 28, 0b10001010: 29,
+  0b10101010: 30,
+};
+/** The reference's mask for a corner neighbour (0 north, 2 east, 4 south, 6 west). */
+const CORNER_MASKS: Record<number, number> = { 2: 16, 4: 17, 0: 18, 6: 19 };
+
+/** The mask columns that draw one terrain's influence bits over tile (x, y). */
+export function blendMasksFor(bits: number, x: number, y: number): number[] {
+  const columns: number[] = [];
+  const edges = EDGE_MASKS[bits & 0b10101010];
+  if (Array.isArray(edges)) {
+    // The reference varies a single edge by the tile's own coordinates.
+    columns.push(edges[(x + y * 3) & 3]);
+  } else if (edges !== undefined) {
+    columns.push(edges);
+  }
+  for (const corner of [0, 2, 4, 6]) {
+    if (bits & (1 << corner)) columns.push(CORNER_MASKS[corner]);
+  }
+  return columns;
+}
+
+/**
+ * Which family of mask shapes two meeting terrains blend with: the tile's
+ * own blend type picks the row, the neighbour's the column. The DAT's blend
+ * types are 0 grass, 1 farm, 2 beach, 3 water, 4 shallows, 5 road, 6 ice, 7
+ * snow; the table is the engine's, as openage documents it.
+ */
+const BLEND_MODE: number[][] = [
+  [2, 3, 2, 1, 1, 6, 5, 4],
+  [3, 3, 3, 1, 1, 6, 5, 4],
+  [2, 3, 2, 1, 1, 6, 1, 4],
+  [1, 1, 1, 0, 7, 6, 5, 4],
+  [1, 1, 1, 7, 7, 6, 5, 4],
+  [6, 6, 6, 6, 6, 6, 5, 4],
+  [5, 5, 1, 5, 5, 5, 5, 4],
+  [4, 3, 4, 4, 4, 4, 4, 4],
+];
+export function blendModeFor(here: number, there: number): number {
+  return BLEND_MODE[Math.min(7, Math.max(0, here))][Math.min(7, Math.max(0, there))];
 }
 
 /**
@@ -286,9 +385,8 @@ export function createTerrainPatch(
   // material, which is what the solid column in the mask atlas is for.
   const blends = assets?.blends;
   const ring = blends ? 1 : 0;
-  const columns = blends?.masksPerMode ?? 1;
   const solidColumn = blends?.solid ?? 0;
-  const maskU = (column: number, t: number): number => (column + t) / columns;
+  const mu = (column: number, t: number): number => blends ? maskU(blends, column, t) : t;
   for (let y = -ring; y < tiles + ring; y++) {
     for (let x = -ring; x < tiles + ring; x++) {
       const outside = x < 0 || y < 0 || x >= tiles || y >= tiles;
@@ -328,7 +426,7 @@ export function createTerrainPatch(
         for (const index of [a, b, c]) {
           positions.push(corners[index].p.x, corners[index].p.y, 0);
           uvs.push(corners[index].u, corners[index].v);
-          uv1s.push(maskU(column, mask[index][0]), mask[index][1]);
+          uv1s.push(mu(column, mask[index][0]), mask[index][1]);
         }
       }
     }

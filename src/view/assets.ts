@@ -109,8 +109,20 @@ export interface BlendMasks {
   modes: THREE.Texture[];
   edges: Record<string, number[]>;
   masksPerMode: number;
+  /** Pixels of gutter either side of every column, so a seam sample stays
+   * inside its own mask. */
+  gutter: number;
   /** The column past the owned masks: the whole diamond, opaque. Ours. */
   solid: number;
+}
+
+/**
+ * The atlas u of a point `t` (0..1) across mask `column`: the column's
+ * pitch is the tile plus its gutters, and `t` spans the tile only.
+ */
+export function maskU(blends: BlendMasks, column: number, t: number): number {
+  const pitch = blends.tile[0] + 2 * blends.gutter;
+  return (column * pitch + blends.gutter + t * blends.tile[0]) / (pitch * blends.masksPerMode);
 }
 
 /** One age as `eras.json` states it: its name and the shield it wears. */
@@ -297,7 +309,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   // so they must not repeat or filter across a column boundary: clamped, and
   // linear only within a mask.
   let blends: BlendMasks | undefined;
-  const blendSpec = (manifest as { blends?: { tile: [number, number]; modes: { image: string; masks: number }[]; edges: Record<string, number[]>; solid: number } }).blends;
+  const blendSpec = (manifest as { blends?: { tile: [number, number]; gutter?: number; modes: { image: string; masks: number }[]; edges: Record<string, number[]>; solid: number } }).blends;
   if (blendSpec?.modes?.length) {
     const modes = await Promise.all(blendSpec.modes.map(mode =>
       loader.loadAsync(CONTENT_BASE + mode.image).then(texture => {
@@ -314,7 +326,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
       })));
     blends = {
       tile: blendSpec.tile, modes, edges: blendSpec.edges,
-      masksPerMode: blendSpec.modes[0].masks, solid: blendSpec.solid,
+      masksPerMode: blendSpec.modes[0].masks, gutter: blendSpec.gutter ?? 0, solid: blendSpec.solid,
     };
   }
   return {

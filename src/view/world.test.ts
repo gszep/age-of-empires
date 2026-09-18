@@ -1,9 +1,9 @@
 import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 import { worldToIso } from './iso';
-import { FARM_TILES_PER_SPAN, FOG_EDGE_INNER, FOG_EDGE_OUTER, FOG_EXPLORED, FOG_UNSEEN, createFog, fogAlpha, createFootprint, createGround, createSelectionOutline, createTerrainPatch, insetConvex, updateSelectionOutline } from './world';
+import { FARM_TILES_PER_SPAN, FOG_EDGE_INNER, FOG_EDGE_OUTER, FOG_EXPLORED, FOG_UNSEEN, blendInfluences, blendMasksFor, blendModeFor, createFog, fogAlpha, createFootprint, createGround, createSelectionOutline, createTerrainPatch, insetConvex, updateSelectionOutline } from './world';
 import { createGame } from '../sim/game';
-import type { ContentAssets } from './assets';
+import { maskU, type ContentAssets } from './assets';
 
 /** Perpendicular distance from a point to the infinite line through a and b. */
 const lineDistance = (
@@ -112,8 +112,10 @@ describe('meshes that lie on the ground', () => {
         modes: [new THREE.DataTexture(new Uint8Array(4), 1, 1)],
         // The four groups blendomatic's masks measure out to.
         edges: { '+x': [12, 13, 14, 15], '+y': [4, 5, 6, 7], '-x': [0, 1, 2, 3], '-y': [8, 9, 10, 11] },
-        // Thirty-one owned masks and the solid column past them.
+        // Thirty-one owned masks and the solid column past them, each with
+        // two pixels of gutter either side.
         masksPerMode: 32,
+        gutter: 2,
         solid: 31,
       },
     } as unknown as ContentAssets;
@@ -319,21 +321,76 @@ describe('meshes that lie on the ground', () => {
     const ground = createGround(state, groundAssets());
     const blend = ground.getObjectByName('blend-ground') as THREE.Mesh;
     expect(blend, 'grass should bleed into the forest around it').toBeDefined();
-    // Four neighbours take the blend, two triangles each, three vertices.
-    expect(blend.geometry.getAttribute('position').count).toBe(4 * 2 * 3);
+    // Four edge neighbours take an edge mask and four corner neighbours a
+    // corner mask, one quad each: two triangles, three vertices.
+    expect(blend.geometry.getAttribute('position').count).toBe(8 * 2 * 3);
     // The mask rides in uv1 while the terrain keeps uv.
     const uv1 = blend.geometry.getAttribute('uv1');
     expect(uv1).toBeDefined();
     const us = Array.from({ length: uv1.count }, (_, i) => uv1.getX(i));
-    // Every mask column lies inside the atlas, and none spans the whole of it.
+    // Every mask column lies inside the atlas, and none spans the whole of
+    // it: the eight quads use edge masks 0-15 and corner masks 16-19, so u
+    // ranges over at most twenty of the thirty-two columns.
     expect(Math.min(...us)).toBeGreaterThanOrEqual(0);
-    expect(Math.max(...us)).toBeLessThanOrEqual(1);
-    expect(Math.max(...us) - Math.min(...us)).toBeLessThan(0.5);
+    expect(Math.max(...us)).toBeLessThanOrEqual(20 / 32 + 1e-6);
+    // And a column's u never reaches the gutter between it and the next:
+    // the seam sample that drew a dotted line of the terrain underneath
+    // along every blended edge stays inside its own mask.
+    const blends = groundAssets().blends!;
+    const pitch = blends.tile[0] + 2 * blends.gutter;
+    for (const u of us) {
+      const within = (u * pitch * blends.masksPerMode) % pitch;
+      expect(within).toBeGreaterThanOrEqual(blends.gutter - 1e-6);
+      expect(within).toBeLessThanOrEqual(blends.gutter + blends.tile[0] + 1e-6);
+    }
     const material = blend.material as THREE.MeshBasicMaterial;
     expect(material.alphaMap).toBeTruthy();
     expect(material.transparent).toBe(true);
     // Above the ground it fades into, below anything standing on it.
     expect(blend.renderOrder).toBeGreaterThan(0);
+  });
+
+  it('picks the reference\'s one mask for a whole neighbourhood', () => {
+    // The engine looks at all eight neighbours and draws each higher
+    // terrain through the mask for the configuration -- not one mask per
+    // edge composited. Numbering is clockwise from the north tip: odd
+    // indexes are edges, even are corners.
+    const priority = (id: number) => ({ 0: 111, 10: 96, 1: 166 } as Record<number, number>)[id];
+    const field = (ids: Partial<Record<string, number>>) =>
+      (dx: number, dy: number) => ids[`${dx},${dy}`] ?? 10;
+    // Grass across the south-east edge only (+x).
+    let bits = blendInfluences(10, priority, field({ '1,0': 0 })).get(0)!;
+    expect(bits).toBe(0b00001000);
+    expect(blendMasksFor(bits, 0, 0)).toEqual([0]);
+    expect(blendMasksFor(bits, 1, 0)).toEqual([1]);
+    // The same neighbour's corner is covered by its edge and adds nothing.
+    bits = blendInfluences(10, priority, field({ '1,0': 0, '1,-1': 0 })).get(0)!;
+    expect(bits).toBe(0b00001000);
+    // A corner alone is its own mask.
+    bits = blendInfluences(10, priority, field({ '1,-1': 0 })).get(0)!;
+    expect(bits).toBe(0b00000100);
+    expect(blendMasksFor(bits, 0, 0)).toEqual([16]);
+    // Two edges, three, four: one mask each, from the table.
+    expect(blendMasksFor(0b00100010, 0, 0)).toEqual([20]);
+    expect(blendMasksFor(0b10100000, 0, 0)).toEqual([22]);
+    expect(blendMasksFor(0b00101010, 0, 0)).toEqual([26]);
+    expect(blendMasksFor(0b10101010, 0, 0)).toEqual([30]);
+    // Surrounded by grass on every side: one mask, the surrounded one.
+    const all: Record<string, number> = {};
+    for (const dx of [-1, 0, 1]) for (const dy of [-1, 0, 1]) if (dx || dy) all[`${dx},${dy}`] = 0;
+    bits = blendInfluences(10, priority, field(all)).get(0)!;
+    expect(bits).toBe(0b10101010);
+    // Two terrains out-rank the tile: both are listed, lowest priority first.
+    const both = blendInfluences(10, priority, field({ '1,0': 0, '-1,0': 1 }));
+    expect([...both.keys()]).toEqual([0, 1]);
+    // Nothing out-ranks nothing, and a lower terrain is no influence.
+    expect(blendInfluences(0, priority, field({ '1,0': 10 })).size).toBe(0);
+    // The mode is looked up from the two blend types: grass on beach and
+    // water on beach get different families of edge.
+    expect(blendModeFor(2, 0)).toBe(2);
+    expect(blendModeFor(2, 3)).toBe(1);
+    expect(blendModeFor(0, 1)).toBe(3);
+    expect(blendModeFor(3, 3)).toBe(0);
   });
 
   it('draws no blend where nothing out-ranks anything', () => {
@@ -365,10 +422,8 @@ describe('meshes that lie on the ground', () => {
     // The farm's own tiles stay solid and only the ring is masked, which is
     // what the extra column in the atlas is for.
     const uv1 = fading.geometry.getAttribute('uv1');
-    const columns = assets.blends!.masksPerMode;
-    const solid = assets.blends!.solid;
     const us = Array.from({ length: uv1.count }, (_, i) => uv1.getX(i));
-    const solidVertices = us.filter(u => u >= solid / columns).length;
+    const solidVertices = us.filter(u => u >= maskU(assets.blends!, assets.blends!.solid, 0)).length;
     expect(solidVertices).toBe(9 * 6);
     expect((fading.material as THREE.MeshBasicMaterial).alphaMap).toBeTruthy();
     // And with no masks there is no ring and nothing to mask with.
