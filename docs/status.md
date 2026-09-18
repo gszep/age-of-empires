@@ -560,6 +560,15 @@ entity**, each with what is left of it, and clicking a portrait singles that
 one out — which is what makes the grid worth having rather than a tally
 (issue #6).
 
+On the placed panel (issue #64 onward) the group is laid out in the widget
+file's own boxes: the count in `ObjectName`'s box and the portraits from
+`ObjectImage`'s corner to `Clipped`'s far edges, at the 80x80 command
+button's pitch. One box holding both had stacked the count over the whole
+height, pushed the grid out of sight, and put the count's left edge under
+the command panel's frame ("3 selected" read as "selected"); measured in
+the page after the fix, the count sits at x=35 on the parchment with the
+three portraits at x=36, 81, 126 beneath it.
+
 **Double-clicking a unit takes every one of its kind that can presently be
 seen.** On screen rather than on the map, which is AoE2's own rule and the
 reason it is a selection you could have made with a drag. Only the player's

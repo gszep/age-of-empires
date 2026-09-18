@@ -145,6 +145,10 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 #selection-panel.placed .stat-icon { position: absolute; left: 0; top: 0; width: calc(50px * var(--ui-scale)); height: calc(50px * var(--ui-scale)); background-size: contain; background-repeat: no-repeat; background-position: center; }
 #selection-panel.placed .stat-value { position: absolute; left: calc(60px * var(--ui-scale)); top: 0; height: 100%; display: flex; align-items: center; font-size: calc(30px * var(--ui-scale)); color: #f3ead2; white-space: nowrap; }
 #selection-panel.placed .object-name { white-space: nowrap; line-height: 1; display: flex; align-items: center; }
+/* A group's portraits at the command button's own 80x80 pitch (the
+   `QueueButtons` anchor gives the origin and no size of its own). */
+#selection-panel.placed .selection-grid { gap: calc(6px * var(--ui-scale)); padding: 0; height: 100%; }
+#selection-panel.placed .selection-member { width: calc(80px * var(--ui-scale)); height: calc(80px * var(--ui-scale)); }
 #selection-panel.placed .hp-bar, #selection-panel.placed .progress-bar { margin: 0; }
 #selection-panel.placed .object-detail, #selection-panel.placed .object-hp,
 #selection-panel.placed .progress-label { white-space: nowrap; display: flex; align-items: center; margin: 0; }

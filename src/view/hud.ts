@@ -509,9 +509,23 @@ export class Hud {
     // A group is shown as its members, not as whichever of them happens to be
     // first: one portrait per selected unit, each with what is left of it.
     if (info.members && info.members.length > 1) {
+      // Placed where the widget file puts a selection's parts: the count in
+      // `ObjectName`'s box and the portraits from `ObjectImage`'s corner to
+      // `Clipped`'s far edges. One box holding both stacked the count over the
+      // whole height and pushed the grid out of sight, with the count's left
+      // edge under the command panel's frame.
+      const grid = (() => {
+        const clipped = widgetBox(this.ui?.layouts.commandpanel, 'BackgroundRight', 'Clipped');
+        const image = widgetBox(this.ui?.layouts.commandpanel, 'BackgroundRight', 'ObjectImage');
+        if (!clipped || !image) return '';
+        const scaled = (value: number): string => `calc(${value}px * var(--ui-scale))`;
+        return `left:${scaled(image.left)};top:${scaled(image.top)};`
+          + `width:${scaled(clipped.left + clipped.width - image.left - 10)};`
+          + `height:${scaled(clipped.top + clipped.height - image.top - 10)};`;
+      })();
       this.selectionPanel.innerHTML = `
-        <div class="placed-box" style="${this.placedStyle('Clipped')}">
-        <div class="object-name">${info.members.length} selected</div>
+        <div class="placed-box" style="${this.placedStyle('ObjectName')}"><div class="object-name">${info.members.length} selected</div></div>
+        <div class="placed-box" style="${grid}">
         <div class="selection-grid">
           ${info.members.map(member => `
             <button class="selection-member" data-id="${member.id}" title="${member.name}">
