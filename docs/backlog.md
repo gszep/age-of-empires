@@ -36,6 +36,14 @@ construction-complete cue, so that one has no owned source to draw on.
   higher resolution than blendomatic's 97x49 and are unused: their indexing
   lives in a compiled shader, and at one mask per tile edge 97x49 is the
   reference's own tile size anyway.
+- **The fog has no clouds.** AoE2DE's "Animate Fog" option ("animate the fog
+  of war with clouds") draws never-seen ground as a slowly drifting brown-grey
+  cloud instead of flat black, and "Animate Fog Border" moves the edge between
+  seen and explored. The constants are owned -- `colorcorrection.json`'s
+  `fog_tint_color`, `fog_anim_speed`, `fog_cell_size`, and the combine
+  shader's `g_Time`/`g_FogScreenULOffsets` -- but no cloud texture was found
+  under a searchable name in the depot, so the noise may be procedural. Flat
+  black is the option-off look and is what ships.
 - **Seven of Arabia's eleven biomes are not shipped.** Each is twelve terrain
   ids out of the same `MAP_CONSTANTS` block — a data addition, not work — and
   they are left out only so the import does not carry textures no board deals.

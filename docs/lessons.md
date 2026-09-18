@@ -599,10 +599,15 @@ keeps the record.
   `strings` on one lists its samplers and constants -- `g_VisibilityTexture`
   with `sBilinear`, `g_fogFadeAmount`, `g_OverlayForEdges`, `g_MaskTexture`
   beside `g_BlendTexture`. That told issue #41 the fog edge is a filtered
-  per-tile texture and not art, without disassembling anything. Values are
-  another matter: a constant's *setting* is in the engine, so it is an
-  approximation to record. Rule: before writing "lives in a compiled shader"
-  as a reason something is unknowable, run `strings` over it.
+  per-tile texture and not art, without disassembling anything. And the names
+  are the search key for the values: `g_FogTintColor` and `g_fogCellSize` are
+  `fog_tint_color` and `fog_cell_size` in
+  `terrain/colorcorrection_json/colorcorrection.json`, beside
+  `fog_seen_land_mult` -- which is how the explored level became a read number
+  rather than a guess, an hour after it had been written up as unknowable.
+  Rule: before writing "lives in a compiled shader" as a reason something is
+  unknowable, run `strings` over it, then grep the depot's JSON for each name
+  with the `g_` prefix dropped.
 
 - **A cosmetic feature must not draw on the stream that decides the game.**
   Dressing the board in a biome needed random numbers, and taking them from the

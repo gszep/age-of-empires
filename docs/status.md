@@ -1844,8 +1844,9 @@ tenth to nine tenths dark in **5-12 pixels** where it took 28-115.
 The mechanism is the reference's own, read from the owned shaders rather than
 guessed: `TerrainAttributes_ps.so` samples `g_VisibilityTexture` through
 `sBilinear`, and the combine pass carries `g_fogFadeAmount`, `g_fogCellSize`
-and `g_OptionFogBorder`. What those constants are *set to* lives in the engine,
-not in any owned file, so two things here are approximations: the sample is a
+and `g_OptionFogBorder`. Most of those constants are *set* in the owned
+`colorcorrection.json` (below); the fade amount is not, so two things here are
+approximations: the sample is a
 cubic B-spline (four bilinear taps) rather than the plain bilinear ramp, because
 the snapped bilinear ramp is a polygon with a facet a tile long and the spline
 bends it into a curve; and the edge is softened over 0.075 of a tile either
@@ -1858,7 +1859,15 @@ reads 0.5), which is the price of the curve.
 
 Explored-but-unseen and never-seen are the texture's two channels and are
 shaped the same way, so the boundary of the black is as round as the boundary
-of the dim. The map's border clamps onto its own tiles, as before. The per-frame
+of the dim. The levels come from the owned `terrain/colorcorrection_json/
+colorcorrection.json` (Default profile), which is where the constants the
+combine shader names are set: explored land is `fog_seen_land_mult` 0.5, the
+ground at half brightness, and never-seen ground is black outright, alpha 1 --
+it was 0.97, which let bright sand read faintly through the dark. That is the
+reference with its "Animate Fog" option off; on, the same file's
+`fog_tint_color` (0.25 grey) and `fog_anim_speed` drive the drifting clouds
+the official screenshots show, whose unexplored reads about RGB 32/20/10 with
+an edge 40-170 px soft. The clouds are not implemented; see backlog.md. The map's border clamps onto its own tiles, as before. The per-frame
 cost is two byte writes a tile instead of a corner-averaging pass and 24 float
 writes; the corner pass is gone.
 

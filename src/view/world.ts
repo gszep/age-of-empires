@@ -453,13 +453,18 @@ export interface FogLayer {
 }
 
 /**
- * How dark explored-but-unseen ground and never-seen ground are.
+ * How dark explored-but-unseen ground and never-seen ground are, as the
+ * opacity of a black overlay. Explored land is the DAT-side
+ * `colorcorrection.json` Default profile's `fog_seen_land_mult` of 0.5: the
+ * ground at half brightness. Never-seen ground is black outright -- with the
+ * reference's "Animate Fog" option off nothing of the ground shows through,
+ * and 0.97 let the sand's texture read faintly through the dark (issue #41).
  *
  * Exported so the fog tests can state the edge in terms of the two levels
  * rather than repeating the numbers.
  */
-export const FOG_EXPLORED = 0.45;
-export const FOG_UNSEEN = 0.97;
+export const FOG_EXPLORED = 0.5;
+export const FOG_UNSEEN = 1;
 /**
  * Where across a tile the fog edge falls and how soft it is, as fractions of
  * the ramp between one tile's centre and the next. The renderer filters the
@@ -468,9 +473,10 @@ export const FOG_UNSEEN = 0.97;
  * across the corner tiles of a staircase, so a circle of seen tiles reads as a
  * circle rather than as the diamonds it is made of (issue #41). The width
  * either side of the midpoint is the only thing here that is not geometry:
- * AoE2DE shapes its own `g_VisibilityTexture` ramp with engine constants the
- * owned files do not carry, so 0.075 of a tile is an approximation -- it was
- * 0.15 and read as a gradient on a real screen -- see docs/status.md.
+ * AoE2DE shapes its own `g_VisibilityTexture` ramp with `g_fogFadeAmount`,
+ * which is the one fog constant `colorcorrection.json` does not set, so 0.075
+ * of a tile is an approximation -- it was 0.15 and read as a gradient on a
+ * real screen -- see docs/status.md.
  */
 export const FOG_EDGE_INNER = 0.425;
 export const FOG_EDGE_OUTER = 0.575;
