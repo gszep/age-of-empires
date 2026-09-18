@@ -65,14 +65,20 @@ try {
 // ?map=windsor, ?map=painted-proof, or nothing for arabia. An unknown name falls back
 // rather than killing the page, and asking for a map explicitly means a
 // fresh board of it -- not whatever match a dev-session snapshot resumes.
-const mapParam = new URLSearchParams(location.search).get('map');
+const pageParams = new URLSearchParams(location.search);
+const mapParam = pageParams.get('map');
 const mapType = mapParam !== null && mapParam in MAPS ? mapParam : 'arabia';
 if (mapParam !== null && mapType !== mapParam) {
   console.warn(`[map] unknown map type '${mapParam}', dealing arabia`);
 }
+// And which board of it: ?seed=3 deals that seed, on load and again on New
+// Match, so a board somebody is looking at can be named. Like ?map=, asking
+// for one means a fresh board rather than a resumed session.
+const seedParam = Number(pageParams.get('seed'));
+const seedFixed = Number.isInteger(seedParam) && seedParam > 0 ? seedParam : undefined;
 
-const restored = mapParam === null ? loadSession(rules) : undefined;
-let game = restored ?? createGame(42, rules, undefined, mapType);
+const restored = mapParam === null && seedFixed === undefined ? loadSession(rules) : undefined;
+let game = restored ?? createGame(seedFixed ?? 42, rules, undefined, mapType);
 if (restored) console.info(`[dev] resumed match at tick ${restored.tick}; menu restart starts a new one`);
 let selectedIds: number[] = [];
 let buildMode: BuildingKind | undefined;
@@ -386,7 +392,7 @@ if (import.meta.hot) {
 function restart(): void {
   replay = undefined;
   clearSession();
-  game = createGame((Date.now() >>> 0) || 1, rules, undefined, mapType);
+  game = createGame(seedFixed ?? ((Date.now() >>> 0) || 1), rules, undefined, mapType);
   cameraCenter = homeCamera(game);
   selectedIds = [];
   buildMode = undefined;

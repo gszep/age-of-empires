@@ -63,6 +63,9 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 - `F4` toggles a debug reveal of the whole map. It is strictly a view-side
   override — the simulation's fog, the AI's observation and every checksum are
   untouched, so a revealed match replays identically to a fogged one.
+- `?seed=` in the URL deals a named board (`?seed=3` has a pond in a wood
+  around tile 11,62) and keeps it across New Match; without it a fresh load is
+  seed 42 and New Match deals from the clock.
 - `?map=` in the URL picks the board: `black-forest`, `senlac` (the real ground
   at Battle, East Sussex), `windsor` (392x392 real ground at 15 m/tile around
   Windsor Castle, the Long Walk, Snow Hill and the Thames), `painted-proof`, or nothing for Arabia. Real-ground maps
