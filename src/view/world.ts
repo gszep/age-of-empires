@@ -1,7 +1,9 @@
 import * as THREE from 'three/webgpu';
 import { floor, fract, smoothstep as smoothstepNode, texture as textureNode, uv, vec2 } from 'three/tsl';
 import { TILE_W, TILE_H, worldToIso } from './iso';
+import { TERRAIN_WATER } from '../sim/mapgen';
 import { maskU, type ContentAssets, type ImportedTerrain } from './assets';
+import { createWaterMaterial, waterPresetFor } from './water';
 import type { GameState } from '../sim/types';
 
 /**
@@ -96,6 +98,15 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
     const altitude = maxElevation ? level / maxElevation * 0.16 : 0.16;
     return Math.max(0.68, Math.min(1, 0.82 + altitude + (across + down) * 0.035));
   };
+  // The water shader wants to know how far from the shore it is: 0 at a
+  // corner where any of the tiles meeting there is land, 1 in open water.
+  const waterPreset = assets && waterPresetFor(state, assets);
+  const isWater = (px: number, py: number): boolean =>
+    px >= 0 && py >= 0 && px < state.width && py < state.height
+    && state.terrain[py * state.width + px] === TERRAIN_WATER;
+  const depthAt = (px: number, py: number): number =>
+    isWater(px - 1, py - 1) && isWater(px, py - 1) && isWater(px - 1, py) && isWater(px, py) ? 1 : 0;
+  const depths = classes.map(() => [] as number[]);
   for (let y = 0; y < state.height; y++) {
     for (let x = 0; x < state.width; x++) {
       const terrain = state.terrain[y * state.width + x] ?? 0;
@@ -105,7 +116,7 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
       const point = (px: number, py: number) => {
         const iso = worldToIso(px, py);
         iso.y += cornerElevation(state, px, py) * ELEVATION_PIXELS;
-        return { iso, u: px / spanX, v: py / spanY, shade: shadeAt(px, py) };
+        return { iso, u: px / spanX, v: py / spanY, shade: shadeAt(px, py), depth: depthAt(px, py) };
       };
       const [north, east, south, west] = [
         point(x, y), point(x + 1, y), point(x + 1, y + 1), point(x, y + 1),
@@ -116,6 +127,7 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
           bucket.positions.push(corner.iso.x, corner.iso.y, 0);
           bucket.uvs.push(corner.u, corner.v);
           bucket.colors.push(corner.shade, corner.shade, corner.shade);
+          depths[category].push(corner.depth);
         }
       }
     }
@@ -135,6 +147,7 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
   /** Blend quads per (overlying terrain id, mode), drawn in priority order. */
   const overlays = new Map<string, {
     id: number; mode: number; positions: number[]; uvs: number[]; uv1s: number[]; colors: number[];
+    depths: number[];
   }>();
   if (blends) {
     const at = (x: number, y: number): number | undefined =>
@@ -152,7 +165,7 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
           const key = `${there}:${mode}`;
           let bucket = overlays.get(key);
           if (!bucket) {
-            bucket = { id: there, mode, positions: [], uvs: [], uv1s: [], colors: [] };
+            bucket = { id: there, mode, positions: [], uvs: [], uv1s: [], colors: [], depths: [] };
             overlays.set(key, bucket);
           }
           const [spanX, spanY] = slot.dimensions;
@@ -169,6 +182,8 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
               bucket!.uvs.push(px / spanX, py / spanY);
               bucket!.uv1s.push(mu(u1), v1);
               bucket!.colors.push(shade, shade, shade);
+              // An overlay is a shore by definition: what it lies on is land.
+              bucket!.depths.push(0);
             };
             // North, east, south, west of the tile against the mask's own
             // top, right, bottom and left points. The texture is flipped on
@@ -196,12 +211,17 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(buckets[i].positions, 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(buckets[i].uvs, 2));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(buckets[i].colors, 3));
+    geometry.setAttribute('depth', new THREE.Float32BufferAttribute(depths[i], 1));
     const slot = byId.get(entry.id)?.slot;
     const texture = slot && assets?.textures.get(slot.image);
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-      ...(texture ? { map: texture } : { color: entry.fallback }),
-      vertexColors: true, side: THREE.DoubleSide,
-    }));
+    // Water is a shader, not a tile, where the owned presets are in.
+    const material = entry.id === TERRAIN_WATER && waterPreset && slot
+      ? createWaterMaterial(assets!, waterPreset, { span: slot.dimensions[0] })
+      : new THREE.MeshBasicMaterial({
+        ...(texture ? { map: texture } : { color: entry.fallback }),
+        vertexColors: true, side: THREE.DoubleSide,
+      });
+    const mesh = new THREE.Mesh(geometry, material);
     mesh.renderOrder = 0;
     mesh.name = `terrain-${entry.key}`;
     group.add(mesh);
@@ -222,10 +242,14 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(bucket.uvs, 2));
     geometry.setAttribute('uv1', new THREE.Float32BufferAttribute(bucket.uv1s, 2));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(bucket.colors, 3));
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-      map: texture, alphaMap: mask, transparent: true, depthWrite: false,
-      vertexColors: true, side: THREE.DoubleSide,
-    }));
+    geometry.setAttribute('depth', new THREE.Float32BufferAttribute(bucket.depths, 1));
+    const material = bucket.id === TERRAIN_WATER && waterPreset
+      ? createWaterMaterial(assets!, waterPreset, { span: slot.dimensions[0], masked: mask })
+      : new THREE.MeshBasicMaterial({
+        map: texture, alphaMap: mask, transparent: true, depthWrite: false,
+        vertexColors: true, side: THREE.DoubleSide,
+      });
+    const mesh = new THREE.Mesh(geometry, material);
     // Above every base terrain, below anything standing on the ground, and
     // in priority order among themselves.
     mesh.renderOrder = 1 + order;

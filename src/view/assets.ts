@@ -125,6 +125,39 @@ export function maskU(blends: BlendMasks, column: number, t: number): number {
   return (column * pitch + blends.gutter + t * blends.tile[0]) / (pitch * blends.masksPerMode);
 }
 
+/**
+ * One water preset as `water_def.json` states it and the importer carries
+ * it: the reference draws water through a shader rather than a tile, and
+ * these are that shader's inputs. Texture paths are relative to the content
+ * base and are loaded into `ContentAssets.textures` like the terrain.
+ */
+export interface WaterPreset {
+  name: string;
+  normal: string;
+  normalVelocity: [number, number];
+  normalDirection: [[number, number], [number, number]];
+  normalAzimuth: number;
+  normalScale: number;
+  sky: string;
+  seaFloor: string;
+  sunDirection: [number, number, number];
+  sunColor: [number, number, number];
+  skyColor: [number, number, number];
+  waterColor: [number, number, number];
+  seaFloorIntensity: number;
+  skyIntensity: number;
+  skyRotation: number;
+  skyScale: number;
+  specularIntensity: number;
+  specularPower: number;
+  mapScale: number;
+  seaFloorScale: number;
+  waveAnimationSpeed: number;
+  waveRepeatLength: number;
+  waveAmplitude: number;
+  types: Record<string, { reflectivity: number; opacity: number }>;
+}
+
 /** One age as `eras.json` states it: its name and the shield it wears. */
 export interface ImportedAge { name?: string; shield: string }
 
@@ -135,6 +168,8 @@ export interface ContentAssets {
   /** Skin families by the base key they stand in for. */
   skins: Map<string, SkinFamily[]>;
   terrain: Record<string, ImportedTerrain>;
+  /** Water presets by `water_def.json` index; absent without owned content. */
+  water?: Record<string, WaterPreset>;
   textures: Map<string, THREE.Texture>;
   playerColors?: PlayerColors;
   /** One 256-texel ramp per player, indexed by a sprite's own grey. */
@@ -247,6 +282,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     entities: Record<string, ImportedEntity>;
     ages?: ImportedAge[];
     terrain?: Record<string, ImportedTerrain>;
+    water?: Record<string, WaterPreset>;
     playerColors?: PlayerColors;
     particles?: Record<string, ParticleEffect>;
   }>(`${CONTENT_BASE}manifest.json`);
@@ -299,6 +335,28 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
       textures.set(slot.image, texture);
     }));
   }
+  // The water shader's textures. The normal map and the sea floor tile
+  // across the water like terrain; the sky dome is looked up by a reflected
+  // direction and is clamped. The normal map is data, not colour.
+  const water = manifest.water ?? {};
+  const waterImages = new Set<string>();
+  for (const preset of Object.values(water)) {
+    for (const image of [preset.normal, preset.sky, preset.seaFloor]) waterImages.add(image);
+  }
+  for (const image of waterImages) {
+    jobs.push(loader.loadAsync(CONTENT_BASE + image).then(texture => {
+      const sky = image === Object.values(water).find(p => p.sky === image)?.sky;
+      const normal = Object.values(water).some(p => p.normal === image);
+      texture.colorSpace = normal ? THREE.NoColorSpace : THREE.SRGBColorSpace;
+      texture.wrapS = sky ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping;
+      texture.wrapT = texture.wrapS;
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.generateMipmaps = true;
+      texture.anisotropy = 16;
+      textures.set(image, texture);
+    }));
+  }
   await Promise.all(jobs);
   const playerColors = manifest.playerColors;
   const playerRamps = new Map<number, THREE.DataTexture>();
@@ -331,7 +389,8 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   }
   return {
     entities: manifest.entities, skins: skinFamilies(manifest.entities), ages: manifest.ages ?? [],
-    terrain, textures, playerColors, playerRamps, blends, particles: manifest.particles,
+    terrain, water: Object.keys(water).length ? water : undefined,
+    textures, playerColors, playerRamps, blends, particles: manifest.particles,
   };
 }
 

@@ -102,6 +102,48 @@ def convert_terrain(
     return converted
 
 
+def convert_water(
+    water: dict[str, Any], terrain_dir: Path, out_dir: Path, hashes: dict[str, str]
+) -> dict[str, Any]:
+    """The water presets' textures: the normal map, the sky dome and the sea
+    floor each preset names, as PNG beside the terrain. `terrain_dir` is
+    the `textures/2x` directory; the water textures live in `../../water`
+    and a sea floor may be an ordinary terrain texture."""
+    from PIL import Image
+
+    if not water:
+        return {}
+    common = terrain_dir.parent.parent
+    converted: dict[str, Any] = {}
+    done: dict[str, str] = {}
+    for index, preset in water.items():
+        entry = dict(preset)
+        for key in ("normal", "sky", "seaFloor"):
+            named = preset[key]
+            if named in done:
+                entry[key] = done[named]
+                continue
+            source = common / named
+            if not source.is_file():
+                raise FileNotFoundError(f"water texture missing: {source}")
+            relative = "water/" + Path(named).with_suffix(".png").name
+            target = out_dir / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with Image.open(source) as image:
+                image.load()
+                # The sky dome and some sea floors are 2048 square; half
+                # that is more than a reflection or a floor eight tiles to
+                # the repeat resolves, and a quarter of the download.
+                if image.width > 1024:
+                    image = image.resize((1024, 1024), Image.LANCZOS)
+                image.convert("RGBA").save(target, optimize=True)
+            hashes[f"water/{source.name}"] = sha256(source)
+            done[named] = relative
+            entry[key] = relative
+        converted[index] = entry
+    return converted
+
+
 def decoder_fingerprint() -> str:
     """What the conversion code itself would produce, in one hash.
 
@@ -341,6 +383,7 @@ def main() -> None:
     source = dict(imported["source"])
     hashes = dict(source.get("sha256", {}))
     terrain = convert_terrain(imported.get("terrain", {}), args.terrain, args.out, hashes)
+    water = convert_water(imported.get("water", {}), args.terrain, args.out, hashes)
     particles = convert_particles(imported.get("particles", {}), args.out)
     source["sha256"] = hashes
 
@@ -365,6 +408,8 @@ def main() -> None:
         "playerAttributes": imported.get("playerAttributes", {}),
         "ages": imported.get("ages", []),
         "terrain": terrain,
+        # The water presets and their textures (issue: the surface).
+        "water": water,
         # The DAT's passability table, per restriction row: which of the
         # shipped terrains each may stand on. Rules, not art, so it passes
         # through -- and, like `playerAttributes`, has to be listed here.

@@ -195,7 +195,13 @@ export interface MapDescriptor {
    * is a margin off the centreline; `border` is the script's
    * `left/right/top/bottom_border`, a percentage of the map the land keeps
    * from every edge. */
-  land?: { tiles: number; baseSize: number; clearance: number; clumping?: number; border?: number };
+  land?: {
+    tiles: number; baseSize: number; clearance: number; clumping?: number; border?: number;
+    /** `border_fuzziness`: how softly the land meets its limits, as the
+     * width in tiles over which a tile's chance of being taken fades from
+     * all to none. A hard limit cuts a coast dead straight. */
+    fuzziness?: number;
+  };
   /** Woods on an island keep this many tiles from the coast
    * (`spacing_to_other_terrain_types` on the script's wood passes). */
   woodShoreSpacing?: number;
@@ -306,7 +312,7 @@ export const BLACK_FOREST: MapDescriptor = {
 export const ISLANDS: MapDescriptor = {
   base: 'water',
   biomes: ARABIA_BIOMES,
-  land: { tiles: 2520, baseSize: 15, clearance: 11, clumping: 22, border: 7 },
+  land: { tiles: 2520, baseSize: 15, clearance: 11, clumping: 22, border: 7, fuzziness: 11 },
   woodShoreSpacing: 3,
   playerForest: { tiles: 55, groups: 2, near: 14, far: 26, groupSpacing: 6 },
   // The script's island woods: 450-550 tiles in 9-10 clumps at map scale,
@@ -709,8 +715,18 @@ export function generateMap(
     const margin = Math.ceil(descriptor.land.clearance / 2);
     const border = Math.ceil((descriptor.land.border ?? 0) / 100 * Math.min(ctx.width, ctx.height));
     const land = new Uint8Array(ctx.width * ctx.height);
-    const inLand = (x: number, y: number): boolean => x < halfWidth - margin
-      && x >= border && y >= border && y < ctx.height - border;
+    // How far inside every limit a tile is; the land fades out over the
+    // script's fuzziness rather than stopping at a line, so a coast is
+    // ragged where it meets the map's edge or the other land's zone.
+    const fuzz = descriptor.land.fuzziness ?? 0;
+    const inside = (x: number, y: number): number => Math.min(
+      halfWidth - margin - x, x - border + 1, y - border + 1, ctx.height - border - y);
+    const inLand = (x: number, y: number): boolean => {
+      const room = inside(x, y);
+      if (room <= 0) return false;
+      if (room > fuzz) return true;
+      return randInt(ctx.rng, fuzz) < room;
+    };
     // The circular base the script asks for (`base_size N, set_circular_base`)
     // is stamped whole, then the rest grows from the ring around it -- each
     // ring tile its own round-robin frontier, so the fringe advances evenly

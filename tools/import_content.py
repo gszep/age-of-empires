@@ -17,6 +17,8 @@ from typing import Any
 
 from genieutils.datfile import DatFile
 
+from depot import depot_root
+
 RESOURCE_NAMES = {0: "food", 1: "wood", 2: "stone", 3: "gold"}
 # The bit of a projectile's `smart_mode` that makes it lead a moving target.
 PROJECTILE_LEADS_TARGET = 1
@@ -1248,6 +1250,71 @@ def terrain_entry(
     }
 
 
+#: The water presets a board can roll, by `water_def.json` index: 0 is the
+#: engine's default (Islands names none), 3 "Calm" and 6 "Dimmed" are what
+#: Arabia's `WATER_POND` rolls between (includes/water_preset.inc, 65/35).
+WATER_PRESETS = (0, 3, 6)
+
+
+def water_presets(dat_path: Path, hashes: dict[str, str]) -> dict[str, Any]:
+    """DE renders water through a shader, not a tile: `water_def.json`
+    beside the terrain names, per preset, a normal map and its drift, a sky
+    dome to reflect, a sea-floor texture and its intensity, the sun and the
+    colours. The three presets the shipped maps roll are carried whole;
+    the textures are converted by the atlas step."""
+    # The DAT depot and the terrain depot are different depots; the water
+    # definition lives beside the terrain textures, in 813782.
+    tail = Path("resources/_common/terrain/water_json/water_def.json")
+    candidates = [depot_root() / "depot_813782" / tail] + [
+        parent / "depot_813782" / tail for parent in dat_path.parents
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            path = candidate
+            break
+    else:
+        return {}
+    hashes["terrain/water_def.json"] = sha256(path)
+    types = json.loads(path.read_text())["water_types"]
+    presets: dict[str, Any] = {}
+    for index in WATER_PRESETS:
+        entry = types[index]
+        normal = entry["water_normals_def"][0]
+        presets[str(index)] = {
+            "name": entry["water_type_name"],
+            # Texture paths as the file spells them, resolved by the atlas step.
+            "normal": normal["normalFileName"].replace("\\", "/"),
+            "normalVelocity": [normal["velocity_min"], normal["velocity_max"]],
+            "normalDirection": [normal["direction_min"], normal["direction_max"]],
+            "normalAzimuth": normal["azimuth"],
+            "normalScale": normal["scale"],
+            "sky": entry["water_sky_texture"].replace("\\", "/"),
+            "seaFloor": entry["sea_floor_texture"].replace("\\", "/"),
+            "sunDirection": entry["sun_direction"],
+            "sunColor": entry["sun_color"],
+            "skyColor": entry["sky_color"],
+            "waterColor": entry["water_color"],
+            "seaFloorIntensity": entry["sea_floor_intensity"],
+            "skyIntensity": entry["sky_intensity"],
+            "skyRotation": entry["sky_rotation"],
+            "skyScale": entry["sky_scale"],
+            "specularIntensity": entry["specular_intensity"],
+            "specularPower": entry["specular_power"],
+            "mapScale": entry["map_scale"],
+            "seaFloorScale": entry["sea_floor_scale"],
+            "waveAnimationSpeed": entry["wave_animation_speed"],
+            "waveRepeatLength": entry["wave_repeat_length"],
+            "waveAmplitude": entry["wave_amplitude"],
+            # Per water class: how much sky it reflects and how opaque it is
+            # over the floor, 0..255.
+            "types": {
+                kind["name"]: {"reflectivity": kind["reflectivity"], "opacity": kind["opacity"]}
+                for kind in entry["water_types_def"]
+            },
+        }
+    return presets
+
+
 def terrain_restrictions(
     dat: DatFile, rows: set[int], terrain_ids: list[int]
 ) -> dict[str, list[int]]:
@@ -1357,6 +1424,7 @@ def extract(
     }
     return {
         "terrain": terrain,
+        "water": water_presets(dat_path, hashes),
         "terrainRestrictions": terrain_restrictions(
             dat,
             {entity["terrainRestriction"] for entity in entities.values() if "terrainRestriction" in entity},
