@@ -561,13 +561,13 @@ one out — which is what makes the grid worth having rather than a tally
 (issue #6).
 
 On the placed panel (issue #64 onward) the group is laid out in the widget
-file's own boxes: the count in `ObjectName`'s box and the portraits from
-`ObjectImage`'s corner to `Clipped`'s far edges, at the 80x80 command
-button's pitch. One box holding both had stacked the count over the whole
+file's own boxes: the portraits run from `ObjectImage`'s corner to
+`Clipped`'s far edges at the 80x80 command button's pitch, and nothing is
+written beside them — the reference shows no count, the grid is the count.
+One box holding a count and the grid had stacked the count over the whole
 height, pushed the grid out of sight, and put the count's left edge under
 the command panel's frame ("3 selected" read as "selected"); measured in
-the page after the fix, the count sits at x=35 on the parchment with the
-three portraits at x=36, 81, 126 beneath it.
+the page after the fix, the three portraits sit at x=36, 81, 126.
 
 **Double-clicking a unit takes every one of its kind that can presently be
 seen.** On screen rather than on the map, which is AoE2's own rule and the
@@ -1235,11 +1235,21 @@ fallback unit without swing timing keeps the view's clock.
 `fonts/` ships the faces the widget files index — Georgia in four styles
 beside the Century and Lucida families and two bitmap atlases — and nothing
 in the files names which `FontIndex` is which face (0 on six thousand labels,
-2 on ninety, 3 on eight). The HUD's labels in the reference are a bold serif,
-and Georgia Bold is that (issue #69): `georgia.ttf` and `georgiab.ttf` are
-imported under `ui/fonts/` and installed as one `@font-face` family, bold on
-every label. The index-to-face mapping is inferred from the look, not read,
-and is the one chosen part of this. `UIColors.json` beside the widget files
+2 on ninety, 3 on eight). The HUD's labels looked a bold serif, and were set in
+Georgia Bold at first (issue #69): `georgia.ttf` and `georgiab.ttf` are
+imported under `ui/fonts/` and installed as one `@font-face` family. A
+playtest found every label too big, and the reference's own glyph atlas
+(`fonts/combined.txt`, rasterised at 64 px) and two measured strings
+settled it: "Dark Age" is 172 design px wide at `AgeTextLabel`'s PointSize
+44, and "Frazzle: 241/241" 309 at `FontsHolder`'s 48 — Georgia Regular at
+the file's PointSize predicts 181 and 321, Bold 209 and 369. Every HUD
+label in the widget files is `Style: Normal`, so the labels are set
+regular at PointSize × scale, with the thin dark edge the files declare
+(`TextOutlineWidth` 0.05 em on the age and gatherer labels, 0.1 on the
+score) as a text-shadow, and on the parchment in the files' dark brown
+(57,28,27): `ObjectName` 40, `ObjectHealth` 32, the owner line 40, the
+training `StatusLabel` 38. The index-to-face mapping is still inferred
+rather than read, and is the one chosen part of this. `UIColors.json` beside the widget files
 is imported too: per player colour, the tint the reference writes text in
 (Blue 110,166,235; Red 255,100,100 — lighter than the palette block the
 sprites wear), which is what the score panel's names now use.

@@ -14,8 +14,13 @@ html, body, #app {
 canvas.battlefield { display: block; position: absolute; inset: 0; }
 
 #hud { position: absolute; inset: 0; pointer-events: none; --ui-scale: 0.5; }
-/* The reference's own faces once imported: a bold serif on every label. */
-#hud.reference-fonts { font-family: 'AoE2 HUD', Georgia, 'Times New Roman', serif; font-weight: bold; }
+/* The reference's own face once imported. Every HUD label in the widget
+   files is `Style: Normal`, and the reference's own glyph atlas measures as
+   Georgia Regular at the file's PointSize: "Dark Age" 172 design px wide
+   where Bold would be 209. The outline some labels declare
+   (`TextOutlineWidth` 0.05 em) is the thin dark edge below, not weight. */
+#hud.reference-fonts { font-family: 'AoE2 HUD', Georgia, 'Times New Roman', serif; font-weight: normal; }
+#hud.reference-fonts .outlined { text-shadow: 0.05em 0 0 #000, -0.05em 0 0 #000, 0 0.05em 0 #000, 0 -0.05em 0 #000; }
 #hud .panel { position: absolute; pointer-events: auto; background-repeat: no-repeat; background-size: 100% 100%; }
 #hud button { pointer-events: auto; cursor: pointer; border: 0; background-color: transparent; color: inherit; font-family: inherit; }
 
@@ -58,7 +63,7 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 #resource-panel.placed .workers {
   position: absolute; display: flex; align-items: flex-end; justify-content: flex-end;
   font-size: calc(32px * var(--ui-scale)); line-height: 1; color: #fff;
-  text-shadow: 0 0 2px #000, 0 0 2px #000, 1px 1px 1px #000;
+  text-shadow: 0.05em 0 0 #000, -0.05em 0 0 #000, 0 0.05em 0 #000, 0 -0.05em 0 #000;
 }
 #resource-panel.placed .idle-villager { position: absolute; margin: 0; }
 #resource-panel.placed .idle-count { z-index: 1; pointer-events: none; }
@@ -67,8 +72,8 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 #resource-panel.placed .age-fill { position: absolute; left: 0; top: 0; height: 100%; width: 0; background-size: auto 100%; background-repeat: no-repeat; }
 #resource-panel.placed .age-text {
   position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center;
-  font-size: calc(44px * var(--ui-scale)); line-height: 1; color: #fff; font-weight: bold;
-  text-shadow: 0 0 2px #000, 0 0 2px #000, 1px 1px 1px #000; padding-bottom: calc(4px * var(--ui-scale));
+  font-size: calc(44px * var(--ui-scale)); line-height: 1; color: #fff;
+  text-shadow: 0.05em 0 0 #000, -0.05em 0 0 #000, 0 0.05em 0 #000, 0 -0.05em 0 #000; padding-bottom: calc(4px * var(--ui-scale));
 }
 #resource-panel:not(.placed) .workers, #resource-panel:not(.placed) .age-shield, #resource-panel:not(.placed) .age-bar { display: none; }
 
@@ -157,14 +162,22 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
   background-size: cover; background-color: rgba(0, 0, 0, 0.35);
   border: calc(2px * var(--ui-scale)) solid #6f5b34;
 }
-.object-name { font-size: calc(42px * var(--ui-scale)); color: #f7ecd0; }
+.object-name { font-size: calc(40px * var(--ui-scale)); color: #f7ecd0; }
 .hp-bar {
   width: calc(240px * var(--ui-scale)); height: calc(14px * var(--ui-scale));
   background: #3a0d0d; border: 1px solid #000; margin-top: calc(8px * var(--ui-scale));
 }
 .hp-fill { height: 100%; background: #2ecc40; }
-.object-hp, .object-detail { font-size: calc(30px * var(--ui-scale)); color: #e8dcbc; }
+.object-hp, .object-detail { font-size: calc(32px * var(--ui-scale)); color: #e8dcbc; }
 .progress-label { font-size: calc(28px * var(--ui-scale)); color: #ffe9a8; margin-top: calc(6px * var(--ui-scale)); }
+/* On the parchment the widget files write in dark brown (57,28,27):
+   ObjectName and ObjectHealth 40 and 32 Normal, the owner line 40 Outlined,
+   the training StatusLabel 38. */
+#selection-panel.placed .object-name, #selection-panel.placed .object-hp, #selection-panel.placed .object-detail,
+#selection-panel.placed .progress-label { color: #391c1b; text-shadow: none; }
+#selection-panel.placed .object-detail { font-size: calc(40px * var(--ui-scale)); }
+#selection-panel.placed .progress-label { font-size: calc(38px * var(--ui-scale)); }
+#selection-panel.placed .stat-value { color: #391c1b; }
 .progress-bar {
   width: calc(280px * var(--ui-scale)); height: calc(18px * var(--ui-scale));
   background: #241d10; border: 1px solid #000;
@@ -187,9 +200,10 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 .score-badge {
   width: calc(40px * var(--ui-scale)); height: calc(40px * var(--ui-scale));
   display: flex; align-items: center; justify-content: center;
-  font-size: calc(34px * var(--ui-scale)); font-weight: bold; color: #fff; text-shadow: 0 0 2px #000;
+  font-size: calc(34px * var(--ui-scale)); color: #fff; text-shadow: 0 0 2px #000;
 }
-.score-name { font-size: calc(48px * var(--ui-scale)); font-weight: bold; white-space: nowrap; text-shadow: 0 0 2px #000, 1px 1px 1px #000; }
+/* FontsHolder: 48 Normal with a 0.1 em outline. */
+.score-name { font-size: calc(48px * var(--ui-scale)); white-space: nowrap; text-shadow: 0.1em 0 0 #000, -0.1em 0 0 #000, 0 0.1em 0 #000, 0 -0.1em 0 #000; }
 .score-civ, .score-age { width: calc(48px * var(--ui-scale)); height: calc(48px * var(--ui-scale)); background-size: contain; background-repeat: no-repeat; background-position: center; }
 #hud.fallback #score-panel { display: none; }
 #map-panel {
