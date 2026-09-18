@@ -30,6 +30,8 @@ import type { AnimalKind, BuildingKind, Point, UnitKind } from './types';
  * to draw more than one ground (docs/overnight.md, terrain blend edges). */
 export const TERRAIN_GRASS = 0;
 export const TERRAIN_FOREST = 10;
+/** `Water, Shallow`: the `POND_TERRAIN` every one of Arabia's biomes names. */
+export const TERRAIN_WATER = 1;
 
 /**
  * The terrains one of Arabia's biomes dresses the board in.
@@ -147,6 +149,19 @@ export interface ForestSpec {
   groupSpacing: number;
 }
 
+/**
+ * Ponds in the woods, as the owned `Arabia.rms` deals them: one roll per
+ * match over how many, then `WATER_SHALLOW` clumps grown over forest with
+ * `spacing_to_other_terrain_types 1`, so a pond is ringed by trees and never
+ * touches open ground. `number_of_tiles` and `number_of_clumps` are the
+ * script's own, at its `set_scale_by_size` reference of a 100x100 board, and
+ * are totals for the whole map; the generator grows half and mirrors.
+ */
+export interface PondSpec {
+  /** `percent_chance` per level, in order; a level is tiles and clumps. */
+  levels: { chance: number; tiles: number; clumps: number }[];
+}
+
 export interface NeutralSpec {
   /** The middle of the map: neutral wood at the owned Arabia's density
    * (~8% of the board in a dozen clumps, kept off the start areas by the
@@ -173,6 +188,7 @@ export interface MapDescriptor {
   road?: { width: number };
   playerForest?: ForestSpec;
   neutral?: NeutralSpec;
+  ponds?: PondSpec;
   /**
    * A fixed terrain layer, produced offline (tools/paint_map.py) and
    * committed beside the rules: geography is data the generator reads, not
@@ -217,6 +233,17 @@ export const ARABIA: MapDescriptor = {
   // cover at the script's own ~8%. Stragglers are the classic thirty lone
   // trees at map scale, fifteen a half.
   neutral: { forest: { tiles: 460, clumps: 6 }, stragglers: 15, avoid: { radius: 18, fade: 10 } },
+  // The script's global forest ponds: NONE 30, FEW 40 (16 tiles in 2 clumps),
+  // NORMAL 25 (32 in 4), MANY 5 (48 in 6). Its per-player forest ponds are
+  // compiled out by `GOODBYE_PONDS` and are not dealt here either.
+  ponds: {
+    levels: [
+      { chance: 30, tiles: 0, clumps: 0 },
+      { chance: 40, tiles: 16, clumps: 2 },
+      { chance: 25, tiles: 32, clumps: 4 },
+      { chance: 5, tiles: 48, clumps: 6 },
+    ],
+  },
   opening: [
     { kind: 'berries', count: 6, near: 10, far: 12, grouping: 'tight', groupSpacing: 6 },
     { kind: 'gold', count: 7, near: 12, far: 16, grouping: 'tight', groupSpacing: 7 },
@@ -725,6 +752,63 @@ export function generateMap(
   }
 
   cleanMask(mask, ctx.width, ctx.height, freeBoth);
+
+  // Ponds, carved out of the woods before the trees go in. They decide play
+  // -- a pond is ground nothing walks on and a wood with fewer trees -- so
+  // they are mirrored like the wood, and they draw from their own stream
+  // derived from the match seed rather than from the board's: a pond must
+  // not move a sheep, and a stream of their own keeps every board dealt
+  // before ponds existed dealing the same objects.
+  if (descriptor.ponds && !descriptor.baked) {
+    const pondStream = { seed: seedFrom(ctx.rng.seed ^ 0x90_4d) };
+    const roll = randInt(pondStream, 100);
+    let level = descriptor.ponds.levels[0];
+    for (let at = 0, sum = 0; at < descriptor.ponds.levels.length; at++) {
+      sum += descriptor.ponds.levels[at].chance;
+      if (roll < sum) { level = descriptor.ponds.levels[at]; break; }
+    }
+    // `set_scale_by_size` / `set_scale_by_groups`: the script's numbers are
+    // for a 100x100 board and scale with the area; and they are for the
+    // whole map, so the scanning half grows half and the mirror does the rest.
+    const scale = (ctx.width * ctx.height) / 10_000;
+    const tiles = Math.round(level.tiles * scale / 2);
+    const clumps = Math.max(tiles > 0 ? 1 : 0, Math.round(level.clumps * scale / 2));
+    // `spacing_to_other_terrain_types 1`: a pond tile is a wood tile whose
+    // every neighbour is wood, so the water never touches open ground and
+    // the trees ring it.
+    const deepInWood = (x: number, y: number): boolean => {
+      if (x >= halfWidth || !mask[y * ctx.width + x]) return false;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= ctx.width || ny >= ctx.height) return false;
+          if (!mask[ny * ctx.width + nx]) return false;
+        }
+      }
+      return true;
+    };
+    const pondCtx: MapgenContext = { ...ctx, rng: pondStream };
+    const water = new Uint8Array(ctx.width * ctx.height);
+    if (tiles > 0) {
+      const seeds = pickSeeds(
+        candidateOrderBox(pondCtx, 0, 0, halfWidth - 1, ctx.height - 1), clumps,
+        Math.floor(2 * Math.sqrt(tiles / clumps)), deepInWood);
+      growClumps(pondCtx, water, seeds, tiles, deepInWood);
+    }
+    for (let tile = 0; tile < water.length; tile++) {
+      if (!water[tile]) continue;
+      mask[tile] = 0;
+      reserved[tile] = 1;
+      terrain[tile] = TERRAIN_WATER;
+      const other = mirror(tileCentre(tile % ctx.width, Math.floor(tile / ctx.width)));
+      const mirrored = Math.floor(other.y) * ctx.width + Math.floor(other.x);
+      mask[mirrored] = 0;
+      reserved[mirrored] = 1;
+      terrain[mirrored] = TERRAIN_WATER;
+    }
+  }
+
   // Each mask tile is planted here and again at its mirror, so a tile that is
   // *itself* the mirror of another mask tile would take two trees on one
   // square. `cleanMask` mends pinholes without regard for which half it is in,

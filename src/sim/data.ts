@@ -19,6 +19,12 @@ export interface UnitRules {
   radius: number;
   speed: number; // tiles per second
   lineOfSight: number;
+  /**
+   * The row of the DAT's `terrain_restrictions` table this obeys -- which
+   * terrains it may stand on. Land units are row 7; absent, that is assumed.
+   * See `terrainAllows`.
+   */
+  terrainRestriction?: number;
   cost: Cost;
   trainSeconds: number;
   trainedAt: BuildingKind;
@@ -186,6 +192,8 @@ export interface BuildingRules {
   hp: number;
   radius: number; // half footprint edge in tiles
   lineOfSight: number;
+  /** As `UnitRules.terrainRestriction`; buildings are row 4, walls row 10. */
+  terrainRestriction?: number;
   cost: Cost;
   buildSeconds: number;
   popSupport: number;
@@ -338,7 +346,49 @@ export interface GameRules {
    */
   repairCostFraction: { building: number; unit: number };
   technologies: Record<TechKey, TechRules>;
+  /**
+   * The DAT's passability table: for each restriction row something here
+   * obeys, the terrain ids it may stand on. "A land unit may not enter
+   * water" is not a rule anywhere in this file; it is row 7 having no entry
+   * for `Water, Shallow` -- and the shallows a villager wades through are
+   * the same row having one for `Shallows`.
+   */
+  terrainRestrictions: Record<number, number[]>;
 }
+
+/** The rows the open fallback assumes when an entity names none. */
+export const LAND_RESTRICTION = 7;
+export const BUILDING_RESTRICTION = 4;
+
+/**
+ * Whether something obeying `row` may stand on `terrain`. A row the rules do
+ * not carry refuses nothing -- the fallback lists the rows its own entities
+ * name, and the importer lists every row an imported entity names, so an
+ * unknown row is a new entity and not a hole in the table.
+ */
+export function terrainAllows(rules: GameRules, row: number, terrain: number): boolean {
+  const allowed = rules.terrainRestrictions[row];
+  return allowed === undefined || allowed.includes(terrain);
+}
+
+/** The restriction row an entity obeys: its own, or its category's default. */
+export function restrictionOf(rules: GameRules, entity: { kind: Entity['kind'] }): number {
+  if (isBuilding(entity.kind)) {
+    return rules.buildings[entity.kind as BuildingKind]?.terrainRestriction ?? BUILDING_RESTRICTION;
+  }
+  return rules.units[entity.kind as UnitKind]?.terrainRestriction ?? LAND_RESTRICTION;
+}
+
+/**
+ * The terrains the open fallback's board can be painted with, which are all
+ * land: the generator's ids from `Arabia.rms`'s biomes plus the road and the
+ * two farm slots. Every fallback row allows all of them and nothing else,
+ * which is what the DAT's rows 4, 7, 10, 20 and 28 say over this set -- the
+ * shore terrains those rows differ on are not painted by any board yet.
+ */
+const FALLBACK_LAND_TERRAINS = [
+  0, 3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 19, 24, 29, 48, 71, 88, 89, 100, 104, 110, 117, 121,
+];
 
 export type NodeKind = 'berries' | 'tree' | 'gold' | 'stone';
 
@@ -522,6 +572,7 @@ export const FALLBACK_RULES: GameRules = {
       fogVisibility: 1,
     },
     deer: {
+      terrainRestriction: 1,
       hp: 5, radius: 0.3, speed: 0.737, lineOfSight: 2, cost: cost(), trainSeconds: 0,
       trainedAt: 'town-center', popCost: 0,
       datClass: 9,
@@ -723,7 +774,7 @@ export const FALLBACK_RULES: GameRules = {
       blastRadius: 1.5, blastAttackLevel: 2,
     },
     'scout-cavalry': {
-      age: 1,
+      age: 1, terrainRestriction: 28,
       hp: 45, radius: 0.25, speed: 1.2, lineOfSight: 4, cost: cost(80), trainSeconds: 30,
       trainedAt: 'stable', popCost: 1, trainButton: 1,
       datClass: 47,
@@ -732,7 +783,7 @@ export const FALLBACK_RULES: GameRules = {
       attackReloadSeconds: 2, attackReleaseSeconds: 0.4,
     },
     'trade-cart': {
-      age: 1,
+      age: 1, terrainRestriction: 20,
       hp: 70, radius: 0.25, speed: 1.25, lineOfSight: 7, cost: cost(0, 100, 50), trainSeconds: 51,
       trainedAt: 'market', popCost: 1, trainButton: 1,
       datClass: 19,
@@ -917,12 +968,14 @@ export const FALLBACK_RULES: GameRules = {
       buildButton: 8,
     },
     'palisade-wall': {
+      terrainRestriction: 10,
       hp: 150, radius: 0.5, lineOfSight: 2, cost: cost(0, 3), buildSeconds: 7,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 2 }],
       buildButton: 7,
     },
     'palisade-gate': {
+      terrainRestriction: 10,
       hp: 240, radius: 1, footprint: { x: 1, y: 0.5 }, passableForOwner: true,
       lineOfSight: 6, cost: cost(0, 30), buildSeconds: 30,
       popSupport: 0, buildable: true, accepts: [],
@@ -1005,6 +1058,10 @@ export const FALLBACK_RULES: GameRules = {
   gatherRatePerSecond: { food: 0.31, wood: 0.39, gold: 0.38, stone: 0.36 },
   carryCapacity: 10,
   repairCostFraction: { building: 0.5, unit: 0.5 },
+  terrainRestrictions: {
+    1: FALLBACK_LAND_TERRAINS, 4: FALLBACK_LAND_TERRAINS, 7: FALLBACK_LAND_TERRAINS,
+    10: FALLBACK_LAND_TERRAINS, 20: FALLBACK_LAND_TERRAINS, 28: FALLBACK_LAND_TERRAINS,
+  },
   technologies: {
     loom: {
       techId: 22, name: 'Loom', cost: cost(0, 0, 50), researchSeconds: 25,
@@ -1029,6 +1086,7 @@ export const FALLBACK_RULES: GameRules = {
 interface ManifestEntity {
   hitPoints: number;
   collision: [number, number];
+  terrainRestriction?: number;
   /** Nothing walks round it: no collision height, no obstruction class, and
    * no annexes to carry one (issue #40). */
   passable?: boolean;
@@ -1107,6 +1165,8 @@ export interface ContentManifest {
   civilization?: CivilizationRules & { datIndex?: number; treeFile?: string };
   /** Where each modelled player attribute starts, from the civ's own table. */
   playerAttributes?: Partial<Record<PlayerAttribute, number>>;
+  /** Per restriction row, the shipped terrain ids it may stand on. */
+  terrainRestrictions?: Record<string, number[]>;
 }
 
 
@@ -1142,6 +1202,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       radius: e[key].collision[0],
       speed: e[key].speedTilesPerSecond ?? 0.8,
       lineOfSight: e[key].lineOfSight,
+      terrainRestriction: e[key].terrainRestriction ?? fallback?.terrainRestriction,
       cost: manifestCost(e[key]),
       trainSeconds: e[key].train?.seconds ?? 25,
       trainButton: e[key].train?.button ?? fallback?.trainButton,
@@ -1203,6 +1264,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       hp: e[key].hitPoints,
       radius: e[key].collision[0],
       lineOfSight: e[key].lineOfSight,
+      terrainRestriction: e[key].terrainRestriction ?? fallback.terrainRestriction,
       cost: manifestCost(e[key]),
       buildSeconds: e[key].build?.seconds ?? 25,
       popSupport: e[key].popSupport ?? 0,
@@ -1445,6 +1507,9 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       unit: manifest.playerAttributes?.unitRepairCost ?? FALLBACK_RULES.repairCostFraction.unit,
     },
     technologies: technologies(manifest, e),
+    terrainRestrictions: manifest.terrainRestrictions
+      ? Object.fromEntries(Object.entries(manifest.terrainRestrictions).map(([row, ids]) => [Number(row), ids]))
+      : FALLBACK_RULES.terrainRestrictions,
   };
 }
 

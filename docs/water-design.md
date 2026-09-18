@@ -1,33 +1,52 @@
-# Water: a design note, not an implementation
+# Water
 
-`overnight.md` item **D2** asks for shoreline terrain, a dock and a fishing
-ship, and says to scope it before starting. This is that scope. Nothing here is
-built. Everything below that names a number, a unit or a terrain slot was read
-out of the owned DAT (`empires2_x2_p1.dat`, civ 1) during the run that wrote
-this note; the commands are in the session, and anything not evidenced is
-marked as a decision rather than a fact.
+`overnight.md` item **D2** asked for shoreline terrain, a dock and a fishing
+ship, and said to scope it before starting. This was that scope; it is now
+also the record of what is built. Everything below that names a number, a
+unit or a terrain slot was read out of the owned DAT (`empires2_x2_p1.dat`,
+civ 1) or the owned `Arabia.rms`; anything not evidenced is marked as a
+decision rather than a fact.
 
-## Why it is a subsystem and not an item
+## Where it stands (2026-09-18)
 
-Every feature shipped so far has been a new entity on the same board: a kind in
-the rules, art through the importer, a rule in `src/sim`. Water is the first
-that changes the board itself. Three things that are currently constants stop
-being constants:
+Built, in `src/sim` and the importer:
 
-- **The map has one terrain.** `createGround` lays a single texture over the
-  whole grid and `GameState` has no per-tile terrain at all. Water needs one,
-  and `canonicalSnapshot` hashes every field of `GameState` that is not
-  `rules` — so a terrain grid is checksum-visible, and every stored replay's
-  checksums change the day it lands.
-- **Passability is a footprint question.** `buildNavGrid` blocks tiles that
-  something stands on. With water it also has to block tiles by what they *are*
-  and by *who is asking*: land units off water, ships off land. The per-owner
-  grid the palisade gate introduced is the shape of the answer but not the
-  answer — this is per unit *class*, and both axes now vary.
-- **Terrain meets terrain.** Today no two terrains ever touch, which is exactly
-  why the missing blend masks (item A6) have never shown. A grass tile beside a
-  water tile with no blend is a hard sawtooth edge, and it is the first thing
-  anyone will look at.
+- **W1, the terrain grid** -- `GameState.terrain` has been there since the
+  map generator was rebuilt (`map-generation-design.md` M1).
+- **W3, the shore** -- terrain blending landed with issue #42, and it is
+  blendomatic's own mode 3 that draws water over its neighbours, so the
+  beach-ring workaround this note once recommended was never needed.
+- **The passability table.** `terrain_restrictions` is imported per row
+  (`manifest.terrainRestrictions`), every entity carries the row it obeys
+  (`terrainRestriction`), and `buildNavGrid`, `placementLegal` and the spawn
+  search all ask it. "A land unit may not enter water" is nowhere in the
+  code: it is row 7 having no entry for `Water, Shallow`. Windsor's Thames,
+  which used to be walked across, is now water.
+- **Ponds on Arabia.** `Arabia.rms` deals `WATER_SHALLOW` clumps inside the
+  woods (30% none, 40% 16 tiles, 25% 32, 5% 48, scaled by area, ringed by a
+  tile of forest). They are grown from their own seed-derived stream so no
+  board dealt before them moved an object, and they are mirrored like the
+  wood. This is the visual check: a pond in a wood, drawn through the
+  blend masks, with a villager that will not wade in.
+
+Not built: **W2's coast** (a water *map*; Arabia's ponds are enclosed and
+carry no fish), **W4 the dock** and **W5 the fishing ship and fish** -- the
+DAT reading for all three is below and still holds. And the water *surface*:
+the DAT's `g_wtr` texture is what is drawn, where the reference renders water
+through a shader driven by `terrain/water_json/water_def.json` (normal maps,
+a sky dome, a sea floor; preset 3 "Calm" or 6 "Dimmed" for ponds, waves
+off). That is the next visual step and is in `backlog.md`.
+
+## Why it was a subsystem and not an item
+
+Every feature before it had been a new entity on the same board: a kind in
+the rules, art through the importer, a rule in `src/sim`. Water was the first
+that changed the board itself, and three things that were constants stopped
+being constants -- the map has more than one terrain (`GameState.terrain`,
+checksum-visible), passability is decided by what a tile *is* and *who is
+asking* as well as by what stands on it (the restriction row, a second axis
+beside the gate's per-owner one), and terrain meets terrain (the blend masks).
+All three are now in.
 
 ## What the DAT already gives, for free
 
@@ -93,34 +112,23 @@ fisherman art to import.
 In dependency order. Each stage is meant to be shippable on its own, with the
 gate green, and to leave the game playable if the next stage never happens.
 
-**W1. A terrain grid in the simulation.** `GameState` gains
-`terrain: Uint8Array` of DAT terrain ids, one per tile, generated with the map.
-`createGame` fills it with Grass, which is what it means today, so W1 alone
-changes no behaviour and no checksum beyond the field's presence. Rules gain a
-terrain table: id, name, and the restriction rows that may enter it.
-*Acceptance:* a determinism test replays a match to an identical checksum with
-the grid present; the existing suite is untouched.
+**W1. A terrain grid in the simulation.** Done -- see above.
 
-**W2. Water on the map and off the pathfinder.** Map generation grows a water
-region (a coast along one edge is the smallest thing that is still a real
-coast); `buildNavGrid` gains the unit's restriction row and blocks tiles the row
-refuses. Land units path around a lake. Nothing floats yet.
-*Acceptance:* nav tests for a land unit ordered across water — it goes round, or
-stops on the shore, and never stands on a water tile; a batch run still decides
-16 of 16 and replays clean.
+**W2. Water on the map and off the pathfinder.** The pathfinder half is done:
+`buildNavGrid` takes the walker's restriction row and blocks what the row
+refuses, with the terrain layer cached per row for the match and rows that
+agree over the board's terrains sharing one layer. What remains is a water
+*map*: a coast along one edge is the smallest thing that is still a real
+coast, and it needs the automatic beach (the engine turns any land tile with
+a water tile among its eight neighbours into `Beach`, terrain 2 -- restriction
+rows 7 and 4 differ on exactly that shore family, which is why the table was
+imported whole).
+*Acceptance:* a batch run still decides 16 of 16 and replays clean with a
+coast on the board.
 
-**W3. Terrain rendering that does not embarrass the shore.** This is the item
-that is currently blocked, and it should be treated as W2's real cost rather
-than as a detail. `createGround` becomes per-tile textured, which is
-straightforward; the blend between two terrains is not. What was measured for
-A6 and recorded in `overnight.md` still stands: nothing found in the owned files
-says which file under `terrain/blends/` a terrain's `blend_type` selects, nor
-how a 512x512 blend mask is indexed against one tile. Until that mapping is
-evidenced, the honest options are (a) ship W3 with hard tile edges and say so,
-(b) ship the beach slots as a one-tile-wide authored shore ring, which is art
-the DAT does give and which hides most of the seam, or (c) block W3 the way A6
-is blocked. **Recommendation: (b).** A beach ring is real AoE2 terrain used the
-way AoE2 uses it, it needs no mask mapping, and it degrades honestly.
+**W3. Terrain rendering that does not embarrass the shore.** Done with issue
+#42: blendomatic mode 3 is the water family's own mask set, and a pond's edge
+bleeds into the wood around it. What is not done is the surface -- see above.
 
 **W4. The dock.** A building whose placement rule is new: it must sit on the
 shore, straddling land and water. In the DAT that is restriction 6 plus a
@@ -148,10 +156,9 @@ is `enabled 0` in this DAT and is a Feudal technology's business); the
 non-navigable beach family; ice; and any map script. Water is a coast on a
 generated map, not a map type.
 
-## The one thing to decide before starting
+## The one thing to decide before continuing
 
-W3. If the answer is (b) — a beach ring — the whole subsystem is five staged
-changes with no unknowns in it, and the blend mapping stays exactly as blocked
-as it is today, which is a gap this project has already recorded honestly. If
-the answer is (a) or (c), W2 ships something that looks wrong, and the run
-should say so out loud in `status.md` rather than let a screenshot say it.
+Which map carries the coast. Arabia's ponds are enclosed by design and its
+aquatic includes are never reached, so W2/W4/W5 need a second generated map
+type with `base_terrain WATER` lands or a coast band -- and that is a
+descriptor, not code, once the beach sweep exists.

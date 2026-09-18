@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES } from './data';
-import { applyCommand, createGame, stepGame } from './game';
+import { applyCommand, createGame, placementLegal, stepGame } from './game';
+import { TERRAIN_WATER } from './mapgen';
 import { buildNavGrid, findPath, isBlocked, type NavGrid } from './nav';
 import { observe } from './observe';
 import type { BuildingKind, Entity, GameState, Point } from './types';
@@ -319,6 +320,55 @@ describe('navigation compatibility suite', () => {
     const tile = Math.floor(mover.position.y) * state.width + Math.floor(mover.position.x);
     expect(wood.has(tile)).toBe(false);
     expect(mover.order.kind).toBe('idle');
+  });
+
+  it('water: a land unit sent across a pond goes round it and never stands in it', () => {
+    // A pond is a wall to anything on the villager's restriction row, which
+    // is the DAT's table and not a rule here: row 7 has no entry for
+    // `Water, Shallow`. The pond is painted onto an empty arena so the test
+    // does not depend on which seed rolls one.
+    const state = arena();
+    const pond = new Set<number>();
+    for (let y = 12; y <= 17; y++) for (let x = 14; x <= 17; x++) {
+      state.terrain[y * state.width + x] = TERRAIN_WATER;
+      pond.add(y * state.width + x);
+    }
+    const grid = buildNavGrid(state);
+    expect(isBlocked(grid, 15, 14)).toBe(true);
+    expect(isBlocked(grid, 13, 14)).toBe(false);
+    // Straight across it: the route exists and every step of it is dry.
+    const path = findPath(grid, { x: 10.5, y: 14.5 }, { x: 21.5, y: 14.5 });
+    expect(path?.length).toBeGreaterThan(0);
+    for (const step of path!) expect(pond.has(Math.floor(step.y) * state.width + Math.floor(step.x))).toBe(false);
+
+    const mover = unit(state, { x: 10.5, y: 14.5 }, 1, 'villager');
+    applyCommand(state, { kind: 'order', player: 1, entityIds: [mover.id], target: { x: 21.5, y: 14.5 } });
+    run(state, 20 * 40, () => {
+      const tile = Math.floor(mover.position.y) * state.width + Math.floor(mover.position.x);
+      expect(pond.has(tile), `standing in the pond at tick ${state.tick}`).toBe(false);
+    });
+    expect(distance(mover.position, { x: 21.5, y: 14.5 })).toBeLessThan(1);
+    // Sent *into* it, it stops on the shore rather than wading.
+    applyCommand(state, { kind: 'order', player: 1, entityIds: [mover.id], target: { x: 15.5, y: 14.5 } });
+    run(state, 20 * 30);
+    const tile = Math.floor(mover.position.y) * state.width + Math.floor(mover.position.x);
+    expect(pond.has(tile)).toBe(false);
+    expect(mover.order.kind).toBe('idle');
+  });
+
+  it('water: a house cannot be founded on it, and a unit is not trained into it', () => {
+    const state = arena();
+    for (let y = 10; y <= 13; y++) for (let x = 10; x <= 13; x++) {
+      state.terrain[y * state.width + x] = TERRAIN_WATER;
+    }
+    const builder = unit(state, { x: 8.5, y: 12.5 }, 1, 'villager');
+    const house = applyCommand(state, {
+      kind: 'build', player: 1, building: 'house', target: { x: 12, y: 12 }, builderIds: [builder.id],
+    });
+    expect(house.ok).toBe(false);
+    // Half on the shore is still on the water.
+    expect(placementLegal(state, 'house', { x: 13.5, y: 12 }).ok).toBe(false);
+    expect(placementLegal(state, 'house', { x: 16, y: 12 }).ok).toBe(true);
   });
 
   it('crossing groups: two opposing groups pass and settle without stacking', () => {

@@ -365,6 +365,10 @@ def main() -> None:
         "playerAttributes": imported.get("playerAttributes", {}),
         "ages": imported.get("ages", []),
         "terrain": terrain,
+        # The DAT's passability table, per restriction row: which of the
+        # shipped terrains each may stand on. Rules, not art, so it passes
+        # through -- and, like `playerAttributes`, has to be listed here.
+        "terrainRestrictions": imported.get("terrainRestrictions", {}),
         # The fires a damaged building burns with (issue #73).
         "particles": particles,
         # The reference's words for a refused order (issue #70).
@@ -373,6 +377,13 @@ def main() -> None:
         "skippedMasks": sorted(mask_skipped),
     }
     manifest_path = args.out / "manifest.json"
+    # `blends` is written by tools/import_blends.py, which runs after this
+    # step; rebuilding the dict from scratch dropped it whenever this step was
+    # re-run on its own, and every terrain edge went hard without an error.
+    if manifest_path.is_file():
+        previous = json.loads(manifest_path.read_text())
+        if "blends" in previous:
+            manifest["blends"] = previous["blends"]
     manifest_path.write_text(json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n")
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     cache_path.write_text(json.dumps({"decoder": fingerprint, "atlases": cache},

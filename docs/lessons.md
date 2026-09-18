@@ -609,6 +609,24 @@ keeps the record.
   unknowable, run `strings` over it, then grep the depot's JSON for each name
   with the `g_` prefix dropped.
 
+- **A DAT colour field may be a palette index.** `Terrain.colors` is three
+  indices into `original.pal` -- the minimap shade and its lighter and darker
+  neighbours -- and the importer had shipped them as RGB for months. Nobody
+  noticed because grass's indices (55, 236, 54) happen to be green; water's
+  (19, 19, 19) would have been black, and only water showed it. Rule: a
+  three-byte field on a 256-colour-era format is an index until a palette
+  lookup proves otherwise; the player colours already went through the
+  palette in the same file, three functions up.
+- **The manifest is assembled by two tools, and the second one's key is not
+  the first one's to lose.** `convert_sld.py` rebuilds the manifest dict and
+  `import_blends.py` adds `blends` to it afterwards; re-running the atlas
+  step alone published a manifest without `blends`, and every terrain edge
+  went hard with no error anywhere -- the first pond screenshot was taken
+  over it and the shore was read as a rendering bug. `convert_sld.py` now carries `blends`
+  through and the import test asserts it. Rule: when a file is written by a
+  pipeline, re-run the pipeline (`tools/import_aoe2.sh`), not the step; and
+  a key the game reads gets a presence guard the day it is added.
+
 - **A cosmetic feature must not draw on the stream that decides the game.**
   Dressing the board in a biome needed random numbers, and taking them from the
   match's own generator shifted every draw after it — so choosing what colour

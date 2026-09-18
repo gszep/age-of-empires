@@ -614,9 +614,15 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # food), which the game read off the fallback's identical 175 for a
         # month. Every key the game reads rules from, not only the one that
         # bit first.
-        for key in ("playerAttributes", "civilization", "ages", "playerColors"):
+        for key in ("playerAttributes", "civilization", "ages", "playerColors", "terrainRestrictions"):
             self.assertIn(key, published, key)
             self.assertEqual(published[key], self.result[key], key)
+        # And `blends`, which import_blends.py adds *after* the atlas step:
+        # re-running the atlas step alone rebuilt the dict without it, and
+        # every terrain edge went hard with no error anywhere.
+        if (manifest.parent / "blends").is_dir():
+            self.assertIn("blends", published)
+            self.assertEqual(len(published["blends"]["modes"]), 9)
 
     def test_every_atlas_fits_a_webgpu_texture(self):
         # A sheet over the device's maxTextureDimension2D (8192 by default)
@@ -1122,6 +1128,39 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # Farms are their own blend family; ordinary ground is land-on-land.
         self.assertEqual(self.result["terrain"]["farm"]["blendType"], 1)
         self.assertEqual(self.result["terrain"]["ground"]["blendType"], 0)
+
+    def test_terrain_restrictions_are_the_dats_table(self):
+        """Who may stand where is a table in the DAT, read per row and cut to
+        the shipped terrains. Row 7 is the villager's: every land terrain,
+        the beach and the shallows, and never open water. Row 4 is the
+        house's: land only, no shore at all."""
+        rows = self.result["terrainRestrictions"]
+        entities = self.result["entities"]
+        self.assertEqual(entities["villager"]["terrainRestriction"], 7)
+        self.assertEqual(entities["house"]["terrainRestriction"], 4)
+        self.assertEqual(entities["palisade-wall"]["terrainRestriction"], 10)
+        water = self.result["terrain"]["water"]["terrainId"]
+        ground = self.result["terrain"]["ground"]["terrainId"]
+        forest = self.result["terrain"]["forest"]["terrainId"]
+        for row in ("7", "4", "10"):
+            self.assertIn(row, rows)
+            self.assertIn(ground, rows[row], row)
+            self.assertIn(forest, rows[row], row)
+            self.assertNotIn(water, rows[row], row)
+        # A row is only listed because something imported obeys it, and
+        # every listed id is a shipped terrain.
+        shipped = {slot["terrainId"] for slot in self.result["terrain"].values()}
+        for row, ids in rows.items():
+            self.assertTrue(set(ids) <= shipped, row)
+            self.assertTrue(
+                any(str(e.get("terrainRestriction")) == row for e in entities.values()), row
+            )
+
+    def test_minimap_colours_are_palette_entries_not_indices(self):
+        """`colors` on a terrain slot is three palette indices. Read raw, water
+        was (19, 19, 19) -- black -- and grass green only by luck."""
+        self.assertEqual(self.result["terrain"]["water"]["minimapColor"], [48, 93, 182])
+        self.assertEqual(self.result["terrain"]["ground"]["minimapColor"], [0, 169, 0])
 
     def test_ground_terrain_comes_from_the_dat(self):
         ground = self.result["terrain"]["ground"]

@@ -8,7 +8,7 @@
  * reproduce AoE tile/clearance behavior deterministically, so the smallest
  * grid search is implemented instead (see docs/library-strategy.md).
  */
-import { isBuilding } from './data';
+import { isBuilding, LAND_RESTRICTION, terrainAllows } from './data';
 import type { Entity, GameState, PlayerId, Point } from './types';
 
 /** A building's half-extents in tiles: square unless it says otherwise. */
@@ -26,19 +26,85 @@ const index = (grid: NavGrid, x: number, y: number) => y * grid.width + x;
 export const tileOf = (p: Point) => ({ x: Math.floor(p.x), y: Math.floor(p.y) });
 
 /**
- * Static obstructions: complete buildings, foundations, and resource nodes.
+ * Static obstructions: the ground itself, then complete buildings,
+ * foundations, and resource nodes.
  *
  * `forOwner` builds the map one player walks on rather than the map everybody
  * shares: a gate is a hole in its owner's wall and a wall to everyone else, so
- * passability is per player and the grid has to be too.
+ * passability is per player and the grid has to be too. `restriction` is the
+ * DAT row the walker obeys -- which terrains it may stand on -- so a pond is
+ * a wall to a villager on row 7 and, one day, a road to a ship on row 3.
  */
 export function buildNavGrid(
   state: GameState, ignoreEntityId?: number, forOwner?: PlayerId,
+  restriction: number = LAND_RESTRICTION,
+): NavGrid {
+  return entityGrid(state, ignoreEntityId, forOwner, terrainLayer(state, restriction));
+}
+
+/**
+ * The ground a restriction row may not stand on, 1 per refused tile. The
+ * terrain is fixed for the match, so each row's layer is computed once per
+ * board and kept against the board's own array; building it per tick for
+ * every row in play doubled the tick.
+ */
+const terrainLayers = new WeakMap<number[], Map<number, Uint8Array>>();
+export function terrainLayer(state: GameState, restriction: number): Uint8Array {
+  const terrain = state.terrain;
+  let rows = terrainLayers.get(terrain);
+  if (!rows) {
+    rows = new Map();
+    terrainLayers.set(terrain, rows);
+  }
+  let layer = rows.get(restriction);
+  if (layer) return layer;
+  // Rows that agree over this board's terrains share one layer object -- the
+  // scout's row 28 and the villager's row 7 differ only on shores no board
+  // paints -- so a caller keying on the layer sees one map, not three.
+  const allowed = state.rules.terrainRestrictions[restriction];
+  for (const [other, built] of rows) {
+    const otherAllowed = state.rules.terrainRestrictions[other];
+    const same = allowed === otherAllowed
+      || (allowed !== undefined && otherAllowed !== undefined
+        && allowed.length === otherAllowed.length && allowed.every(id => otherAllowed.includes(id)));
+    if (same) {
+      rows.set(restriction, built);
+      return built;
+    }
+  }
+  layer = new Uint8Array(state.width * state.height);
+  // A board dealt before the grid existed has no terrain and is all land.
+  if (terrain.length === layer.length) {
+    // Terrain ids repeat across thousands of tiles, so the row is asked once
+    // per id rather than once per tile.
+    const refused = new Map<number, boolean>();
+    for (let tile = 0; tile < terrain.length; tile++) {
+      const id = terrain[tile];
+      let blocked = refused.get(id);
+      if (blocked === undefined) {
+        blocked = !terrainAllows(state.rules, restriction, id);
+        refused.set(id, blocked);
+      }
+      if (blocked) layer[tile] = 1;
+    }
+  }
+  rows.set(restriction, layer);
+  return layer;
+}
+
+/**
+ * The obstructions entities make, for one walker, scanned onto `base` -- a
+ * terrain layer, or nothing for a board that is all land. Starting from a
+ * copy of the layer is a memcpy; laying it over afterwards was a pass over
+ * the board that cost a twentieth of the tick.
+ */
+export function entityGrid(
+  state: GameState, ignoreEntityId?: number, forOwner?: PlayerId, base?: Uint8Array,
 ): NavGrid {
   const grid: NavGrid = {
     width: state.width,
     height: state.height,
-    blocked: new Uint8Array(state.width * state.height),
+    blocked: base ? new Uint8Array(base) : new Uint8Array(state.width * state.height),
   };
   for (const entity of state.entities) {
     if (entity.dead || entity.id === ignoreEntityId) continue;

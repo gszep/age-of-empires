@@ -371,6 +371,10 @@ def extract_entity(
         "category": category,
         "hitPoints": unit.hit_points,
         "lineOfSight": rounded(unit.line_of_sight),
+        # The row of `terrain_restrictions` it obeys: which terrains it may
+        # stand on. Land units are row 7, buildings row 4, walls row 10 --
+        # and the table, not a rule, is what keeps a villager out of a pond.
+        "terrainRestriction": unit.terrain_restriction,
         "collision": [rounded(unit.collision_size_x), rounded(unit.collision_size_y)],
         # Whether anything has to walk round it. A farm has a collision box
         # like any building but no height to it and no obstruction class, and
@@ -1215,12 +1219,19 @@ def technologies_from_tree(
     return keep, skipped
 
 
-def terrain_entry(dat: DatFile, terrain_id: int) -> dict[str, Any]:
+def terrain_entry(
+    dat: DatFile, terrain_id: int, palette: list[tuple[int, int, int]] | None = None,
+) -> dict[str, Any]:
     """Texture name, tile span, and minimap color for one DAT terrain slot."""
     terrain = dat.terrain_block.terrains[terrain_id]
     if not terrain.name_2:
         raise ValueError(f"terrain {terrain_id} has no texture name")
     width, height = terrain.terrain_dimensions
+    # `colors` is three *indices* into the game palette -- the minimap's
+    # colour for the slot, and its lighter and darker shades -- not an RGB
+    # triple. Read raw, grass came out (55, 236, 54), which is green by luck,
+    # and water (19, 19, 19), which is black by the same luck the other way.
+    minimap = list(palette[terrain.colors[0]]) if palette else list(terrain.colors)
     return {
         "terrainId": terrain_id,
         "name": terrain.name,
@@ -1233,7 +1244,23 @@ def terrain_entry(dat: DatFile, terrain_id: int) -> dict[str, Any]:
         # neighbour. Both are the DAT's own fields.
         "blendPriority": terrain.blend_priority,
         "blendType": terrain.blend_type,
-        "minimapColor": list(terrain.colors),
+        "minimapColor": minimap,
+    }
+
+
+def terrain_restrictions(
+    dat: DatFile, rows: set[int], terrain_ids: list[int]
+) -> dict[str, list[int]]:
+    """For each row of `terrain_restrictions` something imported obeys, the
+    shipped terrain ids it may stand on -- the DAT's own passability table,
+    cut down to the terrains the board can hold. A nonzero multiplier is
+    passable; the multiplier itself (a damage factor) is not modelled."""
+    return {
+        str(row): [
+            terrain_id for terrain_id in terrain_ids
+            if dat.terrain_restrictions[row].passable_buildable_dmg_multiplier[terrain_id] != 0
+        ]
+        for row in sorted(rows)
     }
 
 
@@ -1322,12 +1349,19 @@ def extract(
     technologies, skipped_technologies = technologies_from_tree(
         dat, dat_path, spec, entities, civilization, hashes, strings
     )
+    palette_path = palettes_dir / "original.pal"
+    palette = read_jasc_pal(palette_path) if palette_path.is_file() else None
     terrain = {
-        key: terrain_entry(dat, slot["terrainId"])
+        key: terrain_entry(dat, slot["terrainId"], palette)
         for key, slot in spec.get("terrain", {}).items()
     }
     return {
         "terrain": terrain,
+        "terrainRestrictions": terrain_restrictions(
+            dat,
+            {entity["terrainRestriction"] for entity in entities.values() if "terrainRestriction" in entity},
+            [slot["terrainId"] for slot in spec.get("terrain", {}).values()],
+        ),
         # The ages, from `eras.json` beside the DAT: each names its string and
         # the shield the resource panel's `AgeUp` button shows for it.
         "ages": ages_of(dat_path, strings),

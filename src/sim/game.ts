@@ -1,10 +1,13 @@
 import {
-  GARRISON_CATEGORY, FALLBACK_RULES, TICK_SECONDS, TICKS_PER_SECOND, isAnimal, isBuilding, isMilitary, isUnit } from './data';
+  BUILDING_RESTRICTION, GARRISON_CATEGORY, FALLBACK_RULES, LAND_RESTRICTION, TICK_SECONDS, TICKS_PER_SECOND,
+  isAnimal, isBuilding, isMilitary, isUnit, restrictionOf, terrainAllows } from './data';
 import type {
   AttackValue, BuildingRules, Cost, GameRules, NodeKind, TechEffect, TechKey, UnitRules,
 } from './data';
 import { MAPS, generateMap } from './mapgen';
-import { buildNavGrid, findPath, halfExtent, isBlocked, separateUnits, tileOf, type NavGrid } from './nav';
+import {
+  buildNavGrid, entityGrid, findPath, halfExtent, isBlocked, separateUnits, terrainLayer, tileOf, type NavGrid,
+} from './nav';
 import { random01, seedFrom } from './random';
 import { buildingRulesFor, combine, unitRulesFor } from './rules';
 import { createVisibility, isEntityVisible, updateVisibility } from './visibility';
@@ -351,6 +354,23 @@ export function placementLegal(
   if (target.x - half.x < 0 || target.x + half.x > state.width
     || target.y - half.y < 0 || target.y + half.y > state.height) {
     return rejected('placement is outside the map');
+  }
+  // The ground under every tile of the footprint has to take the building:
+  // the DAT's restriction row for it (4 for a house, 10 for a wall), which
+  // is what keeps a house out of a pond and would put a dock on the shore.
+  if (state.terrain.length === state.width * state.height) {
+    const row = state.rules.buildings[building].terrainRestriction ?? BUILDING_RESTRICTION;
+    const minX = Math.max(0, Math.floor(target.x - half.x + 1e-6));
+    const maxX = Math.min(state.width - 1, Math.ceil(target.x + half.x - 1e-6) - 1);
+    const minY = Math.max(0, Math.floor(target.y - half.y + 1e-6));
+    const maxY = Math.min(state.height - 1, Math.ceil(target.y + half.y - 1e-6) - 1);
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        if (!terrainAllows(state.rules, row, state.terrain[y * state.width + x])) {
+          return rejected('placement is on ground that cannot take it');
+        }
+      }
+    }
   }
   // Units are ignored: real AoE nudges them off foundations (recorded approximation).
   for (const entity of state.entities) {
@@ -2075,9 +2095,15 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
 }
 
 /** A spot clear of the map edge and of every building and resource footprint. */
-function spawnFree(state: GameState, point: Point, radius: number): boolean {
+function spawnFree(state: GameState, point: Point, radius: number, restriction = LAND_RESTRICTION): boolean {
   if (point.x - radius < 0 || point.x + radius > state.width) return false;
   if (point.y - radius < 0 || point.y + radius > state.height) return false;
+  // Nothing appears on ground it could not walk to. The generator asks this
+  // before the board has terrain, and a board without terrain is all land.
+  if (state.terrain.length === state.width * state.height) {
+    const tile = Math.floor(point.y) * state.width + Math.floor(point.x);
+    if (!terrainAllows(state.rules, restriction, state.terrain[tile])) return false;
+  }
   for (const entity of state.entities) {
     if (entity.dead) continue;
     if (!isBuilding(entity.kind) && entity.kind !== 'resource') continue;
@@ -2092,7 +2118,9 @@ function spawnFree(state: GameState, point: Point, radius: number): boolean {
  * from there for a clear spot: a building against the map edge would otherwise
  * push its units off the map.
  */
-function spawnPoint(state: GameState, building: Entity, unitRadius: number): Point {
+function spawnPoint(
+  state: GameState, building: Entity, unitRadius: number, restriction = LAND_RESTRICTION,
+): Point {
   // Screen depth grows with x+y, so (1,1) is the corner nearest the viewer.
   let direction: Point = { x: 1, y: 1 };
   if (building.rally) {
@@ -2113,7 +2141,7 @@ function spawnPoint(state: GameState, building: Entity, unitRadius: number): Poi
         x: building.position.x + Math.cos(angle) * distance,
         y: building.position.y + Math.sin(angle) * distance,
       };
-      if (spawnFree(state, point, unitRadius)) return point;
+      if (spawnFree(state, point, unitRadius, restriction)) return point;
     }
   }
   // Hemmed in on every side: place it on the building and let separation sort
@@ -2123,7 +2151,7 @@ function spawnPoint(state: GameState, building: Entity, unitRadius: number): Poi
 
 function spawnTrainedUnit(state: GameState, building: Entity, kind: UnitKind): void {
   const rules = unitRulesFor(state, building.owner, kind);
-  const spawn = spawnPoint(state, building, rules.radius);
+  const spawn = spawnPoint(state, building, rules.radius, rules.terrainRestriction ?? LAND_RESTRICTION);
   const unit = addEntity(state, kind, building.owner, spawn, rules);
   if (building.rally) {
     const target = building.rally.targetId
@@ -2331,16 +2359,36 @@ export function stepGame(state: GameState): void {
   if (state.winner) return;
   state.tick += 1;
   updateAnimals(state);
-  const grid = buildNavGrid(state);
+  const land = terrainLayer(state, LAND_RESTRICTION);
+  const grid = entityGrid(state, undefined, undefined, land);
   // A gate is a hole in its owner's wall and a wall to everybody else, so the
-  // owner of one walks a different map. Only players who have one pay for it.
-  const owned = new Map<PlayerId, NavGrid>();
+  // owner of one walks a different map; and a unit on another restriction
+  // row than the villager's walks another map again. Rows that agree over
+  // the board's terrains share one layer object, so on a board with no water
+  // this is one grid per gate owner and no more.
+  const gateOwners = new Set<PlayerId>();
   for (const entity of state.entities) {
     if (entity.dead || entity.owner === 0 || entity.buildProgress !== undefined) continue;
     if (!state.rules.buildings[entity.kind as BuildingKind]?.passableForOwner) continue;
-    const owner = entity.owner as PlayerId;
-    if (!owned.has(owner)) owned.set(owner, buildNavGrid(state, undefined, owner));
+    gateOwners.add(entity.owner as PlayerId);
   }
+  const grids = new Map<Uint8Array, Map<PlayerId | 0, NavGrid>>([[land, new Map([[0, grid]])]]);
+  const gridFor = (entity: Entity): NavGrid => {
+    const layer = terrainLayer(state, restrictionOf(state.rules, entity));
+    const owner = entity.owner !== 0 && gateOwners.has(entity.owner as PlayerId)
+      ? entity.owner as PlayerId : 0;
+    let byOwner = grids.get(layer);
+    if (!byOwner) {
+      byOwner = new Map();
+      grids.set(layer, byOwner);
+    }
+    let built = byOwner.get(owner);
+    if (!built) {
+      built = entityGrid(state, undefined, owner || undefined, layer);
+      byOwner.set(owner, built);
+    }
+    return built;
+  };
   const builderCounts = new Map<number, number>();
   const movable: Entity[] = [];
   for (const entity of [...state.entities]) {
@@ -2349,7 +2397,7 @@ export function stepGame(state: GameState): void {
       continue;
     }
     if (isUnit(entity.kind)) {
-      updateUnit(state, (entity.owner !== 0 && owned.get(entity.owner as PlayerId)) || grid, entity, builderCounts);
+      updateUnit(state, gridFor(entity), entity, builderCounts);
       movable.push(entity);
     } else if (isBuilding(entity.kind) && entity.buildProgress === undefined) {
       updateBuildingProduction(state, entity);

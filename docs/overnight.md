@@ -272,9 +272,9 @@ attributes, and one upgrades to the heavy scorpion. The rest are land
 technologies blocked on other things — see Q5 and the four-group breakdown in
 `status.md`. Do not read "skipped" as "naval".
 
-`docs/water-design.md` scopes water as W1–W5 and it is deliberately not
-started; its one open question is the shore seam, which is the same blend-mask
-mapping that blocks terrain blends.
+`docs/water-design.md` scopes water as W1–W5; W1, W3, the passability
+table and Arabia's ponds are in, and the naval half (a coast, the dock, the
+fishing ship) waits on a water map type -- see its "Where it stands".
 
 If water is not going to be built, say so in `status.md` and stop listing its
 technologies as gaps.
@@ -393,8 +393,9 @@ test, because every stage changes the checksum.
   which a blendomatic-against-PNG comparison settles without guessing, and the
   atlas indexing inside the compiled shader. It is a real feature, not a
   lookup: a second terrain pass with a mask, changing `createGround`.
-- **Water.** `docs/water-design.md` scopes it as W1–W5 from the owned DAT. It
-  changes the board rather than adding to it; do not start it mid-run.
+- **Water's naval half.** Ponds and passability are in; the coast, dock and
+  fishing ship (`docs/water-design.md` W2/W4/W5) need a water map type first
+  and change the board rather than adding to it -- do not start it mid-run.
 - **The monk's occlusion contour.** Its idle and attack outline layers are the
   only consumed sources that fail `tools/sld_layers.py`'s walk invariant, so
   they sit in the manifest's `skippedMasks`. The invariant is the decoder

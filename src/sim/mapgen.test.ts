@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { checksumState } from './checksum';
 import { FALLBACK_RULES } from './data';
 import { createGame, stepGame } from './game';
+import { TERRAIN_WATER } from './mapgen';
 import { buildNavGrid, findPath } from './nav';
 import type { Entity, GameState } from './types';
 
@@ -117,6 +118,40 @@ describe('the grown map', () => {
       const right = half(e => e.kind === 'resource' && e.resourceKind === kind && e.position.x >= 60);
       expect(left, kind).toBe(right);
     }
+  });
+
+  it('deals ponds in the woods at the script\'s rates, ringed by trees', () => {
+    // `Arabia.rms`: 30% no ponds, 40% FEW (16 tiles), 25% NORMAL (32), 5%
+    // MANY (48), scaled by area (x1.44 on 120x120) -- so 0, 23, 46 or 69
+    // tiles, give or take the rounding of each half. Every pond tile is a
+    // wood tile with wood all round it, and the water carries no tree.
+    const seen = new Map<number, number>();
+    for (let seed = 1; seed <= 24; seed++) {
+      const state = createGame(seed, FALLBACK_RULES);
+      const trees = treeTiles(state);
+      const water: number[] = [];
+      state.terrain.forEach((id, tile) => { if (id === TERRAIN_WATER) water.push(tile); });
+      seen.set(water.length, (seen.get(water.length) ?? 0) + 1);
+      for (const tile of water) {
+        expect(trees.has(tile), `tree on water at ${tile}`).toBe(false);
+        expect(occupiedTiles(state).has(tile), `object on water at ${tile}`).toBe(false);
+        const x = tile % state.width;
+        const y = Math.floor(tile / state.width);
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const other = (y + dy) * state.width + x + dx;
+            expect(state.terrain[other] === TERRAIN_WATER || trees.has(other),
+              `pond at ${x},${y} touches open ground`).toBe(true);
+          }
+        }
+        // Mirrored across x like the wood it sits in.
+        expect(state.terrain[y * state.width + (state.width - 1 - x)]).toBe(TERRAIN_WATER);
+      }
+    }
+    const sizes = [...seen.keys()].sort((a, b) => a - b);
+    expect(sizes[0]).toBe(0);
+    expect(sizes.length).toBeGreaterThanOrEqual(3);
+    for (const size of sizes.slice(1)) expect([24, 46, 70]).toContain(size);
   });
 
   it('dresses the board in a biome instead of one flat terrain', () => {

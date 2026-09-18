@@ -1875,6 +1875,70 @@ Verified under three's WebGL2 fallback in headless Chrome; the node material is
 the same one the sprites use, so the WebGPU path compiles the same graph, but
 it has not been looked at on a GPU this session.
 
+## Water: ponds in Arabia's woods, and the ground that decides who walks
+
+The first water on a generated board, and the first time the ground itself
+says no. Two things landed together because neither is honest without the
+other.
+
+**Ponds, as `Arabia.rms` deals them.** The owned script's global forest ponds:
+one roll per match -- 30% none, 40% FEW (`WATER_SHALLOW`, 16 tiles in 2
+clumps), 25% NORMAL (32 in 4), 5% MANY (48 in 6) -- grown over
+`FOREST_PLACEHOLDER` with `spacing_to_other_terrain_types 1`, and
+`set_scale_by_size`/`set_scale_by_groups` scaling both by area against the
+script's 100x100 reference. On this 120x120 board that is 0, 24, 46 or 70
+water tiles, every one a wood tile whose eight neighbours are wood or water,
+carrying no tree and no object, mirrored like the wood it sits in. The
+per-player forest ponds the script also defines are compiled out by its own
+`GOODBYE_PONDS` and are not dealt here either. Two decisions to know about:
+the ponds draw from their own seed-derived stream, so every board dealt before
+they existed deals the same objects (they decide play -- a wall, and fewer
+trees -- so they are mirrored, unlike the dressing); and `POND_TERRAIN` is
+`Water, Shallow` (1) in every biome, which is what the script says.
+
+**Passability is the DAT's table.** `terrain_restrictions` is 53 rows of
+per-terrain multipliers and every unit names its row. The importer now emits
+the rows anything imported obeys, cut to the shipped terrain ids
+(`manifest.terrainRestrictions`), and each entity's `terrainRestriction`: the
+villager, militia, archer and boar are row 7, the scout 28, the trade cart and
+the siege 20, the deer 1, buildings 4, walls and gates 10. Row 7 has no entry
+for the three open-water slots and does have one for `Beach` and `Shallows`,
+which is AoE2's own wading-through-shallows, unwritten. `buildNavGrid` takes
+the walker's row and blocks what it refuses; the terrain layer is computed
+once per board per row and rows that agree over the board's terrains share
+one layer, so a board with no water costs one grid per gate owner as before
+(measured: the tick at parity, after a first cut that doubled it).
+`placementLegal` refuses a footprint with any tile the building's row
+refuses -- a house half on the shore is on the water -- and the spawn search
+will not put a trained unit on ground it could not walk to. The open fallback
+carries the same rows over the terrains its boards can paint, which over that
+set is "all land" for every row: the shore family the rows differ on is not
+painted by any board yet.
+
+A consequence worth knowing: Windsor's Thames was `Water, Shallow` all along
+and was walked across; it is now water, and a route between the two town
+centers still exists (204 steps, checked).
+
+**The shore is the blend.** Water's `blend_priority` 166 out-ranks every land
+slot and its `blend_type` 3 is blendomatic's water family, so a pond bleeds
+into the wood around it through the same pass issue #42 built. Nothing was
+added for it. The surface is the DAT's `g_wtr` texture as-is; the reference
+renders water through a shader (`water_def.json`: normal maps, sky dome, sea
+floor, preset "Calm"/"Dimmed" for ponds, waves off) and that is not
+implemented -- `backlog.md`.
+
+**Minimap colours were palette indices.** A terrain slot's `colors` is three
+indices into the game palette, not an RGB triple. Read raw, grass came out
+(55, 236, 54) -- green by luck -- and water (19, 19, 19), black. They are now
+resolved through `original.pal`: grass (0, 169, 0), water (48, 93, 182).
+
+Verified: `mapgen.test.ts` over 24 seeds (rates, ringing, mirroring, no tree
+or object on water), `nav.test.ts` (a villager sent across a pond goes round
+and never stands in it, sent into it stops on the shore; a house is refused on
+and half on water), `test_import_aoe2.py` (the rows, the palette colours, and
+that the published manifest carries them), and a headless-Chrome screenshot of
+seed 3's pond with the map revealed.
+
 ## A farm is twelve furrows across, and no two are the same
 
 `terrain_dimensions` is 6x6 for the grown farm (`g_fm1`) and 3x3 for the one
