@@ -69,9 +69,15 @@ export interface BiomeSpec {
   /** The leaf litter a lone tree stands on, and the patch inside that. */
   stragglerForest: number;
   stragglerForestVariation: number;
+  /**
+   * The script's `AESTHETIC_FLAT`, `_GROUPED` and `_SCATTER` for the biome,
+   * as imported entity keys: picture the view strews over the board
+   * (`src/view/scatter.ts`), never simulation entities.
+   */
+  aesthetics?: { flat: string; grouped: string; scatter: string };
 }
 
-type BiomeTerrain = Exclude<keyof BiomeSpec, 'name'>;
+type BiomeTerrain = Exclude<keyof BiomeSpec, 'name' | 'aesthetics'>;
 
 /**
  * Arabia's `<TERRAIN_GENERATION>` passes, in the script's own order, with its
@@ -108,24 +114,28 @@ export const ARABIA_BIOMES: BiomeSpec[] = [
   {
     name: 'PALAEARCTIC_MIDDLE_EAST_DESERT',
     stragglerForest: 48, stragglerForestVariation: 110,
+    aesthetics: { flat: 'plant-dead', grouped: 'cactus', scatter: 'animal-skeleton' },
     base: 14, blendA: 11, blendB: 6, blendC: 14, blendD: 14,
     forest: 13, forestEdge: 13, forestVariationA: 110, forestVariationB: 13, forestBlend: 3,
   },
   {
     name: 'PALAEARCTIC_EUROPE_TEMPERATE',
     stragglerForest: 19, stragglerForestVariation: 71,
+    aesthetics: { flat: 'plant-flower', grouped: 'stump', scatter: 'plant-flower' },
     base: 12, blendA: 5, blendB: 9, blendC: 12, blendD: 12,
     forest: 10, forestEdge: 89, forestVariationA: 19, forestVariationB: 104, forestBlend: 12,
   },
   {
     name: 'NEARCTIC_TEMPERATE',
     stragglerForest: 89, stragglerForestVariation: 110,
+    aesthetics: { flat: 'plant-bush', grouped: 'plant-flower', scatter: 'plant-shrub' },
     base: 3, blendA: 0, blendB: 9, blendC: 12, blendD: 3,
     forest: 19, forestEdge: 89, forestVariationA: 10, forestVariationB: 19, forestBlend: 0,
   },
   {
     name: 'PALAEARCTIC_EUROPE_MEDITERRANEAN',
     stragglerForest: 19, stragglerForestVariation: 71,
+    aesthetics: { flat: 'plant-flower', grouped: 'stump', scatter: 'plant-flower' },
     base: 9, blendA: 100, blendB: 117, blendC: 121, blendD: 3,
     forest: 88, forestEdge: 89, forestVariationA: 19, forestVariationB: 104, forestBlend: 0,
   },

@@ -20,6 +20,7 @@ import type { ResourceStatus, ScoreRow } from './view/hud';
 import { costLabel, displayName as nameFrom, plainHelp } from './view/names';
 import { artKey, chooseAnimation, createEntityView, gatherTargetResource, playerColorHex, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline, elevatedWorldToIso, elevationAt, ELEVATION_PIXELS } from './view/world';
+import { createScatter } from './view/scatter';
 import { createCueWatcher, pollCues } from './view/cues';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 
@@ -201,6 +202,9 @@ let zoom = 1;
 
 let ground = view.createGround(game, assets);
 scene.add(ground);
+// The aesthetic scatter: picture only, placed by the view from the board.
+let scatter = createScatter(game, assets);
+scene.add(scatter);
 let fog = view.createFog(game);
 scene.add(fog.mesh);
 
@@ -1667,6 +1671,10 @@ function rebuildPresentation(): void {
   disposeObject(ground);
   ground = view.createGround(game, assets);
   scene.add(ground);
+  scene.remove(scatter);
+  disposeObject(scatter);
+  scatter = createScatter(game, assets);
+  scene.add(scatter);
 
   scene.remove(fog.mesh);
   disposeObject(fog.mesh);

@@ -1997,6 +1997,30 @@ and half on water), `test_import_aoe2.py` (the rows, the palette colours, and
 that the published manifest carries them), and a headless-Chrome screenshot of
 seed 3's pond with the map revealed.
 
+## The aesthetic scatter is picture, and it is the script's
+
+`Arabia.rms` ends its object generation with `AESTHETICS`: per biome, an
+`AESTHETIC_FLAT`, `_GROUPED` and `_SCATTER` object (dead plants, cacti and an
+animal skeleton in the desert; flowers and stumps in the temperate and
+Mediterranean; bushes, flowers and shrubs in the nearctic) strewn in pairs
+three tiles across at twenty tiles' spacing on the biome's `BASE_BLEND_A`
+ground, pairs at twenty-eight anywhere, and singles at forty-two, all sixteen
+or twenty-four tiles from a player and four from a wood. Seven gaia units are
+imported for them (`category: decoration`), each with the DAT's own variants
+in its idle sheet, picked by where the object stands.
+
+In the reference they have no collision box and no obstruction class -- a
+cactus has a half-tile box and still no height -- so nothing walks round them
+and nothing gathers them. Here they are picture only (`src/view/scatter.ts`):
+placed by the view from the match seed and the board, drawn as static
+sprites among the entity bodies at their own depth, never in
+`state.entities`, so the simulation, the observation, the protocol and every
+checksum are untouched. Fifty-odd objects on a 120x120 board, as the script's
+spacings work out; a test holds them off the water, the woods and the players
+and proves the placement pure. What the passes' `avoid_actor_area` lists say
+about herdables and huntables is not modelled: a bush may stand beside a
+deer.
+
 ## A farm is twelve furrows across, and no two are the same
 
 `terrain_dimensions` is 6x6 for the grown farm (`g_fm1`) and 3x3 for the one

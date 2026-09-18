@@ -1279,6 +1279,83 @@
       }
     },
     {
+      "key": "plant-bush",
+      "unitId": 1360,
+      "civ": "gaia",
+      "category": "decoration",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        }
+      }
+    },
+    {
+      "key": "plant-shrub",
+      "unitId": 1362,
+      "civ": "gaia",
+      "category": "decoration",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        }
+      }
+    },
+    {
+      "key": "plant-dead",
+      "unitId": 1365,
+      "civ": "gaia",
+      "category": "decoration",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        }
+      }
+    },
+    {
+      "key": "plant-flower",
+      "unitId": 1366,
+      "civ": "gaia",
+      "category": "decoration",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        }
+      }
+    },
+    {
+      "key": "cactus",
+      "unitId": 709,
+      "civ": "gaia",
+      "category": "decoration",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        }
+      }
+    },
+    {
+      "key": "stump",
+      "unitId": 809,
+      "civ": "gaia",
+      "category": "decoration",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        }
+      }
+    },
+    {
+      "key": "animal-skeleton",
+      "unitId": 1091,
+      "civ": "gaia",
+      "category": "decoration",
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        }
+      }
+    },
+    {
       "key": "mill",
       "unitId": 68,
       "category": "building",
