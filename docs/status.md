@@ -1830,29 +1830,40 @@ that exists (see issue #44).
 
 Terrain-to-terrain edges are still hard lines; that is issue #42.
 
-## Fog fades across a tile instead of stepping at its edge
+## The fog edge is a rounded contour, not a staircase and not a gradient
 
-Every tile carried one alpha on both of its triangles, so the boundary between
-seen and unseen ground was a hard diamond edge and the fog read as a staircase
-rather than as fog. The alpha is now averaged at each tile *corner*, over the
-up-to-four tiles that meet there, and the GPU interpolates across the quad —
-the same trick `cornerElevation` already used to keep neighbouring tiles' hills
-joined. Measured on the opening view: a horizontal scan across the boundary
-takes **118 pixels** to go from a tenth to nine tenths of the way dark where it
-took 45, over 64 distinct levels rather than 29.
+Issue #41. The seen area used to be a staircase of tile diamonds, then (from
+ca95297) a gradient a tile wide that still showed every diamond through it.
+It is now what the reference does: the fog is a per-tile visibility texture
+that the GPU filters across the tiles and snaps at the midpoint of the ramp.
+Along a straight run that puts the edge exactly on the tile boundary; at the
+corners of the staircase it cuts across, so a circle of seen tiles is drawn as
+a circle. Measured on the opening view, a scan across the boundary goes from a
+tenth to nine tenths dark in **5-12 pixels** where it took 28-115.
 
-Corners on the map's own border clamp onto the tiles that exist rather than
-averaging in the void beyond, which would draw a dark rim round the whole
-board; a test asserts a fully-explored map is uniformly clear to its edges.
+The mechanism is the reference's own, read from the owned shaders rather than
+guessed: `TerrainAttributes_ps.so` samples `g_VisibilityTexture` through
+`sBilinear`, and the combine pass carries `g_fogFadeAmount`, `g_fogCellSize`
+and `g_OptionFogBorder`. What those constants are *set to* lives in the engine,
+not in any owned file, so two things here are approximations: the sample is a
+cubic B-spline (four bilinear taps) rather than the plain bilinear ramp, because
+the snapped bilinear ramp is a polygon with a facet a tile long and the spline
+bends it into a curve; and the edge is softened over 0.3 of a tile either side
+of the midpoint (`FOG_EDGE_INNER`/`FOG_EDGE_OUTER`). Both are in `world.ts`
+beside the levels, and `fogAlpha` mirrors the opacity node so the shape is
+tested without a GPU. The spline pulls the contour a fraction of a tile inward
+at a convex corner tile (0.42 at the middle of its outer edge, where bilinear
+reads 0.5), which is the price of the curve.
 
-It is also cheaper than what it replaced. The RGB of the overlay is black for
-the life of the mesh and was being rewritten every frame along with the alpha;
-writing only the alpha pays for the corner pass and more. On Windsor's 392x392
-board, `fog.update` went from **2.66 ms to 1.74 ms** a frame.
+Explored-but-unseen and never-seen are the texture's two channels and are
+shaped the same way, so the boundary of the black is as round as the boundary
+of the dim. The map's border clamps onto its own tiles, as before. The per-frame
+cost is two byte writes a tile instead of a corner-averaging pass and 24 float
+writes; the corner pass is gone.
 
-What this is *not* is AoE2DE's own fog edge, which is drawn from art rather
-than interpolated. The reference's terrain blending is a separate mechanism and
-is still not implemented — see the note in `backlog.md`.
+Verified under three's WebGL2 fallback in headless Chrome; the node material is
+the same one the sprites use, so the WebGPU path compiles the same graph, but
+it has not been looked at on a GPU this session.
 
 ## A farm is twelve furrows across, and no two are the same
 

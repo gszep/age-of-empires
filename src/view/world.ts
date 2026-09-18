@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { floor, fract, smoothstep as smoothstepNode, texture as textureNode, uv, vec2 } from 'three/tsl';
 import { TILE_W, TILE_H, worldToIso } from './iso';
 import type { ContentAssets, ImportedTerrain } from './assets';
 import type { GameState } from '../sim/types';
@@ -445,30 +446,107 @@ export function updateSelectionOutline(mesh: THREE.Mesh, half: { x: number; y: n
 
 export interface FogLayer {
   mesh: THREE.Mesh;
+  /** One texel per tile, red seen now and green ever seen, 0 or 255. */
+  texture: THREE.DataTexture;
   update(state: GameState): void;
+  dispose(): void;
 }
 
-/** Per-tile fog quad-grid: unexplored is black, explored-not-visible dimmed. */
 /**
  * How dark explored-but-unseen ground and never-seen ground are.
  *
- * Exported so the fog tests can state the gradient in terms of the two levels
+ * Exported so the fog tests can state the edge in terms of the two levels
  * rather than repeating the numbers.
  */
 export const FOG_EXPLORED = 0.45;
 export const FOG_UNSEEN = 0.97;
+/**
+ * Where across a tile the fog edge falls and how soft it is, as fractions of
+ * the ramp between one tile's centre and the next. The renderer filters the
+ * visibility texture, which is a ramp about a tile wide; snapping it at its
+ * midpoint puts the edge on the tile boundary along a straight run and cuts
+ * across the corner tiles of a staircase, so a circle of seen tiles reads as a
+ * circle rather than as the diamonds it is made of (issue #41). The width
+ * either side of the midpoint is the only thing here that is not geometry:
+ * AoE2DE shapes its own `g_VisibilityTexture` ramp with engine constants the
+ * owned files do not carry, so 0.15 of a tile is an approximation -- see
+ * docs/status.md.
+ */
+export const FOG_EDGE_INNER = 0.35;
+export const FOG_EDGE_OUTER = 0.65;
 
+/** `smoothstep`, as the shader has it, so the test can follow the same curve. */
+const smoothstep = (edge0: number, edge1: number, x: number): number => {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * The fog's darkness at a point whose bilinear visibility reads `sight` (how
+ * much of the surrounding ground is seen right now) and `explored` (how much
+ * has ever been seen). Mirrors the material's opacity node exactly -- keep
+ * the two together -- so the shape of the edge can be tested without a GPU.
+ */
+export function fogAlpha(sight: number, explored: number): number {
+  const seen = smoothstep(FOG_EDGE_INNER, FOG_EDGE_OUTER, sight);
+  const known = smoothstep(FOG_EDGE_INNER, FOG_EDGE_OUTER, explored);
+  return FOG_UNSEEN * (1 - known) + FOG_EXPLORED * known * (1 - seen);
+}
+
+/**
+ * Cubic B-spline sampling of a texture whose size is known, as four bilinear
+ * taps (the trick from GPU Gems 2 ch. 20, which is what three's own
+ * `textureBicubic` does under a mip chain this texture does not have). Bilinear
+ * alone joins the tile centres with straight ramps, so the snapped edge is a
+ * polygon with a facet a tile long; the spline bends the ramp through the
+ * corners and the edge comes out as a curve.
+ */
+function bicubic(map: ReturnType<typeof textureNode>, width: number, height: number) {
+  const scaled = uv().mul(vec2(width, height)).add(0.5);
+  const cell = floor(scaled);
+  const t = fract(scaled);
+  // The B-spline's four weights, paired into two bilinear taps per axis.
+  const w0 = t.oneMinus().pow(3).div(6);
+  const w1 = t.pow(3).mul(3).sub(t.pow(2).mul(6)).add(4).div(6);
+  const w2 = t.pow(3).mul(-3).add(t.pow(2).mul(3)).add(t.mul(3)).add(1).div(6);
+  const w3 = t.pow(3).div(6);
+  const g0 = w0.add(w1);
+  const g1 = w2.add(w3);
+  const h0 = w1.div(g0).sub(1);
+  const h1 = w3.div(g1).add(1);
+  const texel = vec2(1 / width, 1 / height);
+  const at = (dx: typeof h0.x, dy: typeof h0.y) =>
+    map.sample(vec2(cell.x.add(dx), cell.y.add(dy)).sub(0.5).mul(texel));
+  return g0.y.mul(g0.x.mul(at(h0.x, h0.y)).add(g1.x.mul(at(h1.x, h0.y))))
+    .add(g1.y.mul(g0.x.mul(at(h0.x, h1.y)).add(g1.x.mul(at(h1.x, h1.y)))));
+}
+
+/**
+ * Fog overlay: a black quad-grid over the ground whose opacity comes from a
+ * visibility texture, one texel per tile, filtered across the tiles and
+ * snapped at the edge. That is the reference's own mechanism -- AoE2DE's
+ * terrain shader reads `g_VisibilityTexture` through a bilinear sampler and
+ * shapes the result -- and it is what makes the seen area a rounded shape
+ * rather than a staircase of diamonds or a tile-wide gradient. The mesh
+ * follows the ground's elevation like the ground itself does, so the fog sits
+ * on a hill rather than under it.
+ */
 export function createFog(state: GameState): FogLayer {
-  const size = state.width * state.height;
+  const { width, height } = state;
+  const size = width * height;
   const positions = new Float32Array(size * 6 * 3);
-  const alphas = new Float32Array(size * 6);
+  const uvs = new Float32Array(size * 6 * 2);
   let offset = 0;
-  for (let y = 0; y < state.height; y++) {
-    for (let x = 0; x < state.width; x++) {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
       const raised = (px: number, py: number) => {
         const iso = worldToIso(px, py);
         iso.y += cornerElevation(state, px, py) * ELEVATION_PIXELS;
-        return iso;
+        // The texel for tile (x, y) is centred at ((x + 0.5) / width, ...), so
+        // a corner's UV lands exactly between the up-to-four tiles that meet
+        // there and the sampler averages them; clamping at the map's border
+        // averages only the tiles that exist rather than a dark rim beyond.
+        return { x: iso.x, y: iso.y, u: px / width, v: py / height };
       };
       const north = raised(x, y);
       const east = raised(x + 1, y);
@@ -478,95 +556,49 @@ export function createFog(state: GameState): FogLayer {
         positions[offset * 3] = p.x;
         positions[offset * 3 + 1] = p.y;
         positions[offset * 3 + 2] = 0;
+        uvs[offset * 2] = p.u;
+        uvs[offset * 2 + 1] = p.v;
         offset++;
       }
     }
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  // Black overlay with per-vertex RGBA alpha: unexplored opaque, fogged dim.
-  // The RGB stays 0 for the life of the mesh, so only alpha is written per
-  // frame — three quarters of the writes on a board this size, saved.
-  const colorAttribute = new THREE.BufferAttribute(new Float32Array(size * 6 * 4), 4);
-  geometry.setAttribute('color', colorAttribute);
-  void alphas;
-  // One alpha per tile *corner*, reused between frames. Shading a tile flat
-  // made every fog boundary a hard diamond edge, because both triangles of a
-  // tile carried its own single value; averaging the up-to-four tiles that
-  // meet at a corner lets the GPU interpolate across the quad instead, which
-  // is the gradient the reference shows. Same trick as `cornerElevation`.
-  const cornerAlphas = new Float32Array((state.width + 1) * (state.height + 1));
-  const tileAlphas = new Float32Array(size);
-  const mesh = new THREE.Mesh(
-    geometry,
-    new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide }),
-  );
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+
+  // Two bytes a tile: red is seen now, green is ever seen. Both are filtered,
+  // so the explored/unseen edge is shaped exactly like the seen/explored one.
+  const flags = new Uint8Array(size * 2);
+  const visibilityTexture = new THREE.DataTexture(flags, width, height, THREE.RGFormat);
+  visibilityTexture.magFilter = THREE.LinearFilter;
+  visibilityTexture.minFilter = THREE.LinearFilter;
+  visibilityTexture.generateMipmaps = false;
+  // A row is two bytes a tile, so an odd width is not a multiple of four.
+  visibilityTexture.unpackAlignment = 1;
+
+  const material = new THREE.MeshBasicNodeMaterial({
+    color: 0x000000, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide,
+  });
+  const sample = bicubic(textureNode(visibilityTexture), width, height);
+  // The same curve as `fogAlpha` above; change both or neither.
+  const seen = smoothstepNode(FOG_EDGE_INNER, FOG_EDGE_OUTER, sample.r);
+  const known = smoothstepNode(FOG_EDGE_INNER, FOG_EDGE_OUTER, sample.g);
+  material.opacityNode = known.oneMinus().mul(FOG_UNSEEN)
+    .add(known.mul(seen.oneMinus()).mul(FOG_EXPLORED));
+
+  const mesh = new THREE.Mesh(geometry, material);
   mesh.renderOrder = 5000;
 
   const update = (current: GameState) => {
     const visibility = current.visibility[1];
-    const colors = colorAttribute.array as Float32Array;
-    const { width, height } = current;
-    // One alpha per tile first, in a single linear pass: the corner average
-    // below then reads four floats instead of eight typed-array probes, and
-    // this runs every frame on boards up to 392x392.
-    for (let index = 0; index < size; index++) {
-      tileAlphas[index] = visibility.visible[index] ? 0
-        : visibility.explored[index] ? FOG_EXPLORED : FOG_UNSEEN;
+    for (let index = 0, out = 0; index < size; index++, out += 2) {
+      flags[out] = visibility.visible[index] ? 255 : 0;
+      flags[out + 1] = visibility.explored[index] ? 255 : 0;
     }
-    // Corners next, each the mean of the tiles meeting there. The interior is
-    // always four tiles, so it is done without the bounds tests; the border
-    // rows and columns, where a corner has only two tiles or one, are clamped
-    // afterwards. Counting the void beyond the map as unseen instead would
-    // draw a dark rim round the whole board.
-    const stride = width + 1;
-    for (let cy = 1; cy < height; cy++) {
-      const above = (cy - 1) * width;
-      const here = cy * width;
-      let out = cy * stride + 1;
-      for (let cx = 1; cx < width; cx++, out++) {
-        cornerAlphas[out] = (tileAlphas[above + cx - 1] + tileAlphas[above + cx]
-          + tileAlphas[here + cx - 1] + tileAlphas[here + cx]) * 0.25;
-      }
-    }
-    // Border corners: clamp the missing neighbours onto the tiles that exist.
-    const edge = (cx: number, cy: number): number => {
-      const x0 = cx > 0 ? cx - 1 : 0;
-      const x1 = cx < width ? cx : width - 1;
-      const y0 = cy > 0 ? cy - 1 : 0;
-      const y1 = cy < height ? cy : height - 1;
-      return (tileAlphas[y0 * width + x0] + tileAlphas[y0 * width + x1]
-        + tileAlphas[y1 * width + x0] + tileAlphas[y1 * width + x1]) * 0.25;
-    };
-    for (let cx = 0; cx <= width; cx++) {
-      cornerAlphas[cx] = edge(cx, 0);
-      cornerAlphas[height * stride + cx] = edge(cx, height);
-    }
-    for (let cy = 1; cy < height; cy++) {
-      cornerAlphas[cy * stride] = edge(0, cy);
-      cornerAlphas[cy * stride + width] = edge(width, cy);
-    }
-    // The six vertices are north, east, south, north, south, west — the same
-    // order the positions were built in, so each takes its own corner.
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const north = cornerAlphas[y * stride + x];
-        const east = cornerAlphas[y * stride + x + 1];
-        const south = cornerAlphas[(y + 1) * stride + x + 1];
-        const west = cornerAlphas[(y + 1) * stride + x];
-        let base = ((y * width + x) * 6) * 4 + 3;
-        colors[base] = north; base += 4;
-        colors[base] = east; base += 4;
-        colors[base] = south; base += 4;
-        colors[base] = north; base += 4;
-        colors[base] = south; base += 4;
-        colors[base] = west;
-      }
-    }
-    colorAttribute.needsUpdate = true;
+    visibilityTexture.needsUpdate = true;
   };
   update(state);
-  return { mesh, update };
+  return { mesh, texture: visibilityTexture, update, dispose: () => visibilityTexture.dispose() };
 }
 
 export const mapPixelSize = (state: GameState) => ({

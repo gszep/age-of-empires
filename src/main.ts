@@ -1664,6 +1664,7 @@ function rebuildPresentation(): void {
 
   scene.remove(fog.mesh);
   disposeObject(fog.mesh);
+  fog.dispose();
   fog = view.createFog(game);
   scene.add(fog.mesh);
   fog.update(game);

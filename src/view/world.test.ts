@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { describe, expect, it } from 'vitest';
 import { worldToIso } from './iso';
-import { FARM_TILES_PER_SPAN, FOG_UNSEEN, createFog, createFootprint, createGround, createSelectionOutline, createTerrainPatch, insetConvex, updateSelectionOutline } from './world';
+import { FARM_TILES_PER_SPAN, FOG_EDGE_INNER, FOG_EDGE_OUTER, FOG_EXPLORED, FOG_UNSEEN, createFog, fogAlpha, createFootprint, createGround, createSelectionOutline, createTerrainPatch, insetConvex, updateSelectionOutline } from './world';
 import { createGame } from '../sim/game';
 import type { ContentAssets } from './assets';
 
@@ -236,66 +236,76 @@ describe('meshes that lie on the ground', () => {
     expect(Math.max(...us) - Math.min(...us)).toBeCloseTo(3 / FARM_TILES_PER_SPAN, 6);
   });
 
-  it('grades the fog across a boundary instead of stepping at the tile edge', () => {
-    // A tile shaded flat carries one alpha on both its triangles, so every
-    // fog boundary is a hard diamond edge. Averaging the up-to-four tiles that
-    // meet at a corner lets the GPU interpolate across the quad.
+  it('writes each tile into the visibility texture as seen-now and ever-seen', () => {
+    // The fog's shape is the GPU sampling this texture bilinearly, so what
+    // the update has to get right is one texel per tile with the two flags
+    // in the two channels it filters.
     const state = createGame(11);
     const visibility = state.visibility[1];
     visibility.visible.fill(0);
     visibility.explored.fill(0);
-    // A 3x3 block of seen tiles in a never-seen field, so there is an interior
-    // corner as well as a boundary.
     const at = (x: number, y: number) => y * state.width + x;
-    for (let y = 4; y <= 6; y++) for (let x = 4; x <= 6; x++) {
-      visibility.visible[at(x, y)] = 1;
-      visibility.explored[at(x, y)] = 1;
-    }
-
+    visibility.explored[at(5, 5)] = 1;
+    visibility.visible[at(5, 5)] = 1;
+    visibility.explored[at(6, 5)] = 1;
     const fog = createFog(state);
     fog.update(state);
-    const colors = (fog.mesh.geometry.getAttribute('color') as THREE.BufferAttribute);
-    const alphasOf = (x: number, y: number) => {
-      const first = (y * state.width + x) * 6;
-      return Array.from({ length: 6 }, (_, i) => colors.getW(first + i));
-    };
-
-    // Every corner of the middle tile is surrounded by seen ground, so it is
-    // still completely clear -- the gradient must not wash into the interior.
-    const centre = alphasOf(5, 5);
-    for (const alpha of centre) expect(alpha).toBeCloseTo(0, 6);
-
-    // The tile on the block's edge is graded: its inner corners are clear and
-    // its outer ones carry some of the dark beyond.
-    const edge = alphasOf(6, 5);
-    expect(Math.min(...edge)).toBeCloseTo(0, 6);
-    expect(Math.max(...edge)).toBeGreaterThan(0.2);
-    // And the first unseen tile out is graded the other way, rather than
-    // snapping straight to full dark.
-    const beyond = alphasOf(7, 5);
-    expect(Math.min(...beyond)).toBeLessThan(FOG_UNSEEN - 0.05);
-    expect(Math.max(...beyond)).toBeCloseTo(FOG_UNSEEN, 6);
-    for (const alpha of [...centre, ...edge, ...beyond]) {
-      expect(alpha).toBeGreaterThanOrEqual(0);
-      expect(alpha).toBeLessThanOrEqual(FOG_UNSEEN + 1e-6);
-    }
-
-    // Far from anything seen it is still the flat unseen level, so the
-    // gradient is local to the boundary and the rest is untouched.
-    const far = alphasOf(state.width - 2, state.height - 2);
-    for (const alpha of far) expect(alpha).toBeCloseTo(FOG_UNSEEN, 6);
+    const flags = fog.texture.image.data as Uint8Array;
+    expect(fog.texture.image.width).toBe(state.width);
+    expect(fog.texture.image.height).toBe(state.height);
+    expect(Array.from(flags.subarray(at(5, 5) * 2, at(5, 5) * 2 + 2))).toEqual([255, 255]);
+    expect(Array.from(flags.subarray(at(6, 5) * 2, at(6, 5) * 2 + 2))).toEqual([0, 255]);
+    expect(Array.from(flags.subarray(at(7, 5) * 2, at(7, 5) * 2 + 2))).toEqual([0, 0]);
+    expect(fog.texture.magFilter).toBe(THREE.LinearFilter);
+    expect(fog.texture.minFilter).toBe(THREE.LinearFilter);
+    // An update after the tile is lost from sight has to reach the GPU:
+    // `needsUpdate` is a setter that bumps the version the renderer compares.
+    const uploaded = fog.texture.version;
+    visibility.visible[at(5, 5)] = 0;
+    fog.update(state);
+    expect(flags[at(5, 5) * 2]).toBe(0);
+    expect(fog.texture.version).toBe(uploaded + 1);
+    // The corner of tile (x, y) samples at (x / width, y / height): halfway
+    // between the texels of the tiles that meet there, so the sampler's
+    // average is the corner's, and the map's edge clamps onto its own tiles.
+    const uv = fog.mesh.geometry.getAttribute('uv') as THREE.BufferAttribute;
+    const first = at(5, 5) * 6;
+    expect(uv.getX(first)).toBeCloseTo(5 / state.width, 6);
+    expect(uv.getY(first)).toBeCloseTo(5 / state.height, 6);
+    expect(uv.getX(first + 2)).toBeCloseTo(6 / state.width, 6);
+    expect(uv.getY(first + 2)).toBeCloseTo(6 / state.height, 6);
   });
 
-  it('leaves the map border as dark as the tiles inside it', () => {
-    // Corners on the edge average only the tiles that exist; counting the
-    // void beyond as unseen would draw a dark rim round the whole board.
-    const state = createGame(11);
-    state.visibility[1].visible.fill(1);
-    state.visibility[1].explored.fill(1);
-    const fog = createFog(state);
-    fog.update(state);
-    const colors = fog.mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
-    for (let i = 0; i < colors.count; i++) expect(colors.getW(i)).toBeCloseTo(0, 6);
+  it('snaps the fog edge to a rounded contour rather than a tile-wide ramp', () => {
+    // Issue #41. Bilinear sampling of the tile grid is a ramp one tile wide;
+    // the edge is where that ramp is snapped. Along a straight run the
+    // boundary between a seen tile and an unseen one reads 0.5 at the tile
+    // edge, so that is where the fog turns over.
+    expect(fogAlpha(1, 1)).toBeCloseTo(0, 6);
+    expect(fogAlpha(0, 0)).toBeCloseTo(FOG_UNSEEN, 6);
+    expect(fogAlpha(0, 1)).toBeCloseTo(FOG_EXPLORED, 6);
+    expect(fogAlpha(0.5, 1)).toBeCloseTo(FOG_EXPLORED / 2, 6);
+    expect(fogAlpha(0.5, 0.5)).toBeCloseTo((FOG_UNSEEN + FOG_EXPLORED / 2) / 2, 6);
+    // The corner of a staircase: one seen tile of the four that meet there
+    // samples a quarter, which is fully fogged, and three of four samples
+    // three quarters, which is fully clear. That is the corner cut across --
+    // the diamond's points shaved and its notches filled -- and it is what
+    // makes a circle of tiles a circle.
+    expect(fogAlpha(0.25, 1)).toBeCloseTo(FOG_EXPLORED, 6);
+    expect(fogAlpha(0.75, 1)).toBeCloseTo(0, 6);
+    // The transition is confined to the band around the midpoint, so it is
+    // an edge and not a gradient: the whole ramp outside it is flat.
+    expect(fogAlpha(FOG_EDGE_INNER, 1)).toBeCloseTo(FOG_EXPLORED, 6);
+    expect(fogAlpha(FOG_EDGE_OUTER, 1)).toBeCloseTo(0, 6);
+    expect(FOG_EDGE_OUTER - FOG_EDGE_INNER).toBeLessThan(0.5);
+    expect(FOG_EDGE_INNER + FOG_EDGE_OUTER).toBeCloseTo(1, 6);
+    // Monotone across the band, so nothing rings.
+    let last = fogAlpha(0, 1);
+    for (let t = 0.05; t <= 1; t += 0.05) {
+      const next = fogAlpha(t, 1);
+      expect(next).toBeLessThanOrEqual(last + 1e-9);
+      last = next;
+    }
   });
 
   it('fades a terrain into its lower-priority neighbour', () => {

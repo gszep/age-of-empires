@@ -594,6 +594,16 @@ keeps the record.
   not find it in the files I looked at" is a different claim from "the files do
   not contain it", and only the second is a blocker.
 
+- **The owned compiled shaders name their inputs, and that is often the whole
+  answer.** `resources/_common/shaders/d3d11/*.so` are DXBC blobs, and
+  `strings` on one lists its samplers and constants -- `g_VisibilityTexture`
+  with `sBilinear`, `g_fogFadeAmount`, `g_OverlayForEdges`, `g_MaskTexture`
+  beside `g_BlendTexture`. That told issue #41 the fog edge is a filtered
+  per-tile texture and not art, without disassembling anything. Values are
+  another matter: a constant's *setting* is in the engine, so it is an
+  approximation to record. Rule: before writing "lives in a compiled shader"
+  as a reason something is unknowable, run `strings` over it.
+
 - **A cosmetic feature must not draw on the stream that decides the game.**
   Dressing the board in a biome needed random numbers, and taking them from the
   match's own generator shifted every draw after it — so choosing what colour
