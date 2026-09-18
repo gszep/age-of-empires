@@ -122,6 +122,18 @@ key-binding audit, #36 every unit's stats checked against the DAT, and #44 the
 degenerate match seed. Only **#5 (pathing)** is left, still blocked on the human
 for which units doing what, and **#41**, which the human tagged invalid.
 
+**The 2026-09-18/19 run built water and rebuilt the blend.** In order:
+issue #41's fog edge (a per-tile visibility texture snapped to a rounded
+contour, levels from `colorcorrection.json`); Arabia's forest ponds and the
+DAT's `terrain_restrictions` table as passability; then, overnight, Islands
+as a descriptor, the engine's beach sweep, the blend pass rewritten as the
+eight-neighbour algorithm once the mask bytes were read as keep-base alpha,
+a gutter in the mask atlas, and the water surface drawn through
+`water_def.json`'s presets. Every stage has a section in `status.md`; the
+approximations are the fog edge's softness, the water shader's combination,
+and nothing else. Tried and reverted: the nearctic snow dusting
+(`backlog.md`). Left measured but not built: the shore foam.
+
 **The 2026-09-13 session** cleared the bugs filed after the last overnight run:
 #32 (a lumberjack going idle at the camp — the continuation remembered which
 *kind* it had worked but not which resource, and a spent node is swept up three
@@ -384,18 +396,15 @@ test, because every stage changes the checksum.
 
 ## Blocked or deliberately not started
 
-- **Terrain blend edges.** No longer blocked on evidence the way this said:
-  `blend_type` turns out to take 0..7 in coherent terrain families that map
-  one-to-one onto the names in `terrain/blends/` (farms are type 1 and there is
-  a `farmland.png`), and `blendomatic_x1.dat` — never opened until 2026-09-14 —
-  holds nine blending modes of 31 diamond masks and walks exactly to EOF. The
-  full measurement is in `backlog.md`. What is left is the index-to-file order,
-  which a blendomatic-against-PNG comparison settles without guessing, and the
-  atlas indexing inside the compiled shader. It is a real feature, not a
-  lookup: a second terrain pass with a mask, changing `createGround`.
-- **Water's naval half.** Ponds and passability are in; the coast, dock and
-  fishing ship (`docs/water-design.md` W2/W4/W5) need a water map type first
-  and change the board rather than adding to it -- do not start it mid-run.
+- **Terrain blend edges.** Done, the engine's way (2026-09-19): every tile
+  reads its eight neighbours and each higher terrain is drawn through the
+  one blendomatic mask for the configuration, with the mode looked up from
+  the two blend types -- `status.md`, "Terrain edges fade". What is left is
+  optional: DE's own 512x512 masks, whose indexing is in the compiled shader.
+- **Water's naval half.** The board is done -- Islands (`?map=islands`), the
+  engine's beach, the passability table, the reference's water shader -- and
+  the dock and fishing ship (`docs/water-design.md` W4/W5) are entities on
+  it. They no longer change the board and can be started mid-run.
 - **The monk's occlusion contour.** Its idle and attack outline layers are the
   only consumed sources that fail `tools/sld_layers.py`'s walk invariant, so
   they sit in the manifest's `skippedMasks`. The invariant is the decoder

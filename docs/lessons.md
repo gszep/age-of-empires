@@ -641,6 +641,23 @@ keeps the record.
   tooling is needed for the water textures, and `convert_water` in
   `tools/convert_sld.py` is twenty lines.
 
+- **A hard limit in a growth algorithm draws a straight line, and the
+  script has a field for exactly that.** Islands' first coasts were dead
+  straight wherever the land met the half-map margin or the border box,
+  because a tile was either allowed or not. `border_fuzziness` is the
+  engine's answer -- a tile's chance of being taken fades over that many
+  tiles -- and reading it as such gave ragged coasts in one change. Rule:
+  when a generated shape has a straight edge nothing in the reference has,
+  look for the constraint that cut it and for the script field that softens
+  it before inventing noise.
+- **Judge a dressing pass against the reference before shipping it.** The
+  nearctic `POWDER_LIGHT` pass, painted at the script's own numbers through
+  this generator's growth, came out as white blobs the size of the real
+  ponds and read as frozen lakes; the script's negative clumping means
+  something this growth does not do. The numbers were right and the picture
+  was wrong. Rule: a pass copied from a script is verified by a screenshot
+  next to the reference's, not by its numbers matching.
+
 - **A cosmetic feature must not draw on the stream that decides the game.**
   Dressing the board in a biome needed random numbers, and taking them from the
   match's own generator shifted every draw after it — so choosing what colour

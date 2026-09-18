@@ -38,9 +38,19 @@ construction-complete cue, so that one has no owned source to draw on.
 - **The water shader's combination is calibrated, not read.** Every input
   is the preset's own; how `Water_ps` combines them is compiled, so the
   open-water colour is a measured constant (`src/view/water.ts`,
-  `OPEN_WATER`). The shore-foam waves (`WaveAnim_ps`, `atlas_v1_*`, off for
-  ponds and on for `WATER_DEFAULT`) and the vertex wave displacement
-  (`wave_amplitude`) are not drawn.
+  `OPEN_WATER`). The vertex wave displacement (`wave_amplitude`) is not
+  drawn.
+- **The shore foam is not drawn.** DE rolls foam along a `WATER_DEFAULT`
+  coast (`enable_waves 1`; ponds are 0) through `WaveAnim_ps`
+  (`g_WaterAnim1a-d`) from `terrain/water/atlas_v1_{ortho,diag}_{1-4}.png`.
+  Measured 2026-09-19: each atlas is 2048 square, 8x8 frames of 256 px, and
+  `diag_1` then `diag_2` is one 128-frame sequence of a foam line rolling
+  across the frame and back (its centroid travels (93,171) to (135,115) and
+  returns), `diag_3`/`diag_4` the same line mirrored, `ortho_1`/`ortho_2`
+  and `_3`/`_4` the sequence for a shore that runs screen-orthogonally. What
+  is not measured is the frame's footprint against the tile and the
+  direction each pair faces; place one pair against a straight stretch of
+  Islands coast and compare with a DE screenshot before wiring all four.
 - **The fog has no clouds.** AoE2DE's "Animate Fog" option ("animate the fog
   of war with clouds") draws never-seen ground as a slowly drifting brown-grey
   cloud instead of flat black, and "Animate Fog Border" moves the edge between
