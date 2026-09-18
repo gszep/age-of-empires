@@ -469,11 +469,11 @@ export const FOG_UNSEEN = 0.97;
  * circle rather than as the diamonds it is made of (issue #41). The width
  * either side of the midpoint is the only thing here that is not geometry:
  * AoE2DE shapes its own `g_VisibilityTexture` ramp with engine constants the
- * owned files do not carry, so 0.15 of a tile is an approximation -- see
- * docs/status.md.
+ * owned files do not carry, so 0.075 of a tile is an approximation -- it was
+ * 0.15 and read as a gradient on a real screen -- see docs/status.md.
  */
-export const FOG_EDGE_INNER = 0.35;
-export const FOG_EDGE_OUTER = 0.65;
+export const FOG_EDGE_INNER = 0.425;
+export const FOG_EDGE_OUTER = 0.575;
 
 /** `smoothstep`, as the shader has it, so the test can follow the same curve. */
 const smoothstep = (edge0: number, edge1: number, x: number): number => {

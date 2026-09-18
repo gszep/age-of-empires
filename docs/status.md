@@ -1848,8 +1848,9 @@ and `g_OptionFogBorder`. What those constants are *set to* lives in the engine,
 not in any owned file, so two things here are approximations: the sample is a
 cubic B-spline (four bilinear taps) rather than the plain bilinear ramp, because
 the snapped bilinear ramp is a polygon with a facet a tile long and the spline
-bends it into a curve; and the edge is softened over 0.3 of a tile either side
-of the midpoint (`FOG_EDGE_INNER`/`FOG_EDGE_OUTER`). Both are in `world.ts`
+bends it into a curve; and the edge is softened over 0.075 of a tile either
+side of the midpoint (`FOG_EDGE_INNER`/`FOG_EDGE_OUTER`) -- twice that read as
+a gradient on a real screen, so it was halved by eye. Both are in `world.ts`
 beside the levels, and `fogAlpha` mirrors the opacity node so the shape is
 tested without a GPU. The spline pulls the contour a fraction of a tile inward
 at a convex corner tile (0.42 at the middle of its outer edge, where bilinear
