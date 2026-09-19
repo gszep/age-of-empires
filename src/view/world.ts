@@ -4,7 +4,7 @@ import { TILE_W, TILE_H, worldToIso } from './iso';
 import { isOpenWater } from '../sim/mapgen';
 import { maskU, type ContentAssets, type ImportedTerrain } from './assets';
 import { createWaterMaterial, surfaceOpacity, waterPresetFor } from './water';
-import type { GameState } from '../sim/types';
+import type { GameState, ReadonlyGameState } from '../sim/types';
 
 /**
  * Ground plane in the dimetric projection. With imported content the DAT's
@@ -19,18 +19,18 @@ export const ELEVATION_PIXELS = TILE_H / 2;
 /** Height at a world point, in authored levels. Tile means are deliberately
  * sampled rather than invented slopes for entities; ground vertices average
  * their adjacent means so every tile shares exactly the same edge. */
-export function elevationAt(state: GameState, x: number, y: number): number {
+export function elevationAt(state: ReadonlyGameState, x: number, y: number): number {
   const tx = Math.max(0, Math.min(state.width - 1, Math.floor(x)));
   const ty = Math.max(0, Math.min(state.height - 1, Math.floor(y)));
   return state.elevation?.[ty * state.width + tx] ?? 0;
 }
 
-export function elevatedWorldToIso(state: GameState, x: number, y: number) {
+export function elevatedWorldToIso(state: ReadonlyGameState, x: number, y: number) {
   const iso = worldToIso(x, y);
   return { x: iso.x, y: iso.y + elevationAt(state, x, y) * ELEVATION_PIXELS };
 }
 
-function cornerElevation(state: GameState, x: number, y: number): number {
+function cornerElevation(state: ReadonlyGameState, x: number, y: number): number {
   let total = 0;
   let count = 0;
   for (const ty of [y - 1, y]) for (const tx of [x - 1, x]) {
@@ -59,7 +59,7 @@ const FALLBACK_KEYS: Record<number, string> = {
   0: 'ground', 10: 'forest', 1: 'water', 24: 'road',
 };
 
-export function createGround(state: GameState, assets?: ContentAssets): THREE.Group {
+export function createGround(state: ReadonlyGameState, assets?: ContentAssets): THREE.Group {
   // One mesh per terrain the board actually carries, rather than per hardcoded
   // class. A biome dresses the ground in its own base, four blend terrains and
   // three forest variations, so the four-class list drew every one of them as
@@ -582,7 +582,7 @@ export interface FogLayer {
   mesh: THREE.Mesh;
   /** One texel per tile, red seen now and green ever seen, 0 or 255. */
   texture: THREE.DataTexture;
-  update(state: GameState): void;
+  update(state: ReadonlyGameState): void;
   dispose(): void;
 }
 
@@ -671,7 +671,7 @@ function bicubic(map: ReturnType<typeof textureNode>, width: number, height: num
  * follows the ground's elevation like the ground itself does, so the fog sits
  * on a hill rather than under it.
  */
-export function createFog(state: GameState): FogLayer {
+export function createFog(state: ReadonlyGameState): FogLayer {
   const { width, height } = state;
   const size = width * height;
   const positions = new Float32Array(size * 6 * 3);
@@ -729,7 +729,7 @@ export function createFog(state: GameState): FogLayer {
   const mesh = new THREE.Mesh(geometry, material);
   mesh.renderOrder = 5000;
 
-  const update = (current: GameState) => {
+  const update = (current: ReadonlyGameState) => {
     const visibility = current.visibility[1];
     for (let index = 0, out = 0; index < size; index++, out += 2) {
       flags[out] = visibility.visible[index] ? 255 : 0;
@@ -740,8 +740,3 @@ export function createFog(state: GameState): FogLayer {
   update(state);
   return { mesh, texture: visibilityTexture, update, dispose: () => visibilityTexture.dispose() };
 }
-
-export const mapPixelSize = (state: GameState) => ({
-  width: (state.width + state.height) * (TILE_W / 2),
-  height: (state.width + state.height) * (TILE_H / 2),
-});

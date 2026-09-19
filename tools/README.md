@@ -125,6 +125,13 @@ to clearance), `unit.transform_unit_id` (a packed and unpacked siege engine are
 two units and the DAT does not say which is the other; see `docs/ledger.md`),
 `unit.type_50.attacks[*].type` (it is `.class_`).
 
+`tools/survey.py` lists every owned basename under `dat/`, `xs/`,
+`particles/`, `widgetui/*.json` and the shaders that nothing in the repo
+cites, and every DAT unit field no importer or doc names (`--importers`
+asks the stricter question against the importers alone). Run it before
+writing "not in the owned files" anywhere: the same audit by hand found
+sixteen gaps in an hour on 2026-09-17.
+
 `tools/datq.py` reloads the whole DAT on every invocation, which takes tens of
 seconds. Asking it more than two or three questions is slower than writing a
 one-shot script that parses once and prints everything you want.

@@ -18,7 +18,7 @@
 import * as THREE from 'three/webgpu';
 import { ARABIA_BIOMES, TERRAIN_BEACH, isOpenWater, type BiomeSpec } from '../sim/mapgen';
 import { random01, seedFrom } from '../sim/random';
-import type { GameState } from '../sim/types';
+import type { GameState, ReadonlyGameState } from '../sim/types';
 import type { Atlas, ContentAssets } from './assets';
 import { isoDepth, worldToIso } from './iso';
 import { elevationAt, ELEVATION_PIXELS } from './world';
@@ -48,7 +48,7 @@ const FROM_WOOD = 4;
 const FROM_OTHERS = 5;
 
 /** The biome a dealt board is dressed in, from its most common ground. */
-export function biomeOf(state: GameState): BiomeSpec | undefined {
+export function biomeOf(state: ReadonlyGameState): BiomeSpec | undefined {
   const counts = new Map<number, number>();
   for (const id of state.terrain) counts.set(id, (counts.get(id) ?? 0) + 1);
   const ranked = [...counts].sort((a, b) => b[1] - a[1]).map(([id]) => id);
@@ -64,7 +64,7 @@ export function biomeOf(state: GameState): BiomeSpec | undefined {
  * fixed order from the match seed. Exposed for tests; `createScatter` draws
  * them.
  */
-export function scatterPlacements(state: GameState): { key: string; x: number; y: number }[] {
+export function scatterPlacements(state: ReadonlyGameState): { key: string; x: number; y: number }[] {
   const biome = biomeOf(state);
   if (!biome?.aesthetics) return [];
   const { width, height } = state;
@@ -126,7 +126,7 @@ export function scatterPlacements(state: GameState): { key: string; x: number; y
 }
 
 /** One static sprite per placement, from the object's own idle frames. */
-export function createScatter(state: GameState, assets: ContentAssets | undefined): THREE.Group {
+export function createScatter(state: ReadonlyGameState, assets: ContentAssets | undefined): THREE.Group {
   const group = new THREE.Group();
   if (!assets) return group;
   for (const { key, x, y } of scatterPlacements(state)) {

@@ -8,7 +8,7 @@ import { materialUrl, iconUrl, ownedIconUrl, type PlayerColors, type UiAssets } 
 import { placeCommands } from './command-grid';
 import { widgetBox } from './layout';
 import { Minimap } from './minimap';
-import type { GameState, PlayerId, Point } from '../sim/types';
+import type { GameState, PlayerId, Point, ReadonlyGameState } from '../sim/types';
 
 /**
  * What the resource panel shows beside the stockpiles: who is gathering what,
@@ -609,7 +609,7 @@ export class Hud {
       </div>`).join('');
   }
 
-  updateResources(state: GameState, player: PlayerId, status?: ResourceStatus): void {
+  updateResources(state: ReadonlyGameState, player: PlayerId, status?: ResourceStatus): void {
     const p = state.players[player];
     this.resourceValues.wood.textContent = String(p.wood);
     this.resourceValues.food.textContent = String(p.food);

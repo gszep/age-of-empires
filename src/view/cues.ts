@@ -9,7 +9,7 @@
  */
 import { isBuilding } from '../sim/data';
 import type { TechKey } from '../sim/data';
-import type { GameState, PlayerId } from '../sim/types';
+import type { GameState, PlayerId, ReadonlyGameState } from '../sim/types';
 
 /** Alert names, matching the aliases `sounds.json` gives these events. */
 export type Cue =
@@ -89,7 +89,7 @@ export const createCueWatcher = (): CueWatcher => ({
  * unit that was already damaged.
  */
 export function pollCues(
-  watcher: CueWatcher, state: GameState, player: PlayerId, seconds: number,
+  watcher: CueWatcher, state: ReadonlyGameState, player: PlayerId, seconds: number,
 ): Cue[] {
   const cues: Cue[] = [];
   const hp = new Map<number, number>();

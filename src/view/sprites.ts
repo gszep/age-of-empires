@@ -6,7 +6,7 @@ import { isAnimal, isBuilding, isUnit } from '../sim/data';
 import { swingSeconds } from '../sim/game';
 import { createTerrainPatch, elevationAt, ELEVATION_PIXELS, elevatedWorldToIso } from './world';
 import { worldToIso, isoDepth, TILE_H } from './iso';
-import type { Entity, GameState, Point } from '../sim/types';
+import type { Entity, GameState, Point, ReadonlyGameState, DeepReadonly } from '../sim/types';
 
 /** Open-content player colours, used until the game palette is imported. */
 export const PLAYER_COLORS: Record<number, number> = { 0: 0xffffff, 1: 0x1a6cff, 2: 0xe02b2b };
@@ -240,7 +240,7 @@ export function entityKey(entity: Entity): string {
  * is how eaten it is. Returns undefined for anything the food does not drive —
  * a soldier's corpse still rots on the clock.
  */
-export function decayFraction(state: GameState, entity: Entity): number | undefined {
+export function decayFraction(state: ReadonlyGameState, entity: Entity): number | undefined {
   if (!entity.dead || !isAnimal(entity.kind)) return undefined;
   const total = state.rules.units[entity.kind].foodAmount ?? 0;
   if (total <= 0) return undefined;
@@ -254,7 +254,7 @@ export function decayFraction(state: GameState, entity: Entity): number | undefi
  * not a corpse: AoE2 shows it from the first chop and leaves it there while the
  * wood lasts, so the state is read from what the node has left.
  */
-export function treeIsFelled(state: GameState, entity: Entity): boolean {
+export function treeIsFelled(state: ReadonlyGameState, entity: Entity): boolean {
   return entity.kind === 'resource' && entity.resourceKind === 'wood'
     && (entity.amount ?? 0) < state.rules.nodes.tree.amount;
 }
@@ -281,7 +281,7 @@ export const WALL_RUN_Y = 1;
 export const WALL_JOINT = 2;
 export const WALL_POST = 4;
 
-export function wallShape(state: GameState, entity: Entity): number {
+export function wallShape(state: ReadonlyGameState, entity: Entity): number {
   let alongX = false;
   let alongY = false;
   for (const offset of [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]) {
@@ -325,7 +325,7 @@ export const gateArtKey = gateBoxKey;
  */
 export const GATE_OPEN_RANGE = 2.5;
 
-export function gateIsOpen(state: GameState, entity: Entity): boolean {
+export function gateIsOpen(state: ReadonlyGameState, entity: Entity): boolean {
   return state.entities.some(other => !other.dead && other.owner === entity.owner
     && isUnit(other.kind)
     && Math.abs(other.position.x - entity.position.x) <= GATE_OPEN_RANGE
@@ -347,7 +347,7 @@ const AGE_NAMES = ['dark', 'feudal', 'castle', 'imperial'] as const;
  * the rubble, because the variant unit an age upgrades a building into has
  * its own `dying_graphic` and its own rubble unit (issue #61).
  */
-export function ageIdle(state: GameState, entity: Entity, base = 'idle'): string {
+export function ageIdle(state: ReadonlyGameState, entity: Entity, base = 'idle'): string {
   const age = entity.owner === 0 ? 0 : state.players[entity.owner]?.age ?? 0;
   const index = Math.max(0, Math.min(age, AGE_NAMES.length - 1));
   return index === 0 ? base : `${base}-${AGE_NAMES[index]}`;
@@ -360,7 +360,7 @@ export function ageIdle(state: GameState, entity: Entity, base = 'idle'): string
  * market has to fall back to its base art rather than to nothing, and a
  * Castle-age one that had a Feudal variant must not skip past it to the base.
  */
-export function ageChain(state: GameState, entity: Entity, base = 'idle'): string[] {
+export function ageChain(state: ReadonlyGameState, entity: Entity, base = 'idle'): string[] {
   const age = entity.owner === 0 ? 0 : state.players[entity.owner]?.age ?? 0;
   const names: string[] = [];
   for (let index = Math.min(age, AGE_NAMES.length - 1); index > 0; index--) {
@@ -389,7 +389,7 @@ function isVariantArt(entity: Entity, animation: AnimationInfo): boolean {
 }
 
 /** Choose the imported sprite source (entity variant) and animation name. */
-export function chooseAnimation(state: GameState, entity: Entity): { key: string; name: string } {
+export function chooseAnimation(state: ReadonlyGameState, entity: Entity): { key: string; name: string } {
   const kind = entity.kind;
   if (kind === 'resource') {
     const felled = entity.dead || treeIsFelled(state, entity);
@@ -466,7 +466,7 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
 }
 
 /** The villager variant an animal task calls for, or undefined for anything else. */
-function animalVariant(state: GameState, entity: Entity): string | undefined {
+function animalVariant(state: ReadonlyGameState, entity: Entity): string | undefined {
   const target = gatherTarget(state, entity);
   if (!target || !isAnimal(target.kind)) return undefined;
   // A herdable is walked home and milked where it stands; everything else on
@@ -477,26 +477,26 @@ function animalVariant(state: GameState, entity: Entity): string | undefined {
 }
 
 /** Whether what this unit is attacking is game rather than an enemy. */
-function huntingTarget(state: GameState, entity: Entity): boolean {
+function huntingTarget(state: ReadonlyGameState, entity: Entity): boolean {
   const order = entity.order;
   if (order.kind !== 'attack') return false;
   const target = state.entities.find(e => e.id === order.targetId);
   return !!target && isAnimal(target.kind);
 }
 
-function gatherTarget(state: GameState, entity: Entity): Entity | undefined {
+function gatherTarget(state: ReadonlyGameState, entity: Entity): DeepReadonly<Entity> | undefined {
   if (entity.order.kind !== 'gather') return undefined;
   const targetId = entity.order.targetId;
   return state.entities.find(e => e.id === targetId);
 }
 
-function buildTarget(state: GameState, entity: Entity): Entity | undefined {
+function buildTarget(state: ReadonlyGameState, entity: Entity): DeepReadonly<Entity> | undefined {
   if (entity.order.kind !== 'build') return undefined;
   const targetId = entity.order.targetId;
   return state.entities.find(e => e.id === targetId);
 }
 
-export function gatherTargetResource(state: GameState, entity: Entity) {
+export function gatherTargetResource(state: ReadonlyGameState, entity: Entity) {
   return gatherTarget(state, entity)?.resourceKind;
 }
 
@@ -556,7 +556,7 @@ function applyFrame(
  * foundation, a corpse or an undamaged building.
  */
 function updateDamage(
-  view: EntityView, assets: ContentAssets, state: GameState, entity: Entity,
+  view: EntityView, assets: ContentAssets, state: ReadonlyGameState, entity: Entity,
   imported: ImportedEntity | undefined, animationName: string, frameIndex: number, depth: number, time: number,
 ): void {
   const lost = entity.maxHp > 0 ? 1 - entity.hp / entity.maxHp : 0;
@@ -770,7 +770,7 @@ export function updateProjectileView(
  */
 const HIDDEN_FRACTION = 0.5;
 
-export function updateOcclusion(views: Map<string, EntityView>, state: GameState): void {
+export function updateOcclusion(views: Map<string, EntityView>, state: ReadonlyGameState): void {
   const occluders: { depth: number; x: number; y: number; width: number; height: number }[] = [];
   for (const entity of state.entities) {
     if (entity.dead) continue;
@@ -816,7 +816,7 @@ export function updateOcclusion(views: Map<string, EntityView>, state: GameState
 
 /** Farms swap between the construction and grown terrain slots. */
 function updateFarmView(
-  view: EntityView, assets: ContentAssets | undefined, state: GameState, entity: Entity,
+  view: EntityView, assets: ContentAssets | undefined, state: ReadonlyGameState, entity: Entity,
 ): void {
   const slot = entity.buildProgress !== undefined ? 'farm-construction' : 'farm';
   if (view.patchSlot !== slot) {
@@ -840,7 +840,7 @@ function updateFarmView(
 export function updateEntityView(
   view: EntityView,
   assets: ContentAssets | undefined,
-  state: GameState,
+  state: ReadonlyGameState,
   entity: Entity,
   time: number,
 ): void {
@@ -892,7 +892,9 @@ export function updateEntityView(
   // and once the art has played out the unit stands until the next swing
   // (issue #72). Without swing timing -- a fallback unit mid-order -- the
   // view's clock stands in as before.
-  let swing = choice.name === 'attack' ? swingSeconds(state, entity) : undefined;
+  // The one place the view hands its read-only state to a simulation helper
+  // typed on the mutable one; `swingSeconds` only reads.
+  let swing = choice.name === 'attack' ? swingSeconds(state as GameState, entity) : undefined;
   if (swing !== undefined) {
     const attack = imported?.animations['attack'];
     const length = attack ? attack.frames * (attack.frameSeconds > 0 ? attack.frameSeconds : 0.1) : 0;

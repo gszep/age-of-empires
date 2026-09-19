@@ -1,5 +1,6 @@
 import type { BuildingKind, Command, EntityKind, ResourceKind } from './types';
 import { isBuilding } from './data';
+import { distance } from './nav';
 import type { PlayerObservation } from '../protocol/types';
 
 interface Spotted {
@@ -8,7 +9,6 @@ interface Spotted {
   buildProgress?: number; order?: string;
 }
 
-const distance = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
 /**
  * Which resource each villager works, by its place in the line.

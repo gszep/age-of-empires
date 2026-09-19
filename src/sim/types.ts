@@ -231,6 +231,20 @@ export interface GameState {
   winner?: PlayerId;
 }
 
+/**
+ * The simulation's state as the view, the HUD, the debug bridge and the
+ * agents may hold it: readable to any depth, writable nowhere. `src/sim` is
+ * authoritative and everything else reaches it through `applyCommand`; this
+ * type makes that boundary a compile error instead of a discipline.
+ */
+export type DeepReadonly<T> =
+  T extends (...args: never[]) => unknown ? T
+    : T extends Uint8Array | Uint16Array | Uint32Array | Int32Array | Float32Array | Float64Array ? T
+      : T extends (infer U)[] ? readonly DeepReadonly<U>[]
+        : T extends object ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+          : T;
+export type ReadonlyGameState = DeepReadonly<GameState>;
+
 export type Command =
   | { kind: 'order'; player: PlayerId; entityIds: number[]; target: Point; targetId?: number;
       /** Fall in behind what the unit is already doing instead of replacing

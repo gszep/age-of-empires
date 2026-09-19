@@ -12,6 +12,9 @@ import { groundAllows, isBuilding, LAND_RESTRICTION } from './data';
 import type { Entity, GameState, PlayerId, Point } from './types';
 
 /** A building's half-extents in tiles: square unless it says otherwise. */
+/** Euclidean distance between two points, in tiles. */
+export const distance = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y);
+
 export const halfExtent = (entity: Entity): { x: number; y: number } =>
   entity.footprint ?? { x: entity.radius, y: entity.radius };
 

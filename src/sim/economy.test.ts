@@ -2799,41 +2799,41 @@ describe('unit upgrades', () => {
     expect(upgraded.attacks.find(a => a.class === 4)!.amount).toBeGreaterThan(before);
   });
 
-  it('promotes a standing unit for every upgrade the tree carries, the castle line included', () => {
-    // The rule, not the inventory: every technology that replaces a unit
-    // promotes the ones already standing, whichever building researches it
-    // and whatever age it waits on -- the elite longbowman at the castle as
-    // much as the man-at-arms at the barracks. A playtest reported a
-    // longbowman that stayed one through Elite Longbowman; the promotion
-    // holds here for all fifteen, so whatever was seen is not this path.
-    if (!importedRules) return;
-    const lines = Object.entries(importedRules.technologies)
-      .flatMap(([key, tech]) => (tech.upgrades ?? []).map(step => ({ key, tech, step })));
-    expect(lines.length).toBeGreaterThanOrEqual(15);
-    expect(lines.some(l => l.key === 'elite-longbowman')).toBe(true);
-    for (const { key, tech, step } of lines) {
-      const state = createGame(66, importedRules);
-      state.players[1].age = 3;
-      state.players[1].researched.push('feudal-age', 'castle-age', 'imperial-age', ...(tech.requires ?? []));
-      Object.assign(state.players[1], { food: 9000, gold: 9000, wood: 9000, stone: 9000 });
-      const site = state.rules.buildings[tech.researchedAt];
-      const building: Entity = {
-        id: state.nextId++, kind: tech.researchedAt, owner: 1, position: { x: 56.5, y: 56.5 },
-        hp: site.hp, maxHp: site.hp, radius: site.radius, activity: 'idle', order: { kind: 'idle' },
-      };
-      state.entities.push(building);
-      const from = state.rules.units[step.from as UnitKind];
-      const standing: Entity = {
-        id: state.nextId++, kind: step.from as UnitKind, owner: 1, position: { x: 52.5, y: 56.5 },
-        hp: from.hp, maxHp: from.hp, radius: from.radius, activity: 'idle', order: { kind: 'idle' },
-      };
-      state.entities.push(standing);
-      expect(applyCommand(state, { kind: 'research', player: 1, buildingId: building.id, tech: key }).ok,
-        `${key} refused`).toBe(true);
-      for (let i = 0; i < 6000 && !state.players[1].researched.includes(key); i++) stepGame(state);
-      expect(state.players[1].researched, `${key} never landed`).toContain(key);
-      expect(state.entities.find(e => e.id === standing.id)!.kind, `${key} left a ${step.from}`).toBe(step.to);
-    }
+  // The rule, not the inventory: every technology that replaces a unit
+  // promotes the ones already standing, whichever building researches it
+  // and whatever age it waits on -- the elite longbowman at the castle as
+  // much as the man-at-arms at the barracks. One `it` per line: as one test
+  // the fifteen took 22 s against a 30 s timeout and failed under load.
+  const upgradeLines = importedRules
+    ? Object.entries(importedRules.technologies)
+      .flatMap(([key, tech]) => (tech.upgrades ?? []).map(step => ({ key, tech, step })))
+    : [];
+  it.skipIf(!importedRules)('carries at least the fifteen upgrade lines, the castle line included', () => {
+    expect(upgradeLines.length).toBeGreaterThanOrEqual(15);
+    expect(upgradeLines.some(l => l.key === 'elite-longbowman')).toBe(true);
+  });
+  it.each(upgradeLines.map(l => [`${l.key} from ${l.step.from}`, l] as const))('promotes a standing unit through %s', (_name, { key, tech, step }) => {
+    const state = createGame(66, importedRules);
+    state.players[1].age = 3;
+    state.players[1].researched.push('feudal-age', 'castle-age', 'imperial-age', ...(tech.requires ?? []));
+    Object.assign(state.players[1], { food: 9000, gold: 9000, wood: 9000, stone: 9000 });
+    const site = state.rules.buildings[tech.researchedAt];
+    const building: Entity = {
+      id: state.nextId++, kind: tech.researchedAt, owner: 1, position: { x: 56.5, y: 56.5 },
+      hp: site.hp, maxHp: site.hp, radius: site.radius, activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(building);
+    const from = state.rules.units[step.from as UnitKind];
+    const standing: Entity = {
+      id: state.nextId++, kind: step.from as UnitKind, owner: 1, position: { x: 52.5, y: 56.5 },
+      hp: from.hp, maxHp: from.hp, radius: from.radius, activity: 'idle', order: { kind: 'idle' },
+    };
+    state.entities.push(standing);
+    expect(applyCommand(state, { kind: 'research', player: 1, buildingId: building.id, tech: key }).ok,
+      `${key} refused`).toBe(true);
+    for (let i = 0; i < 6000 && !state.players[1].researched.includes(key); i++) stepGame(state);
+    expect(state.players[1].researched, `${key} never landed`).toContain(key);
+    expect(state.entities.find(e => e.id === standing.id)!.kind, `${key} left a ${step.from}`).toBe(step.to);
   });
 
   it('stops the barracks offering what it has upgraded past', () => {

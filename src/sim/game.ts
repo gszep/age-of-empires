@@ -1,13 +1,14 @@
 import {
   BUILDING_RESTRICTION, GARRISON_CATEGORY, FALLBACK_RULES, LAND_RESTRICTION, TICK_SECONDS, TICKS_PER_SECOND,
   OPEN_WATER_TERRAINS, groundAllows, isAnimal, isBuilding, isMilitary, isUnit, restrictionOf, rowAdmitsWater,
-  terrainAllows } from './data';
+  terrainAllows, NODE_OF_RESOURCE,
+} from './data';
 import type {
   AttackValue, BuildingRules, Cost, GameRules, NodeKind, TechEffect, TechKey, UnitRules,
 } from './data';
 import { MAPS, generateMap } from './mapgen';
 import {
-  buildNavGrid, entityGrid, findPath, halfExtent, isBlocked, separateUnits, terrainLayer, tileOf, type NavGrid,
+  buildNavGrid, distance, entityGrid, findPath, halfExtent, isBlocked, separateUnits, terrainLayer, tileOf, type NavGrid,
 } from './nav';
 import { random01, seedFrom } from './random';
 import { buildingRulesFor, combine, unitRulesFor } from './rules';
@@ -17,7 +18,6 @@ import type {
   UnitKind,
 } from './types';
 
-const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 
 export type CommandResult = { ok: true } | { ok: false; reason: string };
 const rejected = (reason: string): CommandResult => ({ ok: false, reason });
@@ -49,9 +49,6 @@ export function addNode(state: GameState, node: NodeKind, position: Point): Enti
 export function nodeOf(entity: Entity): NodeKind {
   return entity.node ?? NODE_OF_RESOURCE[entity.resourceKind ?? 'wood'];
 }
-const NODE_OF_RESOURCE: Record<ResourceKind, NodeKind> = {
-  food: 'berries', wood: 'tree', gold: 'gold', stone: 'stone',
-};
 
 /** A fish, shore or deep: what a boat may gather and a villager may cast for from the bank. */
 export function isFishNode(entity: Entity): boolean {
@@ -2596,9 +2593,3 @@ export function stepGame(state: GameState): void {
   else if (p1Out && p2Out) state.winner = 2; // simultaneous: attacker's tick order favors 2 deterministically
 }
 
-export function nearestEntity(state: GameState, point: Point, maxDistance = 1.3): Entity | undefined {
-  return state.entities
-    .map(entity => ({ entity, d: distance(entity.position, point) - entity.radius }))
-    .filter(item => item.d <= maxDistance)
-    .sort((a, b) => a.d - b.d || a.entity.id - b.entity.id)[0]?.entity;
-}

@@ -44,7 +44,7 @@ import {
 } from 'three/tsl';
 import { isOpenWater } from '../sim/mapgen';
 import { random01, seedFrom } from '../sim/random';
-import type { GameState } from '../sim/types';
+import type { GameState, ReadonlyGameState } from '../sim/types';
 import type { ContentAssets, WaterPreset } from './assets';
 
 /**
@@ -83,7 +83,7 @@ const VIEW = new THREE.Vector3(Math.SQRT1_2 * Math.cos(Math.PI / 6), Math.SQRT1_
  * made from the match seed so it holds for the match and touches nothing
  * the simulation draws on.
  */
-export function waterPresetFor(state: GameState, assets: ContentAssets): WaterPreset | undefined {
+export function waterPresetFor(state: ReadonlyGameState, assets: ContentAssets): WaterPreset | undefined {
   const water = assets.water;
   if (!water) return undefined;
   let wet = 0;

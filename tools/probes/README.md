@@ -37,6 +37,12 @@ Run them from the repo root: `npx tsx tools/probes/snapshot.ts`.
   label's computed font. Crop the same boxes from it and from the reference
   screenshot and stack them at 5x: that is how the face, weight, size and
   digits were settled (issue #92; `docs/ledger.md`). `MAP=`, `SEED=`, `LOOK=x,y`, `NAME=`, `OUT=`.
+- **`scroll.ts`** — issue #31: holds ArrowDown for real, blurs the window
+  without a keyup (the alt-tab case), and reads an entity's screen position
+  to see whether the camera is still panning.
+- **`trebuchet.ts`** — issue #30: stages an unpacked trebuchet bombarding a
+  house through a snapshot and samples the animation name and frame over a
+  few seconds, plus the projectile art key in flight.
 - **`farm_mapping.py`** — draws the farm onto the real diamond and measures its
   furrow pitch, which is the answer issue #22 settled: both sheets carry forty
   furrows to the span and the farm shows about twelve across its three tiles.

@@ -441,7 +441,7 @@ const FALLBACK_WATER_TERRAINS = [1, 23, 2];
 export type NodeKind = 'berries' | 'tree' | 'gold' | 'stone' | 'shore-fish' | 'fish';
 
 /** Which node rules a resource plays by when it does not say (`Entity.node`). */
-const NODE_OF_RESOURCE: Record<ResourceKind, NodeKind> = {
+export const NODE_OF_RESOURCE: Record<ResourceKind, NodeKind> = {
   food: 'berries', wood: 'tree', gold: 'gold', stone: 'stone',
 };
 

@@ -1,5 +1,5 @@
-import type { GameState, PlayerId, Point, UnitKind } from '../sim/types';
-import type { NodeKind } from '../sim/data';
+import type { GameState, PlayerId, Point, ResourceKind, UnitKind, ReadonlyGameState } from '../sim/types';
+import { NODE_OF_RESOURCE, type NodeKind } from '../sim/data';
 import type { ContentAssets } from './assets';
 import { playerColorHex } from './sprites';
 
@@ -16,16 +16,13 @@ const RESOURCE_COLORS: Record<string, string> = {
   gold: '#e8c04a',
   stone: '#9aa0a6',
 };
-const NODE_OF_RESOURCE: Record<string, 'berries' | 'tree' | 'gold' | 'stone'> = {
-  food: 'berries', wood: 'tree', gold: 'gold', stone: 'stone',
-};
-function resourceColor(state: GameState, resource: string | undefined, node?: NodeKind): string {
+function resourceColor(state: ReadonlyGameState, resource: string | undefined, node?: NodeKind): string {
   const kind = resource ?? 'wood';
-  const own = state.rules.nodes[node ?? NODE_OF_RESOURCE[kind]]?.minimapColor;
+  const own = state.rules.nodes[node ?? NODE_OF_RESOURCE[kind as ResourceKind]]?.minimapColor;
   return own ? `rgb(${own[0]},${own[1]},${own[2]})` : RESOURCE_COLORS[kind];
 }
 /** A gaia animal in the DAT's own dot -- a sheep is food-green, not white. */
-function gaiaColor(state: GameState, kind: string): string | undefined {
+function gaiaColor(state: ReadonlyGameState, kind: string): string | undefined {
   const own = state.rules.units[kind as UnitKind]?.minimapColor;
   return own && `rgb(${own[0]},${own[1]},${own[2]})`;
 }
@@ -82,7 +79,7 @@ export class Minimap {
   }
   private colors?: Map<number, readonly [number, number, number]>;
 
-  private terrain(state: GameState, reveal: boolean, assets?: ContentAssets): HTMLCanvasElement {
+  private terrain(state: ReadonlyGameState, reveal: boolean, assets?: ContentAssets): HTMLCanvasElement {
     if (this.tiles?.image.width !== state.width || this.tiles.image.height !== state.height) {
       const canvas = document.createElement('canvas');
       canvas.width = state.width;
@@ -113,7 +110,7 @@ export class Minimap {
     return this.tiles.canvas;
   }
 
-  private toCanvas(state: GameState, x: number, y: number): { x: number; y: number } {
+  private toCanvas(state: ReadonlyGameState, x: number, y: number): { x: number; y: number } {
     const w = this.canvas.width;
     const h = this.canvas.height;
     const scaleX = w / (state.width + state.height);
@@ -124,7 +121,7 @@ export class Minimap {
     };
   }
 
-  fromCanvas(state: GameState, cx: number, cy: number): Point {
+  fromCanvas(state: ReadonlyGameState, cx: number, cy: number): Point {
     const w = this.canvas.width;
     const h = this.canvas.height;
     const scaleX = w / (state.width + state.height);
@@ -140,7 +137,7 @@ export class Minimap {
    * red, where the open-content fallback picks its own softer pair.
    */
   draw(
-    state: GameState, viewCenter: Point, viewTiles: { w: number; h: number },
+    state: ReadonlyGameState, viewCenter: Point, viewTiles: { w: number; h: number },
     assets?: ContentAssets,
     /** Debug reveal: shade and draw everything as if seen (view-only). */
     reveal = false,

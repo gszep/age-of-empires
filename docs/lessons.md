@@ -226,6 +226,14 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 - **`convert_sld.py --terrain-only` for a terrain slot**; the full pipeline
   for everything else, and always the pipeline, never one step.
 - **The gate runs on an idle machine.**
+- **Never edit a shell script while it is running.** Bash reads a script
+  incrementally, so an edit to `tools/gate.sh` mid-run hands the running
+  copy a different file from the offset it had reached; kill the run,
+  edit, restart. The sentinel guards against the other half: anything
+  edited after a gate *started* counts as untested.
+- **More than two or three DAT questions is a one-shot script.**
+  `tools/datq.py` reloads the DAT per call; fourteen calls beside a running
+  gate hit the tool timeout.
 
 ## Before declaring something done
 
