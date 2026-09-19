@@ -1678,7 +1678,7 @@ export function canGarrison(state: GameState, unit: Entity, building: Entity): b
  * inside add, capped at its maximum. An archer adds its `garrison_firepower`
  * of 1.0; a villager's is the DAT's -2.5, an encoding the owned files do not
  * explain, and it counts here as the one arrow the reference's rule gives
- * it (recorded in docs/status.md).
+ * it (recorded in docs/ledger.md).
  */
 export function volleyArrows(state: GameState, building: Entity): number {
   const volley = state.rules.buildings[building.kind as BuildingKind].garrison?.volley;
@@ -1786,7 +1786,7 @@ export function ungarrisonAll(state: GameState, building: Entity): Entity[] {
  * succeed and the second by which it must — so the roll is spread uniformly
  * across it: at `minSeconds` nothing has happened yet, at `maxSeconds` the
  * chance is 1. The real game's per-second roll is not in the owned files
- * (recorded in `docs/status.md`); this keeps both ends the DAT states.
+ * (recorded in `docs/ledger.md`); this keeps both ends the DAT states.
  */
 function updateConverter(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'convert') return;

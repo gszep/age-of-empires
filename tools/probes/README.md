@@ -24,7 +24,7 @@ Run them from the repo root: `npx tsx tools/probes/snapshot.ts`.
   that touches `nav.ts`, movement, or the cost of a tick.
 - **`sea.mts`** — an Islands sea read back as numbers: the mean colour of a
   tile in the shallow rim and one in the open body, against the reference
-  screenshot's (82, 172, 220) and (64, 135, 183) (`docs/status.md`, "Water"),
+  screenshot's (82, 172, 220) and (64, 135, 183) (issue #94),
   plus the minimap's histogram and a crop of each. `MAP=`, `SEED=`, `EXTRA=`
   (a query string the water shader once read switches from), `OUT=`. Not
   throwaway: re-run it after anything that touches `water.ts`, the terrain
@@ -36,8 +36,7 @@ Run them from the repo root: `npx tsx tools/probes/snapshot.ts`.
 - **`hudshot.mts`** — the HUD at the reference's own 2000x1125, with each
   label's computed font. Crop the same boxes from it and from the reference
   screenshot and stack them at 5x: that is how the face, weight, size and
-  digits were settled (`docs/status.md`, "The HUD is set in the reference's
-  own face"). `MAP=`, `SEED=`, `LOOK=x,y`, `NAME=`, `OUT=`.
+  digits were settled (issue #92; `docs/ledger.md`). `MAP=`, `SEED=`, `LOOK=x,y`, `NAME=`, `OUT=`.
 - **`farm_mapping.py`** — draws the farm onto the real diamond and measures its
   furrow pitch, which is the answer issue #22 settled: both sheets carry forty
   furrows to the span and the farm shows about twelve across its three tiles.

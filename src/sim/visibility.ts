@@ -46,7 +46,7 @@ export function lineOfSightOf(state: GameState, entity: Entity): number {
   // A foundation is a claim on the ground, not a garrison: it sees nothing
   // until it is finished. The DAT carries one `line_of_sight` per unit and no
   // construction-time variant, so this rule is the reference's observed
-  // behaviour rather than an imported number -- see docs/status.md.
+  // behaviour rather than an imported number -- see docs/ledger.md.
   if (isBuilding(entity.kind)) {
     if (entity.buildProgress !== undefined) return 0;
     return buildingRulesFor(state, entity.owner, entity.kind as BuildingKind).lineOfSight;

@@ -687,7 +687,7 @@ def extract_entity(
         # How close something has to come before the animal reacts. The deer's
         # 1.0 is exactly the one tile the reference startles it at; the sheep's
         # 4.0 is the reach of a different behaviour, so which animals flee is a
-        # rule (see `docs/status.md`), not this number.
+        # rule (see `docs/ledger.md`), not this number.
         entity["searchRadius"] = rounded(unit.bird.search_radius)
 
     if category in ("resource", "animal"):

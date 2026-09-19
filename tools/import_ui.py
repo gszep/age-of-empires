@@ -355,7 +355,7 @@ def extract_ui(
     # The widget files index a font (0 on nearly every label, 2 and 3 on a
     # handful) and ship the faces in `fonts/`; nothing in the files names
     # which index is which face, so the spec names the faces to carry and
-    # the HUD's choice among them is recorded in `docs/status.md`. A name
+    # the HUD's choice among them is recorded in `docs/ledger.md`. A name
     # with a path reaches beside `fonts/`: the in-game glyph atlas
     # (`combined.txt`) has Georgia's letters and lining digits Georgia has
     # not, and the shipped face whose digits measure as the atlas's is the

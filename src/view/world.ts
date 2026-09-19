@@ -385,7 +385,7 @@ export function blendModeFor(here: number, there: number): number {
  * across its three tiles, reported by the owner of the game. Twelve over three
  * tiles against forty to the span is ten tiles to the span, and applying it to
  * both sheets keeps the pitch steady through construction. Recorded as the
- * owner's observation in `docs/status.md`, because the owned files do not
+ * owner's observation in `docs/ledger.md`, because the owned files do not
  * answer it.
  */
 export const FARM_TILES_PER_SPAN = 10;
@@ -610,7 +610,7 @@ export const FOG_UNSEEN = 1;
  * AoE2DE shapes its own `g_VisibilityTexture` ramp with `g_fogFadeAmount`,
  * which is the one fog constant `colorcorrection.json` does not set, so 0.075
  * of a tile is an approximation -- it was 0.15 and read as a gradient on a
- * real screen -- see docs/status.md.
+ * real screen -- see docs/ledger.md.
  */
 export const FOG_EDGE_INNER = 0.425;
 export const FOG_EDGE_OUTER = 0.575;

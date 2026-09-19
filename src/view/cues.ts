@@ -57,7 +57,7 @@ export interface CueWatcher {
  *
  * Nothing in the owned files states it: `sounds.json` names the cue but not
  * its rearm, and the behaviour lives in the closed runtime. Ten seconds is an
- * approximation of AoE2's feel and is recorded as one in `docs/status.md`.
+ * approximation of AoE2's feel and is recorded as one in `docs/ledger.md`.
  */
 export const ALERT_INTERVAL = 10;
 

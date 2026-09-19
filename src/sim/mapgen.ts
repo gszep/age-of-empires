@@ -625,7 +625,7 @@ function clearAround(
  * in the original's phase order), then the opening objects. `starts[0]` is
  * the scanning player; every placement is mirrored through `mirror` so the
  * two openings stay exact copies -- a named divergence from the original's
- * independent draws (docs/status.md), kept because the paired evaluation
+ * independent draws (docs/ledger.md), kept because the paired evaluation
  * batch rests on it.
  */
 /**

@@ -43,7 +43,7 @@ Important areas:
 - `libopenage/event/` — predicted/event-driven changes;
 - `libopenage/pathfinding/` — hierarchical cost/integration/flow fields.
 
-Use openage as an external converter and design reference. Calling a GPL converter does not require copying its implementation into our runtime, but its output still contains proprietary AoE content and remains local.
+openage is a design reference only: its converter was retired on 2026-08-26 in favour of the local `tools/sld_layers.py` (byte-identical on every imported frame), and its documentation (blendomatic, SLD) may be read under the #112 rule — the read recorded, the code written fresh, nothing copied.
 
 ### 2. Siege Engineers tooling — primary transparent data interpretation
 

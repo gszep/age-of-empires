@@ -18,7 +18,7 @@ import type { Cost } from '../sim/data';
  * is plain "Palisade Gate" where its directional leaves are "(up.)" and
  * "(down.)", which is the file itself saying the qualifier is not the name.
  * Dropping a trailing parenthetical is that rule; it is recorded in
- * `docs/status.md` as the one chosen part of this.
+ * `docs/ledger.md` as the one chosen part of this.
  */
 export function displayName(key: string, imported?: string): string {
   if (imported) return imported.replace(/\s*\([^)]*\)\s*$/, '');

@@ -127,4 +127,4 @@ Imported Microsoft content is generated under ignored `public/imported/` and is 
 - `tools/` — deterministic local DAT/SLD/widgetui/blendomatic/hotkey/strings/
   font import pipeline, run in that order by `tools/import_aoe2.sh`
 - `deploy/` — legally isolated open-content Cloud Run deployment and operations notes
-- `docs/status.md` — delivered scope, measurements, discrepancies, and verification evidence
+- `docs/status.md` — delivered scope, measurements and verification; `docs/ledger.md` — every approximation and its source

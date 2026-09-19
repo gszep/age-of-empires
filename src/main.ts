@@ -104,7 +104,7 @@ let revealMap = false;
  * Default, Fast and Extra Fast (20033..20036), and the lobby dropdown lists the
  * first three as Slow/Normal/Fast (13101..13103). The multipliers themselves
  * are engine constants in code we do not read, so the four values below come
- * from the community references recorded in `docs/status.md`; what the owned
+ * from the community references recorded in `docs/ledger.md`; what the owned
  * files do settle is that there are four, and that the *second* is the
  * default — which is why the game no longer starts at 1x, the Slow setting.
  */
@@ -254,7 +254,7 @@ function selectionMarker(entity: Entity): { shape: 'round' | 'square'; half: { x
  * the owned files (the DAT's `unit_selection_color_1/2` exist but hold unused
  * palette index 0, and widgetui names no such widget — the behaviour lives in
  * the closed runtime), so both are approximated and recorded in
- * `docs/status.md`. Timed on the game clock like every other view animation.
+ * `docs/ledger.md`. Timed on the game clock like every other view animation.
  */
 const ORDER_FLASH_PERIOD_SECONDS = 0.2;
 const ORDER_FLASH_TOTAL_SECONDS = 1.2;

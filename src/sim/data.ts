@@ -182,7 +182,7 @@ export interface UnitRules {
    * for a quarter of a minute, which is what lets a hunter walk up to it and
    * what makes pushing deer toward a town center a thing a player can do. The
    * trigger is the DAT's own `search_radius` (1 tile for a deer); the hop and
-   * the wait are the reference's, recorded in `docs/status.md`.
+   * the wait are the reference's, recorded in `docs/ledger.md`.
    */
   startle?: { range: number; distance: number; restSeconds: [number, number] };
   /** The age this becomes available in; 0 is the Dark Age. */

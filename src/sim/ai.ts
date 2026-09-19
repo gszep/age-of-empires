@@ -72,7 +72,7 @@ const BARRACKS_SPOTS: { x: number; y: number }[] = [
  * 1800-second clock, six spots starved the Castle Age out of existence. Ten
  * is the Q1 rebalance's answer, bought together with the blacksmith's
  * finishing power and the 2400-second measurement clock; the batch
- * distribution in `status.md` is its evidence.
+ * distribution is on issue #124.
  */
 const FARM_SPOTS: { x: number; y: number }[] = [
   { x: -4, y: 3 }, { x: -4, y: -2 }, { x: -1, y: 4 }, { x: 3, y: 4 }, { x: -7, y: 3 },

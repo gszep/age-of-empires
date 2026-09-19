@@ -37,12 +37,12 @@ Built, in `src/sim` and the importer:
   beyond, each drawn as its own tile with the preset's surface over it.
 - **The surface** -- `src/view/water.ts` is the reference's `Water_ps`
   reconstructed from its inputs and `water_def.json`'s presets; see
-  `status.md` for the one calibrated constant.
+  `docs/ledger.md` for the calibrated constants (#94).
 
 - **W4, the dock** and **W5, the fishing ship and the fish** -- issue #81
   (2026-09-19): the dock across the shoreline, the ship launched onto the
   water and kept off the sand, the fish dealt as the script deals them and
-  drawn as the DAT composes them. `status.md` has the record.
+  drawn as the DAT composes them (#81 has the record).
 
 ## Why it was a subsystem and not an item
 
@@ -131,7 +131,7 @@ it, which is why the table was imported whole.
 **W3. Terrain rendering that does not embarrass the shore.** Done: the blend
 pass is the engine's eight-neighbour algorithm with the mode table, the
 beach is one tile of sand, and the water is drawn through the reference's
-own shader inputs (`status.md`, "Water").
+own shader inputs (`docs/ledger.md`, #94).
 
 **W4. The dock.** A building whose placement rule is new: it must sit on the
 shore, straddling land and water. In the DAT that is restriction 6 plus a
