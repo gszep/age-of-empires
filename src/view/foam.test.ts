@@ -79,6 +79,37 @@ describe('shore foam', () => {
     expect(left.uvs).toEqual([[0, 1], [0, 0], [1, 0], [1, 1]]);
   });
 
+  it('rolls a coast together: neighbouring tiles are a fiftieth of the roll apart', () => {
+    // A coin per tile made each tile's crest leap on its own; the reference
+    // shows a stretch at one point of the roll.
+    const state = createGame(11);
+    state.terrain.fill(TERRAIN_WATER);
+    const at = (x: number, y: number) => y * state.width + x;
+    for (let y = 5; y < 15; y++) state.terrain[at(20, y)] = TERRAIN_BEACH;   // a straight shore along y
+    const mesh = createFoam(state, foamAssets())!.getObjectByName('foam') as THREE.Mesh;
+    const phase = mesh.geometry.getAttribute('phase');
+    const kind = mesh.geometry.getAttribute('kind');
+    const position = mesh.geometry.getAttribute('position');
+    // The water tiles at x = 19, land at +x: one quad each; read their phases in y order.
+    const phases: number[] = [];
+    for (let y = 5; y < 15; y++) {
+      const c = worldToIso(19.5, y + 0.5);
+      for (let i = 0; i < position.count; i += 6) {
+        if (Math.abs(position.getX(i) - (c.x - TILE_W / 2)) < 1e-3 && Math.abs(position.getY(i) - (c.y - TILE_H / 2)) < 1e-3) {
+          phases.push(phase.getX(i));
+          break;
+        }
+      }
+    }
+    expect(phases.length).toBeGreaterThan(5);
+    for (let i = 1; i < phases.length; i++) {
+      const step = ((phases[i] - phases[i - 1]) % 1 + 1) % 1;
+      expect(step).toBeCloseTo(1 / 50, 6);
+    }
+    // And the pair holds along a dozen tiles.
+    expect(new Set(Array.from({ length: kind.count }, (_, i) => kind.getX(i))).size).toBeLessThanOrEqual(2);
+  });
+
   it('is nothing without the atlases or a shore', () => {
     const state = createGame(11);
     state.terrain.fill(TERRAIN_WATER);

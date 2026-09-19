@@ -29,13 +29,16 @@
 import * as THREE from 'three/webgpu';
 import { attribute, floor, fract, mix, step, texture as textureNode, time, vec2, vec3 } from 'three/tsl';
 import { isOpenWater } from '../sim/mapgen';
-import { random01, seedFrom } from '../sim/random';
 import type { ReadonlyGameState } from '../sim/types';
 import type { ContentAssets } from './assets';
 import { TILE_H, TILE_W, worldToIso } from './iso';
 
 /** Frames a second through the 128-frame roll: eight seconds a wave. Chosen. */
 const FRAME_RATE = 16;
+/** Tiles along either axis over which a coast's phase advances one roll. Chosen. */
+const PHASE_TILES = 50;
+/** Tiles along either axis between changes of the mirrored pair. Chosen. */
+const VARIANT_TILES = 12;
 /**
  * The frame's alpha is drawn at this fraction. `WaveAnim_ps` hands the
  * atlas's red on as alpha, and the blend state is the engine's: in the
@@ -75,7 +78,6 @@ export function createFoam(state: ReadonlyGameState, assets?: ContentAssets): TH
     const id = at(x, y);
     return id !== undefined && !isOpenWater(id);
   };
-  const rng = { seed: seedFrom(state.matchSeed ^ 0x0f0a_11) };
   const quads: Quad[] = [];
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -87,8 +89,15 @@ export function createFoam(state: ReadonlyGameState, assets?: ContentAssets): TH
       if (land(x, y - 1)) sides.add('-y');
       if (!sides.size) continue;
       const c = worldToIso(x + 0.5, y + 0.5);
-      const phase = random01(rng);
-      const variant = random01(rng) < 0.5 ? 0 : 1;
+      // A coast rolls together: in the reference the foam along a stretch
+      // is at one point of the roll, arrived here and mid-roll a few tiles
+      // on. A tile's phase advances a fiftieth of the roll per tile along
+      // either axis, so neighbours are three frames apart and a wave sweeps
+      // along a shore; the mirrored pair changes every dozen tiles the same
+      // way. Chosen, on the ledger.
+      const along = x + y;
+      const phase = (along / PHASE_TILES) % 1;
+      const variant = Math.floor(along / VARIANT_TILES) % 2;
       // A stepped run: land on two adjacent sides is a shore along a screen
       // axis, drawn once across the step with the `ortho` crest.
       const stepped: [Side, Side, 'below' | 'above' | 'left' | 'right'][] = [
