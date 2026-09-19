@@ -69,5 +69,5 @@ pathfinding, obstruction, DAT-backed combat, fog of war, projectiles,
 construction, drop-sites, the Dark, Feudal and Castle Age building sets, ages
 and technologies, monks and siege, replay verification, and concurrent headless
 batches are all in. `docs/status.md` is the accurate
-inventory; `docs/backlog.md` lists the known gaps. Desktop/laptop remains the
+inventory; the issue tracker lists the known gaps (`docs/backlog.md` says how it is used). Desktop/laptop remains the
 canonical play target and mobile a remote verification surface only.

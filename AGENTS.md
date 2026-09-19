@@ -2,14 +2,20 @@
 
 Open Empires Lab: a deterministic, agent-native AoE2-compatible RTS slice.
 `README.md` covers play/commands; `docs/architecture.md` the design decisions;
-`docs/status.md` delivered scope and known discrepancies.
+`docs/status.md` delivered scope and measurements; `docs/ledger.md` every
+value or rule that is approximated rather than read.
 
-Start a work session by reading `docs/backlog.md` (what needs doing) and
-`docs/lessons.md` (hard-won operational facts). An autonomous run works
-through `docs/overnight.md` top to bottom, one verified item at a time. Before ending a session, write
-new lessons to `docs/lessons.md` and keep `docs/backlog.md` and
-`docs/status.md` truthful. These repo files are the project's memory — do not
-rely on any external memory system.
+Start a work session with `tools/session_start.sh`: it prints the tree's
+state, the gate's last result, the manifest's age, what is running, and the
+open issues in working order. **The GitHub issue tracker is the work queue**
+(`docs/backlog.md` says how it is used); bugs the human files outrank
+everything. Then read `docs/lessons.md` (rules, grouped by the moment they
+apply). An autonomous run follows `docs/overnight.md`'s standing rules, one
+verified item at a time. When you notice a gap, file an issue then and there;
+when you need a call only the human can make, file it as a `decision` and
+ask by number. Before ending a session, prune `docs/lessons.md` and
+`docs/status.md` to what is still true. These repo files and the tracker are
+the project's memory — do not rely on any external memory system.
 
 ## Non-negotiable boundaries
 
@@ -20,7 +26,9 @@ rely on any external memory system.
   patch-matched owned DAT/RMS/AI/XS, `widgetui`, graphics, localization, and
   sound metadata, and use the original local asset through a deterministic
   importer wherever it exists. Approximate only what the downloaded files do
-  not represent, and record the evidence and discrepancy in `docs/status.md`.
+  not represent, and record each approximation in `docs/ledger.md` in the
+  same commit — an inferred rule is written as inferred even when it looks
+  right.
   Do not disassemble `AoE2DE_s.exe`.
 - Keep the open fallback functional for users without the owned game, but do
   not let its limitations lower the fidelity of the imported mode.
@@ -159,8 +167,7 @@ screenshots; use the PNG endpoint only when geometry genuinely needs eyes.
 
 - Complete one playable behaviour end to end before broadening content. A
   production building without its trainable unit, or a mechanic without its
-  feedback, is not complete — finish it or record the gap in
-  `docs/backlog.md`.
+  feedback, is not complete — finish it or file the gap as an issue.
 - On a broad mandate, first turn it into an explicit checklist with a
   verification step per item; report unmet items rather than stopping quietly.
 - Add tests for timing, state transitions, hidden information, replay
