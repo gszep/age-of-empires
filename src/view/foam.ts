@@ -33,8 +33,8 @@ import type { ReadonlyGameState } from '../sim/types';
 import type { ContentAssets } from './assets';
 import { TILE_H, TILE_W, worldToIso } from './iso';
 
-/** Frames a second through the 128-frame roll: eight seconds a wave. Chosen. */
-const FRAME_RATE = 16;
+/** Frames a second through the 128-frame roll: the human times DE's at about four seconds a wave. */
+const FRAME_RATE = 32;
 /** Tiles along either axis over which a coast's phase advances one roll. Chosen. */
 const PHASE_TILES = 50;
 /** Tiles along either axis between changes of the mirrored pair. Chosen. */
@@ -88,6 +88,19 @@ export function createFoam(state: ReadonlyGameState, assets?: ContentAssets): TH
       if (land(x, y + 1)) sides.add('+y');
       if (land(x, y - 1)) sides.add('-y');
       if (!sides.size) continue;
+      // The reference leaves some shore without foam: the inner edges of a
+      // cove and the tile where a coast bends inward. Those are tiles
+      // tucked into a corner -- land on two adjacent sides and on the
+      // diagonals flanking them -- and one-tile channels with land on
+      // opposite sides. A stair-step tile has the same two sides with water
+      // on the flanking diagonals, and keeps its crest. Inferred from
+      // `islands-coast-gaps-2026-09-19.png`, on the ledger.
+      if ((sides.has('+x') && sides.has('-x')) || (sides.has('+y') && sides.has('-y'))) continue;
+      const tucked = [
+        ['+x', '+y', [x + 1, y - 1], [x - 1, y + 1]], ['-x', '-y', [x - 1, y + 1], [x + 1, y - 1]],
+        ['+x', '-y', [x + 1, y + 1], [x - 1, y - 1]], ['-x', '+y', [x - 1, y - 1], [x + 1, y + 1]],
+      ] as const;
+      if (tucked.some(([a, b, p, q]) => sides.has(a) && sides.has(b) && (land(p[0], p[1]) || land(q[0], q[1])))) continue;
       const c = worldToIso(x + 0.5, y + 0.5);
       // A coast rolls together: in the reference the foam along a stretch
       // is at one point of the roll, arrived here and mid-roll a few tiles
