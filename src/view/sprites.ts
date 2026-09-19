@@ -57,6 +57,9 @@ export interface EntityView {
   outlineColor?: number;
   /** Soot over a building, from the SLD damage layer, by hit points lost. */
   damage?: Piece;
+  /** A fish's leap, drawn over its underwater school on the same clock: the
+   * standing graphic is empty but for the frames the fish is in the air. */
+  leap?: Piece;
   /** The fires a damaged building burns with, one piece per flame. */
   flames: Piece[];
   /** Which damage stage the flames are lit for, and since when: they fade in. */
@@ -150,6 +153,11 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
   const annexColors: Piece[] = [];
   const key = entityKey(entity);
   const imported = assets?.entities[key];
+  let leap: Piece | undefined;
+  if (imported?.atlases['leap']) {
+    leap = makePiece();
+    group.add(leap.mesh);
+  }
   if (imported?.annexes) {
     for (const _ of imported.annexes) {
       const piece = makePiece();
@@ -164,7 +172,7 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
     }
   }
   const view: EntityView = {
-    group, owner: entity.owner, shadow, body, color, outline, annexes, annexColors, fallback: !imported,
+    group, owner: entity.owner, shadow, body, color, outline, annexes, annexColors, leap, fallback: !imported,
     flames: [],
     facing: entity.owner === 2 ? Math.PI : 0,
     playerColor: playerColorHex(assets, entity.owner),
@@ -207,6 +215,7 @@ export function artKey(
 
 export function entityKey(entity: Entity): string {
   if (entity.kind === 'resource') {
+    if (entity.node === 'shore-fish' || entity.node === 'fish') return entity.node;
     if (entity.resourceKind === 'food') return 'berries';
     if (entity.resourceKind === 'gold') return 'gold';
     if (entity.resourceKind === 'stone') return 'stone';
@@ -409,9 +418,12 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
     }
     if (entity.dead) return { key: kind, name: 'death' };
     if (entity.activity === 'attacking') return { key: kind, name: 'attack' };
+    // A fishing ship at work casts its net (the gather task's own graphic);
+    // laden, it is the same boat, as the DAT gives it no carrying art.
+    if (kind === 'fishing-ship' && entity.activity === 'gathering') return { key: kind, name: 'work' };
     // A laden trade cart has its own art: the DAT gives the trade task a
     // carrying graphic, which is the full cart on the road.
-    if (entity.carrying) return { key: kind, name: 'carry' };
+    if (entity.carrying && kind !== 'fishing-ship') return { key: kind, name: 'carry' };
     if (entity.activity === 'moving' || entity.activity === 'carrying') return { key: kind, name: 'walk' };
     return { key: kind, name: 'idle' };
   }
@@ -429,7 +441,10 @@ export function chooseAnimation(state: GameState, entity: Entity): { key: string
       // scythe rather than the forager's basket (issue #71).
       const target = gatherTarget(state, entity);
       const resource = entity.carrying?.kind ?? target?.resourceKind;
+      // The fisherman (56) is the task unit for a fish worked from the bank.
+      const node = entity.carrying?.node ?? target?.node;
       if (target?.kind === 'farm') variant = 'villager-farmer';
+      else if (node === 'shore-fish' || node === 'fish') variant = 'villager-fisher';
       else if (resource === 'food') variant = 'villager-forager';
       else if (resource === 'wood') variant = 'villager-lumberjack';
       else if (resource === 'gold') variant = 'villager-goldminer';
@@ -939,6 +954,10 @@ export function updateEntityView(
       atlas.framesInFile - 1,
       Math.floor((entity.buildProgress ?? 0) * atlas.framesInFile),
     );
+  } else if (entity.kind === 'resource' && animation.frameSeconds > 0) {
+    // A fish is the one node that moves: ninety frames on the DAT's clock,
+    // each school started at its own frame so the sea does not swim in step.
+    frameIndex = (entity.id + Math.floor(elapsed / animation.frameSeconds)) % Math.max(1, animation.frames);
   } else if (entity.kind === 'resource' || isVariantArt(entity, animation)) {
     // Angle count encodes art variations for scenery; pick one by id.
     frameIndex = entity.id % atlas.framesInFile;
@@ -981,6 +1000,15 @@ export function updateEntityView(
   applyFrame(view.body, assets, atlas, frameIndex, entity.position, tint);
   view.frameIndex = frameIndex;
   view.body.mesh.renderOrder = 1000 + depth * 10;
+  (view.body.mesh.material as THREE.MeshBasicMaterial).opacity = animation.alpha ?? 1;
+  // The leap over the school, on the same clock; its empty frames draw nothing.
+  const leapAtlas = imported?.atlases['leap'];
+  if (view.leap && leapAtlas && !entity.dead) {
+    applyFrame(view.leap, assets, leapAtlas, frameIndex % leapAtlas.framesInFile, entity.position, tint);
+    view.leap.mesh.renderOrder = 1000 + depth * 10 + 2;
+  } else if (view.leap) {
+    view.leap.mesh.visible = false;
+  }
 
   // Player colour: the DAT's mask layer marks the cloth that takes the owner's
   // colour, laid over the body at the same frame and hotspot. Gaia has none.

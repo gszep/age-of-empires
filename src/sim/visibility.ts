@@ -16,6 +16,7 @@ export interface RememberedEntity {
   hp: number;
   maxHp: number;
   resource?: Entity['resourceKind'];
+  node?: Entity['node'];
   amount?: number;
   buildProgress?: number;
   lastSeenAt: number; // tick
@@ -67,6 +68,7 @@ function remember(state: GameState, player: PlayerId, entity: Entity): void {
     lastSeenAt: state.tick,
   };
   if (entity.resourceKind) snapshot.resource = entity.resourceKind;
+  if (entity.node) snapshot.node = entity.node;
   if (entity.amount !== undefined) snapshot.amount = Math.floor(entity.amount);
   if (entity.buildProgress !== undefined) snapshot.buildProgress = Math.round(entity.buildProgress * 1000) / 1000;
   state.visibility[player].memory[entity.id] = snapshot;

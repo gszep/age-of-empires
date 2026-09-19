@@ -1,4 +1,4 @@
-import type { GameRules } from './data';
+import type { GameRules, NodeKind } from './data';
 import type { PlayerVisibility } from './visibility';
 
 export type PlayerId = 1 | 2;
@@ -8,7 +8,7 @@ export type UnitKind =
   | 'two-handed-swordsman' | 'champion'
   | 'spearman' | 'pikeman' | 'halberdier'
   | 'archer' | 'crossbowman' | 'arbalester' | 'skirmisher' | 'elite-skirmisher'
-  | 'scout-cavalry' | 'light-cavalry' | 'trade-cart'
+  | 'scout-cavalry' | 'light-cavalry' | 'trade-cart' | 'fishing-ship'
   | 'knight' | 'cavalier' | 'cavalry-archer' | 'heavy-cavalry-archer'
   | 'longbowman' | 'elite-longbowman'
   | 'battering-ram' | 'capped-ram' | 'mangonel' | 'onager' | 'monk'
@@ -21,7 +21,7 @@ export type BuildingKind =
   | 'mill' | 'lumber-camp' | 'mining-camp' | 'farm'
   | 'outpost' | 'watch-tower'
   | 'archery-range' | 'blacksmith' | 'market' | 'stable'
-  | 'monastery' | 'siege-workshop' | 'castle' | 'university' | 'wonder'
+  | 'monastery' | 'siege-workshop' | 'castle' | 'university' | 'wonder' | 'dock'
   | 'palisade-wall' | 'palisade-gate';
 export type EntityKind = UnitKind | BuildingKind | 'resource';
 export type Activity =
@@ -63,8 +63,12 @@ export interface Entity {
   /** Resource nodes. */
   resourceKind?: ResourceKind;
   amount?: number;
-  /** Villagers. */
-  carrying?: { kind: ResourceKind; amount: number };
+  /** Which node a resource is (a shore fish and a bush are both food);
+   * absent on a board dealt before nodes were told apart. */
+  node?: NodeKind;
+  /** Villagers and fishing ships: the load, and which node it came off, since
+   * a dock takes fish and not berries. */
+  carrying?: { kind: ResourceKind; amount: number; node?: NodeKind };
   /** Fractional progress towards the next whole unit: a villager's gathering,
    * or a trade cart's goods earned on the road. */
   gatherProgress?: number;

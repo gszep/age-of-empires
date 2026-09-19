@@ -92,6 +92,7 @@
               "scout-cavalry",
               "light-cavalry",
               "trade-cart",
+              "fishing-ship",
               "knight",
               "cavalier",
               "cavalry-archer",
@@ -120,6 +121,7 @@
               "blacksmith",
               "market",
               "stable",
+              "dock",
               "monastery",
               "siege-workshop",
               "castle",
@@ -155,6 +157,17 @@
               "wood",
               "gold",
               "stone"
+            ]
+          },
+          "node": {
+            "$comment": "Which node a resource is: a shore fish and a bush are both food, but only a boat reaches the open sea.",
+            "enum": [
+              "berries",
+              "tree",
+              "gold",
+              "stone",
+              "shore-fish",
+              "fish"
             ]
           },
           "amount": {
@@ -218,6 +231,7 @@
               "scout-cavalry",
               "light-cavalry",
               "trade-cart",
+              "fishing-ship",
               "knight",
               "cavalier",
               "cavalry-archer",
@@ -246,6 +260,7 @@
               "blacksmith",
               "market",
               "stable",
+              "dock",
               "monastery",
               "siege-workshop",
               "castle",
@@ -281,6 +296,17 @@
               "wood",
               "gold",
               "stone"
+            ]
+          },
+          "node": {
+            "$comment": "Which node a resource is: a shore fish and a bush are both food, but only a boat reaches the open sea.",
+            "enum": [
+              "berries",
+              "tree",
+              "gold",
+              "stone",
+              "shore-fish",
+              "fish"
             ]
           },
           "amount": {
@@ -339,6 +365,16 @@
               "amount": {
                 "type": "integer",
                 "minimum": 0
+              },
+              "node": {
+                "enum": [
+                  "berries",
+                  "tree",
+                  "gold",
+                  "stone",
+                  "shore-fish",
+                  "fish"
+                ]
               }
             },
             "required": [
@@ -369,6 +405,7 @@
                   "scout-cavalry",
                   "light-cavalry",
                   "trade-cart",
+                  "fishing-ship",
                   "knight",
                   "cavalier",
                   "cavalry-archer",

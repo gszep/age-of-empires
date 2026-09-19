@@ -516,8 +516,14 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertIn("Thumb Ring", skipped)
         self.assertIn("do not have it", skipped["Thumb Ring"])
         self.assertNotIn("Ballistics", skipped)
-        # The dock is not imported, so its technologies are not offered.
-        self.assertIn("not imported", skipped["Fishing Lines"])
+        # The dock is imported, so its two fishing technologies are offered;
+        # its warship lines are listed with the DAT's own reason -- the Fast
+        # Fire Ship has no research location, the Galleon no effect.
+        self.assertNotIn("Fishing Lines", skipped)
+        self.assertIn("fishing-lines", self.result["technologies"])
+        self.assertIn("gillnets", self.result["technologies"])
+        self.assertIn("no research location or no effect", skipped["Fast Fire Ship"])
+        self.assertIn("no research location or no effect", skipped["Galleon"])
         for reason in skipped.values():
             self.assertTrue(reason)
 
@@ -676,7 +682,8 @@ class ContentImportIntegrationTest(unittest.TestCase):
         dat = _dat()
         civ = dat.civs[SPEC["civIndex"]]
         skins = {key: e for key, e in entities.items() if "skinOf" in e}
-        self.assertEqual(len(skins), 9)
+        # The villager, the builder, and its eight task units, the fisherman included.
+        self.assertEqual(len(skins), 10)
         for key, skin in skins.items():
             base = entities[skin["skinOf"]]
             self.assertEqual(skin["skin"], "female", key)
@@ -800,7 +807,9 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(farmer["animations"]["work"]["source"], "u_vil_male_farmer_taskA_x1.sld")
         self.assertEqual(farmer["animations"]["carry"]["source"], "u_vil_male_farmer_carrywalkA_x1.sld")
         self.assertEqual(farmer["gather"], {"resource": "food", "ratePerSecond": 0.53, "capacity": 10,
-                                            "task": {"actionType": 5, "unitId": 50}})
+                                            "task": {"actionType": 5, "unitId": 50},
+                                            # The farm task names a unit, not a class: no factor.
+                                            "classFactors": {}})
         self.assertEqual(entities["villager-female-farmer"]["skinOf"], "villager-farmer")
         self.assertEqual(entities["villager-female-farmer"]["id"], 214)
 
@@ -1186,6 +1195,61 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(entities["stone"]["minimapColor"], [145, 145, 145])
         self.assertEqual(entities["berries"]["minimapColor"], [165, 196, 108])
         self.assertNotIn("minimapColor", entities["tree-oak"])
+
+    def test_the_dock_and_the_fishing_ship_come_from_the_dat(self):
+        """Issue #81. The dock (45) is row 6, 150 wood in 35 seconds from the
+        villager's slot 5, and its art is composed: a file-less standing
+        graphic whose first delta with a file is the building, in every age.
+        The fishing ship (13) is row 13, 75 wood in 40 seconds at the dock's
+        slot 1, gathers at 0.24 a second times the task factor per class of
+        fish, holds 15, and banks at the dock -- all the DAT's own fields."""
+        dock = self.result["entities"]["dock"]
+        self.assertEqual(dock["terrainRestriction"], 6)
+        self.assertEqual(dock["cost"], {"wood": 150})
+        self.assertEqual(dock["build"], {"builderId": 118, "seconds": 35, "button": 5})
+        for age in ("idle", "idle-feudal", "idle-castle", "idle-imperial"):
+            self.assertIn(age, dock["animations"], age)
+        self.assertEqual(dock["animations"]["idle"]["graphicId"], 216)
+        ship = self.result["entities"]["fishing-ship"]
+        self.assertEqual(ship["terrainRestriction"], 13)
+        self.assertEqual(ship["train"], {"buildingId": 45, "seconds": 40, "button": 1})
+        self.assertEqual(ship["cost"], {"wood": 75})
+        self.assertEqual(ship["gather"]["ratePerSecond"], 0.24)
+        self.assertEqual(ship["gather"]["capacity"], 15)
+        self.assertEqual(ship["gather"]["classFactors"], {"5": 1.75, "33": 1.0, "31": 1.75})
+        self.assertEqual(ship["dropSites"][0], 45)
+        self.assertNotIn("decay", ship["animations"])
+        rows = self.result["terrainRestrictions"]
+        self.assertEqual(set(rows["6"]), {1, 2, 23})
+        self.assertEqual(set(rows["13"]), {1, 2, 23})
+        self.assertEqual(set(rows["19"]), {1, 23})
+
+    def test_fish_are_food_drawn_under_the_surface(self):
+        """A fish stores its food as the DAT's resource 17, which is the food
+        stockpile; it sits on row 19, the water; and its art is composed: the
+        standing graphic is the leap, empty but for the frames in the air,
+        over an "(Underwater)" delta that is the school, drawn through
+        `n_alpha_underwater.palx` at that palette's own 86/255. The villager
+        fishes with its own task unit (56) at 0.43 a second and banks at the
+        dock as well as the town center and the mill."""
+        entities = self.result["entities"]
+        for key, unit_id, food, unit_class in (("shore-fish", 69, 200, 33), ("fish", 458, 225, 5)):
+            fish = entities[key]
+            self.assertEqual(fish["id"], unit_id)
+            self.assertEqual(fish["storage"], {"food": food})
+            self.assertEqual(fish["class"], unit_class)
+            self.assertEqual(fish["terrainRestriction"], 19)
+            self.assertEqual(fish["minimapColor"], [165, 196, 108])
+            self.assertEqual(fish["animations"]["idle"]["alpha"], round(86 / 255, 4))
+            self.assertEqual(fish["animations"]["idle"]["frames"], 90)
+            self.assertNotIn("alpha", fish["animations"]["leap"])
+            self.assertNotEqual(fish["animations"]["leap"]["graphicId"], fish["animations"]["idle"]["graphicId"])
+        fisher = entities["villager-fisher"]
+        self.assertEqual(fisher["gather"]["ratePerSecond"], 0.43)
+        self.assertEqual(fisher["gather"]["task"], {"actionType": 5, "classId": 33})
+        for site in (109, 68, 45):
+            self.assertIn(site, fisher["dropSites"])
+        self.assertEqual(entities["villager-female-fisher"]["skinOf"], "villager-fisher")
 
     def test_water_terrains_name_their_surface_class(self):
         """The water surface is drawn over each water terrain at the preset's

@@ -4,7 +4,7 @@ import type { PlayerObservation } from '../protocol/types';
 
 interface Spotted {
   id: number; kind: string; owner: number; x: number; y: number;
-  resource?: ResourceKind; amount?: number; training?: unknown; researching?: unknown;
+  resource?: ResourceKind; node?: string; amount?: number; training?: unknown; researching?: unknown;
   buildProgress?: number; order?: string;
 }
 
@@ -224,8 +224,12 @@ export function exampleAiCommands(
     const wanted = ASSIGNMENT[index % ASSIGNMENT.length];
     // Farms are food sources too once complete, so they keep villagers fed
     // after the berries run out.
+    // Fish are left alone: this strategy builds no dock, and a fish two
+    // tiles off the bank is food a villager cannot reach, which would be
+    // re-assigned to it every tick it went idle (docs/backlog.md).
     const node = known
       .filter(e => e.resource === wanted && (e.amount ?? 1) > 0
+        && e.node !== 'fish' && e.node !== 'shore-fish'
         && (e.kind === 'resource' || HERD.includes(e.kind)
           || (e.kind === 'farm' && e.owner === player && (e.buildProgress ?? 1) >= 1)))
       // A claimed herdable first, as the reference opening eats sheep before

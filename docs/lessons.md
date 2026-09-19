@@ -854,3 +854,40 @@ keeps the record.
   script.** `Islands.rms` names `VODA` once and includes `F_WaterMasking.inc`
   once; the include is the depth chain. Rule: before writing "no X" about a
   script, grep its includes for X.
+
+- **A table of terrains cannot say "afloat", and the DAT's ship rows list
+  the beach.** Row 13 (the fishing ship) admits the beach exactly as row 6
+  (the dock) does, because the table is one field for passability and
+  buildability; the engine keeps a hull off the sand. Read as passability,
+  a ship launched onto the beach and sailed up it. Rule: a row that admits
+  open water belongs to a boat, and a boat moves and spawns on open water
+  only (`groundAllows`); placement keeps the table's answer (`terrainAllows`).
+  The same shape decided the dock: a row that admits the sea is a shore
+  building's, and a shore building reaches the water and touches the land.
+
+- **The final approach is straight, and straight lines cross water.** Every
+  gatherer walks the last stretch to its target directly, so a footprint that
+  blocks the grid can still be reached; a fish's footprint is on water, and
+  the villager waded in, and a ship beached itself against the dock. Rule:
+  the final approach may enter a footprint, never ground the walker cannot
+  stand on, and when the line leaves the ground it slides along the bank one
+  axis at a time (`moveTowardOnGround`) -- that slide is what brings a caster
+  to the corner of its tile nearest the fish instead of a step short.
+
+- **A file-less standing graphic is a composition; read its deltas.** The
+  dock's graphic 215 has no file: the building is its first delta with one,
+  and from the Feudal Age the first delta is a file-less reflection, so "the
+  first delta" is the wrong rule and "the first delta with a file" the right
+  one. A fish's standing graphic *has* a file and is still not the fish: it
+  is the leap, ninety frames empty but for twenty-two, and the fish is the
+  "(Underwater)" delta drawn through `n_alpha_underwater.palx` at that
+  file's `$ALPHA`. Rule: an atlas whose frames are all empty, or a unit that
+  draws as nothing, means the picture is in a delta; list them by name
+  before deciding the decoder is wrong.
+
+- **Reassigning a list inside `for...of` does not change what is iterated.**
+  `order = clearAround(order, ...)` in a `for (const tile of order)` loop
+  filters a list nobody reads again; the fish were dealt with no spacing at
+  all until the spacing became a mask of tiles too close. The same pattern
+  stands in the opening loop and `pickSeeds` (`backlog.md`). Rule: filter
+  before the loop, or keep the exclusion as a mask the loop consults.

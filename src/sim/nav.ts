@@ -8,7 +8,7 @@
  * reproduce AoE tile/clearance behavior deterministically, so the smallest
  * grid search is implemented instead (see docs/library-strategy.md).
  */
-import { isBuilding, LAND_RESTRICTION, terrainAllows } from './data';
+import { groundAllows, isBuilding, LAND_RESTRICTION } from './data';
 import type { Entity, GameState, PlayerId, Point } from './types';
 
 /** A building's half-extents in tiles: square unless it says otherwise. */
@@ -82,7 +82,7 @@ export function terrainLayer(state: GameState, restriction: number): Uint8Array 
       const id = terrain[tile];
       let blocked = refused.get(id);
       if (blocked === undefined) {
-        blocked = !terrainAllows(state.rules, restriction, id);
+        blocked = !groundAllows(state.rules, restriction, id);
         refused.set(id, blocked);
       }
       if (blocked) layer[tile] = 1;

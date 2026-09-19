@@ -105,16 +105,35 @@ construction-complete cue, so that one has no owned source to draw on.
   new view. Wants the death's age carried on the entity or the view keyed
   through the gap.
 
+## Generator
+
+- **`clearAround` under a `for...of` filters nothing.** The opening loop and
+  `pickSeeds` in `mapgen.ts` reassign their candidate list inside a
+  `for (const tile of order)`, which keeps iterating the original array, so
+  `groupSpacing` and the seed separation are not enforced there. Found
+  dealing the fish (whose spacing is a mask for that reason). Fixing it
+  moves every wood and group on every seed, so it is a deliberate change
+  with a look at the boards after, not a drive-by.
+
 ## Water
 
 Ponds are on Arabia, Islands is a map, the beach and the passability table
 are the engine's and the surface is the reference's shader
 (`docs/water-design.md`, "Where it stands"). What is left is the naval half:
 
-- **No dock, no fishing ship, no fish.** W4 and W5 in `docs/water-design.md`;
-  the DAT reading is there and Islands is the board to verify them on. The
-  dock's placement rule (restriction 6: it must straddle the shore) is a
-  `placementLegal` case the terrain table already answers.
+- **The example AI does not fish.** It builds no dock and its villagers skip
+  fish nodes (`ai.ts`), because a fish two tiles off the bank is food a
+  villager cannot reach and the nearest-food rule would re-send one to it
+  every tick it went idle. A strategy that builds a dock and trains ships
+  is the next piece of the naval half; the observation carries each node's
+  kind (`node`) so it can tell a fish from a bush.
+- **Warships, transports and fish traps** are out of scope by
+  `water-design.md`'s own terms. The dock's tree nodes came in with it:
+  Fishing Lines and Gillnets are researchable and reach the ship; the
+  warship lines are listed as skipped (no research location or no effect
+  in this DAT) and the ships they upgrade are not imported.
+- **`FISH_A` is dealt as the snapper.** The salmon (456, six per map at
+  scale) is the same 225 food and the same class; only its picture differs.
 - **Islands deals no resource islets, and its depth chain is a rule.** The
   2023 script's four 1% `create_land`s (`land_id 20-23`) and their neritic
   fish are not dealt. `F_WaterMasking.inc` is applied as what it converges

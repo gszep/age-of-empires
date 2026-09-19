@@ -145,15 +145,24 @@ remains approximated: the fog edge's softness, the water's red (short by
 the nearctic snow dusting (`backlog.md`). Left measured but not built: the
 shore foam.
 
-**A fresh session starts here:** `git pull`, re-run the three manifest
-steps if `public/imported/aoe2/manifest.json` lacks `water` or `blends`
-(`tools/import_aoe2.sh` does all of it), open `?map=islands&seed=2` and
-`?seed=3`, press F4, and read `docs/water-design.md` "What is next" -- the
-dock and the fishing ship are the queue's head, on a board that now exists.
-`.local/probes/pond.ts` (`MAP=`, `SEED=`, `LOOK=x,y`, `OUT=`) is the
-screenshot probe every picture in `status.md`'s last six sections came
-from; it is untracked, so recreate it from the pattern in
-`tools/probes/snapshot.ts` if it is gone.
+Then issue **#81** (the same day): the dock, the fishing ship and the fish
+-- W4 and W5 of `water-design.md`, which closes that note's queue. The
+gatherer loop learned to ask the gatherer instead of assuming a villager,
+the placement rule learned what a shore building is, and a walker whose
+row admits the sea learned it is afloat or nowhere. Three composed
+graphics were read on the way (the dock's file-less standing graphic, the
+fish's leap over its underwater school) and one alpha palette.
+
+**A fresh session starts here:** `git pull`, re-run the import if
+`public/imported/aoe2/manifest.json` lacks `water`, `blends` or a `dock`
+entity (`tools/import_aoe2.sh` does all of it), open `?map=islands&seed=2`,
+press F4, build a dock on the shore and a fishing ship in it, and read
+`docs/backlog.md` "Water" -- a strategy that fishes is the queue's head.
+`.local/probes/harbour.mts` staged the harbour screenshot in `status.md`
+(a snapshot handed to the page, then `look` and `pixels`); it is untracked,
+so recreate it from the pattern in `tools/probes/snapshot.ts` if it is
+gone -- and remember a snapshot is declined when the URL fixes a map or a
+seed.
 
 **The 2026-09-13 session** cleared the bugs filed after the last overnight run:
 #32 (a lumberjack going idle at the camp — the continuation remembered which

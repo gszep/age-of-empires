@@ -39,9 +39,10 @@ Built, in `src/sim` and the importer:
   reconstructed from its inputs and `water_def.json`'s presets; see
   `status.md` for the one calibrated constant.
 
-Not built: **W4 the dock** and **W5 the fishing ship and fish** -- the DAT
-reading for both is below and still holds, and Islands is now a board they
-can be verified on.
+- **W4, the dock** and **W5, the fishing ship and the fish** -- issue #81
+  (2026-09-19): the dock across the shoreline, the ship launched onto the
+  water and kept off the sand, the fish dealt as the script deals them and
+  drawn as the DAT composes them. `status.md` has the record.
 
 ## Why it was a subsystem and not an item
 
@@ -160,5 +161,6 @@ generated map, not a map type.
 
 ## What is next
 
-The dock on Islands' shore (W4), then the fishing ship and the fish (W5).
-Both are entities on a board that now exists; neither changes the board.
+The naval half is a coast with a working economy on it. What remains is out
+of this note's scope by its own terms: warships and transports, fish traps,
+and a strategy that builds a dock.

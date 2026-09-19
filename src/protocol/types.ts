@@ -1,4 +1,5 @@
 import type { Activity, Command, EntityKind, Order, PlayerId, ResourceKind, UnitKind } from '../sim/types';
+import type { NodeKind } from '../sim/data';
 
 export const PROTOCOL_VERSION = 1;
 
@@ -11,12 +12,13 @@ export interface ObservedEntity {
   hp: number;
   maxHp: number;
   resource?: ResourceKind;
+  node?: NodeKind;
   amount?: number;
   buildProgress?: number;
   /** Own entities only; hidden from opponents. */
   activity?: Activity;
   order?: Order['kind'];
-  carrying?: { kind: ResourceKind; amount: number };
+  carrying?: { kind: ResourceKind; amount: number; node?: NodeKind };
   training?: { kind: UnitKind; remainingSeconds: number };
   /** What it is researching; own buildings only, like `training`. */
   researching?: { tech: string; remainingSeconds: number };
@@ -107,6 +109,7 @@ export interface RememberedEntityObservation {
   hp: number;
   maxHp: number;
   resource?: ResourceKind;
+  node?: NodeKind;
   amount?: number;
   buildProgress?: number;
   /** Seconds of game time when this entity was last seen. */

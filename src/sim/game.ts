@@ -1,6 +1,7 @@
 import {
   BUILDING_RESTRICTION, GARRISON_CATEGORY, FALLBACK_RULES, LAND_RESTRICTION, TICK_SECONDS, TICKS_PER_SECOND,
-  isAnimal, isBuilding, isMilitary, isUnit, restrictionOf, terrainAllows } from './data';
+  OPEN_WATER_TERRAINS, groundAllows, isAnimal, isBuilding, isMilitary, isUnit, restrictionOf, rowAdmitsWater,
+  terrainAllows } from './data';
 import type {
   AttackValue, BuildingRules, Cost, GameRules, NodeKind, TechEffect, TechKey, UnitRules,
 } from './data';
@@ -39,7 +40,22 @@ export function addNode(state: GameState, node: NodeKind, position: Point): Enti
   return addEntity(state, 'resource', 0, position, { hp: 1, radius: rules.radius }, {
     resourceKind: rules.resource,
     amount: rules.amount,
+    node,
   });
+}
+
+/** Which node rules a resource entity plays by: its own kind, or the one its
+ * resource implies on a board dealt before nodes were told apart. */
+export function nodeOf(entity: Entity): NodeKind {
+  return entity.node ?? NODE_OF_RESOURCE[entity.resourceKind ?? 'wood'];
+}
+const NODE_OF_RESOURCE: Record<ResourceKind, NodeKind> = {
+  food: 'berries', wood: 'tree', gold: 'gold', stone: 'stone',
+};
+
+/** A fish, shore or deep: what a boat may gather and a villager may cast for from the bank. */
+export function isFishNode(entity: Entity): boolean {
+  return entity.kind === 'resource' && (entity.node === 'shore-fish' || entity.node === 'fish');
 }
 
 /**
@@ -322,6 +338,48 @@ export function carryCapacityFor(state: GameState, owner: Entity['owner']): numb
   return capacity;
 }
 
+/** A technology's running change to one attribute of one unit key. */
+function researchedAttribute(
+  state: GameState, owner: Entity['owner'], unit: string, attribute: string, base: number,
+): number {
+  let value = base;
+  if (owner === 0) return value;
+  for (const key of state.players[owner as PlayerId].researched) {
+    for (const effect of state.rules.technologies[key]?.effects ?? []) {
+      if (effect.attribute !== attribute || effect.unit !== unit) continue;
+      value = combine(effect.operation, value, effect.amount);
+    }
+  }
+  return value;
+}
+
+/**
+ * What this gatherer holds: a villager's capacity, or a fishing ship's hold
+ * with Fishing Lines and Gillnets on it.
+ */
+export function holdOf(state: GameState, entity: Entity): number {
+  const own = state.rules.units[entity.kind as UnitKind]?.gather;
+  if (!own) return carryCapacityFor(state, entity.owner);
+  return researchedAttribute(state, entity.owner, entity.kind, 'carryCapacity', own.capacity);
+}
+
+/**
+ * How fast this gatherer works this node. A fishing ship is its own DAT
+ * gatherer: its work rate times the task factor for the node's class (a deep
+ * fish 1.75, a shore fish 1.0), under its own technologies. A villager on a
+ * fish is the fisherman task unit's rate; on anything else, the resource's.
+ */
+export function rateOn(state: GameState, entity: Entity, node: Entity): number {
+  const own = state.rules.units[entity.kind as UnitKind]?.gather;
+  const rules = state.rules.nodes[nodeOf(node)];
+  if (own) {
+    const factor = rules?.datClass !== undefined ? own.classFactors[String(rules.datClass)] ?? 1 : 1;
+    return researchedAttribute(state, entity.owner, entity.kind, 'workRate', own.ratePerSecond) * factor;
+  }
+  if (rules?.villagerRatePerSecond !== undefined) return rules.villagerRatePerSecond;
+  return gatherRateFor(state, entity.owner, node.resourceKind ?? rules.resource);
+}
+
 /** A completed building that shoots, so it can be given a target. */
 function canShoot(state: GameState, entity: Entity): boolean {
   return isBuilding(entity.kind) && entity.buildProgress === undefined
@@ -364,13 +422,25 @@ export function placementLegal(
     const maxX = Math.min(state.width - 1, Math.ceil(target.x + half.x - 1e-6) - 1);
     const minY = Math.max(0, Math.floor(target.y - half.y + 1e-6));
     const maxY = Math.min(state.height - 1, Math.ceil(target.y + half.y - 1e-6) - 1);
+    let wet = 0;
+    let dry = 0;
     for (let y = minY; y <= maxY; y++) {
       for (let x = minX; x <= maxX; x++) {
-        if (!terrainAllows(state.rules, row, state.terrain[y * state.width + x])) {
+        const terrain = state.terrain[y * state.width + x];
+        if (!terrainAllows(state.rules, row, terrain)) {
           return rejected('placement is on ground that cannot take it');
         }
+        if (OPEN_WATER_TERRAINS.has(terrain)) wet++;
+        else dry++;
       }
     }
+    // A building whose row admits the sea -- the dock's row 6 takes water
+    // and beach -- is a shore building: it has to reach the water and to
+    // touch the land, which is the engine's own placement rule for it and
+    // what a table of terrains alone cannot say.
+    const admitsWater = rowAdmitsWater(state.rules, row);
+    if (admitsWater && wet === 0) return rejected('placement does not reach the water');
+    if (admitsWater && dry === 0) return rejected('placement does not touch the shore');
   }
   // Units are ignored: real AoE nudges them off foundations (recorded approximation).
   for (const entity of state.entities) {
@@ -396,6 +466,10 @@ export function isCarcass(entity: Entity): boolean {
 }
 
 function isGatherable(state: GameState, entity: Entity, gatherer: Entity): boolean {
+  // A boat gathers fish and nothing else; a villager casts for fish from the
+  // bank as it picks a bush, and its reach is what decides which fish.
+  if (gatherer.kind !== 'villager' && gatherer.kind !== 'fishing-ship') return false;
+  if (gatherer.kind === 'fishing-ship') return isFishNode(entity) && (entity.amount ?? 0) > 0;
   if (entity.kind === 'resource') return true;
   if (isAnimal(entity.kind)) {
     // A carcass is food for whoever reaches it. A live herdable is food only
@@ -423,7 +497,7 @@ function assignOrder(state: GameState, entity: Entity, target: Point, targetEnti
   if (entity.kind === 'trade-cart' && targetEntity && isTradePartner(state, entity, targetEntity)) {
     entity.order = { kind: 'trade', targetId: targetEntity.id };
     entity.carrying = undefined;
-  } else if (targetEntity && isGatherable(state, targetEntity, entity) && entity.kind === 'villager') {
+  } else if (targetEntity && isGatherable(state, targetEntity, entity)) {
     entity.order = { kind: 'gather', targetId: targetEntity.id };
   } else if (
     unitRules?.heal && targetEntity && targetEntity.id !== entity.id
@@ -756,11 +830,46 @@ function moveDirect(grid: NavGrid, entity: Entity, destination: Point, speed: nu
   return arrived;
 }
 
+/**
+ * The final approach straight at an interaction target whose footprint
+ * blocks the grid, stopping at the water's edge: a footprint may be walked
+ * into, the ground under it may not be if the walker cannot stand there. A
+ * villager casting for a fish stops on the bank, and a boat unloading at the
+ * dock stays off the sand (the dock straddles both). Returns true when the
+ * walker is as close as the ground lets it come.
+ */
+function moveTowardOnGround(state: GameState, entity: Entity, target: Point, speed: number): boolean {
+  const layer = terrainLayer(state, restrictionOf(state.rules, entity));
+  const refused = (p: Point): boolean => {
+    const tile = tileOf(p);
+    return tile.x < 0 || tile.y < 0 || tile.x >= state.width || tile.y >= state.height
+      || layer[tile.y * state.width + tile.x] === 1;
+  };
+  const before = { ...entity.position };
+  const arrived = moveToward(entity, target, speed);
+  if (!refused(entity.position)) return arrived;
+  // The straight line leaves the ground: slide along the bank instead, one
+  // axis at a time, which is what brings a caster to the corner of its tile
+  // nearest the fish rather than leaving it a step short on the diagonal.
+  const step = speed * TICK_SECONDS;
+  for (const axis of ['x', 'y'] as const) {
+    const delta = target[axis] - before[axis];
+    if (Math.abs(delta) < 1e-9) continue;
+    const slid = { ...before, [axis]: before[axis] + Math.sign(delta) * Math.min(step, Math.abs(delta)) };
+    if (!refused(slid)) {
+      entity.position = slid;
+      return false;
+    }
+  }
+  entity.position = before;
+  return true;
+}
+
 function moveAlong(state: GameState, grid: NavGrid, entity: Entity, destination: Point, speed: number, directRange = 0): boolean {
   // Final approach straight at an interaction target whose footprint blocks
   // the grid; the caller's range check stops movement at its edge.
   if (directRange > 0 && distance(entity.position, destination) <= directRange) {
-    return moveToward(entity, destination, speed);
+    return moveTowardOnGround(state, entity, destination, speed);
   }
   const goalChanged = !entity.pathGoal ||
     Math.abs(entity.pathGoal.x - destination.x) > 0.5 || Math.abs(entity.pathGoal.y - destination.y) > 0.5;
@@ -1018,13 +1127,21 @@ function nextToWork(
  */
 function nearestDropSite(state: GameState, entity: Entity, resource?: ResourceKind): Entity | undefined {
   const wanted = resource ?? entity.carrying?.kind;
+  // A fishing ship banks where the DAT's `drop_sites` say, the dock; a
+  // villager wherever the building takes the resource -- except that the
+  // dock takes fish and not berries, which is the fisherman's own site list
+  // (town center, mill, dock) against the forager's (town center, mill).
+  const sites = state.rules.units[entity.kind as UnitKind]?.dropSites;
+  const fishOnly = new Set<NodeKind>(['shore-fish', 'fish']);
   let best: Entity | undefined;
   let bestDistance = Infinity;
   for (const candidate of state.entities) {
     if (candidate.dead || candidate.owner !== entity.owner || candidate.buildProgress !== undefined) continue;
     if (!isBuilding(candidate.kind)) continue;
+    if (sites && !sites.includes(candidate.kind as BuildingKind)) continue;
     const accepts = state.rules.buildings[candidate.kind as BuildingKind].accepts;
     if (!wanted || !accepts.includes(wanted)) continue;
+    if (!sites && candidate.kind === 'dock' && !fishOnly.has(entity.carrying?.node ?? 'berries')) continue;
     const d = distance(entity.position, candidate.position);
     if (d < bestDistance || (d === bestDistance && best && candidate.id < best.id)) {
       best = candidate;
@@ -1098,8 +1215,8 @@ function kill(state: GameState, entity: Entity): void {
 
 function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'gather') return;
-  const speed = unitRulesFor(state, entity.owner, 'villager').speed;
-  const capacity = carryCapacityFor(state, entity.owner);
+  const speed = unitRulesFor(state, entity.owner, entity.kind as UnitKind).speed;
+  const capacity = holdOf(state, entity);
   const carrying = entity.carrying;
 
   if (carrying && carrying.amount >= capacity) {
@@ -1189,14 +1306,14 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   entity.lastWorked = node.kind;
   const resource = node.resourceKind!;
   entity.lastResource = resource;
-  entity.gatherProgress = (entity.gatherProgress ?? 0)
-    + gatherRateFor(state, entity.owner, resource) * TICK_SECONDS;
+  entity.gatherProgress = (entity.gatherProgress ?? 0) + rateOn(state, entity, node) * TICK_SECONDS;
   while ((entity.gatherProgress ?? 0) >= 1 && (node.amount ?? 0) > 0 && (entity.carrying?.amount ?? 0) < capacity) {
     entity.gatherProgress! -= 1;
     node.amount! -= 1;
     // Switching resource types discards the old load, as in AoE2.
     if (!entity.carrying || entity.carrying.kind !== resource) entity.carrying = { kind: resource, amount: 0 };
     entity.carrying.amount += 1;
+    if (node.kind === 'resource') entity.carrying.node = nodeOf(node);
   }
   // A worked-out farm is consumed, as in AoE2 where it must be rebuilt.
   if (node.kind === 'farm' && (node.amount ?? 0) <= 0) kill(state, node);
@@ -2102,7 +2219,7 @@ function spawnFree(state: GameState, point: Point, radius: number, restriction =
   // before the board has terrain, and a board without terrain is all land.
   if (state.terrain.length === state.width * state.height) {
     const tile = Math.floor(point.y) * state.width + Math.floor(point.x);
-    if (!terrainAllows(state.rules, restriction, state.terrain[tile])) return false;
+    if (!groundAllows(state.rules, restriction, state.terrain[tile])) return false;
   }
   for (const entity of state.entities) {
     if (entity.dead) continue;

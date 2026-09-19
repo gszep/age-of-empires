@@ -3,7 +3,12 @@ import { skinFamilies, type SkinFamily } from './skins';
 
 export type Frame = { x: number; y: number; w: number; h: number; cx: number; cy: number };
 export type Atlas = { image: string; size: [number, number]; framesInFile: number; frames: Frame[] };
-export type AnimationInfo = { frames: number; directions: number; frameSeconds: number; mirroringMode: number };
+export type AnimationInfo = {
+  frames: number; directions: number; frameSeconds: number; mirroringMode: number;
+  /** Drawn through one of the engine's alpha palettes: a fish's underwater
+   * school at `n_alpha_underwater.palx`'s 86/255. Absent, opaque. */
+  alpha?: number;
+};
 
 export interface ImportedEntity {
   category: string;

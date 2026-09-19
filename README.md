@@ -45,7 +45,7 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   `Ctrl+Shift` + the same letter selects the lot — `B` barracks, `A` archery
   range, `L` stable, `S` blacksmith, `M` market, `I` mill, `U` university,
   `V` castle, `Y` monastery, `K` siege workshop, `G` mining camp, `Z` lumber
-  camp, `H` town centers, `W` wonder. The letters are the reference's own,
+  camp, `H` town centers, `W` wonder, `D` dock. The letters are the reference's own,
   imported from its `hotkeys.json` rather than chosen here.
 - `Delete` destroys what you have selected, of your own. The town center, a
   watch tower, the monastery, the castle and the wonder ask first; everything
@@ -86,10 +86,11 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 - Half your villagers are women, at the odds the reference's own
   `objreplacement.json` states, each with her own art and voice; who is who is
   a view-side roll, so a replay never notices.
-- Select a villager to place any building — the build menu has an economic and a military page, as in the original. Select a town center to train villagers, a barracks for militia and spearmen, an archery range for archers, skirmishers and cavalry archers, a stable for scout cavalry and knights, a market for trade carts, a siege workshop for battering rams and mangonels, a monastery for monks, or a castle for longbowmen (the British unique unit). Destroy the enemy town center to win.
+- Select a villager to place any building — the build menu has an economic and a military page, as in the original. Select a town center to train villagers, a barracks for militia and spearmen, an archery range for archers, skirmishers and cavalry archers, a stable for scout cavalry and knights, a market for trade carts, a siege workshop for battering rams and mangonels, a monastery for monks, a castle for longbowmen (the British unique unit), or a dock -- placed across a shoreline -- for fishing ships. Destroy the enemy town center to win.
 - Both sides play the Britons, which is the civilisation the content is imported for. The ages, the tech tree and the civilisation all come from the owned files, so without them the open fallback plays Dark through Castle only. A civilisation is mostly what it goes without: the Britons have no Thumb Ring, no Bloodlines, no Hussar and no Paladin, and their own tree says so — the game will not offer you what they were never given.
 - A monk right-clicked onto a wounded ally heals it, and onto an enemy soldier converts it to your side — it takes between five and nine seconds, and walking out of the monk's reach loses all of that work. A mangonel's stone hurts everything it lands beside, your own soldiers included, so keep them clear.
 - Right-click a trade cart onto the opponent's market to open a trade route: it loads there and banks gold each time it reaches your own market, and a longer road pays more.
+- On `?map=islands` the sea is full of fish. Right-click a fishing ship onto one and it works the school and banks food at the dock; a villager can cast for a fish from the beach and bank at the dock, the mill or the town center.
 - Sheep join whoever walks up to them and then stand where they are: select them
   and walk them home like any other unit — a villager sent onto one works it with a shepherd's crook. Villagers hunt with a bow, so game that is walking away still gets shot: a deer startles only when something comes within a tile, hops a short way, and then grazes for a quarter of a minute. A boar charges whoever wounds it, arrow or not, so send more than one villager. Click a carcass to see how much food is left on it, and right-click any villager onto it to help eat it.
 - Gather food, wood, gold, and stone. Mills, lumber camps, and mining camps shorten the walk for the resources they accept; the town center takes all four. Farms keep food coming once the berries run out, and watch towers (stone) shoot on their own.

@@ -2074,6 +2074,76 @@ and half on water), `test_import_aoe2.py` (the rows, the palette colours, and
 that the published manifest carries them), and a headless-Chrome screenshot of
 seed 3's pond with the map revealed.
 
+## The dock, the fishing ship and the fish (issue #81)
+
+W4 and W5 of `docs/water-design.md`, on the board Islands made for them.
+
+**The dock** is DAT unit 45: 1800 hit points, 150 wood in 35 seconds from
+the villager's economic page at slot 5 (the DAT's own build button), on
+restriction row 6, which admits the sea and the beach. The table alone
+would let it stand wholly on sand or wholly at sea; the engine's rule on top
+of it is that a shore building reaches the water and touches the land, and
+`placementLegal` says so for any row that admits open water: at least one
+footprint tile is sea and at least one is not. Its art is composed as the
+palisade's is -- a file-less standing graphic whose deltas are a reflection
+(file-less too from the Feudal Age on), the building's own sheet and the
+birds -- so `base_graphic` takes the first delta with a file, in every age
+(`b_dark_dock_age1`, `b_west_dock_age2`, `b_west_dock_age3`, which the
+Imperial dock shares). `Ctrl+D` and `Ctrl+Shift+D` are the reference's own
+`GOTO_DOCK` and `SELECT_ALL_DOCKS`.
+
+**The fishing ship** is unit 13: 50 hit points, 75 wood in 40 seconds at the
+dock's slot 1, speed 1.26, row 13, one population. It is the first gatherer
+that is not a villager, and the gatherer loop now asks the gatherer rather
+than assuming one: its speed is its own, its hold is the DAT's
+`resource_capacity` (15, and Fishing Lines and Gillnets add 5 each, as the
+dock's two technologies now imported), its rate is its `work_rate` (0.24 a
+second) times the gather task's `work_value_1` for the class of node it is
+on (a deep-sea fish, class 5, at 1.75; a shore fish, class 33, at 1.0), and
+it banks where its `drop_sites` say, which is the dock. The DAT's row 13
+lists the beach as row 6 does, and it is the engine that keeps a hull off
+the sand: `groundAllows` refuses anything but open water to a walker whose
+row admits the sea, so the ship is launched onto the water, paths on it, and
+its final approach to a fish or to the dock slides along the shore rather
+than crossing it (`moveTowardOnGround`, which also keeps a villager on the
+bank when it casts).
+
+**The fish** are gaia units storing food as the DAT's resource 17 -- its
+fish stockpile, which lands in the food pile like meat and berries do:
+`Shore Fish` (69, 200 food, class 33, one tile) and the big fish (`Fish
+(Snapper)`, 458, 225 food, class 5, two tiles), both on row 19, the water
+alone. Islands deals them as its `GNR_STANDARDFISH` block does
+(`GeneratingObjects.inc`): `MELKARYBA`, the shore fish, as many as fit at a
+group spacing of 6 anywhere on the sea, and `FISH_B` at 170 (scaled to the
+map) with spacing 8 within four tiles of a land zone -- about two hundred
+and fifty fish on a tiny board, mirrored like everything else, dealt last
+and from their own stream so no earlier board moved. A villager casts for a
+fish from the bank with the fisherman task unit's own rate (56, `VMFIS`,
+0.43 a second against the forager's 0.31) and banks at the town center, the
+mill or the dock, which are that unit's own drop sites; a fish it cannot
+stand beside is one it cannot reach, which the gatherer loop already knew
+how to say. A fish's art is composed too: the standing graphic is the leap,
+ninety frames empty but for the twenty-two the fish is in the air, over an
+"(Underwater)" delta that is the school beneath the surface, drawn through
+`n_alpha_underwater.palx` at that palette's own `$ALPHA` (86/255). The spec
+names the delta and the palette; the view draws the school on the DAT's
+clock, each started at its own frame, with the leap over it.
+
+Approximated and recorded: `FISH_A` (456, the salmon, six per map) is dealt
+as the snapper; the include's random group placement is a candidate scan in
+the stream's order with the spacing kept as a mask; the example AI builds no
+dock and leaves fish alone (`backlog.md`); the villager's unit-variant art
+follows the DAT's fisherman, but no fishing technology reaches a villager.
+
+Verified: `naval.test.ts` -- the dock refused inland and at sea and accepted
+across the shoreline; built by a villager and training a ship that appears
+on open water; the fish dealt on the sea, none on land, mirrored, and none on
+Arabia; a ship working a fish to exhaustion, banking at the dock, never
+off the water, in the net-casting art; a villager casting from the bank at
+0.43 in the fisherman's art. `test_import_aoe2.py` for every DAT field
+above. A headless screenshot of the harbour: the dock across the shore, the
+ship at work beside a school, the fish through the water.
+
 ## The aesthetic scatter is picture, and it is the script's
 
 `Arabia.rms` ends its object generation with `AESTHETICS`: per biome, an

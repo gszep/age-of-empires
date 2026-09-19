@@ -15,6 +15,7 @@ function observeEntity(entity: Entity, player: PlayerId): ObservedEntity {
     maxHp: entity.maxHp,
   };
   if (entity.resourceKind) observed.resource = entity.resourceKind;
+  if (entity.node) observed.node = entity.node;
   if (entity.amount !== undefined) observed.amount = Math.floor(entity.amount);
   if (entity.buildProgress !== undefined) observed.buildProgress = Math.round(entity.buildProgress * 1000) / 1000;
   if (entity.owner === player) {

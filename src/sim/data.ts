@@ -154,6 +154,15 @@ export interface UnitRules {
   tradeRatePerSecond?: number;
   tradeCapacity?: number;
   /**
+   * A gatherer that is not a villager -- the fishing ship: its DAT work
+   * rate, what it holds, and the factor per class of node it works (a deep
+   * fish at 1.75, a shore fish at 1.0, each gather task's `work_value_1`).
+   */
+  gather?: { ratePerSecond: number; capacity: number; classFactors: Record<string, number> };
+  /** Where it banks its load, from the DAT's own `drop_sites`; a villager
+   * names none here and goes by what each building accepts. */
+  dropSites?: BuildingKind[];
+  /**
    * The DAT's `fog_visibility`: 1 keeps the thing drawn once its tile goes
    * dark. Everything gaia puts on the map -- resources, sheep, deer, boar --
    * is 1; everything a player trains or builds is 0, which is why an enemy
@@ -264,6 +273,15 @@ export interface ResourceNodeRules {
   blastDefenseLevel?: number;
   /** The DAT's own minimap dot for the node, a palette colour; trees name none. */
   minimapColor?: [number, number, number];
+  /** The DAT's unit class: 7 a bush, 33 a shore fish, 5 a deep-sea fish. A
+   * gatherer's rate on it is keyed by this. */
+  datClass?: number;
+  /** The row of `terrain_restrictions` it may sit on; fish are row 19, the
+   * water. Absent, the node stands on land. */
+  terrainRestriction?: number;
+  /** A villager's own rate on this node where the DAT gives the task its own
+   * unit: the fisherman's 0.43 a second, against the forager's food rate. */
+  villagerRatePerSecond?: number;
 }
 
 /**
@@ -375,6 +393,30 @@ export function terrainAllows(rules: GameRules, row: number, terrain: number): b
   return allowed === undefined || allowed.includes(terrain);
 }
 
+/**
+ * The open-water terrains: the DAT's `is_water` is 1 (medium), 2 (deep) or
+ * 4 (shallow water) for these, 8 for a walkable shallows, 16 for beach and
+ * 32 for land.
+ */
+export const OPEN_WATER_TERRAINS: ReadonlySet<number> = new Set([1, 22, 23, 15, 96, 97, 98]);
+
+/** Whether a restriction row admits any open water: a boat's row, or the dock's. */
+export function rowAdmitsWater(rules: GameRules, row: number): boolean {
+  return (rules.terrainRestrictions[row] ?? []).some(id => OPEN_WATER_TERRAINS.has(id));
+}
+
+/**
+ * Whether something moving by `row` may stand on `terrain`. A row that
+ * admits the sea is a boat's, and a boat is afloat or nowhere: the DAT lists
+ * the beach in the ship rows (3, 13) as it does in the dock's (6), and it is
+ * the engine that keeps a hull off the sand. Placement asks `terrainAllows`
+ * and gets the beach; movement and spawning ask this.
+ */
+export function groundAllows(rules: GameRules, row: number, terrain: number): boolean {
+  if (!terrainAllows(rules, row, terrain)) return false;
+  return !rowAdmitsWater(rules, row) || OPEN_WATER_TERRAINS.has(terrain);
+}
+
 /** The restriction row an entity obeys: its own, or its category's default. */
 export function restrictionOf(rules: GameRules, entity: { kind: Entity['kind'] }): number {
   if (isBuilding(entity.kind)) {
@@ -384,19 +426,21 @@ export function restrictionOf(rules: GameRules, entity: { kind: Entity['kind'] }
 }
 
 /**
- * The terrains the open fallback's board can be painted with, which are all
- * land: the generator's ids from `Arabia.rms`'s biomes plus the road and the
- * two farm slots. Every fallback row allows all of them and nothing else,
- * which is what the DAT's rows 4, 7, 10, 20 and 28 say over this set -- the
- * shore terrains those rows differ on are not painted by any board yet.
+ * The land the open fallback's board can be painted with: the generator's
+ * ids from `Arabia.rms`'s biomes plus the road and the two farm slots. The
+ * fallback rows are the DAT's over this set and the shore: a walker (7, 20,
+ * 28) and a wall (10) cross the beach, a building (4) and row 1 do not.
  */
 const FALLBACK_LAND_TERRAINS = [
   0, 3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 19, 24, 29, 48, 71, 88, 89, 100, 104, 110, 117, 121,
 ];
+const FALLBACK_SHORE_TERRAINS = [...FALLBACK_LAND_TERRAINS, 2];
+/** Shallow and medium water, and the beach between them and the land. */
+const FALLBACK_WATER_TERRAINS = [1, 23, 2];
 
-export type NodeKind = 'berries' | 'tree' | 'gold' | 'stone';
+export type NodeKind = 'berries' | 'tree' | 'gold' | 'stone' | 'shore-fish' | 'fish';
 
-/** Which node rules a placed resource is playing by; its kind is not kept. */
+/** Which node rules a resource plays by when it does not say (`Entity.node`). */
 const NODE_OF_RESOURCE: Record<ResourceKind, NodeKind> = {
   food: 'berries', wood: 'tree', gold: 'gold', stone: 'stone',
 };
@@ -412,7 +456,7 @@ export function lingersInFog(rules: GameRules, entity: Entity): boolean {
   if (isBuilding(entity.kind)) return true;
   if (entity.kind === 'resource') {
     return entity.resourceKind !== undefined
-      && rules.nodes[NODE_OF_RESOURCE[entity.resourceKind]]?.fogVisibility === 1;
+      && rules.nodes[entity.node ?? NODE_OF_RESOURCE[entity.resourceKind]]?.fogVisibility === 1;
   }
   return rules.units[entity.kind as UnitKind]?.fogVisibility === 1;
 }
@@ -796,6 +840,17 @@ export const FALLBACK_RULES: GameRules = {
       attackReloadSeconds: 0, attackReleaseSeconds: 0,
       tradeRatePerSecond: 0.2875, tradeCapacity: 100,
     },
+    'fishing-ship': {
+      terrainRestriction: 13,
+      hp: 50, radius: 0.4, speed: 1.26, lineOfSight: 5, cost: cost(0, 75), trainSeconds: 40,
+      trainedAt: 'dock', popCost: 1, trainButton: 1,
+      datClass: 21,
+      attacks: [],
+      armors: [{ class: 4, amount: 1 }, { class: 3, amount: 1 }, { class: 16, amount: 0 }],
+      attackReloadSeconds: 0, attackReleaseSeconds: 0,
+      gather: { ratePerSecond: 0.24, capacity: 15, classFactors: { 5: 1.75, 33: 1 } },
+      dropSites: ['dock'],
+    },
     archer: {
       age: 1,
       hp: 30, radius: 0.2, speed: 0.96, lineOfSight: 6, cost: cost(0, 25, 45), trainSeconds: 35,
@@ -1007,6 +1062,13 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
       buildButton: 4,
     },
+    dock: {
+      terrainRestriction: 6,
+      hp: 1800, radius: 1.5, lineOfSight: 8, cost: cost(0, 150), buildSeconds: 35,
+      popSupport: 0, buildable: true, accepts: ['food'],
+      armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
+      buildButton: 5,
+    },
     // Trains nothing; it is where the technologies that do not belong to a
     // barracks or a blacksmith are researched, Ballistics chief among them.
     university: {
@@ -1058,13 +1120,24 @@ export const FALLBACK_RULES: GameRules = {
     tree: { resource: 'wood', radius: 0.5, amount: 100, fogVisibility: 1, blastDefenseLevel: 1 },
     gold: { resource: 'gold', radius: 0.5, amount: 800, fogVisibility: 1, blastDefenseLevel: 0 },
     stone: { resource: 'stone', radius: 0.5, amount: 350, fogVisibility: 1, blastDefenseLevel: 0 },
+    'shore-fish': {
+      resource: 'food', radius: 0.5, amount: 200, fogVisibility: 1, blastDefenseLevel: 0,
+      datClass: 33, terrainRestriction: 19, villagerRatePerSecond: 0.43,
+    },
+    fish: {
+      resource: 'food', radius: 1, amount: 225, fogVisibility: 1, blastDefenseLevel: 0,
+      datClass: 5, terrainRestriction: 19, villagerRatePerSecond: 0.43,
+    },
   },
   gatherRatePerSecond: { food: 0.31, wood: 0.39, gold: 0.38, stone: 0.36 },
   carryCapacity: 10,
   repairCostFraction: { building: 0.5, unit: 0.5 },
   terrainRestrictions: {
-    1: FALLBACK_LAND_TERRAINS, 4: FALLBACK_LAND_TERRAINS, 7: FALLBACK_LAND_TERRAINS,
-    10: FALLBACK_LAND_TERRAINS, 20: FALLBACK_LAND_TERRAINS, 28: FALLBACK_LAND_TERRAINS,
+    1: FALLBACK_LAND_TERRAINS, 4: FALLBACK_LAND_TERRAINS, 7: FALLBACK_SHORE_TERRAINS,
+    10: FALLBACK_SHORE_TERRAINS, 20: FALLBACK_SHORE_TERRAINS, 28: FALLBACK_SHORE_TERRAINS,
+    // The water rows: 6 the dock and 13 the fishing ship take the sea and
+    // the beach, 19 the fish the sea alone.
+    6: FALLBACK_WATER_TERRAINS, 13: FALLBACK_WATER_TERRAINS, 19: [1, 23],
   },
   technologies: {
     loom: {
@@ -1124,7 +1197,6 @@ interface ManifestEntity {
   confirmDelete?: boolean;
   heal?: { hitPointsPerSecond: number; range: number };
   repair?: { hitPointsPerSecond: number; classFactors: Record<string, number> };
-  class?: number;
   garrison?: {
     capacity: number; types: number; healRate: number;
     volley?: { base: number; max: number; arrowUnitId?: number; arrowSpeed?: number; arrowAttacks?: AttackValue[] };
@@ -1132,7 +1204,9 @@ interface ManifestEntity {
   garrisonFirepower?: number;
   convert?: { minSeconds: number; maxSeconds: number; range: number };
   searchRadius?: number;
-  gather?: { resource: ResourceKind; ratePerSecond: number; capacity: number };
+  gather?: { resource: ResourceKind; ratePerSecond: number; capacity: number; classFactors?: Record<string, number> };
+  dropSites?: number[];
+  class?: number;
   trade?: { ratePerSecond: number; capacity: number; buildingId: number };
   age?: number;
   id?: number;
@@ -1198,6 +1272,10 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     const id = e[key]?.combat?.projectileUnitId;
     return id === undefined ? undefined : projectileArtById.get(id);
   };
+  const buildingKindOf = new Map<number, BuildingKind>();
+  for (const [key, entity] of Object.entries(e)) {
+    if (entity.id !== undefined && key in FALLBACK_RULES.buildings) buildingKindOf.set(entity.id, key as BuildingKind);
+  }
   // A manifest generated before an entity existed must not break the game: fall
   // back to that entity's open-content rules and keep everything else imported.
   const unit = (key: string, trainedAt: BuildingKind): UnitRules => {
@@ -1242,6 +1320,19 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       deathSeconds: e[key].deathSeconds ?? fallback?.deathSeconds,
       corpseSeconds: e[key].corpseSeconds ?? fallback?.corpseSeconds,
       datId: e[key].id,
+      // A gatherer of its own kind: the fishing ship's rate, hold and
+      // per-class factors, and the buildings the DAT lets it bank at (by
+      // unit id, turned back into our kinds; a site not imported is dropped).
+      gather: e[key].gather?.classFactors
+        ? {
+          ratePerSecond: e[key].gather!.ratePerSecond,
+          capacity: e[key].gather!.capacity,
+          classFactors: e[key].gather!.classFactors!,
+        }
+        : fallback?.gather,
+      dropSites: e[key].dropSites && fallback?.dropSites
+        ? e[key].dropSites!.map(id => buildingKindOf.get(id)).filter((kind): kind is BuildingKind => !!kind)
+        : fallback?.dropSites,
     };
   };
   /** Gaia's animals: their own rules plus the food the DAT stores on them. */
@@ -1327,6 +1418,13 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       fogVisibility: e[key].fogVisibility ?? FALLBACK_RULES.nodes[fallbackKey].fogVisibility,
       blastDefenseLevel: e[key].blastDefenseLevel ?? FALLBACK_RULES.nodes[fallbackKey].blastDefenseLevel,
       ...(e[key].minimapColor ? { minimapColor: e[key].minimapColor } : {}),
+      datClass: e[key].class ?? FALLBACK_RULES.nodes[fallbackKey].datClass,
+      terrainRestriction: e[key].terrainRestriction ?? FALLBACK_RULES.nodes[fallbackKey].terrainRestriction,
+      // The fisherman is the villager's own task unit for both fish classes
+      // (56, VMFIS, at 0.43 a second), where the forager's food rate is 0.31.
+      villagerRatePerSecond: FALLBACK_RULES.nodes[fallbackKey].villagerRatePerSecond === undefined
+        ? undefined
+        : e['villager-fisher']?.gather?.ratePerSecond ?? FALLBACK_RULES.nodes[fallbackKey].villagerRatePerSecond,
     };
   };
   return {
@@ -1459,6 +1557,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       sheep: animal('sheep'),
       deer: animal('deer'),
       boar: animal('boar'),
+      'fishing-ship': unit('fishing-ship', 'dock'),
       'trade-cart': {
         ...unit('trade-cart', 'market'),
         tradeRatePerSecond: e['trade-cart']?.trade?.ratePerSecond
@@ -1488,6 +1587,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       'archery-range': building('archery-range', true),
       blacksmith: building('blacksmith', true),
       market: building('market', true),
+      dock: building('dock', true),
       stable: building('stable', true),
       monastery: building('monastery', true),
       'siege-workshop': building('siege-workshop', true),
@@ -1502,6 +1602,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       tree: node('tree-oak', 'wood', 'tree'),
       gold: node('gold', 'gold', 'gold'),
       stone: node('stone', 'stone', 'stone'),
+      'shore-fish': node('shore-fish', 'food', 'shore-fish'),
+      fish: node('fish', 'food', 'fish'),
     },
     gatherRatePerSecond: {
       food: e['villager-forager']?.gather?.ratePerSecond ?? FALLBACK_RULES.gatherRatePerSecond.food,
@@ -1568,7 +1670,7 @@ const UNIT_KINDS = new Set<string>([
   'villager', 'militia', 'man-at-arms', 'long-swordsman', 'two-handed-swordsman', 'champion',
   'spearman', 'pikeman', 'halberdier',
   'archer', 'crossbowman', 'arbalester', 'skirmisher', 'elite-skirmisher',
-  'scout-cavalry', 'light-cavalry', 'trade-cart',
+  'scout-cavalry', 'light-cavalry', 'trade-cart', 'fishing-ship',
   'knight', 'cavalier', 'cavalry-archer', 'heavy-cavalry-archer',
   'longbowman', 'elite-longbowman',
   'battering-ram', 'capped-ram', 'mangonel', 'onager', 'monk', 'trebuchet',
@@ -1577,7 +1679,7 @@ const UNIT_KINDS = new Set<string>([
 const BUILDING_KINDS = new Set<string>([
   'town-center', 'barracks', 'house', 'mill', 'lumber-camp', 'mining-camp', 'farm',
   'outpost', 'watch-tower', 'archery-range', 'blacksmith', 'market', 'stable',
-  'monastery', 'siege-workshop', 'castle', 'university', 'wonder',
+  'monastery', 'siege-workshop', 'castle', 'university', 'wonder', 'dock',
   'palisade-wall', 'palisade-gate',
 ]);
 

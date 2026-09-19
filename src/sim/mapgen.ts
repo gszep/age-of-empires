@@ -22,6 +22,7 @@ import type { NodeKind } from './data';
 import paintedProof from './maps/painted-proof.json';
 import senlac from './maps/senlac.json';
 import windsor from './maps/windsor.json';
+import { OPEN_WATER_TERRAINS } from './data';
 import { random01, seedFrom } from './random';
 import type { AnimalKind, BuildingKind, Point, UnitKind } from './types';
 
@@ -38,12 +39,8 @@ export const TERRAIN_WATER = 1;
 export const TERRAIN_WATER_MEDIUM = 23;
 /** `Beach`: what the engine paints on land that touches water. */
 export const TERRAIN_BEACH = 2;
-/**
- * Which terrains are water for the shore sweep: the DAT's `is_water` flag is
- * 1 (medium), 2 (deep) or 4 (shallow water) for open water, 8 for shallows,
- * 16 for beach and 32 for land. Only open water makes a beach.
- */
-const OPEN_WATER = new Set([TERRAIN_WATER, 22, TERRAIN_WATER_MEDIUM, 15, 96, 97, 98]);
+/** Which terrains are water for the shore sweep: only open water makes a beach. */
+const OPEN_WATER = OPEN_WATER_TERRAINS;
 /** Whether a terrain is open water: the sea, not a walkable shallow. */
 export function isOpenWater(terrain: number): boolean {
   return OPEN_WATER.has(terrain);
@@ -240,6 +237,17 @@ export interface MapDescriptor {
    * two terrains are what it leaves.
    */
   waterMasking?: { rim: number };
+  /**
+   * DE's fish (`GeneratingObjects.inc`, `GNR_STANDARDFISH`, which Islands
+   * defines): `MELKARYBA`, the shore fish (69), as many as fit anywhere on
+   * the sea at a group spacing; and the big fish `FISH_A`/`FISH_B`
+   * (456/458) at counts that scale with the map, each within `nearLand`
+   * tiles of a land zone (`max_distance_to_other_zones`).
+   */
+  fish?: {
+    shore: { spacing: number };
+    deep: { tiles: number; spacing: number; nearLand: number }[];
+  };
   /** The connection between the two clearings, cut through the wood. */
   road?: { width: number };
   playerForest?: ForestSpec;
@@ -352,6 +360,7 @@ export const ISLANDS: MapDescriptor = {
   land: { tiles: 2520, baseSize: 15, clearance: 11, clumping: 22, border: 7, fuzziness: 11 },
   woodShoreSpacing: 3,
   waterMasking: { rim: 5 },
+  fish: { shore: { spacing: 6 }, deep: [{ tiles: 6, spacing: 4, nearLand: 4 }, { tiles: 170, spacing: 8, nearLand: 4 }] },
   playerForest: { tiles: 55, groups: 2, near: 14, far: 26, groupSpacing: 6 },
   // The script's island woods: 450-550 tiles in 9-10 clumps at map scale,
   // avoiding the start areas; halved here because every placement mirrors.
@@ -400,7 +409,9 @@ export interface MapgenContext {
   rng: { seed: number };
   width: number;
   height: number;
-  /** Tile centre free of the edge and of every footprint already placed. */
+  /** Tile centre free of the edge and of every footprint already placed.
+   * The board has no terrain yet when this is asked, so a water node is the
+   * generator's own business: it reads its terrain before asking. */
   free(at: Point): boolean;
   place(kind: NodeKind | AnimalKind, at: Point): void;
 }
@@ -1054,6 +1065,47 @@ export function generateMap(
     }
   }
 
+  // The fish, last of all and from their own stream, so a board dealt before
+  // there were fish keeps every sheep where it was. The scanning half is
+  // walked in the stream's order, each accepted tile clears its spacing, and
+  // the mirror takes the other half.
+  if (descriptor.fish) {
+    const fishCtx: MapgenContext = { ...ctx, rng: { seed: seedFrom(ctx.rng.seed ^ 0xf15_4) } };
+    const scale = (ctx.width * ctx.height) / 10_000;
+    const dealFish = (kind: NodeKind, count: number, spacing: number, ok: (tile: number) => boolean) => {
+      const order = candidateOrderBox(fishCtx, 0, 0, halfWidth - 1, ctx.height - 1);
+      // The spacing is kept as a mask of tiles too close to one already
+      // placed: filtering the candidate list under a `for...of` would leave
+      // the iteration on the unfiltered array.
+      const tooNear = new Uint8Array(ctx.width * ctx.height);
+      let left = count;
+      for (const tile of order) {
+        if (left <= 0) break;
+        if (tooNear[tile] || !OPEN_WATER.has(terrain[tile]) || !ok(tile)) continue;
+        const x = tile % ctx.width;
+        const y = Math.floor(tile / ctx.width);
+        const here = tileCentre(x, y);
+        const other = mirror(here);
+        if (!ctx.free(here) || !ctx.free(other)) continue;
+        ctx.place(kind, here);
+        ctx.place(kind, other);
+        for (let dy = 1 - spacing; dy < spacing; dy++) {
+          for (let dx = 1 - spacing; dx < spacing; dx++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx >= 0 && ny >= 0 && nx < ctx.width && ny < ctx.height) tooNear[ny * ctx.width + nx] = 1;
+          }
+        }
+        left--;
+      }
+    };
+    dealFish('shore-fish', Infinity, descriptor.fish.shore.spacing, () => true);
+    for (const school of descriptor.fish.deep) {
+      const coast = nearNonWater(terrain, ctx.width, ctx.height, school.nearLand);
+      dealFish('fish', Math.round(school.tiles * scale / 2), school.spacing, tile => coast[tile] === 1);
+    }
+  }
+
   return { terrain, elevation };
 }
 
@@ -1089,11 +1141,19 @@ export function beachify(terrain: number[], width: number, height: number): void
  * shallow rim and its open body, as `F_WaterMasking.inc` leaves them.
  */
 export function maskWater(terrain: number[], width: number, height: number, rim: number): void {
-  // Grow the non-water set outward `rim` times over the eight neighbours;
+  const near = nearNonWater(terrain, width, height, rim);
+  for (let tile = 0; tile < terrain.length; tile++) {
+    if (!near[tile] && OPEN_WATER.has(terrain[tile])) terrain[tile] = TERRAIN_WATER_MEDIUM;
+  }
+}
+
+/** 1 on every tile within `reach` (Chebyshev) of a tile that is not open water, itself included. */
+function nearNonWater(terrain: number[], width: number, height: number, reach: number): Uint8Array {
+  // Grow the non-water set outward `reach` times over the eight neighbours;
   // what it never reaches is the open sea.
   let near = new Uint8Array(width * height);
   for (let tile = 0; tile < terrain.length; tile++) near[tile] = OPEN_WATER.has(terrain[tile]) ? 0 : 1;
-  for (let step = 0; step < rim; step++) {
+  for (let step = 0; step < reach; step++) {
     const grown = new Uint8Array(near);
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
@@ -1110,9 +1170,7 @@ export function maskWater(terrain: number[], width: number, height: number, rim:
     }
     near = grown;
   }
-  for (let tile = 0; tile < terrain.length; tile++) {
-    if (!near[tile] && OPEN_WATER.has(terrain[tile])) terrain[tile] = TERRAIN_WATER_MEDIUM;
-  }
+  return near;
 }
 
 /** `set_tight_grouping`: flood outward on purely random costs -- a contiguous

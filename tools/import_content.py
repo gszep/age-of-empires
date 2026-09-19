@@ -19,7 +19,10 @@ from genieutils.datfile import DatFile
 
 from depot import depot_root
 
-RESOURCE_NAMES = {0: "food", 1: "wood", 2: "stone", 3: "gold"}
+# The DAT's stockpiles. 17 is its fish storage -- what a fish holds and a
+# fishing task takes in -- and it lands in the food stockpile like meat and
+# berries do.
+RESOURCE_NAMES = {0: "food", 1: "wood", 2: "stone", 3: "gold", 17: "food"}
 # The bit of a projectile's `smart_mode` that makes it lead a moving target.
 PROJECTILE_LEADS_TARGET = 1
 POPULATION_TYPE = 4
@@ -68,6 +71,15 @@ def text_of(strings: dict[int, str], name_id: int, creation_id: int, help_id: in
     if help_id - HELP_STRING_OFFSET in strings:
         text["help"] = strings[help_id - HELP_STRING_OFFSET]
     return text
+
+
+def palx_alpha(path: Path) -> float:
+    """The global alpha a `.palx` palette draws with, as a fraction: its
+    `$ALPHA` header line, 0-255."""
+    for line in path.read_text().splitlines():
+        if line.startswith("$ALPHA"):
+            return round(int(line.split()[1]) / 255, 4)
+    raise ValueError(f"{path.name}: no $ALPHA header")
 
 
 def read_jasc_pal(path: Path) -> list[tuple[int, int, int]]:
@@ -157,6 +169,8 @@ def find_task(unit: Any, selector: dict[str, Any]) -> Any:
 CORPSE_LIFETIME_RESOURCE = 12
 # Constants.xs: cTaskTypeRepair.
 TASK_REPAIR = 106
+#: `cTaskTypeGatherRebuild`: a gather task, one per class of node.
+TASK_GATHER = 5
 
 
 def corpse_seconds(corpse: Any) -> float | None:
@@ -170,20 +184,30 @@ def corpse_seconds(corpse: Any) -> float | None:
     return None
 
 
+def base_graphic(dat: Any, unit: Any, graphic_id: int) -> int:
+    """A composed standing graphic's base: a wall's is the animated flag drawn
+    over the base named in its first delta, which carries the connection
+    shapes; a dock's is a file-less composite whose deltas are a reflection
+    (file-less too, from the Feudal Age on), the building's own sheet and
+    the birds over it. The base is the first delta that has a file. Each
+    age's variant is composed the same way."""
+    deltas = dat.graphics[graphic_id].deltas or []
+    for delta in deltas:
+        if delta.graphic_id < 0:
+            continue
+        graphic = dat.graphics[delta.graphic_id]
+        if graphic is not None and graphic.file_name and graphic.file_name != "None":
+            return delta.graphic_id
+    raise ValueError(f"unit {unit.id}: standing graphic has no base delta")
+
+
 def resolve_graphic_id(unit: Any, animation: dict[str, Any], civ_units: Any, dat: Any = None) -> int:
     if "slot" in animation:
         slot = animation["slot"]
         if slot == "standing":
             return unit.standing_graphic[0]
         if slot == "base":
-            # A wall is composed: the DAT's standing graphic is the animated
-            # flag, drawn over a base graphic named in its first delta. The
-            # base is what carries the connection shapes.
-            deltas = dat.graphics[unit.standing_graphic[0]].deltas or []
-            base = next((d.graphic_id for d in deltas if d.graphic_id >= 0), -1)
-            if base < 0:
-                raise ValueError(f"unit {unit.id}: standing graphic has no base delta")
-            return base
+            return base_graphic(dat, unit, unit.standing_graphic[0])
         if slot == "dead":
             # What is left behind: the DAT models a corpse, a stump, or a pile
             # of rubble as its own unit, and its standing graphic is that art.
@@ -210,6 +234,18 @@ def resolve_graphic_id(unit: Any, animation: dict[str, Any], civ_units: Any, dat
         if slot == "construction":
             return unit.building.construction_graphic_id
         raise ValueError(f"unknown slot {slot}")
+    if "delta" in animation:
+        # A named piece of a composed standing graphic: a fish is its leap
+        # (the standing graphic, empty but for the frames it is in the air)
+        # over a "(Underwater)" delta that is the school beneath the surface.
+        wanted = animation["delta"]
+        for delta in dat.graphics[unit.standing_graphic[0]].deltas or []:
+            if delta.graphic_id < 0:
+                continue
+            graphic = dat.graphics[delta.graphic_id]
+            if graphic is not None and wanted in (graphic.name or ""):
+                return delta.graphic_id
+        raise ValueError(f"unit {unit.id}: standing graphic has no {wanted!r} delta")
     task = find_task(unit, animation["task"])
     return getattr(task, f"{animation['graphic']}_graphic_id")
 
@@ -621,7 +657,7 @@ def extract_entity(
             "range": rounded(unit.type_50.max_range),
         }
 
-    if category == "unit-variant":
+    if category == "unit-variant" or (category == "unit" and "task" in spec):
         task = find_task(unit, spec["task"])
         resource_type = task.resource_out if task.resource_out >= 0 else task.resource_in
         if resource_type in RESOURCE_NAMES:
@@ -630,6 +666,15 @@ def extract_entity(
                 "ratePerSecond": rounded(unit.bird.work_rate),
                 "capacity": int(unit.resource_capacity),
                 "task": spec["task"],
+                # What the work rate is multiplied by per class of node it
+                # gathers from (`work_value_1` on each gather task): the
+                # fishing ship works a deep-sea fish (class 5) at 1.75 and a
+                # shore fish (class 33) at 1.0.
+                "classFactors": {
+                    str(t.class_id): rounded(t.work_value_1)
+                    for t in unit.bird.tasks
+                    if t.action_type == TASK_GATHER and t.class_id >= 0
+                },
             }
         else:
             entity["work"] = {"task": spec["task"]}
@@ -705,12 +750,14 @@ def extract_entity(
             entity["damageStages"] = {"idle": stages}
         last_death = unit.dying_graphic
         last_decay = dead_standing_graphic(civ_units, unit)
+        composed = spec["animations"].get("idle", {}).get("slot") == "base"
         for age, variant_id in age_variants(dat, unit.id).items():
             variant = civ_units[variant_id]
             if variant is None or variant.standing_graphic[0] < 0:
                 continue
+            standing = variant.standing_graphic[0]
             entity["animations"][f"idle-{age}"] = animation_entry(
-                dat, graphics_dir, variant.standing_graphic[0], hashes
+                dat, graphics_dir, base_graphic(dat, variant, standing) if composed else standing, hashes
             )
             variant_stages = damage_stages(dat, variant)
             if variant_stages and variant_stages != stages:
@@ -1165,6 +1212,14 @@ def technologies_from_tree(
             skipped.append({"name": name, "techId": tech_id,
                             "reason": f"researched at DAT unit {node['Building ID']}, not imported"})
             continue
+        # A tree node the DAT gives nowhere to research (the Fast Fire Ship's
+        # locations are all -1) or nothing to do (the Galleon's effect is -1)
+        # is listed but not offered.
+        tech = dat.techs[tech_id]
+        if not any(l.location_id >= 0 for l in tech.research_locations) or tech.effect_id < 0:
+            skipped.append({"name": name, "techId": tech_id,
+                            "reason": "the DAT gives it no research location or no effect"})
+            continue
         entry = technology_entry(
             dat, {"techId": tech_id, "entities": entities}, hashes, strings
         )
@@ -1436,6 +1491,18 @@ def extract(
     )
     palette_path = palettes_dir / "original.pal"
     palette = read_jasc_pal(palette_path) if palette_path.is_file() else None
+    # An animation drawn through one of the engine's alpha palettes: the
+    # underwater school of a fish takes `n_alpha_underwater.palx`, whose
+    # `$ALPHA` header (86 of 255) is how far under the surface it reads.
+    # Which graphics take it is the engine's convention for its "(Underwater)"
+    # deltas, so the spec names the palette on the animation.
+    for entity_spec in spec["entities"]:
+        for name, animation in entity_spec["animations"].items():
+            if "alphaPalette" not in animation:
+                continue
+            palx = palettes_dir / animation["alphaPalette"]
+            hashes[f"palettes/{palx.name}"] = sha256(palx)
+            entities[entity_spec["key"]]["animations"][name]["alpha"] = palx_alpha(palx)
     # A gaia object's own minimap dot, where the DAT gives one: gold (255,
     # 199, 0), stone (145, 145, 145), the huntables, herdables, fish and
     # bushes (165, 196, 108), the relic white -- each a palette index, and

@@ -587,6 +587,82 @@
       }
     },
     {
+      "key": "villager-fisher",
+      "unitId": 56,
+      "category": "unit-variant",
+      "task": {
+        "actionType": 5,
+        "classId": 33
+      },
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 5,
+            "classId": 33
+          },
+          "graphic": "proceeding"
+        },
+        "carry": {
+          "task": {
+            "actionType": 5,
+            "classId": 33
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "villager-female-fisher",
+      "skin": "female",
+      "skinOf": "villager-fisher",
+      "unitId": 57,
+      "category": "unit-variant",
+      "task": {
+        "actionType": 5,
+        "classId": 33
+      },
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 5,
+            "classId": 33
+          },
+          "graphic": "proceeding"
+        },
+        "carry": {
+          "task": {
+            "actionType": 5,
+            "classId": 33
+          },
+          "graphic": "carrying"
+        },
+        "death": {
+          "slot": "dying"
+        },
+        "decay": {
+          "slot": "dead"
+        }
+      }
+    },
+    {
       "key": "villager-farmer",
       "unitId": 259,
       "category": "unit-variant",
@@ -1279,6 +1355,36 @@
       }
     },
     {
+      "key": "shore-fish",
+      "unitId": 69,
+      "civ": "gaia",
+      "category": "resource",
+      "animations": {
+        "idle": {
+          "delta": "Underwater",
+          "alphaPalette": "n_alpha_underwater.palx"
+        },
+        "leap": {
+          "slot": "standing"
+        }
+      }
+    },
+    {
+      "key": "fish",
+      "unitId": 458,
+      "civ": "gaia",
+      "category": "resource",
+      "animations": {
+        "idle": {
+          "delta": "Underwater",
+          "alphaPalette": "n_alpha_underwater.palx"
+        },
+        "leap": {
+          "slot": "standing"
+        }
+      }
+    },
+    {
       "key": "plant-bush",
       "unitId": 1360,
       "civ": "gaia",
@@ -1476,6 +1582,22 @@
       }
     },
     {
+      "key": "dock",
+      "unitId": 45,
+      "category": "building",
+      "animations": {
+        "idle": {
+          "slot": "base"
+        },
+        "construction": {
+          "slot": "construction"
+        },
+        "death": {
+          "slot": "dying"
+        }
+      }
+    },
+    {
       "key": "scout-cavalry",
       "sounds": [
         "select",
@@ -1498,6 +1620,37 @@
         },
         "decay": {
           "slot": "dead"
+        }
+      }
+    },
+    {
+      "key": "fishing-ship",
+      "sounds": [
+        "select",
+        "train"
+      ],
+      "unitId": 13,
+      "category": "unit",
+      "task": {
+        "actionType": 5,
+        "classId": 5
+      },
+      "animations": {
+        "idle": {
+          "slot": "standing"
+        },
+        "walk": {
+          "slot": "walking"
+        },
+        "work": {
+          "task": {
+            "actionType": 5,
+            "classId": 5
+          },
+          "graphic": "proceeding"
+        },
+        "death": {
+          "slot": "dying"
         }
       }
     },
@@ -2145,7 +2298,8 @@
         "castle": "GOTO_CASTLE",
         "mining-camp": "GOTO_MINING_CAMP",
         "lumber-camp": "GOTO_LUMBER_CAMP",
-        "wonder": "GOTO_WONDER"
+        "wonder": "GOTO_WONDER",
+        "dock": "GOTO_DOCK"
       },
       "selectAll": {
         "town-center": "SELECT_ALL_TOWN_CENTERS",
@@ -2162,7 +2316,8 @@
         "mining-camp": "SELECT_ALL_MINING_CAMPS",
         "lumber-camp": "SELECT_ALL_LUMBER_CAMPS",
         "wonder": "SELECT_ALL_WONDERS",
-        "outpost": "SELECT_ALL_OUTPOSTS"
+        "outpost": "SELECT_ALL_OUTPOSTS",
+        "dock": "SELECT_ALL_DOCKS"
       }
     },
     "materials": [

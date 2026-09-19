@@ -111,6 +111,7 @@ export function installDebug(context: DebugContext): void {
       // question is actually asking about.
       amount: entity.amount,
       resourceKind: entity.resourceKind,
+      node: entity.node,
       dead: entity.dead,
       buildProgress: entity.buildProgress,
       order: entity.order.kind,

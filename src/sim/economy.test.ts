@@ -2639,6 +2639,10 @@ describe('what a razing leaves behind', () => {
       // fallow farm. It is imported for its portrait and strings and drawn
       // as terrain, so it carries no animations at all.
       if (key === 'farm') { expect(entity.animations ?? {}).toEqual({}); continue; }
+      // The dock is the other: the DAT gives it no dead unit at all (its
+      // `dead_unit_id` is -1), so a razed dock collapses into the water and
+      // the water keeps it.
+      if (key === 'dock') { expect(Object.keys(entity.animations ?? {})).not.toContain('decay'); continue; }
       expect(Object.keys(entity.animations ?? {}), `${key} leaves nothing`).toContain('decay');
     }
   });

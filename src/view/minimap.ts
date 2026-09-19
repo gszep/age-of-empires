@@ -1,4 +1,5 @@
 import type { GameState, PlayerId, Point, UnitKind } from '../sim/types';
+import type { NodeKind } from '../sim/data';
 import type { ContentAssets } from './assets';
 import { playerColorHex } from './sprites';
 
@@ -18,9 +19,9 @@ const RESOURCE_COLORS: Record<string, string> = {
 const NODE_OF_RESOURCE: Record<string, 'berries' | 'tree' | 'gold' | 'stone'> = {
   food: 'berries', wood: 'tree', gold: 'gold', stone: 'stone',
 };
-function resourceColor(state: GameState, resource: string | undefined): string {
+function resourceColor(state: GameState, resource: string | undefined, node?: NodeKind): string {
   const kind = resource ?? 'wood';
-  const own = state.rules.nodes[NODE_OF_RESOURCE[kind]]?.minimapColor;
+  const own = state.rules.nodes[node ?? NODE_OF_RESOURCE[kind]]?.minimapColor;
   return own ? `rgb(${own[0]},${own[1]},${own[2]})` : RESOURCE_COLORS[kind];
 }
 /** A gaia animal in the DAT's own dot -- a sheep is food-green, not white. */
@@ -174,7 +175,7 @@ export class Minimap {
       if (entity.owner !== this.player && !visible) continue;
       if (entity.owner === this.player || visible) {
         const color = entity.kind === 'resource'
-          ? resourceColor(state, entity.resourceKind)
+          ? resourceColor(state, entity.resourceKind, entity.node)
           : (entity.owner === 0 && gaiaColor(state, entity.kind)) || ownerColor(entity.owner);
         const size = entity.kind === 'town-center' ? 6
           : entity.kind === 'resource' ? resourceDotSize : entity.radius > 0.5 ? 5 : 2.5;
