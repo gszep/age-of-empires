@@ -108,6 +108,13 @@ are the engine's and the surface is the reference's shader
 - **Islands deals no resource islets and no depth chain.** The 2023 script's
   four 1% `create_land`s (`land_id 20-23`) and their neritic fish are not
   dealt; DE's water is one terrain, so there is no depth chain to deal.
+- **Windsor's survey channels make a busy bank.** The Thames is water by the
+  table and has the engine's beach, but the survey's water polygons include
+  the lock cuts and weir channels as one-tile strips, so around (230, 90)
+  the sweep paints sand rims along a lattice of channels and the reach reads
+  busy rather than as a river. `tools/import_terrain.py` could close
+  channels under two tiles wide, or the survey could be re-cut at a coarser
+  water threshold.
 
 ## Civilisations
 
