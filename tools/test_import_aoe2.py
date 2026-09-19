@@ -1178,6 +1178,23 @@ class ContentImportIntegrationTest(unittest.TestCase):
             with Image.open(manifest.parent / mask) as image:
                 self.assertEqual((image.mode, image.size), ("L", (512, 512)), key)
 
+    def test_foam_atlases_are_carried_whole(self):
+        """The shore foam's four sequences (issue #89): eight 2048-square
+        luminance atlases of 8x8 frames, named in pairs, published beside
+        the water textures."""
+        foam = self.result["foam"]
+        self.assertEqual(len(foam["diag"]), 4)
+        self.assertEqual(len(foam["ortho"]), 4)
+        self.assertEqual((foam["frameSize"], foam["framesPerRow"]), (256, 8))
+        manifest = Path("public/imported/aoe2/manifest.json")
+        if not manifest.is_file():
+            self.skipTest("no published manifest to check")
+        published = json.loads(manifest.read_text())["foam"]
+        for family in ("diag", "ortho"):
+            for image in published[family]:
+                with Image.open(manifest.parent / image) as atlas:
+                    self.assertEqual((atlas.mode, atlas.size), ("L", (2048, 2048)), image)
+
     def test_terrain_restrictions_are_the_dats_table(self):
         """Who may stand where is a table in the DAT, read per row and cut to
         the shipped terrains. Row 7 is the villager's: every land terrain,

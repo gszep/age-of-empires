@@ -3,6 +3,7 @@ import { attribute, floor, fract, smoothstep as smoothstepNode, texture as textu
 import { TILE_W, TILE_H, worldToIso } from './iso';
 import { isOpenWater } from '../sim/mapgen';
 import { maskU, type ContentAssets, type ImportedTerrain } from './assets';
+import { createFoam } from './foam';
 import { createWaterMaterial, surfaceOpacity, waterPresetFor } from './water';
 import type { GameState, ReadonlyGameState } from '../sim/types';
 
@@ -237,6 +238,8 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
   }
 
   const group = new THREE.Group();
+  const foam = createFoam(state, assets);
+  if (foam) group.add(foam);
   classes.forEach((entry, i) => {
     if (!buckets[i].positions.length) return;
     const geometry = new THREE.BufferGeometry();

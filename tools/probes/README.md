@@ -77,6 +77,11 @@ had passed (`docs/reviews/2026-09-19.md` §5). Compare in the space the
 `pixels`/`edge` reply names, at the same pixel scale (`hudshot.mts` renders
 at the reference's 2000x1125 for exactly that).
 
+`islands-coast-2026-09-19.png` is the coast reference: DE Islands at its
+default zoom, 2000x1125 as captured (tropical biome, so its colours are
+`CC_JUNGLE`'s; shapes and scale only), with straight and stepped shores,
+foam mid-roll and beach-to-grass crossings. Compare ours at zoom 0.8.
+
 Seeded 2026-09-19 with the five HUD crops from the human's 2026-09-17
 random-map screenshot (2000x1125, 0.52 of the 3840-wide widget space):
 `hud-{top,bottom,menu,score,age}-2026-09-17.png`. The two Islands

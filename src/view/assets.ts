@@ -175,6 +175,21 @@ export interface WaterPreset {
 /** One age as `eras.json` states it: its name and the shield it wears. */
 export interface ImportedAge { name?: string; shield: string }
 
+/**
+ * The shore foam's frames: four sequences of 128 frames, each over two
+ * 8x8 atlases of `frameSize` texels, luminance masks of a crest rolling
+ * across the frame to the shore and back. `diag` is for a shore along a
+ * tile edge (its crest lies at 45 degrees in the frame, the tile axis once
+ * the quad is drawn two to one), `ortho` for a shore stepped along the
+ * screen's axes; the second pair of each is the first mirrored.
+ */
+export interface FoamAtlases {
+  diag: string[];
+  ortho: string[];
+  frameSize: number;
+  framesPerRow: number;
+}
+
 export interface ContentAssets {
   entities: Record<string, ImportedEntity>;
   /** The base era's ages in order, Dark to Imperial. */
@@ -184,6 +199,8 @@ export interface ContentAssets {
   terrain: Record<string, ImportedTerrain>;
   /** Water presets by `water_def.json` index; absent without owned content. */
   water?: Record<string, WaterPreset>;
+  /** The shore foam's frame atlases (`WaveAnim_ps`); absent without owned content. */
+  foam?: FoamAtlases;
   textures: Map<string, THREE.Texture>;
   playerColors?: PlayerColors;
   /** One 256-texel ramp per player, indexed by a sprite's own grey. */
@@ -297,6 +314,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     ages?: ImportedAge[];
     terrain?: Record<string, ImportedTerrain>;
     water?: Record<string, WaterPreset>;
+    foam?: FoamAtlases;
     playerColors?: PlayerColors;
     particles?: Record<string, ParticleEffect>;
   }>(`${CONTENT_BASE}manifest.json`);
@@ -388,6 +406,18 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
       textures.set(image, texture);
     }));
   }
+  // The foam atlases: luminance masks of frames, read by their red.
+  for (const image of [...(manifest.foam?.diag ?? []), ...(manifest.foam?.ortho ?? [])]) {
+    jobs.push(loader.loadAsync(CONTENT_BASE + image).then(texture => {
+      texture.colorSpace = THREE.NoColorSpace;
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.generateMipmaps = true;
+      textures.set(image, texture);
+    }));
+  }
   await Promise.all(jobs);
   const playerColors = manifest.playerColors;
   const playerRamps = new Map<number, THREE.DataTexture>();
@@ -421,6 +451,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   return {
     entities: manifest.entities, skins: skinFamilies(manifest.entities), ages: manifest.ages ?? [],
     terrain, water: Object.keys(water).length ? water : undefined,
+    foam: manifest.foam?.diag?.length ? manifest.foam : undefined,
     textures, playerColors, playerRamps, blends, particles: manifest.particles,
   };
 }

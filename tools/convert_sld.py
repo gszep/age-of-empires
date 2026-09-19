@@ -158,6 +158,32 @@ def convert_water(
     return converted
 
 
+def convert_foam(foam: dict[str, Any], terrain_dir: Path, out_dir: Path, hashes: dict[str, str]) -> dict[str, Any]:
+    """The shore foam atlases, luminance masks already shipped as PNG in
+    `terrain/water`: copied through as 8-bit grey at full size."""
+    from PIL import Image
+
+    if not foam:
+        return {}
+    common = terrain_dir.parent.parent
+    converted = dict(foam)
+    for family in ("diag", "ortho"):
+        images = []
+        for named in foam[family]:
+            source = common / named
+            if not source.is_file():
+                raise FileNotFoundError(f"foam atlas missing: {source}")
+            relative = "water/foam/" + Path(named).name
+            target = out_dir / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with Image.open(source) as image:
+                image.convert("L").save(target, optimize=True)
+            hashes[f"water/foam/{source.name}"] = sha256(source)
+            images.append(relative)
+        converted[family] = images
+    return converted
+
+
 def decoder_fingerprint() -> str:
     """What the conversion code itself would produce, in one hash.
 
@@ -398,6 +424,7 @@ def main() -> None:
     hashes = dict(source.get("sha256", {}))
     terrain = convert_terrain(imported.get("terrain", {}), args.terrain, args.out, hashes)
     water = convert_water(imported.get("water", {}), args.terrain, args.out, hashes)
+    foam = convert_foam(imported.get("foam", {}), args.terrain, args.out, hashes)
     particles = convert_particles(imported.get("particles", {}), args.out)
     source["sha256"] = hashes
 
@@ -424,6 +451,7 @@ def main() -> None:
         "terrain": terrain,
         # The water presets and their textures (issue: the surface).
         "water": water,
+        "foam": foam,
         # The DAT's passability table, per restriction row: which of the
         # shipped terrains each may stand on. Rules, not art, so it passes
         # through -- and, like `playerAttributes`, has to be listed here.

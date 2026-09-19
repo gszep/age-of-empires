@@ -59,6 +59,7 @@ handedness (below); DAT terrain textures with blendomatic edge blending
 (#42) and DE's overlay masks across land crossings (#116); fog as a rounded per-tile contour with `colorcorrection.json`'s
 levels; the reference's water shader read whole from its SM2 build (the
 height field, its drifts, the dome, the glint) over the tile in linear light;
+shore foam from the reference's own frame atlases, one to a shore tile (#89);
 SLD sprites decoded locally (main, shadow, player-colour, outline and damage
 layers) with the keyframe delta rule (#78); player colour through the
 palette's own block; occlusion contours; task animations on the
@@ -114,6 +115,13 @@ comparable because the board changed under them.
   browser smoke (`tools/debug_smoke.mjs`: a private server, real clicks and
   keys). Fidelity assertions skip without the owned content; the gate says
   how many skipped.
+
+## The reference's default zoom is 0.8 of ours
+
+DE at its default zoom draws the 2x assets at 0.80 -- a 77-pixel tile
+against our 96 at zoom 1 (`islands-coast-2026-09-19.png`: a 143-texel
+mangrove stands 115 px, the water's repeat vector is (404, 202) px). A
+side-by-side at "the same zoom" is ours scaled by 0.8, or ours at zoom 0.8.
 
 ## The projection has AoE2's handedness
 

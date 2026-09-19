@@ -1533,6 +1533,15 @@ def extract(
     return {
         "terrain": terrain,
         "water": water_presets(dat_path, hashes),
+        # The shore foam's frames (`WaveAnim_ps`): four sequences of 128
+        # frames, each over two 8x8 atlases of 256 px in `terrain/water`;
+        # `diag` for a shore along a tile edge, `ortho` for one stepped
+        # across the screen's axes, each with a mirrored variant (#89).
+        "foam": {
+            "diag": [f"water/atlas_v1_diag_{i}.png" for i in (1, 2, 3, 4)],
+            "ortho": [f"water/atlas_v1_ortho_{i}.png" for i in (1, 2, 3, 4)],
+            "frameSize": 256, "framesPerRow": 8,
+        },
         "terrainRestrictions": terrain_restrictions(
             dat,
             {entity["terrainRestriction"] for entity in entities.values() if "terrainRestriction" in entity},
