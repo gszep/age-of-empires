@@ -50,3 +50,21 @@ and answers with whichever replies first, so a browser tab somebody left open
 on 5173 will answer your measurement from its own match. Pass `root` and
 `configFile` explicitly or `createServer` takes the working directory as the
 project and serves a 404.
+
+## The reference corpus
+
+`.local/reference/` (gitignored: the images are the reference's) holds the
+crops of AoE2DE that measurements are compared against, one line each in
+`.local/reference/index.md`: file, what it shows, the game's display
+resolution and any crop scale, and the date. Before calibrating anything
+visual, look there; if the corpus lacks the thing, ask the human for a
+screenshot — three of theirs settled six defects the agent's own metrics
+had passed (`docs/reviews/2026-09-19.md` §5). Compare in the space the
+`pixels`/`edge` reply names, at the same pixel scale (`hudshot.mts` renders
+at the reference's 2000x1125 for exactly that).
+
+Seeded 2026-09-19 with the five HUD crops from the human's 2026-09-17
+random-map screenshot (2000x1125, 0.52 of the 3840-wide widget space):
+`hud-{top,bottom,menu,score,age}-2026-09-17.png`. The two Islands
+screenshots from 2026-09-19 (the minimap and sea; the sun glints and HUD
+text) exist only in the chat and are asked for on issue #103.

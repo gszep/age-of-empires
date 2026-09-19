@@ -15,10 +15,10 @@
  */
 
 import * as THREE from 'three/webgpu';
-import { gameTimeSeconds } from './sim/game';
+import { gameTimeSeconds, queuedCount } from './sim/game';
 import type { CommandResult } from './sim/game';
 import type { Command, Entity, GameState, Point } from './sim/types';
-import { colorStats, type ColorStats } from './dev-debug-stats';
+import { colorStats, type ColorStats, edgeWidth, lumaProfile, matchCount } from './dev-debug-stats';
 import { worldToIso, TILE_W } from './view/iso';
 import { WALL_JOINT, WALL_POST, WALL_RUN_X, WALL_RUN_Y, wallShape } from './view/sprites';
 
@@ -47,13 +47,19 @@ export interface DebugContext {
 }
 
 interface DebugQuery {
-  type: 'sim' | 'entities' | 'pixels' | 'command' | 'select' | 'look';
+  type: 'sim' | 'entities' | 'pixels' | 'edge' | 'command' | 'select' | 'look';
   id?: number;
   owner?: number;
   kind?: string;
   entity?: number;
   rect?: [number, number, number, number];
   png?: boolean;
+  /** With `pixels`: count the pixels within `tolerance` (default 8) of this colour. */
+  match?: string;
+  tolerance?: number;
+  /** With `edge`: the line, in CSS pixels, to read a luminance profile along. */
+  from?: [number, number];
+  to?: [number, number];
   /** Include corpses, which are otherwise filtered out like the UI filters them. */
   dead?: boolean;
   command?: Command;
@@ -114,6 +120,10 @@ export function installDebug(context: DebugContext): void {
       node: entity.node,
       dead: entity.dead,
       buildProgress: entity.buildProgress,
+      // What a production building is making and how many it has spoken
+      // for -- the queue question the smoke test asks after a real click.
+      training: entity.training?.kind,
+      queued: queuedCount(entity),
       order: entity.order.kind,
       rally: entity.rally && { x: round(entity.rally.target.x), y: round(entity.rally.target.y) },
       selected: context.selectedIds().includes(entity.id),
@@ -284,7 +294,29 @@ export function installDebug(context: DebugContext): void {
         return { png: scratch.toDataURL('image/png').split(',')[1], width: w, height: h };
       }
       const stats: ColorStats = colorStats(data);
-      return { rect: rect.map(Math.round), devicePixels: [w, h], ...stats };
+      // The space the numbers are in, printed beside them: a colour compared
+      // in the wrong space cost a night of calibration once (docs/lessons.md).
+      const colorSpace = String(context.renderer.outputColorSpace);
+      const matched = query.match ? matchCount(data, query.match, query.tolerance) : {};
+      return { rect: rect.map(Math.round), devicePixels: [w, h], colorSpace, ...stats, ...matched };
+    }
+    // How soft an edge is: the luminance profile along a line and the
+    // distance between its 10% and 90% crossings -- the fog contour, the
+    // beach rim and a blend seam are all this one number.
+    if (query.type === 'edge') {
+      if (!query.from || !query.to) throw new Error('edge query needs `from` and `to`');
+      const x0 = Math.min(query.from[0], query.to[0]);
+      const y0 = Math.min(query.from[1], query.to[1]);
+      const rect: [number, number, number, number] = [
+        x0, y0, Math.abs(query.to[0] - query.from[0]) + 1, Math.abs(query.to[1] - query.from[1]) + 1,
+      ];
+      const canvas = context.renderer.domElement;
+      const ratio = canvas.width / canvas.clientWidth;
+      const { data, w } = await capturePixels(rect);
+      const local = (p: [number, number]): [number, number] => [Math.round((p[0] - x0) * ratio), Math.round((p[1] - y0) * ratio)];
+      const profile = lumaProfile(data, w, local(query.from), local(query.to));
+      const edge = edgeWidth(profile);
+      return { from: query.from, to: query.to, colorSpace: String(context.renderer.outputColorSpace), samples: profile.length, ...edge, widthCss: Math.round(edge.width / ratio * 100) / 100, profile };
     }
     // Reading the match is not enough to verify how it renders: a corpse, a
     // rally flag, or a freshly trained unit only exists once someone plays.

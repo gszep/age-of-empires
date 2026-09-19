@@ -20,6 +20,7 @@ off the reference; **measured** — fitted to a reference screenshot;
 |---|---|---|---|---|
 | Starting resources | 200 food / 200 wood / 100 gold / 200 stone | game setting (the reference's Standard); the DAT's `civs[1].resources[0..3]` are 0 | `data.ts` `rulesFromManifest` | #109 |
 | Herdable claim rule | claimed by whoever comes within its line of sight | inferred rule; the distance is the DAT's `line_of_sight` (3) | `data.ts` `animal`, `game.ts` | — |
+| Training refused at the population cap | "population cap reached" at queue time | chosen; the reference queues past the cap and waits for houses | `game.ts` `applyCommand` | #143 |
 | Drop-site `accepts` | hand table | chosen; `dropsites.json` and `bird.drop_sites` state it | `data.ts` | #52 |
 | Speed / train / reload / frame defaults when a manifest field is absent | `?? 0.8`, `?? 25`, `?? 2`, `?? 10` | chosen; only reached when a manifest key is missing (`imported-rules.test.ts` holds the stated ones) | `data.ts` `rulesFromManifest` | — |
 | Game-speed multipliers | 1.0 / 1.5 / 1.7 / 2.0 | inferred (Steam, AoEZone threads); the names and the Default are owned strings 20033-20036 | `main.ts` | — |

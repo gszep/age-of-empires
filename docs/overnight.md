@@ -27,9 +27,10 @@ in `git log` and `docs/status.md`.
   check passes and `tools/gate.sh` is green; then commit and push before the
   next. If it cannot be finished, revert to the last green state, say why on
   the issue, and move on — a half-shipped feature is worse than an honest gap.
-- **The clock is `date`, not memory.** Run it before every progress note. A
-  run once wrapped up at dawn believing it was mid-afternoon because it had
-  narrated the time for five hours.
+- **The clock is `date`, not memory.** Run it before every progress note;
+  `tools/hooks/clock.sh` also prints the time every twenty-five tool calls.
+  A run once wrapped up at dawn believing it was mid-afternoon because it
+  had narrated the time for five hours.
 - **When the queue empties early, keep going down the tracker** (the human's
   rule, 2026-09-19). A run stops at the deadline the human gave, not when the
   work looks done.
@@ -54,11 +55,12 @@ in `git log` and `docs/status.md`.
 
 - **Hygiene pass, last of all**: list what is running by the process table,
   not by memory; kill the litter; name what deliberately survives.
-- **The morning report is generated, not recalled**: commits from
-  `git rev-list --count <start>..HEAD`, issues from `gh`, and a section
-  headed *not verified* listing every claim the run could not check, every
-  approximation it introduced, and every fixture clock it widened. Counts
-  recalled from memory were wrong in four of the last five reports.
+- **The morning report is generated, not recalled**:
+  `tools/morning_report.sh <start-commit>` prints the commits, the issues
+  closed and opened, the gate, the ledger rows added and a *not verified*
+  section to fill in by hand — every claim the run could not check, every
+  approximation, every fixture clock widened. Counts recalled from memory
+  were wrong in four of the last five reports.
 - Update `docs/lessons.md` (rules, grouped by trigger, only if the tracker
   cannot hold it) and `docs/status.md` (what shipped and its evidence), and
   prune both — a hand-off that only appends is the failure mode.

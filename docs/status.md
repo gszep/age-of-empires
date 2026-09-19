@@ -109,8 +109,10 @@ comparable because the board changed under them.
   local SLD decoder is byte-identical to openage's on all 29,783 frames it
   replaced; every modelled unit's stats match the DAT (487 values, 0
   mismatches, #36).
-- **Tests**: 370 vitest (≈160 s on six workers) and 71 import tests.
-  Fidelity assertions skip without the owned content (#104).
+- **Tests**: 374 vitest (≈160 s on six workers), 72 import tests, and the
+  browser smoke (`tools/debug_smoke.mjs`: a private server, real clicks and
+  keys). Fidelity assertions skip without the owned content; the gate says
+  how many skipped.
 
 ## The projection has AoE2's handedness
 
@@ -128,9 +130,8 @@ lands on the mirror to the tile, sprites are not mirrored.
 ## Verification
 
 ```bash
-tools/gate.sh              # npm test, npm run build, npm run test:import
+tools/gate.sh              # npm test, npm run build, npm run test:import, npm run debug:smoke
 npm run batch -- --matches 16 --concurrency 16 --seed-start 100 --max-time 2400 --out .local/batches/gate
-npm run debug:smoke        # headless Chrome against /__debug
 npm run test:live-agent    # opt-in
 ```
 

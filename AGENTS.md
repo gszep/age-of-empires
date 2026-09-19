@@ -28,8 +28,7 @@ the project's memory — do not rely on any external memory system.
   importer wherever it exists. Approximate only what the downloaded files do
   not represent, and record each approximation in `docs/ledger.md` in the
   same commit — an inferred rule is written as inferred even when it looks
-  right.
-  Do not disassemble `AoE2DE_s.exe`.
+  right. Do not disassemble `AoE2DE_s.exe`.
 - Keep the open fallback functional for users without the owned game, but do
   not let its limitations lower the fidelity of the imported mode.
 - Never commit Steam credentials, game files, converted Microsoft assets,
@@ -44,7 +43,7 @@ the project's memory — do not rely on any external memory system.
 ## Quality gate for every checkpoint
 
 ```bash
-tools/gate.sh          # npm test, npm run build, npm run test:import
+tools/gate.sh          # npm test, build, test:import, debug:smoke (browser)
 ```
 
 Run it through that script rather than by hand, with its output to a file
@@ -54,8 +53,7 @@ refuses `git commit` while any changed non-Markdown file is newer than that
 sentinel, because the prose version of this rule let a red build into
 `origin/main` twice. A commit that touches only `.md` files needs no gate.
 
-Also run the relevant live/headless integration test for changed boundaries.
-Commit only when all gates pass, and always push after committing. Keep
+Commit only when the gate is green, and always push after committing. Keep
 model-provider tests opt-in.
 
 ## Facts you cannot infer from the code
@@ -74,12 +72,11 @@ model-provider tests opt-in.
   `~/Steam/steamapps/content/app_813780`), the SteamCMD depot tree — not a
   normal game install. Pinned depot/manifest IDs live in
   `tools/aoe2-source.json`; setup guide in `docs/owned-assets-setup.md`.
-- **The manifest is three steps, and the last two add keys the first one
-  does not know:** `import_content.py` writes `content.json`,
-  `convert_sld.py` builds `manifest.json` from it (carrying `blends`
-  through from the previous manifest), `import_blends.py` adds `blends`.
-  Re-running one step alone has shipped a manifest with no shore twice.
-  `tools/import_aoe2.sh` runs all of them.
+- **The manifest is three steps** — `import_content.py` writes
+  `content.json`, `convert_sld.py` builds `manifest.json` from it,
+  `import_blends.py` adds `blends` — and re-running one step alone has
+  shipped a manifest with no shore twice. `tools/import_aoe2.sh` runs all
+  of them.
 - **The projection has AoE2's handedness since 2026-09-19:** +x runs
   down-left on screen, +y down-right (`src/view/iso.ts`). Anything that
   turns a tile direction into a screen direction -- the minimap's mapping,
@@ -136,7 +133,9 @@ curl -s localhost:5173/__debug -d '{"type":"entities","owner":2}' # positions, a
 # screenshot to squint at.
 curl -s localhost:5173/__debug -d '{"type":"entities","dead":true}'  # corpses too
 curl -s localhost:5173/__debug -d '{"type":"pixels","entity":12}' # real rendered colours under an entity
-curl -s localhost:5173/__debug -d '{"type":"pixels","rect":[0,0,400,300]}'
+curl -s localhost:5173/__debug -d '{"type":"pixels","rect":[0,0,400,300],"match":"#0000ff","tolerance":8}'  # + count of one colour
+curl -s localhost:5173/__debug -d '{"type":"edge","from":[100,400],"to":[500,400]}'  # 10-90% width of a luminance edge
+# every pixel reply names its colour space; compare in that space or not at all
 curl -s "localhost:5173/__debug/screenshot?x=0&y=0&w=800&h=600" -o shot.png
 ```
 
@@ -160,10 +159,14 @@ server on its own port and open the only page attached to it (pass `root` and
 project and serves a 404). And `entities` returns at most 200 matches, which on
 a 120x120 map is well short of gaia's resources.
 
-`pixels` returns mean colour and a dominant-colour histogram read back from
-the actual canvas — use it to verify rendering changes (tints, masks,
-visibility) numerically instead of asking a human to look. Prefer it over
-screenshots; use the PNG endpoint only when geometry genuinely needs eyes.
+`pixels` returns mean colour, a dominant-colour histogram and a matched
+count read back from the actual canvas; `edge` the softness of a contour.
+Verify rendering with them, against the reference crops in
+`.local/reference/` (`tools/probes/README.md` says what each is and at what
+scale) — three of the human's screenshots settled six defects that my own
+metrics had passed. **A failing number is never overruled by a picture**: a
+screenshot may add to a passing measurement, not replace a failing one.
+Use the PNG endpoint only when geometry genuinely needs eyes.
 
 ## Working style
 
@@ -175,16 +178,14 @@ screenshots; use the PNG endpoint only when geometry genuinely needs eyes.
 - Add tests for timing, state transitions, hidden information, replay
   determinism, protocol compatibility, and prior regressions — and for any
   convention that can fail silently. Do not test trivial getters or constants.
-- There is one way to wait: start the job with a handle
-  (`run_in_background`, or `job & echo $! > .local/job.pid`) and wait on the
-  handle with `tools/wait_for.sh pid|file|gone <target> [timeout]`. A hook
-  (`tools/hooks/guard_bash.sh`) refuses `pgrep -f`, `pkill -f`, bare `sleep`
-  and `until`/`while … sleep` loops, because each recurred for three weeks
-  with the rule written down (sixteen self-matching waiters once ran all
-  night). List processes with `ps -eo pid,etime,args | grep <name>`. A run
-  that started background work ends with a hygiene pass — list what it left
-  running from the process table, kill the litter, and name what
-  deliberately survives.
+- One way to wait: start the job with a handle (`run_in_background`, or
+  `job & echo $! > .local/job.pid`) and `tools/wait_for.sh pid|file|gone
+  <target> [timeout]`. `tools/hooks/guard_bash.sh` refuses `pgrep -f`,
+  `pkill -f`, bare `sleep` and `until`/`while … sleep` loops — each recurred
+  for three weeks with the rule written down. List processes with
+  `ps -eo pid,etime,args | grep <name>`. A run that started background work
+  ends with a hygiene pass from the process table: kill the litter, name
+  what deliberately survives.
 - In interactive sessions, verify lightly but always: before handing a change
   over, run the tests that touch the changed code (the full gate still runs
   at commit time), and first ask what the reference implementation actually
