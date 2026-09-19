@@ -131,10 +131,23 @@ eight-neighbour algorithm once the mask bytes were read as keep-base alpha,
 a gutter in the mask atlas, the water surface drawn through
 `water_def.json`'s presets, the script's aesthetic scatter as view-only
 sprites, and the leaf-litter patches dealt as the script deals them. Every
-stage has a section in `status.md`; the approximations are the fog edge's
-softness, the water shader's combination, and nothing else. Tried and
-reverted: the nearctic snow dusting (`backlog.md`). Left measured but not
-built: the shore foam.
+stage has a section in `status.md`. The morning after, the water's colour
+formula was read off the shader's own SM2 build (the `Aon9` chunk -- see
+`lessons.md`), which replaced the calibrated open-water colour, and the
+minimap took each terrain's texture tone (issue #80). What remains
+approximated: the fog edge's softness, the water's depth alpha and ripple
+scale, and the minimap rule itself. Tried and reverted: the nearctic snow
+dusting (`backlog.md`). Left measured but not built: the shore foam.
+
+**A fresh session starts here:** `git pull`, re-run the three manifest
+steps if `public/imported/aoe2/manifest.json` lacks `water` or `blends`
+(`tools/import_aoe2.sh` does all of it), open `?map=islands&seed=2` and
+`?seed=3`, press F4, and read `docs/water-design.md` "What is next" -- the
+dock and the fishing ship are the queue's head, on a board that now exists.
+`.local/probes/pond.ts` (`MAP=`, `SEED=`, `LOOK=x,y`, `OUT=`) is the
+screenshot probe every picture in `status.md`'s last six sections came
+from; it is untracked, so recreate it from the pattern in
+`tools/probes/snapshot.ts` if it is gone.
 
 **The 2026-09-13 session** cleared the bugs filed after the last overnight run:
 #32 (a lumberjack going idle at the camp — the continuation remembered which

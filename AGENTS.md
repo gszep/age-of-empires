@@ -64,6 +64,17 @@ model-provider tests opt-in.
   `~/Steam/steamapps/content/app_813780`), the SteamCMD depot tree — not a
   normal game install. Pinned depot/manifest IDs live in
   `tools/aoe2-source.json`; setup guide in `docs/owned-assets-setup.md`.
+- **The manifest is three steps, and the last two add keys the first one
+  does not know:** `import_content.py` writes `content.json`,
+  `convert_sld.py` builds `manifest.json` from it (carrying `blends`
+  through from the previous manifest), `import_blends.py` adds `blends`.
+  Re-running one step alone has shipped a manifest with no shore twice.
+  `tools/import_aoe2.sh` runs all of them.
+- **The compiled shaders are readable:** `strings` on a `.so` under
+  `resources/_common/shaders/d3d11` names its inputs, and its `Aon9` chunk
+  is a Shader Model 2 build whose token stream is documented -- that is how
+  the water's colour formula was read. They are resources, not the
+  executable, which stays off limits.
 - **The atlas cache is keyed on the decoder's source:** `sld_layers.py` and
   the `convert`/`convert_mask` functions in `convert_sld.py`. Any edit to
   those re-decodes every sprite — about an hour, masks included; editing the
