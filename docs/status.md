@@ -1723,12 +1723,17 @@ board, two passes between them repainted half of every wood, and on seed 11
 painted, the same seed puts 1071 of them on the biome's own forest floor, with
 the script's sprinkling of variations over the rest.
 
-And a lone tree now brings its own litter. The script grows patches of
-`STRAGGLER_FOREST` and drops the stragglers onto them; painting the tile a tree
-has just taken reaches the same picture without the placement having to consult
-the dressing, which would move the trees themselves. A third take the variation,
-as the script's 24 tiles in 64 do — and in two of the four biomes that variation
-is terrain 71, which the DAT calls **"Underbrush, Leaves"**.
+The litter patches are now dealt as the script deals them (2026-09-19),
+which corrected an earlier reading of it. `STRAGGLER_FOREST` is grown at 64
+tiles in 3 clumps over the base, its variation sprinkled inside at 24 in 24
+-- in two of the four biomes that variation is terrain 71, which the DAT
+calls **"Underbrush, Leaves"** -- and the base punched back into it at 32 in
+16, clumps scaled with the board. The lone trees are placed by
+`stragglers_neutral.inc`, which names no terrain to place on: a straggler
+stands on whatever the dressing dealt there, a patch if one lies under it and
+grass if not. For a while every straggler painted litter under itself
+instead, on the belief that the script dropped them onto the patches; it
+does not.
 
 ## A farm is walked over, not round
 

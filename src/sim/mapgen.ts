@@ -90,8 +90,15 @@ type BiomeTerrain = Exclude<keyof BiomeSpec, 'name' | 'aesthetics'>;
  * makes the numbers land at the script's own coverage.
  */
 const BIOME_PASSES: {
-  paint: BiomeTerrain; over: BiomeTerrain; percent: number; clumps: number; clumping?: number;
+  paint: BiomeTerrain; over: BiomeTerrain; percent?: number; tiles?: number; clumps: number; clumping?: number;
 }[] = [
+  // The leaf-litter patches: `STRAGGLER_FOREST` at 64 tiles in 3 clumps
+  // (`clumping_factor rnd(20,40)`), its variation sprinkled inside at 24 in
+  // 24, and the base punched back into it at 32 in 16 -- ground the lone
+  // trees may or may not stand on; the script ties the two together no more
+  // than that.
+  { paint: 'stragglerForest', over: 'base', tiles: 64, clumps: 3, clumping: 30 },
+  { paint: 'stragglerForestVariation', over: 'stragglerForest', tiles: 24, clumps: 24 },
   { paint: 'forestVariationA', over: 'forest', percent: 2, clumps: 128 },
   { paint: 'forestVariationB', over: 'forest', percent: 1, clumps: 128 },
   { paint: 'blendA', over: 'base', percent: 8, clumps: 4, clumping: 80 },
@@ -101,6 +108,7 @@ const BIOME_PASSES: {
   { paint: 'blendC', over: 'base', percent: 4, clumps: 24 },
   { paint: 'blendD', over: 'base', percent: 6, clumps: 24 },
   { paint: 'forestBlend', over: 'forest', percent: 4, clumps: 24 },
+  { paint: 'base', over: 'stragglerForest', tiles: 32, clumps: 16 },
 ];
 
 /**
@@ -625,13 +633,17 @@ function paintBiome(
     // over forest: at 4% of the *board*, two passes between them repainted
     // half of every wood, and 674 of 1228 trees stood on grass instead of on
     // leaf litter (issue #34).
-    const tiles = Math.round(order.length * pass.percent / 100);
+    // `number_of_tiles` is absolute and `set_scale_by_groups` scales the
+    // clumps with the board against the script's 100x100 reference.
+    const scale = area / 10_000;
+    const tiles = pass.tiles !== undefined
+      ? Math.round(pass.tiles * scale) : Math.round(order.length * (pass.percent ?? 0) / 100);
+    const clumps = pass.tiles !== undefined ? Math.max(1, Math.round(pass.clumps * scale)) : pass.clumps;
     if (tiles <= 0) continue;
-    void area;
     if (!order.length) continue;
     const seeds: { x: number; y: number }[] = [];
     for (const tile of order) {
-      if (seeds.length >= pass.clumps) break;
+      if (seeds.length >= clumps) break;
       seeds.push({ x: tile % ctx.width, y: Math.floor(tile / ctx.width) });
     }
     const mask = new Uint8Array(area);
@@ -979,20 +991,9 @@ export function generateMap(
     const here = tileCentre(x, y);
     ctx.place('tree', here);
     ctx.place('tree', mirror(here));
-    // Leaf litter under it. The script grows patches of STRAGGLER_FOREST and
-    // drops the lone trees onto them; painting the tile a tree has just taken
-    // reaches the same picture without the placement having to consult the
-    // dressing, which would move the trees themselves. A third of them take
-    // the variation, as the script's 24 tiles in 64 do -- and in two of the
-    // four biomes that variation is terrain 71, which the DAT calls
-    // "Underbrush, Leaves" (issue #34).
-    if (biome) {
-      const litter = randInt(dressing, 3) === 0
-        ? biome.stragglerForestVariation : biome.stragglerForest;
-      terrain[tile] = litter;
-      const other = mirror(here);
-      terrain[Math.floor(other.y) * ctx.width + Math.floor(other.x)] = litter;
-    }
+    // No litter of its own: `stragglers_neutral.inc` names no terrain to
+    // place on, so a lone tree stands on whatever the dressing dealt there
+    // -- a litter patch if one happens to lie under it, grass if not.
     stragglers++;
   }
 
