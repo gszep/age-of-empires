@@ -18,11 +18,10 @@ off the reference; **measured** — fitted to a reference screenshot;
 
 | What | Shipped as | Source | Where | Issue |
 |---|---|---|---|---|
-| Starting resources | 200 food / 200 wood / 100 gold / **0 stone** | chosen (fallback leaked); reference Standard is 200 stone | `data.ts` `startingResources` | #105 |
-| Onager projectile speed | 5 | chosen (fallback leaked); DAT projectile 656 is 3.5 | `data.ts` `rulesFromManifest` | #105 |
-| Herd / flee ranges | 2.5 / 5 tiles | chosen (fallback leaked); DAT holds the sheep's task ranges | `data.ts` | #105 |
+| Starting resources | 200 food / 200 wood / 100 gold / 200 stone | game setting (the reference's Standard); the DAT's `civs[1].resources[0..3]` are 0 | `data.ts` `rulesFromManifest` | #109 |
+| Herdable claim rule | claimed by whoever comes within its line of sight | inferred rule; the distance is the DAT's `line_of_sight` (3) | `data.ts` `animal`, `game.ts` | — |
 | Drop-site `accepts` | hand table | chosen; `dropsites.json` and `bird.drop_sites` state it | `data.ts` | #52 |
-| Speed / train / reload / frame defaults when a manifest field is absent | `?? 0.8`, `?? 25`, `?? 2`, `?? 10` | chosen | `data.ts` `rulesFromManifest` | #105 |
+| Speed / train / reload / frame defaults when a manifest field is absent | `?? 0.8`, `?? 25`, `?? 2`, `?? 10` | chosen; only reached when a manifest key is missing (`imported-rules.test.ts` holds the stated ones) | `data.ts` `rulesFromManifest` | — |
 | Game-speed multipliers | 1.0 / 1.5 / 1.7 / 2.0 | inferred (Steam, AoEZone threads); the names and the Default are owned strings 20033-20036 | `main.ts` | — |
 | A foundation's line of sight | 0 | chosen against observed behaviour (issue #1); DAT has no construction-time LOS | `visibility.ts` | — |
 | Conversion odds | uniform over the DAT's 5-9 s window | chosen shape; both ends owned | `game.ts` | — |

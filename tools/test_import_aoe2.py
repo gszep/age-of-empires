@@ -896,6 +896,22 @@ class ContentImportIntegrationTest(unittest.TestCase):
             if combat["accuracyPercent"] >= 100:
                 self.assertNotIn("accuracyDispersion", combat, key)
 
+    def test_a_shot_flies_at_its_projectile_units_own_speed(self):
+        # Issue #105: every shooter that names a projectile carries that
+        # unit's `speed`, so the rules never fall back to a hand-written
+        # value for it -- the onager was flying at 5 where projectile 656
+        # (shared with the mangonel) moves at 3.5.
+        entities = self.result["entities"]
+        for key, entity in entities.items():
+            combat = entity.get("combat") or {}
+            if "projectileUnitId" in combat:
+                self.assertIn("projectileSpeed", combat, key)
+                self.assertGreater(combat["projectileSpeed"], 0, key)
+        self.assertEqual(entities["onager"]["combat"]["projectileSpeed"], 3.5)
+        self.assertEqual(entities["mangonel"]["combat"]["projectileSpeed"], 3.5)
+        self.assertEqual(entities["archer"]["combat"]["projectileSpeed"], 7.0)
+        self.assertEqual(entities["villager-hunter"]["combat"]["projectileSpeed"], 7.0)
+
     def test_blast_levels_decide_what_a_stone_reaches(self):
         # Issue #46: a target is caught when its `blast_defense_level` is at
         # least the shooter's `blast_attack_level`. The rows are the rule:

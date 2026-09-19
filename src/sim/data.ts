@@ -1179,6 +1179,8 @@ interface ManifestEntity {
     minimumRange?: number;
     maximumRange?: number;
     projectileUnitId?: number;
+    /** The projectile unit's own travel speed, tiles a second. */
+    projectileSpeed?: number;
     launchOffset?: number[];
     blastRadius?: number;
     blastAttackLevel?: number;
@@ -1301,7 +1303,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       age: e[key].age ?? fallback?.age,
       range: e[key].combat?.maximumRange || fallback?.range,
       minRange: e[key].combat?.minimumRange || fallback?.minRange,
-      projectileSpeed: fallback?.projectileSpeed,
+      projectileSpeed: e[key].combat?.projectileSpeed ?? fallback?.projectileSpeed,
       projectileArt: projectileArt(key) ?? fallback?.projectileArt,
       launchHeight: e[key].combat?.launchOffset?.[2] ?? fallback?.launchHeight,
       blastRadius: e[key].combat?.blastRadius ?? fallback?.blastRadius,
@@ -1342,7 +1344,9 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       ...unit(key, fallback.trainedAt),
       popCost: 0,
       foodAmount: e[key]?.storage?.food ?? fallback.foodAmount,
-      herdRange: fallback.herdRange,
+      // A herdable is claimed by whoever comes within its sight: the rule is
+      // the reference's (inferred), the distance is the DAT's line of sight.
+      herdRange: fallback.herdRange === undefined ? undefined : e[key]?.lineOfSight ?? fallback.herdRange,
       // Which animals startle is a rule; how close you have to come is the
       // DAT's `search_radius` for that animal.
       startle: fallback.startle && {
@@ -1444,7 +1448,9 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
         },
       }
       : OPEN_CIVILIZATION,
-    startingResources: FALLBACK_RULES.startingResources,
+    // A game setting, not a DAT value (`civs[1].resources[0..3]` are 0): the
+    // reference's Standard start. Decided on issue #109.
+    startingResources: cost(200, 200, 100, 200),
     startingPopulationCap: 0,
     units: {
       // A villager hunting is the DAT's hunter unit: its reach and its arrow
@@ -1454,7 +1460,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
         hunt: e['villager-hunter']?.combat?.maximumRange
           ? {
             range: e['villager-hunter'].combat!.maximumRange!,
-            projectileSpeed: FALLBACK_RULES.units.villager.hunt!.projectileSpeed,
+            projectileSpeed: e['villager-hunter'].combat!.projectileSpeed
+              ?? FALLBACK_RULES.units.villager.hunt!.projectileSpeed,
             launchHeight: e['villager-hunter'].combat!.launchOffset?.[2]
               ?? FALLBACK_RULES.units.villager.hunt!.launchHeight,
             releaseSeconds: Math.round(
@@ -1467,14 +1474,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       militia: unit('militia', 'barracks'),
       'man-at-arms': unit('man-at-arms', 'barracks'),
       pikeman: unit('pikeman', 'barracks'),
-      crossbowman: {
-        ...unit('crossbowman', 'archery-range'),
-        projectileSpeed: FALLBACK_RULES.units.crossbowman.projectileSpeed,
-      },
-      'elite-skirmisher': {
-        ...unit('elite-skirmisher', 'archery-range'),
-        projectileSpeed: FALLBACK_RULES.units['elite-skirmisher'].projectileSpeed,
-      },
+      crossbowman: unit('crossbowman', 'archery-range'),
+      'elite-skirmisher': unit('elite-skirmisher', 'archery-range'),
       'light-cavalry': unit('light-cavalry', 'stable'),
       'long-swordsman': unit('long-swordsman', 'barracks'),
       'two-handed-swordsman': unit('two-handed-swordsman', 'barracks'),
@@ -1482,43 +1483,19 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       halberdier: unit('halberdier', 'barracks'),
       cavalier: unit('cavalier', 'stable'),
       'capped-ram': unit('capped-ram', 'siege-workshop'),
-      arbalester: {
-        ...unit('arbalester', 'archery-range'),
-        projectileSpeed: FALLBACK_RULES.units.arbalester.projectileSpeed,
-      },
-      'heavy-cavalry-archer': {
-        ...unit('heavy-cavalry-archer', 'archery-range'),
-        projectileSpeed: FALLBACK_RULES.units['heavy-cavalry-archer'].projectileSpeed,
-      },
-      'elite-longbowman': {
-        ...unit('elite-longbowman', 'castle'),
-        projectileSpeed: FALLBACK_RULES.units['elite-longbowman'].projectileSpeed,
-      },
-      onager: {
-        ...unit('onager', 'siege-workshop'),
-        projectileSpeed: FALLBACK_RULES.units.onager.projectileSpeed,
-      },
+      arbalester: unit('arbalester', 'archery-range'),
+      'heavy-cavalry-archer': unit('heavy-cavalry-archer', 'archery-range'),
+      'elite-longbowman': unit('elite-longbowman', 'castle'),
+      onager: unit('onager', 'siege-workshop'),
       spearman: unit('spearman', 'barracks'),
       archer: { ...unit('archer', 'archery-range'), range: FALLBACK_RULES.units.archer.range },
-      skirmisher: {
-        ...unit('skirmisher', 'archery-range'),
-        projectileSpeed: FALLBACK_RULES.units.skirmisher.projectileSpeed,
-      },
+      skirmisher: unit('skirmisher', 'archery-range'),
       'scout-cavalry': unit('scout-cavalry', 'stable'),
       knight: unit('knight', 'stable'),
-      'cavalry-archer': {
-        ...unit('cavalry-archer', 'archery-range'),
-        projectileSpeed: FALLBACK_RULES.units['cavalry-archer'].projectileSpeed,
-      },
-      longbowman: {
-        ...unit('longbowman', 'castle'),
-        projectileSpeed: FALLBACK_RULES.units.longbowman.projectileSpeed,
-      },
+      'cavalry-archer': unit('cavalry-archer', 'archery-range'),
+      longbowman: unit('longbowman', 'castle'),
       'battering-ram': unit('battering-ram', 'siege-workshop'),
-      mangonel: {
-        ...unit('mangonel', 'siege-workshop'),
-        projectileSpeed: FALLBACK_RULES.units.mangonel.projectileSpeed,
-      },
+      mangonel: unit('mangonel', 'siege-workshop'),
       monk: unit('monk', 'monastery'),
       // Packed and unpacked are two DAT units and the pairing is not stated,
       // so it is named here; every number on both sides is imported.

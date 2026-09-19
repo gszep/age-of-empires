@@ -551,6 +551,13 @@ def extract_entity(
         # entry carries its travel speed and art.
         if combat.projectile_unit_id is not None and combat.projectile_unit_id >= 0:
             entity["combat"]["projectileUnitId"] = combat.projectile_unit_id
+            # The projectile unit's own `speed` is how fast the shot flies
+            # (arrows 7, the mangonel's and trebuchet's stones 3.5, the town
+            # center's volley 8). It was left to the hand-written fallback
+            # until the review found the onager flying at 5 (issue #105).
+            projectile = civ_units[combat.projectile_unit_id]
+            if projectile is not None and projectile.speed:
+                entity["combat"]["projectileSpeed"] = rounded(projectile.speed)
         # Where the shot leaves the shooter. The z component is what puts a
         # tower's arrows at its top, so a close shot points down rather than up.
         if combat.graphic_displacement:
