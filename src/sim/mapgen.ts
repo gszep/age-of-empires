@@ -772,6 +772,18 @@ export function generateMap(
     growClumps(ctx, land, ring, Math.max(0, descriptor.land.tiles - stamped),
       inLand, descriptor.land.clumping ?? 20);
     cleanMask(land, ctx.width, ctx.height);
+    // The fuzz can leave a tile of land on its own out at sea, which the
+    // beach sweep would turn into a sandbar; a land tile with no land beside
+    // it is not land.
+    for (let y = 0; y < ctx.height; y++) {
+      for (let x = 0; x < ctx.width; x++) {
+        const tile = y * ctx.width + x;
+        if (!land[tile]) continue;
+        const beside = (x > 0 && land[tile - 1]) || (x < ctx.width - 1 && land[tile + 1])
+          || (y > 0 && land[tile - ctx.width]) || (y < ctx.height - 1 && land[tile + ctx.width]);
+        if (!beside) land[tile] = 0;
+      }
+    }
     if (descriptor.base === 'forest') {
       for (let y = 0; y < ctx.height; y++) {
         for (let x = 0; x < halfWidth; x++) {

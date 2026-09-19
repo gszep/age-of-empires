@@ -35,11 +35,13 @@ construction-complete cue, so that one has no owned source to draw on.
   `TerrainBlend_ps` names as `g_MaskTexture` and `g_BlendTexture`; how it
   indexes a 512x512 mask against a tile is in the compiled shader. Worth a
   look only if the classic edge ever reads as too soft against DE.
-- **The water shader's combination is calibrated, not read.** Every input
-  is the preset's own; how `Water_ps` combines them is compiled, so the
-  open-water colour is a measured constant (`src/view/water.ts`,
-  `OPEN_WATER`). The vertex wave displacement (`wave_amplitude`) is not
-  drawn.
+- **The water shader's depth alpha and ripple scale are calibrated.** The
+  combination is read from the shader's own SM2 build (`status.md`,
+  "Water"); what is not in any file is the engine-written depth texture
+  (`DEPTH_ALPHA` in `src/view/water.ts`, 0.35 for open water) and the world
+  unit behind `mapScale` (`RIPPLE_TILES`). The vertex wave displacement
+  (`wave_amplitude`) is not drawn, and the surface's normal is the normal
+  map's rather than the shader's height-tap gradient.
 - **The shore foam is not drawn.** DE rolls foam along a `WATER_DEFAULT`
   coast (`enable_waves 1`; ponds are 0) through `WaveAnim_ps`
   (`g_WaterAnim1a-d`) from `terrain/water/atlas_v1_{ortho,diag}_{1-4}.png`.

@@ -1956,25 +1956,42 @@ its `blend_type` 3 against beach's 2 looks up mode 1 in the engine's table,
 so the water laps onto the sand through the short smooth masks, and the sand
 fades into the grass through mode 2's.
 
-**The surface is the reference's shader, reconstructed.** `Water_ps` takes
+**The surface is the reference's shader, read.** `Water_ps` takes
 `g_WaterSurfaceTexture`, `g_SeaFloorTexture`, `g_SkyDomeTexture`,
-`g_WaterDepthTexture` and the sun; the classic `g_wtr` tile is never drawn.
-`water_def.json` states, per preset, the normal map and its drift, the sky
-dome, the sea floor and its intensity, the colours and the specular power.
-The importer carries the three presets the shipped maps roll -- 0 Default
-(Islands names none), 3 Calm and 6 Dimmed (Arabia's `WATER_POND`, 65/35 in
-`includes/water_preset.inc`) -- and converts their DDS. `src/view/water.ts`
-drifts the normal map at the preset's velocity and azimuth, bends the view
-ray with it, looks up the fisheye sky dome rotated and scaled as the preset
-says, shows the floor through the water in proportion to the preset's
-intensity and far more where a per-vertex depth says the water is shallow
-(the light band along every reference coast), and lays a Blinn glint at the
-preset's power on top. **The one approximation:** how the compiled shader
-combines these terms. It is calibrated to the reference: open water in the
-official Islands screenshots measures (56, 124, 192) and ours (52, 115, 176)
-with the same ripple spread; a grey-blue dome and a green floor do not
-multiply to that blue by any obvious formula, so the open-water colour is a
-constant the preset's `water_color` and the reflected light vary from.
+`g_WaterDepthTexture`, `g_VisibilityTexture`, the beach blend and the sun;
+the classic `g_wtr` tile is never drawn. The shader ships with a Shader Model
+2 build beside its SM4 one -- the DXBC's `Aon9` chunk, a documented token
+stream -- and reading it (a shader resource, not the executable) gives the
+combination outright:
+
+    colour = (floor * seaFloorIntensity * waterColour
+              + sky * skyIntensity * skyColor) * depth.a
+             + pow(max(dot(mirror(L, N), V), 0), specularPower)
+               * specularColor * specularIntensity * visibility
+
+with `sky` the dome at `0.5 + skyDomeMtx * mirror(V, N).xy`, `floor` the sea
+floor at the world position pushed by the normal over `seaFloorScale`, and
+`N` the surface texture's height gradient over several taps drifting at
+`(0.375, 0.625)` and `(0.2, 1)` of the wave speed, scaled by `waveAmplitude`
+into `normalize(g, 0.1)`. Two things the bytecode settles that no data file
+states: `V` is the vector *to* the eye (the specular term reads as a glint
+only that way), and with the camera off the screen's bottom edge the flat
+surface's lookup lands at (0.71, 0.71) of the dome -- its blue half, which
+is evidently what `sky_rotation 178.5` was set to reach. Direct3D's v runs
+down the image and three's up it; turning the dome's v over was the
+difference between grey-teal and blue.
+
+`water_def.json` supplies every constant, converted by the importer for the
+three presets the shipped maps roll -- 0 Default (Islands names none; nor
+do Archipelago, Continental or Mediterranean), 3 Calm and 6 Dimmed
+(Arabia's `WATER_POND`, 65/35). Two things remain calibrated: the depth
+texture's alpha, which the engine writes and which the preset's per-class
+`opacity` (32/255) is far too dark to be -- open water is 0.35, the shore
+1.6 times that, set so the Default preset measures (69, 131, 162) against
+DE's own footage at (45-56, 127, 160-183); and the ripple's scale in tiles,
+because the world unit `mapScale` divides is not stated. The visibility
+factor is the fog's business here and is left out; the normal-map's tilt
+stands in for the height taps.
 
 **Islands is a descriptor.** `?map=islands` is Arabia with the base
 terrain set to water, from the owned `Islands.rms` (2023): one land per

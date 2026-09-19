@@ -658,6 +658,22 @@ keeps the record.
   was wrong. Rule: a pass copied from a script is verified by a screenshot
   next to the reference's, not by its numbers matching.
 
+- **The owned shaders carry a Shader Model 2 build, and SM2 is readable.**
+  Each DXBC under `shaders/d3d11` has an `Aon9` chunk beside its SM4 code:
+  the same shader compiled for feature level 9, whose token stream is the
+  documented D3D9 format -- a hundred lines of Python disassemble it
+  (`.local/probes/sm2dis.py` did the water). `strings` gives the inputs;
+  this gives the arithmetic, and it gave the water's colour formula in an
+  afternoon after a night of calibrating it. It is a shader resource, not
+  the executable, so it is inside the line AGENTS.md draws; keep the
+  disassembler out of the tree all the same and cite what it read. Rule:
+  when a compiled shader's *inputs* are known and its *combination* is
+  not, look for the SM2 build before calibrating.
+- **Direct3D's v runs down the image; three's runs up it.** A dome lookup
+  taken straight from the shader landed on the wrong half of the sky and
+  every measurement said grey-teal until the v was turned over. Rule: any
+  UV arithmetic read from a D3D shader gets `v = 1 - v` on the way in.
+
 - **A cosmetic feature must not draw on the stream that decides the game.**
   Dressing the board in a biome needed random numbers, and taking them from the
   match's own generator shifted every draw after it — so choosing what colour

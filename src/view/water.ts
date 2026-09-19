@@ -2,20 +2,30 @@
  * The water surface, the way the reference draws it: a shader, not a tile.
  *
  * AoE2DE's `Water_ps` takes a normal map (`g_WaterSurfaceTexture`), a sea
- * floor (`g_SeaFloorTexture`), a sky dome (`g_SkyDomeTexture`), a depth
- * texture, the sun, and the colours and intensities `water_def.json` states
- * per preset; the classic `g_wtr` tile is never drawn. This is that shader
- * reconstructed from its inputs: the normal map drifts across the water and
- * bends a view ray, the bent ray looks up the sky dome for a reflection and
- * down through the water at the floor, and the sun glints where the ripple
- * faces it. What the preset states is used as it is stated; how the terms
- * are combined is not in any owned file (the shader is compiled), so the
- * combination here is calibrated to the reference's own screenshots and
- * recorded as an approximation in docs/status.md.
+ * floor (`g_SeaFloorTexture`), a sky dome (`g_SkyDomeTexture`), the depth,
+ * visibility and beach-blend textures, the sun, and the colours and
+ * intensities `water_def.json` states per preset; the classic `g_wtr` tile is
+ * never drawn. The shader ships with a Shader Model 2 build beside its SM4
+ * one (the DXBC's `Aon9` chunk), and SM2 bytecode is a documented token
+ * stream, so the combination is read rather than guessed:
+ *
+ *     colour = (floor * seaFloorIntensity * waterColour
+ *               + sky * skyIntensity * skyColor) * depth.a
+ *              + pow(max(dot(reflect(L, N), V), 0), specularPower)
+ *                * specularColor * specularIntensity * visibility
+ *
+ * where `sky` is the dome looked up at `0.5 + skyDomeMtx * reflect(V, N).xy`,
+ * `floor` the sea floor at the world position pushed by the normal, and `N`
+ * the surface texture's height gradient over several drifting taps, scaled
+ * by `waveAmplitude`. The depth texture is the engine's; its alpha is what
+ * the body is multiplied by, and the preset's water types state an
+ * `opacity` per class, so that is what stands in for it here. The ripple's
+ * scale in tiles is the one thing not read: the world unit the shader's
+ * `mapScale` divides is not stated.
  */
 import * as THREE from 'three/webgpu';
 import {
-  attribute, dot, float, max, mix, normalize, pow, reflect, texture as textureNode, time, uv, vec2,
+  attribute, dot, float, max, mix, normalize, pow, texture as textureNode, time, uv, vec2,
   vec3,
 } from 'three/tsl';
 import { TERRAIN_WATER } from '../sim/mapgen';
@@ -25,22 +35,32 @@ import type { ContentAssets, WaterPreset } from './assets';
 
 /** Ripples repeat every this many tiles; the normal map is 1024 px square. */
 const RIPPLE_TILES = 8;
-/** How far a ripple bends the reflected ray, in the dome's own units. */
-const RIPPLE_STRENGTH = 0.5;
 /**
- * Open water under the Default preset, as the reference's own screenshots
- * show it: (56, 124, 192), measured over the sea in the official Islands
- * shots. The preset's `water_color` and the sky's light vary it from here;
- * how the reference's compiled shader arrives at this from a grey-blue sky
- * dome and a green sea floor is not in any owned file, so this is the one
- * calibrated constant -- see docs/status.md.
+ * The reference builds its normal as `normalize(gradient * amplitude, 0.1)`,
+ * so a wave amplitude of 0.01 tilts the surface by a tenth: the normal map's
+ * own tilt is scaled to match.
  */
-const OPEN_WATER = new THREE.Color().setRGB(56 / 255, 124 / 255, 192 / 255, THREE.SRGBColorSpace);
+const TILT_PER_AMPLITUDE = 20;
 /**
- * The view ray of the dimetric camera in the water's own frame (x east, y
- * south, z up): looking down at the reference's 30 degrees.
+ * The vector from the water to the eye, in world tiles with z up: the camera
+ * sits off the screen's bottom edge, which is world +x+y, and looks down at
+ * the reference's 30 degrees. The shader's `t2` is this vector -- its
+ * specular term is `dot(reflect(L, N), t2)`, which only reads as a glint if
+ * `t2` points at the eye -- and its sky lookup mirrors it about the normal
+ * and turns the result by `sky_rotation`, which for this camera lands a
+ * flat surface on the dome's blue half; the 178.5 degrees were evidently
+ * chosen for that.
  */
-const VIEW = new THREE.Vector3(0, -Math.cos(Math.PI / 6), Math.sin(Math.PI / 6)).normalize();
+const VIEW = new THREE.Vector3(Math.SQRT1_2 * Math.cos(Math.PI / 6), Math.SQRT1_2 * Math.cos(Math.PI / 6), Math.sin(Math.PI / 6)).normalize();
+/**
+ * What the engine's depth texture holds for open water. The shader
+ * multiplies the body by that texture's alpha, and the texture is the
+ * engine's own; the preset's per-class `opacity` (32/255 for the Default)
+ * is far too dark to be it. Calibrated so the Default preset's open water
+ * lands on DE's, measured at (45, 127, 183) in the reference's own
+ * footage; the one constant here that is not read from the owned files.
+ */
+const DEPTH_ALPHA = 0.35;
 
 /**
  * Which preset a board's water takes. Arabia's script rolls `WATER_POND`
@@ -83,63 +103,55 @@ export function createWaterMaterial(
   if (!normalMap || !skyMap || !floorMap) throw new Error(`water preset ${preset.name} has no textures`);
 
   const tiles = uv().mul(options.span);
-  // The normal map drifts along its direction turned by the azimuth, at the
-  // preset's velocity; a second, larger layer drifting the other way keeps
-  // the repeat from reading as a pattern.
-  const azimuth = (preset.normalAzimuth * Math.PI) / 180;
-  const [dx, dy] = preset.normalDirection[0];
-  const drift = vec2(
-    dx * Math.cos(azimuth) - dy * Math.sin(azimuth), dx * Math.sin(azimuth) + dy * Math.cos(azimuth),
-  ).mul(preset.normalVelocity[0] * 0.25);
-  const ripple = tiles.div(RIPPLE_TILES).add(time.mul(drift));
-  const ripple2 = tiles.div(RIPPLE_TILES * 2.3).sub(time.mul(drift).mul(0.6)).add(vec2(0.37, 0.71));
+  // The shader samples its surface at taps drifting along (0.375, 0.625)
+  // and (0.2, 1) of the wave speed, over the wave's repeat length; two
+  // taps of the normal map along the same drifts stand in for its height
+  // taps, and the preset's amplitude sets how far they tilt the surface.
+  const speed = time.mul(preset.waveAnimationSpeed * 0.02);
+  const ripple = tiles.div(RIPPLE_TILES).add(speed.mul(vec2(0.375, 0.625)));
+  const ripple2 = tiles.div(RIPPLE_TILES * 2.3).add(speed.mul(vec2(0.2, 1))).add(vec2(0.37, 0.71));
   const n1 = textureNode(normalMap, ripple).rgb.mul(2).sub(1);
   const n2 = textureNode(normalMap, ripple2).rgb.mul(2).sub(1);
-  const normal = normalize(vec3(n1.xy.add(n2.xy).mul(RIPPLE_STRENGTH), n1.z.add(n2.z)));
+  const tilt = preset.waveAmplitude * TILT_PER_AMPLITUDE;
+  const normal = normalize(vec3(n1.xy.add(n2.xy).mul(tilt), 1));
 
-  // The reflected view ray looks up the sky dome: a fisheye of the hemisphere,
-  // zenith at the centre, rotated and scaled as the preset says.
+  // The eye vector mirrored about the normal looks up the sky dome: a
+  // fisheye of the hemisphere, zenith at the centre, its xy turned by
+  // `sky_rotation` and scaled by `sky_scale`, exactly as the shader does it.
   const view = vec3(VIEW.x, VIEW.y, VIEW.z);
   const sun = normalize(vec3(...preset.sunDirection));
-  const reflected = reflect(view.negate(), normal);
+  const reflected = view.sub(normal.mul(dot(normal, view).mul(2)));
   const rotation = (preset.skyRotation * Math.PI) / 180;
   const rx = reflected.x.mul(Math.cos(rotation)).sub(reflected.y.mul(Math.sin(rotation)));
   const ry = reflected.x.mul(Math.sin(rotation)).add(reflected.y.mul(Math.cos(rotation)));
-  const skyUv = vec2(rx, ry).mul(preset.skyScale).add(0.5);
+  // Direct3D's v runs down the image and three's runs up it, so the dome's
+  // v is turned over.
+  const skyUv = vec2(rx.mul(preset.skyScale).add(0.5), ry.mul(-preset.skyScale).add(0.5));
   const sky = textureNode(skyMap, skyUv).rgb
     .mul(vec3(...preset.skyColor)).mul(preset.skyIntensity);
 
-  // The floor, seen through the bent ray, more of it where the water is shallow.
-  const floorUv = tiles.div(preset.seaFloorScale).add(normal.xy.mul(0.02));
-  const floor = textureNode(floorMap, floorUv).rgb;
-  const depth = attribute('depth', 'float');
-  const clarity = mix(float(1), float(preset.seaFloorIntensity), depth);
+  // The floor at the world position pushed by the normal, over the preset's
+  // floor scale; under its intensity and the water's own colour.
+  const floorUv = tiles.add(normal.xy).div(preset.seaFloorScale);
+  const floor = textureNode(floorMap, floorUv).rgb
+    .mul(preset.seaFloorIntensity).mul(vec3(...preset.waterColor));
 
-  // The sun on the ripple: a Blinn glint, as sharp as the preset's power.
-  const half = normalize(sun.add(view));
-  const glint = pow(max(dot(normal, half), 0), preset.specularPower / 16)
+  // The sun reflected about the normal, against the view: the glint, at the
+  // preset's power, in the preset's specular colour.
+  const sunMirrored = sun.sub(normal.mul(dot(normal, sun).mul(2)));
+  const glint = pow(max(dot(sunMirrored, view), 0), preset.specularPower)
     .mul(preset.specularIntensity).mul(vec3(...preset.sunColor));
 
-  // How the terms meet is the calibration. The body is the reference's open
-  // water under the preset's own colour, lit by the reflected sky -- the
-  // dome is grey-blue and cloudy, so its luminance is what a ripple changes,
-  // brighter where the ray meets cloud and darker where it meets blue. The
-  // floor shows through in proportion to the preset's floor intensity, and
-  // much more where the water is shallow, which is the light band along
-  // every reference coast. The glint sits on top.
-  // Lit by the sun across the ripple -- a crest that faces the sun is
-  // brighter, the trough behind it darker -- and a little by the reflected
-  // sky, whose clouds and blue give the surface its patchiness.
-  const skyLuma = dot(sky, vec3(0.299, 0.587, 0.114)).div(preset.skyIntensity * 1.25);
-  const facing = dot(normal, sun).sub(sun.z);
-  const lit = float(0.74).add(facing.mul(1.6)).add(skyLuma.mul(0.35));
-  const body = vec3(OPEN_WATER.r, OPEN_WATER.g, OPEN_WATER.b).mul(vec3(...preset.waterColor)).mul(lit);
-  const floorShare = mix(float(0.35), float(preset.seaFloorIntensity * 0.5), depth);
-  const water = mix(body, floor.mul(clarity.mul(0.5).add(0.6)), floorShare);
+  // The body is floor plus sky, times the depth texture's alpha: open water
+  // at the calibrated alpha, and clearer toward the shore, where the
+  // reference's beach blend lets the sand through.
+  const depth = attribute('depth', 'float');
+  const alpha = mix(float(DEPTH_ALPHA * 1.6), float(DEPTH_ALPHA), depth);
+  const water = floor.add(sky).mul(alpha);
   const material = new THREE.MeshBasicNodeMaterial({
     side: THREE.DoubleSide, transparent: options.masked !== undefined, depthWrite: false,
   });
-  material.colorNode = water.add(glint.mul(0.3));
+  material.colorNode = water.add(glint);
   if (options.masked) {
     material.opacityNode = textureNode(options.masked, uv(1)).r;
   }
