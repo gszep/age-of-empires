@@ -57,7 +57,8 @@ draw (#44).
 **View** (`src/view`, never mutates state): dimetric projection with AoE2's
 handedness (below); DAT terrain textures with blendomatic edge blending
 (#42); fog as a rounded per-tile contour with `colorcorrection.json`'s
-levels; the reference's water shader read from its SM2 build, with glints;
+levels; the reference's water shader read whole from its SM2 build (the
+height field, its drifts, the dome, the glint) over the tile in linear light;
 SLD sprites decoded locally (main, shadow, player-colour, outline and damage
 layers) with the keyframe delta rule (#78); player colour through the
 palette's own block; occlusion contours; task animations on the
@@ -121,7 +122,7 @@ the diamond's top corner. Everything that turns a tile direction into a
 screen direction leans on it: `worldToIso`/`isoToWorld`, the minimap's
 `toCanvas`/`fromCanvas` and image transform, `directionIndex` (facing into
 sprite frame), the blend-mask neighbour table and tile-corner uv assignment,
-the wall run frames and the gate's art key, the water's screen frame, and
+the wall run frames and the gate's art key, the water's world frame, and
 the two surveyed boards (transposed on import). Player 1's town, at
 x = W/4, is on the screen's right. A change to any of it is verified by
 mirroring an earlier screenshot and laying the new one beside it: layout

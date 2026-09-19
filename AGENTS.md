@@ -81,15 +81,17 @@ model-provider tests opt-in.
   down-left on screen, +y down-right (`src/view/iso.ts`). Anything that
   turns a tile direction into a screen direction -- the minimap's mapping,
   a facing into a sprite frame, the blend-mask neighbour table, which tile
-  corner is east, the water's screen frame, the surveyed boards' transpose
+  corner is east, the water's world frame, the surveyed boards' transpose
   -- is listed in `docs/status.md` "The projection has AoE2's handedness".
   To verify a change to any of it: mirror an earlier screenshot and set the
   new one beside it -- layout must land on the mirror to the tile, sprites
   must not be mirrored.
 - **Two frames, not one:** the tile frame and the shader's world frame. A
   DAT field stated in tiles (footprints, gate axes, RMS) is in the first;
-  `water_def.json`'s `sun_direction` and `mapScale` are in the second, and
-  the sun reaches the eye only when placed behind the camera.
+  `water_def.json`'s `sun_direction` and `mapScale` are in the second,
+  which is the tile frame with x mirrored: the eye looks along world
+  (1, -1), the sun lies beyond the surface on that line, and a position is
+  normalised by the map before `mapScale` divides it (`water.ts`).
 - **The reference's text is a signed distance field atlas**
   (`fonts/combined.txt`): Georgia Regular's glyph boxes drawn heavy, with
   lining digits Georgia 2.05 lacks. The HUD approximates it as Georgia Bold

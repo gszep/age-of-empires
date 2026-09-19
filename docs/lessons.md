@@ -26,9 +26,12 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   arithmetic when the inputs are known (`AGENTS.md`). Calibrate only after
   both.
 - **A read constant that is a direction has a frame.** The water's
-  `sun_direction` reaches the eye only in the shader's world frame, behind
-  the camera; a specular term that measures zero is a light in the wrong
-  place, not a small one.
+  `sun_direction` reaches the eye only in the shader's world frame, which
+  is the tile frame with x mirrored (`docs/ledger.md`, "Water world
+  frame"); a specular term that measures zero is a light in the wrong
+  place, not a small one. Two independent facts pin a frame -- the sun's
+  glint and the texture's streak angle settled this one; one fact leaves a
+  mirror open, and "behind the camera" was the mirror.
 - **A human-supplied number is a measurement with a name.** "About twelve
   furrows" shipped as `FARM_TILES_PER_SPAN = 10`; the ledger says whose
   number it is. Ask the human for a count they can read off the reference,
@@ -95,8 +98,10 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 - **State the colour space beside every number.** The debug readback was
   linear for a day; the water was calibrated in the wrong space for a night;
   a factor of two between an owned constant and a measurement is a
-  colour-space question before it is a calibration. The canvas is sRGB and
-  DE's water offset fits an add in display space.
+  colour-space question before it is a calibration. The canvas is sRGB;
+  DE's water offset fits one weight in linear light across both zones and
+  all three channels, where a display-space add had fitted two channels
+  and left red twenty short for a week.
 - **A number that fails is not overruled by a picture that passes.** Fire was
   declared visible after `pixels` said `orange=0` twice. The picture may add
   to a passing number, never replace a failing one.

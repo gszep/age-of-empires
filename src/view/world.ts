@@ -232,7 +232,7 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
     // Water is its tile with the preset's surface over it, where the owned
     // presets are in.
     const material = weightOf.has(entry.id) && waterPreset && slot && texture
-      ? createWaterMaterial(assets!, waterPreset, { span: slot.dimensions[0], tile: texture })
+      ? createWaterMaterial(assets!, waterPreset, { span: slot.dimensions[0], board: [state.width, state.height], tile: texture })
       : new THREE.MeshBasicMaterial({
         ...(texture ? { map: texture } : { color: entry.fallback }),
         vertexColors: true, side: THREE.DoubleSide,
@@ -260,7 +260,9 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(bucket.colors, 3));
     geometry.setAttribute('surfaceWeight', new THREE.Float32BufferAttribute(bucket.weights, 1));
     const material = weightOf.has(bucket.id) && waterPreset
-      ? createWaterMaterial(assets!, waterPreset, { span: slot.dimensions[0], tile: texture, masked: mask })
+      ? createWaterMaterial(assets!, waterPreset, {
+        span: slot.dimensions[0], board: [state.width, state.height], tile: texture, masked: mask,
+      })
       : new THREE.MeshBasicMaterial({
         map: texture, alphaMap: mask, transparent: true, depthWrite: false,
         vertexColors: true, side: THREE.DoubleSide,

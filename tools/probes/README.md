@@ -23,8 +23,8 @@ Run them from the repo root: `npx tsx tools/probes/snapshot.ts`.
   is the write-up of a run of it. Not throwaway — re-run it after anything
   that touches `nav.ts`, movement, or the cost of a tick.
 - **`sea.mts`** — an Islands sea read back as numbers: the mean colour of a
-  tile in the shallow rim and one in the open body, against the reference
-  screenshot's (82, 172, 220) and (64, 135, 183) (issue #94),
+  tile in the shallow rim and one in the open body, against the 2026-09-19
+  composite's (75-82, 165-172, 207-220) and (72, 138, 181) (issue #94),
   plus the minimap's histogram and a crop of each. `MAP=`, `SEED=`, `EXTRA=`
   (a query string the water shader once read switches from), `OUT=`. Not
   throwaway: re-run it after anything that touches `water.ts`, the terrain
@@ -43,6 +43,11 @@ Run them from the repo root: `npx tsx tools/probes/snapshot.ts`.
 - **`trebuchet.ts`** — issue #30: stages an unpacked trebuchet bombarding a
   house through a snapshot and samples the animation name and frame over a
   few seconds, plus the projectile art key in flight.
+- **`sm2dis.py`** — disassemble the Shader Model 2 build inside one of the
+  reference's compiled shaders (`resources/_common/shaders/d3d11/*.so`): the
+  arithmetic the constants feed, once `strings` has named them. The water's
+  surface (`water.ts`) was read with it; `TerrainBlend_ps` (#116) is next.
+  Resources only, never the executable.
 - **`farm_mapping.py`** — draws the farm onto the real diamond and measures its
   furrow pitch, which is the answer issue #22 settled: both sheets carry forty
   furrows to the span and the farm shows about twelve across its three tiles.

@@ -132,11 +132,10 @@ def convert_water(
             target.parent.mkdir(parents=True, exist_ok=True)
             with Image.open(source) as image:
                 image.load()
-                # The sky dome and some sea floors are 2048 square; half
-                # that is more than a reflection or a floor eight tiles to
-                # the repeat resolves, and a quarter of the download.
-                if image.width > 1024:
-                    image = image.resize((1024, 1024), Image.LANCZOS)
+                # At full size: the dome is 2048 square, and the water's
+                # shimmer is its cloud detail seen through a wobble of a
+                # degree, ten to twenty of its pixels -- halved, the
+                # shimmer measured three fifths of the reference's.
                 image.convert("RGBA").save(target, optimize=True)
             hashes[f"water/{source.name}"] = sha256(source)
             done[named] = relative
