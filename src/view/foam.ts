@@ -36,6 +36,15 @@ import { TILE_H, TILE_W, worldToIso } from './iso';
 
 /** Frames a second through the 128-frame roll: eight seconds a wave. Chosen. */
 const FRAME_RATE = 16;
+/**
+ * The frame's alpha is drawn at this fraction. `WaveAnim_ps` hands the
+ * atlas's red on as alpha, and the blend state is the engine's: in the
+ * reference (`islands-coast-2026-09-19.png`) the foam along a straight
+ * shore is a twelve-pixel band with no bright core, red raised 25 to 60
+ * over the water's 80 -- white at 0.15 to 0.35 -- where the frames carry
+ * 0.3 to 0.75 across the crest. Calibrated, on the ledger.
+ */
+const STRENGTH = 0.4;
 
 type Side = '+x' | '-x' | '+y' | '-y';
 
@@ -140,7 +149,7 @@ export function createFoam(state: ReadonlyGameState, assets?: ContentAssets): TH
   const diag = mix(pair(0), pair(2), step(1, kind));
   const ortho = mix(pair(4), pair(6), step(5, kind));
   material.colorNode = vec3(1, 1, 1);
-  material.opacityNode = mix(diag, ortho, step(3, kind));
+  material.opacityNode = mix(diag, ortho, step(3, kind)).mul(STRENGTH);
 
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'foam';

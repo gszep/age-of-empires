@@ -198,7 +198,9 @@ function homeCamera(state: GameState): Point {
   return elevatedWorldToIso(state, tc?.position.x ?? state.width / 2, tc?.position.y ?? state.height / 2);
 }
 let cameraCenter = homeCamera(game);
-let zoom = 1;
+// The reference's default zoom draws the 2x assets at 0.80 (docs/status.md,
+// "The reference's default zoom"), so a match opens at the same tile.
+let zoom = 0.8;
 
 let ground = view.createGround(game, assets);
 scene.add(ground);
