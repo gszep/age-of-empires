@@ -27,14 +27,17 @@
  *   phase.
  */
 import * as THREE from 'three/webgpu';
-import { attribute, floor, fract, mix, step, texture as textureNode, time, vec2, vec3 } from 'three/tsl';
+import { attribute, floor, fract, mix, step, texture as textureNode, time, vec2, vec3, type ShaderNodeObject } from 'three/tsl';
+import type { Node } from 'three/webgpu';
 import { isOpenWater } from '../sim/mapgen';
 import type { ReadonlyGameState } from '../sim/types';
 import type { ContentAssets } from './assets';
 import { TILE_H, TILE_W, worldToIso } from './iso';
 
-/** Frames a second through the 128-frame roll: the human times DE's at about four seconds a wave. */
-const FRAME_RATE = 32;
+/** Frames a second through the roll: the human times DE's at about four seconds a wave. */
+const FRAME_RATE = 28;
+/** Frames over which the sequence's tail fades into its head at the wrap. Chosen. */
+const CROSSFADE = 16;
 /** Tiles along either axis over which a coast's phase advances one roll. Chosen. */
 const PHASE_TILES = 50;
 /** Tiles along either axis between changes of the mirrored pair. Chosen. */
@@ -156,22 +159,38 @@ export function createFoam(state: ReadonlyGameState, assets?: ContentAssets): TH
   });
   const frames = foam.framesPerRow * foam.framesPerRow;
   const sequence = frames * 2;
-  const frame = floor(fract(time.mul(FRAME_RATE / sequence).add(attribute('phase', 'float'))).mul(sequence));
-  const second = step(frames, frame);
-  const cell = frame.sub(second.mul(frames));
-  const col = cell.mod(foam.framesPerRow);
-  const row = floor(cell.div(foam.framesPerRow));
+  const loop = sequence - CROSSFADE;
   const frameUv = attribute('uv', 'vec2');
-  // The atlas is loaded with v up; the frame's v runs down, as the rows do.
-  const atlasUv = vec2(col.add(frameUv.x).div(foam.framesPerRow), row.add(frameUv.y).div(foam.framesPerRow).oneMinus());
   const kind = attribute('kind', 'float');
-  const sampleOf = (index: number) => textureNode(atlases[index]!, atlasUv).r;
-  // The pair this quad's kind names, and the half of the sequence.
-  const pair = (first: number) => mix(sampleOf(first), sampleOf(first + 1), second);
-  const diag = mix(pair(0), pair(2), step(1, kind));
-  const ortho = mix(pair(4), pair(6), step(5, kind));
+  // The alpha of one frame of the sequence this quad's kind names: the
+  // atlas by the half the frame falls in and the pair by the kind, the
+  // cell by row and column. The atlas is loaded with v up; the frame's v
+  // runs down, as the rows do.
+  const frameAlpha = (frame: ShaderNodeObject<Node>) => {
+    const second = step(frames, frame);
+    const cell = frame.sub(second.mul(frames));
+    const col = cell.mod(foam.framesPerRow);
+    const row = floor(cell.div(foam.framesPerRow));
+    const atlasUv = vec2(col.add(frameUv.x).div(foam.framesPerRow), row.add(frameUv.y).div(foam.framesPerRow).oneMinus());
+    const sampleOf = (index: number) => textureNode(atlases[index]!, atlasUv).r;
+    const pair = (first: number) => mix(sampleOf(first), sampleOf(first + 1), second);
+    const diag = mix(pair(0), pair(2), step(1, kind));
+    const ortho = mix(pair(4), pair(6), step(5, kind));
+    return mix(diag, ortho, step(3, kind));
+  };
+  // The sequence is a cut, not a cycle: its last frame back to its first
+  // differs five times more than any other step (the crest stays, its lace
+  // changes), and with a coast's tiles a fraction of a roll apart the cut
+  // ran along the shore as a wave. So the last CROSSFADE frames fade out
+  // over the first: a loop of 112, each turn 0..112 with the tail 112..128
+  // laid over its start.
+  const position = fract(time.mul(FRAME_RATE / loop).add(attribute('phase', 'float'))).mul(loop);
+  const head = floor(position);
+  const tail = floor(position.add(loop)).min(sequence - 1);
+  const fade = position.div(CROSSFADE).clamp(0, 1);
+  const alpha = mix(frameAlpha(tail), frameAlpha(head), fade);
   material.colorNode = vec3(1, 1, 1);
-  material.opacityNode = mix(diag, ortho, step(3, kind)).mul(STRENGTH);
+  material.opacityNode = alpha.mul(STRENGTH);
 
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'foam';
