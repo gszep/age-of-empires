@@ -153,16 +153,27 @@ row admits the sea learned it is afloat or nowhere. Three composed
 graphics were read on the way (the dock's file-less standing graphic, the
 fish's leap over its underwater school) and one alpha palette.
 
-**A fresh session starts here:** `git pull`, re-run the import if
-`public/imported/aoe2/manifest.json` lacks `water`, `blends` or a `dock`
-entity (`tools/import_aoe2.sh` does all of it), open `?map=islands&seed=2`,
-press F4, build a dock on the shore and a fishing ship in it, and read
-`docs/backlog.md` "Water" -- a strategy that fishes is the queue's head.
-`.local/probes/harbour.mts` staged the harbour screenshot in `status.md`
-(a snapshot handed to the page, then `look` and `pixels`); it is untracked,
-so recreate it from the pattern in `tools/probes/snapshot.ts` if it is
-gone -- and remember a snapshot is declined when the URL fixes a map or a
-seed.
+Then, from a second reference screenshot at this project's own scale: the
+water's sun glint (facets, screen-aligned crests, the sun behind the
+camera) and the HUD's text (Georgia Bold at 0.70 x PointSize, Palatino's
+lining digits, the atlas's cream); and, deliberately, the projection given
+AoE2's own handedness (+x down-left), which retired every axis compensation
+-- the gate's two units, the farm's quarter turn, the blend labels, the
+wall frames -- and transposed the two surveyed boards. Every open item from
+the day is an issue (#89-#96) and the backlog points at them.
+
+**A fresh session starts here:** `git pull`; re-run the import if
+`public/imported/aoe2/manifest.json` lacks a `dock` entity or
+`ui/fonts/PalatinoLinotype.ttf` is missing (`tools/import_aoe2.sh` does all
+of it, ~3 min with the atlas cache warm); open `?map=islands&seed=2`, press
+F4, and look at the sea, the HUD's numbers, and a palisade run with a gate
+-- those are the three things that changed last. Player 1's town now opens
+on the screen's right; that is the handedness, not a bug. The queue's head
+is #89 (the shore foam: atlases read, footprint unmeasured) and #91 (a
+strategy that fishes), with #87 (ships after a depleted node) worth a look
+first since it is the human's report. `tools/probes/sea.mts`,
+`harbour.mts` and `hudshot.mts` are the day's probes, tracked now, and
+`tools/probes/README.md` says what each measures.
 
 **The 2026-09-13 session** cleared the bugs filed after the last overnight run:
 #32 (a lumberjack going idle at the camp — the continuation remembered which

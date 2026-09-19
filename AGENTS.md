@@ -70,6 +70,28 @@ model-provider tests opt-in.
   through from the previous manifest), `import_blends.py` adds `blends`.
   Re-running one step alone has shipped a manifest with no shore twice.
   `tools/import_aoe2.sh` runs all of them.
+- **The projection has AoE2's handedness since 2026-09-19:** +x runs
+  down-left on screen, +y down-right (`src/view/iso.ts`). Anything that
+  turns a tile direction into a screen direction -- the minimap's mapping,
+  a facing into a sprite frame, the blend-mask neighbour table, which tile
+  corner is east, the water's screen frame, the surveyed boards' transpose
+  -- is listed in `docs/status.md` "The projection has AoE2's handedness".
+  To verify a change to any of it: mirror an earlier screenshot and set the
+  new one beside it -- layout must land on the mirror to the tile, sprites
+  must not be mirrored.
+- **Two frames, not one:** the tile frame and the shader's world frame. A
+  DAT field stated in tiles (footprints, gate axes, RMS) is in the first;
+  `water_def.json`'s `sun_direction` and `mapScale` are in the second, and
+  the sun reaches the eye only when placed behind the camera.
+- **The reference's text is a signed distance field atlas**
+  (`fonts/combined.txt`): Georgia Regular's glyph boxes drawn heavy, with
+  lining digits Georgia 2.05 lacks. The HUD approximates it as Georgia Bold
+  at 0.70 x PointSize with Palatino's digits (#92); fit a face by rendering
+  candidates over the reference crop at the same pixel scale, never by
+  width alone.
+- **A dev-session snapshot is declined when the URL fixes a map or seed**
+  (`src/dev-session.ts`): a probe that hands the page a staged state must
+  open the bare URL.
 - **The compiled shaders are readable:** `strings` on a `.so` under
   `resources/_common/shaders/d3d11` names its inputs, and its `Aon9` chunk
   is a Shader Model 2 build whose token stream is documented -- that is how
