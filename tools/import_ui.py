@@ -355,18 +355,22 @@ def extract_ui(
     # The widget files index a font (0 on nearly every label, 2 and 3 on a
     # handful) and ship the faces in `fonts/`; nothing in the files names
     # which index is which face, so the spec names the faces to carry and
-    # the HUD's choice among them is recorded in `docs/status.md`.
+    # the HUD's choice among them is recorded in `docs/status.md`. A name
+    # with a path reaches beside `fonts/`: the in-game glyph atlas
+    # (`combined.txt`) has Georgia's letters and lining digits Georgia has
+    # not, and the shipped face whose digits measure as the atlas's is the
+    # menus' Palatino Linotype under `wpfg/fonts`.
     fonts: dict[str, str] = {}
     if fonts_dir is not None:
         for name in ui_spec.get("fonts", []):
-            source = fonts_dir / name
+            source = (fonts_dir / name).resolve()
             if not source.is_file():
                 continue
-            hashes[f"fonts/{name}"] = sha256(source)
-            target = out_root / "fonts" / name
+            hashes[f"fonts/{source.name}"] = sha256(source)
+            target = out_root / "fonts" / source.name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(source.read_bytes())
-            fonts[name] = f"fonts/{name}"
+            fonts[source.name] = f"fonts/{source.name}"
 
     # The reference's own UI colours: per player colour, the tint its text
     # and health bars use (`UIColors.json`), which is lighter than the

@@ -35,17 +35,22 @@ construction-complete cue, so that one has no owned source to draw on.
   `TerrainBlend_ps` names as `g_MaskTexture` and `g_BlendTexture`; how it
   indexes a 512x512 mask against a tile is in the compiled shader. Worth a
   look only if the classic edge ever reads as too soft against DE.
-- **The water's red is short and its ripple scale is calibrated.** The
-  combination is read from the shader's own SM2 build and the depth alpha is
-  now the preset's own class opacity over the drawn tile (`status.md`,
-  "Water"), which lands green and blue within eight of DE's Islands
-  screenshot; red is 16-29 short in both zones, a neutral term the formula
-  does not produce here (the dome lookup's exact matrix is a candidate --
-  `skyDomeMtx` is derived from `sky_rotation`/`sky_scale`, not read). Still
-  not in any file: the world unit behind `mapScale` (`RIPPLE_TILES`). The
-  vertex wave displacement (`wave_amplitude`) is not drawn, and the
-  surface's normal is the normal map's rather than the shader's height-tap
-  gradient.
+- **The water's glint is calibrated to a picture.** The combination is
+  read from the shader's own SM2 build and the depth alpha is the preset's
+  own class opacity over the drawn tile (`status.md`, "Water"); the facet
+  tilt (120 per unit of amplitude), the ripple repeat (six tiles) and the
+  sun's placement behind the camera are read off the reference's glints
+  rather than any file. Red is 12-24 short in the two zones. Still not in
+  any file: the world unit behind `mapScale`, the tap spacing of the height
+  gradient, and the frame `sun_direction` is stated in. The vertex wave
+  displacement (`wave_amplitude`) is not drawn, and the surface's normal is
+  the normal map's rather than the shader's height-tap gradient.
+- **The HUD's digits are Palatino's, emboldened by the browser.** The
+  reference's atlas has lining figures Georgia 2.05 lacks; Palatino's
+  measure as the atlas's, and the synthetic bold is the browser's smear
+  rather than a drawn weight. Rendering the HUD's labels from the atlas
+  itself (`fonts/combined.txt`, a signed distance field with every glyph)
+  would be the face exactly, digits included.
 - **The minimap's woods are a measured tone.** Trees carry `minimap_color`
   0 in the DAT and DE draws every wood at (41, 140, 33); `src/view/minimap.ts`
   uses that reading. Elevation is not shaded on the minimap, though
@@ -57,10 +62,16 @@ construction-complete cue, so that one has no owned source to draw on.
   `diag_1` then `diag_2` is one 128-frame sequence of a foam line rolling
   across the frame and back (its centroid travels (93,171) to (135,115) and
   returns), `diag_3`/`diag_4` the same line mirrored, `ortho_1`/`ortho_2`
-  and `_3`/`_4` the sequence for a shore that runs screen-orthogonally. What
-  is not measured is the frame's footprint against the tile and the
-  direction each pair faces; place one pair against a straight stretch of
-  Islands coast and compare with a DE screenshot before wiring all four.
+  and `_3`/`_4` the sequence for a shore that runs screen-orthogonally. The
+  frames are luminance masks (0-192) of a foam line; `diag` is for a shore
+  along a tile axis (diagonal on screen), `ortho` for one through the tile
+  corners (along the screen axes), so a coast is a run of edges classed by
+  which way the land lies. What is not measured is the frame's footprint
+  against the tile and the direction each pair faces; place one pair
+  against a straight stretch of Islands coast and compare with the
+  2026-09-19 reference screenshot (its foam is a thin broken white line a
+  tile into the water) before wiring all four. It is the largest remaining
+  difference between the two pictures of a coast.
 - **The fog has no clouds.** AoE2DE's "Animate Fog" option ("animate the fog
   of war with clouds") draws never-seen ground as a slowly drifting brown-grey
   cloud instead of flat black, and "Animate Fog Border" moves the edge between

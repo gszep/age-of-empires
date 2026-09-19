@@ -1238,17 +1238,28 @@ in the files names which `FontIndex` is which face (0 on six thousand labels,
 2 on ninety, 3 on eight). The HUD's labels looked a bold serif, and were set in
 Georgia Bold at first (issue #69): `georgia.ttf` and `georgiab.ttf` are
 imported under `ui/fonts/` and installed as one `@font-face` family. A
-playtest found every label too big, and the reference's own glyph atlas
-(`fonts/combined.txt`, rasterised at 64 px) and two measured strings
-settled it: "Dark Age" is 172 design px wide at `AgeTextLabel`'s PointSize
-44, and "Frazzle: 241/241" 309 at `FontsHolder`'s 48 — Georgia Regular at
-the file's PointSize predicts 181 and 321, Bold 209 and 369. Every HUD
-label in the widget files is `Style: Normal`, so the labels are set
-regular at PointSize × scale, with the thin dark edge the files declare
+playtest found every label too big, and a first pair of measured strings
+put them in Regular at PointSize × scale. A second screenshot of the
+reference at this project's own 2000 px scale (2026-09-19) settled it the
+other way, and more precisely: "Dark Age" (PointSize 44) is 75 px wide and
+16 px high there and the score panel's names (48) 17.6 px high, which is
+**0.70 × PointSize × scale**, and at those sizes Georgia *Bold* gives the
+label's width and stroke to the pixel where Regular is a fifth lighter. The
+reference's own glyph atlas (`fonts/combined.txt`, a signed distance field
+at 64 px) explains both readings: its glyph boxes are Georgia Regular's,
+and the font shader draws it heavy enough that on screen it is Bold's
+stroke. What the atlas has and Georgia 2.05 has not is lining figures --
+its digits stand cap-high (45 of 64 px) where Georgia's sit at the
+x-height (36) -- and the shipped face whose digits measure as the atlas's
+is the menus' Palatino Linotype (`wpfg/fonts`), so the family is composed:
+Georgia Bold for everything but U+0030-0039, Palatino for the digits, which
+the browser emboldens since no bold Palatino ships. A "white" `TextColor`
+renders as the atlas's cream, (250, 230, 211) in the screenshot, which is
+what white labels are set in. The thin dark edge the files declare
 (`TextOutlineWidth` 0.05 em on the age and gatherer labels, 0.1 on the
-score) as a text-shadow, and on the parchment in the files' dark brown
-(57,28,27): `ObjectName` 40, `ObjectHealth` 32, the owner line 40, the
-training `StatusLabel` 38. The index-to-face mapping is still inferred
+score) is a text-shadow, and the parchment labels keep the files' dark
+brown (57,28,27): `ObjectName` 40, `ObjectHealth` 32, the owner line 40,
+the training `StatusLabel` 38. The index-to-face mapping is still inferred
 rather than read, and is the one chosen part of this. `UIColors.json` beside the widget files
 is imported too: per player colour, the tint the reference writes text in
 (Blue 110,166,235; Red 255,100,100 — lighter than the palette block the
@@ -2006,13 +2017,33 @@ each water terrain draws through it, with a `surfaceWeight` per corner from
 its class (`waterClass`, the DAT's `is_water`: 4 shallow, 1 normal, 2 deep,
 8 walkable), and the water lapping onto a shore tile carries its surface
 through the blend mask. Rendered and read back (seed 2, headless): rim
-(53, 167, 213), open sea (47, 132, 183). What is still short is red -- 16
-in the open sea, 29 on the rim -- a neutral term the read formula does not
-produce here; the ripple's scale and tilt were tried and move the mean by a
-unit. The ripple's scale in tiles remains the one unread constant (the
-world unit `mapScale` divides is not stated); the visibility factor is the
-fog's business here and is left out; the normal-map's tilt stands in for
-the height taps.
+(53, 167, 213), open sea (47, 132, 183). What was still short was red -- 16
+in the open sea, 29 on the rim.
+
+**The glints (2026-09-19).** A second screenshot of the reference at this
+project's own scale showed what the first reading of the surface lacked:
+the water is covered in fine horizontal streaks of sun glint, and ours was
+a smooth sheet -- its facets so flat that the specular term added nothing
+at all when measured alone. Three things changed, each read off that
+picture and recorded as such. The surface texture is laid along the screen
+rather than the tile axes (its crests run along its rows and in the
+reference they lie across the screen; along the tile axes they ran
+diagonally). The facets are steeper: the shader's own normal is
+`normalize(gradient * amplitude, 0.1)`, a rough surface, and the normal
+map's tilt now stands in for it at 120 per unit of amplitude (from 20),
+with the map repeating every six tiles (from eight) so the fine ripples sit
+an eighth of a tile apart as the streaks do. And the sun stands behind the
+camera: a glint at power 1600 reaches the eye only from facets that mirror
+the sun almost exactly, so the reference's dense glint means the sun's
+mirror is the eye; the preset's `sun_direction` is in the shader's world
+frame, not the tile frame, and taken as stated in the tile frame its mirror
+lay 78 degrees from the eye. It is placed at the eye's azimuth at the
+preset's elevation. Read back: rim (58, 167, 212), open sea (52, 137, 179)
+against the first screenshot's (82, 172, 220) and (64, 135, 183) -- the
+glints are the neutral term the red was missing, and the shortfall is now
+24 and 12. Still unread: the world unit `mapScale` divides, the exact tap
+spacing of the height gradient, and the shore foam (`backlog.md`); the
+visibility factor is the fog's business here and is left out.
 
 **Islands is a descriptor.** `?map=islands` is Arabia with the base
 terrain set to water, from the owned `Islands.rms` (2023): one land per

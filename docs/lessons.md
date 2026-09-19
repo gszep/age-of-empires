@@ -815,16 +815,27 @@ keeps the record.
   load as contention before reading it as a regression.
 
 - **A weight, a face or a size inferred "from the look" is a measurement
-  not taken.** The HUD was set in Georgia Bold because the reference's
-  labels looked bold, and every label came out about a fifth too wide; the
-  human called them too big. Two strings measured in the reference
-  screenshots against the widget files' PointSize — "Dark Age" 172 design
-  px wide at 44, "Frazzle: 241/241" 309 at 48 — fit Georgia Regular (181,
-  321) and not Bold (209, 369), and the files had said `Style: Normal` on
-  every label all along. Rule: when a widget file states a property, use
-  it, and when the face is unnamed, measure a string's width against the
-  reference before choosing; a glyph atlas the reference ships
-  (`fonts/combined.txt`, rasterised at 64 px) is the face itself.
+  not taken -- and a measurement at the wrong scale is another.** The HUD
+  was set in Georgia Bold because the labels looked bold and came out a
+  fifth too big; two strings measured against the widget files' PointSize
+  then said Regular, and the files said `Style: Normal`. A screenshot at
+  the project's own 2000 px scale said Bold after all, at 0.70 of the
+  PointSize: the first measurement had fitted the weight to a size that was
+  wrong, and the two errors cancelled in width. The glyph atlas settles it
+  (`fonts/combined.txt`): Regular's boxes, drawn bold by the SDF shader,
+  with lining digits Georgia has not. Rule: fit size and weight together,
+  by rendering the candidate faces over the reference crop at the same
+  pixel scale, never from widths alone; and when the reference ships its
+  glyph atlas, its glyph boxes are the face's identity -- compare them.
+
+- **A specular term that adds nothing measured is a light in the wrong
+  place, not a small light.** The water's glint contributed zero when
+  measured alone, and the reference is covered in glints. Power 1600 means
+  a facet has to mirror the sun to within a couple of degrees, so a dense
+  glint tells you where the sun is -- behind the camera -- whatever frame
+  the preset's `sun_direction` is written in. Rule: when a read constant is
+  a direction, ask which frame it is in before trusting its numbers; the
+  picture says whether the light reaches the eye.
 
 - **A DAT colour triple is three shades, and the middle one is the flat
   ground.** A terrain's `colors` is the minimap's shade for a tile sloping

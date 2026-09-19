@@ -47,14 +47,23 @@ import { random01, seedFrom } from '../sim/random';
 import type { GameState } from '../sim/types';
 import type { ContentAssets, WaterPreset } from './assets';
 
-/** Ripples repeat every this many tiles; the normal map is 1024 px square. */
-const RIPPLE_TILES = 8;
 /**
- * The reference builds its normal as `normalize(gradient * amplitude, 0.1)`,
- * so a wave amplitude of 0.01 tilts the surface by a tenth: the normal map's
- * own tilt is scaled to match.
+ * Ripples repeat every this many tiles; the normal map is 1024 px square,
+ * its crests run along its rows with finer ripples on them, and the world
+ * unit `mapScale` divides is not stated. Six tiles puts the fine ripples at
+ * about an eighth of a tile, which is the streak spacing in a screenshot of
+ * the reference at the same zoom.
  */
-const TILT_PER_AMPLITUDE = 20;
+const RIPPLE_TILES = 6;
+/**
+ * The reference builds its normal as `normalize(gradient * amplitude, 0.1)`
+ * over height taps, which is a rough surface: facets steep enough that the
+ * sun's glint catches on many of them, and the reference's water is covered
+ * in those glints. The normal map's own tilt stands in for the gradient and
+ * is scaled until the glints are as dense as the screenshot's -- 120 per
+ * unit of amplitude, where 20 left the surface flat and glintless.
+ */
+const TILT_PER_AMPLITUDE = 120;
 /**
  * The vector from the water to the eye, in world tiles with z up: the camera
  * sits off the screen's bottom edge, which is world +x+y, and looks down at
@@ -121,13 +130,18 @@ export function createWaterMaterial(
   if (!normalMap || !skyMap || !floorMap) throw new Error(`water preset ${preset.name} has no textures`);
 
   const tiles = uv().mul(options.span);
+  // The surface texture is laid along the screen, not the tile axes: its
+  // crests run along its rows, and in the reference they lie across the
+  // screen, where along the tile axes they would run diagonally. Screen
+  // right is the tile diagonal (x - y), screen down is (x + y).
+  const along = vec2(tiles.x.sub(tiles.y), tiles.x.add(tiles.y)).mul(Math.SQRT1_2);
   // The shader samples its surface at taps drifting along (0.375, 0.625)
   // and (0.2, 1) of the wave speed, over the wave's repeat length; two
   // taps of the normal map along the same drifts stand in for its height
   // taps, and the preset's amplitude sets how far they tilt the surface.
   const speed = time.mul(preset.waveAnimationSpeed * 0.02);
-  const ripple = tiles.div(RIPPLE_TILES).add(speed.mul(vec2(0.375, 0.625)));
-  const ripple2 = tiles.div(RIPPLE_TILES * 2.3).add(speed.mul(vec2(0.2, 1))).add(vec2(0.37, 0.71));
+  const ripple = along.div(RIPPLE_TILES).add(speed.mul(vec2(0.375, 0.625)));
+  const ripple2 = along.div(RIPPLE_TILES * 2.3).add(speed.mul(vec2(0.2, 1))).add(vec2(0.37, 0.71));
   const n1 = textureNode(normalMap, ripple).rgb.mul(2).sub(1);
   const n2 = textureNode(normalMap, ripple2).rgb.mul(2).sub(1);
   const tilt = preset.waveAmplitude * TILT_PER_AMPLITUDE;
@@ -137,7 +151,16 @@ export function createWaterMaterial(
   // fisheye of the hemisphere, zenith at the centre, its xy turned by
   // `sky_rotation` and scaled by `sky_scale`, exactly as the shader does it.
   const view = vec3(VIEW.x, VIEW.y, VIEW.z);
-  const sun = normalize(vec3(...preset.sunDirection));
+  // The sun is stated in the shader's own world frame, which is not the
+  // tile frame: the reference's water is covered in its glint, and a glint
+  // at power 1600 only reaches the eye from facets that mirror the sun
+  // almost exactly, so the sun stands behind the camera. It is placed at
+  // the eye's azimuth, at the elevation the preset gives it (z 0.45, about
+  // 27 degrees against the camera's 30); in the tile frame as stated, its
+  // mirror lies 78 degrees from the eye and nothing glints.
+  const elevation = preset.sunDirection[2];
+  const sun = normalize(vec3(VIEW.x * Math.sqrt(1 - elevation * elevation) / Math.hypot(VIEW.x, VIEW.y),
+    VIEW.y * Math.sqrt(1 - elevation * elevation) / Math.hypot(VIEW.x, VIEW.y), elevation));
   const reflected = view.sub(normal.mul(dot(normal, view).mul(2)));
   const rotation = (preset.skyRotation * Math.PI) / 180;
   const rx = reflected.x.mul(Math.cos(rotation)).sub(reflected.y.mul(Math.sin(rotation)));

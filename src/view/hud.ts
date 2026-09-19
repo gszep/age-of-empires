@@ -134,21 +134,29 @@ export class Hud {
   }
 
   /**
-   * The reference's own faces for the HUD's labels (issue #69). `fonts/`
-   * ships Georgia in four styles beside the Century and Lucida families, and
-   * the widget files index a face without naming it. Every HUD label is
-   * `Style: Normal`, and the reference's own glyph atlas measures as Georgia
-   * Regular at the file's PointSize, so the labels are set regular (the CSS
-   * says why). A `@font-face` per imported file, once per page.
+   * The reference's own faces for the HUD's labels (issue #69). The widget
+   * files index a face without naming it; the in-game text is drawn from a
+   * glyph atlas (`fonts/combined.txt`) whose letters measure as Georgia's
+   * and whose digits are lining figures Georgia 2.05 has not -- they
+   * measure as Palatino's. So the family is composed: Georgia for every
+   * character but the digits, and Palatino Linotype for U+0030-0039, which
+   * the browser emboldens itself when the label is bold, since no bold
+   * Palatino ships. The CSS says why the labels are bold. One `@font-face`
+   * per imported file, once per page.
    */
   private installFonts(): void {
     const fonts = this.ui?.fonts;
     if (!fonts || document.getElementById('aoe2-fonts')) return;
     const style = document.createElement('style');
     style.id = 'aoe2-fonts';
+    const digits = 'U+0030-0039';
+    const notDigits = 'U+0000-002F, U+003A-10FFFF';
     style.textContent = Object.entries(fonts).map(([name, path]) => {
       const bold = /b\.ttf$/.test(name);
-      return `@font-face { font-family: 'AoE2 HUD'; src: url('${this.ui!.base}${path}'); font-weight: ${bold ? 'bold' : 'normal'}; font-display: swap; }`;
+      const forDigits = /palatino/i.test(name);
+      const range = fonts['PalatinoLinotype.ttf'] ? (forDigits ? digits : notDigits) : undefined;
+      return `@font-face { font-family: 'AoE2 HUD'; src: url('${this.ui!.base}${path}'); font-weight: ${bold ? 'bold' : 'normal'};`
+        + (range ? ` unicode-range: ${range};` : '') + ' font-display: swap; }';
     }).join('\n');
     document.head.appendChild(style);
     this.root.classList.add('reference-fonts');

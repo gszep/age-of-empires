@@ -13,13 +13,22 @@ html, body, #app {
 
 canvas.battlefield { display: block; position: absolute; inset: 0; }
 
-#hud { position: absolute; inset: 0; pointer-events: none; --ui-scale: 0.5; }
-/* The reference's own face once imported. Every HUD label in the widget
-   files is `Style: Normal`, and the reference's own glyph atlas measures as
-   Georgia Regular at the file's PointSize: "Dark Age" 172 design px wide
-   where Bold would be 209. The outline some labels declare
-   (`TextOutlineWidth` 0.05 em) is the thin dark edge below, not weight. */
-#hud.reference-fonts { font-family: 'AoE2 HUD', Georgia, 'Times New Roman', serif; font-weight: normal; }
+/* Text is drawn at 0.70 of the widget files' PointSize: a screenshot of the
+   reference at this scale sets "Dark Age" (PointSize 44) 16 px high and the
+   score panel's names (48) 17.6 px, both that fraction, and both wide and
+   heavy as Georgia Bold at those sizes to the pixel. A "white" TextColor
+   renders as the glyph atlas's own cream, (250, 230, 211) in the same
+   screenshot. */
+#hud { position: absolute; inset: 0; pointer-events: none; --ui-scale: 0.5; --text-scale: calc(var(--ui-scale) * 0.7); --text-white: #fae6d3; }
+/* The reference's own face once imported. Its in-game text is a signed
+   distance field atlas (`fonts/combined.txt`) whose glyph boxes are Georgia
+   Regular's, drawn heavy enough by the font shader that on screen it is
+   Georgia Bold's stroke and width, so Bold is the shipped file that matches
+   the picture. What the atlas has and Bold does not is lining figures: the
+   reference's digits stand cap-high where Georgia's sit at the x-height
+   (docs/backlog.md). The outline some labels declare (`TextOutlineWidth`
+   0.05 em) is the thin dark edge below. */
+#hud.reference-fonts { font-family: 'AoE2 HUD', Georgia, 'Times New Roman', serif; font-weight: bold; }
 #hud.reference-fonts .outlined { text-shadow: 0.05em 0 0 #000, -0.05em 0 0 #000, 0 0.05em 0 #000, 0 -0.05em 0 #000; }
 #hud .panel { position: absolute; pointer-events: auto; background-repeat: no-repeat; background-size: 100% 100%; }
 #hud button { pointer-events: auto; cursor: pointer; border: 0; background-color: transparent; color: inherit; font-family: inherit; }
@@ -49,7 +58,7 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
   background-size: contain; background-repeat: no-repeat; background-position: center;
   display: inline-block;
 }
-.resource-value { font-size: calc(34px * var(--ui-scale)); color: #fff; text-shadow: 0 0 3px #000; }
+.resource-value { font-size: calc(34px * var(--text-scale)); color: var(--text-white); text-shadow: 0 0 3px #000; }
 .idle-villager {
   width: calc(70px * var(--ui-scale)); height: calc(70px * var(--ui-scale));
   margin-left: calc(60px * var(--ui-scale)); margin-top: calc(8px * var(--ui-scale));
@@ -62,7 +71,7 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 #resource-panel.placed .resource-value { position: absolute; white-space: nowrap; display: flex; align-items: center; }
 #resource-panel.placed .workers {
   position: absolute; display: flex; align-items: flex-end; justify-content: flex-end;
-  font-size: calc(32px * var(--ui-scale)); line-height: 1; color: #fff;
+  font-size: calc(32px * var(--text-scale)); line-height: 1; color: var(--text-white);
   text-shadow: 0.05em 0 0 #000, -0.05em 0 0 #000, 0 0.05em 0 #000, 0 -0.05em 0 #000;
 }
 #resource-panel.placed .idle-villager { position: absolute; margin: 0; }
@@ -72,7 +81,7 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 #resource-panel.placed .age-fill { position: absolute; left: 0; top: 0; height: 100%; width: 0; background-size: auto 100%; background-repeat: no-repeat; }
 #resource-panel.placed .age-text {
   position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center;
-  font-size: calc(44px * var(--ui-scale)); line-height: 1; color: #fff;
+  font-size: calc(44px * var(--text-scale)); line-height: 1; color: var(--text-white);
   text-shadow: 0.05em 0 0 #000, -0.05em 0 0 #000, 0 0.05em 0 #000, 0 -0.05em 0 #000; padding-bottom: calc(4px * var(--ui-scale));
 }
 #resource-panel:not(.placed) .workers, #resource-panel:not(.placed) .age-shield, #resource-panel:not(.placed) .age-bar { display: none; }
@@ -127,7 +136,7 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 .command-button.active { outline: calc(3px * var(--ui-scale)) solid #ffd966; }
 .command-button .hotkey {
   position: absolute; right: 8%; bottom: 4%;
-  font-size: calc(26px * var(--ui-scale));
+  font-size: calc(26px * var(--text-scale));
   color: #ffe9a8; text-shadow: 0 0 3px #000;
 }
 
@@ -148,7 +157,7 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 #selection-panel.placed .object-stats { display: flex; flex-direction: column; }
 #selection-panel.placed .stat { position: relative; height: calc(50px * var(--ui-scale)); width: calc(200px * var(--ui-scale)); }
 #selection-panel.placed .stat-icon { position: absolute; left: 0; top: 0; width: calc(50px * var(--ui-scale)); height: calc(50px * var(--ui-scale)); background-size: contain; background-repeat: no-repeat; background-position: center; }
-#selection-panel.placed .stat-value { position: absolute; left: calc(60px * var(--ui-scale)); top: 0; height: 100%; display: flex; align-items: center; font-size: calc(30px * var(--ui-scale)); color: #f3ead2; white-space: nowrap; }
+#selection-panel.placed .stat-value { position: absolute; left: calc(60px * var(--ui-scale)); top: 0; height: 100%; display: flex; align-items: center; font-size: calc(30px * var(--text-scale)); color: #f3ead2; white-space: nowrap; }
 #selection-panel.placed .object-name { white-space: nowrap; line-height: 1; display: flex; align-items: center; }
 /* A group's portraits at the command button's own 80x80 pitch (the
    `QueueButtons` anchor gives the origin and no size of its own). */
@@ -162,21 +171,21 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
   background-size: cover; background-color: rgba(0, 0, 0, 0.35);
   border: calc(2px * var(--ui-scale)) solid #6f5b34;
 }
-.object-name { font-size: calc(40px * var(--ui-scale)); color: #f7ecd0; }
+.object-name { font-size: calc(40px * var(--text-scale)); color: #f7ecd0; }
 .hp-bar {
   width: calc(240px * var(--ui-scale)); height: calc(14px * var(--ui-scale));
   background: #3a0d0d; border: 1px solid #000; margin-top: calc(8px * var(--ui-scale));
 }
 .hp-fill { height: 100%; background: #2ecc40; }
-.object-hp, .object-detail { font-size: calc(32px * var(--ui-scale)); color: #e8dcbc; }
-.progress-label { font-size: calc(28px * var(--ui-scale)); color: #ffe9a8; margin-top: calc(6px * var(--ui-scale)); }
+.object-hp, .object-detail { font-size: calc(32px * var(--text-scale)); color: #e8dcbc; }
+.progress-label { font-size: calc(28px * var(--text-scale)); color: #ffe9a8; margin-top: calc(6px * var(--ui-scale)); }
 /* On the parchment the widget files write in dark brown (57,28,27):
    ObjectName and ObjectHealth 40 and 32 Normal, the owner line 40 Outlined,
    the training StatusLabel 38. */
 #selection-panel.placed .object-name, #selection-panel.placed .object-hp, #selection-panel.placed .object-detail,
 #selection-panel.placed .progress-label { color: #391c1b; text-shadow: none; }
-#selection-panel.placed .object-detail { font-size: calc(40px * var(--ui-scale)); }
-#selection-panel.placed .progress-label { font-size: calc(38px * var(--ui-scale)); }
+#selection-panel.placed .object-detail { font-size: calc(40px * var(--text-scale)); }
+#selection-panel.placed .progress-label { font-size: calc(38px * var(--text-scale)); }
 #selection-panel.placed .stat-value { color: #391c1b; }
 .progress-bar {
   width: calc(280px * var(--ui-scale)); height: calc(18px * var(--ui-scale));
@@ -200,10 +209,10 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 .score-badge {
   width: calc(40px * var(--ui-scale)); height: calc(40px * var(--ui-scale));
   display: flex; align-items: center; justify-content: center;
-  font-size: calc(34px * var(--ui-scale)); color: #fff; text-shadow: 0 0 2px #000;
+  font-size: calc(34px * var(--text-scale)); color: var(--text-white); text-shadow: 0 0 2px #000;
 }
 /* FontsHolder: 48 Normal with a 0.1 em outline. */
-.score-name { font-size: calc(48px * var(--ui-scale)); white-space: nowrap; text-shadow: 0.1em 0 0 #000, -0.1em 0 0 #000, 0 0.1em 0 #000, 0 -0.1em 0 #000; }
+.score-name { font-size: calc(48px * var(--text-scale)); white-space: nowrap; text-shadow: 0.1em 0 0 #000, -0.1em 0 0 #000, 0 0.1em 0 #000, 0 -0.1em 0 #000; }
 .score-civ, .score-age { width: calc(48px * var(--ui-scale)); height: calc(48px * var(--ui-scale)); background-size: contain; background-repeat: no-repeat; background-position: center; }
 #hud.fallback #score-panel { display: none; }
 #map-panel {
@@ -222,7 +231,7 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 #game-message {
   position: absolute; left: 50%; top: 18%;
   transform: translateX(-50%);
-  font-size: calc(40px * var(--ui-scale));
+  font-size: calc(40px * var(--text-scale));
   color: #ffe9a8; text-shadow: 0 0 4px #000;
   opacity: 0; transition: opacity 0.25s; pointer-events: none;
 }
@@ -240,11 +249,11 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
   pointer-events: auto;
 }
 .dialog.hidden { display: none; }
-.dialog h2 { font-size: calc(64px * var(--ui-scale)); color: #ffd966; margin-bottom: calc(40px * var(--ui-scale)); }
+.dialog h2 { font-size: calc(64px * var(--text-scale)); color: #ffd966; margin-bottom: calc(40px * var(--ui-scale)); }
 .dialog button {
   display: block; margin: calc(16px * var(--ui-scale)) auto;
   min-width: calc(500px * var(--ui-scale));
-  font-size: calc(40px * var(--ui-scale));
+  font-size: calc(40px * var(--text-scale));
   padding: calc(18px * var(--ui-scale));
   background: linear-gradient(#57462a, #3a2f1c);
   border: calc(3px * var(--ui-scale)) solid #8a7340;
@@ -265,7 +274,7 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 #hud.fallback .resource-icon[data-icon='gold'] { background: #d9b23f; }
 #hud.fallback .resource-icon[data-icon='population'] { background: #7d8ca3; }
 #hud.fallback .resource-icon { width: calc(48px * var(--ui-scale)); height: calc(48px * var(--ui-scale)); margin: calc(18px * var(--ui-scale)); }
-#hud.fallback .command-button { background-color: #57462a; border: 1px solid #8a7340; color: #f3ead2; font-size: calc(24px * var(--ui-scale)); }
+#hud.fallback .command-button { background-color: #57462a; border: 1px solid #8a7340; color: #f3ead2; font-size: calc(24px * var(--text-scale)); }
 
 /* Narrow-screen mode (mobile QA): scale the identical composition. */
 @media (max-width: 900px) {

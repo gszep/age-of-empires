@@ -2329,7 +2329,8 @@
     ],
     "fonts": [
       "georgia.ttf",
-      "georgiab.ttf"
+      "georgiab.ttf",
+      "../wpfg/fonts/PalatinoLinotype.ttf"
     ]
   },
   "terrain": {
