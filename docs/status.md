@@ -2007,10 +2007,19 @@ every facing coast dead straight. Nothing is dealt on the water and a land
 unit cannot reach the other island (checked over three seeds). The script's
 resource islets are not dealt.
 
-**Minimap colours were palette indices.** A terrain slot's `colors` is three
-indices into the game palette, not an RGB triple. Read raw, grass came out
-(55, 236, 54) -- green by luck -- and water (19, 19, 19), black. They are now
-resolved through `original.pal`: grass (0, 169, 0), water (48, 93, 182).
+**Minimap colours were palette indices, and the palette's is the classic
+minimap's.** A terrain slot's `colors` is three indices into the game
+palette, not an RGB triple. Read raw, grass came out (55, 236, 54) -- green
+by luck -- and water (19, 19, 19), black. Resolved through `original.pal`
+they are grass (0, 169, 0) and water (48, 93, 182): the saturated lime of
+the AoK and HD minimaps, which issue #80 reported as too bright against
+DE's. DE's minimap reads as the ground itself -- olive grass, sandy desert,
+brown dirt -- so the published `minimapColor` is now each terrain texture's
+mean (grass (130, 146, 64), desert (221, 180, 124), water (33, 120, 162)),
+with the palette colour kept as `classicMinimapColor`. Woods stay dark
+green because trees are drawn as their own dots. That DE derives its colours
+this way is a reading of how its minimap looks, not a field; recorded as
+such.
 
 Verified: `mapgen.test.ts` over 24 seeds (rates, ringing, mirroring, no tree
 or object on water), `nav.test.ts` (a villager sent across a pond goes round

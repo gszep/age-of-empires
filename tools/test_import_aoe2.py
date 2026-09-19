@@ -1158,9 +1158,22 @@ class ContentImportIntegrationTest(unittest.TestCase):
 
     def test_minimap_colours_are_palette_entries_not_indices(self):
         """`colors` on a terrain slot is three palette indices. Read raw, water
-        was (19, 19, 19) -- black -- and grass green only by luck."""
+        was (19, 19, 19) -- black -- and grass green only by luck. The atlas
+        step then publishes the texture's own tone as the minimap colour
+        (issue #80: the palette green is the classic minimap's, not DE's)
+        and keeps the palette colour beside it."""
         self.assertEqual(self.result["terrain"]["water"]["minimapColor"], [48, 93, 182])
         self.assertEqual(self.result["terrain"]["ground"]["minimapColor"], [0, 169, 0])
+        published = Path("public/imported/aoe2/manifest.json")
+        if published.is_file():
+            ground = json.loads(published.read_text())["terrain"]["ground"]
+            self.assertEqual(ground["classicMinimapColor"], [0, 169, 0])
+            r, g, b = ground["minimapColor"]
+            # Olive, not lime: red well up on the palette's zero, green ahead
+            # of both.
+            self.assertGreater(r, 80)
+            self.assertGreater(g, r)
+            self.assertLess(g, 169)
 
     def test_ground_terrain_comes_from_the_dat(self):
         ground = self.result["terrain"]["ground"]

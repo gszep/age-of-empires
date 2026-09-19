@@ -96,9 +96,21 @@ def convert_terrain(
         target = out_dir / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         with Image.open(source) as image:
-            image.convert("RGBA").save(target, optimize=True)
+            rgba = image.convert("RGBA")
+            rgba.save(target, optimize=True)
+            # The minimap draws the ground as the ground: the DAT's palette
+            # colour is the classic minimap's saturated green (issue #80),
+            # where DE's reads as the texture's own tone -- olive grass,
+            # sandy desert, brown dirt. The mean of the texture is that tone;
+            # the palette colour is kept beside it.
+            mean = rgba.convert("RGB").resize((64, 64), Image.BOX).getdata()
+            count = 64 * 64
+            average = [round(sum(px[c] for px in mean) / count) for c in range(3)]
         hashes[f"terrain/{source.name}"] = sha256(source)
-        converted[key] = {**slot, "image": relative}
+        converted[key] = {
+            **slot, "image": relative,
+            "classicMinimapColor": slot.get("minimapColor"), "minimapColor": average,
+        }
     return converted
 
 
