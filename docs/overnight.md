@@ -128,11 +128,13 @@ contour, levels from `colorcorrection.json`); Arabia's forest ponds and the
 DAT's `terrain_restrictions` table as passability; then, overnight, Islands
 as a descriptor, the engine's beach sweep, the blend pass rewritten as the
 eight-neighbour algorithm once the mask bytes were read as keep-base alpha,
-a gutter in the mask atlas, and the water surface drawn through
-`water_def.json`'s presets. Every stage has a section in `status.md`; the
-approximations are the fog edge's softness, the water shader's combination,
-and nothing else. Tried and reverted: the nearctic snow dusting
-(`backlog.md`). Left measured but not built: the shore foam.
+a gutter in the mask atlas, the water surface drawn through
+`water_def.json`'s presets, the script's aesthetic scatter as view-only
+sprites, and the leaf-litter patches dealt as the script deals them. Every
+stage has a section in `status.md`; the approximations are the fog edge's
+softness, the water shader's combination, and nothing else. Tried and
+reverted: the nearctic snow dusting (`backlog.md`). Left measured but not
+built: the shore foam.
 
 **The 2026-09-13 session** cleared the bugs filed after the last overnight run:
 #32 (a lumberjack going idle at the camp — the continuation remembered which
