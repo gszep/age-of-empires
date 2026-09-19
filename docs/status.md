@@ -2226,15 +2226,14 @@ photographed through the debug protocol before and after, and the dominant
 stripe frequency inside the block falls to **0.611** of what it was, against
 the 0.600 the change predicts (the remainder is FFT bin quantisation).
 
-The sheet is also laid a quarter turn round. Its furrows run along one world
-axis and the reference ploughs across the other, so the patch samples `u` from
-world y and `v` from world x — a rotation rather than a transpose, so the art
-is not mirrored with it. Both farm spans are square, so turning it leaves the
-twelve furrows untouched; measured on the same staged block, the stripe
-direction moves from 116.6 to 63.4 degrees on screen at an unchanged pitch
-(ratio 1.000). Those two angles are the diamond's own axes, 90 degrees either
-side of vertical once the dimetric projection has halved y — a right angle in
-the world, which is not a right angle on screen.
+The sheet was also, for a while, laid a quarter turn round: its furrows run
+along one world axis and the reference ploughs across the other *as the
+mirrored projection showed it*, so the patch sampled `u` from world y and
+`v` from world x, which moved the stripe direction from 116.6 to 63.4
+degrees on screen at an unchanged pitch. With the projection given AoE2's
+own handedness (see "The projection has AoE2's handedness") the sheet lies
+as authored and the furrows fall on that same 63.4-degree diagonal
+unturned -- the turn had been compensating for the mirror.
 
 The other half of the issue is fixed with it. A patch sampled its texture in
 patch-local coordinates, so every farm on the map drew the identical corner of
@@ -2315,21 +2314,45 @@ the corpse window the simulation keeps from the base art (`deathSeconds`,
 in the running game through the debug protocol: a Feudal house razed draws
 `house/death-feudal` and then `house/decay-feudal`.
 
-## The DAT's axes are mirrored against this projection
+## The projection has AoE2's handedness
 
-`worldToIso` sends +x down-**right** on screen; AoE2 sends its own +x
-down-**left**. Nothing symmetric shows it — a town center or a barracks looks
-the same either way — but anything the DAT labels by axis does. The palisade
-gate is two units, 789 obstructing 2x1 along the DAT's x and drawing
-`b_dark_gate_palisade_ne_closed`, and 793 the reverse; composited into a wall
-run, 789's art lies across a gate laid along *our* x and 793's lies along it.
+`worldToIso` sends +x down-**left** on screen and +y down-**right**, as AoE2
+does; tile (0, 0) is the diamond's top corner in both. Until 2026-09-19 it
+was the mirror of this, with +x down-right, and nothing symmetric showed it
+-- a town center or a barracks looks the same either way -- but anything the
+DAT labels by axis did. The palisade gate is two units, 789 obstructing 2x1
+along x and drawing `b_dark_gate_palisade_ne_closed`, and 793 the reverse;
+under the mirror, 789's art lay across a gate laid along x, so the gate had
+to ask two different questions of the DAT and take its box from one unit
+and its picture from the other (issue #15). The farm sheet had to be laid a
+quarter turn round to plough the way the reference ploughs; the blend
+masks' world labels were the mirror's; the sun's stated direction had no
+frame to be read in.
 
-So a gate asks two different questions of the DAT and gets two different units:
-the obstruction box comes from the unit whose collision matches the footprint
-(`gateBoxKey`), and the picture from the unit whose stakes run the right way on
-screen (`gateArtKey`). Conflating them is what left every gate lying across the
-wall it was built into (issue #15). Flipping the projection to match the DAT's
-handedness would remove the mirror and is not worth a board-wide change.
+The projection was flipped rather than the assets, once the list of what
+leaned on it was written down: `worldToIso`/`isoToWorld`, the minimap's
+`toCanvas`/`fromCanvas` and its image transform, `directionIndex` (a
+unit's facing into a sprite frame), the blend-mask neighbour table and the
+tile-corner uv assignments (which corner is east), the wall run frames and
+the gate's art key (now the same unit as its box), the water's screen
+frame, and the two surveyed boards, which are transposed so the Thames and
+the ridge keep their geography (`tools/import_terrain.py` and
+`tools/paint_map.py` transpose on the way in now; the committed
+descriptors were transposed once and their start clearings re-cut at the
+game's starts -- the old clearings remain in the ground as two round
+meadows until the surveys are re-imported). The simulation is untouched:
+every board deals the same tiles and the same objects, and plays out the
+same; it is drawn as its mirror image, which is what AoE2 would draw.
+Player 1's town, at x = W/4, is now on the screen's right.
+
+Verified by mirroring the day's earlier screenshots and setting the new
+ones beside them: the harbour's shore, dock, ship and fish land on the
+mirror to the tile; the palisade run and gate lie along their runs in the
+authentic frames where the mirror needed the swapped ones; the farm's
+furrows fall on the same screen diagonal as before, unturned; a villager
+sent along +x walks down-left and one along +y down-right; the minimap's
+terrain, dots and view rectangle agree with the world; Windsor's castle
+stands north of the Thames as it does.
 
 ## Palisade walls
 
@@ -2342,7 +2365,8 @@ The DAT gives the palisade a single base graphic (`b_dark_wall_palisade_x1`,
 graphic 587) with five deltas, and AoE2 picks between them by what a segment is
 joined to. Which delta is which was measured rather than guessed: compositing
 each one into the arrangement it has to serve, and keeping the one that joins
-without a seam. Frame 1 tiles seamlessly along +x and frame 0 along +y; frame 4
+without a seam. Frame 0 tiles seamlessly along +x and frame 1 along +y (measured
+as the reverse under the mirrored projection, and swapped with it); frame 4
 is the lone stake bundle; and **frame 2** — a boxed post with a horizontal
 brace — is the corner, the T and the cross, closing every arm where frame 3
 leaves the outer angle open.

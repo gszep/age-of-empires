@@ -2,6 +2,11 @@
  * AoE2DE dimetric projection at x1 asset scale: one tile is 96x48 screen
  * pixels (calibrated against imported building footprints, for example the
  * 3-tile barracks sprite is 296px wide).
+ *
+ * The handedness is AoE2's own: tile (0, 0) is the diamond's top corner,
+ * +x runs down-**left** and +y down-**right**. It was the mirror of this
+ * until 2026-09-19, which every DAT asset labelled by axis (a gate's two
+ * units, a farm's furrows, the sun) had to be swapped against (issue #15).
  */
 import type { Point } from '../sim/types';
 
@@ -10,14 +15,14 @@ export const TILE_H = 48;
 
 /** World tile coordinates -> screen pixels (y up, as in the Three scene). */
 export function worldToIso(x: number, y: number): { x: number; y: number } {
-  return { x: (x - y) * (TILE_W / 2), y: -(x + y) * (TILE_H / 2) };
+  return { x: (y - x) * (TILE_W / 2), y: -(x + y) * (TILE_H / 2) };
 }
 
 /** Screen pixels -> world tile coordinates. */
 export function isoToWorld(sx: number, sy: number): Point {
   return {
-    x: sx / TILE_W - sy / TILE_H,
-    y: -sx / TILE_W - sy / TILE_H,
+    x: -sx / TILE_W - sy / TILE_H,
+    y: sx / TILE_W - sy / TILE_H,
   };
 }
 

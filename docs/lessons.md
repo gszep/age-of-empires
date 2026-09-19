@@ -902,3 +902,18 @@ keeps the record.
   all until the spacing became a mask of tiles too close. The same pattern
   stands in the opening loop and `pickSeeds` (`backlog.md`). Rule: filter
   before the loop, or keep the exclusion as a mask the loop consults.
+
+- **A projection's handedness is a convention that nothing symmetric can
+  check, and every axis-labelled asset pays for it until it is fixed.** The
+  diamond was drawn with +x down-right where AoE2 draws it down-left, and
+  for four weeks each DAT thing labelled by axis arrived mirrored and was
+  compensated locally: the gate's box from one unit and its picture from
+  another, the farm's sheet turned a quarter turn, the blend masks' world
+  labels swapped, the wall frames measured the wrong way round. Each fix
+  was true and each hid the cause. Flipping the projection took an
+  afternoon once the list of what leaned on it was written down, and every
+  compensation came out. Rule: when the second asset in a row needs an
+  axis swapped to look right, stop patching assets and check the frame;
+  and verify a handedness change by mirroring the old screenshots and
+  laying the new ones beside them -- layout must land on the mirror to the
+  tile, while sprites must *not* be mirrored.

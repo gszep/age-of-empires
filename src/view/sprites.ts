@@ -268,15 +268,16 @@ export function treeIsFelled(state: GameState, entity: Entity): boolean {
  * arrangement it would have to serve, and the one that joins without a seam is
  * that arrangement's frame (see docs/lessons.md).
  *
- * Frame 1 tiles seamlessly along +x and frame 0 along +y; frame 4 is the lone
- * stake bundle. Frame 2 -- a boxed post with a horizontal brace -- is what
+ * Frame 0 tiles seamlessly along +x and frame 1 along +y (measured under the
+ * mirrored projection as the reverse, and swapped with it); frame 4 is the
+ * lone stake bundle. Frame 2 -- a boxed post with a horizontal brace -- is what
  * fills a corner, a T and a cross: dropped into a right-angle or a four-way it
  * closes every arm, where frame 3 leaves the outer angle open and reads as a
  * low straight section, which is what made corners look like runs (issue #15).
  * What frame 3 is for has not been identified; nothing draws it.
  */
-export const WALL_RUN_X = 1;
-export const WALL_RUN_Y = 0;
+export const WALL_RUN_X = 0;
+export const WALL_RUN_Y = 1;
 export const WALL_JOINT = 2;
 export const WALL_POST = 4;
 
@@ -301,25 +302,21 @@ export function wallShape(state: GameState, entity: Entity): number {
 }
 
 /**
- * A gate is two DAT units, one turned. Which of them a gate uses depends on
- * what is being asked, because the DAT's axes and this projection's are
- * mirrored: `worldToIso` sends +x down-**right**, while AoE2 sends its own +x
- * down-**left**. Unit 789 obstructs 2x1 along the DAT's x and draws
- * `..._ne_closed`, whose stakes run down-left on screen; unit 793 is the
- * reverse. Compositing each gate into each wall run proves it — a gate laid
- * along our +x only continues the fence when it draws 793's art (issue #15).
- *
- * So the box and the picture come from different units, and conflating them is
- * what left every gate lying across the wall it was built into.
+ * A gate is two DAT units, one turned: unit 789 obstructs 2x1 along x and
+ * draws `..._ne_closed`, whose stakes run down-left on screen, which is
+ * where +x runs; unit 793 is the reverse. While the projection was the
+ * mirror of AoE2's (until 2026-09-19) the box and the picture had to come
+ * from different units, and conflating them left every gate lying across
+ * the wall it was built into (issue #15). With the handedness AoE2's own,
+ * one unit answers both questions.
  */
 
 /** The unit whose obstruction box matches this gate: for the selection marker. */
 export const gateBoxKey = (entity: Entity): string =>
   (entity.footprint?.y ?? 0) > (entity.footprint?.x ?? 0) ? 'palisade-gate-y' : 'palisade-gate';
 
-/** The unit whose art lies along this gate's run on screen: for drawing it. */
-export const gateArtKey = (entity: Entity): string =>
-  (entity.footprint?.y ?? 0) > (entity.footprint?.x ?? 0) ? 'palisade-gate' : 'palisade-gate-y';
+/** The unit whose art lies along this gate's run on screen: the same one. */
+export const gateArtKey = gateBoxKey;
 
 /**
  * How close one of the owner's units has to come for the gate to swing open.
@@ -628,7 +625,7 @@ function updateDamage(
 function directionIndex(facing: number, directions: number): number {
   const dx = Math.cos(facing);
   const dy = Math.sin(facing);
-  const screenX = dx - dy;
+  const screenX = dy - dx;
   const screenDown = (dx + dy) / 2;
   const angle = Math.atan2(-screenX, screenDown) + Math.PI / 2;
   const index = Math.round(angle / (2 * Math.PI) * directions);

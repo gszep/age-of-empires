@@ -119,7 +119,7 @@ export class Minimap {
     const scaleX = w / (state.width + state.height);
     const scaleY = h / (state.width + state.height);
     return {
-      x: w / 2 + (x - y) * scaleX,
+      x: w / 2 + (y - x) * scaleX,
       y: (x + y) * scaleY,
     };
   }
@@ -131,7 +131,7 @@ export class Minimap {
     const scaleY = h / (state.width + state.height);
     const dx = (cx - w / 2) / scaleX;
     const dy = cy / scaleY;
-    return { x: (dy + dx) / 2, y: (dy - dx) / 2 };
+    return { x: (dy - dx) / 2, y: (dy + dx) / 2 };
   }
 
   /**
@@ -153,12 +153,12 @@ export class Minimap {
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     // Terrain and fog, as one image under the same mapping `toCanvas` applies:
-    // (x, y) -> (w/2 + (x - y) * scaleX, (x + y) * scaleY), which is linear and
+    // (x, y) -> (w/2 + (y - x) * scaleX, (x + y) * scaleY), which is linear and
     // so is exactly a canvas transform.
     const scaleX = this.canvas.width / (state.width + state.height);
     const scaleY = this.canvas.height / (state.width + state.height);
     ctx.save();
-    ctx.setTransform(scaleX, scaleY, -scaleX, scaleY, this.canvas.width / 2, 0);
+    ctx.setTransform(-scaleX, scaleY, scaleX, scaleY, this.canvas.width / 2, 0);
     ctx.drawImage(this.terrain(state, reveal, assets), 0, 0);
     ctx.restore();
 

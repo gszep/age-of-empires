@@ -66,12 +66,15 @@ describe('updateSelectionOutline', () => {
 
 
 /**
- * Everything that lies flat on the ground is wound the same way, and it is the
- * wrong way round: `worldToIso` negates y, so a tile quad listed
- * north-east-south-west comes out clockwise and is back-facing under the
- * default `FrontSide`. The ground and the footprint set `DoubleSide` and draw;
- * the farm's terrain patch did not, and every farm was invisible (issue #2)
- * with nothing logged and no test failing. This asserts the whole class.
+ * Everything that lies flat on the ground is wound the same way. Under the
+ * mirrored projection it was the wrong way round -- a tile quad listed from
+ * the north corner came out clockwise and back-facing under the default
+ * `FrontSide`; the ground and the footprint set `DoubleSide` and drew, the
+ * farm's terrain patch did not, and every farm was invisible (issue #2)
+ * with nothing logged and no test failing. With AoE2's own handedness the
+ * same listing winds counter-clockwise, and the class still sets
+ * `DoubleSide` so that nothing hangs on the winding. This asserts the whole
+ * class, and that the winding is what it is said to be.
  */
 describe('meshes that lie on the ground', () => {
   /** Signed area of the first triangle; negative is clockwise in scene space. */
@@ -198,9 +201,9 @@ describe('meshes that lie on the ground', () => {
     const assets = { ...groundAssets(), blends: undefined } as unknown as ContentAssets;
     const first = createTerrainPatch(assets, 'farm', 1.5, { x: 9, y: 12 })!.geometry.getAttribute('uv');
     const second = createTerrainPatch(assets, 'farm', 1.5, { x: 21, y: 30 })!.geometry.getAttribute('uv');
-    // The sheet is laid a quarter turn round, so u follows world y and v world x.
-    expect(first.getX(0)).toBeCloseTo(12 / FARM_TILES_PER_SPAN, 6);
-    expect(second.getX(0)).toBeCloseTo(30 / FARM_TILES_PER_SPAN, 6);
+    // The sheet lies as authored: u follows world x and v world y.
+    expect(first.getX(0)).toBeCloseTo(9 / FARM_TILES_PER_SPAN, 6);
+    expect(second.getX(0)).toBeCloseTo(21 / FARM_TILES_PER_SPAN, 6);
     const differs = Array.from({ length: first.count }, (_, i) =>
       Math.abs(first.getX(i) - second.getX(i)) > 1e-6 || Math.abs(first.getY(i) - second.getY(i)) > 1e-6);
     expect(differs.every(Boolean)).toBe(true);
@@ -210,30 +213,27 @@ describe('meshes that lie on the ground', () => {
   });
 
   it('ploughs the farm across the axis the reference ploughs', () => {
-    // The furrows in `g_fm1` run along one world axis and the reference runs
-    // them along the other, so the sheet is sampled a quarter turn round: u
-    // follows world y and v world x. On screen that swaps which diagonal of
-    // the diamond the furrows lie along -- a 90 degree turn in world space,
-    // which the dimetric projection shows as the other axis of the diamond
-    // rather than as a right angle.
+    // The furrows in `g_fm1` run along one world axis. Under the mirrored
+    // projection the sheet had to be sampled a quarter turn round to plough
+    // the way the reference does; with AoE2's own handedness it lies as
+    // authored, u along world x and v along world y, and the same screen
+    // diagonal comes out of it.
     const assets = { ...groundAssets(), blends: undefined } as unknown as ContentAssets;
     const uv = createTerrainPatch(assets, 'farm', 1.5, { x: 4, y: 7 })!.geometry.getAttribute('uv');
-    // North corner of the patch: world (4,7) -> u from y, v from x.
-    expect(uv.getX(0)).toBeCloseTo(7 / FARM_TILES_PER_SPAN, 6);
-    expect(uv.getY(0)).toBeCloseTo(-4 / FARM_TILES_PER_SPAN, 6);
+    // North corner of the patch: world (4,7) -> u from x, v from y.
+    expect(uv.getX(0)).toBeCloseTo(4 / FARM_TILES_PER_SPAN, 6);
+    expect(uv.getY(0)).toBeCloseTo(7 / FARM_TILES_PER_SPAN, 6);
     // Read the first triangle of the first tile straight off the mesh: its
     // three vertices are the tile corners (0,0), (1,0) and (1,1) in world
-    // tiles. Stepping one tile along world x must move v and leave u alone,
-    // and along world y the other way about. That is what makes it a turn
-    // rather than a scale, and it is read back rather than recomputed.
+    // tiles. Stepping one tile along world x moves u and leaves v alone,
+    // and along world y the other way about.
     const corner = (i: number) => ({ u: uv.getX(i), v: uv.getY(i) });
     const [origin, alongX, alongXY] = [corner(0), corner(1), corner(2)];
-    expect(alongX.u).toBeCloseTo(origin.u, 6);
-    expect(alongX.v).toBeCloseTo(origin.v - 1 / FARM_TILES_PER_SPAN, 6);
-    expect(alongXY.u).toBeCloseTo(origin.u + 1 / FARM_TILES_PER_SPAN, 6);
-    expect(alongXY.v).toBeCloseTo(alongX.v, 6);
-    // Turning it does not change how many furrows cross the farm: both spans
-    // are square, so the count is the same either way round.
+    expect(alongX.u).toBeCloseTo(origin.u + 1 / FARM_TILES_PER_SPAN, 6);
+    expect(alongX.v).toBeCloseTo(origin.v, 6);
+    expect(alongXY.u).toBeCloseTo(alongX.u, 6);
+    expect(alongXY.v).toBeCloseTo(origin.v + 1 / FARM_TILES_PER_SPAN, 6);
+    // Three tiles of a ten-tile span: twelve furrows across the farm.
     const us = Array.from({ length: uv.count }, (_, i) => uv.getX(i));
     expect(Math.max(...us) - Math.min(...us)).toBeCloseTo(3 / FARM_TILES_PER_SPAN, 6);
   });
@@ -358,18 +358,20 @@ describe('meshes that lie on the ground', () => {
     const priority = (id: number) => ({ 0: 111, 10: 96, 1: 166 } as Record<number, number>)[id];
     const field = (ids: Partial<Record<string, number>>) =>
       (dx: number, dy: number) => ids[`${dx},${dy}`] ?? 10;
-    // Grass across the south-east edge only (+x).
-    let bits = blendInfluences(10, priority, field({ '1,0': 0 })).get(0)!;
+    // Grass across the south-east edge only (+y: +x runs down-left).
+    let bits = blendInfluences(10, priority, field({ '0,1': 0 })).get(0)!;
     expect(bits).toBe(0b00001000);
     expect(blendMasksFor(bits, 0, 0)).toEqual([0]);
     expect(blendMasksFor(bits, 1, 0)).toEqual([1]);
     // The same neighbour's corner is covered by its edge and adds nothing.
-    bits = blendInfluences(10, priority, field({ '1,0': 0, '1,-1': 0 })).get(0)!;
+    bits = blendInfluences(10, priority, field({ '0,1': 0, '-1,1': 0 })).get(0)!;
     expect(bits).toBe(0b00001000);
-    // A corner alone is its own mask.
-    bits = blendInfluences(10, priority, field({ '1,-1': 0 })).get(0)!;
+    // A corner alone is its own mask: the east tip is (-1, +1).
+    bits = blendInfluences(10, priority, field({ '-1,1': 0 })).get(0)!;
     expect(bits).toBe(0b00000100);
     expect(blendMasksFor(bits, 0, 0)).toEqual([16]);
+    // And across +x, the south-west edge, the south-west masks.
+    expect(blendMasksFor(blendInfluences(10, priority, field({ '1,0': 0 })).get(0)!, 0, 0)).toEqual([8]);
     // Two edges, three, four: one mask each, from the table.
     expect(blendMasksFor(0b00100010, 0, 0)).toEqual([20]);
     expect(blendMasksFor(0b10100000, 0, 0)).toEqual([22]);
@@ -430,9 +432,10 @@ describe('meshes that lie on the ground', () => {
     expect((bare.material as THREE.MeshBasicMaterial).alphaMap).toBeFalsy();
   });
 
-  it('is wound clockwise at all, so the check above is not vacuous', () => {
-    // If the projection ever stops flipping y this test fails first, and the
-    // one above becomes a check of nothing rather than silently passing.
-    expect(winding(createFootprint(1.5))).toBeLessThan(0);
+  it('is wound counter-clockwise at all, so the check above is not vacuous', () => {
+    // If the projection's handedness ever changes again this test fails
+    // first, and the one above becomes a check of nothing rather than
+    // silently passing.
+    expect(winding(createFootprint(1.5))).toBeGreaterThan(0);
   });
 });

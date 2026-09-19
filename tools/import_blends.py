@@ -31,9 +31,9 @@ for a single higher neighbour across one edge, 16-19 across one corner,
 20-25 two edges, 26-29 three, 30 all four. Their orientation in this
 decode is *measured* rather than trusted -- each single-edge group must keep
 least of the quadrant that faces its neighbour -- and it comes out with the
-neighbour across the south-east edge (world +x) for masks 0-3, the
-north-east (-y) for 4-7, the south-west (+y) for 8-11 and the north-west
-(-x) for 12-15.
+neighbour across the south-east edge (world +y) for masks 0-3, the
+north-east (-x) for 4-7, the south-west (+x) for 8-11 and the north-west
+(-y) for 12-15 -- world axes as AoE2 lays them, +x down-left on screen.
 
     uv run --locked python tools/import_blends.py
 """
@@ -107,10 +107,10 @@ def quadrant_masks() -> dict[str, np.ndarray]:
     v = (ys - (TILE_H - 1) / 2) / ((TILE_H - 1) / 2)
     inside = np.abs(u) + np.abs(v) <= 1.0001
     return {
-        "+x": inside & (u >= 0) & (v >= 0),   # down-right
-        "+y": inside & (u <= 0) & (v >= 0),   # down-left
-        "-x": inside & (u <= 0) & (v <= 0),   # up-left
-        "-y": inside & (u >= 0) & (v <= 0),   # up-right
+        "+y": inside & (u >= 0) & (v >= 0),   # down-right
+        "+x": inside & (u <= 0) & (v >= 0),   # down-left
+        "-y": inside & (u <= 0) & (v <= 0),   # up-left
+        "-x": inside & (u >= 0) & (v <= 0),   # up-right
     }
 
 
@@ -153,7 +153,7 @@ def coverages(masks: list[np.ndarray]) -> list[dict[str, float]]:
 #: orientation (see the module docstring). Verified against the pixels by
 #: `single_edge_groups`, never assumed.
 EDGE_GROUPS: dict[str, list[int]] = {
-    "+x": [0, 1, 2, 3], "-y": [4, 5, 6, 7], "+y": [8, 9, 10, 11], "-x": [12, 13, 14, 15],
+    "+y": [0, 1, 2, 3], "-x": [4, 5, 6, 7], "+x": [8, 9, 10, 11], "-y": [12, 13, 14, 15],
 }
 
 

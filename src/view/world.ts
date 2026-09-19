@@ -133,11 +133,11 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
         iso.y += cornerElevation(state, px, py) * ELEVATION_PIXELS;
         return { iso, u: px / spanX, v: py / spanY, shade: shadeAt(px, py), weight: weightAt(px, py) };
       };
-      const [north, east, south, west] = [
+      const [north, west, south, east] = [
         point(x, y), point(x + 1, y), point(x + 1, y + 1), point(x, y + 1),
       ];
       const bucket = buckets[category];
-      for (const [a, b, c] of [[north, east, south], [north, south, west]] as const) {
+      for (const [a, b, c] of [[north, west, south], [north, south, east]] as const) {
         for (const corner of [a, b, c]) {
           bucket.positions.push(corner.iso.x, corner.iso.y, 0);
           bucket.uvs.push(corner.u, corner.v);
@@ -200,12 +200,12 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
               // Water lapping over a tile carries its own surface with it.
               bucket!.weights.push(weightOf.get(there) ?? 0);
             };
-            // North, east, south, west of the tile against the mask's own
-            // top, right, bottom and left points. The texture is flipped on
-            // load, so v runs up from the bottom and the north corner takes
-            // v = 1.
+            // North, west, south, east of the tile (+x runs down-left)
+            // against the mask's own top, left, bottom and right points. The
+            // texture is flipped on load, so v runs up from the bottom and
+            // the north corner takes v = 1.
             const corners: [number, number, number, number][] = [
-              [x, y, 0.5, 1], [x + 1, y, 1, 0.5], [x + 1, y + 1, 0.5, 0], [x, y + 1, 0, 0.5],
+              [x, y, 0.5, 1], [x + 1, y, 0, 0.5], [x + 1, y + 1, 0.5, 0], [x, y + 1, 1, 0.5],
             ];
             for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]] as const) {
               for (const index of [a, b, c]) {
@@ -283,7 +283,7 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
  * odd numbers edges.
  */
 const NEIGHBOURS: [number, number][] = [
-  [-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0],
+  [-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [1, -1], [0, -1],
 ];
 
 /**
@@ -322,10 +322,10 @@ export function blendInfluences(
  * boundary does not repeat one silhouette.
  */
 const EDGE_MASKS: Record<number, number | [number, number, number, number]> = {
-  0b00001000: [0, 1, 2, 3],       // south-east edge, +x
-  0b00000010: [4, 5, 6, 7],       // north-east edge, -y
-  0b00100000: [8, 9, 10, 11],     // south-west edge, +y
-  0b10000000: [12, 13, 14, 15],   // north-west edge, -x
+  0b00001000: [0, 1, 2, 3],       // south-east edge, +y
+  0b00000010: [4, 5, 6, 7],       // north-east edge, -x
+  0b00100000: [8, 9, 10, 11],     // south-west edge, +x
+  0b10000000: [12, 13, 14, 15],   // north-west edge, -y
   0b00100010: 20, 0b10001000: 21,
   0b10100000: 22, 0b10000010: 23, 0b00101000: 24, 0b00001010: 25,
   0b00101010: 26, 0b10101000: 27, 0b10100010: 28, 0b10001010: 29,
@@ -412,7 +412,6 @@ export function createTerrainPatch(
   if (!terrain || !texture) return undefined;
   const farm = FARM_SLOTS.has(slot);
   const [spanX, spanY] = farm ? [FARM_TILES_PER_SPAN, FARM_TILES_PER_SPAN] : terrain.dimensions;
-  const turned = farm;
   const positions: number[] = [];
   const uvs: number[] = [];
   const uv1s: number[] = [];
@@ -445,17 +444,14 @@ export function createTerrainPatch(
       // the texture coordinate is absolute, so neighbouring farms show
       // neighbouring ground rather than the same corner twice.
       // Farm sheets are laid the way the reference lays them: ten tiles to the
-      // span, and turned a quarter turn, because the furrows in `g_fm1` run
-      // along the world axis the game ploughs across. A rotation rather than a
-      // transpose -- (u, v) = (y, -x) -- so the art is not mirrored with it.
-      // Both farm spans are square, so the furrow count across a farm is the
-      // same either way round.
-      const uv = turned
-        ? (px: number, py: number) => ({ u: (at.y + py) / spanY, v: -(at.x + px) / spanX })
-        : (px: number, py: number) => ({ u: (at.x + px) / spanX, v: (at.y + py) / spanY });
-      // The mask's four points are the tile's four corners; the texture is
-      // flipped on load, so the north corner takes v = 1.
-      const mask: [number, number][] = [[0.5, 1], [1, 0.5], [0.5, 0], [0, 0.5]];
+      // span. Under the mirrored projection they had to be turned a quarter
+      // turn to plough the way the reference ploughs; with the handedness
+      // AoE2's own the sheet lies as authored.
+      const uv = (px: number, py: number) => ({ u: (at.x + px) / spanX, v: (at.y + py) / spanY });
+      // The mask's four points are the tile's four corners -- north, west,
+      // south, east, since +x runs down-left; the texture is flipped on
+      // load, so the north corner takes v = 1.
+      const mask: [number, number][] = [[0.5, 1], [0, 0.5], [0.5, 0], [1, 0.5]];
       const corners = [
         { p: worldToIso(x, y), ...uv(x, y) },
         { p: worldToIso(x + 1, y), ...uv(x + 1, y) },
@@ -693,10 +689,10 @@ export function createFog(state: GameState): FogLayer {
         return { x: iso.x, y: iso.y, u: px / width, v: py / height };
       };
       const north = raised(x, y);
-      const east = raised(x + 1, y);
+      const west = raised(x + 1, y);
       const south = raised(x + 1, y + 1);
-      const west = raised(x, y + 1);
-      for (const p of [north, east, south, north, south, west]) {
+      const east = raised(x, y + 1);
+      for (const p of [north, west, south, north, south, east]) {
         positions[offset * 3] = p.x;
         positions[offset * 3 + 1] = p.y;
         positions[offset * 3 + 2] = 0;

@@ -814,16 +814,13 @@ describe('gates', () => {
   };
 
   it('draws the gate unit whose stakes run the way the wall does', () => {
-    // Issue #15. The DAT's axes and this projection's are mirrored --
-    // `worldToIso` sends +x down-right, AoE2 sends its own +x down-left -- so
-    // the unit that obstructs 2x1 along our x (789, `..._ne_closed`) is the
-    // one whose art runs the *other* way. Compositing each gate into each wall
-    // run settled it: a gate along our +x continues the fence only with 793's
-    // art, which the manifest calls `palisade-gate-y`.
+    // Issue #15. The projection has AoE2's own handedness (+x down-left),
+    // so the unit that obstructs 2x1 along x (789, `..._ne_closed`, stakes
+    // down-left) is also the one whose art lies along an x run; while the
+    // projection was mirrored the two questions had different answers.
     const state = createGame(64);
-    expect(chooseAnimation(state, gateAt(state, 20, 4.5, 'x')).key).toBe('palisade-gate-y');
-    expect(chooseAnimation(state, gateAt(state, 24.5, 8, 'y')).key).toBe('palisade-gate');
-    // The obstruction box is a world-space question and keeps the other unit.
+    expect(chooseAnimation(state, gateAt(state, 20, 4.5, 'x')).key).toBe('palisade-gate');
+    expect(chooseAnimation(state, gateAt(state, 24.5, 8, 'y')).key).toBe('palisade-gate-y');
     expect(gateBoxKey(gateAt(state, 20, 4.5, 'x'))).toBe('palisade-gate');
     expect(gateBoxKey(gateAt(state, 24.5, 8, 'y'))).toBe('palisade-gate-y');
   });
@@ -862,9 +859,9 @@ describe('gates', () => {
       activity: 'idle' as const, order: { kind: 'idle' as const },
     };
     state.entities.push(wall);
-    expect(wallShape(state, wall)).toBe(4);
+    expect(wallShape(state, wall)).toBe(WALL_POST);
     gateAt(state, 26, 30.5, 'x');
-    expect(wallShape(state, wall)).toBe(1);
+    expect(wallShape(state, wall)).toBe(WALL_RUN_X);
   });
 });
 

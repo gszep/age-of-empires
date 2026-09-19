@@ -107,6 +107,11 @@ def openmap_records(archive: Path, grid: str, layer: str, bbox):
             yield from reader.iterShapeRecords(bbox=bbox)
 
 
+def transpose(grid: list, width: int, height: int) -> list:
+    """The grid with x and y swapped: tile (x, y) becomes tile (y, x)."""
+    return [grid[x * width + y] for y in range(width) for x in range(height)]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--centre", nargs=2, type=float, required=True,
@@ -201,7 +206,11 @@ def main() -> None:
             "url": openmap_url, "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
             "layers": counts,
         }
-    terrain = terrain_grid.ravel().tolist()
+    # The board's x runs down-left on screen (AoE2's own handedness, since
+    # 2026-09-19), which mirrors what the rasteriser's east-to-x mapping
+    # assumed; transposing the grid keeps east on the screen's right.
+    terrain = transpose(terrain_grid.ravel().tolist(), width, height)
+    metres = transpose(list(metres), width, height)
 
     # Playability: starts scale with boards larger than the original 120 tiles.
     starts = [(round(width * 0.25), round(height * 0.5)),
@@ -221,10 +230,11 @@ def main() -> None:
         east, north = float(east_raw), float(north_raw)
         difference = (east - ce) * math.sqrt(2) / args.pitch
         total = width - 1 - (north - cn) * math.sqrt(2) / args.pitch
+        # Transposed like the grid: y before x.
         landmarks.append({
             "kind": kind,
-            "x": round((total + difference) / 2, 3),
-            "y": round((total - difference) / 2, 3),
+            "x": round((total - difference) / 2, 3),
+            "y": round((total + difference) / 2, 3),
             "sourcePoint": [east, north],
         })
 

@@ -133,8 +133,8 @@ export function createWaterMaterial(
   // The surface texture is laid along the screen, not the tile axes: its
   // crests run along its rows, and in the reference they lie across the
   // screen, where along the tile axes they would run diagonally. Screen
-  // right is the tile diagonal (x - y), screen down is (x + y).
-  const along = vec2(tiles.x.sub(tiles.y), tiles.x.add(tiles.y)).mul(Math.SQRT1_2);
+  // right is the tile diagonal (y - x), screen down is (x + y).
+  const along = vec2(tiles.y.sub(tiles.x), tiles.x.add(tiles.y)).mul(Math.SQRT1_2);
   // The shader samples its surface at taps drifting along (0.375, 0.625)
   // and (0.2, 1) of the wave speed, over the wave's repeat length; two
   // taps of the normal map along the same drifts stand in for its height

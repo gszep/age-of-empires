@@ -27,16 +27,19 @@ TERRAIN_FOREST = 10
 source, out = Path(sys.argv[1]), Path(sys.argv[2])
 image = Image.open(source).convert("RGB")
 width, height = image.size
+# Tile (x, y) takes pixel (y, x): the board's x runs down-left on screen
+# (AoE2's own handedness), and a north-up picture keeps east on the right
+# only when the grid is transposed on the way in.
 terrain = []
-for y in range(height):
-    for x in range(width):
-        r, g, b = image.getpixel((x, y))
+for y in range(width):
+    for x in range(height):
+        r, g, b = image.getpixel((y, x))
         forest = g > r and g > b and g < 100
         terrain.append(TERRAIN_FOREST if forest else TERRAIN_GRASS)
 
 out.write_text(json.dumps({
-    "width": width,
-    "height": height,
+    "width": height,
+    "height": width,
     "terrain": terrain,
     "source": {
         "file": source.name,

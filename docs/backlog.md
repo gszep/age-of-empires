@@ -118,6 +118,13 @@ construction-complete cue, so that one has no owned source to draw on.
 
 ## Generator
 
+- **The surveyed boards carry two spare clearings.** Transposing Windsor
+  and Senlac for AoE2's handedness (2026-09-19) moved the start clearings
+  the importer had cut; the committed descriptors were re-cut at the game's
+  starts, and the old clearings remain as round meadows at (H/2, W/4) and
+  (H/2, 3W/4). Re-running `tools/import_terrain.py` (it transposes before
+  clearing now) removes them; it needs the survey downloads.
+
 - **`clearAround` under a `for...of` filters nothing.** The opening loop and
   `pickSeeds` in `mapgen.ts` reassign their candidate list inside a
   `for (const tile of order)`, which keeps iterating the original array, so
