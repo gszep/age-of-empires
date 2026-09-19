@@ -35,7 +35,7 @@ construction-complete cue, so that one has no owned source to draw on.
   `TerrainBlend_ps` names as `g_MaskTexture` and `g_BlendTexture`; how it
   indexes a 512x512 mask against a tile is in the compiled shader. Worth a
   look only if the classic edge ever reads as too soft against DE.
-- **The water's glint is calibrated to a picture.** The combination is
+- **The water's glint is calibrated to a picture (#94).** The combination is
   read from the shader's own SM2 build and the depth alpha is the preset's
   own class opacity over the drawn tile (`status.md`, "Water"); the facet
   tilt (120 per unit of amplitude), the ripple repeat (six tiles) and the
@@ -45,17 +45,17 @@ construction-complete cue, so that one has no owned source to draw on.
   gradient, and the frame `sun_direction` is stated in. The vertex wave
   displacement (`wave_amplitude`) is not drawn, and the surface's normal is
   the normal map's rather than the shader's height-tap gradient.
-- **The HUD's digits are Palatino's, emboldened by the browser.** The
+- **The HUD's digits are Palatino's, emboldened by the browser (#92).** The
   reference's atlas has lining figures Georgia 2.05 lacks; Palatino's
   measure as the atlas's, and the synthetic bold is the browser's smear
   rather than a drawn weight. Rendering the HUD's labels from the atlas
   itself (`fonts/combined.txt`, a signed distance field with every glyph)
   would be the face exactly, digits included.
-- **The minimap's woods are a measured tone.** Trees carry `minimap_color`
+- **The minimap's woods are a measured tone (#96).** Trees carry `minimap_color`
   0 in the DAT and DE draws every wood at (41, 140, 33); `src/view/minimap.ts`
   uses that reading. Elevation is not shaded on the minimap, though
   `minimapShades` now carries the up/down entries for it.
-- **The shore foam is not drawn.** DE rolls foam along a `WATER_DEFAULT`
+- **The shore foam is not drawn (#89).** DE rolls foam along a `WATER_DEFAULT`
   coast (`enable_waves 1`; ponds are 0) through `WaveAnim_ps`
   (`g_WaterAnim1a-d`) from `terrain/water/atlas_v1_{ortho,diag}_{1-4}.png`.
   Measured 2026-09-19: each atlas is 2048 square, 8x8 frames of 256 px, and
@@ -118,14 +118,14 @@ construction-complete cue, so that one has no owned source to draw on.
 
 ## Generator
 
-- **The surveyed boards carry two spare clearings.** Transposing Windsor
+- **The surveyed boards carry two spare clearings (#93).** Transposing Windsor
   and Senlac for AoE2's handedness (2026-09-19) moved the start clearings
   the importer had cut; the committed descriptors were re-cut at the game's
   starts, and the old clearings remain as round meadows at (H/2, W/4) and
   (H/2, 3W/4). Re-running `tools/import_terrain.py` (it transposes before
   clearing now) removes them; it needs the survey downloads.
 
-- **`clearAround` under a `for...of` filters nothing.** The opening loop and
+- **`clearAround` under a `for...of` filters nothing (#90).** The opening loop and
   `pickSeeds` in `mapgen.ts` reassign their candidate list inside a
   `for (const tile of order)`, which keeps iterating the original array, so
   `groupSpacing` and the seed separation are not enforced there. Found
@@ -139,7 +139,7 @@ Ponds are on Arabia, Islands is a map, the beach and the passability table
 are the engine's and the surface is the reference's shader
 (`docs/water-design.md`, "Where it stands"). What is left is the naval half:
 
-- **The example AI does not fish.** It builds no dock and its villagers skip
+- **The example AI does not fish (#91).** It builds no dock and its villagers skip
   fish nodes (`ai.ts`), because a fish two tiles off the bank is food a
   villager cannot reach and the nearest-food rule would re-send one to it
   every tick it went idle. A strategy that builds a dock and trains ships
@@ -150,9 +150,9 @@ are the engine's and the surface is the reference's shader
   Fishing Lines and Gillnets are researchable and reach the ship; the
   warship lines are listed as skipped (no research location or no effect
   in this DAT) and the ships they upgrade are not imported.
-- **`FISH_A` is dealt as the snapper.** The salmon (456, six per map at
+- **`FISH_A` is dealt as the snapper (#95).** The salmon (456, six per map at
   scale) is the same 225 food and the same class; only its picture differs.
-- **Islands deals no resource islets, and its depth chain is a rule.** The
+- **Islands deals no resource islets, and its depth chain is a rule (#95).** The
   2023 script's four 1% `create_land`s (`land_id 20-23`) and their neritic
   fish are not dealt. `F_WaterMasking.inc` is applied as what it converges
   on -- shallow within five tiles of land, medium beyond -- rather than
