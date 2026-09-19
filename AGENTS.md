@@ -47,10 +47,12 @@ the project's memory — do not rely on any external memory system.
 tools/gate.sh          # npm test, npm run build, npm run test:import
 ```
 
-Run it through that script rather than by hand. Piping a step to `tail` hands
-`&&` the status of `tail`, which is always 0, so a broken build sails into a
-commit — that happened twice in one run, once in an ad-hoc chain and once in
-the first script written to replace it.
+Run it through that script rather than by hand, with its output to a file
+(`tools/gate.sh > .local/gate.log 2>&1`), never through a pipe. On GREEN it
+writes `.local/gate.ok`; a `PreToolUse` hook (`tools/hooks/guard_commit.sh`)
+refuses `git commit` while any changed non-Markdown file is newer than that
+sentinel, because the prose version of this rule let a red build into
+`origin/main` twice. A commit that touches only `.md` files needs no gate.
 
 Also run the relevant live/headless integration test for changed boundaries.
 Commit only when all gates pass, and always push after committing. Keep
@@ -173,13 +175,16 @@ screenshots; use the PNG endpoint only when geometry genuinely needs eyes.
 - Add tests for timing, state transitions, hidden information, replay
   determinism, protocol compatibility, and prior regressions — and for any
   convention that can fail silently. Do not test trivial getters or constants.
-- Never wait on a job with `pgrep -f`/`pkill -f` — the pattern matches the
-  waiting shell's own command line, so the loop never ends (sixteen ran all
-  night once). Start the job with a handle (`run_in_background`, or
-  `job & echo $! > .local/job.pid`) and wait on the handle:
-  `tools/wait_for.sh pid|file|gone <target> [timeout]`. A run that started
-  background work ends with a hygiene pass — list what it left running, kill
-  the litter, and name what deliberately survives.
+- There is one way to wait: start the job with a handle
+  (`run_in_background`, or `job & echo $! > .local/job.pid`) and wait on the
+  handle with `tools/wait_for.sh pid|file|gone <target> [timeout]`. A hook
+  (`tools/hooks/guard_bash.sh`) refuses `pgrep -f`, `pkill -f`, bare `sleep`
+  and `until`/`while … sleep` loops, because each recurred for three weeks
+  with the rule written down (sixteen self-matching waiters once ran all
+  night). List processes with `ps -eo pid,etime,args | grep <name>`. A run
+  that started background work ends with a hygiene pass — list what it left
+  running from the process table, kill the litter, and name what
+  deliberately survives.
 - In interactive sessions, verify lightly but always: before handing a change
   over, run the tests that touch the changed code (the full gate still runs
   at commit time), and first ask what the reference implementation actually

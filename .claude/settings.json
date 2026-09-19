@@ -5,7 +5,22 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostCompact\",\"additionalContext\":\"Context was just compacted. Before resuming work: re-read the Process section of docs/lessons.md and the genieutils cheat-sheet in tools/README.md, and list any background jobs or waiters this session started that may still be running (see the wait/hygiene rules in AGENTS.md).\"}}'"
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostCompact\",\"additionalContext\":\"Context was just compacted. Before resuming work: run tools/session_start.sh --no-fetch; re-read docs/lessons.md sections \\\"Before starting, waiting on, or restarting a job\\\" and \\\"Before declaring something done\\\", and the genieutils cheat-sheet in tools/README.md; and list any background jobs this session started (ps, not memory).\"}}'"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/tools/hooks/guard_bash.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/tools/hooks/guard_commit.sh"
           }
         ]
       }
