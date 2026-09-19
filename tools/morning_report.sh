@@ -37,7 +37,7 @@ echo "- test files changed: $(git diff --name-only "$start"..HEAD | grep -cE '\.
 echo "- fixture clocks or timeouts changed (check each): $(git diff "$start"..HEAD -- 'src/**/*.test.ts' vite.config.ts | grep -cE '^\+.*(timeout|maxTimeSeconds|maxTicks|Ticks\b.*[0-9]{4,})' )"
 echo
 echo "## Ledger rows added"
-git diff "$start"..HEAD -- docs/ledger.md | grep -E '^\+\|' | grep -v '^+| What' | sed 's/^+/- /' || true
+git diff "$start"..HEAD -- docs/ledger.md | grep -E '^\+\|' | grep -vE '^\+\|( What |-+\|)' | sed 's/^+/- /' || true
 echo
 cat <<'EOT'
 ## Not verified
