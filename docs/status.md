@@ -84,8 +84,8 @@ masks, overlay masks, water and foam atlases, widgets, fonts, strings,
 particles, hotkeys and audio through a byte-identical local pipeline
 (`tools/import_aoe2.sh`, openage-free); the open fallback stays playable
 without any of it. The base depots only: the Enhanced Graphics Pack is
-neither pinned nor imported (#150), and every DE capture in the reference
-corpus was taken with it installed.
+pinned (#150, decided for the pack) but not yet imported (#151), and every
+DE capture in the reference corpus was taken with it installed.
 
 **Not drawn** (#149): DE's frame is composited offscreen through
 `CombineTerrainSpriteSMP` with bloom, the biome's colour grade, vignette and

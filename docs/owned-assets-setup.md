@@ -4,7 +4,7 @@ The repository is playable without Microsoft content. Owners of **Age of Empires
 
 ## Required patch-matched depots
 
-The core importer consumes three independently downloaded depots. Shared UI audio uses a fourth; the English sound depot is recorded for future localized voices. The pinned IDs and manifests are authoritative in `tools/aoe2-source.json`:
+The core importer consumes three independently downloaded depots. Shared UI audio uses a fourth; the English sound depot is recorded for future localized voices. The Enhanced Graphics Pack — the free UHD DLC — is a sixth, pinned to the same game build (#150); the importer's support for it is #151. The pinned IDs and manifests are authoritative in `tools/aoe2-source.json`:
 
 | Purpose | Depot | Manifest |
 |---|---:|---:|
@@ -13,8 +13,9 @@ The core importer consumes three independently downloaded depots. Shared UI audi
 | Shared Wwise audio | `813783` | `8547122694393480152` |
 | SLD graphics | `813784` | `8087696953400240386` |
 | English Wwise audio (optional) | `813787` | `3172067902980343375` |
+| Enhanced Graphics Pack, UHD SLD graphics (optional; DLC app `1039811`) | `1039811` | `2753360242865160896` |
 
-You must own app `813780`. Do not share Steam credentials, depot files, converted PNGs, or generated manifests.
+You must own app `813780`; the Enhanced Graphics Pack is free but must be added to your Steam account (its store page) before its depot can be downloaded. Do not share Steam credentials, depot files, converted PNGs, or generated manifests.
 
 ## 1. Download with SteamCMD
 
@@ -28,6 +29,7 @@ Steam> download_depot 813780 813782 3503932408267359574
 Steam> download_depot 813780 813783 8547122694393480152
 Steam> download_depot 813780 813784 8087696953400240386
 Steam> download_depot 813780 813787 3172067902980343375
+Steam> download_depot 813780 1039811 2753360242865160896
 Steam> quit
 ```
 
@@ -42,7 +44,8 @@ app_813780/
 ├── depot_813782/widgetui/
 ├── depot_813783/wwise/Base.pck
 ├── depot_813784/resources/_common/drs/graphics/
-└── depot_813787/wwise/en/Base.pck          # optional localized audio
+├── depot_813787/wwise/en/Base.pck          # optional localized audio
+└── depot_1039811/                          # optional Enhanced Graphics Pack (about 26 GB)
 ```
 
 A normal `steamapps/common/AoE2DE` installation is not interchangeable with this tree: independent depots can contain overlapping paths, so the importer intentionally reads Steam's `steamapps/content/app_813780/depot_*` layout.
