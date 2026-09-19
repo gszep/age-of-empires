@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { checksumState } from './checksum';
 import { FALLBACK_RULES } from './data';
 import { createGame, stepGame } from './game';
-import { TERRAIN_BEACH, TERRAIN_WATER, beachify } from './mapgen';
+import { TERRAIN_BEACH, TERRAIN_WATER, TERRAIN_WATER_MEDIUM, beachify, isOpenWater } from './mapgen';
 import { buildNavGrid, findPath } from './nav';
 import type { Entity, GameState } from './types';
 
@@ -157,6 +157,47 @@ describe('the grown map', () => {
     expect(sizes[0]).toBe(0);
     expect(sizes.length).toBeGreaterThanOrEqual(3);
     for (const size of sizes.slice(1)) expect([24, 46, 70]).toContain(size);
+  });
+
+  it('masks the sea of Islands into a shallow rim and a medium body', () => {
+    // `F_WaterMasking.inc` (WMASK_VODA): the sea stays `VODA` for five
+    // tiles out from any other terrain and is `MED_WATER` beyond -- DE's
+    // Islands minimap shows the two blues, and its main view a pale band
+    // along every coast about five tiles wide. Arabia's ponds take no
+    // masking: the script does not include it, and a pond is never five
+    // tiles from its bank anyway.
+    for (const seed of [1, 2, 3]) {
+      const state = createGame(seed, FALLBACK_RULES, undefined, 'islands');
+      const { width, height } = state;
+      const landWithin = (x: number, y: number, reach: number): boolean => {
+        for (let dy = -reach; dy <= reach; dy++) {
+          for (let dx = -reach; dx <= reach; dx++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+            if (!isOpenWater(state.terrain[ny * width + nx])) return true;
+          }
+        }
+        return false;
+      };
+      let shallow = 0;
+      let medium = 0;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const id = state.terrain[y * width + x];
+          if (id === TERRAIN_WATER_MEDIUM) {
+            medium++;
+            expect(landWithin(x, y, 5), `medium water at ${x},${y} within five of land`).toBe(false);
+          } else if (id === TERRAIN_WATER) {
+            shallow++;
+            expect(landWithin(x, y, 5), `shallow water at ${x},${y} with no land within five`).toBe(true);
+          }
+        }
+      }
+      expect(medium, `seed ${seed} has an open sea`).toBeGreaterThan(shallow);
+      expect(shallow, `seed ${seed} has a rim`).toBeGreaterThan(width);
+    }
+    for (const id of createGame(4).terrain) expect(id).not.toBe(TERRAIN_WATER_MEDIUM);
   });
 
   it('dresses the board in a biome instead of one flat terrain', () => {

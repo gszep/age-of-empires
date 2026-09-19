@@ -93,7 +93,12 @@ export interface ImportedTerrain {
   texture: string;
   image: string;
   dimensions: [number, number];
+  /** The DAT's flat-ground minimap shade; `minimapShades` is up, flat, down. */
   minimapColor: [number, number, number];
+  minimapShades?: [number, number, number][];
+  /** For a water terrain, the preset class the surface is drawn over it in
+   * (`WaterPreset.types`); absent on land. */
+  waterClass?: string | null;
 }
 
 /**

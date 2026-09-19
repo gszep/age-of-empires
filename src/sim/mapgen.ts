@@ -31,8 +31,11 @@ import type { AnimalKind, BuildingKind, Point, UnitKind } from './types';
 export const TERRAIN_GRASS = 0;
 export const TERRAIN_FOREST = 10;
 /** `Water, Shallow`: the `POND_TERRAIN` every one of Arabia's biomes names,
- * and the one water DE's Islands deals (`VODA`). */
+ * and the water DE's Islands deals its sea in (`VODA`) before the masking
+ * chain sets the open sea in `MED_WATER`. */
 export const TERRAIN_WATER = 1;
+/** `Water, Medium`: the open sea beyond the coastal rim (`MED_WATER`). */
+export const TERRAIN_WATER_MEDIUM = 23;
 /** `Beach`: what the engine paints on land that touches water. */
 export const TERRAIN_BEACH = 2;
 /**
@@ -40,7 +43,11 @@ export const TERRAIN_BEACH = 2;
  * 1 (medium), 2 (deep) or 4 (shallow water) for open water, 8 for shallows,
  * 16 for beach and 32 for land. Only open water makes a beach.
  */
-const OPEN_WATER = new Set([TERRAIN_WATER, 22, 23, 15, 96, 97, 98]);
+const OPEN_WATER = new Set([TERRAIN_WATER, 22, TERRAIN_WATER_MEDIUM, 15, 96, 97, 98]);
+/** Whether a terrain is open water: the sea, not a walkable shallow. */
+export function isOpenWater(terrain: number): boolean {
+  return OPEN_WATER.has(terrain);
+}
 
 /**
  * The terrains one of Arabia's biomes dresses the board in.
@@ -223,6 +230,16 @@ export interface MapDescriptor {
   /** Woods on an island keep this many tiles from the coast
    * (`spacing_to_other_terrain_types` on the script's wood passes). */
   woodShoreSpacing?: number;
+  /**
+   * DE's water masking chain (`F_WaterMasking.inc`, which every sea map
+   * includes): the base water stays as a rim this many tiles out from any
+   * other terrain, and the sea beyond is `Water, Medium`. The include
+   * carves medium water two tiles off the land, pushes a third terrain
+   * three tiles further in, then folds the ring between back into the base
+   * -- a rim of five -- and its deep-water patches back into medium, so
+   * two terrains are what it leaves.
+   */
+  waterMasking?: { rim: number };
   /** The connection between the two clearings, cut through the wood. */
   road?: { width: number };
   playerForest?: ForestSpec;
@@ -322,16 +339,19 @@ export const BLACK_FOREST: MapDescriptor = {
  * engine's beach. The owned `Islands.rms` (2023): `create_player_lands` at
  * `land_percent 35` shared across the players, `base_size 15`, borders 7,
  * `border_fuzziness 11`, `other_zone_avoidance_distance 11`,
- * `clumping_factor 22`; one water terrain, `VODA` (1); woods
- * (`WOODIES`) at `spacing_to_other_terrain_types 3` from anything else, so
- * they stand back from the coast; the opening from the same include. The
- * script's resource islets (`land_id 20-23`, 1% each) are not dealt.
+ * `clumping_factor 22`; the sea dealt in `VODA` (1) and masked by
+ * `F_WaterMasking.inc` (`WMASK_VODA`) into a five-tile shallow rim with
+ * `MED_WATER` (23) beyond; woods (`WOODIES`) at
+ * `spacing_to_other_terrain_types 3` from anything else, so they stand
+ * back from the coast; the opening from the same include. The script's
+ * resource islets (`land_id 20-23`, 1% each) are not dealt.
  */
 export const ISLANDS: MapDescriptor = {
   base: 'water',
   biomes: ARABIA_BIOMES,
   land: { tiles: 2520, baseSize: 15, clearance: 11, clumping: 22, border: 7, fuzziness: 11 },
   woodShoreSpacing: 3,
+  waterMasking: { rim: 5 },
   playerForest: { tiles: 55, groups: 2, near: 14, far: 26, groupSpacing: 6 },
   // The script's island woods: 450-550 tiles in 9-10 clumps at map scale,
   // avoiding the start areas; halved here because every placement mirrors.
@@ -938,6 +958,13 @@ export function generateMap(
     }
   }
 
+  // The script's water masking: the sea keeps its base terrain as a rim
+  // along every coast and turns to medium water beyond it. The include
+  // grows it as clumps at land percentages well over what the water can
+  // hold, so the rule is what it converges on; a pocket of sea too narrow
+  // to seed is the one thing that could differ.
+  if (descriptor.waterMasking) maskWater(terrain, ctx.width, ctx.height, descriptor.waterMasking.rim);
+
   // The engine's beach: once the water is laid, every land tile with open
   // water among its eight neighbours becomes Beach -- the one tile of sand
   // between the sea and the grass on every reference map. It applies to a
@@ -1054,6 +1081,38 @@ export function beachify(terrain: number[], width: number, height: number): void
     }
   }
   for (const tile of shore) terrain[tile] = TERRAIN_BEACH;
+}
+
+/**
+ * Set every open-water tile more than `rim` tiles (Chebyshev) from any
+ * terrain that is not open water to `Water, Medium`, in place: the sea's
+ * shallow rim and its open body, as `F_WaterMasking.inc` leaves them.
+ */
+export function maskWater(terrain: number[], width: number, height: number, rim: number): void {
+  // Grow the non-water set outward `rim` times over the eight neighbours;
+  // what it never reaches is the open sea.
+  let near = new Uint8Array(width * height);
+  for (let tile = 0; tile < terrain.length; tile++) near[tile] = OPEN_WATER.has(terrain[tile]) ? 0 : 1;
+  for (let step = 0; step < rim; step++) {
+    const grown = new Uint8Array(near);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (!near[y * width + x]) continue;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+            grown[ny * width + nx] = 1;
+          }
+        }
+      }
+    }
+    near = grown;
+  }
+  for (let tile = 0; tile < terrain.length; tile++) {
+    if (!near[tile] && OPEN_WATER.has(terrain[tile])) terrain[tile] = TERRAIN_WATER_MEDIUM;
+  }
 }
 
 /** `set_tight_grouping`: flood outward on purely random costs -- a contiguous

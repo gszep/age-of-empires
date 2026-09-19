@@ -16,7 +16,7 @@
  * wood. Which object each pass strews is the biome's, from `MAP_CONSTANTS`.
  */
 import * as THREE from 'three/webgpu';
-import { ARABIA_BIOMES, TERRAIN_BEACH, TERRAIN_WATER, type BiomeSpec } from '../sim/mapgen';
+import { ARABIA_BIOMES, TERRAIN_BEACH, isOpenWater, type BiomeSpec } from '../sim/mapgen';
 import { random01, seedFrom } from '../sim/random';
 import type { GameState } from '../sim/types';
 import type { Atlas, ContentAssets } from './assets';
@@ -89,7 +89,7 @@ export function scatterPlacements(state: GameState): { key: string; x: number; y
   const dry = (x: number, y: number): boolean => {
     if (x < 0 || y < 0 || x >= width || y >= height) return false;
     const id = state.terrain[at(x, y)];
-    return id !== TERRAIN_WATER && id !== TERRAIN_BEACH;
+    return !isOpenWater(id) && id !== TERRAIN_BEACH;
   };
   // Every tile once, in the stream's order: the script's own candidate scan.
   const order = Array.from({ length: width * height }, (_, i) => i);

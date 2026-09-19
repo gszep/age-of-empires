@@ -35,13 +35,21 @@ construction-complete cue, so that one has no owned source to draw on.
   `TerrainBlend_ps` names as `g_MaskTexture` and `g_BlendTexture`; how it
   indexes a 512x512 mask against a tile is in the compiled shader. Worth a
   look only if the classic edge ever reads as too soft against DE.
-- **The water shader's depth alpha and ripple scale are calibrated.** The
-  combination is read from the shader's own SM2 build (`status.md`,
-  "Water"); what is not in any file is the engine-written depth texture
-  (`DEPTH_ALPHA` in `src/view/water.ts`, 0.35 for open water) and the world
-  unit behind `mapScale` (`RIPPLE_TILES`). The vertex wave displacement
-  (`wave_amplitude`) is not drawn, and the surface's normal is the normal
-  map's rather than the shader's height-tap gradient.
+- **The water's red is short and its ripple scale is calibrated.** The
+  combination is read from the shader's own SM2 build and the depth alpha is
+  now the preset's own class opacity over the drawn tile (`status.md`,
+  "Water"), which lands green and blue within eight of DE's Islands
+  screenshot; red is 16-29 short in both zones, a neutral term the formula
+  does not produce here (the dome lookup's exact matrix is a candidate --
+  `skyDomeMtx` is derived from `sky_rotation`/`sky_scale`, not read). Still
+  not in any file: the world unit behind `mapScale` (`RIPPLE_TILES`). The
+  vertex wave displacement (`wave_amplitude`) is not drawn, and the
+  surface's normal is the normal map's rather than the shader's height-tap
+  gradient.
+- **The minimap's woods are a measured tone.** Trees carry `minimap_color`
+  0 in the DAT and DE draws every wood at (41, 140, 33); `src/view/minimap.ts`
+  uses that reading. Elevation is not shaded on the minimap, though
+  `minimapShades` now carries the up/down entries for it.
 - **The shore foam is not drawn.** DE rolls foam along a `WATER_DEFAULT`
   coast (`enable_waves 1`; ponds are 0) through `WaveAnim_ps`
   (`g_WaterAnim1a-d`) from `terrain/water/atlas_v1_{ortho,diag}_{1-4}.png`.
@@ -107,9 +115,12 @@ are the engine's and the surface is the reference's shader
   the DAT reading is there and Islands is the board to verify them on. The
   dock's placement rule (restriction 6: it must straddle the shore) is a
   `placementLegal` case the terrain table already answers.
-- **Islands deals no resource islets and no depth chain.** The 2023 script's
-  four 1% `create_land`s (`land_id 20-23`) and their neritic fish are not
-  dealt; DE's water is one terrain, so there is no depth chain to deal.
+- **Islands deals no resource islets, and its depth chain is a rule.** The
+  2023 script's four 1% `create_land`s (`land_id 20-23`) and their neritic
+  fish are not dealt. `F_WaterMasking.inc` is applied as what it converges
+  on -- shallow within five tiles of land, medium beyond -- rather than
+  grown as its clumps; a pocket of sea too narrow to seed would stay
+  shallow in DE and turns medium here.
 - **Windsor's survey channels make a busy bank.** The Thames is water by the
   table and has the engine's beach, but the survey's water polygons include
   the lock cuts and weir channels as one-tile strips, so around (230, 90)

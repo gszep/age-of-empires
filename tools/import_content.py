@@ -1221,6 +1221,10 @@ def technologies_from_tree(
     return keep, skipped
 
 
+#: `water_def.json`'s per-class rows, by the DAT's `is_water` flag.
+WATER_CLASSES = {4: "shallow", 1: "normal", 2: "deep", 8: "walkable"}
+
+
 def terrain_entry(
     dat: DatFile, terrain_id: int, palette: list[tuple[int, int, int]] | None = None,
 ) -> dict[str, Any]:
@@ -1229,11 +1233,17 @@ def terrain_entry(
     if not terrain.name_2:
         raise ValueError(f"terrain {terrain_id} has no texture name")
     width, height = terrain.terrain_dimensions
-    # `colors` is three *indices* into the game palette -- the minimap's
-    # colour for the slot, and its lighter and darker shades -- not an RGB
-    # triple. Read raw, grass came out (55, 236, 54), which is green by luck,
+    # `colors` is three *indices* into the game palette, not an RGB triple:
+    # the minimap's shade for a tile sloping up, lying flat, and sloping
+    # down. Read raw, grass came out (55, 236, 54), which is green by luck,
     # and water (19, 19, 19), which is black by the same luck the other way.
-    minimap = list(palette[terrain.colors[0]]) if palette else list(terrain.colors)
+    # Read as the first entry, grass was the up-slope highlight (0, 169, 0),
+    # which issue #80 reported as too bright: DE's own minimap draws flat
+    # grass at (51, 149, 39), the middle entry to within the screenshot's
+    # rounding, and open sea at the middle entry of `Water, Medium` the same
+    # way. Flat ground is what a board here mostly is.
+    shades = [list(palette[index]) for index in terrain.colors] if palette else None
+    minimap = shades[1] if shades else list(terrain.colors)
     return {
         "terrainId": terrain_id,
         "name": terrain.name,
@@ -1247,7 +1257,15 @@ def terrain_entry(
         "blendPriority": terrain.blend_priority,
         "blendType": terrain.blend_type,
         "minimapColor": minimap,
+        # Up-slope, flat, down-slope, for a minimap that shades relief.
+        "minimapShades": shades,
+        # Which of a water preset's classes the surface takes over it: the
+        # DAT's `is_water` is 4 for shallow water, 1 for medium, 2 for deep,
+        # 8 for walkable shallows, 16 for beach and 32 for land. Nothing
+        # carries the presets' `ocean` class: `Deep Ocean` is 2 like `Deep`.
+        "waterClass": WATER_CLASSES.get(terrain.is_water),
     }
+
 
 
 #: The water presets a board can roll, by `water_def.json` index: 0 is the
@@ -1418,6 +1436,17 @@ def extract(
     )
     palette_path = palettes_dir / "original.pal"
     palette = read_jasc_pal(palette_path) if palette_path.is_file() else None
+    # A gaia object's own minimap dot, where the DAT gives one: gold (255,
+    # 199, 0), stone (145, 145, 145), the huntables, herdables, fish and
+    # bushes (165, 196, 108), the relic white -- each a palette index, and
+    # what DE's own minimap draws them in. Trees are 0, black, and DE draws
+    # them anyway, so the minimap keeps its own wood.
+    if palette:
+        for entity_spec in spec["entities"]:
+            civ_index = spec["gaiaIndex"] if entity_spec.get("civ") == "gaia" else spec["civIndex"]
+            unit = dat.civs[civ_index].units[entity_spec["unitId"]]
+            if unit is not None and unit.minimap_color:
+                entities[entity_spec["key"]]["minimapColor"] = list(palette[unit.minimap_color % 256])
     terrain = {
         key: terrain_entry(dat, slot["terrainId"], palette)
         for key, slot in spec.get("terrain", {}).items()

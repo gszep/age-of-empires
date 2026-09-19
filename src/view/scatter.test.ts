@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGame } from '../sim/game';
-import { TERRAIN_BEACH, TERRAIN_WATER } from '../sim/mapgen';
+import { TERRAIN_BEACH, TERRAIN_WATER, TERRAIN_WATER_MEDIUM } from '../sim/mapgen';
 import { biomeOf, scatterPlacements } from './scatter';
 
 describe('the aesthetic scatter', () => {
@@ -18,7 +18,7 @@ describe('the aesthetic scatter', () => {
       for (const { key, x, y } of placed) {
         expect(wanted.has(key), key).toBe(true);
         const id = state.terrain[Math.floor(y) * state.width + Math.floor(x)];
-        expect([TERRAIN_WATER, TERRAIN_BEACH]).not.toContain(id);
+        expect([TERRAIN_WATER, TERRAIN_WATER_MEDIUM, TERRAIN_BEACH]).not.toContain(id);
         for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
           expect(wood.has(`${Math.floor(x) + dx},${Math.floor(y) + dy}`), `a ${key} in the wood at ${x},${y}`).toBe(false);
         }

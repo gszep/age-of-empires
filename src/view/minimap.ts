@@ -1,13 +1,33 @@
-import type { GameState, PlayerId, Point } from '../sim/types';
+import type { GameState, PlayerId, Point, UnitKind } from '../sim/types';
 import type { ContentAssets } from './assets';
 import { playerColorHex } from './sprites';
 
+/**
+ * Resource dots without owned content. With it, the DAT's own
+ * `minimap_color` per node is drawn (`ResourceNodeRules.minimapColor`);
+ * trees carry none there, and DE draws them at (41, 140, 33) -- read off a
+ * screenshot of its Islands minimap, where every wood is that one flat
+ * tone -- which no owned field states.
+ */
 const RESOURCE_COLORS: Record<string, string> = {
   food: '#c4506e',
-  wood: '#1f5426',
+  wood: '#298c21',
   gold: '#e8c04a',
   stone: '#9aa0a6',
 };
+const NODE_OF_RESOURCE: Record<string, 'berries' | 'tree' | 'gold' | 'stone'> = {
+  food: 'berries', wood: 'tree', gold: 'gold', stone: 'stone',
+};
+function resourceColor(state: GameState, resource: string | undefined): string {
+  const kind = resource ?? 'wood';
+  const own = state.rules.nodes[NODE_OF_RESOURCE[kind]]?.minimapColor;
+  return own ? `rgb(${own[0]},${own[1]},${own[2]})` : RESOURCE_COLORS[kind];
+}
+/** A gaia animal in the DAT's own dot -- a sheep is food-green, not white. */
+function gaiaColor(state: GameState, kind: string): string | undefined {
+  const own = state.rules.units[kind as UnitKind]?.minimapColor;
+  return own && `rgb(${own[0]},${own[1]},${own[2]})`;
+}
 
 /** AoE-style diamond minimap with fog, entity dots, and the camera diamond. */
 /** Fog shades, as RGB triples so the per-tile buffer can be written directly. */
@@ -154,8 +174,8 @@ export class Minimap {
       if (entity.owner !== this.player && !visible) continue;
       if (entity.owner === this.player || visible) {
         const color = entity.kind === 'resource'
-          ? RESOURCE_COLORS[entity.resourceKind ?? 'wood']
-          : ownerColor(entity.owner);
+          ? resourceColor(state, entity.resourceKind)
+          : (entity.owner === 0 && gaiaColor(state, entity.kind)) || ownerColor(entity.owner);
         const size = entity.kind === 'town-center' ? 6
           : entity.kind === 'resource' ? resourceDotSize : entity.radius > 0.5 ? 5 : 2.5;
         drawDot(entity.position.x, entity.position.y, color, size);
@@ -165,8 +185,8 @@ export class Minimap {
       const index = Math.floor(remembered.y) * state.width + Math.floor(remembered.x);
       if (visibility.visible[index] === 1) continue;
       const color = remembered.kind === 'resource'
-        ? RESOURCE_COLORS[remembered.resource ?? 'wood']
-        : ownerColor(remembered.owner);
+        ? resourceColor(state, remembered.resource)
+        : (remembered.owner === 0 && gaiaColor(state, remembered.kind)) || ownerColor(remembered.owner);
       drawDot(
         remembered.x, remembered.y, color,
         remembered.kind === 'town-center' ? 6

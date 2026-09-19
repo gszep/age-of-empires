@@ -1,13 +1,13 @@
 /**
- * The water surface, the way the reference draws it: a shader, not a tile.
+ * The water surface, the way the reference draws it: a shader over the tile.
  *
  * AoE2DE's `Water_ps` takes a normal map (`g_WaterSurfaceTexture`), a sea
  * floor (`g_SeaFloorTexture`), a sky dome (`g_SkyDomeTexture`), the depth,
  * visibility and beach-blend textures, the sun, and the colours and
- * intensities `water_def.json` states per preset; the classic `g_wtr` tile is
- * never drawn. The shader ships with a Shader Model 2 build beside its SM4
- * one (the DXBC's `Aon9` chunk), and SM2 bytecode is a documented token
- * stream, so the combination is read rather than guessed:
+ * intensities `water_def.json` states per preset. The shader ships with a
+ * Shader Model 2 build beside its SM4 one (the DXBC's `Aon9` chunk), and SM2
+ * bytecode is a documented token stream, so the combination is read rather
+ * than guessed:
  *
  *     colour = (floor * seaFloorIntensity * waterColour
  *               + sky * skyIntensity * skyColor) * depth.a
@@ -17,18 +17,32 @@
  * where `sky` is the dome looked up at `0.5 + skyDomeMtx * reflect(V, N).xy`,
  * `floor` the sea floor at the world position pushed by the normal, and `N`
  * the surface texture's height gradient over several drifting taps, scaled
- * by `waveAmplitude`. The depth texture is the engine's; its alpha is what
- * the body is multiplied by, and the preset's water types state an
- * `opacity` per class, so that is what stands in for it here. The ripple's
- * scale in tiles is the one thing not read: the world unit the shader's
- * `mapScale` divides is not stated.
+ * by `waveAmplitude`.
+ *
+ * What that colour is added to is the water terrain's own texture, drawn as
+ * ground like any other. DE ships a texture per depth (`g_wtr` for `Water,
+ * Shallow`, `g_wt3` for `Water, Medium`), and a screenshot of its Islands
+ * shows the coastal rim at (82, 172, 220) and the open sea at (64, 135,
+ * 183): each about (45, 52, 57) above its own texture, one offset over two
+ * textures, which is what a surface added to a drawn tile gives and a
+ * surface in place of it does not. The offset is the dome's own colour at
+ * the lookup, times the preset's sky terms, times its per-class `opacity`
+ * (32/255 for the Default preset's shallow and normal classes) -- (26, 53,
+ * 56), the green and blue within five of the screenshot -- with every
+ * texture read as its stored values and the sum taken in display space, as
+ * a renderer without colour management takes it. So the tile, the surface
+ * and the glint are composed here in display space and handed back through
+ * the sRGB EOTF, which the renderer's own output encoding undoes; added in
+ * linear light the same weight came out at half the reference's offset. The
+ * ripple's scale in tiles is the one thing not read: the world unit the
+ * shader's `mapScale` divides is not stated.
  */
 import * as THREE from 'three/webgpu';
 import {
-  attribute, dot, float, max, mix, normalize, pow, texture as textureNode, time, uv, vec2,
-  vec3,
+  attribute, dot, max, normalize, pow, sRGBTransferEOTF, sRGBTransferOETF, texture as textureNode, time,
+  uv, vec2, vec3,
 } from 'three/tsl';
-import { TERRAIN_WATER } from '../sim/mapgen';
+import { isOpenWater } from '../sim/mapgen';
 import { random01, seedFrom } from '../sim/random';
 import type { GameState } from '../sim/types';
 import type { ContentAssets, WaterPreset } from './assets';
@@ -53,16 +67,6 @@ const TILT_PER_AMPLITUDE = 20;
  */
 const VIEW = new THREE.Vector3(Math.SQRT1_2 * Math.cos(Math.PI / 6), Math.SQRT1_2 * Math.cos(Math.PI / 6), Math.sin(Math.PI / 6)).normalize();
 /**
- * What the engine's depth texture holds for open water. The shader
- * multiplies the body by that texture's alpha, and the texture is the
- * engine's own; the preset's per-class `opacity` (32/255 for the Default)
- * is far too dark to be it. Calibrated so the Default preset's open water
- * lands on DE's, measured at (45, 127, 183) in the reference's own
- * footage; the one constant here that is not read from the owned files.
- */
-const DEPTH_ALPHA = 0.35;
-
-/**
  * Which preset a board's water takes. Arabia's script rolls `WATER_POND`
  * (includes/water_preset.inc: 65% Calm, 35% Dimmed) for its ponds, and
  * Islands names none, which is the engine's Default. The board says which
@@ -74,7 +78,7 @@ export function waterPresetFor(state: GameState, assets: ContentAssets): WaterPr
   const water = assets.water;
   if (!water) return undefined;
   let wet = 0;
-  for (const id of state.terrain) if (id === TERRAIN_WATER) wet++;
+  for (const id of state.terrain) if (isOpenWater(id)) wet++;
   if (wet > state.terrain.length * 0.3) return water['0'];
   const roll = random01({ seed: seedFrom(state.matchSeed ^ 0x7a7e_12) });
   return (roll < 0.65 ? water['3'] : water['6']) ?? water['0'];
@@ -83,16 +87,30 @@ export function waterPresetFor(state: GameState, assets: ContentAssets): WaterPr
 export interface WaterMaterialOptions {
   /** Tiles per texture repeat of the mesh's `uv`, so the shader can work in tiles. */
   span: number;
-  /** Fade the surface through the blend mask in `uv1` (an overlay onto a shore tile). */
+  /** The water terrain's own texture, which the surface is added to. */
+  tile: THREE.Texture;
+  /** Fade the whole through the blend mask in `uv1` (water lapping onto a
+   * neighbouring tile). */
   masked?: THREE.Texture;
 }
 
 /**
- * A water material for one preset. The mesh supplies `uv` in texture
- * repeats (tile / span) like every terrain mesh, and optionally a `depth`
- * attribute, 0 at the shore and 1 in open water, that decides how much of
- * the floor shows: shallow water is clearer, which is what makes the
- * lighter band along every reference coast.
+ * The weight the surface is added at over a water terrain: the preset's
+ * `opacity` for the terrain's class, as a fraction. A terrain that names no
+ * class the preset carries takes the `normal` row.
+ */
+export function surfaceOpacity(preset: WaterPreset, waterClass: string | null | undefined): number {
+  const row = (waterClass && preset.types[waterClass]) || preset.types.normal;
+  return (row?.opacity ?? 32) / 255;
+}
+
+/**
+ * A water material for one preset and one water terrain: the tile under
+ * the surface. The mesh supplies `uv` in texture repeats (tile / span) like
+ * every terrain mesh, `color` as the ground's shade, and a `surfaceWeight`
+ * attribute, the class weight of the water at each corner, so the surface
+ * steps from the shallow rim's weight to the open sea's across the tile
+ * where the two meet.
  */
 export function createWaterMaterial(
   assets: ContentAssets, preset: WaterPreset, options: WaterMaterialOptions,
@@ -127,13 +145,15 @@ export function createWaterMaterial(
   // Direct3D's v runs down the image and three's runs up it, so the dome's
   // v is turned over.
   const skyUv = vec2(rx.mul(preset.skyScale).add(0.5), ry.mul(-preset.skyScale).add(0.5));
-  const sky = textureNode(skyMap, skyUv).rgb
+  // The dome and the floor as stored: the renderer decodes an sRGB texture
+  // on sampling, and the reference's arithmetic is on the stored values.
+  const sky = sRGBTransferOETF(textureNode(skyMap, skyUv).rgb)
     .mul(vec3(...preset.skyColor)).mul(preset.skyIntensity);
 
   // The floor at the world position pushed by the normal, over the preset's
   // floor scale; under its intensity and the water's own colour.
   const floorUv = tiles.add(normal.xy).div(preset.seaFloorScale);
-  const floor = textureNode(floorMap, floorUv).rgb
+  const floor = sRGBTransferOETF(textureNode(floorMap, floorUv).rgb)
     .mul(preset.seaFloorIntensity).mul(vec3(...preset.waterColor));
 
   // The sun reflected about the normal, against the view: the glint, at the
@@ -142,16 +162,15 @@ export function createWaterMaterial(
   const glint = pow(max(dot(sunMirrored, view), 0), preset.specularPower)
     .mul(preset.specularIntensity).mul(vec3(...preset.sunColor));
 
-  // The body is floor plus sky, times the depth texture's alpha: open water
-  // at the calibrated alpha, and clearer toward the shore, where the
-  // reference's beach blend lets the sand through.
-  const depth = attribute('depth', 'float');
-  const alpha = mix(float(DEPTH_ALPHA * 1.6), float(DEPTH_ALPHA), depth);
-  const water = floor.add(sky).mul(alpha);
+  // The tile in the ground's shade, plus the body -- floor and sky at the
+  // depth texture's alpha, the class weight -- plus the glint, in display
+  // space; then back through the EOTF for the renderer to encode again.
+  const ground = sRGBTransferOETF(textureNode(options.tile, uv()).rgb).mul(attribute('color', 'vec3'));
+  const water = floor.add(sky).mul(attribute('surfaceWeight', 'float'));
   const material = new THREE.MeshBasicNodeMaterial({
     side: THREE.DoubleSide, transparent: options.masked !== undefined, depthWrite: false,
   });
-  material.colorNode = water.add(glint);
+  material.colorNode = sRGBTransferEOTF(ground.add(water).add(glint).clamp(0, 1));
   if (options.masked) {
     material.opacityNode = textureNode(options.masked, uv(1)).r;
   }

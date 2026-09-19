@@ -1156,24 +1156,48 @@ class ContentImportIntegrationTest(unittest.TestCase):
                 any(str(e.get("terrainRestriction")) == row for e in entities.values()), row
             )
 
-    def test_minimap_colours_are_palette_entries_not_indices(self):
-        """`colors` on a terrain slot is three palette indices. Read raw, water
-        was (19, 19, 19) -- black -- and grass green only by luck. The atlas
-        step then publishes the texture's own tone as the minimap colour
-        (issue #80: the palette green is the classic minimap's, not DE's)
-        and keeps the palette colour beside it."""
-        self.assertEqual(self.result["terrain"]["water"]["minimapColor"], [48, 93, 182])
-        self.assertEqual(self.result["terrain"]["ground"]["minimapColor"], [0, 169, 0])
+    def test_minimap_colours_are_the_flat_palette_shade(self):
+        """`colors` on a terrain slot is three palette indices -- the shade
+        for a tile sloping up, flat, and sloping down. Read raw, water was
+        (19, 19, 19), black, and grass green only by luck; read as the first
+        entry, grass was the up-slope highlight (0, 169, 0), which issue #80
+        reported as too bright. DE's own minimap (a screenshot of Islands)
+        draws flat grass at (51, 149, 39), the shallow rim at (48, 93, 180)
+        and the open sea at (0, 74, 185): the middle entries, to a rounding.
+        The atlas step publishes them unchanged."""
+        terrain = self.result["terrain"]
+        self.assertEqual(terrain["ground"]["minimapColor"], [51, 151, 39])
+        self.assertEqual(terrain["ground"]["minimapShades"], [[0, 169, 0], [51, 151, 39], [0, 141, 0]])
+        self.assertEqual(terrain["water"]["minimapColor"], [48, 93, 182])
+        self.assertEqual(terrain["water-medium"]["minimapColor"], [0, 74, 187])
         published = Path("public/imported/aoe2/manifest.json")
         if published.is_file():
             ground = json.loads(published.read_text())["terrain"]["ground"]
-            self.assertEqual(ground["classicMinimapColor"], [0, 169, 0])
-            r, g, b = ground["minimapColor"]
-            # Olive, not lime: red well up on the palette's zero, green ahead
-            # of both.
-            self.assertGreater(r, 80)
-            self.assertGreater(g, r)
-            self.assertLess(g, 169)
+            self.assertEqual(ground["minimapColor"], [51, 151, 39])
+
+    def test_resource_dots_take_the_dat_minimap_colour(self):
+        """A unit's `minimap_color` is a palette index; gaia's resources
+        carry one, and it is what DE's minimap draws them in (the screenshot
+        of Islands has its gold at (255, 199, 0), its stone at (138, 145,
+        148) and its fish at (166, 184, 103), to the minimap's blending).
+        Trees carry 0 and name none."""
+        entities = self.result["entities"]
+        self.assertEqual(entities["gold"]["minimapColor"], [255, 199, 0])
+        self.assertEqual(entities["stone"]["minimapColor"], [145, 145, 145])
+        self.assertEqual(entities["berries"]["minimapColor"], [165, 196, 108])
+        self.assertNotIn("minimapColor", entities["tree-oak"])
+
+    def test_water_terrains_name_their_surface_class(self):
+        """The water surface is drawn over each water terrain at the preset's
+        opacity for that terrain's class, which is the DAT's `is_water`:
+        shallow for the pond and the coastal rim, normal for the open sea.
+        Land names none."""
+        terrain = self.result["terrain"]
+        self.assertEqual(terrain["water"]["waterClass"], "shallow")
+        self.assertEqual(terrain["water-medium"]["waterClass"], "normal")
+        self.assertIsNone(terrain["ground"]["waterClass"])
+        self.assertIsNone(terrain["beach"]["waterClass"])
+        self.assertEqual(terrain["water-medium"]["texture"], "g_wt3")
 
     def test_ground_terrain_comes_from_the_dat(self):
         ground = self.result["terrain"]["ground"]

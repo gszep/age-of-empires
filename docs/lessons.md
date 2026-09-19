@@ -825,3 +825,32 @@ keeps the record.
   it, and when the face is unnamed, measure a string's width against the
   reference before choosing; a glyph atlas the reference ships
   (`fonts/combined.txt`, rasterised at 64 px) is the face itself.
+
+- **A DAT colour triple is three shades, and the middle one is the flat
+  ground.** A terrain's `colors` is the minimap's shade for a tile sloping
+  up, lying flat and sloping down. Reading the first entry gave grass the
+  up-slope highlight (0, 169, 0), too bright against DE; the "fix" was a
+  texture mean that matched nothing. One screenshot of DE's own minimap
+  matched the middle entry of every terrain to within two units. Rule: when
+  a field is a tuple, find out what each position means before using
+  position zero; and when a reading of "how it looks" replaces a field,
+  ask the human for a screenshot before shipping it -- one histogram of the
+  reference settles a colour in a minute.
+
+- **Check what space the framebuffer blends in before calibrating a weight.**
+  The water surface at the preset's own 32/255 came out at half the
+  reference's offset, and a calibrated 0.35 had once stood in for it. The
+  renderer's canvas is sRGB, so the hardware adds in linear light; DE's
+  offset fits an add in display space (one offset over two textures) and not
+  in linear (two). Composed in the shader in display space and returned
+  through the EOTF, the owned weight lands within five in green and blue.
+  Rule: a factor of two between an owned constant and a measurement is a
+  colour-space question before it is a calibration; and a term the
+  reference *adds* to a drawn texture is not a term that replaces it --
+  subtract the texture from the reference and see whether one offset fits
+  every texture.
+
+- **"The script deals one water terrain" is a claim about an include, not a
+  script.** `Islands.rms` names `VODA` once and includes `F_WaterMasking.inc`
+  once; the include is the depth chain. Rule: before writing "no X" about a
+  script, grep its includes for X.

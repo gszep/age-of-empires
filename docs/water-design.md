@@ -32,7 +32,9 @@ Built, in `src/sim` and the importer:
 - **W2, the coast** -- `?map=islands` (2026-09-19): one island per player
   from the owned `Islands.rms`, the engine's beach on every shore, water a
   land unit cannot cross. The engine's beach sweep is the generator's, on
-  every board.
+  every board. The sea is two terrains, as the script's `F_WaterMasking.inc`
+  leaves it: `Water, Shallow` five tiles out from any coast, `Water, Medium`
+  beyond, each drawn as its own tile with the preset's surface over it.
 - **The surface** -- `src/view/water.ts` is the reference's `Water_ps`
   reconstructed from its inputs and `water_def.json`'s presets; see
   `status.md` for the one calibrated constant.

@@ -133,11 +133,17 @@ a gutter in the mask atlas, the water surface drawn through
 sprites, and the leaf-litter patches dealt as the script deals them. Every
 stage has a section in `status.md`. The morning after, the water's colour
 formula was read off the shader's own SM2 build (the `Aon9` chunk -- see
-`lessons.md`), which replaced the calibrated open-water colour, and the
-minimap took each terrain's texture tone (issue #80). What remains
-approximated: the fog edge's softness, the water's depth alpha and ripple
-scale, and the minimap rule itself. Tried and reverted: the nearctic snow
-dusting (`backlog.md`). Left measured but not built: the shore foam.
+`lessons.md`), which replaced the calibrated open-water colour. A screenshot
+of DE's Islands then settled three things at once (2026-09-19): the minimap
+draws the DAT's *middle* `colors` entry (issue #80 closed with a field, not
+a texture mean) and the DAT's own resource dots; the sea has a depth chain
+(`F_WaterMasking.inc`: a five-tile shallow rim, medium water beyond); and
+the surface is added to the drawn water tile in display space at the
+preset's own class opacity, which retired the calibrated depth alpha. What
+remains approximated: the fog edge's softness, the water's red (short by
+16-29), the ripple scale, and the minimap's wood tone. Tried and reverted:
+the nearctic snow dusting (`backlog.md`). Left measured but not built: the
+shore foam.
 
 **A fresh session starts here:** `git pull`, re-run the three manifest
 steps if `public/imported/aoe2/manifest.json` lacks `water` or `blends`

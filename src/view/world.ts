@@ -1,9 +1,9 @@
 import * as THREE from 'three/webgpu';
 import { floor, fract, smoothstep as smoothstepNode, texture as textureNode, uv, vec2 } from 'three/tsl';
 import { TILE_W, TILE_H, worldToIso } from './iso';
-import { TERRAIN_WATER } from '../sim/mapgen';
+import { isOpenWater } from '../sim/mapgen';
 import { maskU, type ContentAssets, type ImportedTerrain } from './assets';
-import { createWaterMaterial, waterPresetFor } from './water';
+import { createWaterMaterial, surfaceOpacity, waterPresetFor } from './water';
 import type { GameState } from '../sim/types';
 
 /**
@@ -98,15 +98,30 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
     const altitude = maxElevation ? level / maxElevation * 0.16 : 0.16;
     return Math.max(0.68, Math.min(1, 0.82 + altitude + (across + down) * 0.035));
   };
-  // The water shader wants to know how far from the shore it is: 0 at a
-  // corner where any of the tiles meeting there is land, 1 in open water.
+  // The water surface is added over each water tile at the preset's weight
+  // for the tile's class (shallow along the rim, normal in the open sea),
+  // averaged at a corner over the water tiles meeting there so the step
+  // between two classes is a ramp across one tile.
   const waterPreset = assets && waterPresetFor(state, assets);
-  const isWater = (px: number, py: number): boolean =>
-    px >= 0 && py >= 0 && px < state.width && py < state.height
-    && state.terrain[py * state.width + px] === TERRAIN_WATER;
-  const depthAt = (px: number, py: number): number =>
-    isWater(px - 1, py - 1) && isWater(px, py - 1) && isWater(px - 1, py) && isWater(px, py) ? 1 : 0;
-  const depths = classes.map(() => [] as number[]);
+  const weightOf = new Map<number, number>();
+  if (waterPreset) {
+    for (const { id } of classes) {
+      if (isOpenWater(id)) weightOf.set(id, surfaceOpacity(waterPreset, byId.get(id)?.slot.waterClass));
+    }
+  }
+  const weightAt = (px: number, py: number): number => {
+    let sum = 0;
+    let wet = 0;
+    for (const [tx, ty] of [[px - 1, py - 1], [px, py - 1], [px - 1, py], [px, py]]) {
+      if (tx < 0 || ty < 0 || tx >= state.width || ty >= state.height) continue;
+      const weight = weightOf.get(state.terrain[ty * state.width + tx]);
+      if (weight === undefined) continue;
+      sum += weight;
+      wet++;
+    }
+    return wet ? sum / wet : 0;
+  };
+  const weights = classes.map(() => [] as number[]);
   for (let y = 0; y < state.height; y++) {
     for (let x = 0; x < state.width; x++) {
       const terrain = state.terrain[y * state.width + x] ?? 0;
@@ -116,7 +131,7 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
       const point = (px: number, py: number) => {
         const iso = worldToIso(px, py);
         iso.y += cornerElevation(state, px, py) * ELEVATION_PIXELS;
-        return { iso, u: px / spanX, v: py / spanY, shade: shadeAt(px, py), depth: depthAt(px, py) };
+        return { iso, u: px / spanX, v: py / spanY, shade: shadeAt(px, py), weight: weightAt(px, py) };
       };
       const [north, east, south, west] = [
         point(x, y), point(x + 1, y), point(x + 1, y + 1), point(x, y + 1),
@@ -127,7 +142,7 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
           bucket.positions.push(corner.iso.x, corner.iso.y, 0);
           bucket.uvs.push(corner.u, corner.v);
           bucket.colors.push(corner.shade, corner.shade, corner.shade);
-          depths[category].push(corner.depth);
+          weights[category].push(corner.weight);
         }
       }
     }
@@ -147,7 +162,7 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
   /** Blend quads per (overlying terrain id, mode), drawn in priority order. */
   const overlays = new Map<string, {
     id: number; mode: number; positions: number[]; uvs: number[]; uv1s: number[]; colors: number[];
-    depths: number[];
+    weights: number[];
   }>();
   if (blends) {
     const at = (x: number, y: number): number | undefined =>
@@ -165,7 +180,7 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
           const key = `${there}:${mode}`;
           let bucket = overlays.get(key);
           if (!bucket) {
-            bucket = { id: there, mode, positions: [], uvs: [], uv1s: [], colors: [], depths: [] };
+            bucket = { id: there, mode, positions: [], uvs: [], uv1s: [], colors: [], weights: [] };
             overlays.set(key, bucket);
           }
           const [spanX, spanY] = slot.dimensions;
@@ -182,8 +197,8 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
               bucket!.uvs.push(px / spanX, py / spanY);
               bucket!.uv1s.push(mu(u1), v1);
               bucket!.colors.push(shade, shade, shade);
-              // An overlay is a shore by definition: what it lies on is land.
-              bucket!.depths.push(0);
+              // Water lapping over a tile carries its own surface with it.
+              bucket!.weights.push(weightOf.get(there) ?? 0);
             };
             // North, east, south, west of the tile against the mask's own
             // top, right, bottom and left points. The texture is flipped on
@@ -211,12 +226,13 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(buckets[i].positions, 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(buckets[i].uvs, 2));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(buckets[i].colors, 3));
-    geometry.setAttribute('depth', new THREE.Float32BufferAttribute(depths[i], 1));
+    geometry.setAttribute('surfaceWeight', new THREE.Float32BufferAttribute(weights[i], 1));
     const slot = byId.get(entry.id)?.slot;
     const texture = slot && assets?.textures.get(slot.image);
-    // Water is a shader, not a tile, where the owned presets are in.
-    const material = entry.id === TERRAIN_WATER && waterPreset && slot
-      ? createWaterMaterial(assets!, waterPreset, { span: slot.dimensions[0] })
+    // Water is its tile with the preset's surface over it, where the owned
+    // presets are in.
+    const material = weightOf.has(entry.id) && waterPreset && slot && texture
+      ? createWaterMaterial(assets!, waterPreset, { span: slot.dimensions[0], tile: texture })
       : new THREE.MeshBasicMaterial({
         ...(texture ? { map: texture } : { color: entry.fallback }),
         vertexColors: true, side: THREE.DoubleSide,
@@ -242,9 +258,9 @@ export function createGround(state: GameState, assets?: ContentAssets): THREE.Gr
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(bucket.uvs, 2));
     geometry.setAttribute('uv1', new THREE.Float32BufferAttribute(bucket.uv1s, 2));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(bucket.colors, 3));
-    geometry.setAttribute('depth', new THREE.Float32BufferAttribute(bucket.depths, 1));
-    const material = bucket.id === TERRAIN_WATER && waterPreset
-      ? createWaterMaterial(assets!, waterPreset, { span: slot.dimensions[0], masked: mask })
+    geometry.setAttribute('surfaceWeight', new THREE.Float32BufferAttribute(bucket.weights, 1));
+    const material = weightOf.has(bucket.id) && waterPreset
+      ? createWaterMaterial(assets!, waterPreset, { span: slot.dimensions[0], tile: texture, masked: mask })
       : new THREE.MeshBasicMaterial({
         map: texture, alphaMap: mask, transparent: true, depthWrite: false,
         vertexColors: true, side: THREE.DoubleSide,

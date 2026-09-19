@@ -1984,14 +1984,35 @@ difference between grey-teal and blue.
 `water_def.json` supplies every constant, converted by the importer for the
 three presets the shipped maps roll -- 0 Default (Islands names none; nor
 do Archipelago, Continental or Mediterranean), 3 Calm and 6 Dimmed
-(Arabia's `WATER_POND`, 65/35). Two things remain calibrated: the depth
-texture's alpha, which the engine writes and which the preset's per-class
-`opacity` (32/255) is far too dark to be -- open water is 0.35, the shore
-1.6 times that, set so the Default preset measures (69, 131, 162) against
-DE's own footage at (45-56, 127, 160-183); and the ripple's scale in tiles,
-because the world unit `mapScale` divides is not stated. The visibility
-factor is the fog's business here and is left out; the normal-map's tilt
-stands in for the height taps.
+(Arabia's `WATER_POND`, 65/35).
+
+**The surface is added to the water terrain's own tile, in display space.**
+The first reading drew the shader *instead* of the tile and had to calibrate
+the depth texture's alpha (0.35, against footage) because the preset's
+per-class `opacity` (32/255) was "far too dark". A screenshot of DE's
+Islands showed why: DE ships a texture per depth (`g_wtr` for `Water,
+Shallow`, mean (33, 120, 162); `g_wt3` for `Water, Medium`, (24, 82, 127))
+and draws its coastal rim at (82, 172, 220) and its open sea at
+(64, 135, 183) -- each about (45, 52, 57) above its own texture. One offset
+over two textures is a surface *added* to a drawn tile. The offset itself is
+the dome's colour at the lookup times the preset's sky terms times 32/255:
+(26, 53, 56), green and blue within five of the screenshot, with the
+textures read as stored and the sum taken in display space, as a renderer
+without colour management takes it (in linear light the same weight gave
+half the offset, and the rim and the sea would need different weights).
+So `createWaterMaterial` composes tile, surface and glint in display space
+and returns them through the sRGB EOTF for the renderer to encode again;
+each water terrain draws through it, with a `surfaceWeight` per corner from
+its class (`waterClass`, the DAT's `is_water`: 4 shallow, 1 normal, 2 deep,
+8 walkable), and the water lapping onto a shore tile carries its surface
+through the blend mask. Rendered and read back (seed 2, headless): rim
+(53, 167, 213), open sea (47, 132, 183). What is still short is red -- 16
+in the open sea, 29 on the rim -- a neutral term the read formula does not
+produce here; the ripple's scale and tilt were tried and move the mean by a
+unit. The ripple's scale in tiles remains the one unread constant (the
+world unit `mapScale` divides is not stated); the visibility factor is the
+fog's business here and is left out; the normal-map's tilt stands in for
+the height taps.
 
 **Islands is a descriptor.** `?map=islands` is Arabia with the base
 terrain set to water, from the owned `Islands.rms` (2023): one land per
@@ -2007,19 +2028,44 @@ every facing coast dead straight. Nothing is dealt on the water and a land
 unit cannot reach the other island (checked over three seeds). The script's
 resource islets are not dealt.
 
-**Minimap colours were palette indices, and the palette's is the classic
-minimap's.** A terrain slot's `colors` is three indices into the game
-palette, not an RGB triple. Read raw, grass came out (55, 236, 54) -- green
-by luck -- and water (19, 19, 19), black. Resolved through `original.pal`
-they are grass (0, 169, 0) and water (48, 93, 182): the saturated lime of
-the AoK and HD minimaps, which issue #80 reported as too bright against
-DE's. DE's minimap reads as the ground itself -- olive grass, sandy desert,
-brown dirt -- so the published `minimapColor` is now each terrain texture's
-mean (grass (130, 146, 64), desert (221, 180, 124), water (33, 120, 162)),
-with the palette colour kept as `classicMinimapColor`. Woods stay dark
-green because trees are drawn as their own dots. That DE derives its colours
-this way is a reading of how its minimap looks, not a field; recorded as
-such.
+**The sea has a depth chain after all.** "One water terrain" was wrong:
+`Islands.rms` defines `WMASK_VODA` and includes `F_WaterMasking.inc`, which
+every sea map in the depot includes. The chain carves `MED_WATER` out of
+`VODA` two tiles off any other terrain, pushes `DLC_WATER4` three tiles
+further in, folds the ring between back into `VODA`, and folds its
+`DEEP_WATER` and `DLC_WATER4` patches back into `MED_WATER` -- so it leaves
+two terrains: `Water, Shallow` as a five-tile rim along every coast and
+`Water, Medium` (23) beyond. DE's minimap shows exactly that (the two
+blues), and its main view a pale band along every coast about five tiles
+wide (160 px at 33 px a tile). `maskWater` applies the rule the chain
+converges on -- open water more than five tiles (Chebyshev) from any other
+terrain becomes medium; the include grows it as clumps at land percentages
+well over what the sea can hold, so only a pocket too narrow to seed could
+differ. `Water, Medium` is imported (`water-medium`, `g_wt3`, priority 178
+over shallow's 166, so it laps onto the rim through mode 1); the
+restriction rows refuse it to land units as they refuse shallow. Arabia's
+ponds take no chain: the script includes none, and a pond is never five
+tiles from its bank.
+
+**Minimap colours are the DAT's flat-ground shade.** A terrain slot's
+`colors` is three indices into the game palette, not an RGB triple: the
+minimap's shade for a tile sloping up, lying flat, and sloping down. Read
+raw, grass came out (55, 236, 54) -- green by luck -- and water
+(19, 19, 19), black. Read as the first entry, grass was the up-slope
+highlight (0, 169, 0), which issue #80 reported as too bright against DE's;
+a texture-mean stood in for a day. A screenshot of DE's own Islands minimap
+settled it: flat grass there is (51, 149, 39), the coastal water
+(48, 93, 180), the open sea (0, 74, 185) -- the *middle* entries of Grass,
+`Water, Shallow` and `Water, Medium` (51, 151, 39), (48, 93, 182),
+(0, 74, 187), each within the screenshot's own two units. The published
+`minimapColor` is that middle entry, and `minimapShades` carries all three
+for a minimap that shades relief. The resource dots are the DAT's too: a
+unit's `minimap_color` is another palette index, and gold (255, 199, 0),
+stone (145, 145, 145), the huntables, herdables, fish and bushes
+(165, 196, 108) and the relic (white) are what the screenshot draws them in
+(its sea is speckled with fish). Trees carry 0 there and DE draws every wood
+at one flat (41, 140, 33), which no field states; the minimap uses that
+measured tone for its trees.
 
 Verified: `mapgen.test.ts` over 24 seeds (rates, ringing, mirroring, no tree
 or object on water), `nav.test.ts` (a villager sent across a pond goes round

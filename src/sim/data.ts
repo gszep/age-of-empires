@@ -161,6 +161,8 @@ export interface UnitRules {
    * pose.
    */
   fogVisibility?: number;
+  /** The DAT's own minimap dot, a palette colour: gaia's animals carry one. */
+  minimapColor?: [number, number, number];
   /** Animals: the food their carcass holds. */
   foodAmount?: number;
   /** Animals: how close a player's unit must come to claim a herdable. */
@@ -260,6 +262,8 @@ export interface ResourceNodeRules {
   fogVisibility?: number;
   /** As `BuildingRules.blastDefenseLevel`: a tree is 1, a bush or mine 0. */
   blastDefenseLevel?: number;
+  /** The DAT's own minimap dot for the node, a palette colour; trees name none. */
+  minimapColor?: [number, number, number];
 }
 
 /**
@@ -1114,6 +1118,8 @@ interface ManifestEntity {
   };
   /** The DAT's `blast_defense_level`: units 3, buildings 2, trees 1, else 0. */
   blastDefenseLevel?: number;
+  /** The DAT's `minimap_color`, resolved through the palette; gaia's resources carry one. */
+  minimapColor?: [number, number, number];
   /** The DAT's `hero_mode` bit 32: Delete asks first. */
   confirmDelete?: boolean;
   heal?: { hitPointsPerSecond: number; range: number };
@@ -1230,6 +1236,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       garrisonFirepower: e[key].garrisonFirepower ?? fallback?.garrisonFirepower,
       convert: e[key].convert ?? fallback?.convert,
       fogVisibility: e[key].fogVisibility ?? fallback?.fogVisibility,
+      ...(e[key].minimapColor ? { minimapColor: e[key].minimapColor } : {}),
       accuracyPercent: e[key].combat?.accuracyPercent ?? fallback?.accuracyPercent,
       accuracyDispersion: e[key].combat?.accuracyDispersion ?? fallback?.accuracyDispersion,
       deathSeconds: e[key].deathSeconds ?? fallback?.deathSeconds,
@@ -1319,6 +1326,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       amount: e[key].storage?.[resource] ?? FALLBACK_RULES.nodes[fallbackKey].amount,
       fogVisibility: e[key].fogVisibility ?? FALLBACK_RULES.nodes[fallbackKey].fogVisibility,
       blastDefenseLevel: e[key].blastDefenseLevel ?? FALLBACK_RULES.nodes[fallbackKey].blastDefenseLevel,
+      ...(e[key].minimapColor ? { minimapColor: e[key].minimapColor } : {}),
     };
   };
   return {
