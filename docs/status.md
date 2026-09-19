@@ -56,8 +56,9 @@ draw (#44).
 
 **View** (`src/view`, never mutates state): dimetric projection with AoE2's
 handedness (below); DAT terrain textures with blendomatic edge blending
-(#42) and DE's overlay masks across land crossings (#116); fog as a rounded per-tile contour with `colorcorrection.json`'s
-levels; the reference's water shader read whole from its SM2 build (the
+(#42) and DE's overlay masks across land crossings (#116; the water's edge
+is still blendomatic's, #148); fog as a rounded per-tile contour with
+`colorcorrection.json`'s levels; the reference's water shader read whole from its SM2 build (the
 height field, its drifts, the dome, the glint) over the tile in linear light;
 shore foam from the reference's own frame atlases, one to a shore tile (#89);
 SLD sprites decoded locally (main, shadow, player-colour, outline and damage
@@ -79,9 +80,17 @@ verification and browser playback; process-isolated paired batches with
 Wilson intervals; an opt-in live-model boundary (`RUN_LIVE_AGENT=1`).
 
 **Import** (`tools/`): patch-matched DAT rules, palettes, terrain, blend
-masks, widgets, fonts, strings, particles, hotkeys and audio through a
-byte-identical local pipeline (`tools/import_aoe2.sh`, openage-free); the
-open fallback stays playable without any of it.
+masks, overlay masks, water and foam atlases, widgets, fonts, strings,
+particles, hotkeys and audio through a byte-identical local pipeline
+(`tools/import_aoe2.sh`, openage-free); the open fallback stays playable
+without any of it. The base depots only: the Enhanced Graphics Pack is
+neither pinned nor imported (#150), and every DE capture in the reference
+corpus was taken with it installed.
+
+**Not drawn** (#149): DE's frame is composited offscreen through
+`CombineTerrainSpriteSMP` with bloom, the biome's colour grade, vignette and
+sprite supersampling, then an antialias and unsharp pass; ours draws
+straight to the canvas. Nor the ground's scatter and layer (#55).
 
 ## Deliberately omitted
 
@@ -120,8 +129,9 @@ comparable because the board changed under them.
 
 DE at its default zoom draws the 2x assets at 0.80 -- a 77-pixel tile
 against our 96 at zoom 1 (`islands-coast-2026-09-19.png`: a 143-texel
-mangrove stands 115 px, the water's repeat vector is (404, 202) px). A
-side-by-side at "the same zoom" is ours scaled by 0.8, or ours at zoom 0.8.
+mangrove stands 115 px, the water's repeat vector is (404, 202) px). A match
+here now opens at zoom 0.8, so a composite at each game's default compares
+like with like.
 
 ## The projection has AoE2's handedness
 

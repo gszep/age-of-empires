@@ -32,6 +32,17 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   place, not a small one. Two independent facts pin a frame -- the sun's
   glint and the texture's streak angle settled this one; one fact leaves a
   mirror open, and "behind the camera" was the mirror.
+- **Two facts pin a frame; one leaves a mirror open.** The water's sun
+  and its streak angle together fixed the shader's world frame; the sun
+  alone had put it "behind the camera", the mirror of the truth.
+- **A statistic of a picture is not the picture.** The foam's crest
+  *position* traced smoothly through all 128 frames while the 128th to the
+  first was a cut five times any other step; a continuity check compares
+  the frames, not a number read off them.
+- **Ask what the reference was captured with.** A day of comparisons ran
+  against DE with the Enhanced Graphics Pack installed (#150); shapes and
+  placement survived that, texture detail did not. The corpus index now
+  says so at the top -- a capture's settings are part of its entry.
 - **A human-supplied number is a measurement with a name.** "About twelve
   furrows" shipped as `FARM_TILES_PER_SPAN = 10`; the ledger says whose
   number it is. Ask the human for a count they can read off the reference,
@@ -122,6 +133,10 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 - **A Group's renderOrder outranks every child's.** Express the layer on the
   mesh, groups at default, and verify layering with a pixel probe where the
   wrong order shows a colour the right one hides.
+- **A per-tile coin turns a seam into a wave.** Random phases per shore
+  tile made every tile's crest leap on its own; a gradient along the coast
+  then marched the atlases' own cut down the shore. Find the seam in the
+  data first, then decide what varies per tile.
 - **A tie-break added on intuition re-creates the bug.** "Prefer the living"
   made carcasses unclickable again, because eaters stand on them.
 
