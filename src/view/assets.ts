@@ -104,6 +104,10 @@ export interface ImportedTerrain {
   /** For a water terrain, the preset class the surface is drawn over it in
    * (`WaterPreset.types`); absent on land. */
   waterClass?: string | null;
+  /** The mask `TerrainBlend_ps` gates this terrain by where it is drawn
+   * over a neighbour (the DAT's `overlay_mask_name`), sampled at the
+   * tile's own uv; absent for a terrain that names none. */
+  overlayMask?: string | null;
 }
 
 /**
@@ -326,6 +330,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   }
   for (const effect of Object.values(manifest.particles ?? {})) loadAtlases({ flipbook: effect.atlas });
   const terrain = manifest.terrain ?? {};
+  const masksStarted = new Set<string>();
   for (const slot of Object.values(terrain)) {
     jobs.push(loader.loadAsync(CONTENT_BASE + slot.image).then(texture => {
       texture.colorSpace = THREE.SRGBColorSpace;
@@ -344,6 +349,22 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
       texture.anisotropy = 16;
       textures.set(slot.image, texture);
     }));
+    // The overlay mask tiles with the terrain at the same uv; it is data,
+    // read by its red.
+    if (slot.overlayMask && !masksStarted.has(slot.overlayMask)) {
+      const mask = slot.overlayMask;
+      masksStarted.add(mask);
+      jobs.push(loader.loadAsync(CONTENT_BASE + mask).then(texture => {
+        texture.colorSpace = THREE.NoColorSpace;
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.magFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+        texture.generateMipmaps = true;
+        texture.anisotropy = 16;
+        textures.set(mask, texture);
+      }));
+    }
   }
   // The water shader's textures. The normal map and the sea floor tile
   // across the water like terrain; the sky dome is looked up by a reflected

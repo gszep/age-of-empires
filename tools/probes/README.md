@@ -29,6 +29,9 @@ Run them from the repo root: `npx tsx tools/probes/snapshot.ts`.
   (a query string the water shader once read switches from), `OUT=`. Not
   throwaway: re-run it after anything that touches `water.ts`, the terrain
   pass or the minimap.
+- **`coast.mts`** — photograph a beach tile with land behind it and water
+  before it at zoom 1, for the edge's shape against the reference's coast
+  crop (#116), and read `edge` profiles across it. `MAP=`, `SEED=`, `OUT=`.
 - **`harbour.mts`** — stage a dock with a fishing ship at work beside a
   school and photograph it: the naval slice's acceptance picture. A snapshot
   handed to the page, then `look` and `pixels`; remember a snapshot is

@@ -36,7 +36,7 @@ describe('the surface over a water tile', () => {
     mapScale: 0.0045, waveRepeatLength: 20, waveAmplitude: 0.01, waveAnimationSpeed: 2,
     seaFloorScale: 8, seaFloorIntensity: 0.1, skyIntensity: 2, skyRotation: 178.5, skyScale: -0.35,
     skyColor: [1, 1.5, 1.25], waterColor: [1, 1, 1], sunColor: [1, 1, 1], sunDirection: [0.7, -0.68, 0.45],
-    specularPower: 1600, specularIntensity: 0.7,
+    specularPower: 1600, specularIntensity: 0.7, normalVelocity: [0.125, 0.125],
     types: { shallow: { opacity: 32, reflectivity: 144 }, normal: { opacity: 32, reflectivity: 144 }, walkable: { opacity: 24, reflectivity: 64 } },
   } as unknown as WaterPreset;
 

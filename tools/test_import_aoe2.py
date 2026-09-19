@@ -1154,6 +1154,30 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(self.result["terrain"]["farm"]["blendType"], 1)
         self.assertEqual(self.result["terrain"]["ground"]["blendType"], 0)
 
+    def test_terrain_names_the_mask_its_edge_is_gated_by(self):
+        """`TerrainBlend_ps` gates an overlaid terrain by `g_MaskTexture`, the
+        DAT's `overlay_mask_name`, sampled at the tile's own uv (issue #116).
+        The beach's is `beach_soft.png`, the waters' `water.png`, grass's
+        `grass.png`; a terrain that names none carries nothing, and the
+        published manifest carries each mask as a file beside the terrain."""
+        terrain = self.result["terrain"]
+        self.assertEqual(terrain["beach"]["overlayMask"], "beach_soft.png")
+        self.assertEqual(terrain["water"]["overlayMask"], "water.png")
+        self.assertEqual(terrain["water-medium"]["overlayMask"], "water.png")
+        self.assertEqual(terrain["ground"]["overlayMask"], "grass.png")
+        manifest = Path("public/imported/aoe2/manifest.json")
+        if not manifest.is_file():
+            self.skipTest("no published manifest to check")
+        published = json.loads(manifest.read_text())["terrain"]
+        for key, slot in terrain.items():
+            if not slot.get("overlayMask"):
+                self.assertIsNone(published[key].get("overlayMask"), key)
+                continue
+            mask = published[key]["overlayMask"]
+            self.assertEqual(mask, f"terrain/masks/{Path(slot['overlayMask']).stem}.png", key)
+            with Image.open(manifest.parent / mask) as image:
+                self.assertEqual((image.mode, image.size), ("L", (512, 512)), key)
+
     def test_terrain_restrictions_are_the_dats_table(self):
         """Who may stand where is a table in the DAT, read per row and cut to
         the shipped terrains. Row 7 is the villager's: every land terrain,

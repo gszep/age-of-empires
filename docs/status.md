@@ -56,7 +56,7 @@ draw (#44).
 
 **View** (`src/view`, never mutates state): dimetric projection with AoE2's
 handedness (below); DAT terrain textures with blendomatic edge blending
-(#42); fog as a rounded per-tile contour with `colorcorrection.json`'s
+(#42) and DE's overlay masks across land crossings (#116); fog as a rounded per-tile contour with `colorcorrection.json`'s
 levels; the reference's water shader read whole from its SM2 build (the
 height field, its drifts, the dome, the glint) over the tile in linear light;
 SLD sprites decoded locally (main, shadow, player-colour, outline and damage

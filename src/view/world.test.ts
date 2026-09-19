@@ -343,11 +343,51 @@ describe('meshes that lie on the ground', () => {
       expect(within).toBeGreaterThanOrEqual(blends.gutter - 1e-6);
       expect(within).toBeLessThanOrEqual(blends.gutter + blends.tile[0] + 1e-6);
     }
-    const material = blend.material as THREE.MeshBasicMaterial;
-    expect(material.alphaMap).toBeTruthy();
+    const material = blend.material as THREE.MeshBasicNodeMaterial;
+    expect(material.opacityNode).toBeTruthy();
     expect(material.transparent).toBe(true);
     // Above the ground it fades into, below anything standing on it.
     expect(blend.renderOrder).toBeGreaterThan(0);
+  });
+
+  it('gates a land crossing by both terrains\' overlay masks, and a shore by none', () => {
+    // Issue #116. `TerrainBlend_ps` gates the layer by its terrain's
+    // `overlay_mask_name` at the tile's own uv; between two land terrains
+    // the lower one also reaches back over the higher's tile through its
+    // mask, so the crossing is a band rather than a line along the tile.
+    // Water keeps the plain shape: the reference's shore is a rim.
+    const state = createGame(11);
+    state.terrain.fill(10);                       // forest, priority 96
+    const at = (x: number, y: number) => y * state.width + x;
+    state.terrain[at(5, 5)] = 0;                  // grass, priority 111
+    state.terrain[at(20, 20)] = 1;                // water, priority 166
+    const assets = groundAssets();
+    const more = { forest: [10, 96, 'masks/leaves.png'], water: [1, 166, 'masks/water.png'] } as const;
+    for (const [key, [id, blendPriority, overlayMask]] of Object.entries(more)) {
+      assets.textures.set(`terrain/${key}.png`, new THREE.Texture());
+      assets.terrain[key] = {
+        ...assets.terrain.ground, name: key, terrainId: id, image: `terrain/${key}.png`, blendPriority, overlayMask,
+      };
+    }
+    assets.terrain.ground.overlayMask = 'masks/grass.png';
+    for (const slot of Object.values(assets.terrain)) {
+      if (slot.overlayMask) assets.textures.set(slot.overlayMask, new THREE.Texture());
+    }
+    const ground = createGround(state, assets);
+    const names = ground.children.map(child => child.name);
+    // Grass over the forest through its mask, and the forest back over the grass.
+    expect(names).toContain('blend-ground');
+    expect(names).toContain('blend-forest');
+    // The grass tile sees forest on all eight sides: one mask, one quad.
+    const forestBack = ground.getObjectByName('blend-forest') as THREE.Mesh;
+    expect(forestBack.geometry.getAttribute('position').count).toBe(2 * 3);
+    // Water over the forest keeps its shape alone: no forest reaches back
+    // over the water tile.
+    expect(names.filter(name => name === 'blend-forest')).toHaveLength(1);
+    const water = ground.getObjectByName('blend-water') as THREE.Mesh;
+    expect(water).toBeDefined();
+    // The back pass is drawn under the forward one.
+    expect(forestBack.renderOrder).toBeLessThan((ground.getObjectByName('blend-ground') as THREE.Mesh).renderOrder);
   });
 
   it('picks the reference\'s one mask for a whole neighbourhood', () => {

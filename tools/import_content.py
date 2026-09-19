@@ -1326,6 +1326,11 @@ def terrain_entry(
         # 8 for walkable shallows, 16 for beach and 32 for land. Nothing
         # carries the presets' `ocean` class: `Deep Ocean` is 2 like `Deep`.
         "waterClass": WATER_CLASSES.get(terrain.is_water),
+        # The irregular mask `TerrainBlend_ps` gates this terrain by where it
+        # is drawn over a neighbour (`g_MaskTexture`, sampled at the tile's
+        # own uv): a file in `terrain/masks`, or nothing for a terrain that
+        # names none.
+        "overlayMask": terrain.overlay_mask_name or None,
     }
 
 

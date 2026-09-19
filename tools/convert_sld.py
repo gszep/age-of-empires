@@ -100,6 +100,20 @@ def convert_terrain(
             rgba.save(target, optimize=True)
         hashes[f"terrain/{source.name}"] = sha256(source)
         converted[key] = {**slot, "image": relative}
+        # The terrain's overlay mask (`overlay_mask_name`), from
+        # `terrain/masks` beside the water: 512 square, read by its red.
+        mask = slot.get("overlayMask")
+        if mask:
+            mask_source = terrain_dir.parent.parent / "masks" / mask
+            if not mask_source.is_file():
+                raise FileNotFoundError(f"terrain mask missing: {mask_source}")
+            mask_relative = f"terrain/masks/{Path(mask).stem}.png"
+            mask_target = out_dir / mask_relative
+            mask_target.parent.mkdir(parents=True, exist_ok=True)
+            with Image.open(mask_source) as image:
+                image.convert("L").save(mask_target, optimize=True)
+            hashes[f"terrain/masks/{mask}"] = sha256(mask_source)
+            converted[key]["overlayMask"] = mask_relative
     return converted
 
 

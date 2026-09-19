@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { floor, fract, smoothstep as smoothstepNode, texture as textureNode, uv, vec2 } from 'three/tsl';
+import { attribute, floor, fract, smoothstep as smoothstepNode, texture as textureNode, uv, vec2 } from 'three/tsl';
 import { TILE_W, TILE_H, worldToIso } from './iso';
 import { isOpenWater } from '../sim/mapgen';
 import { maskU, type ContentAssets, type ImportedTerrain } from './assets';
@@ -158,11 +158,14 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
   // own edge.
   const blends = assets?.blends;
   const priority = (id: number): number => byId.get(id)?.slot.blendPriority ?? 0;
+  /** Whether `there` is drawn over `here` through its overlay mask: both land, and a mask to draw with. */
+  const masked = (here: number, there: number): boolean =>
+    !isOpenWater(here) && !isOpenWater(there) && !!byId.get(there)?.slot.overlayMask;
   const blendType = (id: number): number => byId.get(id)?.slot.blendType ?? 0;
   /** Blend quads per (overlying terrain id, mode), drawn in priority order. */
   const overlays = new Map<string, {
-    id: number; mode: number; positions: number[]; uvs: number[]; uv1s: number[]; colors: number[];
-    weights: number[];
+    id: number; mode: number; back: boolean; gated: boolean; positions: number[]; uvs: number[];
+    uv1s: number[]; colors: number[]; weights: number[];
   }>();
   if (blends) {
     const at = (x: number, y: number): number | undefined =>
@@ -171,16 +174,30 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
     for (let y = 0; y < state.height; y++) {
       for (let x = 0; x < state.width; x++) {
         const here = at(x, y)!;
-        const influences = blendInfluences(here, priority, (dx, dy) => at(x + dx, y + dy));
-        for (const [there, bits] of influences) {
+        const neighbour = (dx: number, dy: number) => at(x + dx, y + dy);
+        // The higher terrain advances over this tile through the edge's
+        // shape; between two land terrains it is also gated by its own
+        // overlay mask, and the lower terrain reaches back over the
+        // higher's tile the same way, so the crossing is a band of each in
+        // the other rather than a line along the tile (#116). Water keeps
+        // the plain shape: its mask is a marble, not blobs, and the
+        // reference's shore is a rim, not a band.
+        const influences = [
+          ...[...blendInfluences(here, priority, neighbour)].map(([there, bits]) => [there, bits, false] as const),
+          ...[...blendInfluences(here, id => -priority(id), neighbour)]
+            .filter(([there]) => masked(here, there))
+            .map(([there, bits]) => [there, bits, true] as const),
+        ];
+        for (const [there, bits, back] of influences) {
           const slot = byId.get(there)?.slot;
           const texture = slot && assets?.textures.get(slot.image);
           if (!texture) continue;
           const mode = blendModeFor(blendType(here), blendType(there));
-          const key = `${there}:${mode}`;
+          const gated = masked(here, there);
+          const key = `${there}:${mode}:${back ? 'back' : gated ? 'masked' : 'over'}`;
           let bucket = overlays.get(key);
           if (!bucket) {
-            bucket = { id: there, mode, positions: [], uvs: [], uv1s: [], colors: [], weights: [] };
+            bucket = { id: there, mode, back, gated, positions: [], uvs: [], uv1s: [], colors: [], weights: [] };
             overlays.set(key, bucket);
           }
           const [spanX, spanY] = slot.dimensions;
@@ -247,7 +264,7 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
   // higher of the two is painted over the other's edge, as the reference
   // draws them.
   const ordered = [...overlays.values()]
-    .sort((a, b) => priority(a.id) - priority(b.id) || a.id - b.id || a.mode - b.mode);
+    .sort((a, b) => Number(b.back) - Number(a.back) || priority(a.id) - priority(b.id) || a.id - b.id || a.mode - b.mode);
   ordered.forEach((bucket, order) => {
     if (!bucket.positions.length) return;
     const slot = byId.get(bucket.id)!.slot;
@@ -259,14 +276,16 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
     geometry.setAttribute('uv1', new THREE.Float32BufferAttribute(bucket.uv1s, 2));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(bucket.colors, 3));
     geometry.setAttribute('surfaceWeight', new THREE.Float32BufferAttribute(bucket.weights, 1));
+    // The edge's shape is the blend mask in `uv1`; within it the terrain
+    // shows through its own overlay mask at the tile's uv, as
+    // `TerrainBlend_ps` gates `g_LayerTexture` by `g_MaskTexture`, which is
+    // what makes the reference's crossings ragged below the tile (#116).
+    const overlay = bucket.gated && slot.overlayMask ? assets!.textures.get(slot.overlayMask) : undefined;
     const material = weightOf.has(bucket.id) && waterPreset
       ? createWaterMaterial(assets!, waterPreset, {
-        span: slot.dimensions[0], board: [state.width, state.height], tile: texture, masked: mask,
+        span: slot.dimensions[0], board: [state.width, state.height], tile: texture, masked: mask, overlay,
       })
-      : new THREE.MeshBasicMaterial({
-        map: texture, alphaMap: mask, transparent: true, depthWrite: false,
-        vertexColors: true, side: THREE.DoubleSide,
-      });
+      : createBlendMaterial(texture, mask, overlay);
     const mesh = new THREE.Mesh(geometry, material);
     // Above every base terrain, below anything standing on the ground, and
     // in priority order among themselves.
@@ -275,6 +294,23 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
     group.add(mesh);
   });
   return group;
+}
+
+/**
+ * A land terrain drawn over a neighbour's tile: its texture in the ground's
+ * shade, faded through the blend mask in `uv1`, and gated by its overlay
+ * mask at the tile's own uv where it has one.
+ */
+function createBlendMaterial(
+  texture: THREE.Texture, mask: THREE.Texture, overlay: THREE.Texture | undefined,
+): THREE.MeshBasicNodeMaterial {
+  const material = new THREE.MeshBasicNodeMaterial({
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+  });
+  material.colorNode = textureNode(texture, uv()).rgb.mul(attribute('color', 'vec3'));
+  const shape = textureNode(mask, uv(1)).r;
+  material.opacityNode = overlay ? shape.mul(textureNode(overlay, uv()).r) : shape;
+  return material;
 }
 
 /**

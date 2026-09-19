@@ -65,10 +65,6 @@ import type { ContentAssets, WaterPreset } from './assets';
  */
 const TERRAIN_SCALE = 1;
 /**
- * The shader's `g_time` is taken in seconds; the unit is not stated.
- */
-const TIME_UNIT = 1;
-/**
  * The shader scales the glint by the visibility texture's blue channel,
  * which the engine fills and no owned file states. At 1 the read geometry
  * puts a saturated white dash on every facet that mirrors the sun (one in a
@@ -136,6 +132,9 @@ export interface WaterMaterialOptions {
   /** Fade the whole through the blend mask in `uv1` (water lapping onto a
    * neighbouring tile). */
   masked?: THREE.Texture;
+  /** With `masked`: the water terrain's own overlay mask at the tile's uv,
+   * gating where it laps (`TerrainBlend_ps`'s `g_MaskTexture`). */
+  overlay?: THREE.Texture;
 }
 
 /**
@@ -185,7 +184,14 @@ export function createWaterMaterial(
     tiles.x.mul(-TERRAIN_SCALE / (boardWidth * preset.mapScale)),
     tiles.y.mul(TERRAIN_SCALE / (boardHeight * preset.mapScale)),
   );
-  const T = time.mul(TIME_UNIT * preset.waveAnimationSpeed);
+  // The shader's `g_time` is its `wave_animation_speed` times a clock whose
+  // unit is not stated; every preset's `water_normals_def` carries a
+  // `velocity` of 0.125 that no shader input names, so the engine can only
+  // apply it through that clock, and at a second per second the fastest
+  // layer crossed two tiles a second where the reference drifts gently.
+  // Inferred, on the ledger. The clock is the wall's, not the match's: the
+  // surface is a shader over the frame, not a task on the simulation's.
+  const T = time.mul(preset.normalVelocity[0] * preset.waveAnimationSpeed);
   const repeat = preset.waveRepeatLength;
   // Direct3D's v runs down the image and three's runs up it; the surface
   // wraps, so the turn is a sign.
@@ -245,7 +251,8 @@ export function createWaterMaterial(
   });
   material.colorNode = ground.add(water).add(glint);
   if (options.masked) {
-    material.opacityNode = textureNode(options.masked, uv(1)).r;
+    const shape = textureNode(options.masked, uv(1)).r;
+    material.opacityNode = options.overlay ? shape.mul(textureNode(options.overlay, uv()).r) : shape;
   }
   return material;
 }
