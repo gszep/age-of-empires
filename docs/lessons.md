@@ -40,8 +40,9 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   first was a cut five times any other step; a continuity check compares
   the frames, not a number read off them.
 - **Ask what the reference was captured with.** A day of comparisons ran
-  against DE with the Enhanced Graphics Pack installed (#150); shapes and
-  placement survived that, texture detail did not. The corpus index now
+  against DE with the Enhanced Graphics Pack installed (#150) while we
+  imported the base art; shapes and placement survived that, texture
+  detail did not until the pack was imported too (#151). The corpus index
   says so at the top -- a capture's settings are part of its entry.
 - **A human-supplied number is a measurement with a name.** "About twelve
   furrows" shipped as `FARM_TILES_PER_SPAN = 10`; the ledger says whose
@@ -100,6 +101,10 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 - **A material a widget names may be a placeholder the engine swaps**
   (`CivEmblem` → `CivEmblemBritons`). Search the material table for what you
   expect to see and record the substitution.
+- **A crop is not the invariant; the picture against the hotspot is.** The
+  pack's x2 frames are cut on BC1 blocks, so their boxes differ from twice
+  the x1 box by up to eight pixels and a size test failed twice; the drawn
+  pixels' box relative to the hotspot, halved, lands within one x1 pixel.
 - **Pillow reads the DDS.** No DirectX tooling.
 - **Direct3D's v runs down the image; three's runs up.** `v = 1 - v` on any
   UV read from a D3D shader.
@@ -246,6 +251,18 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 - **`convert_sld.py --terrain-only` for a terrain slot**; the full pipeline
   for everything else, and always the pipeline, never one step.
 - **The gate runs on an idle machine.**
+- **An asset set that grows fourfold breaks whatever loaded it all at
+  once.** The pack's 5.5 GB of sprite pages, fetched up front as the x1
+  set had been, took the WSL VM down inside the gate's browser step (the
+  "core dump" of 2026-09-20). After an import that changes the art's size,
+  sample `free` during `debug:smoke` before running the gate.
+- **A single-threaded hour on twelve cores is a loop to parallelise, not
+  a wait.** The x2 conversion paced at five hours on one worker; four
+  workers took 57 minutes, and the change was outside the decoder's
+  fingerprint.
+- **Killing a wrapper shell leaves its Python child running.** `kill` on
+  `import_aoe2.sh`'s PID left `convert_sld.py` converting at full speed;
+  read the table after a kill and kill the child by its own PID.
 - **Never edit a shell script while it is running.** Bash reads a script
   incrementally, so an edit to `tools/gate.sh` mid-run hands the running
   copy a different file from the offset it had reached; kill the run,

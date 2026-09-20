@@ -77,8 +77,9 @@ had passed (`docs/reviews/2026-09-19.md` §5). Compare in the space the
 `pixels`/`edge` reply names, at the same pixel scale (`hudshot.mts` renders
 at the reference's 2000x1125 for exactly that).
 
-Every DE capture from 2026-09-19 has the Enhanced Graphics Pack installed
-(#150): compare shapes, placement and zoom against them, not texture detail.
+Every DE capture from 2026-09-19 has the Enhanced Graphics Pack installed,
+and since c501d56 so does our import (#150, #151): texture detail compares
+like for like, at DE's default zoom against our 0.8.
 `islands-coast-2026-09-19.png` is the coast reference: DE Islands at its
 default zoom, 2000x1125 as captured (tropical biome, so its colours are
 `CC_JUNGLE`'s; shapes and scale only), with straight and stepped shores,
