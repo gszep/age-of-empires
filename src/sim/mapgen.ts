@@ -22,7 +22,7 @@ import type { NodeKind } from './data';
 import paintedProof from './maps/painted-proof.json';
 import senlac from './maps/senlac.json';
 import windsor from './maps/windsor.json';
-import { OPEN_WATER_TERRAINS } from './data';
+import { FALLBACK_RULES, OPEN_WATER_TERRAINS } from './data';
 import { random01, seedFrom } from './random';
 import type { AnimalKind, BuildingKind, Point, UnitKind } from './types';
 
@@ -239,8 +239,8 @@ export interface MapDescriptor {
   waterMasking?: { rim: number };
   /**
    * DE's fish (`GeneratingObjects.inc`, `GNR_STANDARDFISH`, which Islands
-   * defines): `MELKARYBA`, the shore fish (69), as many as fit anywhere on
-   * the sea at a group spacing; and the big fish `FISH_A`/`FISH_B`
+   * defines): `MELKARYBA`, the shore fish (69), as many as fit along
+   * the shore at a group spacing; and the big fish `FISH_A`/`FISH_B`
    * (456/458) at counts that scale with the map, each within `nearLand`
    * tiles of a land zone (`max_distance_to_other_zones`).
    */
@@ -406,6 +406,7 @@ export const MAPS: Record<string, MapDescriptor> = {
 /** What the generator needs from the game: its RNG stream, whether a tile
  * can take a one-tile footprint, and somewhere to put what it places. */
 export interface MapgenContext {
+  nodes?: typeof FALLBACK_RULES.nodes;
   rng: { seed: number };
   width: number;
   height: number;
@@ -1073,6 +1074,11 @@ export function generateMap(
     const fishCtx: MapgenContext = { ...ctx, rng: { seed: seedFrom(ctx.rng.seed ^ 0xf15_4) } };
     const scale = (ctx.width * ctx.height) / 10_000;
     const dealFish = (kind: NodeKind, count: number, spacing: number, ok: (tile: number) => boolean) => {
+      const sides = (ctx.nodes ?? FALLBACK_RULES.nodes)[kind].placementSideTerrain;
+      const sideAllows = (x: number, y: number): boolean => !sides?.length || [-1, 0, 1].some(dy =>
+        [-1, 0, 1].some(dx => (dx !== 0 || dy !== 0)
+          && x + dx >= 0 && x + dx < ctx.width && y + dy >= 0 && y + dy < ctx.height
+          && sides.includes(terrain[(y + dy) * ctx.width + x + dx])));
       const order = candidateOrderBox(fishCtx, 0, 0, halfWidth - 1, ctx.height - 1);
       // The spacing is kept as a mask of tiles too close to one already
       // placed: filtering the candidate list under a `for...of` would leave
@@ -1086,6 +1092,7 @@ export function generateMap(
         const y = Math.floor(tile / ctx.width);
         const here = tileCentre(x, y);
         const other = mirror(here);
+        if (!sideAllows(x, y) || !sideAllows(Math.floor(other.x), Math.floor(other.y))) continue;
         if (!ctx.free(here) || !ctx.free(other)) continue;
         ctx.place(kind, here);
         ctx.place(kind, other);

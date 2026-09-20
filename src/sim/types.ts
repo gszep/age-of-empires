@@ -11,7 +11,7 @@ export type UnitKind =
   | 'scout-cavalry' | 'light-cavalry' | 'trade-cart' | 'fishing-ship'
   | 'knight' | 'cavalier' | 'cavalry-archer' | 'heavy-cavalry-archer'
   | 'longbowman' | 'elite-longbowman'
-  | 'battering-ram' | 'capped-ram' | 'mangonel' | 'onager' | 'monk'
+  | 'battering-ram' | 'capped-ram' | 'mangonel' | 'onager' | 'scorpion' | 'heavy-scorpion' | 'monk'
   | 'trebuchet'
   | AnimalKind;
 /** Gaia's food on the hoof: herded, or hunted where it stands. */
@@ -176,6 +176,9 @@ export interface PlayerState {
  * dies first simply takes the arrow into empty ground.
  */
 export interface Projectile {
+  /** Persist shot art and pass-through damage even when the shooter dies or upgrades. */
+  art?: string;
+  piercing?: { radius: number; attacks: { class: number; amount: number }[]; hitIds: number[] };
   id: number;
   owner: PlayerId;
   position: Point;
@@ -263,7 +266,7 @@ export type Command =
   /** Set a siege engine up to shoot, or pack it up to travel. */
   | { kind: 'pack'; player: PlayerId; entityIds: number[]; unpacked: boolean }
   /** Take the last unit off a building's queue and refund it. */
-  | { kind: 'cancel-train'; player: PlayerId; buildingId: number }
+  | { kind: 'cancel-train'; player: PlayerId; buildingId: number; index?: number }
   /** Everybody sheltering in this building comes out onto the ground round it. */
   | { kind: 'ungarrison'; player: PlayerId; buildingId: number }
   /**

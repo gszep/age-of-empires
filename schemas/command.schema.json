@@ -85,6 +85,8 @@
             "capped-ram",
             "mangonel",
             "onager",
+            "scorpion",
+            "heavy-scorpion",
             "trebuchet",
             "monk"
           ]
@@ -321,7 +323,12 @@
         },
         "buildingId": {
           "type": "integer",
-          "$comment": "Takes the last unit off this building's queue, or the one being trained when the queue is empty, and refunds its cost."
+          "$comment": "Refunds the indexed entry, or the last entry when index is omitted."
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "$comment": "Zero is the active unit; subsequent indices are waiting units."
         }
       },
       "required": [

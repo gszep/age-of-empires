@@ -192,6 +192,17 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
   background: #241d10; border: 1px solid #000;
 }
 .progress-fill { height: 100%; background: #d8b84a; }
+/* commandpanel.json Progress StateNormal is red; ProgressBack is parchment brown. */
+#selection-panel.placed .progress-bar { background: #391c1b; }
+#selection-panel.placed .progress-fill { background: #ff0000; }
+#selection-panel.placed .progress-label.training-status { display: block; line-height: calc(38px * var(--ui-scale)); }
+#training-active { position: absolute; left: 30%; top: 30%; }
+#training-queue { position: absolute; display: flex; flex-wrap: wrap; left: 30%; top: 55%; width: 68%; }
+#training-queue[hidden], #training-active[hidden] { display: none; }
+.production-portrait { flex: 0 0 calc(70px * var(--ui-scale)); width: calc(70px * var(--ui-scale)); height: calc(70px * var(--ui-scale)); overflow: hidden; font-size: calc(20px * var(--text-scale)); }
+.production-portrait.command-button { background-size: 100% 100%, 100% 100% !important; }
+.production-progress { position: absolute; inset: 0 auto 0 0; pointer-events: none; background: rgba(0, 255, 0, 0.3); }
+.queue-count { position: absolute; top: 0; left: 0; color: white; font-size: calc(40px * var(--ui-scale)); line-height: 1; text-shadow: 1px 1px 1px #000; }
 
 .map-button { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; }
 .map-button:disabled { filter: grayscale(0.7) brightness(0.7); cursor: default; }

@@ -507,9 +507,8 @@ class ContentImportIntegrationTest(unittest.TestCase):
         ballistics = techs["ballistics"]
         self.assertEqual(ballistics["researchedAt"], 209)
         self.assertEqual(ballistics["cost"], {"wood": 300, "gold": 175})
-        self.assertEqual(ballistics["effects"], [{
-            "unit": "arrow", "attribute": "leadsTarget", "operation": "set", "amount": 1.0,
-        }])
+        for projectile in ("arrow", "scorpion-bolt", "heavy-scorpion-bolt"):
+            self.assertIn({"unit": projectile, "attribute": "leadsTarget", "operation": "set", "amount": 1.0}, ballistics["effects"])
 
         # A multiply on attack packs the armour class the same way an add
         # does, and its low byte is a percentage: Heated Shot arrives as 4321,
@@ -575,11 +574,10 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(techs["elite-longbowman"]["upgrades"],
                          [{"from": "longbowman", "to": "elite-longbowman"}])
 
-        # The upgrades whose far end is not imported say so rather than
-        # vanishing: the heavy scorpion needs a unit this game does not have.
+        # With both ends imported, Heavy Scorpion is no longer skipped.
         skipped = {row["name"]: row["reason"] for row in self.result["skippedTechnologies"]}
-        self.assertIn("Heavy Scorpion", skipped)
-        self.assertIn("not imported", skipped["Heavy Scorpion"])
+        self.assertNotIn("Heavy Scorpion", skipped)
+        self.assertEqual(techs["heavy-scorpion"]["upgrades"], [{"from": "scorpion", "to": "heavy-scorpion"}])
 
     def test_the_civilisation_is_read_from_its_own_tech_tree(self):
         # An AoE2 civilisation is mostly what it does not get, and the depot
@@ -630,9 +628,11 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # food), which the game read off the fallback's identical 175 for a
         # month. Every key the game reads rules from, not only the one that
         # bit first.
-        for key in ("playerAttributes", "civilization", "ages", "playerColors", "terrainRestrictions"):
+        for key in ("playerAttributes", "civilization", "ages", "playerColors", "terrainRestrictions", "shadows"):
             self.assertIn(key, published, key)
             self.assertEqual(published[key], self.result[key], key)
+        self.assertEqual(published["shadows"], {"profile": "Default", "strength": 1.0, "color": [0.0, 0.0, 0.0]})
+        self.assertIn("terrain/colorcorrection.json", published["source"]["sha256"])
         # And `blends`, which import_blends.py adds *after* the atlas step:
         # re-running the atlas step alone rebuilt the dict without it, and
         # every terrain edge went hard with no error anywhere.
@@ -857,6 +857,8 @@ class ContentImportIntegrationTest(unittest.TestCase):
             self.assertEqual(self.result["strings"][key], value)
 
     def test_names_and_tooltips_are_the_reference_strings(self):
+        self.assertEqual(self.result["strings"]["creating"], "Creating")
+        self.assertEqual(self.result["strings"]["stopCreating"], "Click to stop creating this unit.")
         # Issue #48: what the panel calls a thing is the DAT's own string,
         # not the slug spelled out. The rows are the ones the slug got wrong.
         entities = self.result["entities"]
@@ -1284,6 +1286,9 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(entities["stone"]["minimapColor"], [145, 145, 145])
         self.assertEqual(entities["berries"]["minimapColor"], [165, 196, 108])
         self.assertNotIn("minimapColor", entities["tree-oak"])
+        self.assertEqual(entities["farm"]["minimapMode"], 0)
+        for key in ("town-center", "house", "barracks", "castle", "watch-tower"):
+            self.assertEqual(entities[key]["minimapMode"], 1, key)
 
     def test_the_dock_and_the_fishing_ship_come_from_the_dat(self):
         """Issue #81. The dock (45) is row 6, 150 wood in 35 seconds from the
@@ -1313,6 +1318,29 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(set(rows["13"]), {1, 2, 23})
         self.assertEqual(set(rows["19"]), {1, 23})
 
+    def test_scorpion_line_and_piercing_bolts_are_owned_content(self):
+        entities = self.result["entities"]
+        for key, unit_id, bolt_id, hp in (("scorpion", 279, 367, 40), ("heavy-scorpion", 542, 627, 60)):
+            unit = entities[key]
+            self.assertEqual(unit["id"], unit_id)
+            self.assertEqual(unit["hitPoints"], hp)
+            self.assertEqual(unit["train"], {"buildingId": 49, "seconds": 30, "button": 3})
+            self.assertEqual(unit["combat"]["projectileUnitId"], bolt_id)
+            self.assertEqual(unit["combat"]["projectileSpeed"], 6)
+            self.assertEqual(unit["combat"]["minimumRange"], 2)
+            self.assertIn("scorpion", unit["animations"]["idle"]["source"])
+            bolt = entities[key + "-bolt"]
+            self.assertEqual(bolt["projectile"]["hitMode"], 1)
+            self.assertEqual(bolt["projectile"]["vanishMode"], 1)
+            self.assertEqual(bolt["projectile"]["arc"], 0)
+            self.assertEqual(bolt["collision"][0], 0.1)
+            self.assertTrue(bolt["combat"]["attacks"])
+        tech = self.result["technologies"]["heavy-scorpion"]
+        self.assertEqual(tech["techId"], 239)
+        self.assertEqual(tech["requiresAge"], 3)
+        self.assertEqual(tech["upgrades"], [{"from": "scorpion", "to": "heavy-scorpion"}])
+        self.assertIn({"unit": "heavy-scorpion-bolt", "attribute": "attack", "operation": "add", "armorClass": 3, "amount": 4}, tech["effects"])
+
     def test_fish_are_food_drawn_under_the_surface(self):
         """A fish stores its food as the DAT's resource 17, which is the food
         stockpile; it sits on row 19, the water; and its art is composed: the
@@ -1328,6 +1356,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
             self.assertEqual(fish["storage"], {"food": food})
             self.assertEqual(fish["class"], unit_class)
             self.assertEqual(fish["terrainRestriction"], 19)
+            self.assertEqual(fish["placementSideTerrain"], [2, 35] if key == "shore-fish" else [])
             self.assertEqual(fish["minimapColor"], [165, 196, 108])
             self.assertEqual(fish["animations"]["idle"]["alpha"], round(86 / 255, 4))
             self.assertEqual(fish["animations"]["idle"]["frames"], 90)

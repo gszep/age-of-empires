@@ -24,7 +24,11 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    entities, technologies, ages, civilisation and player attributes from the
    patch-matched DAT and the JSON beside it (`eras.json`, `objreplacement.json`,
    `civilizations.json`), with the reference's names, button text and tooltips
-   from `--strings` (`resources/en/strings/key-value/key-value-strings-utf8.txt`).
+    from `--strings` (`resources/en/strings/key-value/key-value-strings-utf8.txt`).
+    Current metadata also includes node `placementSideTerrain`, building
+    `minimapMode`, and `shadows` from the owned `colorcorrection.json` Default
+    profile. `shadows` must pass through the published manifest and asset loader;
+    it does not yet select a profile per biome.
    Historically it extracted the
    Dark Age slice (militia, villager + task variants, town center, barracks,
    house, berries, gold, oak tree) from the patch-matched DAT with
@@ -76,7 +80,7 @@ the owned fixture, including determinism checks.
 
 Every approximation is a row in `docs/ledger.md`. Import-side gaps the
 manifest records itself: `skippedMasks` (the monk's outline layers, #119),
-`skippedTechnologies` (forty-eight, with reasons), `skippedAtlases`, and in
+`skippedTechnologies` (each with its reason), `skippedAtlases`, and in
 the UI manifest `rawTextures`/`missingMaterials` (`stat_icon_*` and
 `submenu_*` resolve inside the executable; `staticons/` is imported raw) and
 `unresolvedTexture` (a few dangling refs in `materials.json`, kept as
@@ -84,6 +88,20 @@ evidence rather than substituted). Forager and gold-miner work animations use
 the task `proceeding` graphic because the DAT's `working` graphic is `-1`.
 
 ## genieutils DAT cheat-sheet
+
+`unit.placement_side_terrain` contains two alternative neighbouring terrain IDs
+(-1 unused): shore fish (69) require 2 or 35 (beach), deep fish (456/458) neither.
+
+Scorpion projectile units 367/627 have `projectile.hit_mode = 1` and
+`vanish_mode = 1`, `collision_size_x = 0.1`, and their own `type_50.attacks`
+for collateral damage. Heavy Scorpion technology 239 additionally changes
+those projectile attacks (class 3 +4); importing only its unit swap loses this.
+
+`unit.minimap_mode` is 0 for the farm, 1 for the other modelled buildings
+(including the town center, castle, tower, wall and gate). It states visibility,
+not a pixel size; `mappanel.json` likewise states MapView geometry, not marker size.
+Farm help string 26149 states the one-villager limit explicitly; neither the
+farm's resource capacity (15) nor garrison capacity (0) is a worker limit.
 
 Field names in `genieutils-py` are non-obvious and guessing them costs a
 failed run each time. The ones this importer consumes (`unit` is an entry of

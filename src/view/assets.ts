@@ -218,6 +218,8 @@ export interface FoamAtlases {
 }
 
 export interface ContentAssets {
+  /** Default colorcorrection.json shadow settings; biome grading is separate. */
+  shadows?: { profile: string; strength: number; color: [number, number, number] };
   entities: Record<string, ImportedEntity>;
   /** The base era's ages in order, Dark to Imperial. */
   ages: ImportedAge[];
@@ -344,6 +346,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     ages?: ImportedAge[];
     terrain?: Record<string, ImportedTerrain>;
     water?: Record<string, WaterPreset>;
+    shadows?: ContentAssets['shadows'];
     foam?: FoamAtlases;
     playerColors?: PlayerColors;
     particles?: Record<string, ParticleEffect>;
@@ -503,6 +506,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   return {
     entities: manifest.entities, skins: skinFamilies(manifest.entities), ages: manifest.ages ?? [],
     terrain, water: Object.keys(water).length ? water : undefined,
+    shadows: manifest.shadows,
     foam: manifest.foam?.diag?.length ? manifest.foam : undefined,
     textures, loadTexture, playerColors, playerRamps, blends, particles: manifest.particles,
   };

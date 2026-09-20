@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three/webgpu';
 import { createGame } from '../sim/game';
 import { TERRAIN_BEACH, TERRAIN_WATER, TERRAIN_WATER_MEDIUM } from '../sim/mapgen';
-import { biomeOf, scatterPlacements } from './scatter';
+import { biomeOf, scatterPlacements, createScatter, fillScatter } from './scatter';
+import type { ContentAssets } from './assets';
 
 describe('the aesthetic scatter', () => {
   it('strews the biome\'s own objects, off the water, the woods and the players', () => {
@@ -34,5 +36,37 @@ describe('the aesthetic scatter', () => {
     expect(JSON.stringify(a.entities)).toBe(before);
     expect(scatterPlacements(createGame(11))).toEqual(first);
     expect(scatterPlacements(createGame(12))).not.toEqual(first);
+  });
+
+  it('does not reveal scenery when ground fog moves beneath whole sprites', () => {
+    const state = createGame(3);
+    const keys = [...new Set(scatterPlacements(state).map(p => p.key))];
+    const assets: ContentAssets = {
+      entities: Object.fromEntries(keys.map(key => [key, {
+        category: 'scenery', animations: {}, atlases: { idle: { image: 'scatter.png', size: [4, 4], framesInFile: 1,
+          frames: [{ x: 0, y: 0, w: 4, h: 4, cx: 2, cy: 2 }] } },
+      }])), ages: [], skins: new Map(), terrain: {}, textures: new Map([['scatter.png', new THREE.Texture()]]), playerRamps: new Map(),
+    };
+    const scatter = createScatter(state, assets);
+    expect(scatter.children.length).toBeGreaterThan(0);
+    const visibility = state.visibility[1];
+    visibility.explored.fill(0); visibility.visible.fill(0);
+    fillScatter(scatter, assets, state);
+    expect(scatter.children.every(child => !child.visible)).toBe(true);
+    const first = scatter.children[0] as THREE.Mesh;
+    const tile = first.userData.tile as number;
+    visibility.explored[tile] = 1;
+    fillScatter(scatter, assets, state);
+    expect(first.visible).toBe(true);
+    expect((first.material as THREE.MeshBasicMaterial).color.r).toBe(0.5);
+    expect((first.material as THREE.MeshBasicMaterial).opacity).toBe(1);
+    visibility.visible[tile] = 1;
+    fillScatter(scatter, assets, state);
+    expect((first.material as THREE.MeshBasicMaterial).color.r).toBe(1);
+    visibility.explored[tile] = 0; visibility.visible[tile] = 0;
+    fillScatter(scatter, assets, state);
+    expect(first.visible).toBe(false);
+    fillScatter(scatter, assets, state, 1, true);
+    expect(scatter.children.every(child => child.visible)).toBe(true);
   });
 });

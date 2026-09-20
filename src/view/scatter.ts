@@ -18,10 +18,10 @@
 import * as THREE from 'three/webgpu';
 import { ARABIA_BIOMES, TERRAIN_BEACH, isOpenWater, type BiomeSpec } from '../sim/mapgen';
 import { random01, seedFrom } from '../sim/random';
-import type { GameState, ReadonlyGameState } from '../sim/types';
+import type { GameState, ReadonlyGameState, PlayerId } from '../sim/types';
 import { atlasPage, spriteTexture, type Atlas, type ContentAssets } from './assets';
 import { isoDepth, worldToIso } from './iso';
-import { elevationAt, ELEVATION_PIXELS } from './world';
+import { elevationAt, ELEVATION_PIXELS, FOG_EXPLORED } from './world';
 
 interface Pass {
   /** Which of the biome's three objects. */
@@ -156,8 +156,9 @@ export function createScatter(state: ReadonlyGameState, assets: ContentAssets | 
     const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
       map: texture ?? null, transparent: true, depthWrite: false, depthTest: false,
     }));
-    mesh.visible = Boolean(texture);
+    mesh.visible = false; // fillScatter applies authoritative tile visibility
     mesh.userData.page = page.image;
+    mesh.userData.tile = Math.floor(y) * state.width + Math.floor(x);
     const scale = atlas.scale ?? 1;
     const w = frame.w / scale;
     const h = frame.h / scale;
@@ -174,16 +175,22 @@ export function createScatter(state: ReadonlyGameState, assets: ContentAssets | 
   return group;
 }
 
-/** Show each scatter sprite whose page has landed since it was built. */
-export function fillScatter(group: THREE.Group, assets: ContentAssets | undefined): void {
+/** Whole scenery sprites obey their anchor tile's visibility, just like
+ * resource entities. Ground fog no longer doubles as a screen-space cutout. */
+export function fillScatter(
+  group: THREE.Group, assets: ContentAssets | undefined, state: ReadonlyGameState,
+  player: PlayerId = 1, reveal = false,
+): void {
   if (!assets) return;
+  const visibility = state.visibility[player];
   for (const child of group.children) {
-    if (child.visible) continue;
-    const texture = assets.textures.get(child.userData.page as string);
-    if (!texture) continue;
+    const tile = child.userData.tile as number;
+    if (!reveal && !visibility.explored[tile]) { child.visible = false; continue; }
+    const texture = spriteTexture(assets, child.userData.page as string);
+    if (!texture) { child.visible = false; continue; }
     const material = (child as THREE.Mesh).material as THREE.MeshBasicMaterial;
-    material.map = texture;
-    material.needsUpdate = true;
+    if (material.map !== texture) { material.map = texture; material.needsUpdate = true; }
+    material.color.setScalar(reveal || visibility.visible[tile] ? 1 : 1 - FOG_EXPLORED);
     child.visible = true;
   }
 }

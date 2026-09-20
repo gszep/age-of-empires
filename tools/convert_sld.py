@@ -487,6 +487,7 @@ def main() -> None:
         "terrain": terrain,
         # The water presets and their textures (issue: the surface).
         "water": water,
+        "shadows": imported.get("shadows", {}),
         "foam": foam,
         # The DAT's passability table, per restriction row: which of the
         # shipped terrains each may stand on. Rules, not art, so it passes

@@ -20,7 +20,7 @@ import { buildingRulesFor, unitRulesFor } from './sim/rules';
 import { gridKey, placeCommands } from './view/command-grid';
 import type { ResourceStatus, ScoreRow } from './view/hud';
 import { costLabel, displayName as nameFrom, plainHelp } from './view/names';
-import { artKey, chooseAnimation, createEntityView, gatherTargetResource, playerColorHex, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
+import { artKey, chooseAnimation, createEntityView, refreshEntityTextures, dimFogSnapshot, gatherTargetResource, playerColorHex, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline, elevatedWorldToIso, elevationAt, ELEVATION_PIXELS } from './view/world';
 import { createScatter, fillScatter } from './view/scatter';
 import { createCueWatcher, pollCues } from './view/cues';
@@ -36,7 +36,7 @@ import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 const view = {
   pollCues,
   createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline,
-  createEntityView, updateEntityView, createProjectileView, updateProjectileView,
+  createEntityView, updateEntityView, refreshEntityTextures, dimFogSnapshot, createProjectileView, updateProjectileView,
   createFlagView, updateFlagView, updateOcclusion, entityKey, gateBoxKey, Hud,
 };
 
@@ -392,6 +392,11 @@ function createHud(): Hud {
     onSelectIdleVillager: () => selectIdleVillager(),
     onSelectMember: id => {
       if (game.entities.some(e => e.id === id && !e.dead)) selectedIds = [id];
+      hud.setSelection(selectionInfo());
+    },
+    onCancelTraining: (buildingId, index) => {
+      if (replay) return;
+      applyCommand(game, { kind: 'cancel-train', player: localPlayer, buildingId, index });
       hud.setSelection(selectionInfo());
     },
     onMenu: action => {
@@ -1246,7 +1251,7 @@ function resourceStatus(): ResourceStatus {
 
 /**
  * The stat row beside the portrait, as the reference shows it: attack (the
- * class-4 amount, else class-3 -- the DAT's own `displayed_attack`), armour
+ * positive class-4 amount, else class-3 -- the DAT's own `displayed_attack`), armour
  * as melee/pierce (classes 4 and 3), range when there is one, and what a
  * villager is carrying. Read through research, so Forging shows as +1.
  */
@@ -1254,14 +1259,15 @@ function selectionStats(entity: Entity): SelectionInfo['stats'] {
   if (entity.kind === 'resource' || isCarcass(entity)) return undefined;
   const icons = 'textures/ingame/staticons/';
   const stats: NonNullable<SelectionInfo['stats']> = [];
-  const attacksOf = (attacks: AttackValue[]) => attacks.find(a => a.class === 4)?.amount ?? attacks.find(a => a.class === 3)?.amount;
+  // Scorpions retain a zero melee attack for rams' negative melee armour;
+  // their displayed attack and icon are nevertheless the pierce attack.
+  const attacksOf = (attacks: AttackValue[]) => attacks.find(a => a.class === 4 && a.amount > 0) ?? attacks.find(a => a.class === 3);
   const armourOf = (armors: AttackValue[], cls: number) => armors.find(a => a.class === cls)?.amount ?? 0;
   if (isUnit(entity.kind)) {
     const unit = unitRulesFor(game, entity.owner, entity.kind as UnitKind);
     const attacks = entity.unpacked && unit.unpacked ? unit.unpacked.attacks : unit.attacks;
     const attack = attacksOf(attacks);
-    const pierce = attacks.length && !attacks.some(a => a.class === 4);
-    if (attack !== undefined && attack > 0) stats.push({ icon: `${icons}${pierce ? 'pierceAttack' : 'damage'}.png`, value: String(attack), title: 'Attack' });
+    if (attack && attack.amount > 0) stats.push({ icon: `${icons}${attack.class === 3 ? 'pierceAttack' : 'damage'}.png`, value: String(attack.amount), title: 'Attack' });
     stats.push({ icon: `${icons}armor.png`, value: `${armourOf(unit.armors, 4)}/${armourOf(unit.armors, 3)}`, title: 'Armor (melee/pierce)' });
     const range = entity.unpacked && unit.unpacked ? unit.unpacked.range : unit.range;
     if (range) stats.push({ icon: `${icons}range.png`, value: String(range), title: 'Range' });
@@ -1270,7 +1276,7 @@ function selectionStats(entity: Entity): SelectionInfo['stats'] {
     const building = buildingRulesFor(game, entity.owner, entity.kind as BuildingKind);
     if (building.attack) {
       const attack = attacksOf(building.attack.attacks);
-      if (attack) stats.push({ icon: `${icons}pierceAttack.png`, value: String(attack), title: 'Attack' });
+      if (attack?.amount) stats.push({ icon: `${icons}pierceAttack.png`, value: String(attack.amount), title: 'Attack' });
     }
     stats.push({ icon: `${icons}armor.png`, value: `${armourOf(building.armors, 4)}/${armourOf(building.armors, 3)}`, title: 'Armor (melee/pierce)' });
     if (building.attack) stats.push({ icon: `${icons}range.png`, value: String(building.attack.range), title: 'Range' });
@@ -1378,19 +1384,26 @@ function selectionInfo(): SelectionInfo | undefined {
     };
   } else if (entity.training) {
     const total = rules.units[entity.training.kind].trainSeconds / TICK_SECONDS;
-    // What is on the anvil, and how many are waiting behind it (issue #7).
-    const waiting = entity.trainingQueue?.length ?? 0;
+    const fraction = Math.max(0, Math.min(1, 1 - entity.training.remainingTicks / total));
     progress = {
-      label: waiting
-        ? `Training ${entity.training.kind} (+${waiting} queued)`
-        : `Training ${entity.training.kind}`,
-      fraction: 1 - entity.training.remainingTicks / total,
+      label: `${messages.creating ?? 'Creating'} ${Math.floor(fraction * 100)}%`,
+      name: displayName(entity.training.kind),
+      fraction,
     };
   }
   const iconIndex = assets?.entities[view.entityKey(entity)]?.iconId;
   const category = isUnit(entity.kind) ? 'Units' : 'Buildings';
   return {
     members,
+    trainingQueue: entity.owner === localPlayer && entity.training && selection.length === 1 ? {
+      buildingId: entity.id,
+      cancelLabel: messages.stopCreating ?? 'Click to stop creating this unit.',
+      entries: [entity.training.kind, ...(entity.trainingQueue ?? [])].map(kind => ({
+        kind,
+        name: displayName(kind),
+        icon: hud.iconFor('Units', assets?.entities[kind]?.iconId, entity.owner),
+      })),
+    } : undefined,
     name,
     stats: selectionStats(entity),
     icon: entity.kind !== 'resource' ? hud.iconFor(category, iconIndex, entity.owner) : undefined,
@@ -1433,7 +1446,8 @@ function syncScene(time: number): void {
     }
     view.updateEntityView(entityView, assets, game, renderEntity(entity), time);
   }
-  // Remembered fogged entities render as static snapshots (fog dims them).
+  // Remembered entities render as whole, dimmed static snapshots. Ground fog
+  // sits beneath bodies, so it cannot cut through their crowns and roofs.
   // A revealed board draws the real entities, so the snapshots stand down.
   for (const remembered of revealMap ? [] : Object.values(game.visibility[localPlayer].memory)) {
     if (isTileVisible(game, localPlayer, remembered.x, remembered.y)) continue;
@@ -1450,9 +1464,11 @@ function syncScene(time: number): void {
       };
       entityView = view.createEntityView(assets, fake);
       view.updateEntityView(entityView, assets, game, fake, 0);
+      view.dimFogSnapshot(entityView);
       views.set(key, entityView);
       scene.add(entityView.group);
     }
+    view.refreshEntityTextures(entityView, assets);
   }
   // Gather-point flags: AoE2 shows one where a selected building sends what it
   // trains, and only while that building is selected.
@@ -1509,7 +1525,7 @@ function syncScene(time: number): void {
     const shooterRules = shooter
       ? (game.rules.units as Partial<Record<string, UnitRules>>)[shooter.kind]
       : undefined;
-    const art = shooterRules?.unpacked?.projectileArt ?? shooterRules?.projectileArt ?? 'arrow';
+    const art = projectile.art ?? shooterRules?.unpacked?.projectileArt ?? shooterRules?.projectileArt ?? 'arrow';
     view.updateProjectileView(
       entityView, assets, position, heading, progress, span, projectile.launchHeight,
       art, time, elevationAt(game, position.x, position.y) * ELEVATION_PIXELS,
@@ -1531,7 +1547,7 @@ function syncScene(time: number): void {
   // Contours for units something else is drawing in front of, once every
   // piece this frame has been placed.
   view.updateOcclusion(views, game);
-  fillScatter(scatter, assets);
+  fillScatter(scatter, assets, game, localPlayer, revealMap);
 
   // Selection markers from reusable pools: rings under units, footprint
   // outlines on the ground under buildings and resources (`selectionMarker`).
@@ -1845,6 +1861,8 @@ if (import.meta.hot) {
       if (sprites) {
         view.createEntityView = sprites.createEntityView;
         view.updateEntityView = sprites.updateEntityView;
+        view.refreshEntityTextures = sprites.refreshEntityTextures;
+        view.dimFogSnapshot = sprites.dimFogSnapshot;
         view.createProjectileView = sprites.createProjectileView;
         view.updateProjectileView = sprites.updateProjectileView;
         view.createFlagView = sprites.createFlagView;

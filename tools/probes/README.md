@@ -8,6 +8,34 @@ re-run, because a doc cites their numbers.
 
 Run them from the repo root: `npx tsx tools/probes/snapshot.ts`.
 
+## Maintained issue-acceptance checks
+
+These scripts live directly under `tools/` and start private Vite/browser
+fixtures. Run `npx tsx tools/<name>.mts`; they supplement the gate's general
+browser smoke and are maintained regression tools.
+
+- **`tree_fog_smoke.mts`** — #88's accepted visual correction: opaque canopy
+  pixels must be identical with ground fog on and F4 reveal, remembered trees
+  retain full silhouettes at half linear brightness, and visible shadows match
+  their owned masks × Default strength. `TREE_FOG_SCREENSHOTS=1` also saves
+  geometry crops under `.local/`. This is the test for the human's comparison.
+- **`tree_shadow_smoke.mts`** — the distinct cold-load regression: hold the
+  shadow PNG until its tree enters fog memory, then verify texture arrival,
+  frozen pose, sRGB darkening and unchanged simulation checksum. Passing this
+  alone did **not** establish that #88's visible-canopy problem was fixed.
+- **`training_queue_smoke.mts`** — separate active unit plus counted waiting
+  runs, source-scale 3/3/1 layout, refunds without interrupting the current
+  unit, and fourteen waiting entries plus the active one. Also run with
+  `OPEN_FALLBACK=1` for the open-content UI.
+- **`scorpion_smoke.mts`** — real training/research clicks, Heavy Scorpion art
+  and attack display, then a right-click attack.
+- **`farm_occupancy_smoke.mts`** — group right-click on a farm gives one farmer
+  and actual food gathering.
+- **`minimap_markers_smoke.mts`** — actual minimap pixels for live and remembered
+  building dots, reveal parity, and the absence of a farm marker.
+
+## General probes
+
 - **`snapshot.ts`** — build a state in Node through the simulation's own
   `applyCommand`/entity list, hand it to the page as a dev-session snapshot,
   then read what it drew. This is how you photograph a state a fresh match

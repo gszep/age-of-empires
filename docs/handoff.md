@@ -1,174 +1,196 @@
 # Agent handoff — 2026-09-20
 
-## Task and human context
+## Task and human acceptance
 
-Take over this repository for the human's next requested issue. No new coding
-item has been assigned at handoff. The human is doing **solo QA on Ysgramor**,
-approved the map selector (#144: “this looks really good”), and asked for docs
-and an end-of-conversation handoff. Keep updates short and complete a narrow,
-verified change before expanding scope. Prior runs spent too long profiling.
+The human accepted the corrected tree/fog/shadow presentation for #88 with
+**“ok, this is good. update the docs and hand off”**, then explicitly requested
+**“commit and push”**. This checkpoint publishes the verified session work.
+This session implemented **#145, #140, #127, #82, #84 and #88**, in that order.
+No further coding issue has been assigned. Prepare for the human's next request;
+do not start another issue merely because the tracker lists these as open.
 
-This checkpoint gathers the completed shared-play, synchronization, solo-mode
-and map-selector work. Those changes were previously deployed from a dirty
-working tree; the human clarified that commits happen at conversation end.
-`AGENTS.md` had an existing human edit before this work and is excluded from
-the checkpoint. Preserve it. Do not assume remaining uncommitted files are
-disposable.
+The human is doing **solo QA on Ysgramor**, most recently on
+`http://localhost:5173/?solo=1&seed=2`. Keep updates concise. The latest #88
+acceptance follows a rejected first attempt; preserve that distinction below.
 
-## Start here
+## Repository state — preserve before doing anything
 
-1. Read `AGENTS.md`, `docs/lessons.md`, this handoff and `docs/shared-play.md`.
-2. Run `tools/session_start.sh` and inspect `git status` and recent commits.
-   **Known reporting gap #155:** startup reads only `.local/gate.log` and its
-   process regex misses the managed shared services. It can report an old gate
-   and “nothing of ours” while the host is running. Check the explicit evidence
-   and services below; do not start a duplicate server.
-3. Wait for the human's next issue. For an explicitly requested autonomous run,
-   follow `docs/overnight.md` and the live tracker, human-filed bugs first.
+- Workspace: `/home/fraser/repos/age-of-empires`, branch `main`.
+- Implementation base was `2cc51c5` (shared play and map selection). The six
+  fixes and their detailed issue evidence are included in this checkpoint;
+  consult `git log` for its commit ID rather than treating their old issue
+  titles as missing implementations.
+- `AGENTS.md` was already edited by the human before this session. Preserve
+  that edit and keep it separate from any requested implementation checkpoint.
+- New implementation files included in this checkpoint:
+  `src/sim/farm-occupancy.test.ts`, `src/sim/scorpion.test.ts`,
+  `src/view/render-order.ts`, and the six smoke scripts listed below. They are
+   maintained work, not disposable scratch files.
+- Do not stash/reset the tree or overwrite unfamiliar changes. Read
+  `AGENTS.md`, `docs/lessons.md`, `README.md`, `docs/status.md` and
+  `docs/ledger.md` before resuming.
 
-## Where to play
+## Current verification
 
-| Purpose | URL |
+**Full gate GREEN:** `.local/tree-fog-gate.log`, exit 0 in
+`.local/tree-fog-gate.exit`, started 2026-09-20 at 23:16.
+**453 Vitest tests, build, 81 owned import tests, real-browser debug smoke.**
+`.local/gate.ok` is the sentinel. Only Markdown handoff edits followed the
+last verified code; new non-Markdown edits require fresh checks.
+
+Latest complete content regeneration: `.local/tree-fog-import.log`, exit 0.
+**1,967 cached atlases reused.** This includes scorpions, placement-side terrain,
+minimap modes, queue strings and Default shadow settings. No decoder edit or
+hour-long atlas regeneration was needed. Reload QA tabs after an import.
+
+| Dedicated check | What passed |
 |---|---|
-| Human's current solo QA, this machine (Ysgramor) | `http://localhost:5173/?solo=1` |
-| Same solo mode through the existing remote link | `https://ysgramor.tail6e864b.ts.net:5173/?solo=1` |
-| Shared player 1, Ysgramor | same addresses without `solo=1` |
-| Shared player 2, Artemis laptop in Japan | `http://localhost:5174/` **opened on Artemis** |
+| `tools/training_queue_smoke.mts` | Reference-scale 3/3/1 **waiting** batches, active portrait, exact refunds, unchanged active progress when cancelling a waiting unit, stable click targets, full-queue wrapping and an empty waiting row; also passed with `OPEN_FALLBACK=1` |
+| `tools/scorpion_smoke.mts` | Actual train/research buttons, upgrade replacement art and displayed pierce attack, right-click combat |
+| `tools/farm_occupancy_smoke.mts` | Group right-click produces one rendered farmer gathering food |
+| `tools/minimap_markers_smoke.mts` | Actual minimap sRGB readback: four backing pixels for live/remembered building markers; F4 preserves size; no farm marker |
+| `tools/tree_shadow_smoke.mts` | Held shadow PNG arrives after a tree becomes a fog snapshot; frozen pose and simulation checksum preserved |
+| `tools/tree_fog_smoke.mts` | Complete visible and remembered canopies, owned shadow-mask strength, no unseen-tree disclosure; passed again after the full gate |
 
-`solo=1` bypasses the match connection and runs the normal browser simulation
-against AI. It does not reset the shared match. F10 → Game Settings chooses
-map/seed; Random clears the seed for a fresh board; Start Game applies it.
-Changing fields alone does not change the match. Restart repeats a known setup.
-Map choices persist, and menu-launched solo matches resume on reload. Explicit
-map/seed URLs still request a fresh solo board.
+Run these with `npx tsx tools/<script>.mts`. They create private Vite servers
+and browser fixtures. Pixel comparisons use `/__debug` readback and state their
+colour space; screenshots supplement geometry checks. The shadow probes expose
+view handles through a private-server transform, never a shared tester tab.
 
-## Installed services and state
+The #88 canopy check sampled **620 opaque leaf pixels**: before correction,
+all changed when F4 revealed the ground behind an already-visible tree, with
+maximum sRGB difference 215; afterward **none change, maximum difference 0**.
+Remembered canopy maximum error is **0.841 sRGB bytes** against half linear
+brightness. **190 ground-shadow samples** have mean linear-alpha error
+**0.0029** against the owned mask × Default strength 1.
 
-- Both machines have an enabled user unit named `open-empires-shared.service`.
-  Ysgramor runs `tools/shared-host.mts` on 5173; Artemis runs
-  `tools/shared-join.mjs` on 5174. Use `systemctl --user status ...` locally
-  and `ssh artemis 'systemctl --user status ...'` remotely.
-- The host is a Node simulation inside the Vite service, not a browser tab.
-  Artemis serves artwork locally and proxies application code and WebSockets
-  to Ysgramor. No lobby, accounts, public multiplayer infrastructure or worker
-  was added. This is intentionally a two-person household setup.
-- Shared state: `.local/shared-match.json`, saved every five seconds and on
-  clean shutdown. Pre-fix backup: `.local/shared-match-before-sync-fix.json`.
-  Preserve both. A service restart pauses the match; F3 resumes it.
-- Solo state lives in that browser tab's `sessionStorage`; map preference is
-  small `localStorage` metadata. Do not replace a human's live tab with a probe.
-- Restart the service after simulation/host changes, preserving its checkpoint.
-  Presentation modules have HMR; `main.ts` and simulation changes reload tabs.
-  `npm run dev -- --port 5175` runs independent standalone development alongside
-  the installed service.
-- Temporary test servers, tunnels and imports were stopped. Leave the two
-  managed user services and existing Tailscale routes intact.
+`TREE_FOG_SCREENSHOTS=1 npx tsx tools/tree_fog_smoke.mts` writes geometry crops:
+`.local/tree-fog-visible-fixed.png`, `.local/tree-fog-memory-fixed.png`, and
+`.local/tree-shadow-visible-fixed.png`. The human's two screenshots (queue,
+then DE/ours tree comparison) are conversation attachments, indexed in
+`.local/reference/index.md`; their original image files are not on disk.
 
-## What shipped and where
+## What changed
 
-### Shared play and #153
+### #88 — accepted after the screenshot correction
 
-- `src/shared/server.ts`, `match.ts`, `protocol.ts`: single authoritative clock,
-  ordered commands, join/recovery snapshots, pause/speed, checkpoint persistence,
-  player-2 AI handover and host-only restart. Snapshot transfer has a separate
-  backpressure allowance until acknowledged, so large Windsor joins survive.
-- `src/shared/checksum.ts`: stable object-key ordering, preserved array order,
-  fast native serialization for primitive terrain/fog arrays. **Legacy replay
-  checksums in `src/sim/checksum.ts` retain their original byte representation.**
-- `src/shared/playback.ts`, `client.ts`: 100 ms wall-clock buffer, bounded work
-  batches, MessageChannel immediate scheduling, view-only position interpolation
-  and diagnostics. No simulation ticks are skipped.
-- `src/main.ts`, `view/world.ts`, `view/minimap.ts`: player-relative UI/fog,
-  rendering/picking at interpolated positions, same-map recovery retaining the
-  scene, HUD, camera and valid selection. `view/assets.ts` bounds sprite loads
-  and cools down failed retries; it does not implement texture eviction.
-- `tools/shared-host.mts`, `shared-join.mjs`, `install-shared.mjs`: launchers,
-  local-asset gateway and user-service installer. Join needs only Node.
+- `src/view/world.ts`, `render-order.ts`, `sprites.ts`, `scatter.ts`, and
+  `src/main.ts`: ground fog draws below whole sprite bodies, with bounded
+  terrain/farm/shadow order on both 120- and 392-tile boards. Visible trees
+  show whole canopies. Remembered sprites dim RGB ×0.5 while retaining their
+  opaque silhouettes. Scenery explicitly checks its anchor tile, preventing
+  unseen decorations from appearing above the lowered ground fog.
+- `import_content.py` imports the owned `colorcorrection.json` Default
+  `shadow_strength`/`shadow_color`; `convert_sld.py` publishes `shadows`,
+  `assets.ts` reads it and `configureShadow` uses it. The arbitrary extra
+  **0.55 multiplier was removed** in favour of Default **1.0/black**.
+- The earlier, retained fix lays out valid frames before textures arrive and
+  uses `refreshEntityTextures` to finish cached fog views without choosing
+  newer frames/ages or reading newer entity state. HMR bindings are wired.
+- **What failed:** the first acceptance test proved only a cold-texture case.
+  The human rejected it because the actual fog overlay still sliced crowns.
+  The screenshot-driven canopy and visible-shadow tests above are the relevant
+  acceptance evidence. The final human response was “ok, this is good.”
+- Default profile selection and direct alpha composition are still limited
+  approximations, recorded in the ledger; full biome grading/compositing is
+  #149, and animated fog is #117. Do not call the entire DE frame pixel-identical.
 
-### Map selector #144
+### #82 and #84 — farms and minimap
 
-- `src/view/hud.ts`, `style.css`: map/seed form in F10, native seed validation,
-  Random/Start Game, and read-only guest controls.
-- `src/match-setup.ts`: registry-derived choices, valid positive uint32 seeds,
-  stored preferences. `src/dev-session.ts` keeps launch metadata outside game
-  state; old sessions remain readable. Unknown legacy setup is not invented:
-  choose Start Game once to establish repeatable restart settings.
-- `src/main.ts`: starts selected maps, rebuilds terrain/fog/minimap, resets
-  per-match view state and shields input/select editing from gameplay hotkeys.
-  The debug import is deferred until view initialization is complete.
-- `tools/import_content.py`: imports labels and standard map names from owned
-  localization IDs. `screenmapselection.json` and `editorbottommappanel.json`
-  were inspected; the compact native form is a recorded project approximation,
-  not a recreation of the full DE map catalogue (`docs/ledger.md`).
-- Launch metadata is carried separately in shared snapshots/checkpoints, so
-  naming the map/seed does not alter authoritative or replay checksums.
+- `src/sim/game.ts` derives exclusive farm reservations from live gather
+  orders, including approach and drop-off. Surplus group members use nearby
+  free farms or idle; automatic continuation and queued orders respect claims.
+  Only one participating builder becomes the farmer. Stop, retasking and death
+  release the reservation; old duplicate orders resolve deterministically.
+  Owned farm help string **26149** states the one-worker limit.
+- `src/view/minimap.ts` uses uniform snapped **2×2 backing-pixel** building
+  markers (about 3×3 CSS pixels at the 2000px reference scale), with the same
+  path for live/fog-memory buildings. Imported `minimap_mode` hides farms (0);
+  other modelled buildings use 1. Exact per-building marker sizing is inferred.
+- A 40-minute Islands/102 simulation completed **48,000 ticks**, median
+  **1.620 ms**, p99 **8.893 ms**, worst **33.062 ms**; no winner because the
+  existing AI lacks boats. No fixture timeouts were widened.
+- New gap **#156**: the same tooltip permits abandoned enemy farms, but the
+  current gathering rule admits only owned farms. This is separate work.
 
-## Verification and evidence
+### #145, #140 and #127 — fish, queue and scorpions
 
-Latest full gate: **GREEN**, `.local/map-menu-final-gate.log` (19:15 start):
-**429 Vitest tests, build, 80 owned import tests, real-browser smoke**.
-`.local/gate.ok` is the gate sentinel; later non-Markdown changes need new checks.
-This handoff documentation requires no additional full gate.
+- `mapgen.ts`, `data.ts`, importer: shore fish honour DAT unit 69's
+  `placement_side_terrain` beach alternatives **2/35** on both mirrored
+  placements. Four-seed regressions and browser Islands/3 passed; that board
+  has 46 shore fish, all beside beach. Old saved boards need a fresh match.
+- `hud.ts`, `style.css`, `main.ts`, command schema and `game.ts`: optional
+  `cancel-train.index` preserves legacy last-entry cancellation. Index 0 is
+  active; waiting batches begin at 1. Portrait nodes persist across updates.
+  Cancelling a waiting batch refunds one unit without resetting active progress.
+- **Human queue clarification:** the screenshot's first “3 militia” means
+  three waiting militia **in addition to** the active militia. Thus four
+  militia precede the spearmen. Consecutive waiting runs group as 3/3/1 without
+  merging the final militia into the first run. Maximum queue remains fifteen
+  total: one active plus fourteen waiting. The separate active portrait and
+  two-line creation status use imported labels and measured 70px reference
+  portraits. Within-batch cancellation order and green tint alpha remain
+  documented approximations. Population-cap queuing is still #143.
+- Imported Scorpion **279**, Heavy Scorpion **542**, bolts **367/627**, and
+  technology **239**, with animations/icons/voices. Bolts hit enemies once along
+  a swept path, spare allies and retain flight data after shooter death.
+  Collateral uses the bolt's DAT attacks, including tech 239's **+4 pierce**:
+  upgraded primary/collateral pierce is **14/10**, not a guessed half-damage rule.
+  Travel to maximum range +3 is inferred. Upgrades also replace active/waiting
+  training entries. Types, schemas, rules and UI all include the new line.
 
-- `tools/map_menu_smoke.mts`: all six choices, actual key/click paths, invalid
-  seeds and input hotkey isolation, Islands seed 2, reload persistence, Windsor
-  392 ↔ standard 120 map transitions with a terrain pixel check, random seed,
-  host/guest restrictions, matching state and saved setup. Latest result:
-  `.local/map-menu-final-smoke.log`, GREEN.
-- `tools/shared_smoke.mts`: two real clients, training clicks, forced same-map
-  recovery preserving selection/rebuild count, 1,500+ fast-forward ticks without
-  unintended resync, local PNGs/tree rendering, reload and host restart.
-  `.local/shared-sync-final-smoke.log` is GREEN.
-- Artemis profiling used a copy of the human's save: 9,387 ticks across speeds,
-  then 6,075 at 10x after optimization, no resyncs. Final host/guest agreed at
-  tick 51,026, hash `7c3f9a8f`. See `docs/shared-play.md` for measurements.
-- Last full content regeneration: `.local/map-menu-import.log`, exit 0;
-  1,919 cached atlases reused. No decoder edit or fresh atlas conversion was
-  needed for the map labels.
+## Services, play and rollout
 
-Browser probes must use private ports with explicit Vite root/config. With
-multiple tabs, use page-local `window.__empiresDebug(...)`; HTTP `/__debug`
-broadcasts and can answer from the wrong page. `sim` includes `synchronizationHash`,
-legacy `checksum`, setup and timing/counter diagnostics. `snapshot` exports state;
-`resync` requests deliberate diagnostic recovery.
+- Solo: `http://localhost:5173/?solo=1` or
+  `https://ysgramor.tail6e864b.ts.net:5173/?solo=1`.
+  The comparison used `?solo=1&seed=2`. Explicit `?map=`/`?seed=` declines the
+  dev-session snapshot; menu-launched solo setups resume normally on reload.
+- Shared: Ysgramor on 5173, Artemis on **its own** `http://localhost:5174/`.
+  Both have `open-empires-shared.service`; Ysgramor was verified active at
+  handoff. It runs `tools/shared-host.mts`. Artemis's gateway serves local art.
+- Preserve `.local/shared-match.json` and
+  `.local/shared-match-before-sync-fix.json`, browser saves, and Tailscale routes.
+  The running shared host has preceding rules. The session's rule changes make
+  its saved rules hash incompatible with a simple restart. **Shared rollout
+  requires an explicitly agreed new match with the checkpoint preserved.**
+  Artemis also needs the new owned content imported locally. Neither rollout
+  nor new two-machine acceptance was performed in this session.
+- Artemis clone: `/home/gszep/Documents/repos/age-of-empires`; served art:
+  `.local/shared-runtime/public` there (x1). Preserve its pre-existing
+  `docs/lessons.md` edit. Its clone was not fast-forwarded; reconcile installed
+  gateway files before updating it. Noninteractive Node may need its NVM PATH.
+- Prior shared-play/map-menu code and verification are documented in
+  `docs/shared-play.md` and issues #144/#153. They are the committed baseline,
+  not new work to redo. Public deployment has not been updated in this session.
+- Temporary probes/imports/gates/browser processes have exited. Leave the
+  managed shared services intact. Use a private port for further QA.
 
-## What failed and what not to repeat
+## Gate monitoring and next-agent instructions
 
-- Raw `JSON.stringify` hashes falsely disagreed on identical states after JSON
-  dropped undefined properties and later assignments reordered keys. The human's
-  save reproduced this after 318 ticks. `structuredClone` hid it in initial tests;
-  wire tests now use JSON. Do not “fix” this by comparing fewer gameplay values.
-- Rebuilding the entire presentation for every recovery amplified the false
-  alarms. Preserve the scene on same-map corrections.
-- Chained `setTimeout(0)` clamps limited fast catch-up. MessageChannel ready work
-  reduced the observed 10x peak queue from 372 to 32 ticks.
-- Copying gigabytes of HD art across Tailscale was abandoned. Artemis regenerated
-  its owned x1 assets locally; Ysgramor retains x2. Do not repeat the copy/import
-  unless the task actually changes assets.
-- Background browser RAF waits stalled early probes. Bring a page to the front
-  for clicks and use explicit polling for state readiness. Puppeteer modifiers
-  use key down/press/up, not Playwright-style `press('Control+a')`.
-- WSL restarted during an earlier gate. An interrupted log is not a passing run;
-  the final complete gate above supersedes those attempts.
+1. Run `tools/session_start.sh` first, then inspect the actual tree. **#155**:
+   startup still reads the obsolete default gate log and can say “nothing of
+   ours” while the shared service is active. Trust the explicit current log
+   above, `.local/gate.ok`, process table and `systemctl --user` instead.
+2. The human asked about repeated gate timeouts. Those were **120-second
+   monitoring windows**, not failed gates. The gate takes over six minutes.
+   Use a handled background job and `tools/wait_for.sh file <exit-file> 600`
+   with a tool timeout greater than 600 seconds. Use a fresh exit-file name so
+   a previous result cannot satisfy the new wait. Run on an idle host.
+3. Read the issue comments before choosing work. The six issues above are
+   implemented in this checkpoint. **No next implementation is assigned.**
+   Follow an explicit new user request; use the live tracker for an authorized
+   autonomous run rather than a stale list in this handoff.
+4. For subsequent changes, start from this checkpoint and review the full
+   working tree. Preserve the human's `AGENTS.md` edit;
+   never include owned assets, `.local/`, `.tools/` or credentials. Run the
+   required gate after any code edits, then commit/push as requested.
+5. Remaining relevant follow-ups: #149 final grading/compositing, #117 animated
+   fog, #155 truthful startup/progress reporting, #152 texture eviction,
+   #154 cold Artemis transfer performance, and #156 abandoned enemy farms.
+   These are context, not authorization to begin them.
 
-## Remaining gaps and constraints
-
-- #154: cold uncompressed Three.js dependency transfer to Japan measured only
-  28.5 KB/s for a 2.55 MB chunk. Profiling preloaded a byte-identical dependency
-  to model a warm cache; this is **not** a cold-start improvement. No compression
-  or production code cache was implemented.
-- #152: sprite pages still have no eviction. Do not claim bounded GPU memory.
-- Profiling used forced SwiftShader: roughly 5.8 fps paused versus 5.9 at 10x
-  demonstrates no additional speed-related collapse, **not** native-GPU FPS.
-  A long two-human match and hardware-GPU performance remain unverified.
-- #144 and #153 have detailed implementation/evidence comments. Reconcile their
-  tracker state with the published handoff checkpoint; do not reimplement them.
-- Artemis clone: `/home/gszep/Documents/repos/age-of-empires`; served assets:
-  `.local/shared-runtime/public` there (about 1.7 GB, x1). Its clone was not
-  fast-forwarded: preserve the pre-existing `docs/lessons.md` edit and reconcile
-  the installed gateway/installer files before any future git update. Node is
-  under NVM and may not be on the noninteractive SSH PATH.
-- Keep the original-content-first rule, open fallback, authoritative `src/sim/`,
-  versioned replay compatibility and MIT/licensing boundaries. Never commit
-  `.local/`, `.tools/`, `public/imported/`, game files or credentials. Never reset
-  Tailscale routes or rewrite published `origin/main` history.
+Hardware-GPU performance measurements, full DE post-processing, grouped-queue
+click semantics/tint alpha, and rollout to Artemis remain unverified. Every
+approximation and its source lives in `docs/ledger.md`. The simulation remains
+authoritative; renderer/debug/agent code never mutates it directly. Do not
+rewrite published history or copy GPL/AGPL code or owned game assets into Git.

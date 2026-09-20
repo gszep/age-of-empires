@@ -23,10 +23,18 @@ export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: Uni
   let rules = base;
   for (const key of researched) {
     for (const effect of state.rules.technologies[key]?.effects ?? []) {
+      if (base.piercing && effect.unit === base.piercing.unit && effect.attribute === 'attack') {
+        const attacks = (rules.piercing ?? base.piercing).attacks.map(a => ({ ...a }));
+        const entry = attacks.find(a => a.class === effect.armorClass);
+        if (entry) entry.amount = combine(effect.operation, entry.amount, effect.amount);
+        else attacks.push({ class: effect.armorClass ?? 0, amount: combine(effect.operation, 0, effect.amount) });
+        rules = { ...rules, piercing: { ...base.piercing, attacks } };
+        continue;
+      }
       if (effect.unit !== kind) continue;
-      if (rules === base) {
+      if (rules.attacks === base.attacks) {
         rules = {
-          ...base,
+          ...rules,
           armors: base.armors.map(a => ({ ...a })),
           attacks: base.attacks.map(a => ({ ...a })),
         };

@@ -27,10 +27,13 @@ off the reference; **measured** — fitted to a reference screenshot;
 | A foundation's line of sight | 0 | chosen against observed behaviour (issue #1); DAT has no construction-time LOS | `visibility.ts` | — |
 | Conversion odds | uniform over the DAT's 5-9 s window | chosen shape; both ends owned | `game.ts` | — |
 | Blast falloff | none inside `blast_width` | chosen; DAT states no falloff | `game.ts` | — |
+| Scorpion bolt travel and contact | swept circle, one hit per enemy, no friendly damage, full shooter attack on the intended target and projectile attacks on others; travels maximum range +3 | **inferred** engine interpretation of owned hit/vanish mode 1; extra three tiles and friendly immunity corroborated by [community Scorpion article](https://ageofempires.fandom.com/wiki/Scorpion_(Age_of_Empires_II)); radius, speed, primary/collateral attacks and upgrade effects owned | `game.ts` `releaseAttack`, `updateProjectiles` | #127 |
 | Miss scatter, fallback rules only | 1 tile | chosen; imported units use `accuracy_dispersion` | `game.ts` `MISS_TILES` | — |
 | Trade gold | `bird.work_rate` × travel seconds, capped at `resource_capacity`, paid on arrival | chosen substitution; the community's 0.46/tile and DE's pay-both-ends are not in the files | `game.ts` | — |
 | Trebuchet packed/unpacked pairing | named by hand (331 ↔ 42) | chosen; task 109 names no target unit | `data.ts` | — |
 | Farm re-sow from the mill | option, off by default | engine convenience; DAT gives the farm one build location | `game.ts` | — |
+| Farm reservation and overflow | current gather order reserves a farm during travel and banking; surplus direct orders choose a visible free farm within 3×LOS of the clicked farm, otherwise idle; one participating builder becomes its farmer | single-worker limit **owned** (farm help string 26149); reservation lifetime, overflow search and deterministic first-worker/lowest-id legacy conflict resolution **inferred** | `game.ts` `farmAvailable`, `nearbyFreeFarm` | #82 |
+| Enemy farms | only the owner's farms are gatherable | existing limitation; owned string 26149 permits abandoned enemy farms | `game.ts` `isGatherable` | #156 |
 | Repair targets beyond the class table (a farm) | repairs at the building rate | chosen | `game.ts` | — |
 | `garrison_heal_rate` unit | hit points a second | inferred | `game.ts` | — |
 | Villager `garrison_firepower` −2.5 | one arrow | inferred (the reference's rule) | `game.ts` | — |
@@ -47,7 +50,7 @@ off the reference; **measured** — fitted to a reference screenshot;
 | Hunter and farmer gather rates | the forager's 0.31 into 10 | chosen; DAT gives 0.41/35 and 0.53/10 | `game.ts` | #132 |
 | Technology prerequisites | every listed requirement this game offers | chosen; DAT states `required_tech_count` | `import_content.py` | #129 |
 | Unmodelled attributes 23, 130, 48, 49 | recorded per technology, not applied | owned but unmodelled | manifest `unmodelled` | #128 |
-| Forty-eight skipped technologies | not researchable, reason each | owned | manifest `skippedTechnologies` | #128, #97, #127 |
+| Skipped technologies | not researchable, reason each | owned | manifest `skippedTechnologies` | #128, #97 |
 | Age variants' hit points | not applied | owned, not applied | — | #126 |
 | Mirror-symmetric board | exact mirror | chosen divergence; the paired batch rests on it | `mapgen.ts` | — |
 | Black Forest seed 7 | one far-gold pair dropped | chosen compromise | `mapgen.ts` | — |
@@ -58,6 +61,7 @@ off the reference; **measured** — fitted to a reference screenshot;
 | Dock placement | reaches the water and touches the land | inferred | `game.ts` `placementLegal` | — |
 | A ship is afloat or nowhere; final approach slides along the bank | rule | inferred from the table's shape | `game.ts` `groundAllows`, `moveTowardOnGround` | — |
 | `FISH_A` (salmon) | dealt as the snapper | chosen | `mapgen.ts` | #95 |
+| Placement-side neighbourhood | any of the eight neighbouring tiles satisfies the DAT's `placement_side_terrain` alternatives | inferred engine interpretation; the shore fish's beach IDs 2/35 are owned | `mapgen.ts` `dealFish` | #145 |
 | Islands resource islets | not dealt | — | `mapgen.ts` | #95 |
 | The AI never orders a villager onto a boar | rule | chosen (deliberate) | `ai.ts` | — |
 | AI tuning constants | `ARMY_BEFORE_AGE`, `FARM_SPOTS`, camp costs… | chosen; strategy, not fidelity | `ai.ts` | #124 |
@@ -71,6 +75,7 @@ off the reference; **measured** — fitted to a reference screenshot;
 |---|---|---|---|---|
 | Order-flash cadence and colour | 0.2 s on/off for 1.2 s, marker colour | chosen; `unit_selection_color_1/2` hold palette 0, no widget | `main.ts` `ORDER_FLASH_*` | — |
 | Occlusion contour threshold | ≥ half the sprite's box covered | chosen (stands in for the per-pixel test) | `sprites.ts` `HIDDEN_FRACTION` | — |
+| Sprite shadow profile/composition | imported Default `shadow_strength` (1.0) and black `shadow_color`, applied to the owned mask over the ground | values **owned**, imported from `colorcorrection.json`; using Default for every biome and direct alpha blending rather than DE's final compositor remains **inferred**. The extra 0.55 multiplier was removed after the human rejected #88's first visual fix | `sprites.ts` `configureShadow`, `import_content.py` `shadow_profile` | #149 |
 | Selection outline width and colour, scene background | 2.5 px, `0xf5f0dc`, `0x18140c` | chosen | `main.ts`, `world.ts` | — |
 | Damage soot curve | linear in hit points lost | chosen; the shader's curve is unread | `sprites.ts` | — |
 | Which build targets take the seed-sowing graphic | the farm | inferred (engine rule) | `sprites.ts` | — |
@@ -79,6 +84,7 @@ off the reference; **measured** — fitted to a reference screenshot;
 | Fog edge softness | `FOG_EDGE_INNER/OUTER` 0.425/0.575 | chosen, then halved by eye | `world.ts` | — |
 | Fog sampler | cubic B-spline | chosen; the shader names bilinear (pulls the contour inward a fraction of a tile) | `world.ts` | — |
 | Fog levels | unseen 1.0, explored 0.5 | owned (`colorcorrection.json`); black-when-animate-off from the option's string and web reading | `world.ts` | #117 |
+| Whole sprites at a fog boundary | ground fog below bodies; current visibility admits the whole sprite; last-seen sprites retain opaque silhouettes with RGB ×0.5; scenery obeys its anchor tile too | **human** comparison supplied for #88 shows whole trees over the ground contour; reusing Default's explored-ground multiplier for remembered sprites is **inferred**, pending the full reference compositor | `world.ts`, `sprites.ts` `dimFogSnapshot`, `scatter.ts` | #88, #149 |
 | Blend shapes | blendomatic's 31 masks over eight neighbours | engine's classic algorithm; DE's own `terrain/blends/*.png` (512 square, a border fade, a 64-px hole, a 128-px diamond, four slits) are windowed by engine vertex data `TerrainBlend_ps` does not state | `world.ts`, `import_blends.py` | #116, #113 |
 | Land crossings through the overlay masks, both ways | the higher terrain over the lower's tile at shape × its `overlay_mask_name`, and the lower back over the higher's tile the same way | owned: `TerrainBlend_ps` gates the layer by `g_MaskTexture` at the tile's uv; **inferred**: that the pass runs both ways (the reference's sand-to-grass crossing is a band of each in the other, and one way exposes the tile's edge), and that `g_OverlayForEdges` is on for land and off for water (the reference's shore is a rim; the water mask is a marble that exposed the tile) | `world.ts` `masked` | #116 |
 | Water surface arithmetic | `Water_ps`'s SM2 build, read: height field summed over rgb, three drifting layers, central difference at 0.05, normal over 0.1, dome through `skyDomeMtx`, glint at `specularPower` | owned; register map c0 = (seaFloorIntensity, skyIntensity, specularIntensity, specularPower), c1 = (waveAnimationSpeed, waveRepeatLength, waveAmplitude, mapScale), c2 = (seaFloorScale, lightDirection), c3-c5 specularColor/waterColour/skyColor, c6-c7.xy skyDomeMtx, c7.z time, c7.w terrainScale, c8.x SampleBlendTexture; s4 surface, s5 floor, s0 dome, s1 visibility, s2 depth, s3 beach blend | `water.ts` | #94 |
@@ -96,7 +102,7 @@ off the reference; **measured** — fitted to a reference screenshot;
 | Default zoom | 0.8 | measured (the reference's default draws the 2x assets at 0.80) | `main.ts` | — |
 | DE's default zoom | 0.80 of ours (a 77-px tile) | measured: a 143-texel mangrove stands 115 px, the water's repeat vector is (404, 202) px | `docs/status.md` | — |
 | Minimap wood tone | (41, 140, 33) | measured off DE's minimap; trees carry `minimap_color` 0 | `minimap.ts` | #96 |
-| Minimap building squares | too large | reported | `minimap.ts` | #84 |
+| Minimap building squares | uniform snapped 2×2 backing pixels for live and remembered buildings, about 3×3 CSS pixels in the 2000px reference; farms hidden by DAT minimap_mode 0 | **measured** compact blue markers in `hud-bottom-2026-09-17.png`, sRGB; treating all mode-1 buildings uniformly **inferred**, since DAT and MapView state no per-building marker size | `minimap.ts` `drawBuilding` | #84 |
 | Fogged minimap dim | `REMEMBERED_FACTOR` 0.55 | chosen | `minimap.ts` | — |
 | Minimap flare | 4 s pulsing ring | chosen; `sounds.json` names the cue only | `minimap.ts` `FLARE_MS` | — |
 | Double-click window | 350 ms | chosen | `main.ts` | — |
@@ -104,6 +110,8 @@ off the reference; **measured** — fitted to a reference screenshot;
 | Font index → face mapping | inferred | inferred | `import_ui.py` | — |
 | Names drop a trailing parenthetical qualifier | rule | chosen; the file's own buildable gate argues for it | `names.ts` | — |
 | Stop / Back / Cancel / pack / unpack / build-page cells | the cells the layout leaves | chosen | `main.ts` | — |
+| Training queue runtime placement | 70px portraits at Progress's x, 4px below its bottom; active portrait at the same x and StatusLabel's y; adjacent equal kinds grouped with counts | **measured** from the human's 2000×1125 barracks-queue screenshot (2026-09-20): active ≈(482,978), queue ≈(482,1029), 36px portraits at 36–37px pitch, groups 3/3/1; `commandpanel.json` gives the status/bar boxes but QueueButtons has no runtime geometry | `hud.ts` `setTrainingQueue`, `style.css` | #140 |
+| Grouped queue interaction and active tint | groups count waiting units only; clicking a group cancels its first waiting entry; separate active portrait cancels index 0; green fill at 30% opacity tracks progress | **human-confirmed**: active militia is additional to the first three waiting militia. **Chosen**: cancellation within a waiting group and tint alpha; wrapping tested through 14 alternating waiting entries plus the active unit (15 total) | `hud.ts`, `style.css` | #140 |
 | The AI's computer name | dealt by seed from `civilizations.json`'s table | chosen dealing, owned table | `ai.ts` | — |
 | Under-attack alert rearm | 10 s | chosen; `sounds.json` names the cue, not its rearm | `cues.ts` `ALERT_INTERVAL` | — |
 | Fallow-farm alert grace | 0.5 game seconds | chosen | `cues.ts` `RESEED_GRACE` | — |

@@ -138,6 +138,7 @@ export function createGame(
   const { terrain, elevation } = generateMap(
     {
       rng: state, width: state.width, height: state.height,
+      nodes: rules.nodes,
       free: at => freeSpot(state, at),
       place: (kind, at) => {
         if (kind === 'sheep' || kind === 'deer' || kind === 'boar') addAnimal(state, kind, at);
@@ -462,6 +463,19 @@ export function isCarcass(entity: Entity): boolean {
   return !!entity.dead && (entity.amount ?? 0) > 0;
 }
 
+/** A farmer's gather order reserves the farm while walking and banking too.
+ * Derive the claim from live orders so Stop, death and retasking release it
+ * immediately. Lowest id resolves duplicate orders in pre-fix saved matches. */
+function farmAvailable(state: GameState, farm: Entity, gatherer: Entity): boolean {
+  let farmer: Entity | undefined;
+  for (const worker of state.entities) {
+    if (worker.dead || worker.kind !== 'villager' || worker.owner !== farm.owner
+      || worker.order.kind !== 'gather' || worker.order.targetId !== farm.id) continue;
+    if (!farmer || worker.id < farmer.id) farmer = worker;
+  }
+  return !farmer || farmer.id === gatherer.id;
+}
+
 function isGatherable(state: GameState, entity: Entity, gatherer: Entity): boolean {
   // A boat gathers fish and nothing else; a villager casts for fish from the
   // bank as it picks a bush, and its reach is what decides which fish.
@@ -477,7 +491,24 @@ function isGatherable(state: GameState, entity: Entity, gatherer: Entity): boole
     return state.rules.units[entity.kind].herdRange !== undefined && entity.owner === gatherer.owner;
   }
   return entity.kind === 'farm' && entity.owner === gatherer.owner
-    && entity.buildProgress === undefined && (entity.amount ?? 0) > 0;
+    && !entity.dead && entity.buildProgress === undefined && (entity.amount ?? 0) > 0
+    && farmAvailable(state, entity, gatherer);
+}
+
+/** A group sent to an occupied farm spreads to visible free farms nearby. */
+function nearbyFreeFarm(state: GameState, worker: Entity, origin: Point): Entity | undefined {
+  let best: Entity | undefined;
+  let bestDistance = autoContinueRange(state, worker);
+  for (const candidate of state.entities) {
+    if (candidate.kind !== 'farm' || !isGatherable(state, candidate, worker)
+      || !isEntityVisible(state, worker.owner as PlayerId, candidate)) continue;
+    const d = distance(origin, candidate.position);
+    if (d < bestDistance || (d === bestDistance && (!best || candidate.id < best.id))) {
+      best = candidate;
+      bestDistance = d;
+    }
+  }
+  return best;
 }
 
 /** A live animal a hunter has to kill before there is anything to carry. */
@@ -494,6 +525,13 @@ function assignOrder(state: GameState, entity: Entity, target: Point, targetEnti
   if (entity.kind === 'trade-cart' && targetEntity && isTradePartner(state, entity, targetEntity)) {
     entity.order = { kind: 'trade', targetId: targetEntity.id };
     entity.carrying = undefined;
+  } else if (entity.kind === 'villager' && targetEntity?.kind === 'farm'
+    && !targetEntity.dead && targetEntity.owner === entity.owner
+    && targetEntity.buildProgress === undefined && (targetEntity.amount ?? 0) > 0) {
+    const farm = isGatherable(state, targetEntity, entity)
+      ? targetEntity : nearbyFreeFarm(state, entity, targetEntity.position);
+    if (!farm) { becomeIdle(entity); return; }
+    entity.order = { kind: 'gather', targetId: farm.id };
   } else if (targetEntity && isGatherable(state, targetEntity, entity)) {
     entity.order = { kind: 'gather', targetId: targetEntity.id };
   } else if (
@@ -655,17 +693,20 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
   if (command.kind === 'cancel-train') {
     const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
     if (!building) return rejected(`building ${command.buildingId} is not owned`);
-    // The last one asked for is the first one taken back, which is what makes
-    // a queue safe to fill: nothing is spent that cannot be undone.
     const queue = building.trainingQueue ?? [];
+    const index = command.index ?? queuedCount(building) - 1;
+    if (!queuedCount(building)) return rejected('nothing is being trained');
+    if (!Number.isInteger(index) || index < 0 || index >= queuedCount(building)) return rejected('invalid training queue index');
     let refund: UnitKind | undefined;
-    if (queue.length) {
-      refund = queue[queue.length - 1];
-      building.trainingQueue = queue.slice(0, -1);
+    if (index > 0 || !building.training) {
+      const waitingIndex = index - (building.training ? 1 : 0);
+      refund = queue[waitingIndex];
+      building.trainingQueue = queue.filter((_, i) => i !== waitingIndex);
       if (!building.trainingQueue.length) building.trainingQueue = undefined;
     } else if (building.training) {
       refund = building.training.kind;
       building.training = undefined;
+      startNextTraining(state, building);
     }
     if (!refund) return rejected('nothing is being trained');
     const cost = state.rules.units[refund].cost;
@@ -943,6 +984,8 @@ function combatOf(state: GameState, entity: Entity): {
     reloadSeconds: rules.attackReloadSeconds,
     releaseSeconds: rules.attackReleaseSeconds,
     projectileSpeed: rules.projectileSpeed,
+    piercing: rules.piercing,
+    piercingRange: rules.piercing ? (rules.range ?? 0) + 3 : undefined,
     launchHeight: rules.launchHeight,
     blastRadius: rules.blastRadius,
     blastAttackLevel: rules.blastAttackLevel,
@@ -992,6 +1035,8 @@ export function swingSeconds(state: GameState, entity: Entity): number | undefin
  * hurt. All four are the DAT's own fields on the shooter.
  */
 interface Shot {
+  piercing?: UnitRules['piercing'];
+  piercingRange?: number;
   blastRadius?: number;
   blastAttackLevel?: number;
   accuracyPercent?: number;
@@ -1212,6 +1257,17 @@ function kill(state: GameState, entity: Entity): void {
 
 function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'gather') return;
+  const assignedId = entity.order.targetId;
+  const assignedFarm = state.entities.find(e => e.id === assignedId && e.kind === 'farm');
+  if (assignedFarm && !farmAvailable(state, assignedFarm, entity)) {
+    // Repair old snapshots before either gathering or banking. An incumbent's
+    // load and progress are untouched; the duplicate keeps any carried food.
+    const next = nearbyFreeFarm(state, entity, entity.position);
+    if (!next) { becomeIdle(entity); return; }
+    entity.order = { kind: 'gather', targetId: next.id };
+    entity.gatherProgress = 0;
+    clearPath(entity);
+  }
   const speed = unitRulesFor(state, entity.owner, entity.kind as UnitKind).speed;
   const capacity = holdOf(state, entity);
   const carrying = entity.carrying;
@@ -1907,6 +1963,15 @@ function releaseAttack(
     aim.x += Math.cos(angle) * scatter;
     aim.y += Math.sin(angle) * scatter;
   }
+  if (shot.piercing && shot.piercingRange) {
+    const dx = aim.x - shooter.position.x;
+    const dy = aim.y - shooter.position.y;
+    const length = Math.hypot(dx, dy);
+    if (length > 1e-6) {
+      aim.x = shooter.position.x + dx / length * shot.piercingRange;
+      aim.y = shooter.position.y + dy / length * shot.piercingRange;
+    }
+  }
   state.projectiles.push({
     id: state.nextId++,
     owner: shooter.owner as PlayerId,
@@ -1918,6 +1983,10 @@ function releaseAttack(
     speed: projectileSpeed,
     launchHeight,
     aim,
+    ...(shot.piercing ? {
+      art: shot.piercing.unit,
+      piercing: { radius: shot.piercing.radius, attacks: shot.piercing.attacks.map(a => ({ ...a })), hitIds: [] },
+    } : {}),
     ...(shot.blastRadius ? { blastRadius: shot.blastRadius, blastAttackLevel: shot.blastAttackLevel } : {}),
   });
 }
@@ -2019,6 +2088,21 @@ function updateProjectiles(state: GameState): void {
       x: projectile.position.x + dx / gap * step,
       y: projectile.position.y + dy / gap * step,
     };
+
+    if (projectile.piercing) {
+      const bolt = projectile.piercing;
+      for (const other of state.entities) {
+        if (other.dead || other.kind === 'resource' || other.owner === projectile.owner || bolt.hitIds.includes(other.id)) continue;
+        if (pointToSegment(other.position, projectile.position, next) > other.radius + bolt.radius) continue;
+        bolt.hitIds.push(other.id);
+        applyDamage(state, other, other.id === projectile.targetId ? projectile.attacks : bolt.attacks, projectile.shooterId);
+      }
+      if (!landing) {
+        projectile.position = next;
+        remaining.push(projectile);
+      }
+      continue;
+    }
 
     // Anything not the shooter's own can be struck, gaia's animals included:
     // a hunter's arrow is the same arrow.
@@ -2295,7 +2379,11 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
     const to = state.rules.units[upgrade.to as UnitKind];
     if (!to) continue;
     for (const entity of state.entities) {
-      if (entity.dead || entity.owner !== owner || entity.kind !== upgrade.from) continue;
+      if (entity.dead || entity.owner !== owner) continue;
+      if (entity.training?.kind === upgrade.from) entity.training.kind = upgrade.to as UnitKind;
+      if (entity.trainingQueue) entity.trainingQueue = entity.trainingQueue.map(kind =>
+        kind === upgrade.from ? upgrade.to as UnitKind : kind);
+      if (entity.kind !== upgrade.from) continue;
       const damage = entity.maxHp - entity.hp;
       const promoted = unitRulesFor(state, owner, upgrade.to as UnitKind);
       entity.kind = upgrade.to as UnitKind;
@@ -2361,7 +2449,11 @@ function updateBuildingProduction(state: GameState, entity: Entity): void {
   entity.training = undefined;
   spawnTrainedUnit(state, entity, kind);
   recalculatePopulation(state);
-  // Straight on to the next one asked for; it was paid for when it was queued.
+  startNextTraining(state, entity);
+}
+
+/** Start the next paid entry after completion or cancellation of the active one. */
+function startNextTraining(state: GameState, entity: Entity): void {
   const queue = entity.trainingQueue;
   if (queue && queue.length) {
     const next = queue[0];
@@ -2545,9 +2637,13 @@ export function stepGame(state: GameState): void {
         // A finished farm becomes a food source its owner can work until spent.
         site.resourceKind = 'food';
         site.amount = farmAmount;
-        // Builders keep working it as gatherers instead of standing idle.
+        // Only one builder becomes its farmer (owned string 26149). Others
+        // retain build orders for the adjacent-site continuation below.
         for (const builder of state.entities) {
-          if (builder.order.kind === 'build' && builder.order.targetId === site.id) {
+          if (!builder.dead && builder.kind === 'villager' && builder.owner === site.owner
+            && builder.activity === 'building'
+            && builder.order.kind === 'build' && builder.order.targetId === site.id
+            && farmAvailable(state, site, builder)) {
             builder.order = { kind: 'gather', targetId: site.id };
             builder.activity = 'moving';
           }
@@ -2592,4 +2688,3 @@ export function stepGame(state: GameState): void {
   else if (p2Out && !p1Out) state.winner = 1;
   else if (p1Out && p2Out) state.winner = 2; // simultaneous: attacker's tick order favors 2 deterministically
 }
-

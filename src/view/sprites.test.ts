@@ -5,10 +5,10 @@ import { applyCommand, createGame, stepGame } from '../sim/game';
 import type { Entity, GameState } from '../sim/types';
 import { RAMP_LEVELS, rampLut, type AnimationInfo, type Atlas, type ContentAssets } from './assets';
 import { worldToIso } from './iso';
-import { ELEVATION_PIXELS } from './world';
+import { createFog, ELEVATION_PIXELS } from './world';
 import {
   PLAYER_COLORS, chooseAnimation, createEntityView, createFlagView, decayFraction, playerColorHex,
-  gateBoxKey, treeIsFelled, updateEntityView, updateFlagView, updateOcclusion, wallShape,
+  gateBoxKey, treeIsFelled, updateEntityView, refreshEntityTextures, dimFogSnapshot, updateFlagView, updateOcclusion, wallShape,
   WALL_JOINT, WALL_POST, WALL_RUN_X, WALL_RUN_Y, type EntityView,
 } from './sprites';
 
@@ -85,6 +85,93 @@ describe('tree chopping stages', () => {
     // Only wood has a felled stage; a half-eaten bush keeps its idle art.
     expect(treeIsFelled(state, berries)).toBe(false);
     expect(chooseAnimation(state, berries).name).toBe('idle');
+  });
+});
+
+describe('late textures on frozen fog snapshots (#88)', () => {
+  it.each([false, true])('finishes the tree mask without changing the frozen pose (body already loaded: %s)', bodyLoaded => {
+    const state = createGame();
+    const tree = treeOf(state);
+    state.elevation[Math.floor(tree.position.y) * state.width + Math.floor(tree.position.x)] = 3;
+    const assets = fakeAssets();
+    const still = { frames: 1, directions: 1, frameSeconds: 0, mirroringMode: 0 };
+    const atlas = (image: string): Atlas => ({ image, size: [16, 12], framesInFile: 1, scale: 2,
+      frames: [{ x: 0, y: 0, w: 16, h: 12, cx: 10, cy: 7 }] });
+    assets.entities['tree-oak'] = { category: 'resource', animations: { idle: still },
+      atlases: { idle: atlas('tree.png'), 'idle-shadow': atlas('tree-shadow.png') } };
+    const body = new THREE.Texture(), shadow = new THREE.Texture();
+    if (bodyLoaded) assets.textures.set('tree.png', body);
+    const view = createEntityView(assets, tree);
+    updateEntityView(view, assets, state, tree, 0);
+    expect(view.body.mesh.visible).toBe(bodyLoaded);
+    expect(view.shadow.mesh.visible).toBe(false);
+    const position = view.shadow.mesh.position.clone();
+    const size = view.shadow.mesh.scale.clone();
+    const uv = [...view.shadow.mesh.geometry.getAttribute('uv').array];
+    const flat = worldToIso(tree.position.x, tree.position.y);
+    expect(position.y).toBeCloseTo(flat.y + 0.5 + 3 * ELEVATION_PIXELS);
+    dimFogSnapshot(view);
+    // The real tree changes unseen; loading pixels must not reveal the chop.
+    tree.amount = tree.amount! - 1;
+    assets.textures.set('tree.png', body);
+    assets.textures.set('tree-shadow.png', shadow);
+    refreshEntityTextures(view, assets);
+    expect(view.body.mesh.visible).toBe(true);
+    expect(view.shadow.mesh.visible).toBe(true);
+    expect((view.shadow.mesh.material as THREE.MeshBasicMaterial).map).toBe(shadow);
+    expect((view.shadow.mesh.material as THREE.MeshBasicMaterial).color.getHex()).toBe(0);
+    expect(view.shadow.mesh.position).toEqual(position);
+    expect(view.shadow.mesh.scale).toEqual(size);
+    expect([...view.shadow.mesh.geometry.getAttribute('uv').array]).toEqual(uv);
+    expect(view.animationState).toBe('tree-oak/idle');
+    expect(view.animationStartedAt).toBe(0);
+    expect(view.shadow.pendingTexture).toBeUndefined();
+    expect((view.body.mesh.material as THREE.MeshBasicMaterial).color.r).toBe(0.5);
+    expect((view.body.mesh.material as THREE.MeshBasicMaterial).opacity).toBe(1);
+  });
+
+  it('does not turn an intentionally empty shadow frame into a rectangle', () => {
+    const state = createGame();
+    const assets = fakeAssets();
+    assets.entities.villager.atlases['idle-shadow'] = { image: 'empty-shadow.png', size: [4, 4], framesInFile: 1,
+      frames: [{ x: 0, y: 0, w: 4, h: 4, cx: 0, cy: 0 }] };
+    const villager = state.entities.find(e => e.kind === 'villager' && e.owner === 1)!;
+    const view = createEntityView(assets, villager);
+    updateEntityView(view, assets, state, villager, 0);
+    expect(view.shadow.pendingTexture).toBe('empty-shadow.png');
+    assets.entities.villager.atlases['idle-shadow'].frames[0].w = 0;
+    assets.entities.villager.atlases['idle-shadow'].frames[0].h = 0;
+    updateEntityView(view, assets, state, villager, 0);
+    assets.textures.set('empty-shadow.png', new THREE.Texture());
+    refreshEntityTextures(view, assets);
+    expect(view.shadow.mesh.visible).toBe(false);
+    expect(view.shadow.pendingTexture).toBeUndefined();
+  });
+
+  it.each([120, 392])('keeps ground passes under fog and whole bodies above it on a %i-tile board', size => {
+    const state = createGame();
+    state.width = state.height = size;
+    state.elevation = new Array(size * size).fill(0);
+    const assets = fakeAssets();
+    assets.shadows = { profile: 'fixture', strength: 0.8, color: [0, 0, 0] };
+    assets.entities.villager.atlases['idle-shadow'] = assets.entities.villager.atlases.idle;
+    const villager = state.entities.find(e => e.kind === 'villager' && e.owner === 1)!;
+    villager.position = { x: size - 1.5, y: size - 1.5 };
+    const view = createEntityView(assets, villager);
+    updateEntityView(view, assets, state, villager, 0);
+    const fog = createFog(state);
+    expect(view.shadow.mesh.renderOrder).toBeLessThan(fog.mesh.renderOrder);
+    expect(view.body.mesh.renderOrder).toBeGreaterThan(fog.mesh.renderOrder);
+    expect((view.shadow.mesh.material as THREE.MeshBasicMaterial).opacity).toBe(0.8);
+    assets.terrain.farm = { terrainId: 7, blendPriority: 1, blendType: 0, name: 'farm', texture: 'farm',
+      image: 'farm.png', dimensions: [3, 3], minimapColor: [0, 0, 0] };
+    assets.textures.set('farm.png', new THREE.Texture());
+    const farm: Entity = { ...villager, kind: 'farm', radius: 1.5 };
+    const farmView = createEntityView(assets, farm);
+    updateEntityView(farmView, assets, state, farm, 0);
+    expect(farmView.patch).toBeDefined();
+    expect(farmView.patch!.renderOrder).toBeLessThan(fog.mesh.renderOrder);
+    fog.mesh.geometry.dispose(); fog.dispose();
   });
 });
 

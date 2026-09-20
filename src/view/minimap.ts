@@ -1,5 +1,5 @@
-import type { GameState, PlayerId, Point, ResourceKind, UnitKind, ReadonlyGameState } from '../sim/types';
-import { NODE_OF_RESOURCE, type NodeKind } from '../sim/data';
+import type { EntityKind, GameState, PlayerId, Point, ResourceKind, UnitKind, ReadonlyGameState } from '../sim/types';
+import { isBuilding, NODE_OF_RESOURCE, type NodeKind } from '../sim/data';
 import type { ContentAssets } from './assets';
 import { playerColorHex } from './sprites';
 
@@ -35,6 +35,12 @@ const WATER = [0x38, 0x78, 0xa8] as const;
 const ROAD = [0xa8, 0x7d, 0x4e] as const;
 const FOREST = [0x31, 0x5f, 0x35] as const;
 const REMEMBERED_FACTOR = 0.55;
+
+/** Compact building dot: 2 backing pixels become about 3px in the owned
+ * 2000px-wide HUD (MapView is 720 reference pixels, our buffer 240).
+ * Measured against hud-bottom-2026-09-17.png, not a world-space footprint.
+ * Live and remembered buildings use this same marker. */
+const BUILDING_DOT_SIZE = 2;
 
 /** Keep resources at roughly one map tile rather than a fixed three pixels.
  * A fixed dot made each Windsor tree cover about 10 surveyed tiles and turned
@@ -165,6 +171,17 @@ export class Minimap {
       ctx.fillStyle = color;
       ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
     };
+    const drawBuilding = (kind: EntityKind, x: number, y: number, color: string): boolean => {
+      if (!isBuilding(kind)) return false;
+      if (state.rules.buildings[kind].minimapMode !== 0) {
+        const p = this.toCanvas(state, x, y);
+        ctx.fillStyle = color;
+        // Snapping prevents an extra antialiased fringe around a two-pixel dot.
+        ctx.fillRect(Math.round(p.x - BUILDING_DOT_SIZE / 2), Math.round(p.y - BUILDING_DOT_SIZE / 2),
+          BUILDING_DOT_SIZE, BUILDING_DOT_SIZE);
+      }
+      return true;
+    };
     for (const entity of state.entities) {
       if (entity.dead) continue;
       const index = Math.floor(entity.position.y) * state.width + Math.floor(entity.position.x);
@@ -174,8 +191,8 @@ export class Minimap {
         const color = entity.kind === 'resource'
           ? resourceColor(state, entity.resourceKind, entity.node)
           : (entity.owner === 0 && gaiaColor(state, entity.kind)) || ownerColor(entity.owner);
-        const size = entity.kind === 'town-center' ? 6
-          : entity.kind === 'resource' ? resourceDotSize : entity.radius > 0.5 ? 5 : 2.5;
+        if (drawBuilding(entity.kind, entity.position.x, entity.position.y, color)) continue;
+        const size = entity.kind === 'resource' ? resourceDotSize : 2.5;
         drawDot(entity.position.x, entity.position.y, color, size);
       }
     }
@@ -185,10 +202,10 @@ export class Minimap {
       const color = remembered.kind === 'resource'
         ? resourceColor(state, remembered.resource)
         : (remembered.owner === 0 && gaiaColor(state, remembered.kind)) || ownerColor(remembered.owner);
+      if (drawBuilding(remembered.kind, remembered.x, remembered.y, color)) continue;
       drawDot(
         remembered.x, remembered.y, color,
-        remembered.kind === 'town-center' ? 6
-          : remembered.kind === 'resource' ? resourceDotSize : 3,
+        remembered.kind === 'resource' ? resourceDotSize : 3,
       );
     }
 

@@ -4,6 +4,7 @@ import { TILE_W, TILE_H, worldToIso } from './iso';
 import { isOpenWater } from '../sim/mapgen';
 import { maskU, type ContentAssets, type ImportedTerrain } from './assets';
 import { createFoam } from './foam';
+import { GROUND_FOG_ORDER } from './render-order';
 import { createWaterMaterial, surfaceOpacity, waterPresetFor } from './water';
 import type { GameState, ReadonlyGameState, PlayerId } from '../sim/types';
 
@@ -292,7 +293,7 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
     const mesh = new THREE.Mesh(geometry, material);
     // Above every base terrain, below anything standing on the ground, and
     // in priority order among themselves.
-    mesh.renderOrder = 1 + order;
+    mesh.renderOrder = 1 + 100 * order / Math.max(1, ordered.length);
     mesh.name = `blend-${byId.get(bucket.id)!.key}`;
     group.add(mesh);
   });
@@ -768,7 +769,9 @@ export function createFog(state: ReadonlyGameState, player: PlayerId = 1): FogLa
     .add(known.mul(seen.oneMinus()).mul(FOG_EXPLORED));
 
   const mesh = new THREE.Mesh(geometry, material);
-  mesh.renderOrder = 5000;
+  // This is ground fog. Bodies are shown as whole sprites according to their
+  // anchor's authoritative visibility; a ground contour must not slice a crown.
+  mesh.renderOrder = GROUND_FOG_ORDER;
 
   const update = (current: ReadonlyGameState) => {
     const visibility = current.visibility[player];

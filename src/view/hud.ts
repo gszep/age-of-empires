@@ -71,7 +71,8 @@ export interface SelectionInfo {
    * which is what these carry -- read through research, so an upgrade shows.
    */
   stats?: { icon: string; value: string; title: string }[];
-  progress?: { label: string; fraction: number };
+  progress?: { label: string; name?: string; fraction: number };
+  trainingQueue?: { buildingId: number; cancelLabel: string; entries: { kind: string; name: string; icon?: string }[] };
   /**
    * One entry per selected entity, when more than one is. AoE2 shows the
    * group as a grid of portraits rather than the first of them, and each is
@@ -85,6 +86,7 @@ export interface HudCallbacks {
   onCommand(id: string, shift?: boolean): void;
   /** A portrait in the group grid was clicked: select that one entity. */
   onSelectMember(id: number): void;
+  onCancelTraining(buildingId: number, index: number): void;
   onMinimapNavigate(point: Point): void;
   /** The flare button, then a minimap click: signal that spot (canvas point). */
   onFlare(point: Point): void;
@@ -108,6 +110,7 @@ export class Hud {
   private endDialog!: HTMLElement;
   private buttons = new Map<string, HTMLButtonElement>();
   private lastCommandSignature = '';
+  private lastQueueSignature = '';
   /** The flare button was pressed: the next minimap click drops one. */
   private flareArmed = false;
   /** Whether the score panel is up; the player-stats ribbon toggles it. */
@@ -208,7 +211,7 @@ export class Hud {
       </div>
       <div id="bottombar-strip" class="panel"></div>
       <div id="command-panel" class="panel"><div id="command-grid"></div></div>
-      <div id="selection-panel" class="panel"><div id="civ-emblem"></div><div id="selection-content"></div></div>
+      <div id="selection-panel" class="panel"><div id="civ-emblem"></div><div id="selection-content"></div><div id="training-active"></div><div id="training-queue"></div></div>
       <div id="map-panel" class="panel">
         <canvas id="minimap-canvas" width="240" height="130"></canvas>
         <button class="map-button" data-widget="ButtonFlare" data-map="flare" title="Flare: click the minimap to signal a spot"></button>
@@ -557,6 +560,9 @@ export class Hud {
   }
 
   setSelection(info: SelectionInfo | undefined): void {
+    this.setTrainingQueue(info?.trainingQueue, info?.progress?.name !== undefined);
+    const activeFill = this.root.querySelector<HTMLElement>('.production-progress');
+    if (activeFill) activeFill.style.width = `${Math.max(0, Math.min(1, info?.progress?.fraction ?? 0)) * 100}%`;
     // The parchment is always there in the reference; only what is written
     // on it comes and goes. The open fallback, with no art, hides the panel.
     const panel = this.root.querySelector<HTMLElement>('#selection-panel')!;
@@ -616,7 +622,7 @@ export class Hud {
           <div class="object-hp">${Math.ceil(info.hp!)} / ${info.maxHp}</div>` : ''}
           ${info.details.map(line => `<div class="object-detail">${line}</div>`).join('')}
           ${info.progress ? `
-            <div class="progress-label">${info.progress.label}</div>
+            <div class="progress-label">${info.progress.label}${info.progress.name ? `<br>${info.progress.name}` : ''}</div>
             <div class="progress-bar"><div class="progress-fill" style="width:${(info.progress.fraction * 100).toFixed(1)}%"></div></div>` : ''}
         </div>`;
       return;
@@ -636,9 +642,80 @@ export class Hud {
       ${info.stats?.length ? `<div ${at('ObjectStats')}"><div class="object-stats">${info.stats.map(stat => `
         <div class="stat" title="${stat.title}"><span class="stat-icon" style="background-image:url('${this.ui!.base}${stat.icon}')"></span><span class="stat-value">${stat.value}</span></div>`).join('')}</div></div>` : ''}
       ${info.progress ? `
-        <div ${at('StatusLabel')}"><div class="progress-label">${info.progress.label}</div></div>
+        <div ${at('StatusLabel')}"><div class="progress-label${info.progress.name ? ' training-status' : ''}">${info.progress.label}${info.progress.name ? `<br>${info.progress.name}` : ''}</div></div>
         <div ${at('Progress')}"><div class="progress-bar"><div class="progress-fill" style="width:${(info.progress.fraction * 100).toFixed(1)}%"></div></div></div>` : ''}
     `;
+  }
+
+  private setTrainingQueue(queue: SelectionInfo['trainingQueue'], showActive: boolean): void {
+    const signature = JSON.stringify([queue ?? null, showActive]);
+    if (signature === this.lastQueueSignature) return;
+    this.lastQueueSignature = signature;
+    const row = this.root.querySelector<HTMLElement>('#training-queue')!;
+    const active = this.root.querySelector<HTMLElement>('#training-active')!;
+    row.replaceChildren();
+    active.replaceChildren();
+    row.hidden = !queue || queue.entries.length <= 1;
+    active.hidden = !queue?.entries.length || !showActive;
+    if (!queue?.entries.length) return;
+    const layout = this.ui?.layouts.commandpanel;
+    const anchor = widgetBox(layout, 'BackgroundRight', 'QueueButtons');
+    const progress = widgetBox(layout, 'BackgroundRight', 'Progress');
+    const status = widgetBox(layout, 'BackgroundRight', 'StatusLabel');
+    const clip = widgetBox(layout, 'BackgroundRight', 'Clipped');
+    // The supplied 2000x1125 DE capture measures 36px portraits (70 reference
+    // pixels), touching, 2px below Progress. QueueButtons itself has no size.
+    if (anchor && progress && clip) {
+      row.style.left = `calc(${progress.left + anchor.left - clip.left}px * var(--ui-scale))`;
+      row.style.top = `calc(${progress.top + progress.height + 4 + anchor.top - clip.top}px * var(--ui-scale))`;
+      row.style.width = `calc(${clip.left + clip.width - progress.left}px * var(--ui-scale))`;
+      if (status) {
+        active.style.left = `calc(${progress.left}px * var(--ui-scale))`;
+        active.style.top = `calc(${status.top}px * var(--ui-scale))`;
+      }
+    }
+    const portrait = (entry: typeof queue.entries[number], index: number, count = 1): HTMLButtonElement => {
+      const button = document.createElement('button');
+      button.className = 'production-portrait command-button';
+      button.dataset.index = String(index);
+      button.dataset.kind = entry.kind;
+      button.title = `${entry.name}${count > 1 ? ` (${count})` : ''}\n${queue.cancelLabel}`;
+      button.setAttribute('aria-label', button.title);
+      button.style.backgroundImage = entry.icon
+        ? `${entry.icon}, ${this.texture('ButtonCmdIconNormal')}` : this.texture('ButtonCmdIconNormal');
+      if (!entry.icon) button.textContent = entry.name;
+      if (count > 1) {
+        const number = document.createElement('span');
+        number.className = 'queue-count';
+        number.textContent = String(count);
+        button.appendChild(number);
+      }
+      button.addEventListener('click', () => {
+        this.callbacks.onSound('button_ui');
+        this.callbacks.onCancelTraining(queue.buildingId, index);
+      });
+      return button;
+    };
+    if (showActive) {
+      const button = portrait(queue.entries[0], 0);
+      const fill = document.createElement('span');
+      fill.className = 'production-progress';
+      button.appendChild(fill);
+      active.appendChild(button);
+    }
+    // Index 0 is already on the anvil and has its own portrait above.
+    // Batch counts and cancellation targets here describe waiting units only.
+    for (let index = 1; index < queue.entries.length;) {
+      const entry = queue.entries[index];
+      let end = index + 1;
+      while (end < queue.entries.length && queue.entries[end].kind === entry.kind) end++;
+      // Preserve order: a later run of militia is its own tile, not folded
+      // into an earlier run on the other side of a batch of spearmen.
+      const button = portrait(entry, index, end - index);
+      button.classList.add('training-portrait');
+      row.appendChild(button);
+      index = end;
+    }
   }
 
   /**

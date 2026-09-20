@@ -864,6 +864,28 @@ describe('a building\'s training queue', () => {
       .toEqual({ ok: false, reason: 'nothing is being trained' });
   });
 
+  it('cancels a chosen middle entry and restarts the next unit after cancelling the active one', () => {
+    const state = createGame(142);
+    const tc = centre(state);
+    // A mixed producer fixture makes removing the wrong index observable.
+    tc.training = { kind: 'militia', remainingTicks: 17 };
+    tc.trainingQueue = ['archer', 'villager', 'spearman'];
+    const before = { ...state.players[1] };
+    expect(applyCommand(state, { kind: 'cancel-train', player: 1, buildingId: tc.id, index: 2 }).ok).toBe(true);
+    expect(tc.training).toEqual({ kind: 'militia', remainingTicks: 17 });
+    expect(tc.trainingQueue).toEqual(['archer', 'spearman']);
+    expect(state.players[1].food).toBe(before.food + FALLBACK_RULES.units.villager.cost.food);
+    expect(applyCommand(state, { kind: 'cancel-train', player: 1, buildingId: tc.id, index: 0 }).ok).toBe(true);
+    expect(tc.training).toEqual({ kind: 'archer', remainingTicks: Math.round(FALLBACK_RULES.units.archer.trainSeconds * TICKS_PER_SECOND) });
+    expect(tc.trainingQueue).toEqual(['spearman']);
+    expect(state.players[1].gold).toBe(before.gold + FALLBACK_RULES.units.militia.cost.gold);
+    for (const index of [-1, 0.5, 2, NaN]) {
+      expect(applyCommand(state, { kind: 'cancel-train', player: 1, buildingId: tc.id, index }).ok).toBe(false);
+    }
+    expect(applyCommand(state, { kind: 'cancel-train', player: 2, buildingId: tc.id, index: 0 }).ok).toBe(false);
+    expect(tc.trainingQueue).toEqual(['spearman']);
+  });
+
   it('counts what is queued against the population cap', () => {
     // Otherwise fifteen villagers could be ordered into five places.
     const state = createGame(143);
@@ -2497,9 +2519,11 @@ describe('the technology tree', () => {
     expect(ballistics.researchedAt).toBe('university');
     expect(ballistics.requiresAge).toBe(2);
     expect(ballistics.cost).toMatchObject({ wood: 300, gold: 175 });
-    expect(ballistics.effects).toEqual([
+    expect(ballistics.effects).toEqual(expect.arrayContaining([
       { unit: 'arrow', attribute: 'leadsTarget', operation: 'set', amount: 1 },
-    ]);
+      { unit: 'scorpion-bolt', attribute: 'leadsTarget', operation: 'set', amount: 1 },
+      { unit: 'heavy-scorpion-bolt', attribute: 'leadsTarget', operation: 'set', amount: 1 },
+    ]));
     expect(importedRules.buildings.university.buildable).toBe(true);
     expect(importedRules.buildings.university.age).toBe(2);
   });

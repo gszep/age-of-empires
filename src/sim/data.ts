@@ -53,6 +53,8 @@ export interface UnitRules {
    * stone. Unset draws the arrow (issue #30).
    */
   projectileArt?: string;
+  /** A bolt keeps flying after contact; collateral uses its own DAT attacks. */
+  piercing?: { radius: number; attacks: AttackValue[]; unit: string };
   /** Height the shot leaves from, in tiles (DAT graphic displacement z). */
   launchHeight?: number;
   /** Tiles around the point of impact that also take the hit: a mangonel's
@@ -190,6 +192,8 @@ export interface UnitRules {
 }
 
 export interface BuildingRules {
+  /** DAT minimap_mode: 0 hides the marker (farms); 1 draws an ordinary dot. */
+  minimapMode?: number;
   /** The DAT unit id; see `UnitRules.datId`. */
   datId?: number;
   /** Who it holds and what it does with them; absent, nothing goes in. */
@@ -264,6 +268,8 @@ export interface BuildingRules {
 }
 
 export interface ResourceNodeRules {
+  /** DAT placement_side_terrain: at least one neighbouring tile must match. */
+  placementSideTerrain?: number[];
   resource: ResourceKind;
   radius: number;
   amount: number;
@@ -902,6 +908,26 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 4, amount: -3 }, { class: 3, amount: 180 }, { class: 17, amount: 0 }, { class: 20, amount: 0 }, { class: 31, amount: 0 }],
       attackReloadSeconds: 5, attackReleaseSeconds: 0.5,
     },
+    scorpion: {
+      hp: 40, radius: 0.5, speed: 0.65, lineOfSight: 9,
+      cost: cost(0, 75, 75), trainSeconds: 30, trainedAt: 'siege-workshop', trainButton: 3,
+      popCost: 1, age: 2, datClass: 55, terrainRestriction: 20,
+      attacks: [{ class: 3, amount: 11 }, { class: 4, amount: 0 }, { class: 11, amount: 3 }],
+      armors: [{ class: 4, amount: 0 }, { class: 3, amount: 7 }, { class: 20, amount: 0 }],
+      attackReloadSeconds: 3.6, attackReleaseSeconds: 0.6, range: 7, minRange: 2,
+      projectileSpeed: 6, projectileArt: 'scorpion-bolt', launchHeight: 0.5,
+      piercing: { radius: 0.1, attacks: [{ class: 3, amount: 5 }, { class: 11, amount: 1 }], unit: 'scorpion-bolt' },
+    },
+    'heavy-scorpion': {
+      hp: 60, radius: 0.5, speed: 0.65, lineOfSight: 9,
+      cost: cost(0, 75, 75), trainSeconds: 30, trainedAt: 'siege-workshop', trainButton: 3,
+      popCost: 1, age: 3, datClass: 55, terrainRestriction: 20,
+      attacks: [{ class: 3, amount: 14 }, { class: 4, amount: 0 }, { class: 11, amount: 6 }],
+      armors: [{ class: 4, amount: 1 }, { class: 3, amount: 8 }, { class: 20, amount: 0 }],
+      attackReloadSeconds: 3.6, attackReleaseSeconds: 0.3, range: 7, minRange: 2,
+      projectileSpeed: 6, projectileArt: 'heavy-scorpion-bolt', launchHeight: 0.5,
+      piercing: { radius: 0.1, attacks: [{ class: 3, amount: 6 }, { class: 11, amount: 4 }], unit: 'heavy-scorpion-bolt' },
+    },
     mangonel: {
       age: 2,
       hp: 50, radius: 0.5, speed: 0.6, lineOfSight: 9, cost: cost(0, 160, 135), trainSeconds: 46,
@@ -975,6 +1001,7 @@ export const FALLBACK_RULES: GameRules = {
       buildButton: 3,
     },
     farm: {
+      minimapMode: 0,
       hp: 480, radius: 1.5, lineOfSight: 1, cost: cost(0, 60), buildSeconds: 15,
       // Nothing walks round a farm: the DAT gives it no collision height and
       // no obstruction class (issue #40).
@@ -1123,6 +1150,7 @@ export const FALLBACK_RULES: GameRules = {
     'shore-fish': {
       resource: 'food', radius: 0.5, amount: 200, fogVisibility: 1, blastDefenseLevel: 0,
       datClass: 33, terrainRestriction: 19, villagerRatePerSecond: 0.43,
+      placementSideTerrain: [2, 35],
     },
     fish: {
       resource: 'food', radius: 1, amount: 225, fogVisibility: 1, blastDefenseLevel: 0,
@@ -1161,6 +1189,9 @@ export const FALLBACK_RULES: GameRules = {
 };
 
 interface ManifestEntity {
+  minimapMode?: number;
+  projectile?: { hitMode?: number; vanishMode?: number };
+  placementSideTerrain?: number[];
   hitPoints: number;
   collision: [number, number];
   terrainRestriction?: number;
@@ -1274,6 +1305,13 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     const id = e[key]?.combat?.projectileUnitId;
     return id === undefined ? undefined : projectileArtById.get(id);
   };
+  const piercing = (key: string): UnitRules['piercing'] => {
+    const art = projectileArt(key);
+    const bolt = art ? e[art] : undefined;
+    return bolt?.projectile?.hitMode === 1 && bolt.projectile.vanishMode === 1
+      ? { radius: bolt.collision[0], attacks: attackValues(bolt.combat?.attacks), unit: art! }
+      : undefined;
+  };
   const buildingKindOf = new Map<number, BuildingKind>();
   for (const [key, entity] of Object.entries(e)) {
     if (entity.id !== undefined && key in FALLBACK_RULES.buildings) buildingKindOf.set(entity.id, key as BuildingKind);
@@ -1305,6 +1343,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       minRange: e[key].combat?.minimumRange || fallback?.minRange,
       projectileSpeed: e[key].combat?.projectileSpeed ?? fallback?.projectileSpeed,
       projectileArt: projectileArt(key) ?? fallback?.projectileArt,
+      piercing: piercing(key) ?? fallback?.piercing,
       launchHeight: e[key].combat?.launchOffset?.[2] ?? fallback?.launchHeight,
       blastRadius: e[key].combat?.blastRadius ?? fallback?.blastRadius,
       blastAttackLevel: e[key].combat?.blastAttackLevel ?? fallback?.blastAttackLevel,
@@ -1367,6 +1406,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       radius: e[key].collision[0],
       lineOfSight: e[key].lineOfSight,
       terrainRestriction: e[key].terrainRestriction ?? fallback.terrainRestriction,
+      minimapMode: e[key].minimapMode ?? fallback.minimapMode,
       cost: manifestCost(e[key]),
       buildSeconds: e[key].build?.seconds ?? 25,
       popSupport: e[key].popSupport ?? 0,
@@ -1423,6 +1463,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       blastDefenseLevel: e[key].blastDefenseLevel ?? FALLBACK_RULES.nodes[fallbackKey].blastDefenseLevel,
       ...(e[key].minimapColor ? { minimapColor: e[key].minimapColor } : {}),
       datClass: e[key].class ?? FALLBACK_RULES.nodes[fallbackKey].datClass,
+      placementSideTerrain: e[key].placementSideTerrain ?? FALLBACK_RULES.nodes[fallbackKey].placementSideTerrain,
       terrainRestriction: e[key].terrainRestriction ?? FALLBACK_RULES.nodes[fallbackKey].terrainRestriction,
       // The fisherman is the villager's own task unit for both fish classes
       // (56, VMFIS, at 0.43 a second), where the forager's food rate is 0.31.
@@ -1496,6 +1537,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       longbowman: unit('longbowman', 'castle'),
       'battering-ram': unit('battering-ram', 'siege-workshop'),
       mangonel: unit('mangonel', 'siege-workshop'),
+      scorpion: unit('scorpion', 'siege-workshop'),
+      'heavy-scorpion': unit('heavy-scorpion', 'siege-workshop'),
       monk: unit('monk', 'monastery'),
       // Packed and unpacked are two DAT units and the pairing is not stated,
       // so it is named here; every number on both sides is imported.
@@ -1650,7 +1693,7 @@ const UNIT_KINDS = new Set<string>([
   'scout-cavalry', 'light-cavalry', 'trade-cart', 'fishing-ship',
   'knight', 'cavalier', 'cavalry-archer', 'heavy-cavalry-archer',
   'longbowman', 'elite-longbowman',
-  'battering-ram', 'capped-ram', 'mangonel', 'onager', 'monk', 'trebuchet',
+  'battering-ram', 'capped-ram', 'mangonel', 'onager', 'scorpion', 'heavy-scorpion', 'monk', 'trebuchet',
   'sheep', 'deer', 'boar',
 ]);
 const BUILDING_KINDS = new Set<string>([

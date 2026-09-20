@@ -420,6 +420,8 @@ def extract_entity(
         # stand on. Land units are row 7, buildings row 4, walls row 10 --
         # and the table, not a rule, is what keeps a villager out of a pond.
         "terrainRestriction": unit.terrain_restriction,
+        "minimapMode": unit.minimap_mode,
+        "placementSideTerrain": [terrain for terrain in unit.placement_side_terrain if terrain >= 0],
         "collision": [rounded(unit.collision_size_x), rounded(unit.collision_size_y)],
         # Whether anything has to walk round it. A farm has a collision box
         # like any building but no height to it and no obstruction class, and
@@ -616,6 +618,8 @@ def extract_entity(
         # between units in ways this import does not interpret; the renderer
         # uses the magnitude for the visual arc height.
         entity["projectile"] = {
+            "hitMode": unit.projectile.hit_mode,
+            "vanishMode": unit.projectile.vanish_mode,
             "arc": rounded(unit.projectile.projectile_arc),
             # Whether the shot leads a moving target. `smart_mode` is a flag
             # field and this is its low bit: Ballistics sets every projectile
@@ -1348,6 +1352,21 @@ def terrain_entry(
 WATER_PRESETS = (0, 3, 6)
 
 
+def shadow_profile(dat_path: Path, hashes: dict[str, str]) -> dict[str, Any]:
+    """Default shadow settings read by CombineTerrainSpriteSMP. Per-biome
+    colour grading is not yet rendered; preserve the Default profile here."""
+    tail = Path("resources/_common/terrain/colorcorrection_json/colorcorrection.json")
+    candidates = [depot_root() / "depot_813782" / tail] + [
+        parent / "depot_813782" / tail for parent in dat_path.parents
+    ]
+    for path in candidates:
+        if path.is_file():
+            hashes["terrain/colorcorrection.json"] = sha256(path)
+            profile = next(p for p in json.loads(path.read_text())["correction_types"] if p["name"] == "Default")
+            return {"profile": profile["name"], "strength": profile["shadow_strength"], "color": profile["shadow_color"]}
+    return {}
+
+
 def water_presets(dat_path: Path, hashes: dict[str, str]) -> dict[str, Any]:
     """DE renders water through a shader, not a tile: `water_def.json`
     beside the terrain names, per preset, a normal map and its drift, a sky
@@ -1548,6 +1567,7 @@ def extract(
     return {
         "terrain": terrain,
         "water": water_presets(dat_path, hashes),
+        "shadows": shadow_profile(dat_path, hashes),
         # The shore foam's frames (`WaveAnim_ps`): four sequences of 128
         # frames, each over two 8x8 atlases of 256 px in `terrain/water`;
         # `diag` for a shore along a tile edge, `ortho` for one stepped
@@ -1585,6 +1605,7 @@ def extract(
             for name, string_id in (
                 ("notEnoughFood", 3001), ("notEnoughWood", 3002), ("notEnoughStone", 3003),
                 ("notEnoughGold", 3004), ("needMoreHouses", 3005),
+                ("creating", 4310), ("stopCreating", 42105),
                 # Map setup labels and the three shipped random-map names (#144).
                 ("mapType", 9691), ("mapSeed", 10658), ("startGame", 9472),
                 ("gameSettings", 9682), ("randomSeed", 10107),

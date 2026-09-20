@@ -45,19 +45,26 @@ reloads, while shared selection belongs to the host and is sent to the guest.
 integer resources with gathering, drop-off and depletion; building placement,
 construction, repair (#74), garrison (#75), destruction with each age's
 collapse and rubble (#61) and fire (#73); population and housing; fifteen-deep
-refundable training queues (#7) and Shift-for-five (#76); rally points; tile
+refundable training queues (#7), indexed cancellation (#140), and Shift-for-five (#76); rally points; tile
 A* with footprint obstruction, repathing and separation; the DAT's armour
 classes, minimum damage, discrete windup/release/cooldown, `accuracy_dispersion`
 misses (#45) and blast levels (#46); projectiles aimed once at launch;
 corpses that decay by food eaten and are selectable while worth something
 (#14); the DAT's hunter, shepherd and farmer villagers (#71), startled deer,
-herdable sheep; the Britons' sixty-six technologies from `CivTechTrees` with
+herdable sheep; the Britons' technologies from `CivTechTrees` with
 the DAT's effect commands (types 0, 1, 3, 4, 5), prerequisites and ages, the
 Feudal, Castle and Imperial Ages and every land upgrade line to the champion;
-the trebuchet packed and unpacked (#28); monks that heal and convert;
+the trebuchet packed and unpacked (#28); scorpions and the Heavy Scorpion
+upgrade with pass-through bolts and DAT-backed collateral damage (#127);
+monks that heal and convert;
 palisade walls and owner-only gates; the wonder (no victory, #110); the
 trade cart; the dock, fishing ship and fish on the DAT's `terrain_restrictions`
 (#81); fog with explored memory and legal last-seen observations.
+
+Shore fish honour the DAT's neighbouring-beach placement requirement (#145).
+Farms reserve one farmer through travel and drop-off; group orders, construction
+completion, queued orders and automatic continuation respect occupancy (#82).
+Upgrades replace active and waiting training entries as well as living units.
 
 **Board** (`src/sim/mapgen.ts`): the original's two primitives from the owned
 RMS scripts — cost-ordered clump growth and banded candidate scans — with
@@ -80,12 +87,16 @@ layers) with the keyframe delta rule (#78); player colour through the
 palette's own block; occlusion contours; task animations on the
 simulation's clock (#72); the HUD laid out from the widget files — command
 grid with the DAT's `button_id` cells and action icons, selection panel with
-stat row and group portraits, resource panel with gatherer counts and age
+stat row, group portraits and counted training-queue batches with a separate
+active-production portrait/status (#140), resource panel with gatherer counts and age
 bar, menu panel, minimap with four buttons and a flare, score panel — in the
 reference's face and colours (#69), names and tooltips from the strings file
 (#48), portraits in the owner's colour (#77), context refusals in the
 reference's words (#70); unit voices and the feedback cues from the owned
 audio.
+
+Minimap buildings use compact, equal-sized live and fog-memory markers (#84),
+with farms hidden according to the DAT's `minimap_mode`.
 
 **Agents and protocol**: versioned JSON contracts; browser, built-in AI,
 JSONL subprocess, deadline subprocess, WebSocket and MCP strategies share
@@ -116,6 +127,22 @@ for a frame or two on its first appearance; nothing evicts a page once
 uploaded (#152). Every DE capture in the reference corpus was taken with
 the pack installed, so texture detail now compares like for like.
 
+Fog snapshots finish binding late sprite pages without changing their frozen
+pose or reading newer entity state (#88). In particular, a tree that leaves
+sight before its shadow sheet arrives no longer keeps a permanently missing
+shadow. That initial fix did not address the human's visible-canopy report.
+Ground fog now draws below whole sprites; remembered sprites are dimmed in RGB
+rather than cut through by the ground contour. Decorative scenery separately
+checks its anchor tile, so this does not reveal unknown objects. Shadows use
+the imported Default profile strength instead of an extra 0.55 multiplier.
+The screenshot-driven browser check measures opaque canopy pixels across F4,
+remembered-canopy brightness, and visible-ground shadow coverage against the
+owned mask. Final biome-specific grading/compositing is still #149.
+The human accepted this corrected presentation on 2026-09-20 (“ok, this is
+good”). The six issues completed in this session are included in the accepted
+checkpoint; `docs/handoff.md` records their verification and the pending
+shared-play rollout.
+
 **Not drawn** (#149): DE's frame is composited offscreen through
 `CombineTerrainSpriteSMP` with bloom, the biome's colour grade, vignette and
 sprite supersampling, then an antialias and unsharp pass; ours draws
@@ -124,9 +151,9 @@ straight to the canvas. Nor the ground's scatter and layer (#55).
 ## Deliberately omitted
 
 Other civilisations (#122) and their bonuses (#123); formations; warships,
-transports and fish traps (#97); the scorpion (#127); campaigns; public multiplayer;
+transports and fish traps (#97); campaigns; public multiplayer;
 diplomacy; relics (#130); stone walls; a genetic-algorithm framework;
-separate mobile gameplay. Forty-eight technologies are not researchable, each
+separate mobile gameplay. Skipped technologies are recorded individually, each
 with its reason in the manifest's `skippedTechnologies` (#128). The open
 fallback stops at the Castle Age (#125).
 
@@ -149,10 +176,18 @@ comparable because the board changed under them.
   local SLD decoder is byte-identical to openage's on all 29,783 frames it
   replaced; every modelled unit's stats match the DAT (487 values, 0
   mismatches, #36).
-- **Tests**: 429 vitest (≈150–210 s on six workers), 80 import tests, and the
+- **Tests**: 453 vitest (≈150–210 s on six workers), 81 import tests, and the
   browser smoke (`tools/debug_smoke.mjs`: a private server, real clicks and
   keys). Fidelity assertions skip without the owned content; the gate says
   how many skipped.
+
+Latest full working-tree gate: GREEN, `.local/tree-fog-gate.log`
+(2026-09-20), including the screenshot-driven #88 correction, #82/#84 and the
+waiting-only #140 count correction.
+Dedicated browser checks pass single-farmer group orders, live/fog-memory
+minimap marker pixels, counted queues (imported and fallback), scorpions, and
+delayed tree-shadow texture arrival, complete visible/remembered canopies and
+visible shadow coverage against the owned mask and Default strength.
 
 ## The reference's default zoom is 0.8 of ours
 

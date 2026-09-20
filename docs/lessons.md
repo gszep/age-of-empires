@@ -248,6 +248,10 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   with the shell the harness times out; a job meant to outlive its command is
   started with `setsid` writing an exit file and waited on from a separate
   command.
+- **A monitoring timeout is not a job failure.** The six-plus-minute gate
+  repeatedly outlived 120-second sentinel waits while every stage passed. Use
+  a 600-second wait with a longer tool timeout, and a fresh exit-file name so
+  a previous run cannot satisfy the new wait.
 - **Before restarting a job that "seems stuck", look at the process table.**
   Three atlas conversions once ran at once and looked exactly like a hang;
   Python logs are block-buffered — pass `-u`.
@@ -277,6 +281,12 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   gate hit the tool timeout.
 
 ## Before declaring something done
+
+- **Reproduce the visual symptom before selecting a cause.** The first #88
+  regression proved late shadow textures could arrive in fog, while the
+  human's comparison still showed crowns sliced by the ground-fog overlay.
+  Comparing opaque canopy pixels with and without ground fog caught the
+  reported defect; the loading test did not.
 
 - **Do the user's action, not the assertion you just wrote.** A real click
   found what two verified layers missed.

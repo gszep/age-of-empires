@@ -2090,6 +2090,44 @@
       }
     },
     {
+      "key": "scorpion",
+      "sounds": ["select", "train"],
+      "unitId": 279,
+      "category": "unit",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "attack": { "slot": "attack" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
+      "key": "heavy-scorpion",
+      "sounds": ["select", "train"],
+      "unitId": 542,
+      "category": "unit",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "attack": { "slot": "attack" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
+      }
+    },
+    {
+      "key": "scorpion-bolt",
+      "unitId": 367,
+      "category": "projectile",
+      "animations": { "idle": { "slot": "standing" } }
+    },
+    {
+      "key": "heavy-scorpion-bolt",
+      "unitId": 627,
+      "category": "projectile",
+      "animations": { "idle": { "slot": "standing" } }
+    },
+    {
       "key": "mangonel",
       "sounds": [
         "select",

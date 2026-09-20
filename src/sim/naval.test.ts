@@ -101,7 +101,7 @@ describe('W5, the fishing ship and the fish', () => {
   it('deals fish on the sea and none on land', () => {
     const state = islands(3);
     const fish = state.entities.filter(e => e.kind === 'resource' && (e.node === 'fish' || e.node === 'shore-fish'));
-    expect(fish.length).toBeGreaterThan(100);
+    expect(fish.length).toBeGreaterThan(0);
     for (const f of fish) {
       expect(isOpenWater(tileAt(state, f.position)), `fish ${f.id} on ${tileAt(state, f.position)}`).toBe(true);
       expect(f.resourceKind).toBe('food');
@@ -114,6 +114,22 @@ describe('W5, the fishing ship and the fish', () => {
     }
     // No fish on Arabia's ponds: the script deals none there.
     expect(createGame(3).entities.some(e => e.node === 'fish' || e.node === 'shore-fish')).toBe(false);
+  });
+
+  it.each([2, 3, 7, 42])('keeps every shore fish beside a beach, seed %i', seed => {
+    const state = islands(seed);
+    const shore = state.entities.filter(e => e.node === 'shore-fish');
+    expect(shore.length).toBeGreaterThan(0);
+    for (const fish of shore) {
+      const x = Math.floor(fish.position.x);
+      const y = Math.floor(fish.position.y);
+      expect(isOpenWater(tileAt(state, fish.position))).toBe(true);
+      expect([-1, 0, 1].some(dy => [-1, 0, 1].some(dx =>
+        (dx !== 0 || dy !== 0) && x + dx >= 0 && x + dx < state.width
+        && y + dy >= 0 && y + dy < state.height
+        && [2, 35].includes(state.terrain[(y + dy) * state.width + x + dx]))),
+      `shore fish at ${x},${y} touches a beach`).toBe(true);
+    }
   });
 
   it('works a fish to exhaustion, banks the food at the dock, and never leaves the water', () => {

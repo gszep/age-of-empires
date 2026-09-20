@@ -4,7 +4,8 @@ import { skinnedKey } from './skins';
 import { atlasPage, spriteTexture, type ContentAssets, type Atlas, type AnimationInfo, type ImportedEntity } from './assets';
 import { isAnimal, isBuilding, isUnit } from '../sim/data';
 import { swingSeconds } from '../sim/game';
-import { createTerrainPatch, elevationAt, ELEVATION_PIXELS, elevatedWorldToIso } from './world';
+import { createTerrainPatch, elevationAt, ELEVATION_PIXELS, elevatedWorldToIso, FOG_EXPLORED } from './world';
+import { groundLayerOrder } from './render-order';
 import { worldToIso, isoDepth, TILE_H } from './iso';
 import type { Entity, GameState, Point, ReadonlyGameState, DeepReadonly } from '../sim/types';
 
@@ -31,6 +32,8 @@ export function playerColorHex(assets: ContentAssets | undefined, owner: number)
 interface Piece {
   mesh: THREE.Mesh;
   atlasKey?: string;
+  /** A valid frozen frame whose page has not arrived yet. */
+  pendingTexture?: string;
   /**
    * Set on a piece drawn through a player's palette ramp: the sheet is bound to
    * the shader as a node rather than as `material.map`, so swapping animation
@@ -500,6 +503,51 @@ export function gatherTargetResource(state: ReadonlyGameState, entity: Entity) {
   return gatherTarget(state, entity)?.resourceKind;
 }
 
+function bindTexture(piece: Piece, texture: THREE.Texture): void {
+  const material = piece.mesh.material as THREE.MeshBasicMaterial;
+  if (piece.mapNode) {
+    if (piece.mapNode.value !== texture) piece.mapNode.value = texture;
+  } else if (material.map !== texture) {
+    material.map = texture;
+    material.needsUpdate = true;
+  }
+}
+
+function configureShadow(piece: Piece, assets: ContentAssets): void {
+  const material = piece.mesh.material as THREE.MeshBasicMaterial;
+  // The SLD mask already contains soft coverage. The old extra 0.55 multiplier
+  // weakened it again; use the owned Default profile until biome grading lands.
+  material.opacity = assets.shadows?.strength ?? 1;
+  material.color.setRGB(...(assets.shadows?.color ?? [0, 0, 0]));
+}
+
+/** Finish loading a fog snapshot without re-reading live state, choosing a
+ * newer age/animation, or advancing its clock. The pose was laid out when the
+ * snapshot was made; only its texture binding is allowed to change here. */
+export function refreshEntityTextures(view: EntityView, assets: ContentAssets | undefined): void {
+  if (!assets) return;
+  for (const piece of [view.body, view.shadow, view.color, view.damage, view.leap,
+    ...view.annexes, ...view.annexColors, ...view.flames, view.outline]) {
+    if (!piece?.pendingTexture) continue;
+    const texture = spriteTexture(assets, piece.pendingTexture);
+    if (!texture) continue;
+    bindTexture(piece, texture);
+    piece.pendingTexture = undefined;
+    // Contour visibility belongs to updateOcclusion, not to a texture load.
+    if (piece !== view.outline) piece.mesh.visible = true;
+  }
+}
+
+/** Called once when making a last-seen view. Dim RGB rather than opacity:
+ * remembered trees keep their entire silhouette, with no terrain showing
+ * through their trunks. Shadows and farm patches already receive ground fog. */
+export function dimFogSnapshot(view: EntityView): void {
+  for (const piece of [view.body, view.color, view.outline, view.damage, view.leap,
+    ...view.annexes, ...view.annexColors, ...view.flames]) {
+    if (piece) (piece.mesh.material as THREE.MeshBasicMaterial).color.multiplyScalar(1 - FOG_EXPLORED);
+  }
+}
+
 function applyFrame(
   piece: Piece,
   assets: ContentAssets,
@@ -511,17 +559,19 @@ function applyFrame(
   const mesh = piece.mesh;
   const frame = atlas.frames[Math.min(frameIndex, atlas.frames.length - 1)];
   const page = frame && atlasPage(atlas, frame);
-  const texture = page && spriteTexture(assets, page.image);
   // Shadow atlases hold zero-sized entries where a frame casts none.
-  if (!texture || !frame || frame.w === 0 || frame.h === 0) { mesh.visible = false; return; }
-  mesh.visible = true;
-  const meshMaterial = mesh.material as THREE.MeshBasicMaterial;
-  if (piece.mapNode) {
-    if (piece.mapNode.value !== texture) piece.mapNode.value = texture;
-  } else if (meshMaterial.map !== texture) {
-    meshMaterial.map = texture;
-    meshMaterial.needsUpdate = true;
+  if (!page || !frame || frame.w === 0 || frame.h === 0) {
+    piece.pendingTexture = undefined;
+    mesh.visible = false;
+    return;
   }
+  const texture = spriteTexture(assets, page.image);
+  piece.pendingTexture = texture ? undefined : page.image;
+  mesh.visible = !!texture;
+  const meshMaterial = mesh.material as THREE.MeshBasicMaterial;
+  if (texture) bindTexture(piece, texture);
+  // Geometry, UVs, tint and subsequent elevation/annex offsets must be fixed
+  // even while the page is absent: cached fog views are not animated again.
   meshMaterial.color.set(tint);
   const [atlasWidth, atlasHeight] = page.size;
   // Half-texel inset: linear filtering samples across the frame edge, which
@@ -677,8 +727,8 @@ export function updateFlagView(
   const shadowAtlas = flag?.atlases['idle-shadow'];
   if (shadowAtlas) {
     applyFrame(view.shadow, assets, shadowAtlas, frame, position, 0x000000);
-    view.shadow.mesh.renderOrder = 500 + depth;
-    (view.shadow.mesh.material as THREE.MeshBasicMaterial).opacity = 0.55;
+    view.shadow.mesh.renderOrder = groundLayerOrder(500, depth);
+    configureShadow(view.shadow, assets);
   }
   // Over every sprite: the flag marks a point on the map, and a building
   // between the camera and that point must not swallow it.
@@ -839,7 +889,7 @@ function updateFarmView(
   if (!view.patch) return;
   const iso = worldToIso(entity.position.x - entity.radius, entity.position.y - entity.radius);
   view.patch.position.set(iso.x, iso.y + elevationAt(state, entity.position.x, entity.position.y) * ELEVATION_PIXELS, 0);
-  view.patch.renderOrder = 10 + isoDepth(entity.position.x, entity.position.y);
+  view.patch.renderOrder = groundLayerOrder(200, isoDepth(entity.position.x, entity.position.y));
   view.patch.visible = !entity.dead;
 }
 
@@ -996,8 +1046,8 @@ export function updateEntityView(
   if (shadowAtlas && !entity.dead) {
     // Mask sheets are neutral white, so the shadow asks for black here.
     applyFrame(view.shadow, assets, shadowAtlas, frameIndex, entity.position, 0x000000);
-    view.shadow.mesh.renderOrder = 500 + depth;
-    (view.shadow.mesh.material as THREE.MeshBasicMaterial).opacity = 0.55;
+    view.shadow.mesh.renderOrder = groundLayerOrder(500, depth);
+    configureShadow(view.shadow, assets);
   } else {
     view.shadow.mesh.visible = false;
   }

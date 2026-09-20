@@ -103,6 +103,8 @@
               "capped-ram",
               "mangonel",
               "onager",
+              "scorpion",
+              "heavy-scorpion",
               "trebuchet",
               "monk",
               "sheep",
@@ -242,6 +244,8 @@
               "capped-ram",
               "mangonel",
               "onager",
+              "scorpion",
+              "heavy-scorpion",
               "trebuchet",
               "monk",
               "sheep",
@@ -416,6 +420,8 @@
                   "capped-ram",
                   "mangonel",
                   "onager",
+                  "scorpion",
+                  "heavy-scorpion",
                   "trebuchet",
                   "monk"
                 ]
