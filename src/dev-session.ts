@@ -14,6 +14,8 @@
  */
 import type { GameRules } from './sim/data';
 import type { GameState } from './sim/types';
+import { validMatchSetup, type MatchSetup } from './match-setup';
+import { seedFrom } from './sim/random';
 
 const KEY = 'open-empires-lab:dev-session';
 /**
@@ -32,13 +34,14 @@ interface Snapshot {
   version: number;
   rulesOrigin: string;
   state: Omit<GameState, 'rules'>;
+  setup?: MatchSetup;
 }
 
-export function saveSession(state: GameState): void {
+export function saveSession(state: GameState, setup?: MatchSetup): void {
   if (!import.meta.env.DEV) return;
   try {
     const { rules, ...rest } = state;
-    const snapshot: Snapshot = { version: VERSION, rulesOrigin: rules.origin, state: rest };
+    const snapshot: Snapshot = { version: VERSION, rulesOrigin: rules.origin, state: rest, setup };
     sessionStorage.setItem(KEY, JSON.stringify(snapshot));
   } catch {
     // Quota exceeded or storage unavailable: a lost snapshot is not an error.
@@ -67,4 +70,13 @@ export function clearSession(): void {
   } catch {
     // Storage unavailable; nothing to clear.
   }
+}
+
+export function loadSessionSetup(rules: GameRules): MatchSetup | undefined {
+  try {
+    const saved: Snapshot = JSON.parse(sessionStorage.getItem(KEY) ?? 'null');
+    if (saved?.version === VERSION && saved.rulesOrigin === rules.origin && validMatchSetup(saved.setup)
+      && seedFrom(saved.setup.seed) === saved.state.matchSeed) return saved.setup;
+  } catch { /* old or unavailable session */ }
+  return;
 }

@@ -5,7 +5,7 @@ import { isOpenWater } from '../sim/mapgen';
 import { maskU, type ContentAssets, type ImportedTerrain } from './assets';
 import { createFoam } from './foam';
 import { createWaterMaterial, surfaceOpacity, waterPresetFor } from './water';
-import type { GameState, ReadonlyGameState } from '../sim/types';
+import type { GameState, ReadonlyGameState, PlayerId } from '../sim/types';
 
 /**
  * Ground plane in the dimetric projection. With imported content the DAT's
@@ -712,7 +712,7 @@ function bicubic(map: ReturnType<typeof textureNode>, width: number, height: num
  * follows the ground's elevation like the ground itself does, so the fog sits
  * on a hill rather than under it.
  */
-export function createFog(state: ReadonlyGameState): FogLayer {
+export function createFog(state: ReadonlyGameState, player: PlayerId = 1): FogLayer {
   const { width, height } = state;
   const size = width * height;
   const positions = new Float32Array(size * 6 * 3);
@@ -771,7 +771,7 @@ export function createFog(state: ReadonlyGameState): FogLayer {
   mesh.renderOrder = 5000;
 
   const update = (current: ReadonlyGameState) => {
-    const visibility = current.visibility[1];
+    const visibility = current.visibility[player];
     for (let index = 0, out = 0; index < size; index++, out += 2) {
       flags[out] = visibility.visible[index] ? 255 : 0;
       flags[out + 1] = visibility.explored[index] ? 255 : 0;

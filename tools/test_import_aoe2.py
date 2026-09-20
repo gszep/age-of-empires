@@ -837,13 +837,24 @@ class ContentImportIntegrationTest(unittest.TestCase):
     def test_the_refusal_lines_are_the_reference_s_own(self):
         # Issue #70: the reference lets an unaffordable press through and
         # says why, in its own words -- strings 3001-3005.
-        self.assertEqual(self.result["strings"], {
+        expected = {
             "notEnoughFood": "Not enough food.",
             "notEnoughWood": "Not enough wood.",
             "notEnoughStone": "Not enough stone.",
             "notEnoughGold": "Not enough gold.",
             "needMoreHouses": "You need to build more houses.",
-        })
+        }
+        for key, value in expected.items():
+            self.assertEqual(self.result["strings"][key], value)
+
+    def test_map_setup_labels_and_names_are_imported(self):
+        expected = {
+            "mapType": "Map Type", "mapSeed": "Seed", "startGame": "Start Game",
+            "gameSettings": "Game Settings", "randomSeed": "Random",
+            "mapArabia": "Arabia", "mapBlackForest": "Black Forest", "mapIslands": "Islands",
+        }
+        for key, value in expected.items():
+            self.assertEqual(self.result["strings"][key], value)
 
     def test_names_and_tooltips_are_the_reference_strings(self):
         # Issue #48: what the panel calls a thing is the DAT's own string,

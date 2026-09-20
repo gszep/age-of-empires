@@ -260,6 +260,29 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
   color: #f3ead2;
 }
 .dialog button:hover { filter: brightness(1.2); }
+.dialog :disabled { opacity: 0.45; cursor: default; }
+#menu-dialog { max-height: 95vh; overflow-y: auto; }
+/* Compact project map launcher: reference labels, existing dialog palette. */
+#map-setup {
+  margin: calc(32px * var(--ui-scale)) 0;
+  padding: calc(24px * var(--ui-scale)) 0;
+  border-block: calc(3px * var(--ui-scale)) solid #8a7340;
+  font-size: max(14px, calc(40px * var(--text-scale)));
+  text-align: left;
+}
+#map-setup h3 { color: #ffd966; text-align: center; margin-bottom: calc(24px * var(--ui-scale)); }
+#map-setup label { display: block; margin: calc(16px * var(--ui-scale)) 0; }
+#map-setup input, #map-setup select {
+  width: 100%; min-width: 0; padding: calc(18px * var(--ui-scale));
+  background: #241c10; color: #f3ead2;
+  border: calc(3px * var(--ui-scale)) solid #8a7340;
+  font: inherit;
+}
+#map-setup button { font-size: inherit; }
+#map-setup input { user-select: text; -webkit-user-select: text; }
+#map-setup .seed-row { display: flex; gap: calc(16px * var(--ui-scale)); }
+#map-setup .seed-row button { min-width: 0; margin: 0; }
+#map-host-note { text-align: center; }
 
 #selection-box {
   position: absolute; border: 1px solid #d9ffb0;

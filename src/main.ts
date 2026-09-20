@@ -2,7 +2,8 @@ import * as THREE from 'three/webgpu';
 import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
 import { observe } from './sim/observe';
-import { TRAINING_QUEUE_LIMIT, applyCommand, buildingFootprint, createGame, gameTimeSeconds, isCarcass, isRepairable, placementLegal, queuedCount, shortfall, stepGame, upgradedAway, notYetUpgradedInto } from './sim/game';
+import { TRAINING_QUEUE_LIMIT, applyCommand as applyLocalCommand, buildingFootprint, createGame, gameTimeSeconds, isCarcass, isRepairable, placementLegal, queuedCount, shortfall, stepGame, upgradedAway, notYetUpgradedInto } from './sim/game';
+import { connectSharedMatch } from './shared/client';
 import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, rulesFromManifest, type AttackValue, type ContentManifest, type Cost, type GameRules, type TechKey, type UnitRules } from './sim/data';
 import { MAPS } from './sim/mapgen';
 import { isTileVisible } from './sim/visibility';
@@ -11,7 +12,8 @@ import type { MatchRecord } from './protocol/types';
 import type { BuildingKind, Entity, GameState, PlayerId, Point, UnitKind } from './sim/types';
 import { buildMenu, type BuildPage } from './view/build-menu';
 import { sameKindOnScreen } from './view/selection';
-import { clearSession, loadSession, saveSession } from './dev-session';
+import { clearSession, loadSession, loadSessionSetup, saveSession } from './dev-session';
+import { loadMapPreference, saveMapPreference, mapChoices, validMatchSetup, MAX_MAP_SEED, type MatchSetup } from './match-setup';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
 import { buildingRulesFor, unitRulesFor } from './sim/rules';
@@ -39,6 +41,11 @@ const view = {
 };
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
+const loading = document.createElement('div');
+loading.id = 'game-message';
+loading.className = 'show';
+loading.textContent = 'Loading artwork…';
+app.appendChild(loading);
 
 const renderer = new THREE.WebGPURenderer({ antialias: false });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -67,8 +74,9 @@ try {
 // rather than killing the page, and asking for a map explicitly means a
 // fresh board of it -- not whatever match a dev-session snapshot resumes.
 const pageParams = new URLSearchParams(location.search);
+const mapPreference = loadMapPreference();
 const mapParam = pageParams.get('map');
-const mapType = mapParam !== null && mapParam in MAPS ? mapParam : 'arabia';
+const mapType = mapParam === null ? (mapPreference?.map ?? 'arabia') : Object.hasOwn(MAPS, mapParam) ? mapParam : 'arabia';
 if (mapParam !== null && mapType !== mapParam) {
   console.warn(`[map] unknown map type '${mapParam}', dealing arabia`);
 }
@@ -76,10 +84,31 @@ if (mapParam !== null && mapType !== mapParam) {
 // Match, so a board somebody is looking at can be named. Like ?map=, asking
 // for one means a fresh board rather than a resumed session.
 const seedParam = Number(pageParams.get('seed'));
-const seedFixed = Number.isInteger(seedParam) && seedParam > 0 ? seedParam : undefined;
+const seedFixed = Number.isInteger(seedParam) && seedParam > 0 && seedParam <= MAX_MAP_SEED ? seedParam : undefined;
+const initialSetup: MatchSetup = { map: mapType, seed: seedFixed ?? (mapParam === null ? mapPreference?.seed : undefined) ?? 42 };
 
 const restored = mapParam === null && seedFixed === undefined ? loadSession(rules) : undefined;
-let game = restored ?? createGame(seedFixed ?? 42, rules, undefined, mapType);
+const savedSetup = loadSessionSetup(rules);
+const hostResume = loadSession(rules);
+loading.textContent = 'Connecting to shared match…';
+const shared = await connectSharedMatch(
+  () => hostResume ?? createGame(initialSetup.seed, rules, undefined, initialSetup.map),
+  notice => { loading.textContent = notice; },
+  hostResume ? savedSetup : initialSetup,
+);
+loading.remove();
+const localPlayer: PlayerId = shared?.player ?? 1;
+if (shared) rules = shared.state.rules;
+let game = shared?.state ?? restored ?? createGame(initialSetup.seed, rules, undefined, initialSetup.map);
+let activeSetup: MatchSetup = shared?.setup ?? (restored ? savedSetup : undefined) ?? initialSetup;
+let setupKnown = shared ? shared.setup !== undefined : !restored || savedSetup !== undefined;
+const renderPosition = (entity: Entity): Point => shared?.renderPosition(entity) ?? entity.position;
+const renderEntity = (entity: Entity): Entity => {
+  const position = renderPosition(entity);
+  return position === entity.position ? entity : { ...entity, position };
+};
+let presentationRebuilds = 0;
+const applyCommand: typeof applyLocalCommand = (state, command) => shared ? shared.command(command) : applyLocalCommand(state, command);
 if (restored) console.info(`[dev] resumed match at tick ${restored.tick}; menu restart starts a new one`);
 let selectedIds: number[] = [];
 let buildMode: BuildingKind | undefined;
@@ -148,6 +177,7 @@ interface ReplayState {
 let replay: ReplayState | undefined;
 
 function startReplay(raw: unknown): void {
+  if (shared) { hud.showMessage('Open a standalone game to watch a replay'); return; }
   const record = raw as MatchRecord;
   if (!record || record.version !== 1 || !Array.isArray(record.commands) || !Array.isArray(record.checksums)) {
     hud.showMessage('Not a valid replay file');
@@ -163,6 +193,8 @@ function startReplay(raw: unknown): void {
   // A record from before civilisations were written down replays as whatever
   // the content is for, which is what it was played as.
   game = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia');
+  activeSetup = { map: record.map ?? 'arabia', seed: record.seed };
+  setupKnown = true;
   cameraCenter = homeCamera(game);
   selectedIds = [];
   buildMode = undefined;
@@ -179,6 +211,7 @@ function startReplay(raw: unknown): void {
     verified: 0,
     failed: false,
   };
+  resetMatchView();
   hud.showMessage(`Replaying seed ${record.seed}`);
 }
 
@@ -194,7 +227,7 @@ camera.position.z = 10;
  * too; the camera is a view preference and the snapshot holds game state.
  */
 function homeCamera(state: GameState): Point {
-  const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center' && !e.dead);
+  const tc = state.entities.find(e => e.owner === localPlayer && e.kind === 'town-center' && !e.dead);
   return elevatedWorldToIso(state, tc?.position.x ?? state.width / 2, tc?.position.y ?? state.height / 2);
 }
 let cameraCenter = homeCamera(game);
@@ -207,7 +240,7 @@ scene.add(ground);
 // The aesthetic scatter: picture only, placed by the view from the board.
 let scatter = createScatter(game, assets);
 scene.add(scatter);
-let fog = view.createFog(game);
+let fog = view.createFog(game, localPlayer);
 scene.add(fog.mesh);
 
 const views = new Map<string, EntityView>();
@@ -263,7 +296,7 @@ const ORDER_FLASH_TOTAL_SECONDS = 1.2;
 let orderFlash: { entityId: number; startedAt: number } | undefined;
 
 /** Somebody else's: not this player's, and not gaia's trees and animals. */
-const isHostile = (entity: Entity): boolean => entity.owner !== 0 && entity.owner !== 1;
+const isHostile = (entity: Entity): boolean => entity.owner !== 0 && entity.owner !== localPlayer;
 
 /**
  * Placement preview: the building's own art where it will stand, over the tile
@@ -305,7 +338,7 @@ function acknowledge(): void {
 /** A stand-in entity so the preview reuses the normal building rendering. */
 function ghostEntity(kind: BuildingKind, at: Point): Entity {
   return {
-    id: 0, kind, owner: 1, position: at,
+    id: 0, kind, owner: localPlayer, position: at,
     hp: 1, maxHp: 1, radius: rules.buildings[kind].radius,
     activity: 'idle', order: { kind: 'idle' },
     ...(rules.buildings[kind].footprint
@@ -362,25 +395,77 @@ function createHud(): Hud {
       hud.setSelection(selectionInfo());
     },
     onMenu: action => {
-      if (action === 'pause') paused = !paused;
-      if (action === 'resume') paused = false;
-      if (action === 'restart') restart();
+      if (action === 'pause') setPaused(!paused);
+      if (action === 'resume') setPaused(false);
+      if (action === 'restart') {
+        if (setupKnown) restart();
+        else { hud.hideEnd(); hud.toggleMenu(true); }
+      }
     },
     onReplayFile: record => startReplay(record),
     onSound: alias => playSound(alias),
+    onStartMatch: setup => {
+      if (!restart(setup)) return false;
+      // The menu now owns setup. Keep solo/player flags, and let ordinary
+      // reloads resume the saved match instead of re-dealing an old URL map.
+      const url = new URL(location.href);
+      url.searchParams.delete('map'); url.searchParams.delete('seed');
+      history.replaceState(null, '', url);
+      return true;
+    },
   });
   created.playerColors = assets?.playerColors;
+  created.minimap.player = localPlayer;
+  configureMapMenu(created);
   return created;
+}
+
+function configureMapMenu(target: Hud): void {
+  target.configureMapMenu(mapChoices(messages), activeSetup, !shared || localPlayer === 1, messages, setupKnown);
 }
 
 let hud = createHud();
 
+function setPaused(value: boolean): void {
+  if (shared) shared.send({ type: 'settings', paused: value });
+  else paused = value;
+}
+
+if (shared) {
+  paused = shared.settings.paused;
+  speedIndex = shared.settings.speed;
+  shared.onSettings = settings => { paused = settings.paused; speedIndex = settings.speed; };
+  shared.onNotice = notice => hud.showMessage(notice);
+  shared.onSnapshot = (state, changedMap) => {
+    game = state;
+    rules = state.rules;
+    if (shared.setup) {
+      const different = !setupKnown || activeSetup.map !== shared.setup.map || activeSetup.seed !== shared.setup.seed;
+      activeSetup = shared.setup;
+      setupKnown = true;
+      saveMapPreference(activeSetup);
+      if (different && !changedMap) configureMapMenu(hud);
+    }
+    if (changedMap) {
+      resetMatchView();
+    }
+    // Same-map recovery replaces authoritative data only. syncScene reconciles
+    // entity ids on the next frame; terrain, HUD, camera and textures survive.
+  };
+  hud.showMessage(`Shared match — player ${localPlayer}${paused ? ' — paused (F3 to resume)' : ''}`);
+}
+
 // Text-based debug protocol for the dev server's /__debug endpoint. Loaded
 // dynamically so none of it reaches a production bundle.
-if (import.meta.hot) {
+async function installDevelopmentDebug(): Promise<void> {
   const { installDebug } = await import('./dev-debug');
   installDebug({
     game: () => game,
+    connection: () => ({ player: localPlayer, connected: shared?.connected ?? false, paused,
+      speed: speedIndex, pendingTicks: shared?.pendingTicks ?? 0, synchronization: shared?.stats, presentationRebuilds,
+      setup: setupKnown ? activeSetup : undefined }),
+    renderPosition,
+    resync: () => shared?.requestResync(),
     cameraCenter: () => cameraCenter,
     zoom: () => zoom,
     selectedIds: () => selectedIds,
@@ -395,25 +480,46 @@ if (import.meta.hot) {
   });
 }
 
-function restart(): void {
+function restart(setup: MatchSetup | undefined = setupKnown ? activeSetup : undefined): boolean {
+  if (!validMatchSetup(setup)) return false;
+  if (shared) {
+    if (localPlayer !== 1) { hud.showMessage('Ysgramor starts a new match'); return false; }
+    return shared.send({ type: 'restart', seed: setup.seed, map: setup.map });
+  }
   replay = undefined;
   clearSession();
-  game = createGame(seedFixed ?? ((Date.now() >>> 0) || 1), rules, undefined, mapType);
+  activeSetup = setup;
+  setupKnown = true;
+  game = createGame(setup.seed, rules, undefined, setup.map);
+  saveMapPreference(setup);
+  saveSession(game, setup);
+  paused = false;
+  resetMatchView();
+  return true;
+}
+
+function resetMatchView(): void {
+  hud.toggleMenu(false);
   cameraCenter = homeCamera(game);
   selectedIds = [];
   buildMode = undefined;
   repairMode = false;
-  paused = false;
-  hud.hideEnd();
-  for (const entityView of views.values()) scene.remove(entityView.group);
-  views.clear();
+  wallStart = undefined;
+  orderFlash = undefined;
+  aiClock = 0;
+  accumulator = 0;
+  ended = false;
+  shownAge = game.players[localPlayer].age;
+  knownOwnUnits = new Set();
+  cueWatcher = createCueWatcher();
+  rebuildPresentation();
 }
 
 const ownSelected = (): Entity[] =>
-  game.entities.filter(e => selectedIds.includes(e.id) && e.owner === 1 && !e.dead);
+  game.entities.filter(e => selectedIds.includes(e.id) && e.owner === localPlayer && !e.dead);
 
 function selectIdleVillager(): void {
-  const idle = game.entities.filter(e => e.owner === 1 && e.kind === 'villager' && !e.dead && e.order.kind === 'idle');
+  const idle = game.entities.filter(e => e.owner === localPlayer && e.kind === 'villager' && !e.dead && e.order.kind === 'idle');
   if (!idle.length) { hud.showMessage('No idle villagers'); return; }
   const current = idle.findIndex(e => selectedIds.includes(e.id));
   const next = idle[(current + 1) % idle.length];
@@ -431,7 +537,7 @@ function runUiCommand(id: string, shift = false): void {
     const kind = id.slice('build-'.length) as BuildingKind;
     // The reference lets the press through and says what is short rather
     // than greying the button (issue #70); nothing is placed until it is paid.
-    const short = shortfall(game, 1, rules.buildings[kind].cost);
+    const short = shortfall(game, localPlayer, rules.buildings[kind].cost);
     if (short) { reject(`not enough ${short}`); return; }
     if (kind === buildMode && rules.buildings[kind].footprint) {
       gateOrientation = gateOrientation === 'x' ? 'y' : 'x';
@@ -440,7 +546,7 @@ function runUiCommand(id: string, shift = false): void {
     return;
   }
   if (id === 'stop') {
-    if (selection.length) applyCommand(game, { kind: 'stop', player: 1, entityIds: selection.map(e => e.id) });
+    if (selection.length) applyCommand(game, { kind: 'stop', player: localPlayer, entityIds: selection.map(e => e.id) });
     return;
   }
   if (id.startsWith('train-')) {
@@ -454,7 +560,7 @@ function runUiCommand(id: string, shift = false): void {
     // is only news when nothing at all was queued.
     const wanted = shift ? BATCH_TRAIN_COUNT : 1;
     for (let queued = 0; queued < wanted; queued++) {
-      const result = applyCommand(game, { kind: 'train', player: 1, buildingId: building.id, unit });
+      const result = applyCommand(game, { kind: 'train', player: localPlayer, buildingId: building.id, unit });
       if (!result.ok) {
         if (queued === 0) reject(result.reason);
         return;
@@ -464,7 +570,7 @@ function runUiCommand(id: string, shift = false): void {
   }
   if (id === 'ungarrison') {
     for (const building of selection.filter(e => isBuilding(e.kind) && e.garrison?.length)) {
-      const result = applyCommand(game, { kind: 'ungarrison', player: 1, buildingId: building.id });
+      const result = applyCommand(game, { kind: 'ungarrison', player: localPlayer, buildingId: building.id });
       if (!result.ok) reject(result.reason);
     }
     return;
@@ -472,7 +578,7 @@ function runUiCommand(id: string, shift = false): void {
   if (id === 'cancel-train') {
     const producer = ownSelected().find(e => isBuilding(e.kind) && (e.training || e.trainingQueue?.length));
     if (!producer) return;
-    applyCommand(game, { kind: 'cancel-train', player: 1, buildingId: producer.id });
+    applyCommand(game, { kind: 'cancel-train', player: localPlayer, buildingId: producer.id });
     return;
   }
   if (id === 'pack' || id === 'unpack') {
@@ -480,7 +586,7 @@ function runUiCommand(id: string, shift = false): void {
       && rules.units[e.kind as UnitKind].unpacked !== undefined);
     if (!engines.length) return;
     applyCommand(game, {
-      kind: 'pack', player: 1, entityIds: engines.map(e => e.id), unpacked: id === 'unpack',
+      kind: 'pack', player: localPlayer, entityIds: engines.map(e => e.id), unpacked: id === 'unpack',
     });
     return;
   }
@@ -488,8 +594,8 @@ function runUiCommand(id: string, shift = false): void {
     const mill = selection.find(e => e.kind === 'mill' && e.buildProgress === undefined);
     if (!mill) return;
     applyCommand(game, {
-      kind: 'reseed', player: 1, buildingId: mill.id,
-      enabled: !(game.players[1].autoReseedFarms === true),
+      kind: 'reseed', player: localPlayer, buildingId: mill.id,
+      enabled: !(game.players[localPlayer].autoReseedFarms === true),
     });
     return;
   }
@@ -498,7 +604,7 @@ function runUiCommand(id: string, shift = false): void {
     const at = rules.technologies[tech as TechKey]?.researchedAt;
     const building = selection.find(e => e.kind === at && e.buildProgress === undefined);
     if (!building) return;
-    const result = applyCommand(game, { kind: 'research', player: 1, buildingId: building.id, tech });
+    const result = applyCommand(game, { kind: 'research', player: localPlayer, buildingId: building.id, tech });
     if (!result.ok) reject(result.reason);
     return;
   }
@@ -546,11 +652,12 @@ function pickEntity(point: Point): Entity | undefined {
     // how much is left; a corpse with nothing on it stays unclickable, so a
     // battlefield of dead soldiers never gets in the way of the living.
     if (entity.dead && !isCarcass(entity)) continue;
-    if (!revealMap && entity.owner !== 1 && entity.owner !== 0 && !isTileVisible(game, 1, entity.position.x, entity.position.y)) continue;
+    if (!revealMap && entity.owner !== localPlayer && entity.owner !== 0 && !isTileVisible(game, localPlayer, entity.position.x, entity.position.y)) continue;
     // Nearest to the click wins, carcass or not. Preferring the living sounds
     // reasonable and is not: villagers eating a carcass stand right on it, so
     // any bias at all puts the corpse back out of reach, which is the bug.
-    const d = Math.hypot(entity.position.x - point.x, entity.position.y - point.y) - entity.radius;
+    const at = renderPosition(entity);
+    const d = Math.hypot(at.x - point.x, at.y - point.y) - entity.radius;
     if (d < Math.min(bestDistance, 0.9)) {
       best = entity;
       bestDistance = d;
@@ -589,7 +696,7 @@ let gateOrientation: 'x' | 'y' = 'x';
 
 function orientationOf(kind: BuildingKind, at: Point): 'x' | 'y' {
   if (!rules.buildings[kind].footprint) return 'x';
-  const joins = (dx: number, dy: number) => game.entities.some(e => !e.dead && e.owner === 1
+  const joins = (dx: number, dy: number) => game.entities.some(e => !e.dead && e.owner === localPlayer
     && e.kind === 'palisade-wall'
     && Math.abs(e.position.x - (at.x + dx)) < 0.6 && Math.abs(e.position.y - (at.y + dy)) < 0.6);
   if (joins(-1.5, 0) || joins(1.5, 0)) return 'x';
@@ -603,7 +710,7 @@ function placeBuilding(kind: BuildingKind, targets: Point[]): void {
   let failure: string | undefined;
   for (const target of targets) {
     const result = applyCommand(game, {
-      kind: 'build', player: 1, builderIds: builders, building: kind, target,
+      kind: 'build', player: localPlayer, builderIds: builders, building: kind, target,
       orientation: orientationOf(kind, target),
     });
     if (!result.ok) failure ??= result.reason;
@@ -674,10 +781,11 @@ addEventListener('pointerup', event => {
     const maxX = Math.max(a.x, b.x, c.x, d.x);
     const minY = Math.min(a.y, b.y, c.y, d.y);
     const maxY = Math.max(a.y, b.y, c.y, d.y);
-    const units = game.entities.filter(e =>
-      !e.dead && e.owner === 1 && isUnit(e.kind) &&
-      e.position.x >= minX && e.position.x <= maxX && e.position.y >= minY && e.position.y <= maxY,
-    );
+    const units = game.entities.filter(e => {
+      if (e.dead || e.owner !== localPlayer || !isUnit(e.kind)) return false;
+      const at = renderPosition(e);
+      return at.x >= minX && at.x <= maxX && at.y >= minY && at.y <= maxY;
+    });
     if (units.length) selectedIds = units.map(e => e.id);
   } else {
     const target = pickEntity(screenToWorld(event.clientX, event.clientY));
@@ -688,8 +796,8 @@ addEventListener('pointerup', event => {
       && now - lastClick.at <= DOUBLE_CLICK_MS;
     lastClick = target ? { id: target.id, at: now } : undefined;
     if (target && again && !event.shiftKey) {
-      selectedIds = sameKindOnScreen(game.entities, target, 1, isOnScreen).map(e => e.id);
-    } else if (target && target.owner === 1) {
+      selectedIds = sameKindOnScreen(game.entities.map(renderEntity), target, localPlayer, isOnScreen).map(e => e.id);
+    } else if (target && target.owner === localPlayer) {
       selectedIds = event.shiftKey ? [...new Set([...selectedIds, target.id])] : [target.id];
     } else if (target) {
       selectedIds = [target.id];
@@ -709,7 +817,7 @@ function contextOrder(point: Point, _clientX: number, _clientY: number, queue = 
   if (units.length) {
     const targetId = target && target.id !== units[0].id ? target.id : undefined;
     const result = applyCommand(game, {
-      kind: 'order', player: 1, entityIds: units.map(e => e.id),
+      kind: 'order', player: localPlayer, entityIds: units.map(e => e.id),
       target: point, targetId,
       // Shift-click falls in behind what they are doing, as the reference does.
       ...(queue ? { queue: true } : {}),
@@ -736,7 +844,7 @@ function contextOrder(point: Point, _clientX: number, _clientY: number, queue = 
     && (hostile || trainableAt(e.kind as BuildingKind).length === 0));
   if (towers.length) {
     const result = applyCommand(game, {
-      kind: 'order', player: 1, entityIds: towers.map(e => e.id),
+      kind: 'order', player: localPlayer, entityIds: towers.map(e => e.id),
       target: point, targetId: hostile ? target!.id : undefined,
     });
     if (!result.ok) reject(result.reason);
@@ -751,7 +859,7 @@ function contextOrder(point: Point, _clientX: number, _clientY: number, queue = 
   const building = selection.find(e => isBuilding(e.kind) && e.buildProgress === undefined
     && trainableAt(e.kind as BuildingKind).length > 0);
   if (building) {
-    applyCommand(game, { kind: 'rally', player: 1, buildingId: building.id, target: point, targetId: target?.id });
+    applyCommand(game, { kind: 'rally', player: localPlayer, buildingId: building.id, target: point, targetId: target?.id });
     hud.showMessage('Rally point set');
     playSound('gatherpoint_set');
   }
@@ -761,12 +869,12 @@ function contextOrder(point: Point, _clientX: number, _clientY: number, queue = 
  * Units this player has that were not there a frame ago. Owned units are
  * always visible, so a new id is one that finished training.
  */
-const cueWatcher = createCueWatcher();
+let cueWatcher = createCueWatcher();
 let knownOwnUnits = new Set<number>();
 function announceTrained(): void {
   const current = new Set<number>();
   for (const entity of game.entities) {
-    if (entity.dead || entity.owner !== 1 || !isUnit(entity.kind)) continue;
+    if (entity.dead || entity.owner !== localPlayer || !isUnit(entity.kind)) continue;
     current.add(entity.id);
     if (knownOwnUnits.size && !knownOwnUnits.has(entity.id)) playUnitSound(entity, 'train');
   }
@@ -777,6 +885,12 @@ function announceTrained(): void {
 const heldKeys = new Set<string>();
 addEventListener('keydown', event => {
   const key = event.key;
+  if (event.target instanceof HTMLElement && event.target.closest('input, select, textarea, [contenteditable="true"]')) {
+    if (key === 'Escape' || key === 'F10') {
+      hud.toggleMenu(false); event.target.blur(); event.preventDefault();
+    }
+    return;
+  }
   if (key.startsWith('Arrow')) { heldKeys.add(key); event.preventDefault(); return; }
   if (key === 'Escape') {
     if (buildMode) { buildMode = undefined; wallStart = undefined; }
@@ -785,7 +899,7 @@ addEventListener('keydown', event => {
     else hud.toggleMenu(true);
     return;
   }
-  if (key === 'F3') { paused = !paused; event.preventDefault(); return; }
+  if (key === 'F3') { setPaused(!paused); event.preventDefault(); return; }
   if (key === 'F4') {
     revealMap = !revealMap;
     hud.showMessage(`Reveal map (debug): ${revealMap ? 'on' : 'off'}`);
@@ -800,7 +914,8 @@ addEventListener('keydown', event => {
     const next = Math.max(0, Math.min(GAME_SPEEDS.length - 1, speedIndex + (faster ? 1 : -1)));
     const setting = GAME_SPEEDS[next];
     if (next !== speedIndex) {
-      speedIndex = next;
+      if (shared) shared.send({ type: 'settings', speed: next });
+      else speedIndex = next;
       hud.showMessage(`Game speed: ${setting.label}`);
     } else {
       hud.showMessage(faster
@@ -816,7 +931,7 @@ addEventListener('keydown', event => {
     // Nothing comes back, so it asks first — and only about what it can
     // actually destroy, since the selection may hold somebody else's.
     const mine = game.entities.filter(e =>
-      selectedIds.includes(e.id) && e.owner === 1 && !e.dead);
+      selectedIds.includes(e.id) && e.owner === localPlayer && !e.dead);
     // What is asked about is the DAT's own list, not "buildings": its
     // `hero_mode` bit 32 is set on the town center, watch tower, monastery,
     // castle and wonder and on nothing else, so a house or a barracks goes on
@@ -830,7 +945,7 @@ addEventListener('keydown', event => {
       ? mine.filter(e => !asked.includes(e))
       : mine;
     if (doomed.length) {
-      applyCommand(game, { kind: 'delete', player: 1, entityIds: doomed.map(e => e.id) });
+      applyCommand(game, { kind: 'delete', player: localPlayer, entityIds: doomed.map(e => e.id) });
       selectedIds = selectedIds.filter(id => !doomed.some(e => e.id === id));
     }
     event.preventDefault();
@@ -851,7 +966,7 @@ addEventListener('keydown', event => {
       && !!binding.shift === event.shiftKey)?.[0];
     if (kind) {
       const mine = game.entities.filter(e =>
-        e.owner === 1 && e.kind === kind && !e.dead && e.buildProgress === undefined);
+        e.owner === localPlayer && e.kind === kind && !e.dead && e.buildProgress === undefined);
       if (mine.length) {
         if (event.shiftKey) {
           selectedIds = mine.map(e => e.id);
@@ -870,7 +985,7 @@ addEventListener('keydown', event => {
     }
   }
   if (key === 'h' || key === 'H') {
-    const tc = game.entities.find(e => e.owner === 1 && e.kind === 'town-center' && !e.dead);
+    const tc = game.entities.find(e => e.owner === localPlayer && e.kind === 'town-center' && !e.dead);
     if (tc) {
       selectedIds = [tc.id];
       cameraCenter = elevatedWorldToIso(game, tc.position.x, tc.position.y);
@@ -915,7 +1030,7 @@ function panCamera(dt: number): void {
 // Command grid derived from the current selection and player resources.
 function currentCommands(): CommandButton[] {
   const selection = ownSelected();
-  const player = game.players[1];
+  const player = game.players[localPlayer];
   const buttons: CommandButton[] = [];
   if (buildMode) {
     return [{
@@ -956,7 +1071,7 @@ function currentCommands(): CommandButton[] {
           help: helpFor(kind, building.cost),
           slot: building.buildButton,
           enabled: true,
-          icon: hud.iconFor('Buildings', assets?.entities[kind]?.iconId, 1),
+          icon: hud.iconFor('Buildings', assets?.entities[kind]?.iconId, localPlayer),
         });
       }
       buttons.push({
@@ -1006,7 +1121,7 @@ function currentCommands(): CommandButton[] {
         // (issue #7). Nor the price or the housing: the reference lets the
         // press through and says what is short (issue #70).
         enabled: queuedCount(producer) < TRAINING_QUEUE_LIMIT,
-        icon: hud.iconFor('Units', assets?.entities[kind]?.iconId, 1),
+        icon: hud.iconFor('Units', assets?.entities[kind]?.iconId, localPlayer),
       });
     }
   }
@@ -1026,7 +1141,7 @@ function currentCommands(): CommandButton[] {
     });
   }
   // Technologies the selected building researches, in the DAT's own order.
-  const player1 = game.players[1];
+  const player1 = game.players[localPlayer];
   for (const [key, tech] of Object.entries(rules.technologies) as [TechKey, typeof rules.technologies[TechKey]][]) {
     const building = selection.find(e => e.kind === tech.researchedAt && e.buildProgress === undefined);
     if (!building) continue;
@@ -1041,7 +1156,7 @@ function currentCommands(): CommandButton[] {
       help: tech.help ? plainHelp(tech.help, tech.cost) : undefined,
       slot: tech.button,
       enabled: !building.researching,
-      icon: hud.iconFor('Techs', tech.iconId, 1),
+      icon: hud.iconFor('Techs', tech.iconId, localPlayer),
     });
   }
   // The mill's one standing option: whether a fallow farm is sown again where
@@ -1084,12 +1199,12 @@ let buildPage: BuildPage | undefined;
 
 const trainableAt = (building: BuildingKind): UnitKind[] =>
   (Object.keys(rules.units) as UnitKind[]).filter(kind =>
-    rules.units[kind].trainedAt === building && (rules.units[kind].age ?? 0) <= game.players[1].age
+    rules.units[kind].trainedAt === building && (rules.units[kind].age ?? 0) <= game.players[localPlayer].age
     && !isAnimal(kind)
     // A unit that has been upgraded past is gone from the panel, not greyed
     // out: the barracks offers the man-at-arms in place of the militia.
-    && !upgradedAway(game, 1, kind)
-    && !notYetUpgradedInto(game, 1, kind));
+    && !upgradedAway(game, localPlayer, kind)
+    && !notYetUpgradedInto(game, localPlayer, kind));
 
 /**
  * What the reference calls this entity key: its own string where the manifest
@@ -1106,13 +1221,13 @@ function resourceStatus(): ResourceStatus {
   let idle = 0;
   let villagers = 0;
   for (const entity of game.entities) {
-    if (entity.owner !== 1 || entity.dead || entity.kind !== 'villager') continue;
+    if (entity.owner !== localPlayer || entity.dead || entity.kind !== 'villager') continue;
     villagers += 1;
     const resource = entity.carrying?.kind ?? gatherTargetResource(game, entity);
     if (resource) workers[resource] += 1;
     else if (entity.order.kind === 'idle') idle += 1;
   }
-  const age = game.players[1].age;
+  const age = game.players[localPlayer].age;
   const imported = assets?.ages[age];
   // `eras.json` names the shield `ShieldDarkAge`; the material table spells
   // the button's normal state `ButtonsShieldDark-AgeNormal`.
@@ -1120,7 +1235,7 @@ function resourceStatus(): ResourceStatus {
     .replace(/^Shield(.*)Age$/, 'ButtonsShield$1-AgeNormal');
   let ageProgress = 0;
   for (const entity of game.entities) {
-    if (entity.owner !== 1 || !entity.researching) continue;
+    if (entity.owner !== localPlayer || !entity.researching) continue;
     const tech = rules.technologies[entity.researching.tech as TechKey];
     if (tech?.grantsAge === undefined) continue;
     const total = tech.researchSeconds / TICK_SECONDS;
@@ -1184,7 +1299,7 @@ function scoreRows(): ScoreRow[] {
   const computer = names.length ? names[(game.matchSeed ?? 0) % names.length] : 'Computer';
   return ([1, 2] as const).map(player => ({
     number: player,
-    name: player === 1 ? 'Player 1' : computer,
+    name: shared ? (player === 1 ? 'Ysgramor' : 'Artemis') : player === 1 ? 'Player 1' : computer,
     color: playerColorHex(assets, player) ?? (player === 1 ? '#3b64ff' : '#ff3b3b'),
     textColor: hud.textColor(playerColorName(player), playerColorHex(assets, player) ?? '#ffffff'),
     // The civilisation's small icon is the material `<Name>Icon`, by the
@@ -1244,7 +1359,7 @@ function selectionInfo(): SelectionInfo | undefined {
       maxHp: member.maxHp,
     }))
     : undefined;
-  if (entity.kind === 'town-center' && entity.owner === 1) details.push(AGE_NAMES[game.players[1].age]);
+  if (entity.kind === 'town-center' && entity.owner === localPlayer) details.push(AGE_NAMES[game.players[localPlayer].age]);
   if (entity.amount !== undefined) details.push(`${Math.floor(entity.amount)} ${entity.resourceKind}`);
   if (entity.garrison?.length) {
     const capacity = rules.buildings[entity.kind as BuildingKind]?.garrison?.capacity;
@@ -1290,15 +1405,15 @@ function selectionInfo(): SelectionInfo | undefined {
 // ---------------------------------------------------------------------------
 // Scene sync.
 function entityVisible(entity: Entity): boolean {
-  if (revealMap || entity.owner === 1) return true;
-  return isTileVisible(game, 1, entity.position.x, entity.position.y);
+  if (revealMap || entity.owner === localPlayer) return true;
+  return isTileVisible(game, localPlayer, entity.position.x, entity.position.y);
 }
 
 function syncScene(time: number): void {
   const wanted = new Set<string>();
   for (const entity of game.entities) {
     if (!entityVisible(entity)) continue;
-    if (!revealMap && entity.owner === 0 && !isTileVisible(game, 1, entity.position.x, entity.position.y)) {
+    if (!revealMap && entity.owner === 0 && !isTileVisible(game, localPlayer, entity.position.x, entity.position.y)) {
       // Gaia in unseen tiles is handled through memory below.
       continue;
     }
@@ -1316,12 +1431,12 @@ function syncScene(time: number): void {
       views.set(key, entityView);
       scene.add(entityView.group);
     }
-    view.updateEntityView(entityView, assets, game, entity, time);
+    view.updateEntityView(entityView, assets, game, renderEntity(entity), time);
   }
   // Remembered fogged entities render as static snapshots (fog dims them).
   // A revealed board draws the real entities, so the snapshots stand down.
-  for (const remembered of revealMap ? [] : Object.values(game.visibility[1].memory)) {
-    if (isTileVisible(game, 1, remembered.x, remembered.y)) continue;
+  for (const remembered of revealMap ? [] : Object.values(game.visibility[localPlayer].memory)) {
+    if (isTileVisible(game, localPlayer, remembered.x, remembered.y)) continue;
     const key = `m${remembered.id}`;
     wanted.add(key);
     let entityView = views.get(key);
@@ -1342,7 +1457,7 @@ function syncScene(time: number): void {
   // Gather-point flags: AoE2 shows one where a selected building sends what it
   // trains, and only while that building is selected.
   for (const entity of game.entities) {
-    if (entity.dead || !entity.rally || entity.owner !== 1) continue;
+    if (entity.dead || !entity.rally || entity.owner !== localPlayer) continue;
     if (!selectedIds.includes(entity.id)) continue;
     const key = `f${entity.id}`;
     wanted.add(key);
@@ -1361,21 +1476,23 @@ function syncScene(time: number): void {
   // Arrows in flight. They are simulation state, so they render from it
   // directly rather than being faked on the view side.
   for (const projectile of game.projectiles) {
-    if (!revealMap && !isTileVisible(game, 1, projectile.position.x, projectile.position.y)) continue;
+    if (!revealMap && !isTileVisible(game, localPlayer, projectile.position.x, projectile.position.y)) continue;
     const key = `p${projectile.id}`;
+    const position = shared?.renderProjectile(projectile) ?? projectile.position;
     wanted.add(key);
     const target = game.entities.find(e => e.id === projectile.targetId);
-    const heading = target
-      ? Math.atan2(target.position.y - projectile.position.y, target.position.x - projectile.position.x)
+    const targetPosition = target ? renderPosition(target) : undefined;
+    const heading = targetPosition
+      ? Math.atan2(targetPosition.y - position.y, targetPosition.x - position.x)
       : 0;
     // Progress along the shot, measured against the launch point so a moving
     // target still gives a sane 0..1 sweep.
     const flown = Math.hypot(
-      projectile.position.x - projectile.origin.x,
-      projectile.position.y - projectile.origin.y,
+      position.x - projectile.origin.x,
+      position.y - projectile.origin.y,
     );
-    const left = target
-      ? Math.hypot(target.position.x - projectile.position.x, target.position.y - projectile.position.y)
+    const left = targetPosition
+      ? Math.hypot(targetPosition.x - position.x, targetPosition.y - position.y)
       : 0;
     const span = flown + left;
     const progress = span > 1e-6 ? flown / span : 0;
@@ -1394,8 +1511,8 @@ function syncScene(time: number): void {
       : undefined;
     const art = shooterRules?.unpacked?.projectileArt ?? shooterRules?.projectileArt ?? 'arrow';
     view.updateProjectileView(
-      entityView, assets, projectile.position, heading, progress, span, projectile.launchHeight,
-      art, time, elevationAt(game, projectile.position.x, projectile.position.y) * ELEVATION_PIXELS,
+      entityView, assets, position, heading, progress, span, projectile.launchHeight,
+      art, time, elevationAt(game, position.x, position.y) * ELEVATION_PIXELS,
     );
   }
 
@@ -1409,7 +1526,7 @@ function syncScene(time: number): void {
   announceTrained();
   // Alerts and feedback, read out of what the view can already see. The
   // simulation never raises them: it does not know about sound.
-  for (const cue of view.pollCues(cueWatcher, game, 1, gameTimeSeconds(game))) playSound(cue);
+  for (const cue of view.pollCues(cueWatcher, game, localPlayer, gameTimeSeconds(game))) playSound(cue);
 
   // Contours for units something else is drawing in front of, once every
   // piece this frame has been placed.
@@ -1422,7 +1539,8 @@ function syncScene(time: number): void {
   let outlinesUsed = 0;
   const drawMarker = (entity: Entity): void => {
     const marker = selectionMarker(entity);
-    const iso = elevatedWorldToIso(game, entity.position.x, entity.position.y);
+    const position = renderPosition(entity);
+    const iso = elevatedWorldToIso(game, position.x, position.y);
     if (marker.shape === 'round') {
       if (ringsUsed === ringPool.length) {
         const ring = new THREE.Mesh(
@@ -1560,7 +1678,7 @@ resize();
 // Snapshot the live match so a full reload (a simulation edit, or any change
 // HMR cannot accept) resumes instead of restarting. Reloads fire pagehide;
 // visibilitychange also covers a tab being backgrounded and discarded.
-const snapshot = (): void => { if (!replay) saveSession(game); };
+const snapshot = (): void => { if (!replay && !shared) saveSession(game, setupKnown ? activeSetup : undefined); };
 addEventListener('pagehide', snapshot);
 addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') snapshot(); });
 
@@ -1568,19 +1686,20 @@ let previous = performance.now();
 let accumulator = 0;
 let hudClock = 0;
 let ended = false;
-let shownAge = game.players[1].age;
+let shownAge = game.players[localPlayer].age;
 
 renderer.setAnimationLoop(now => {
+  shared?.beginRender(performance.now());
   const elapsed = Math.min(0.1, (now - previous) / 1000);
   previous = now;
   panCamera(elapsed);
 
-  if (game.players[1].age !== shownAge) {
-    shownAge = game.players[1].age;
+  if (game.players[localPlayer].age !== shownAge) {
+    shownAge = game.players[localPlayer].age;
     hud.showMessage(`Advancing to the ${AGE_NAMES[shownAge]}`);
   }
 
-  if (!paused && !game.winner) {
+  if (!shared && !paused && !game.winner) {
     // `elapsed` is already capped at 0.1s, so a frame runs at most the fastest
     // setting's multiplier over `TICK_SECONDS` ticks: a machine that cannot
     // keep up falls behind real time rather than spiralling.
@@ -1631,7 +1750,7 @@ renderer.setAnimationLoop(now => {
   hudClock += elapsed;
   if (hudClock > 0.15) {
     hudClock = 0;
-    hud.updateResources(game, 1, resourceStatus());
+    hud.updateResources(game, localPlayer, resourceStatus());
     hud.updateScore(scoreRows());
     hud.setCommands(currentCommands());
     hud.setSelection(selectionInfo());
@@ -1641,7 +1760,7 @@ renderer.setAnimationLoop(now => {
     }, assets, revealMap);
     if (game.winner && !ended) {
       ended = true;
-      hud.showEnd(game.winner === 1);
+      hud.showEnd(game.winner === localPlayer);
     }
     if (!game.winner) ended = false;
   }
@@ -1658,6 +1777,9 @@ renderer.setAnimationLoop(now => {
 // and fall through to Vite's default full reload: those either own or reshape
 // authoritative state, and hot-patching them risks a silent divergence from
 // what a deterministic replay of the same seed would produce.
+// Defer the debug import until all per-match view state has been initialized.
+if (import.meta.hot) void installDevelopmentDebug();
+
 function disposeObject(object: THREE.Object3D): void {
   object.traverse(child => {
     if (!(child instanceof THREE.Mesh)) return;
@@ -1670,6 +1792,7 @@ function disposeObject(object: THREE.Object3D): void {
 
 /** Recreate every view-owned object from the current simulation state. */
 function rebuildPresentation(): void {
+  presentationRebuilds++;
   scene.remove(ground);
   disposeObject(ground);
   ground = view.createGround(game, assets);
@@ -1682,7 +1805,7 @@ function rebuildPresentation(): void {
   scene.remove(fog.mesh);
   disposeObject(fog.mesh);
   fog.dispose();
-  fog = view.createFog(game);
+  fog = view.createFog(game, localPlayer);
   scene.add(fog.mesh);
   fog.update(game);
 
@@ -1694,11 +1817,11 @@ function rebuildPresentation(): void {
   hud.destroy();
   hud = createHud();
   if (menuWasOpen) hud.toggleMenu(true);
-  hud.updateResources(game, 1, resourceStatus());
+  hud.updateResources(game, localPlayer, resourceStatus());
   hud.updateScore(scoreRows());
   hud.setCommands(currentCommands());
   hud.setSelection(selectionInfo());
-  if (game.winner) hud.showEnd(game.winner === 1);
+  if (game.winner) hud.showEnd(game.winner === localPlayer);
 
   syncScene(gameTimeSeconds(game));
 }

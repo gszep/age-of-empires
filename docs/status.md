@@ -1,12 +1,20 @@
 # Project status
 
-What is delivered, what is measured, and how it is verified. What is
+What is delivered, what is measured, and how it is verified. The current
+session/deployment handoff is in [handoff.md](handoff.md). What is
 approximated rather than read is in `docs/ledger.md`; what is still to do is
 the issue tracker (`docs/backlog.md` says how it is used). The evidence for
 each feature is in the commit that shipped it and on its issue — this file
 does not repeat it.
 
 ## Run and play
+
+On the installed Ysgramor service, use **http://localhost:5173/?solo=1**
+for the human's current solo QA, or the same path through
+**https://ysgramor.tail6e864b.ts.net:5173/**. Removing `solo=1` joins the shared
+match. Artemis joins through its own **http://localhost:5174/** gateway.
+
+For a fresh standalone installation:
 
 ```bash
 npm install
@@ -18,12 +26,18 @@ npm run dev
 - Tailnet/mobile QA URL: `https://<host>.tail6e864b.ts.net:5173/` — the
   host is the machine running Vite (`calcifer` or `ysgramor`); both are in
   `vite.config.ts`'s `allowedHosts`.
-- `?map=<name>&seed=<n>` deals a named board (`islands`, `black-forest`,
-  `windsor`, `senlac`, `painted-proof`; none for Arabia); F4 reveals the map;
+- `?map=<name>&seed=<n>` deals a named solo board (`arabia`, `islands`,
+  `black-forest`, `windsor`, `senlac`, `painted-proof`). Omitting setup uses the
+  remembered choice, or Arabia/42 on a first visit. F4 reveals the map;
   `+`/`-` step the game speed.
 
 Controls and hotkeys are in `README.md`. `F10 → Load replay…` plays a
 headless record and checks its periodic hashes.
+
+`F10 → Game Settings` chooses the map and seed without editing a URL (#144).
+Start Game rebuilds the board and minimap; Random requests a fresh seed;
+Restart repeats the chosen setup. Solo sessions remember their setup across
+reloads, while shared selection belongs to the host and is sent to the guest.
 
 ## Delivered scope
 
@@ -79,6 +93,14 @@ JSONL subprocess, deadline subprocess, WebSocket and MCP strategies share
 verification and browser playback; process-isolated paired batches with
 Wilson intervals; an opt-in live-model boundary (`RUN_LIVE_AGENT=1`).
 
+**Household shared play**: one Node-hosted match, two human seats, late-join
+snapshots and tick-ordered command replication with periodic checksum checks;
+reconnect and disk checkpoints; player-specific cameras, selection, HUD and
+fog; transport-stable checksums, bounded buffered playback, interpolated
+presentation and same-map recovery without scene rebuilding (#153).
+Artemis's local gateway serves its own assets while fetching code and
+match traffic from Ysgramor. See `docs/shared-play.md` for setup and evidence.
+
 **Import** (`tools/`): patch-matched DAT rules, palettes, terrain, blend
 masks, overlay masks, water and foam atlases, widgets, fonts, strings,
 particles, hotkeys and audio through a byte-identical local pipeline
@@ -102,7 +124,7 @@ straight to the canvas. Nor the ground's scatter and layer (#55).
 ## Deliberately omitted
 
 Other civilisations (#122) and their bonuses (#123); formations; warships,
-transports and fish traps (#97); the scorpion (#127); campaigns; multiplayer;
+transports and fish traps (#97); the scorpion (#127); campaigns; public multiplayer;
 diplomacy; relics (#130); stone walls; a genetic-algorithm framework;
 separate mobile gameplay. Forty-eight technologies are not researchable, each
 with its reason in the manifest's `skippedTechnologies` (#128). The open
@@ -127,7 +149,7 @@ comparable because the board changed under them.
   local SLD decoder is byte-identical to openage's on all 29,783 frames it
   replaced; every modelled unit's stats match the DAT (487 values, 0
   mismatches, #36).
-- **Tests**: 404 vitest (≈160 s on six workers), 72 import tests, and the
+- **Tests**: 429 vitest (≈150–210 s on six workers), 80 import tests, and the
   browser smoke (`tools/debug_smoke.mjs`: a private server, real clicks and
   keys). Fidelity assertions skip without the owned content; the gate says
   how many skipped.

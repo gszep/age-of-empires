@@ -1585,6 +1585,10 @@ def extract(
             for name, string_id in (
                 ("notEnoughFood", 3001), ("notEnoughWood", 3002), ("notEnoughStone", 3003),
                 ("notEnoughGold", 3004), ("needMoreHouses", 3005),
+                # Map setup labels and the three shipped random-map names (#144).
+                ("mapType", 9691), ("mapSeed", 10658), ("startGame", 9472),
+                ("gameSettings", 9682), ("randomSeed", 10107),
+                ("mapArabia", 10875), ("mapBlackForest", 10878), ("mapIslands", 10885),
             )
             if strings is not None and string_id in strings
         },

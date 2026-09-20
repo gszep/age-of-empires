@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "shared:host": "tsx tools/shared-host.mts",
+    "shared:join": "node tools/shared-join.mjs",
     "build": "tsc --noEmit && vite build",
     "build:public": "OPEN_CONTENT_ONLY=1 tsc --noEmit && OPEN_CONTENT_ONLY=1 vite build",
     "test": "vitest run",

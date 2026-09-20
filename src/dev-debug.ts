@@ -16,6 +16,8 @@
 
 import * as THREE from 'three/webgpu';
 import { gameTimeSeconds, queuedCount } from './sim/game';
+import { checksumState } from './sim/checksum';
+import { synchronizationHash } from './shared/checksum';
 import type { CommandResult } from './sim/game';
 import type { Command, Entity, GameState, Point } from './sim/types';
 import { colorStats, type ColorStats, edgeWidth, lumaProfile, matchCount } from './dev-debug-stats';
@@ -24,6 +26,9 @@ import { WALL_JOINT, WALL_POST, WALL_RUN_X, WALL_RUN_Y, wallShape } from './view
 
 export interface DebugContext {
   game(): GameState;
+  renderPosition?(entity: Entity): Point;
+  resync?(): void;
+  connection?(): { player: number; connected: boolean; paused: boolean };
   cameraCenter(): Point;
   zoom(): number;
   selectedIds(): number[];
@@ -37,6 +42,7 @@ export interface DebugContext {
   scene: THREE.Scene;
   camera: THREE.Camera;
   views: Map<string, {
+    body?: { mesh?: { visible?: boolean } };
     animationState?: string;
     frameIndex?: number;
     facing: number;
@@ -47,7 +53,7 @@ export interface DebugContext {
 }
 
 interface DebugQuery {
-  type: 'sim' | 'entities' | 'pixels' | 'edge' | 'command' | 'select' | 'look';
+  type: 'sim' | 'snapshot' | 'resync' | 'entities' | 'pixels' | 'edge' | 'command' | 'select' | 'look';
   id?: number;
   owner?: number;
   kind?: string;
@@ -68,6 +74,8 @@ interface DebugQuery {
 
 export function installDebug(context: DebugContext): void {
   const hot = import.meta.hot!;
+  // A page-local probe cannot accidentally measure another tab on the shared host.
+  Object.assign(globalThis, { __empiresDebug: (query: DebugQuery) => handle(query) });
 
   hot.on('aoe:debug-request', async (message: { id: number; query: DebugQuery }) => {
     try {
@@ -92,7 +100,8 @@ export function installDebug(context: DebugContext): void {
   }
 
   function describeEntity(entity: Entity): Record<string, unknown> {
-    const screen = toScreen(entity.position.x, entity.position.y);
+    const position = context.renderPosition?.(entity) ?? entity.position;
+    const screen = toScreen(position.x, position.y);
     const canvas = context.renderer.domElement;
     const view = context.views.get(`e${entity.id}`);
     const material = view?.color.mesh?.material as { color?: { getHexString(): string } } | undefined;
@@ -130,6 +139,7 @@ export function installDebug(context: DebugContext): void {
       screen: { x: Math.round(screen.x), y: Math.round(screen.y) },
       onScreen: screen.x >= 0 && screen.x < canvas.clientWidth && screen.y >= 0 && screen.y < canvas.clientHeight,
       rendered: view !== undefined,
+      bodyVisible: view?.body?.mesh?.visible ?? false,
       animation: view?.animationState,
       frame: view?.frameIndex,
       facing: view ? round(view.facing) : undefined,
@@ -243,6 +253,8 @@ export function installDebug(context: DebugContext): void {
   }
 
   async function handle(query: DebugQuery): Promise<unknown> {
+    if (query.type === 'resync') { context.resync?.(); return { ok: true }; }
+    if (query.type === 'snapshot') return context.game();
     const game = context.game();
     if (query.type === 'sim') {
       const counts: Record<string, Record<string, number>> = {};
@@ -253,6 +265,9 @@ export function installDebug(context: DebugContext): void {
       }
       return {
         tick: game.tick,
+        checksum: checksumState(game),
+        synchronizationHash: synchronizationHash(game),
+        connection: context.connection?.(),
         seconds: round(gameTimeSeconds(game)),
         winner: game.winner,
         players: Object.fromEntries(Object.entries(game.players).map(([id, player]) => [id, {

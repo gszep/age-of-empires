@@ -58,7 +58,7 @@ export class Minimap {
    */
   private tiles?: { canvas: HTMLCanvasElement; image: ImageData };
 
-  constructor(private canvas: HTMLCanvasElement, private player: PlayerId = 1) {
+  constructor(private canvas: HTMLCanvasElement, public player: PlayerId = 1) {
     this.context = canvas.getContext('2d')!;
   }
 

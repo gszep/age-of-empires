@@ -210,6 +210,10 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 
 ## Before writing or trusting a test
 
+- **A network test uses the wire codec.** `structuredClone` preserves
+  undefined properties that JSON drops. Their later insertion order produced
+  different raw-JSON checksums for identical game values (#153); shared-play
+  tests now cross JSON, and synchronization hashes order object fields.
 - **The test measures the outcome, never the intermediate table.**
   `unitRulesFor` returned 5 after Fletching; combat read
   `state.rules.units[kind]` and dealt 4 for the match. Hit points lost, food

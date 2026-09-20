@@ -92,6 +92,7 @@ export interface HudCallbacks {
   onMenu(action: 'resume' | 'restart' | 'pause'): void;
   onReplayFile(record: unknown): void;
   onSound(alias: string): void;
+  onStartMatch(setup: { map: string; seed: number }): boolean;
 }
 
 const REFERENCE_WIDTH = 3840;
@@ -221,6 +222,18 @@ export class Hud {
         <h2>Menu</h2>
         <button data-menu="resume">Resume</button>
         <button data-menu="restart">Restart</button>
+        <form id="map-setup">
+          <h3 data-map-label="gameSettings">Game Settings</h3>
+          <label for="map-choice" data-map-label="mapType">Map Type</label>
+          <select id="map-choice" name="map"></select>
+          <label for="map-seed" data-map-label="mapSeed">Seed</label>
+          <div class="seed-row">
+            <input id="map-seed" name="seed" type="number" min="1" max="4294967295" step="1" inputmode="numeric" placeholder="Random">
+            <button type="button" id="random-map-seed" data-map-label="randomSeed">Random</button>
+          </div>
+          <button type="submit" data-map-label="startGame">Start Game</button>
+          <p id="map-host-note" hidden>Ysgramor starts shared matches.</p>
+        </form>
         <button data-menu="load-replay">Load replay…</button>
         <input id="replay-file" type="file" accept=".json" style="display:none">
       </div>
@@ -273,6 +286,21 @@ export class Hud {
     this.messageBox = this.root.querySelector('#game-message')!;
     this.menuDialog = this.root.querySelector('#menu-dialog')!;
     this.endDialog = this.root.querySelector('#end-dialog')!;
+    const mapForm = this.root.querySelector<HTMLFormElement>('#map-setup')!;
+    const seedInput = this.root.querySelector<HTMLInputElement>('#map-seed')!;
+    this.root.querySelector('#random-map-seed')!.addEventListener('click', () => {
+      this.callbacks.onSound('button_ui');
+      seedInput.value = '';
+      seedInput.focus();
+    });
+    mapForm.addEventListener('submit', event => {
+      event.preventDefault();
+      if (mapForm.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled || !mapForm.reportValidity()) return;
+      const map = this.root.querySelector<HTMLSelectElement>('#map-choice')!.value;
+      const seed = seedInput.value === '' ? ((Date.now() >>> 0) || 1) : seedInput.valueAsNumber;
+      this.callbacks.onSound('button_ui');
+      if (this.callbacks.onStartMatch({ map, seed })) this.toggleMenu(false);
+    });
 
     this.root.addEventListener('pointerdown', event => event.stopPropagation());
     this.root.addEventListener('click', event => {
@@ -437,6 +465,31 @@ export class Hud {
   private applyScale(): void {
     const scale = Math.max(0.24, Math.min(0.62, innerWidth / REFERENCE_WIDTH));
     this.root.style.setProperty('--ui-scale', String(scale));
+  }
+
+  configureMapMenu(
+    choices: { id: string; label: string }[], setup: { map: string; seed: number },
+    enabled: boolean, strings: Record<string, string>, setupKnown = true,
+  ): void {
+    const select = this.root.querySelector<HTMLSelectElement>('#map-choice')!;
+    select.replaceChildren(...choices.map(choice => new Option(choice.label, choice.id)));
+    select.value = setup.map;
+    const seed = this.root.querySelector<HTMLInputElement>('#map-seed')!;
+    seed.value = setupKnown ? String(setup.seed) : '';
+    seed.placeholder = strings.randomSeed ?? 'Random';
+    for (const label of this.root.querySelectorAll<HTMLElement>('[data-map-label]')) {
+      const text = strings[label.dataset.mapLabel!];
+      if (text) label.textContent = text;
+    }
+    for (const control of this.root.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>('#map-setup input, #map-setup select, #map-setup button')) {
+      control.disabled = !enabled;
+    }
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-menu="restart"]')) {
+      button.disabled = !enabled || (!setupKnown && !button.closest('#end-dialog'));
+    }
+    const note = this.root.querySelector<HTMLElement>('#map-host-note')!;
+    note.hidden = enabled && setupKnown;
+    note.textContent = enabled ? 'Choose a map and seed to start a new game.' : 'Ysgramor starts shared matches.';
   }
 
   toggleMenu(open?: boolean): void {

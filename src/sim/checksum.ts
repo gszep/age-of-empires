@@ -11,7 +11,11 @@ export function canonicalSnapshot(state: GameState): string {
 
 /** FNV-1a over a canonical authoritative snapshot. */
 export function checksumState(state: GameState): string {
-  const canonical = canonicalSnapshot(state);
+  return checksumText(canonicalSnapshot(state));
+}
+
+/** Shared primitive; the legacy replay serialization above remains unchanged. */
+export function checksumText(canonical: string): string {
   let hash = 0x811c9dc5;
   for (let i = 0; i < canonical.length; i++) {
     hash ^= canonical.charCodeAt(i);

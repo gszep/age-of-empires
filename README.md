@@ -10,8 +10,13 @@ npm run dev
 ```
 
 - Public open-content build: <https://empires.gszep.com/>
-- Desktop development: <http://localhost:5173/>
-- Tailnet imported-content verification: <https://calcifer.tail6e864b.ts.net:5173/> (or `ysgramor` on the same tailnet; both hosts are in `vite.config.ts`'s `allowedHosts`)
+- Current Ysgramor solo testing: <http://localhost:5173/?solo=1> or <https://ysgramor.tail6e864b.ts.net:5173/?solo=1>
+- Shared game: <http://localhost:5173/> on Ysgramor; <http://localhost:5174/> on Artemis (its local gateway joins Ysgramor).
+- Tailnet imported-content verification also supports `calcifer`; both hosts are in `vite.config.ts`'s `allowedHosts`.
+
+The installed user service already occupies port 5173. The commands above are
+for a fresh standalone setup; use `npm run dev -- --port 5175` for a separate
+dev server alongside the service. Current agent handoff: [docs/handoff.md](docs/handoff.md).
 
 The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the same complete composition for remote QA.
 
@@ -63,9 +68,14 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 - `F4` toggles a debug reveal of the whole map. It is strictly a view-side
   override — the simulation's fog, the AI's observation and every checksum are
   untouched, so a revealed match replays identically to a fogged one.
-- `?seed=` in the URL deals a named board (`?seed=3` has a pond in a wood
-  around tile 11,62) and keeps it across New Match; without it a fresh load is
-  seed 42 and New Match deals from the clock.
+- **F10 → Game Settings** selects any supported map. Enter a **Seed** to
+  reproduce a board, or press **Random** for a fresh seed, then **Start Game**.
+  Changing a field alone leaves the current match running. The chosen map and
+  seed are remembered; **Restart** repeats them. In shared play, Ysgramor
+  controls these settings and Artemis sees the selected values.
+- `?seed=` still works for direct links (`?seed=3` has a pond in a wood around
+  tile 11,62). The first visit defaults to Arabia, seed 42; later visits use
+  the last chosen setup unless the URL overrides it.
 - `?map=` in the URL picks the board: `islands` (one island each, sea
   between; the shore and the water are where terrain blending shows best),
   `black-forest`, `senlac` (the real ground
@@ -110,6 +120,37 @@ npm run test:live-agent   # opt-in: one bounded call using existing machine auth
 ```
 
 Strategies may be `builtin`, `idle`, `cmd:<shell>`, `deadline-cmd:<shell>`, `ws:<url>`, or `mcp:<shell>`. JSONL subprocesses, WebSockets, and MCP tools all return the same versioned public commands consumed by the browser and simulation.
+
+## Two-machine shared play
+
+For solo testing against the AI on the same server, open
+**<http://localhost:5173/?solo=1>** (or add `solo=1` to your usual Tailscale
+link). Map and seed options work normally, e.g. `?solo=1&map=islands&seed=7`.
+Remove `solo=1` to rejoin the shared match.
+
+Ysgramor hosts one authoritative match; Artemis joins as player 2 and reads
+its artwork from its own disk. Each player has their own camera, selection,
+fog and HUD. The host sends snapshots on join/reconnect and ordered commands
+between them; both browsers run the same simulation and compare checksums.
+
+```bash
+# Ysgramor (in place of npm run dev)
+npm run shared:host
+
+# Artemis: game code comes from Ysgramor, artwork from this public directory
+MATCH_ASSETS=/path/to/local/public npm run shared:join
+```
+
+On Ysgramor open the usual `http://localhost:5173/` or existing Tailscale
+link. **On Artemis open <http://localhost:5174/>**. A remote web page cannot
+read the local Steam installation; the join service is what serves the local
+import. It never falls back to downloading a missing texture from Ysgramor.
+Base and Enhanced Graphics Pack imports both work, independently per machine.
+
+`node tools/install-shared.mjs host` (Ysgramor) or
+`node tools/install-shared.mjs join /path/to/local/public` (Artemis) installs
+the user service `open-empires-shared`, starting automatically with the user
+session. See [shared-play setup and checks](docs/shared-play.md).
 
 Imported Microsoft content is generated under ignored `public/imported/` and is never committed. Owners can follow the cross-platform [Steam asset setup guide](docs/owned-assets-setup.md), including Linux, macOS, and Windows/WSL2 paths. Batch results, replay files, and local tool state belong under ignored `.local/`.
 

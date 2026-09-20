@@ -354,9 +354,25 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   const jobs: Promise<void>[] = [];
   // Sprite pages load on demand (`spriteTexture`); this is what a miss starts.
   const pending = new Set<string>();
+  const waiting: string[] = [];
+  const failedAt = new Map<string, number>();
+  let active = 0;
   const loadTexture = (image: string) => {
     if (textures.has(image) || pending.has(image)) return;
+    // Avoid retrying an absent page every render frame; allow recovery after a local import.
+    if (performance.now() - (failedAt.get(image) ?? -Infinity) < 10_000) return;
     pending.add(image);
+    waiting.push(image);
+    pumpTextures();
+  };
+  const pumpTextures = () => {
+    // Bound simultaneous PNG decoding/upload pressure when a new area comes into view.
+    while (active < 4 && waiting.length) {
+      active++;
+      startTexture(waiting.shift()!);
+    }
+  };
+  const startTexture = (image: string) => {
     loader.loadAsync(CONTENT_BASE + image).then(texture => {
       texture.colorSpace = THREE.SRGBColorSpace;
       // Sprites are x1 art drawn at 1:1 CSS pixels, so a HiDPI backing store
@@ -373,10 +389,14 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
       // wrote rather than as an sRGB colour to be decoded.
       if (/-playercolor(-p\d+)?\.png$/.test(image)) texture.colorSpace = THREE.NoColorSpace;
       textures.set(image, texture);
-      pending.delete(image);
+      failedAt.delete(image);
     }, error => {
-      pending.delete(image);
+      failedAt.set(image, performance.now());
       console.error(`sprite page ${image} failed to load`, error);
+    }).finally(() => {
+      pending.delete(image);
+      active--;
+      pumpTextures();
     });
   };
   const terrain = manifest.terrain ?? {};
