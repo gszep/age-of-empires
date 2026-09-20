@@ -17,7 +17,7 @@ from typing import Any
 
 from genieutils.datfile import DatFile
 
-from depot import depot_root
+from depot import Graphics, depot_root
 
 # The DAT's stockpiles. 17 is its fish storage -- what a fish holds and a
 # fishing task takes in -- and it lands in the food stockpile like meat and
@@ -251,18 +251,25 @@ def resolve_graphic_id(unit: Any, animation: dict[str, Any], civ_units: Any, dat
 
 
 def animation_entry(
-    dat: DatFile, graphics_dir: Path, graphic_id: int, hashes: dict[str, str]
+    dat: DatFile, graphics_dir: Path | Graphics, graphic_id: int, hashes: dict[str, str]
 ) -> dict[str, Any]:
+    """One graphic's art: the DAT's counts and timing, and the file to decode.
+
+    `source` is the file actually decoded and `scale` its pixels per screen
+    unit: the DAT's `_x1` at 1, or the Enhanced Graphics Pack's `_x2` twin at
+    2 when that depot is present (`depot.Graphics.source`).
+    """
     graphic = dat.graphics[graphic_id]
     if graphic is None or not graphic.file_name or graphic.file_name == "None":
         raise ValueError(f"graphic {graphic_id} has no source file")
-    sld = graphics_dir / f"{graphic.file_name}.sld"
+    sld, scale = Graphics.of(graphics_dir).source(graphic.file_name)
     if not sld.is_file():
         raise FileNotFoundError(sld)
     hashes[sld.name] = sha256(sld)
     return {
         "graphicId": graphic_id,
         "source": sld.name,
+        "scale": scale,
         "frames": graphic.frame_count,
         "directions": graphic.angle_count,
         "frameSeconds": rounded(graphic.frame_duration),
@@ -394,7 +401,7 @@ def extract_entity(
     dat: DatFile,
     civ_units: Any,
     spec: dict[str, Any],
-    graphics_dir: Path,
+    graphics_dir: Path | Graphics,
     hashes: dict[str, str],
     strings: dict[int, str] | None = None,
 ) -> dict[str, Any]:
@@ -828,7 +835,7 @@ def extract_entity(
 
 
 def effect_entry(
-    dat: DatFile, graphics_dir: Path, spec: dict[str, Any], hashes: dict[str, str]
+    dat: DatFile, graphics_dir: Path | Graphics, spec: dict[str, Any], hashes: dict[str, str]
 ) -> dict[str, Any]:
     """Art the engine draws itself, with no unit behind it to resolve it from.
 
@@ -1471,8 +1478,16 @@ def extract(
     spec: dict[str, Any],
     source: dict[str, Any],
     strings_path: Path | None = None,
+    uhd_dir: Path | None = None,
 ) -> dict[str, Any]:
+    """Everything the game reads off the owned data, as `content.json`.
+
+    `uhd_dir` is the Enhanced Graphics Pack's graphics directory when that
+    depot is downloaded: every animation whose `_x2` twin it holds is then
+    sourced from the pack at scale 2 (issue #151).
+    """
     dat = DatFile.parse(dat_path)
+    graphics = Graphics.of(graphics_dir, uhd_dir)
     hashes: dict[str, str] = {"dat": sha256(dat_path)}
     strings: dict[int, str] | None = None
     if strings_path is not None and strings_path.is_file():
@@ -1482,10 +1497,10 @@ def extract(
     for entity_spec in spec["entities"]:
         civ_index = spec["gaiaIndex"] if entity_spec.get("civ") == "gaia" else spec["civIndex"]
         entities[entity_spec["key"]] = extract_entity(
-            dat, dat.civs[civ_index].units, entity_spec, graphics_dir, hashes, strings
+            dat, dat.civs[civ_index].units, entity_spec, graphics, hashes, strings
         )
     for effect_spec in spec.get("effects", []):
-        entities[effect_spec["key"]] = effect_entry(dat, graphics_dir, effect_spec, hashes)
+        entities[effect_spec["key"]] = effect_entry(dat, graphics, effect_spec, hashes)
     # The particle definitions the buildings' fires name, from the directory
     # beside the DAT's.
     flame_names = {
@@ -1596,6 +1611,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dat", type=Path, default=content / "resources/_common/dat/empires2_x2_p1.dat")
     parser.add_argument("--graphics", type=Path, default=resources / "resources/_common/drs/graphics")
+    parser.add_argument("--uhd-graphics", type=Path, default=None,
+                        help="the Enhanced Graphics Pack's graphics directory, preferred when given")
     parser.add_argument("--palettes", type=Path, default=content / "resources/_common/palettes")
     parser.add_argument("--strings", type=Path,
                         default=content / "resources/en/strings/key-value/key-value-strings-utf8.txt")
@@ -1611,6 +1628,7 @@ def main() -> None:
         json.loads(args.spec.read_text()),
         json.loads(args.source.read_text()),
         args.strings,
+        uhd_dir=args.uhd_graphics,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")

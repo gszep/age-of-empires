@@ -178,6 +178,62 @@ describe('the colours a player is drawn in', () => {
   });
 });
 
+describe("the Enhanced Graphics Pack's x2 art", () => {
+  /** The villager's idle at x2: an 8x8 frame with its hotspot at (4, 6), on
+   * the second of two pages, beside the x1 sheet's 4x4 at (2, 3). */
+  function x1Assets(): ContentAssets {
+    const assets = fakeAssets();
+    assets.entities.villager.atlases.idle.frames = [{ x: 0, y: 0, w: 4, h: 4, cx: 2, cy: 3 }];
+    return assets;
+  }
+  function x2Assets(): ContentAssets {
+    const assets = x1Assets();
+    for (const image of ['villager/idle-p1.png', 'villager/idle-playercolor-p1.png']) {
+      const texture = new THREE.DataTexture(new Uint8Array(16 * 16 * 4), 16, 16);
+      texture.needsUpdate = true;
+      assets.textures.set(image, texture);
+    }
+    const paged = (image: string): Atlas => ({
+      image, size: [8, 8], framesInFile: 1, scale: 2,
+      frames: [{ x: 4, y: 4, w: 8, h: 8, cx: 4, cy: 6, page: 1 }],
+      pages: [{ image, size: [8, 8] }, { image: image.replace('.png', '-p1.png'), size: [16, 16] }],
+    });
+    assets.entities.villager.atlases = {
+      idle: paged('villager/idle.png'), 'idle-playercolor': paged('villager/idle-playercolor.png'),
+    };
+    return assets;
+  }
+
+  it('draws at half size, anchored where the x1 frame anchors', () => {
+    const state = createGame();
+    const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const x1 = createEntityView(x1Assets(), villager);
+    updateEntityView(x1, x1Assets(), state, villager, 0);
+    const x2 = createEntityView(x2Assets(), villager);
+    updateEntityView(x2, x2Assets(), state, villager, 0);
+    expect(x2.body.mesh.scale.x).toBe(4);
+    expect(x2.body.mesh.scale.y).toBe(4);
+    expect(x2.body.mesh.position.x).toBe(x1.body.mesh.position.x);
+    expect(x2.body.mesh.position.y).toBe(x1.body.mesh.position.y);
+  });
+
+  it('samples the page the frame is on, in that page\'s pixels', () => {
+    const state = createGame();
+    const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const assets = x2Assets();
+    const view = createEntityView(assets, villager);
+    updateEntityView(view, assets, state, villager, 0);
+    expect((view.body.mesh.material as THREE.MeshBasicMaterial).map).toBe(assets.textures.get('villager/idle-p1.png'));
+    expect(view.color?.mapNode?.value).toBe(assets.textures.get('villager/idle-playercolor-p1.png'));
+    // The frame's box on a 16x16 page, half a texel in: (4..12)/16.
+    const uv = view.body.mesh.geometry.getAttribute('uv') as THREE.BufferAttribute;
+    expect(uv.getX(0)).toBeCloseTo(4 / 16 + 0.5 / 16);
+    expect(uv.getX(1)).toBeCloseTo(12 / 16 - 0.5 / 16);
+    expect(uv.getY(0)).toBeCloseTo(1 - 4 / 16 - 0.5 / 16);
+    expect(uv.getY(2)).toBeCloseTo(1 - 12 / 16 + 0.5 / 16);
+  });
+});
+
 describe('what a building wears in each age', () => {
   /** A barracks with Dark and Castle art but nothing for the Feudal Age. */
   function agedAssets(present: string[]): ContentAssets {

@@ -16,6 +16,8 @@ WIDGETUI="$DEPOT_ROOT/depot_813782/widgetui"
 FONTS="$DEPOT_ROOT/depot_813781/resources/_common/fonts"
 TERRAIN="$DEPOT_ROOT/depot_813782/resources/_common/terrain/textures/2x"
 GRAPHICS="$DEPOT_ROOT/depot_813784/resources/_common/drs/graphics"
+# The Enhanced Graphics Pack (depot 1039811): optional, preferred when present.
+UHD_GRAPHICS="$DEPOT_ROOT/depot_1039811/resources/_common/drs/graphics"
 AUDIO_PACK="$DEPOT_ROOT/depot_813783/wwise/Base.pck"
 
 for required in "$DAT" "$SOUNDS" "$BLENDOMATIC" "$HOTKEYS" "$STRINGS" "$PALETTES" "$WIDGETUI" "$TERRAIN" "$GRAPHICS"; do
@@ -26,10 +28,18 @@ for required in "$DAT" "$SOUNDS" "$BLENDOMATIC" "$HOTKEYS" "$STRINGS" "$PALETTES
   fi
 done
 
+UHD=()
+if [ -d "$UHD_GRAPHICS" ]; then
+  UHD=(--uhd-graphics "$UHD_GRAPHICS")
+  echo "Enhanced Graphics Pack found; sprites import at x2." >&2
+else
+  echo "Enhanced Graphics Pack (depot 1039811) not found; sprites import at x1." >&2
+fi
+
 uv run --project "$ROOT" --locked python "$ROOT/tools/import_content.py" \
-  --dat "$DAT" --graphics "$GRAPHICS" --palettes "$PALETTES" --strings "$STRINGS"
+  --dat "$DAT" --graphics "$GRAPHICS" "${UHD[@]}" --palettes "$PALETTES" --strings "$STRINGS"
 uv run --project "$ROOT" --locked python "$ROOT/tools/convert_sld.py" \
-  --graphics "$GRAPHICS" --terrain "$TERRAIN"
+  --graphics "$GRAPHICS" "${UHD[@]}" --terrain "$TERRAIN"
 uv run --project "$ROOT" --locked python "$ROOT/tools/import_ui.py" \
   --widgetui "$WIDGETUI" --sounds "$SOUNDS" --hotkeys "$HOTKEYS" --fonts "$FONTS"
 uv run --project "$ROOT" --locked python "$ROOT/tools/import_blends.py" \

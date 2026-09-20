@@ -19,7 +19,7 @@ import * as THREE from 'three/webgpu';
 import { ARABIA_BIOMES, TERRAIN_BEACH, isOpenWater, type BiomeSpec } from '../sim/mapgen';
 import { random01, seedFrom } from '../sim/random';
 import type { GameState, ReadonlyGameState } from '../sim/types';
-import type { Atlas, ContentAssets } from './assets';
+import { atlasPage, spriteTexture, type Atlas, type ContentAssets } from './assets';
 import { isoDepth, worldToIso } from './iso';
 import { elevationAt, ELEVATION_PIXELS } from './world';
 
@@ -131,13 +131,16 @@ export function createScatter(state: ReadonlyGameState, assets: ContentAssets | 
   if (!assets) return group;
   for (const { key, x, y } of scatterPlacements(state)) {
     const atlas: Atlas | undefined = assets.entities[key]?.atlases['idle'];
-    const texture = atlas && assets.textures.get(atlas.image);
-    if (!atlas || !texture) continue;
+    if (!atlas) continue;
     // The idle sheet holds the object's variants; pick one by where it stands.
     const hash = (Math.imul(Math.floor(x * 7), 73_856_093) ^ Math.imul(Math.floor(y * 7), 19_349_663)) >>> 0;
     const frame = atlas.frames[hash % atlas.frames.length];
     if (!frame || frame.w === 0 || frame.h === 0) continue;
-    const [atlasWidth, atlasHeight] = atlas.size;
+    const page = atlasPage(atlas, frame);
+    // The page may still be loading (`spriteTexture`): the mesh is built
+    // now, hidden, and `fillScatter` shows it once the page lands.
+    const texture = spriteTexture(assets, page.image);
+    const [atlasWidth, atlasHeight] = page.size;
     const geometry = new THREE.PlaneGeometry(1, 1);
     const uv = geometry.getAttribute('uv') as THREE.BufferAttribute;
     const insetX = 0.5 / atlasWidth;
@@ -151,12 +154,17 @@ export function createScatter(state: ReadonlyGameState, assets: ContentAssets | 
     uv.setXY(2, left, bottom);
     uv.setXY(3, right, bottom);
     const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-      map: texture, transparent: true, depthWrite: false, depthTest: false,
+      map: texture ?? null, transparent: true, depthWrite: false, depthTest: false,
     }));
-    mesh.scale.set(frame.w, frame.h, 1);
+    mesh.visible = Boolean(texture);
+    mesh.userData.page = page.image;
+    const scale = atlas.scale ?? 1;
+    const w = frame.w / scale;
+    const h = frame.h / scale;
+    mesh.scale.set(w, h, 1);
     const iso = worldToIso(x, y);
     iso.y += elevationAt(state, x, y) * ELEVATION_PIXELS;
-    mesh.position.set(iso.x + frame.w / 2 - frame.cx, iso.y - frame.h / 2 + frame.cy, 0);
+    mesh.position.set(iso.x + w / 2 - frame.cx / scale, iso.y - h / 2 + frame.cy / scale, 0);
     // Among the entity bodies, at its own depth, so a villager walks in
     // front of a bush and behind the next one.
     mesh.renderOrder = 1000 + isoDepth(x, y) * 10;
@@ -164,4 +172,18 @@ export function createScatter(state: ReadonlyGameState, assets: ContentAssets | 
     group.add(mesh);
   }
   return group;
+}
+
+/** Show each scatter sprite whose page has landed since it was built. */
+export function fillScatter(group: THREE.Group, assets: ContentAssets | undefined): void {
+  if (!assets) return;
+  for (const child of group.children) {
+    if (child.visible) continue;
+    const texture = assets.textures.get(child.userData.page as string);
+    if (!texture) continue;
+    const material = (child as THREE.Mesh).material as THREE.MeshBasicMaterial;
+    material.map = texture;
+    material.needsUpdate = true;
+    child.visible = true;
+  }
 }

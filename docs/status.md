@@ -83,9 +83,16 @@ Wilson intervals; an opt-in live-model boundary (`RUN_LIVE_AGENT=1`).
 masks, overlay masks, water and foam atlases, widgets, fonts, strings,
 particles, hotkeys and audio through a byte-identical local pipeline
 (`tools/import_aoe2.sh`, openage-free); the open fallback stays playable
-without any of it. The base depots only: the Enhanced Graphics Pack is
-pinned (#150, decided for the pack) but not yet imported (#151), and every
-DE capture in the reference corpus was taken with it installed.
+without any of it. With the Enhanced Graphics Pack downloaded (depot
+1039811, #150/#151) every sprite is sourced from its `_x2` file at scale 2
+and drawn at half size, where its drawn pixels land within one x1 pixel of
+the base art's; sheets over 8192 px continue on pages. The base depots
+alone still import at x1. Sprite pages load on first use rather than all
+at start -- the pack's 1,839 sheets are 5.5 GB of PNG, and loading them
+up front took the machine down (WSL, 15 GB) -- so a sprite may be absent
+for a frame or two on its first appearance; nothing evicts a page once
+uploaded (#152). Every DE capture in the reference corpus was taken with
+the pack installed, so texture detail now compares like for like.
 
 **Not drawn** (#149): DE's frame is composited offscreen through
 `CombineTerrainSpriteSMP` with bloom, the biome's colour grade, vignette and

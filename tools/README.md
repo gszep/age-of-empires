@@ -36,7 +36,9 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    `public/imported/aoe2/<key>/<state>.png` plus the combined manifest. The
    player-colour sheet carries the main layer's grey in RGB and the mask's
    coverage in alpha, because that grey indexes the player's palette block.
-   Decoding all of it takes about twenty minutes, so an atlas is reused from
+   Sheets convert in parallel (`--jobs`, four by default; a worker on a
+   large x2 sheet holds two gigabytes). Decoding all of it still takes the
+   better part of an hour, so an atlas is reused from
    `.local/aoe2de/atlas-cache.json` when its source hash, its frame count and a
    fingerprint of the decoder's own code are unchanged — adding one unit costs
    under a minute, and editing the decoder still regenerates everything.
@@ -44,6 +46,16 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    byte-identical atlases and manifest. When only DAT terrain slots changed,
    `convert_sld.py --terrain-only` updates those DDS textures in an existing
    manifest without needlessly decoding every SLD first.
+   With the Enhanced Graphics Pack downloaded (depot `1039811`, beside the
+   base depots) both steps take `--uhd-graphics` and every sprite is sourced
+   from its `_x2` file at `scale` 2 -- twice the pixels per screen unit, drawn
+   at half size (`depot.py` `Graphics`, issue #151). A sheet that outgrows
+   the 8192 device limit continues on further pages (`<state>-p1.png` …),
+   each a texture of its own; the manifest lists them under `pages` and
+   every frame names its page. The whole import measured 57 minutes on four
+   workers (2026-09-20), and `public/imported/` grows to 5.5 GB. The game
+   loads a sprite page the first time a frame needs it (`spriteTexture`):
+   loading all 1,839 up front took the machine down.
 4. `import_ui.py` extracts the WEST widget-UI subset (resource/command/map/
    bottom/menu/score panels, materials, entity + action + stat icons,
    click-sound aliases from `sounds.json`, `UIColors.json`, and the faces the

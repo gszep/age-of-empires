@@ -20,7 +20,7 @@ import type { ResourceStatus, ScoreRow } from './view/hud';
 import { costLabel, displayName as nameFrom, plainHelp } from './view/names';
 import { artKey, chooseAnimation, createEntityView, gatherTargetResource, playerColorHex, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline, elevatedWorldToIso, elevationAt, ELEVATION_PIXELS } from './view/world';
-import { createScatter } from './view/scatter';
+import { createScatter, fillScatter } from './view/scatter';
 import { createCueWatcher, pollCues } from './view/cues';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 
@@ -1414,6 +1414,7 @@ function syncScene(time: number): void {
   // Contours for units something else is drawing in front of, once every
   // piece this frame has been placed.
   view.updateOcclusion(views, game);
+  fillScatter(scatter, assets);
 
   // Selection markers from reusable pools: rings under units, footprint
   // outlines on the ground under buildings and resources (`selectionMarker`).

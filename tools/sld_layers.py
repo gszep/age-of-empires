@@ -394,15 +394,18 @@ MAX_SHEET = 8192
 
 def _shelf_pack(
     usable: list[MaskFrame | ColorFrame | None],
-) -> tuple[list[dict[str, int]], int, int]:
+) -> tuple[list[dict[str, int]], list[tuple[int, int]]]:
     """Shelf packing in rows about as wide as the widest frame allows, keeping
     the sheet roughly square without a bin-packing dependency. Absent frames
     keep a zero-sized entry to hold their position in the sequence.
 
     A sheet whose square layout would pass MAX_SHEET is capped at it and packed
-    tallest-first instead, so rows hold frames of similar height and the capped
-    width still fits everything under the limit. Placements are indexed by
-    frame, so the physical order on the sheet is free to differ."""
+    tallest-first instead, so rows hold frames of similar height. When the
+    rows outgrow MAX_SHEET as well -- the Enhanced Graphics Pack's x2 art
+    quadruples every sheet, and the unpacked trebuchet's attack already filled
+    one -- the packing continues on a further page: every placement names its
+    page, and the pages' sizes come back in order. Placements are indexed by
+    frame, so the physical order on the sheets is free to differ."""
     boxes = [(f.width, f.height) if f else (0, 0) for f in usable]
     widest = max((w for w, _ in boxes), default=1)
     columns = max(1, int(len(usable) ** 0.5))
@@ -411,35 +414,57 @@ def _shelf_pack(
     if sheet_width > MAX_SHEET:
         sheet_width = MAX_SHEET
         order.sort(key=lambda index: -boxes[index][1])
+    if widest > MAX_SHEET:
+        raise ValueError(f"a frame is {widest} wide, over the {MAX_SHEET} device limit")
 
     placements: list[dict[str, int] | None] = [None] * len(usable)
-    x = y = row_height = 0
+    pages: list[tuple[int, int]] = []
+    page = x = y = row_height = 0
     for index in order:
         width, height = boxes[index]
         frame = usable[index]
         if width == 0 or frame is None:
-            placements[index] = {"x": 0, "y": 0, "w": 0, "h": 0, "cx": 0, "cy": 0}
+            placements[index] = {"x": 0, "y": 0, "w": 0, "h": 0, "cx": 0, "cy": 0, "page": 0}
             continue
+        if height > MAX_SHEET:
+            raise ValueError(f"a frame is {height} tall, over the {MAX_SHEET} device limit")
         if x + width > sheet_width and x > 0:
             x = 0
             y += row_height
             row_height = 0
+        if y + height > MAX_SHEET:
+            pages.append((sheet_width, max(1, y + row_height)))
+            page += 1
+            x = y = row_height = 0
         placements[index] = {
             "x": x, "y": y, "w": width, "h": height,
-            "cx": frame.hotspot_x, "cy": frame.hotspot_y,
+            "cx": frame.hotspot_x, "cy": frame.hotspot_y, "page": page,
         }
         x += width
         row_height = max(row_height, height)
-    sheet_height = max(1, y + row_height)
-    if sheet_width > MAX_SHEET or sheet_height > MAX_SHEET:
-        raise ValueError(
-            f"atlas would be {sheet_width}x{sheet_height}, over the {MAX_SHEET} device limit"
-        )
-    return placements, sheet_width, sheet_height
+    pages.append((sheet_width, max(1, y + row_height)))
+    return placements, pages
+
+
+def _atlas(placements: list[dict[str, int]], pages: list[tuple[int, int]]) -> dict[str, Any]:
+    """The manifest's description of a packed atlas: `size` is the first
+    page's, and `pages` lists every page's size only when there is more than
+    one, so a sheet that fits keeps the shape the renderer has always read:
+    the frames name their page only then."""
+    if len(pages) == 1:
+        placements = [{k: v for k, v in frame.items() if k != "page"} for frame in placements]
+    atlas: dict[str, Any] = {
+        "size": list(pages[0]),
+        "framesInFile": len(placements),
+        "frames": placements,
+    }
+    if len(pages) > 1:
+        atlas["pages"] = [list(size) for size in pages]
+    return atlas
 
 
 def pack_mask_atlas(frames: list[MaskFrame | None], limit: int) -> tuple[Any, dict[str, Any]]:
-    """Pack the first `limit` masks into one greyscale-alpha atlas.
+    """Pack the first `limit` masks into greyscale-alpha atlas pages.
 
     Frame order matches the main layer, so the renderer reuses the frame index
     it already computed.
@@ -447,25 +472,21 @@ def pack_mask_atlas(frames: list[MaskFrame | None], limit: int) -> tuple[Any, di
     from PIL import Image
 
     usable = [f if (f is not None and not f.empty) else None for f in frames[:limit]]
-    placements, sheet_width, sheet_height = _shelf_pack(usable)
+    placements, pages = _shelf_pack(usable)
 
-    image = Image.new("L", (sheet_width, sheet_height), 0)
+    images = [Image.new("L", size, 0) for size in pages]
     for placement, frame in zip(placements, usable):
         if frame is None or placement["w"] == 0:
             continue
-        image.paste(
+        images[placement["page"]].paste(
             Image.frombytes("L", (frame.width, frame.height), bytes(frame.alpha)),
             (placement["x"], placement["y"]),
         )
     # White with the mask as alpha. The renderer multiplies its own colour
     # through this, so the sheet has to stay neutral: baking a colour in here
     # would multiply to that colour, and baking black would multiply to black.
-    rgba = Image.merge("RGBA", [Image.new("L", image.size, 255)] * 3 + [image])
-    return rgba, {
-        "size": [sheet_width, sheet_height],
-        "framesInFile": len(placements),
-        "frames": placements,
-    }
+    rgba = [Image.merge("RGBA", [Image.new("L", image.size, 255)] * 3 + [image]) for image in images]
+    return rgba, _atlas(placements, pages)
 
 
 def luminance(red: int, green: int, blue: int) -> int:
@@ -488,10 +509,10 @@ def pack_playercolor_atlas(
     from PIL import Image
 
     usable = [f if (f is not None and not f.empty) else None for f in masks[:limit]]
-    placements, sheet_width, sheet_height = _shelf_pack(usable)
+    placements, pages = _shelf_pack(usable)
 
-    shade = Image.new("L", (sheet_width, sheet_height), 0)
-    coverage = Image.new("L", (sheet_width, sheet_height), 0)
+    shades = [Image.new("L", size, 0) for size in pages]
+    coverages = [Image.new("L", size, 0) for size in pages]
     for index, (placement, frame) in enumerate(zip(placements, usable)):
         if frame is None or placement["w"] == 0:
             continue
@@ -502,38 +523,31 @@ def pack_playercolor_atlas(
             luminance(color.rgba[i * 4], color.rgba[i * 4 + 1], color.rgba[i * 4 + 2])
             for i in range(frame.width * frame.height)
         )
-        shade.paste(Image.frombytes("L", (frame.width, frame.height), levels),
-                    (placement["x"], placement["y"]))
-        coverage.paste(Image.frombytes("L", (frame.width, frame.height), bytes(frame.alpha)),
-                       (placement["x"], placement["y"]))
-    rgba = Image.merge("RGBA", [shade] * 3 + [coverage])
-    return rgba, {
-        "size": [sheet_width, sheet_height],
-        "framesInFile": len(placements),
-        "frames": placements,
-    }
+        shades[placement["page"]].paste(Image.frombytes("L", (frame.width, frame.height), levels),
+                                        (placement["x"], placement["y"]))
+        coverages[placement["page"]].paste(
+            Image.frombytes("L", (frame.width, frame.height), bytes(frame.alpha)),
+            (placement["x"], placement["y"]))
+    rgba = [Image.merge("RGBA", [shade] * 3 + [coverage]) for shade, coverage in zip(shades, coverages)]
+    return rgba, _atlas(placements, pages)
 
 
 def pack_color_atlas(frames: list[ColorFrame | None], limit: int) -> tuple[Any, dict[str, Any]]:
-    """Pack the first `limit` main-layer frames into one RGBA atlas."""
+    """Pack the first `limit` main-layer frames into RGBA atlas pages."""
     from PIL import Image
 
     usable = [f if (f is not None and not f.empty) else None for f in frames[:limit]]
-    placements, sheet_width, sheet_height = _shelf_pack(usable)
+    placements, pages = _shelf_pack(usable)
 
-    image = Image.new("RGBA", (sheet_width, sheet_height), (0, 0, 0, 0))
+    images = [Image.new("RGBA", size, (0, 0, 0, 0)) for size in pages]
     for placement, frame in zip(placements, usable):
         if frame is None or placement["w"] == 0:
             continue
-        image.paste(
+        images[placement["page"]].paste(
             Image.frombytes("RGBA", (frame.width, frame.height), bytes(frame.rgba)),
             (placement["x"], placement["y"]),
         )
-    return image, {
-        "size": [sheet_width, sheet_height],
-        "framesInFile": len(placements),
-        "frames": placements,
-    }
+    return images, _atlas(placements, pages)
 
 
 def mask_summary(frames: list[MaskFrame | None]) -> dict[str, Any]:

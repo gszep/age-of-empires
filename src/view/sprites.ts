@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { materialColor, materialOpacity, texture as textureNode, vec2 } from 'three/tsl';
 import { skinnedKey } from './skins';
-import type { ContentAssets, Atlas, AnimationInfo, ImportedEntity } from './assets';
+import { atlasPage, spriteTexture, type ContentAssets, type Atlas, type AnimationInfo, type ImportedEntity } from './assets';
 import { isAnimal, isBuilding, isUnit } from '../sim/data';
 import { swingSeconds } from '../sim/game';
 import { createTerrainPatch, elevationAt, ELEVATION_PIXELS, elevatedWorldToIso } from './world';
@@ -509,8 +509,9 @@ function applyFrame(
   tint: number,
 ): void {
   const mesh = piece.mesh;
-  const texture = assets.textures.get(atlas.image);
   const frame = atlas.frames[Math.min(frameIndex, atlas.frames.length - 1)];
+  const page = frame && atlasPage(atlas, frame);
+  const texture = page && spriteTexture(assets, page.image);
   // Shadow atlases hold zero-sized entries where a frame casts none.
   if (!texture || !frame || frame.w === 0 || frame.h === 0) { mesh.visible = false; return; }
   mesh.visible = true;
@@ -522,7 +523,7 @@ function applyFrame(
     meshMaterial.needsUpdate = true;
   }
   meshMaterial.color.set(tint);
-  const [atlasWidth, atlasHeight] = atlas.size;
+  const [atlasWidth, atlasHeight] = page.size;
   // Half-texel inset: linear filtering samples across the frame edge, which
   // would drag in whichever neighbouring frame the packer placed alongside.
   const insetX = 0.5 / atlasWidth;
@@ -539,10 +540,15 @@ function applyFrame(
     uv.setXY(3, right, bottom);
     uv.needsUpdate = true;
   }
-  mesh.scale.set(frame.w, frame.h, 1);
+  // The frame's pixels per screen unit: x2 art draws at half its size, and
+  // its hotspot is halved with it.
+  const scale = atlas.scale ?? 1;
+  const w = frame.w / scale;
+  const h = frame.h / scale;
+  mesh.scale.set(w, h, 1);
   const iso = worldToIso(position.x, position.y);
   // Anchor the hotspot at the entity ground position.
-  mesh.position.set(iso.x + frame.w / 2 - frame.cx, iso.y - frame.h / 2 + frame.cy, 0);
+  mesh.position.set(iso.x + w / 2 - frame.cx / scale, iso.y - h / 2 + frame.cy / scale, 0);
 }
 
 /**

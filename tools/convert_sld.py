@@ -6,8 +6,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any
+
+from depot import Graphics
 
 
 def sha256(path: Path) -> str:
@@ -33,11 +36,22 @@ def convert(source: Path, output: Path, expected_frames: int) -> dict[str, Any]:
     if playable == 0:
         raise ValueError(f"{source.name}: no frames decoded")
 
-    image, atlas = pack_color_atlas(frames, playable)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    image.save(output, optimize=True)
+    images, atlas = pack_color_atlas(frames, playable)
+    save_pages(images, output)
     atlas["framesInFile"] = len(frames)
     return {"image": output.name, **atlas}
+
+
+def page_path(output: Path, page: int) -> Path:
+    """The file a page of an atlas is saved to: the atlas's own name for the
+    first, `<name>-p<page>.png` beside it for the rest."""
+    return output if page == 0 else output.with_name(f"{output.stem}-p{page}{output.suffix}")
+
+
+def save_pages(images: list[Any], output: Path) -> None:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    for page, image in enumerate(images):
+        image.save(page_path(output, page), optimize=True)
 
 
 MASK_LAYERS = ("shadow", "playercolor", "outline", "damage")
@@ -72,11 +86,10 @@ def convert_mask(source: Path, output: Path, expected_frames: int, layer: str) -
     if playable == 0 or not any(f is not None and not f.empty for f in frames[:playable]):
         return {}
     if layer == "playercolor":
-        image, atlas = pack_playercolor_atlas(frames, decode_colors(data), playable)
+        images, atlas = pack_playercolor_atlas(frames, decode_colors(data), playable)
     else:
-        image, atlas = pack_mask_atlas(frames, playable)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    image.save(output, optimize=True)
+        images, atlas = pack_mask_atlas(frames, playable)
+    save_pages(images, output)
     return atlas
 
 
@@ -198,7 +211,7 @@ def decoder_fingerprint() -> str:
 
     digest = hashlib.sha256()
     digest.update(Path(__file__).with_name("sld_layers.py").read_bytes())
-    for function in (convert, convert_mask):
+    for function in (convert, convert_mask, page_path, save_pages):
         digest.update(inspect.getsource(function).encode())
     digest.update(repr(MASK_LAYERS).encode())
     return digest.hexdigest()
@@ -246,11 +259,9 @@ def convert_particles(particles: dict[str, Any], out_dir: Path) -> dict[str, Any
                 hotspot_y *= scale
             frames.append(ColorFrame(cut.width, cut.height, round(hotspot_x), round(hotspot_y),
                                      bytearray(cut.tobytes())))
-        image, atlas = pack_color_atlas(frames, len(frames))
+        images, atlas = pack_color_atlas(frames, len(frames))
         relative = f"particles/{name}.png"
-        target = out_dir / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        image.save(target, optimize=True)
+        save_pages(images, out_dir / relative)
         converted[name] = {
             "atlas": {**atlas, "image": relative},
             "loop": effect["loop"],
@@ -259,6 +270,20 @@ def convert_particles(particles: dict[str, Any], out_dir: Path) -> dict[str, Any
             "fadeOutSeconds": effect["fadeOutSeconds"],
         }
     return converted
+
+
+def published(atlas: dict[str, Any], image: str, scale: int) -> dict[str, Any]:
+    """The manifest's entry for a packed atlas: its image, each further page's
+    image beside the first, and the art's pixels per screen unit."""
+    entry = {**atlas, "image": image}
+    if "pages" in atlas:
+        entry["pages"] = [
+            {"image": page_path(Path(image), page).as_posix(), "size": size}
+            for page, size in enumerate(atlas["pages"])
+        ]
+    if scale != 1:
+        entry["scale"] = scale
+    return entry
 
 
 def atlas_jobs(imported: dict[str, Any]) -> list[dict[str, Any]]:
@@ -271,6 +296,9 @@ def atlas_jobs(imported: dict[str, Any]) -> list[dict[str, Any]]:
                 "key": key,
                 "name": f"{prefix}{state}",
                 "source": animation["source"],
+                # Pixels per screen unit: 1 for the base depot's `_x1` art, 2
+                # for the Enhanced Graphics Pack's `_x2` (issue #151).
+                "scale": animation.get("scale", 1),
                 "expected": animation["frames"] * animation["directions"],
                 # The damage layer is soot on a standing building; nothing
                 # else asks for it, and a unit's sheet carries one too.
@@ -285,6 +313,18 @@ def atlas_jobs(imported: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+def _convert_one(work: tuple[str, str, str, int, str | None]) -> tuple[str, dict[str, Any] | None, str | None]:
+    """One sheet, in a worker process: the main layer when `layer` is None,
+    else that mask. Returns the atlas, or the error a mask raised."""
+    identifier, source, output, expected, layer = work
+    try:
+        if layer is None:
+            return identifier, convert(Path(source), Path(output), expected), None
+        return identifier, convert_mask(Path(source), Path(output), expected, layer), None
+    except Exception as error:  # noqa: BLE001 - reported to the parent, which decides
+        return identifier, None, f"{type(error).__name__}: {error}"
+
+
 def main() -> None:
     root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser()
@@ -294,6 +334,8 @@ def main() -> None:
         type=Path,
         default=Path.home() / "Steam/steamapps/content/app_813780/depot_813784/resources/_common/drs/graphics",
     )
+    parser.add_argument("--uhd-graphics", type=Path, default=None,
+                        help="the Enhanced Graphics Pack's graphics directory, where `_x2` sources live")
     parser.add_argument(
         "--terrain",
         type=Path,
@@ -302,6 +344,8 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=root / "public/imported/aoe2")
     parser.add_argument("--cache", type=Path, default=root / ".local/aoe2de/atlas-cache.json")
     parser.add_argument("--fresh", action="store_true", help="ignore the atlas cache")
+    parser.add_argument("--jobs", type=int, default=max(1, min(4, (os.cpu_count() or 1) // 2)),
+                        help="sheets converted at once; a worker on a large x2 sheet can hold two gigabytes")
     parser.add_argument("--terrain-only", action="store_true",
                         help="update terrain textures in an existing manifest without decoding SLDs")
     args = parser.parse_args()
@@ -323,6 +367,7 @@ def main() -> None:
         return
 
     jobs = atlas_jobs(imported)
+    graphics = Graphics(args.graphics, args.uhd_graphics)
 
     # Decoding every frame of every animation takes about twenty minutes, and
     # adding one unit re-decodes the other seventy-odd sources for nothing. An
@@ -345,7 +390,8 @@ def main() -> None:
         if entry["source"] != source_hashes.get(job["source"]) or entry["expected"] != job["expected"]:
             return None
         atlas = entry["atlas"]
-        if atlas and not (args.out / image).is_file():
+        if atlas and not all(page_path(args.out / image, page).is_file()
+                             for page in range(len(atlas.get("pages", [0])))):
             return None
         return atlas
 
@@ -353,57 +399,47 @@ def main() -> None:
     atlases: dict[str, dict[str, Any]] = {}
     skipped: list[str] = []
     reused = 0
-    for job in jobs:
-        identifier = f"{job['key']}:{job['name']}"
-        image = f"{job['key']}/{job['name']}.png"
-        atlas = cached(identifier, job, image)
-        if atlas is None:
-            atlas = convert(
-                args.graphics / job["source"], args.out / job["key"] / f"{job['name']}.png", job["expected"]
-            )
-            print(identifier)
-        else:
-            reused += 1
-        cache[identifier] = {"source": source_hashes.get(job["source"]), "expected": job["expected"], "atlas": atlas}
-        atlas = dict(atlas)
-        atlas["image"] = image
-        atlases.setdefault(job["key"], {})[job["name"]] = atlas
-
-    # A mask failure costs that entity one mask and is recorded, never fatal.
+    # Every sheet still to produce: the main layer of each animation, then
+    # its masks. A mask failure costs that entity one mask and is recorded,
+    # never fatal.
     mask_skipped: list[str] = []
+    pending: list[tuple[str, dict[str, Any], str, str | None]] = []
     for job in jobs:
-        for layer in job["layers"]:
-            identifier = f"{job['key']}:{job['name']}:{layer}"
-            image = f"{job['key']}/{job['name']}-{layer}.png"
+        for layer in (None, *job["layers"]):
+            suffix = "" if layer is None else f"-{layer}"
+            identifier = f"{job['key']}:{job['name']}" + ("" if layer is None else f":{layer}")
+            image = f"{job['key']}/{job['name']}{suffix}.png"
             atlas = cached(identifier, job, image)
-            if atlas is not None:
-                reused += 1
-                cache[identifier] = {
-                    "source": source_hashes.get(job["source"]), "expected": job["expected"], "atlas": atlas,
-                }
-                if atlas:
-                    atlas = dict(atlas)
-                    atlas["image"] = image
-                    atlases.setdefault(job["key"], {})[f"{job['name']}-{layer}"] = atlas
+            if atlas is None:
+                pending.append((identifier, job, image, layer))
                 continue
-            try:
-                atlas = convert_mask(
-                    args.graphics / job["source"],
-                    args.out / job["key"] / f"{job['name']}-{layer}.png",
-                    job["expected"],
-                    layer,
-                )
-            except Exception as error:  # noqa: BLE001 - one bad layer must not stop the import
+            reused += 1
+            cache[identifier] = {"source": source_hashes.get(job["source"]), "expected": job["expected"], "atlas": atlas}
+            if atlas:
+                atlases.setdefault(job["key"], {})[f"{job['name']}{suffix}"] = published(atlas, image, job["scale"])
+
+    # The sheets are independent, so they convert in parallel: a worker per
+    # `--jobs`, each decoding one source and writing its pages. The order
+    # they finish in is not the order they are published in -- the manifest
+    # is assembled by key -- so the output stays byte-identical.
+    from multiprocessing import Pool
+
+    work = [(identifier, str(graphics.path(job["source"])), str(args.out / image), job["expected"], layer)
+            for identifier, job, image, layer in pending]
+    by_identifier = {identifier: (job, image, layer) for identifier, job, image, layer in pending}
+    with Pool(processes=args.jobs) as pool:
+        for identifier, atlas, error in pool.imap_unordered(_convert_one, work):
+            job, image, layer = by_identifier[identifier]
+            suffix = "" if layer is None else f"-{layer}"
+            if error is not None:
+                if layer is None:
+                    raise RuntimeError(f"{identifier}: {error}")
                 mask_skipped.append(identifier)
                 print(f"skipped {identifier}: {error}")
                 continue
-            cache[identifier] = {
-                "source": source_hashes.get(job["source"]), "expected": job["expected"], "atlas": atlas,
-            }
+            cache[identifier] = {"source": source_hashes.get(job["source"]), "expected": job["expected"], "atlas": atlas}
             if atlas:
-                atlas = dict(atlas)
-                atlas["image"] = f"{job['key']}/{job['name']}-{layer}.png"
-                atlases.setdefault(job["key"], {})[f"{job['name']}-{layer}"] = atlas
+                atlases.setdefault(job["key"], {})[f"{job['name']}{suffix}"] = published(atlas, image, job["scale"])
             print(identifier)
 
     entities: dict[str, Any] = {}

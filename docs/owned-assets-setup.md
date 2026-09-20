@@ -144,7 +144,7 @@ npm run test:import
 npm run dev
 ```
 
-The first import bootstraps a pinned Python/openage toolchain under `.tools/` and can take several minutes. Successful output appears under `public/imported/aoe2/`; the browser detects it automatically. Re-running `npm run import:aoe2` against identical depot inputs regenerates byte-identical output.
+The first import bootstraps a pinned Python toolchain; with the Enhanced Graphics Pack present it decodes every sprite at twice the density, which measured 57 minutes on four workers, and `public/imported/` grows to 5.5 GB. Successful output appears under `public/imported/aoe2/`; the browser detects it automatically. Re-running `npm run import:aoe2` against identical depot inputs regenerates byte-identical output.
 
 ## Remote QA over Tailscale
 

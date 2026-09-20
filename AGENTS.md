@@ -107,10 +107,16 @@ model-provider tests opt-in.
   the water's colour formula was read. They are resources, not the
   executable, which stays off limits.
 - **The atlas cache is keyed on the decoder's source:** `sld_layers.py` and
-  the `convert`/`convert_mask` functions in `convert_sld.py`. Any edit to
-  those re-decodes every sprite — about an hour, masks included; editing the
+  the `convert`/`convert_mask`/`page_path`/`save_pages` functions in
+  `convert_sld.py`. Any edit to those re-decodes every sprite — 57 minutes
+  for the pack's x2 on four workers (`--jobs`), masks included; editing the
   manifest dict or anything else in the converter does not. Batch decoder
   edits, and never restart the run.
+- **Sprites come from the Enhanced Graphics Pack when depot `1039811` is
+  beside the base depots** (`tools/depot.py`): every `source` is then a
+  `_x2.sld` at `scale` 2, drawn at half size, and a sheet over 8192 px
+  continues on `pages`. A test that names a source file uses the suite's
+  `sld(stem)`; a probe that reads a frame's box divides by `atlas.scale`.
 - **A tester's tab goes stale across re-imports:** the manifest is fetched
   once per load. After regenerating `public/imported/`, ask for a reload
   before investigating a report from an old tab.

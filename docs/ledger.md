@@ -110,7 +110,8 @@ off the reference; **measured** — fitted to a reference screenshot;
 | Aesthetic scatter | view-only sprites | chosen (the script deals objects) | `world.ts` | — |
 | Nearctic snow dusting | not dealt | tried, reverted | — | #118 |
 | Deer startle | hop 1.5 tiles, rest 14-20 s | inferred (AoE wiki); the 1-tile trigger is the DAT's `search_radius` | `data.ts` | — |
-| The monk's occlusion contour | absent | decoder invariant fails on its outline layers | manifest `skippedMasks` | #119 |
+| The monk's occlusion contour | absent at x1 | decoder invariant fails on the base depot's outline layers; the pack's x2 layers pass it, so with the pack the monk has its contour | manifest `skippedMasks` | #119 |
+| Which file the Enhanced Graphics Pack draws, and at what size | the DAT's `<stem>_x1.sld` becomes the pack's `<stem>_x2.sld`, drawn at half size | inferred: the DAT names `_x1` only; the pack ships a `_x2` for each and its drawn pixels sit within one x1 pixel of the x1 art's once halved about the hotspot (`test_the_pack_sources_every_sprite_at_twice_the_density`); `widgetui/build_atlas.ps1` states the UI's UHD level is twice HD, nothing states the sprites' | `depot.py` `Graphics.source`, `sprites.ts` `applyFrame` | #151 |
 
 ## Adding a row
 

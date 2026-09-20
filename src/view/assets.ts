@@ -1,8 +1,35 @@
 import * as THREE from 'three/webgpu';
 import { skinFamilies, type SkinFamily } from './skins';
 
-export type Frame = { x: number; y: number; w: number; h: number; cx: number; cy: number };
-export type Atlas = { image: string; size: [number, number]; framesInFile: number; frames: Frame[] };
+/** A frame's box on its page, in the page's pixels; `page` indexes `Atlas.pages` and is absent on a one-page atlas. */
+export type Frame = { x: number; y: number; w: number; h: number; cx: number; cy: number; page?: number };
+export type AtlasPage = { image: string; size: [number, number] };
+export type Atlas = {
+  image: string; size: [number, number]; framesInFile: number; frames: Frame[];
+  /** Every page when the art outgrew one sheet; `image`/`size` are the first. */
+  pages?: AtlasPage[];
+  /** The art's pixels per screen unit: 1 for the base depot's `_x1` sprites
+   * (the default), 2 for the Enhanced Graphics Pack's `_x2`, drawn at half
+   * size so they land where the x1 art did. */
+  scale?: number;
+};
+
+/** The page a frame is drawn from. */
+export function atlasPage(atlas: Atlas, frame: Frame): AtlasPage {
+  return atlas.pages?.[frame.page ?? 0] ?? atlas;
+}
+
+/**
+ * A sprite page's texture, or undefined while it is still on its way.
+ * Sprites load on first use: the Enhanced Graphics Pack's atlases are
+ * 5.5 GB of PNG (#151), and loading all 1,839 up front took the machine
+ * down, where a match draws a few dozen.
+ */
+export function spriteTexture(assets: ContentAssets, image: string): THREE.Texture | undefined {
+  const texture = assets.textures.get(image);
+  if (!texture) assets.loadTexture?.(image);
+  return texture;
+}
 export type AnimationInfo = {
   frames: number; directions: number; frameSeconds: number; mirroringMode: number;
   /** Drawn through one of the engine's alpha palettes: a fish's underwater
@@ -202,6 +229,9 @@ export interface ContentAssets {
   /** The shore foam's frame atlases (`WaveAnim_ps`); absent without owned content. */
   foam?: FoamAtlases;
   textures: Map<string, THREE.Texture>;
+  /** Starts fetching a sprite page that `textures` lacks; a page lands in
+   * the map when decoded. Absent in the tests, which fill the map themselves. */
+  loadTexture?: (image: string) => void;
   playerColors?: PlayerColors;
   /** One 256-texel ramp per player, indexed by a sprite's own grey. */
   playerRamps: Map<number, THREE.DataTexture>;
@@ -322,31 +352,33 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   const textures = new Map<string, THREE.Texture>();
   const loader = new THREE.TextureLoader();
   const jobs: Promise<void>[] = [];
-  const loadAtlases = (atlases: Record<string, Atlas>) => {
-    for (const atlas of Object.values(atlases)) {
-      jobs.push(loader.loadAsync(CONTENT_BASE + atlas.image).then(texture => {
-        texture.colorSpace = THREE.SRGBColorSpace;
-        // Sprites are x1 art drawn at 1:1 CSS pixels, so a HiDPI backing store
-        // or zoom magnifies them; nearest sampling turned that into visible
-        // blocks. Filter linearly (applyFrame insets the UVs by half a texel so
-        // neighbouring atlas frames cannot bleed in). Mipmaps stay off: they
-        // would blend across frame boundaries within the atlas.
-        texture.magFilter = THREE.LinearFilter;
-        texture.minFilter = THREE.LinearFilter;
-        texture.generateMipmaps = false;
-        // A player-colour sheet is not a picture: its RGB is the shade to look
-        // up in the player's ramp, so it must arrive as the byte the importer
-        // wrote rather than as an sRGB colour to be decoded.
-        if (atlas.image.endsWith('-playercolor.png')) texture.colorSpace = THREE.NoColorSpace;
-        textures.set(atlas.image, texture);
-      }));
-    }
+  // Sprite pages load on demand (`spriteTexture`); this is what a miss starts.
+  const pending = new Set<string>();
+  const loadTexture = (image: string) => {
+    if (textures.has(image) || pending.has(image)) return;
+    pending.add(image);
+    loader.loadAsync(CONTENT_BASE + image).then(texture => {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      // Sprites are x1 art drawn at 1:1 CSS pixels, so a HiDPI backing store
+      // or zoom magnifies them; nearest sampling turned that into visible
+      // blocks. Filter linearly (applyFrame insets the UVs by half a texel so
+      // neighbouring atlas frames cannot bleed in). Mipmaps stay off: they
+      // would blend across frame boundaries within the atlas. The pack's x2
+      // art is drawn at half size, where bilinear is exactly a 2x2 box.
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
+      // A player-colour sheet is not a picture: its RGB is the shade to look
+      // up in the player's ramp, so it must arrive as the byte the importer
+      // wrote rather than as an sRGB colour to be decoded.
+      if (/-playercolor(-p\d+)?\.png$/.test(image)) texture.colorSpace = THREE.NoColorSpace;
+      textures.set(image, texture);
+      pending.delete(image);
+    }, error => {
+      pending.delete(image);
+      console.error(`sprite page ${image} failed to load`, error);
+    });
   };
-  for (const entity of Object.values(manifest.entities)) {
-    loadAtlases(entity.atlases);
-    for (const annex of entity.annexes ?? []) loadAtlases(annex.atlases);
-  }
-  for (const effect of Object.values(manifest.particles ?? {})) loadAtlases({ flipbook: effect.atlas });
   const terrain = manifest.terrain ?? {};
   const masksStarted = new Set<string>();
   for (const slot of Object.values(terrain)) {
@@ -452,7 +484,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     entities: manifest.entities, skins: skinFamilies(manifest.entities), ages: manifest.ages ?? [],
     terrain, water: Object.keys(water).length ? water : undefined,
     foam: manifest.foam?.diag?.length ? manifest.foam : undefined,
-    textures, playerColors, playerRamps, blends, particles: manifest.particles,
+    textures, loadTexture, playerColors, playerRamps, blends, particles: manifest.particles,
   };
 }
 

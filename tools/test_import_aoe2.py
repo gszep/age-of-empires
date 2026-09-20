@@ -8,7 +8,7 @@ import unittest
 
 from PIL import Image
 
-from depot import depot_root
+from depot import Graphics, depot_root, uhd_graphics_dir
 from import_content import extract
 from import_ui import extract_ui
 from import_audio import import_audio, read_banks, resolve_event
@@ -27,11 +27,21 @@ TERRAIN = ROOT / "depot_813782/resources/_common/terrain/textures/2x"
 AUDIO_PACK = ROOT / "depot_813783/wwise/Base.pck"
 SPEC = json.loads(Path(__file__).with_name("import-spec.json").read_text())
 SOURCE = Path(__file__).with_name("aoe2-source.json")
+# The Enhanced Graphics Pack, when downloaded: every sprite then imports from
+# its `_x2` file at scale 2 (issue #151), and the suite runs against that.
+UHD = uhd_graphics_dir(ROOT)
+SOURCES = Graphics(GRAPHICS, UHD)
+
+
+def sld(stem: str) -> str:
+    """The source file the import records for a DAT graphic: the pack's `_x2`
+    when it is present, else the base depot's `_x1`."""
+    return f"{stem}_x2.sld" if UHD else f"{stem}_x1.sld"
 
 
 @lru_cache(maxsize=1)
 def extracted_content():
-    return extract(DAT, GRAPHICS, PALETTES, SPEC, json.loads(SOURCE.read_text()), STRINGS)
+    return extract(DAT, GRAPHICS, PALETTES, SPEC, json.loads(SOURCE.read_text()), STRINGS, uhd_dir=UHD)
 
 
 @lru_cache(maxsize=1)
@@ -251,7 +261,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
         expected = animation["frames"] * animation["directions"]
         with tempfile.TemporaryDirectory() as directory:
             out = Path(directory) / "idle-outline.png"
-            atlas = convert_mask(GRAPHICS / animation["source"], out, expected, "outline")
+            atlas = convert_mask(SOURCES.path(animation["source"]), out, expected, "outline")
             self.assertTrue(atlas)
             # The renderer indexes the contour with the body's frame index, so
             # the sheet holds an entry for every frame the animation plays.
@@ -270,19 +280,19 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # `dead_unit_id`; the decay art is that unit's standing graphic.
         entities = self.result["entities"]
         militia = entities["militia"]["animations"]["decay"]
-        self.assertEqual(militia["source"], "u_inf_militia_decayA_x1.sld")
+        self.assertEqual(militia["source"], sld("u_inf_militia_decayA"))
         self.assertEqual(militia["frames"], 30)
         self.assertEqual(militia["directions"], 16)
         # A depleted tree leaves the generic stump, one frame per variation.
         # The bush names the same unit and never reaches it — see
         # test_only_something_that_can_die_leaves_anything_behind.
         stump = entities["tree-oak"]["animations"]["decay"]
-        self.assertEqual(stump["source"], "n_tree_stump_generic_x1.sld")
+        self.assertEqual(stump["source"], sld("n_tree_stump_generic"))
         self.assertEqual(stump["frames"], 1)
         # The chain is per task variant, not one corpse for every villager.
         self.assertEqual(
             entities["villager-lumberjack"]["animations"]["decay"]["source"],
-            "u_vil_male_lumberjack_decayA_x1.sld",
+            sld("u_vil_male_lumberjack_decayA"),
         )
         # A unit with nothing to leave behind must say so rather than resolve
         # to graphic -1 and fail later, mid-conversion.
@@ -376,8 +386,8 @@ class ContentImportIntegrationTest(unittest.TestCase):
         skirmisher = self.result["entities"]["skirmisher"]
         self.assertEqual(skirmisher["id"], 7)
         self.assertEqual(skirmisher["internalName"], "XBOWM")
-        for state, source in (("idle", "u_arc_skirmisher_idleA_x1.sld"),
-                              ("attack", "u_arc_skirmisher_attackA_x1.sld")):
+        for state, source in (("idle", sld("u_arc_skirmisher_idleA")),
+                              ("attack", sld("u_arc_skirmisher_attackA"))):
             self.assertEqual(skirmisher["animations"][state]["source"], source)
         self.assertEqual(skirmisher["cost"], {"food": 25, "wood": 35})
         self.assertEqual(skirmisher["train"], {"buildingId": 87, "seconds": 26, "button": 2})
@@ -392,12 +402,12 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(stable["cost"], {"wood": 175})
         self.assertEqual(stable["build"]["seconds"], 50)
         # The file the previously used decoder died on, now just another source.
-        self.assertEqual(stable["animations"]["idle"]["source"], "b_west_stable_age2_x1.sld")
+        self.assertEqual(stable["animations"]["idle"]["source"], sld("b_west_stable_age2"))
         scout = entities["scout-cavalry"]
         self.assertEqual(scout["id"], 448)
         self.assertEqual(scout["cost"], {"food": 80})
         self.assertEqual(scout["train"], {"buildingId": stable["id"], "seconds": 30, "button": 1})
-        self.assertEqual(scout["animations"]["idle"]["source"], "u_cav_scout_idleA_x1.sld")
+        self.assertEqual(scout["animations"]["idle"]["source"], sld("u_cav_scout_idleA"))
 
     def test_gate_leaves_and_axes_come_from_the_dat_units_that_hold_them(self):
         entities = self.result["entities"]
@@ -415,16 +425,16 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # Open and closed are separate units in the DAT sharing everything but
         # the art, so the open leaf is read from the unit that holds it.
         self.assertEqual(
-            along_x["animations"]["idle"]["source"], "b_dark_gate_palisade_ne_closed_x1.sld"
+            along_x["animations"]["idle"]["source"], sld("b_dark_gate_palisade_ne_closed")
         )
         self.assertEqual(
-            along_x["animations"]["open"]["source"], "b_dark_gate_palisade_ne_open_x1.sld"
+            along_x["animations"]["open"]["source"], sld("b_dark_gate_palisade_ne_open")
         )
         self.assertEqual(
-            along_y["animations"]["idle"]["source"], "b_dark_gate_palisade_se_closed_x1.sld"
+            along_y["animations"]["idle"]["source"], sld("b_dark_gate_palisade_se_closed")
         )
         self.assertEqual(
-            along_y["animations"]["open"]["source"], "b_dark_gate_palisade_se_open_x1.sld"
+            along_y["animations"]["open"]["source"], sld("b_dark_gate_palisade_se_open")
         )
 
     def test_selection_markers_carry_the_dat_obstruction_shape_and_outline_box(self):
@@ -455,7 +465,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
             "ratePerSecond": 0.2875, "capacity": 100, "buildingId": 84,
         })
         # A laden cart has its own art, named by the trade task itself.
-        self.assertEqual(cart["animations"]["carry"]["source"], "u_trade_cart_west_walkA_x1.sld")
+        self.assertEqual(cart["animations"]["carry"]["source"], sld("u_trade_cart_west_walkA"))
         # No attack of its own, though it has armour like anything else that
         # can be shot at.
         self.assertEqual(cart["combat"]["attacks"], [])
@@ -641,11 +651,22 @@ class ContentImportIntegrationTest(unittest.TestCase):
         published = json.loads(manifest.read_text())
         for key, entity in published["entities"].items():
             for name, atlas in entity.get("atlases", {}).items():
-                width, height = atlas["size"]
-                self.assertLessEqual(
-                    max(width, height), 8192,
-                    f"{key}/{name} is {width}x{height}, over the 8192 device limit",
-                )
+                # The pack's x2 art outgrows one sheet and continues on
+                # further pages (issue #151): each is a texture of its own,
+                # under the same limit, and each is on disk.
+                for page in atlas.get("pages", [atlas]):
+                    width, height = page["size"]
+                    self.assertLessEqual(
+                        max(width, height), 8192,
+                        f"{key}/{name} ({page['image']}) is {width}x{height}, over the 8192 device limit",
+                    )
+                    self.assertTrue((manifest.parent / page["image"]).is_file(), page["image"])
+                if "pages" in atlas:
+                    self.assertEqual(atlas["pages"][0], {"image": atlas["image"], "size": atlas["size"]})
+                    self.assertEqual(
+                        len(atlas["pages"]), 1 + max(frame.get("page", 0) for frame in atlas["frames"]),
+                        f"{key}/{name} lists a page no frame is on",
+                    )
 
     def test_a_line_keeps_its_cell_in_the_grid(self):
         # The DAT places every train and research button (`button_id`, 1-15),
@@ -798,14 +819,14 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # her) with its own scythe, rate and carry.
         entities = self.result["entities"]
         builder = entities["villager-builder"]["animations"]
-        self.assertEqual(builder["work"]["source"], "u_vil_male_builder_taskA_x1.sld")
-        self.assertEqual(builder["work-farm"]["source"], "u_vil_male_farmer_seedA_x1.sld")
+        self.assertEqual(builder["work"]["source"], sld("u_vil_male_builder_taskA"))
+        self.assertEqual(builder["work-farm"]["source"], sld("u_vil_male_farmer_seedA"))
         self.assertEqual(entities["villager-female-builder"]["animations"]["work-farm"]["source"],
-                         "u_vil_female_farmer_seedA_x1.sld")
+                         sld("u_vil_female_farmer_seedA"))
         farmer = entities["villager-farmer"]
         self.assertEqual(farmer["id"], 259)
-        self.assertEqual(farmer["animations"]["work"]["source"], "u_vil_male_farmer_taskA_x1.sld")
-        self.assertEqual(farmer["animations"]["carry"]["source"], "u_vil_male_farmer_carrywalkA_x1.sld")
+        self.assertEqual(farmer["animations"]["work"]["source"], sld("u_vil_male_farmer_taskA"))
+        self.assertEqual(farmer["animations"]["carry"]["source"], sld("u_vil_male_farmer_carrywalkA"))
         self.assertEqual(farmer["gather"], {"resource": "food", "ratePerSecond": 0.53, "capacity": 10,
                                             "task": {"actionType": 5, "unitId": 50},
                                             # The farm task names a unit, not a class: no factor.
@@ -1018,8 +1039,8 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertNotIn("decay-imperial", house)
         sources = {house[name]["source"] for name in ("death", "death-feudal", "death-castle")}
         self.assertEqual(len(sources), 3)
-        self.assertEqual(house["death-feudal"]["source"], "b_west_house_age2_destruction_x1.sld")
-        self.assertEqual(house["decay-feudal"]["source"], "b_west_house_age2_rubble_x1.sld")
+        self.assertEqual(house["death-feudal"]["source"], sld("b_west_house_age2_destruction"))
+        self.assertEqual(house["decay-feudal"]["source"], sld("b_west_house_age2_rubble"))
         # A collapse is the same length in every age, so the corpse window the
         # simulation keeps from the base art holds for the variants too.
         for name in ("death", "death-feudal", "death-castle"):
@@ -1073,7 +1094,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
         flag = self.result["entities"]["rally-flag"]
         self.assertEqual(flag["category"], "effect")
         idle = flag["animations"]["idle"]
-        self.assertEqual(idle["source"], "b_misc_waypoint_flag_britons_x1.sld")
+        self.assertEqual(idle["source"], sld("b_misc_waypoint_flag_britons"))
         self.assertEqual(idle["frames"], 90)
         self.assertEqual(idle["directions"], 1)
         self.assertEqual(len(self.result["source"]["sha256"][idle["source"]]), 64)
@@ -1441,6 +1462,45 @@ class ContentImportIntegrationTest(unittest.TestCase):
                     self.assertGreater(animation["frames"], 0, f"{key}/{state}")
                     self.assertEqual(len(hashes[animation["source"]]), 64, f"{key}/{state}")
 
+    @unittest.skipUnless(UHD, "the Enhanced Graphics Pack is not downloaded")
+    def test_the_pack_sources_every_sprite_at_twice_the_density(self):
+        # With depot 1039811 beside the base depots, every animation reads
+        # its `_x2` twin at scale 2 (issue #151): the same frames, and the
+        # drawn pixels land where the x1 art's do once the frame is halved
+        # about its hotspot -- the crops differ by BC1 blocks and are no
+        # measure, the picture's box against the hotspot is.
+        from sld_layers import decode_colors
+
+        def drawn_box(frame):
+            xs, ys = [], []
+            for i in range(frame.width * frame.height):
+                if frame.rgba[i * 4 + 3] > 0:
+                    xs.append(i % frame.width)
+                    ys.append(i // frame.width)
+            return (min(xs) - frame.hotspot_x, max(xs) + 1 - frame.hotspot_x,
+                    min(ys) - frame.hotspot_y, max(ys) + 1 - frame.hotspot_y)
+
+        for key, entity in self.result["entities"].items():
+            groups = [entity["animations"]] + [
+                annex["animations"] for annex in entity.get("annexes", [])
+            ]
+            for animations in groups:
+                for state, animation in animations.items():
+                    self.assertTrue(animation["source"].endswith("_x2.sld"), f"{key}/{state}")
+                    self.assertEqual(animation["scale"], 2, f"{key}/{state}")
+                    self.assertTrue(SOURCES.path(animation["source"]).is_file(), f"{key}/{state}")
+        walk = self.result["entities"]["villager-lumberjack"]["animations"]["walk"]["source"]
+        x2 = decode_colors((UHD / walk).read_bytes())
+        x1 = decode_colors((GRAPHICS / walk.replace("_x2.sld", "_x1.sld")).read_bytes())
+        self.assertEqual(len(x1), len(x2))
+        drawn = [(a, b) for a, b in zip(x1, x2) if a is not None and b is not None and not a.empty and not b.empty]
+        self.assertGreater(len(drawn), 100)
+        for a, b in drawn[:48]:
+            box_x1 = drawn_box(a)
+            box_x2 = drawn_box(b)
+            for edge_x1, edge_x2 in zip(box_x1, box_x2):
+                self.assertLessEqual(abs(edge_x2 / 2 - edge_x1), 1, (box_x1, box_x2))
+
     def test_player_colour_ramps_come_from_the_dat_palette_blocks(self):
         from import_content import read_jasc_pal
         colors = self.result["playerColors"]
@@ -1469,7 +1529,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(len(self.result["source"]["sha256"]["palettes/original.pal"]), 64)
 
     def test_regeneration_is_deterministic(self):
-        again = extract(DAT, GRAPHICS, PALETTES, SPEC, json.loads(SOURCE.read_text()), STRINGS)
+        again = extract(DAT, GRAPHICS, PALETTES, SPEC, json.loads(SOURCE.read_text()), STRINGS, uhd_dir=UHD)
         self.assertEqual(
             json.dumps(self.result, sort_keys=True), json.dumps(again, sort_keys=True)
         )
@@ -1490,13 +1550,76 @@ class ContentImportIntegrationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             first = Path(directory) / "a.png"
             second = Path(directory) / "b.png"
-            atlas = convert(GRAPHICS / animation["source"], first, expected)
-            convert(GRAPHICS / animation["source"], second, expected)
+            atlas = convert(SOURCES.path(animation["source"]), first, expected)
+            convert(SOURCES.path(animation["source"]), second, expected)
             self.assertEqual(first.read_bytes(), second.read_bytes())
             self.assertEqual(len(atlas["frames"]), expected)
             with Image.open(first) as image:
                 self.assertEqual(image.size, tuple(atlas["size"]))
                 self.assertEqual(image.mode, "RGBA")
+
+
+class AtlasPackingTest(unittest.TestCase):
+    """The packer and the pack's source rule, on synthetic frames: no depot."""
+
+    def test_a_sheet_that_outgrows_the_device_limit_continues_on_a_page(self):
+        from sld_layers import ColorFrame, MAX_SHEET, pack_color_atlas
+        # Five frames 8000 wide and 3000 tall: one per row, two rows per
+        # page, so three pages, and every frame keeps its own index.
+        frames = [ColorFrame(8000, 3000, 10 * i, 7, bytearray(b"\xff" * (8000 * 3000 * 4))) for i in range(5)]
+        images, atlas = pack_color_atlas(frames, len(frames))
+        self.assertEqual(atlas["pages"], [[MAX_SHEET, 6000], [MAX_SHEET, 6000], [MAX_SHEET, 3000]])
+        self.assertEqual(atlas["size"], [MAX_SHEET, 6000])
+        self.assertEqual([image.size for image in images], [(MAX_SHEET, 6000), (MAX_SHEET, 6000), (MAX_SHEET, 3000)])
+        self.assertEqual([frame["page"] for frame in atlas["frames"]], [0, 0, 1, 1, 2])
+        self.assertEqual([frame["cx"] for frame in atlas["frames"]], [0, 10, 20, 30, 40])
+        last = atlas["frames"][4]
+        self.assertEqual(images[2].getpixel((last["x"] + 1, last["y"] + 1)), (255, 255, 255, 255))
+
+    def test_a_sheet_that_fits_keeps_the_one_page_shape(self):
+        from sld_layers import ColorFrame, pack_color_atlas
+        frames = [ColorFrame(4, 4, 1, 1, bytearray(64)) for _ in range(3)]
+        images, atlas = pack_color_atlas(frames, 3)
+        self.assertEqual(len(images), 1)
+        self.assertNotIn("pages", atlas)
+        self.assertTrue(all("page" not in frame for frame in atlas["frames"]))
+
+    def test_a_published_atlas_names_its_further_pages_and_its_scale(self):
+        from convert_sld import published
+        atlas = {"size": [8192, 6000], "framesInFile": 5, "frames": [], "pages": [[8192, 6000], [8192, 3000]]}
+        entry = published(atlas, "wonder/death.png", 2)
+        self.assertEqual(entry["pages"], [
+            {"image": "wonder/death.png", "size": [8192, 6000]},
+            {"image": "wonder/death-p1.png", "size": [8192, 3000]},
+        ])
+        self.assertEqual(entry["scale"], 2)
+        self.assertEqual(entry["image"], "wonder/death.png")
+        # Base art is scale 1 and says nothing, so a manifest without the
+        # pack reads as it always did.
+        self.assertNotIn("scale", published({"size": [4, 4], "framesInFile": 1, "frames": []}, "a/b.png", 1))
+
+    def test_the_pack_s_x2_file_wins_over_the_dat_s_x1_unless_empty(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory) / "base"
+            uhd = Path(directory) / "uhd"
+            base.mkdir()
+            uhd.mkdir()
+            (base / "u_a_x1.sld").write_bytes(b"1")
+            (uhd / "u_a_x2.sld").write_bytes(b"22")
+            (base / "u_b_x1.sld").write_bytes(b"1")
+            (base / "u_c_x1.sld").write_bytes(b"")
+            (uhd / "u_c_x2.sld").write_bytes(b"")
+            (base / "n_flat.sld").write_bytes(b"1")
+            with_pack = Graphics(base, uhd)
+            self.assertEqual(with_pack.source("u_a_x1"), (uhd / "u_a_x2.sld", 2))
+            self.assertEqual(with_pack.source("u_b_x1"), (base / "u_b_x1.sld", 1))
+            self.assertEqual(with_pack.source("u_c_x1"), (base / "u_c_x1.sld", 1))
+            self.assertEqual(with_pack.source("n_flat"), (base / "n_flat.sld", 1))
+            self.assertEqual(with_pack.path("u_a_x2.sld"), uhd / "u_a_x2.sld")
+            self.assertEqual(with_pack.path("u_b_x1.sld"), base / "u_b_x1.sld")
+            without = Graphics(base)
+            self.assertEqual(without.source("u_a_x1"), (base / "u_a_x1.sld", 1))
+            self.assertEqual(without.path("u_a_x2.sld"), base / "u_a_x2.sld")
 
 
 @unittest.skipUnless(
