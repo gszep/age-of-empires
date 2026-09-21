@@ -21,13 +21,16 @@ mkdirSync(directory, { recursive: true });
 writeFileSync(`${directory}/open-empires-shared.service`, `[Unit]
 Description=Open Empires household ${role}
 After=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
 WorkingDirectory=${root.replaceAll('%', '%%')}
 ExecStart=${command.map(quote).join(' ')}
 Environment=${environment.map(quote).join(' ')}
-Restart=always
+Restart=on-failure
+RestartPreventExitStatus=78
 RestartSec=3
 TimeoutStopSec=15
 
@@ -37,4 +40,5 @@ WantedBy=default.target
 execFileSync('systemctl', ['--user', 'daemon-reload'], { stdio: 'inherit' });
 execFileSync('systemctl', ['--user', 'enable', 'open-empires-shared.service'], { stdio: 'inherit' });
 execFileSync('systemctl', ['--user', 'restart', 'open-empires-shared.service'], { stdio: 'inherit' });
-console.log(role === 'host' ? 'Ysgramor now hosts the shared match on port 5173.' : 'Join the shared match at http://localhost:5174/');
+console.log(`Installed household ${role} service and requested startup. Check: systemctl --user status open-empires-shared.service`);
+console.log(role === 'host' ? 'Host URL when ready: http://localhost:5173/' : 'Join URL when ready: http://localhost:5174/');

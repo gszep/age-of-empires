@@ -20,6 +20,25 @@ GATE_LOG="${GATE_LOG:-.local/gate-step.log}"
 mkdir -p "$(dirname "$GATE_LOG")"
 rm -f .local/gate.ok
 touch .local/gate.started
+gate_status=running
+# Record the actual redirected output, including named issue logs. A killed
+# wrapper may leave 'running'; session_start checks its PID rather than claiming
+# an old default log is the latest result.
+record_run() {
+  python3 - "$gate_status" "$$" <<'PY'
+import json, os, time
+import sys
+from pathlib import Path
+record = dict(status=sys.argv[1], pid=int(sys.argv[2]),
+              started=Path('.local/gate.started').stat().st_mtime,
+              updated=time.time(), log=os.readlink(f'/proc/{sys.argv[2]}/fd/1'))
+temporary = Path('.local/gate.latest.json.tmp')
+temporary.write_text(json.dumps(record) + '\n')
+temporary.replace('.local/gate.latest.json')
+PY
+}
+record_run
+trap record_run EXIT
 skipped_note=""
 for step in "npm test" "npm run build" "npm run test:import" "npm run debug:smoke"; do
   echo "=== $step ==="
@@ -27,6 +46,7 @@ for step in "npm test" "npm run build" "npm run test:import" "npm run debug:smok
   status=$?
   tail -"${GATE_TAIL:-8}" "$GATE_LOG"
   if [ "$status" -ne 0 ]; then
+    gate_status="failed: $step"
     echo "GATE FAILED: $step (exit $status); full output in $GATE_LOG"
     exit "$status"
   fi
@@ -42,6 +62,7 @@ for step in "npm test" "npm run build" "npm run test:import" "npm run debug:smok
       n=$(grep -oE 'skipped=[0-9]+' "$GATE_LOG" | tail -1 | grep -oE '[0-9]+' || true)
       [ -n "$n" ] && skipped_note="$skipped_note import:$n"
       if [ "${ran:-0}" -eq 0 ] && [ -f public/imported/aoe2/manifest.json ]; then
+        gate_status="failed: empty import suite"
         echo "GATE FAILED: the import suite ran 0 tests although the manifest exists; check tools/test_import_aoe2.py's DAT path"
         exit 1
       fi;;
@@ -51,4 +72,5 @@ if [ -n "$skipped_note" ]; then
   echo "skipped (not run, not passed):$skipped_note -- with the owned content only the opt-in live-agent test should skip"
 fi
 touch -r .local/gate.started .local/gate.ok
+gate_status=green
 echo "GATE GREEN"

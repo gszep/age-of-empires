@@ -229,13 +229,13 @@ comparable because the board changed under them.
   local SLD decoder is byte-identical to openage's on all 29,783 frames it
   replaced; every modelled unit's stats match the DAT (487 values, 0
   mismatches, #36).
-- **Tests**: 604 vitest, 82 import tests, and the
+- **Tests**: 609 vitest, 83 Python/import tests, and the
   browser smoke (`tools/debug_smoke.mjs`: a private server, real clicks and
   keys). Fidelity assertions skip without the owned content; the gate says
   how many skipped.
 
-Latest full working-tree gate: GREEN, `.local/issue83-gate-r2.log`
-(2026-09-21, group-arrival correction). The four issue-specific naval browser
+Latest full working-tree gate: GREEN, `.local/issues157-158-155-gate-r3.log`
+(2026-09-21, three Vitest workers; no fixture timeouts widened). The four issue-specific naval browser
 scenarios also passed in `.local/issue97-naval-final-d1659.log`: dock buttons
 and upgrades, boarding and shore unloading, fish-trap construction/income,
 and visible fire shots.
@@ -250,6 +250,18 @@ public-command regressions check compactness, personal space and settlement;
 `tools/group_movement_smoke.mts` verifies a real 25-unit right-click in imported
 mode (2.186×2.083 tiles, radius 1.160). This is collision separation, not the
 reference's selectable formation system; its numerical tie-break is in the ledger.
+
+Shared-host incompatible checkpoint startup (#157/#158) now exits with
+non-retryable status 78 and preserves the saved bytes. The installed service
+also bounds transient retries, and session-start reports its failed/running
+state and restart count (#155). CLI regressions cover version/rules mismatch,
+malformed JSON, retryable port conflicts and compatible checkpoint restoration.
+Ysgramor's incompatible checkpoint was preserved byte-for-byte while its service
+entered `failed/78` without increasing the restart count; an explicit recovery
+choice is still needed before that household match can run.
+The private two-browser shared smoke passed adoption, training, synchronization,
+reconnection and checkpoint restoration; a transient systemd probe recovered
+on its second attempt under the same restart policy.
 
 ## The reference's default zoom is 0.8 of ours
 

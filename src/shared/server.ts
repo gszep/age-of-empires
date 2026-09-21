@@ -11,6 +11,15 @@ import type { PlayerId } from '../sim/types';
 import { SharedMatch } from './match';
 import { SHARED_SPEEDS, SHARED_VERSION, type HostMessage } from './protocol';
 
+/** EX_CONFIG: retrying cannot repair a saved match; leave it for its owner. */
+export class SharedCheckpointError extends Error {
+  readonly exitCode = 78;
+  constructor(path: string, reason: string) {
+    super(`Shared checkpoint ${JSON.stringify(path)} ${reason}. Saved match preserved. Restore matching game rules/version, or move this checkpoint aside to start a new match, then start open-empires-shared.service.`);
+    this.name = 'SharedCheckpointError';
+  }
+}
+
 export function sharedMatchPlugin(root: string, checkpointPath = resolve(root, '.local/shared-match.json')): Plugin {
   let cleanup: (() => void) | undefined;
   return {
@@ -24,9 +33,14 @@ export function sharedMatchPlugin(root: string, checkpointPath = resolve(root, '
       const match = new SharedMatch(createGame(42, rules), { map: 'arabia', seed: 42 });
       let pristine = !existsSync(checkpoint);
       if (existsSync(checkpoint)) {
-        const saved = JSON.parse(readFileSync(checkpoint, 'utf8'));
-        if (saved.version !== SHARED_VERSION || saved.rulesHash !== rulesHash) {
-          throw new Error('Shared checkpoint uses different rules/version. Move .local/shared-match.json aside to start a new match.');
+        let saved;
+        try { saved = JSON.parse(readFileSync(checkpoint, 'utf8')); }
+        catch (error) {
+          if (error instanceof SyntaxError) throw new SharedCheckpointError(checkpoint, 'is not valid JSON');
+          throw error;
+        }
+        if (!saved || saved.version !== SHARED_VERSION || saved.rulesHash !== rulesHash) {
+          throw new SharedCheckpointError(checkpoint, 'uses different rules/version');
         }
         match.state = { ...saved.state, rules };
         match.settings = saved.settings;

@@ -67,8 +67,11 @@ different browser cannot recover another browser's session storage.
 use `npm run dev -- --port 5175` while the shared service occupies port 5173.
 After editing simulation/host code, restart the shared service as well as
 reloading browsers. Bump `SHARED_VERSION` when checkpoint compatibility changes.
-A checkpoint with a different version or rules hash requires an explicit new
-match: move it aside before starting the service. Keep the old file if wanted.
+A checkpoint with a different version or rules hash is preserved and fails
+startup with status 78 (`CONFIG`), as does malformed checkpoint JSON. The
+service does not retry that permanent failure. Restore the matching game
+rules/version to resume it, or explicitly move the checkpoint aside to start
+a new match. The diagnostic prints the exact saved path.
 
 ## Operations
 
@@ -81,6 +84,20 @@ journalctl --user -u open-empires-shared -n 50
 node tools/install-shared.mjs host
 node tools/install-shared.mjs join /absolute/path/to/asset/public
 ```
+
+Reinstall an older service to apply the restart policy: `Restart=on-failure`,
+`RestartPreventExitStatus=78`, at most five starts per 60 seconds. Transient
+failures still retry after three seconds; after hitting the rate limit, repair
+the cause, then `systemctl --user reset-failed open-empires-shared` and
+`systemctl --user start open-empires-shared`. No checkpoint is automatically
+deleted or replaced during incompatible startup.
+
+`tools/session_start.sh` reports the managed service's active/substate, last
+exit status, result and restart counter even when no process is running. The
+gate records its actual redirected log and result in `.local/gate.latest.json`,
+so named issue logs are reported instead of a stale default `gate.log`.
+For a private host test, `MATCH_CHECKPOINT` overrides the saved path and
+`MATCH_PORT` overrides the listener port; normal household defaults are unchanged.
 
 The join script needs only Node, not npm dependencies. `MATCH_HOST` overrides
 the default `https://ysgramor.tail6e864b.ts.net:5173`; `MATCH_ASSETS` is the
