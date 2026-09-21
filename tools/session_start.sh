@@ -4,12 +4,23 @@
 # the manifest on disk and the process table. The prose queues used to carry
 # this and were wrong within a day (docs/reviews/2026-09-19.md, §7).
 #
-# Usage: tools/session_start.sh [--no-fetch]
+# Usage: tools/session_start.sh [--no-fetch] [--unattended]
 set -u
 cd "$(dirname "$0")/.."
 
 fetch=1
-[ "${1:-}" = "--no-fetch" ] && fetch=0
+unattended=0
+for arg in "$@"; do
+  case "$arg" in
+    --no-fetch) fetch=0 ;;
+    --unattended) unattended=1 ;;
+    *) echo "unknown option: $arg" >&2; exit 2 ;;
+  esac
+done
+
+if [ "$unattended" -eq 1 ]; then
+  node tools/unattended_preflight.mjs || exit 1
+fi
 
 section() { printf '\n== %s ==\n' "$1"; }
 
@@ -67,4 +78,5 @@ cat <<'EOF'
 1. Read AGENTS.md, then docs/overnight.md's standing rules, then docs/lessons.md.
 2. Bugs first, in issue order; then decisions the human has answered; then enhancements.
 3. Run tools/gate.sh before every commit; push after every commit.
+4. Before an unattended OpenCode run: tools/session_start.sh --unattended, then the live-session probes in docs/overnight.md.
 EOF

@@ -19,6 +19,23 @@ in `git log` and `docs/status.md`.
    nothing reverted; the ones that did not, stopped early or ran the wrong
    item. Paste the answers into the run's first commit message or the issue
    thread, and confirm the stopping rule below.
+4. **Verify unattended permissions before promising readiness.** For OpenCode,
+   run `tools/session_start.sh --unattended` (or
+   `node tools/unattended_preflight.mjs` on its own). It checks the installed binary's
+   merged `build` permissions, the resolved owned depot, and noninteractive
+   GitHub/repository access. Any remaining approval rule fails preflight.
+   `opencode.jsonc` permits the known depot paths and returns errors instead of
+   prompting for unknown external paths, secret-file reads or repeated calls.
+   Resolve the depot with `uv run --locked python tools/depot.py`; never guess
+   a Steam directory and start an external search there.
+5. **Configuration on disk is not the running session.** After permission edits,
+   restart OpenCode (or recreate/restart its hosting server/session) and use
+   the `build` agent. Before the clock starts, use the actual Read tool on the
+   `dropsites.json` path printed by preflight, and verify a scratch edit and a
+   shell command in that session. Resolve any approvals while the human is
+   still present. Check selected-provider authentication too; the CLI permission
+   probe deliberately makes no model calls. Do not claim an eight-hour run is
+   ready based on project instructions or `gh auth status` alone.
 
 ## During the run
 
@@ -31,6 +48,10 @@ in `git log` and `docs/status.md`.
   `tools/hooks/clock.sh` also prints the time every twenty-five tool calls.
   A run once wrapped up at dawn believing it was mid-afternoon because it
   had narrated the time for five hours.
+- **An unavailable action is a blocker, not a request to wait.** Record it and
+  move to another eligible item during an unattended run. Do not retry denied
+  actions through another tool. Check the deadline immediately after a long
+  tool return; an approval wait consumes the real run window too.
 - **When the queue empties early, keep going down the tracker** (the human's
   rule, 2026-09-19). A run stops at the deadline the human gave, not when the
   work looks done.

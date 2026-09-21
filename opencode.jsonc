@@ -1,0 +1,43 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "build",
+  "references": {
+    "aoe2-owned": {
+      "path": "~/.local/share/Steam/steamcmd/linux32/steamapps/content/app_813780",
+      "description": "Owned AoE2DE depots: read-only source DAT, scripts, localization, UI, graphics and audio. Resolve the actual root with tools/depot.py before searching. Never commit these assets."
+    }
+  },
+  "agent": {
+    "build": {
+      // A pending approval suspends the entire turn, including parallel calls.
+      // Permit the project's inputs; return an error for other external paths.
+      // These are tool permissions, not authorization for an unrequested task.
+      "permission": {
+        "external_directory": {
+          "*": "deny",
+          "~/Steam/steamapps/content/app_813780/*": "allow",
+          "~/.local/share/Steam/steamcmd/linux32/steamapps/content/app_813780/*": "allow",
+          "~/.local/share/Steam/steamapps/content/app_813780/*": "allow",
+          "~/.steam/steam/steamapps/content/app_813780/*": "allow",
+          "~/.claude/skills/*": "allow",
+          "~/.agents/skills/*": "allow",
+          "~/.claude/projects/*": "allow",
+          "~/.codex/sessions/*": "allow",
+          "/tmp/opencode/*": "allow"
+        },
+        "read": {
+          "*": "allow",
+          "*.env": "deny",
+          "*.env.*": "deny",
+          "*.env.example": "allow"
+        },
+        "edit": {
+          "*": "allow",
+          "*/steamapps/content/app_813780/*": "deny"
+        },
+        "doom_loop": "deny",
+        "question": "deny"
+      }
+    }
+  }
+}
