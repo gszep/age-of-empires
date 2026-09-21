@@ -68,6 +68,32 @@ function insideAnyFootprint(state: GameState, point: Point, epsilon = 0.05): boo
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 
 describe('navigation compatibility suite', () => {
+  it.each([10, 25])('a %i-unit ground order settles into a compact two-dimensional group', count => {
+    const state = arena();
+    state.entities = state.entities.filter(e => e.kind === 'town-center');
+    state.terrain.fill(0);
+    const group = Array.from({ length: count }, (_, i) =>
+      unit(state, { x: 20 + i % 5, y: 20 + Math.floor(i / 5) }));
+    const target = { x: 40, y: 30 };
+    expect(applyCommand(state, { kind: 'order', player: 1,
+      entityIds: group.map(e => e.id), target }).ok).toBe(true);
+    run(state, 1200);
+    expect(group.every(e => e.order.kind === 'idle')).toBe(true);
+    const xs = group.map(e => e.position.x);
+    const ys = group.map(e => e.position.y);
+    const width = Math.max(...xs) - Math.min(...xs);
+    const height = Math.max(...ys) - Math.min(...ys);
+    expect(Math.min(width, height)).toBeGreaterThan(group[0].radius * 2);
+    expect(Math.max(...group.map(e => distance(e.position, target))))
+      .toBeLessThan(Math.sqrt(count) * group[0].radius * 2);
+    for (const [i, a] of group.entries()) for (const b of group.slice(i + 1)) {
+      expect(distance(a.position, b.position)).toBeGreaterThan(a.radius + b.radius - 0.01);
+    }
+    const settled = group.map(e => ({ ...e.position }));
+    run(state, 100);
+    expect(Math.max(...group.map((e, i) => distance(e.position, settled[i])))).toBeLessThan(0.01);
+  });
+
   it('direct path: walks straight to an open destination', () => {
     const state = arena();
     const mover = unit(state, { x: 12, y: 15 });

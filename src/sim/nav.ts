@@ -374,9 +374,18 @@ export function separateUnits(state: GameState, movable: Entity[], grid: NavGrid
       const d = Math.hypot(dx, dy);
       if (d >= minDistance) continue;
       const push = (minDistance - d) / 2;
-      // Perfectly stacked units break the tie along the x axis.
-      const ux = d > 1e-9 ? dx / d : 1;
-      const uy = d > 1e-9 ? dy / d : 0;
+      // A shared destination makes positions exactly equal. An axis-only
+      // tie-break traps every later arrival in the same line (#83). Give the
+      // collision normal a tiny, stable two-dimensional perturbation instead;
+      // it consumes no simulation RNG and never changes the contact distance.
+      // Golden-angle phases avoid a short repeating sequence of directions.
+      const phaseA = a.id * 2.399963229728653;
+      const phaseB = b.id * 2.399963229728653;
+      const nx = dx + (Math.cos(phaseB) - Math.cos(phaseA)) * 1e-6;
+      const ny = dy + (Math.sin(phaseB) - Math.sin(phaseA)) * 1e-6;
+      const normalLength = Math.hypot(nx, ny);
+      const ux = nx / normalLength;
+      const uy = ny / normalLength;
       tryNudge(grid, a, -ux * push, -uy * push, state);
       tryNudge(grid, b, ux * push, uy * push, state);
     }

@@ -31,6 +31,8 @@ browser smoke and are maintained regression tools.
   and attack display, then a right-click attack.
 - **`farm_occupancy_smoke.mts`** — group right-click on a farm gives one farmer
   and actual food gathering.
+- **`group_movement_smoke.mts`** — #83's real 25-unit ground right-click settles
+  into a compact two-dimensional group with all arrivals rendered.
 - **`minimap_markers_smoke.mts`** — actual minimap pixels for live and remembered
   building dots, reveal parity, and the absence of a farm marker.
 

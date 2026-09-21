@@ -229,13 +229,13 @@ comparable because the board changed under them.
   local SLD decoder is byte-identical to openage's on all 29,783 frames it
   replaced; every modelled unit's stats match the DAT (487 values, 0
   mismatches, #36).
-- **Tests**: 602 vitest, 82 import tests, and the
+- **Tests**: 604 vitest, 82 import tests, and the
   browser smoke (`tools/debug_smoke.mjs`: a private server, real clicks and
   keys). Fidelity assertions skip without the owned content; the gate says
   how many skipped.
 
-Latest full working-tree gate: GREEN, `.local/issue97-final-d1646.log`
-(2026-09-21, after moving Ubuntu to D:). The four issue-specific naval browser
+Latest full working-tree gate: GREEN, `.local/issue83-gate-r2.log`
+(2026-09-21, group-arrival correction). The four issue-specific naval browser
 scenarios also passed in `.local/issue97-naval-final-d1659.log`: dock buttons
 and upgrades, boarding and shore unloading, fish-trap construction/income,
 and visible fire shots.
@@ -243,6 +243,13 @@ Earlier dedicated browser checks cover single-farmer group orders, live/fog-memo
 minimap marker pixels, counted queues (imported and fallback), scorpions, and
 delayed tree-shadow texture arrival, complete visible/remembered canopies and
 visible shadow coverage against the owned mask and Default strength.
+
+Group arrival (#83) no longer degenerates into an axis-aligned line: stationary
+collision normals break positional ties in two dimensions. Ten- and 25-unit
+public-command regressions check compactness, personal space and settlement;
+`tools/group_movement_smoke.mts` verifies a real 25-unit right-click in imported
+mode (2.186×2.083 tiles, radius 1.160). This is collision separation, not the
+reference's selectable formation system; its numerical tie-break is in the ledger.
 
 ## The reference's default zoom is 0.8 of ours
 
