@@ -219,8 +219,25 @@ export function exampleAiCommands(
   const place = (offset: { x: number; y: number }) =>
     tc ? { x: tc.x + direction * offset.x, y: tc.y + offset.y } : offset;
 
+  // A foundation is already paid for. Recover unstaffed houses before buying
+  // another building or assigning gatherers; a builder walking there counts
+  // just as much as one hammering. Presence of buildProgress means unfinished,
+  // even if its rounded public value has reached 1 (#146).
+  const constructionWorkers = new Set<number>();
+  const staffed = new Set(villagers.filter(e => e.order === 'build').map(e => e.buildTargetId));
+  for (const house of mine.filter(e => e.kind === 'house' && e.buildProgress !== undefined)
+    .sort((a, b) => a.id - b.id)) {
+    if (staffed.has(house.id)) continue;
+    const worker = villagers.filter(e => !constructionWorkers.has(e.id) && (e.order === 'idle' || e.order === 'gather'))
+      .sort((a, b) => Number(a.order !== 'idle') - Number(b.order !== 'idle')
+        || distance(a, house) - distance(b, house) || a.id - b.id)[0];
+    if (!worker) break;
+    constructionWorkers.add(worker.id);
+    commands.push({ kind: 'order', player, entityIds: [worker.id], target: { x: house.x, y: house.y }, targetId: house.id });
+  }
+
   for (const [index, villager] of villagers.entries()) {
-    if (villager.order !== 'idle') continue;
+    if (villager.order !== 'idle' || constructionWorkers.has(villager.id)) continue;
     const wanted = ASSIGNMENT[index % ASSIGNMENT.length];
     // Farms are food sources too once complete, so they keep villagers fed
     // after the berries run out.
@@ -258,6 +275,7 @@ export function exampleAiCommands(
   // gold, working something that is not wood or gold -- not carrying it, not
   // standing at a known node of it -- is sent to the nearest known node.
   for (const [index, villager] of villagers.entries()) {
+    if (constructionWorkers.has(villager.id)) continue;
     const wanted = ASSIGNMENT[index % ASSIGNMENT.length];
     if (wanted === 'food') continue; // food assigns itself; the herd rule below
     if (villager.order === 'idle' || villager.order === 'build') continue;
@@ -287,7 +305,7 @@ export function exampleAiCommands(
     .sort((a, b) => (tc ? distance(a, tc) - distance(b, tc) : 0) || a.id - b.id)[0];
   if (dinner) {
     const puller = villagers
-      .filter((v, index) => ASSIGNMENT[index % ASSIGNMENT.length] === 'food' && v.order === 'gather')
+      .filter((v, index) => !constructionWorkers.has(v.id) && ASSIGNMENT[index % ASSIGNMENT.length] === 'food' && v.order === 'gather')
       .sort((a, b) => distance(a, dinner) - distance(b, dinner) || a.id - b.id)[0];
     if (puller) {
       commands.push({
@@ -319,7 +337,10 @@ export function exampleAiCommands(
     });
   }
 
-  const idleBuilder = villagers.find(e => e.order === 'idle') ?? villagers[0];
+  // Keep a worker on its foundation until it finishes, even if a new camp's
+  // automatic gathering means there are no idle builders this decision.
+  const idleBuilder = villagers.find(e => !constructionWorkers.has(e.id) && e.order === 'idle')
+    ?? villagers.find(e => !constructionWorkers.has(e.id) && e.order !== 'build');
   /**
    * One building per decision. Every `build` retasks the villager it names, so
    * asking the same one for a camp, then a house, then a barracks in a single
@@ -327,10 +348,11 @@ export function exampleAiCommands(
    * foundations nobody is coming back to. Measured: the population sat at 5/5
    * for the first four minutes because the house was always overwritten.
    */
-  let builderTasked = false;
+  let builderTasked = constructionWorkers.size > 0;
   const build = (building: BuildingKind, target: { x: number; y: number }) => {
     if (builderTasked || !idleBuilder) return;
     builderTasked = true;
+    constructionWorkers.add(idleBuilder.id);
     commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building, target });
   };
   /**
@@ -381,25 +403,31 @@ export function exampleAiCommands(
   // barracks or a camp and a house, and on a map where the trees are twenty
   // tiles out, spending it all on the barracks buys one militia and then a
   // wood queue that never clears.
-  // A drop site beside whatever is being gathered furthest from home.
-  /** The nearest known node of a resource, and how far it is from a drop site. */
-  const supply = (resource: ResourceKind) => {
+  /** Known supply in home-distance order. A served or unsuitable nearest node
+   * must not hide another patch that actually needs a camp (#147). */
+  const supply = function* (resource: ResourceKind, unservedOnly = false) {
     const nodes = known
-      .filter(e => e.kind === 'resource' && e.resource === resource && (e.amount ?? 0) > 0)
+      .filter(e => e.kind === 'resource' && e.resource === resource && (e.amount ?? 0) > 0
+        && e.node !== 'fish' && e.node !== 'shore-fish')
       .sort((a, b) => distance(tc ?? a, a) - distance(tc ?? b, b) || a.id - b.id);
+    const sites = mine.filter(e => (BANKS[e.kind] ?? []).includes(resource) && e.buildProgress === undefined);
     // A lumber camp goes by a *wood*. The map scatters lone trees, and a camp
     // anchored on the nearest one -- a hundred wood, then nothing -- starved
     // the whole military opening: measured, no barracks in thirty minutes.
     // A real wood is a tree with company.
-    const node = resource === 'wood'
-      ? nodes.find(n =>
-        nodes.filter(o => o !== n && Math.abs(o.x - n.x) <= 4 && Math.abs(o.y - n.y) <= 4).length >= 4)
-      : nodes[0];
-    if (!node) return undefined;
-    const walk = mine
-      .filter(e => (BANKS[e.kind] ?? []).includes(resource) && (e.buildProgress ?? 1) >= 1)
-      .reduce((best, site) => Math.min(best, distance(site, node)), Infinity);
-    return { node, walk };
+    for (const node of nodes) {
+      const walk = sites.reduce((best, site) => Math.min(best, distance(site, node)), Infinity);
+      if (unservedOnly && walk <= CAMP_RANGE) continue;
+      if (resource === 'wood') {
+        let neighbours = 0;
+        for (const other of nodes) {
+          if (other !== node && Math.abs(other.x - node.x) <= 4 && Math.abs(other.y - node.y) <= 4) neighbours++;
+          if (neighbours >= 4) break;
+        }
+        if (neighbours < 4) continue;
+      }
+      yield { node, walk };
+    }
   };
 
   // Housing before anything else it might spend wood on. Two hundred wood is
@@ -415,12 +443,13 @@ export function exampleAiCommands(
   // buys the barracks. Two of them at once once the cap is actually reached.
   const houseHeadroom = 3;
   const housesAtOnce = headroom <= 0 ? 2 : 1;
-  const building = mine.filter(e => e.kind === 'house' && (e.buildProgress ?? 1) < 1).length;
+  const building = mine.filter(e => e.kind === 'house' && e.buildProgress !== undefined).length;
   if (idleBuilder && headroom <= houseHeadroom && building < housesAtOnce
       && observation.wood >= 25) {
     // Cycle deterministically through candidate spots so a blocked placement
     // is retried elsewhere on the next decision.
-    const spot = clearSpot(HOUSE_SPOTS, 1);
+    const spot = clearSpot(HOUSE_SPOTS, 1) ?? clearSpot(RANGE_SPOTS, 1)
+      ?? clearSpot(BARRACKS_SPOTS, 1);
     if (spot) build('house', spot);
   }
   // Either the trees are near a drop site already, or a camp has been built
@@ -429,8 +458,8 @@ export function exampleAiCommands(
   // mining camp first, in the minutes before the scout has even found the
   // trees, left 15 wood, an income of ten a minute, and a lumber camp that
   // arrived at minute eleven -- measured, on the real distance bands.
-  const woodIsHandy = mine.some(e => e.kind === 'lumber-camp' && (e.buildProgress ?? 1) >= 1)
-    || (supply('wood')?.walk ?? Infinity) <= CAMP_RANGE;
+  const woodIsHandy = mine.some(e => e.kind === 'lumber-camp' && e.buildProgress === undefined)
+    || (supply('wood').next().value?.walk ?? Infinity) <= CAMP_RANGE;
   for (const camp of CAMPS) {
     if (observation.wood < CAMP_COST_WOOD || !idleBuilder || !tc) continue;
     if (camp.resource !== 'wood' && !woodIsHandy) continue;
@@ -447,14 +476,24 @@ export function exampleAiCommands(
     // hundred and seventy-five that starts an army.
     if (!barracks && built.length >= 1) continue;
     // One at a time: a second would be sited against the same node anyway.
-    if (built.some(e => (e.buildProgress ?? 1) < 1)) continue;
-    const at = supply(camp.resource);
-    if (!at || at.walk <= CAMP_RANGE) continue;
+    if (built.some(e => e.buildProgress !== undefined)) continue;
     const step = Math.floor(observation.time / 3);
-    const home = Math.atan2(tc.y - at.node.y, tc.x - at.node.x);
-    const bearing = home + CAMP_FAN[step % CAMP_FAN.length];
     const reach = CAMP_RADII[Math.floor(step / CAMP_FAN.length) % CAMP_RADII.length];
-    build(camp.building, { x: at.node.x + Math.cos(bearing) * reach, y: at.node.y + Math.sin(bearing) * reach });
+    for (const at of supply(camp.resource, true)) {
+      // Do not keep retrying a mill beside the old one as this fan rotates.
+      // Its entire placement envelope must clear the existing service area.
+      // #147 permits useful nearby wood/mining camps, but not duplicate mills.
+      if (camp.building === 'mill' && built.some(site =>
+        distance(site, at.node) <= CAMP_RANGE + Math.max(...CAMP_RADII))) continue;
+      const home = Math.atan2(tc.y - at.node.y, tc.x - at.node.x);
+      const bearing = home + CAMP_FAN[step % CAMP_FAN.length];
+      const target = { x: at.node.x + Math.cos(bearing) * reach, y: at.node.y + Math.sin(bearing) * reach };
+      // The mill's 2×2 placement snaps to whole tiles at the command boundary.
+      if (camp.building === 'mill' && built.some(site =>
+        distance(site, { x: Math.round(target.x), y: Math.round(target.y) }) <= CAMP_RANGE)) continue;
+      build(camp.building, target);
+      break;
+    }
   }
 
   // Not until the wood is banked somewhere near the trees. The starting wood
@@ -465,7 +504,8 @@ export function exampleAiCommands(
   // whose camp served a different wood once never built a barracks at all.)
   const range = mine.find(e => e.kind === 'archery-range');
   if (!range && barracks && idleBuilder && observation.age >= 1 && observation.wood >= 175) {
-    const spot = clearSpot(RANGE_SPOTS, 1.5);
+    const spot = clearSpot(RANGE_SPOTS, 1.5) ?? clearSpot(BARRACKS_SPOTS, 1.5)
+      ?? clearSpot(HOUSE_SPOTS, 1.5);
     if (spot) build('archery-range', spot);
   }
 
@@ -615,7 +655,8 @@ export function exampleAiCommands(
     // take to chew through -- which is exactly when the surplus would have
     // paid for the Castle Age.
     const razers = villagers.filter((e, index) =>
-      e.order !== 'attack' && ASSIGNMENT[index % ASSIGNMENT.length] !== 'food');
+      e.order !== 'attack' && e.order !== 'build' && !constructionWorkers.has(e.id)
+      && ASSIGNMENT[index % ASSIGNMENT.length] !== 'food');
     if (razers.length) {
       commands.push({
         kind: 'order', player, entityIds: razers.map(e => e.id).sort((a, b) => a - b),

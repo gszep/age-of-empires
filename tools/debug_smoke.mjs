@@ -135,26 +135,22 @@ try {
         `training=${tc1.training}, queued=${tc1.queued}, food ${foodBefore} -> ${food1}`);
       // Issue #7's bug: the button greyed the moment its building was busy.
       check('train button stays enabled while training', await button.evaluate(el => !el.disabled));
-      // A second press queues behind the first -- unless the simulation's
-      // population rule refuses it, which the opening's 4-of-5 population
-      // does (the reference lets a queue outgrow the cap; issue #143). The
-      // check asks the sim's own rule what should happen, then the button.
+      // #143: queue past the opening's 4-of-5 population. Housing is checked
+      // when a unit emerges, never when the player pays for another entry.
       const p1 = (await query({ type: 'sim' })).players['1'];
-      const fits = p1.population + tc1.queued + 1 <= p1.populationCap;
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
       await settle();
       const tc2 = await entity(townCenter.id);
-      check(fits ? 'second click queues behind the first' : 'second click is refused at the population cap',
-        tc2.queued === (fits ? 2 : 1), `queued=${tc2.queued}, population ${p1.population}/${p1.populationCap}`);
+      check('second click queues beyond the population cap',
+        tc2.queued === 2, `queued=${tc2.queued}, population ${p1.population}/${p1.populationCap}`);
       // The hotkey goes through the same command as the button.
       const hotkey = await button.$eval('.hotkey', el => el.textContent).catch(() => null);
       if (hotkey) {
         const before = tc2.queued;
-        const fitsNow = p1.population + before + 1 <= p1.populationCap;
         await page.keyboard.press(hotkey.toLowerCase());
         await settle();
         const tc3 = await entity(townCenter.id);
-        check(`hotkey ${hotkey} reaches the same command`, tc3.queued === (fitsNow ? before + 1 : before),
+        check(`hotkey ${hotkey} reaches the same command`, tc3.queued === before + 1,
           `queued ${before} -> ${tc3.queued}`);
       }
     }

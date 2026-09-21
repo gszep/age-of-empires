@@ -66,6 +66,8 @@ export interface ImportedEntity {
   projectile?: { arc: number };
   animations: Record<string, AnimationInfo>;
   atlases: Record<string, Atlas>;
+  animationLayers?: Record<string, { animation: string; x: number; y: number }[]>;
+  particleEffect?: string;
   annexes?: { unitId: number; misplacement: [number, number]; animations: Record<string, AnimationInfo>; atlases: Record<string, Atlas> }[];
   /**
    * A building's fires (issue #73): per standing animation (the age's own

@@ -1,4 +1,4 @@
-import type { AnimalKind, BuildingKind, Entity, EntityKind, ResourceKind, UnitKind } from './types';
+import type { AnimalKind, BuildingKind, Entity, EntityKind, ResourceKind, UnitKind, NavalUnitKind } from './types';
 
 export const TICK_SECONDS = 0.05;
 export const TICKS_PER_SECOND = 20;
@@ -155,12 +155,16 @@ export interface UnitRules {
   /** Trade carts: goods earned per second on the road, and the most they hold. */
   tradeRatePerSecond?: number;
   tradeCapacity?: number;
+  transportCapacity?: number;
+  selfDestruct?: boolean;
+  projectilesPerAttack?: number;
+  requires?: string[];
   /**
    * A gatherer that is not a villager -- the fishing ship: its DAT work
    * rate, what it holds, and the factor per class of node it works (a deep
    * fish at 1.75, a shore fish at 1.0, each gather task's `work_value_1`).
    */
-  gather?: { ratePerSecond: number; capacity: number; classFactors: Record<string, number> };
+  gather?: { ratePerSecond: number; capacity: number; classFactors: Record<string, number>; trapFactor?: number };
   /** Where it banks its load, from the DAT's own `drop_sites`; a villager
    * names none here and goes by what each building accepts. */
   dropSites?: BuildingKind[];
@@ -218,6 +222,8 @@ export interface BuildingRules {
   accepts: ResourceKind[];
   /** Food a farm holds; undefined for everything else. */
   farmAmount?: number;
+  fishTrapAmount?: number;
+  builderKind?: 'villager' | 'fishing-ship';
   /**
    * Its slot in the villager's build menu, from the DAT's own build button.
    * The DAT states the slot and not the page, but it states the page's shape:
@@ -357,6 +363,10 @@ export const GARRISON_CATEGORY: Record<number, number> = {
   13: 32, 51: 32, 54: 32,     // siege
 };
 
+export type VillagerGatherTask = 'forager' | 'farmer' | 'hunter' | 'shepherd'
+  | 'fisher' | 'lumberjack' | 'goldminer' | 'stonemason';
+export interface VillagerGatherRules { ratePerSecond: number; capacity: number }
+
 export interface GameRules {
   origin: 'fallback' | 'imported';
   civilization: CivilizationRules;
@@ -367,6 +377,7 @@ export interface GameRules {
   nodes: Record<NodeKind, ResourceNodeRules>;
   gatherRatePerSecond: Record<ResourceKind, number>;
   carryCapacity: number;
+  villagerGather: Record<VillagerGatherTask, VillagerGatherRules>;
   /**
    * What a full repair costs, as a fraction of the price: the DAT's player
    * attributes 271 (buildings) and 270 (units), both 0.5, charged as the
@@ -564,6 +575,39 @@ export const AGE_NAMES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'
 
 const cost = (food = 0, wood = 0, gold = 0, stone = 0): Cost => ({ food, wood, gold, stone });
 
+// Open equivalents of the pinned DAT naval rows. Imported mode reads every
+// value again from the owned entities; the common factory only saves repetition.
+const ship = (hp: number, speed: number, los: number, wood: number, gold: number,
+  age: number, seconds: number, button: number, attack: [number, number][],
+  melee: number, pierce: number, range = 0, reload = 0, extra: Partial<UnitRules> = {}): UnitRules => ({
+  hp, radius: 0.5, speed, lineOfSight: los, cost: cost(0, wood, gold), age,
+  trainSeconds: seconds, trainButton: button, trainedAt: 'dock', popCost: 1,
+  terrainRestriction: 3, datClass: 22,
+  attacks: attack.map(([class_, amount]) => ({ class: class_, amount })),
+  armors: [{ class: 16, amount: 0 }, { class: 4, amount: melee }, { class: 3, amount: pierce }, { class: 31, amount: 0 }],
+  range, attackReloadSeconds: reload, attackReleaseSeconds: 0,
+  blastDefenseLevel: 3, ...extra,
+});
+export const NAVAL_RULES: Record<NavalUnitKind, UnitRules> = {
+  galley: ship(110, 1.36, 7, 90, 30, 1, 45, 2, [[11, 6], [3, 6], [17, 3], [60, 5]], 0, 3, 5, 3, { projectileSpeed: 6 }),
+  'war-galley': ship(125, 1.36, 8, 90, 30, 2, 27, 2, [[11, 6], [3, 7], [17, 3], [60, 5]], 0, 4, 6, 3, { projectileSpeed: 6 }),
+  galleon: ship(155, 1.36, 9, 90, 30, 3, 27, 2, [[11, 6], [3, 9], [17, 3], [60, 9]], 0, 6, 7, 3, { projectileSpeed: 6 }),
+  hulk: ship(90, 1.42, 5, 75, 35, 1, 42, 3, [[4, 4], [21, -3], [41, 1]], 4, 1, 1, 1.75, { projectileSpeed: 3, projectilesPerAttack: 3 }),
+  'war-hulk': ship(115, 1.42, 5, 75, 35, 2, 27, 3, [[4, 4], [21, -3], [41, 1]], 5, 1, 1, 1.5, { projectileSpeed: 3, projectilesPerAttack: 3 }),
+  'fire-galley': ship(110, 1.36, 5, 75, 45, 1, 49, 4, [[11, 1], [4, 2], [60, 1]], 1, 4, 2.5, 0.25, { projectileSpeed: 3 }),
+  'fire-ship': ship(120, 1.47, 5, 75, 45, 2, 27, 4, [[11, 2], [4, 3], [60, 1]], 2, 4, 2.5, 0.25, { projectileSpeed: 3 }),
+  'fast-fire-ship': ship(140, 1.56, 6, 75, 45, 3, 27, 4, [[11, 3], [4, 4], [60, 1]], 3, 7, 2.5, 0.25, { projectileSpeed: 3 }),
+  'demolition-raft': ship(40, 1.42, 6, 45, 80, 1, 45, 8, [[11, 180], [4, 75]], 0, 0, 0, 0, { selfDestruct: true, blastRadius: 2.5, blastAttackLevel: 2 }),
+  'demolition-ship': ship(50, 1.52, 6, 45, 80, 2, 31, 8, [[11, 220], [4, 95]], 1, 0, 0, 0, { selfDestruct: true, blastRadius: 3, blastAttackLevel: 2 }),
+  'heavy-demolition-ship': ship(70, 1.52, 6, 45, 80, 3, 31, 8, [[11, 280], [4, 120]], 2, 0, 0, 0, { selfDestruct: true, blastRadius: 3.25, blastAttackLevel: 2 }),
+  'cannon-galleon': ship(120, 1.05, 15, 200, 150, 3, 46, 9, [[11, 200], [4, 50], [20, 25]], 0, 5, 13, 10,
+    { projectileSpeed: 3.5, minRange: 3, blastRadius: 0.25, blastAttackLevel: 2 }),
+  'transport-ship': ship(70, 1.45, 5, 125, 0, 0, 46, 6, [], 0, 2, 0, 0, { datClass: 20, transportCapacity: 20, terrainRestriction: 15 }),
+  'trade-cog': ship(80, 1.65, 6, 100, 50, 1, 36, 7, [], 0, 6, 0, 0, { datClass: 2, radius: 0.3, tradeRatePerSecond: 0.375375, tradeCapacity: 200 }),
+};
+for (const kind of ['galley', 'war-galley', 'galleon', 'cannon-galleon'] as const) NAVAL_RULES[kind].armors.push({ class: 60, amount: 0 });
+for (const kind of ['fire-galley', 'fire-ship', 'fast-fire-ship'] as const) NAVAL_RULES[kind].armors.push({ class: 41, amount: 0 });
+
 /**
  * Open fallback rules for users without the owned game. Values approximate the
  * AoE2DE Dark Age slice; when the imported manifest is available,
@@ -575,6 +619,7 @@ export const FALLBACK_RULES: GameRules = {
   startingResources: cost(200, 200, 100),
   startingPopulationCap: 0,
   units: {
+    ...NAVAL_RULES,
     villager: {
       hp: 25, radius: 0.2, speed: 0.8, lineOfSight: 4, cost: cost(50), trainSeconds: 25,
       trainedAt: 'town-center', popCost: 1, trainButton: 1,
@@ -854,7 +899,7 @@ export const FALLBACK_RULES: GameRules = {
       attacks: [],
       armors: [{ class: 4, amount: 1 }, { class: 3, amount: 1 }, { class: 16, amount: 0 }],
       attackReloadSeconds: 0, attackReleaseSeconds: 0,
-      gather: { ratePerSecond: 0.24, capacity: 15, classFactors: { 5: 1.75, 33: 1 } },
+      gather: { ratePerSecond: 0.24, capacity: 15, classFactors: { 5: 1.75, 33: 1 }, trapFactor: 1.45 },
       dropSites: ['dock'],
     },
     archer: {
@@ -954,6 +999,11 @@ export const FALLBACK_RULES: GameRules = {
     },
   },
   buildings: {
+    'fish-trap': { hp: 250, radius: 0.5, lineOfSight: 1, terrainRestriction: 13,
+      cost: cost(0, 100), buildSeconds: 40 / (0.24 * 3.57), popSupport: 0, buildable: true,
+      builderKind: 'fishing-ship', buildButton: 1, age: 1, accepts: [], fishTrapAmount: 700,
+      passable: true, blastDefenseLevel: 2, corpseSeconds: 60,
+      armors: [{ class: 4, amount: 1 }, { class: 3, amount: 1 }, { class: 11, amount: 10 }, { class: 21, amount: 0 }] },
     'town-center': {
       hp: 2400, radius: 2, lineOfSight: 8, cost: cost(0, 275), buildSeconds: 100,
       popSupport: 5, buildable: false, accepts: ['food', 'wood', 'gold', 'stone'],
@@ -1159,8 +1209,19 @@ export const FALLBACK_RULES: GameRules = {
   },
   gatherRatePerSecond: { food: 0.31, wood: 0.39, gold: 0.38, stone: 0.36 },
   carryCapacity: 10,
+  villagerGather: {
+    forager: { ratePerSecond: 0.31, capacity: 10 },
+    farmer: { ratePerSecond: 0.53, capacity: 10 },
+    hunter: { ratePerSecond: 0.41, capacity: 35 },
+    shepherd: { ratePerSecond: 0.33, capacity: 10 },
+    fisher: { ratePerSecond: 0.43, capacity: 10 },
+    lumberjack: { ratePerSecond: 0.39, capacity: 10 },
+    goldminer: { ratePerSecond: 0.38, capacity: 10 },
+    stonemason: { ratePerSecond: 0.36, capacity: 10 },
+  },
   repairCostFraction: { building: 0.5, unit: 0.5 },
   terrainRestrictions: {
+    3: [1, 2, 4, 22, 23, 35, 59], 15: [1, 2, 4, 22, 23, 35, 59], 30: [1, 2, 4, 22, 23, 35, 59],
     1: FALLBACK_LAND_TERRAINS, 4: FALLBACK_LAND_TERRAINS, 7: FALLBACK_SHORE_TERRAINS,
     10: FALLBACK_SHORE_TERRAINS, 20: FALLBACK_SHORE_TERRAINS, 28: FALLBACK_SHORE_TERRAINS,
     // The water rows: 6 the dock and 13 the fishing ship take the sea and
@@ -1168,6 +1229,16 @@ export const FALLBACK_RULES: GameRules = {
     6: FALLBACK_WATER_TERRAINS, 13: FALLBACK_WATER_TERRAINS, 19: [1, 23],
   },
   technologies: {
+    warships: { techId: 34, name: 'Medium Warships', button: 12, cost: cost(0, 150, 100), researchSeconds: 50,
+      researchedAt: 'dock', requiresAge: 2, effects: [], upgrades: [
+        { from: 'galley', to: 'war-galley' }, { from: 'fire-galley', to: 'fire-ship' }, { from: 'hulk', to: 'war-hulk' }] },
+    'heavy-warships': { techId: 35, name: 'Heavy Warships', button: 12, cost: cost(0, 400, 315), researchSeconds: 65,
+      researchedAt: 'dock', requiresAge: 3, requires: ['warships'], effects: [], upgrades: [
+        { from: 'war-galley', to: 'galleon' }, { from: 'fire-ship', to: 'fast-fire-ship' }] },
+    'demolition-ship': { techId: 905, name: 'Demolition Ship', button: 13, cost: cost(0, 50, 100), researchSeconds: 50,
+      researchedAt: 'dock', requiresAge: 2, effects: [], upgrades: [{ from: 'demolition-raft', to: 'demolition-ship' }] },
+    'heavy-demolition-ship': { techId: 244, name: 'Heavy Demolition Ship', button: 13, cost: cost(0, 250, 300), researchSeconds: 50,
+      researchedAt: 'dock', requiresAge: 3, requires: ['demolition-ship'], effects: [], upgrades: [{ from: 'demolition-ship', to: 'heavy-demolition-ship' }] },
     loom: {
       techId: 22, name: 'Loom', cost: cost(0, 0, 50), researchSeconds: 25,
       researchedAt: 'town-center', requiresAge: 0, button: 6,
@@ -1237,7 +1308,12 @@ interface ManifestEntity {
   garrisonFirepower?: number;
   convert?: { minSeconds: number; maxSeconds: number; range: number };
   searchRadius?: number;
-  gather?: { resource: ResourceKind; ratePerSecond: number; capacity: number; classFactors?: Record<string, number> };
+  transportCapacity?: number;
+  selfDestruct?: boolean;
+  projectilesPerAttack?: number;
+  foodAmount?: number;
+  requires?: string[];
+  gather?: { resource: ResourceKind; ratePerSecond: number; capacity: number; classFactors?: Record<string, number>; trapFactor?: number };
   dropSites?: number[];
   class?: number;
   trade?: { ratePerSecond: number; capacity: number; buildingId: number };
@@ -1346,7 +1422,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       piercing: piercing(key) ?? fallback?.piercing,
       launchHeight: e[key].combat?.launchOffset?.[2] ?? fallback?.launchHeight,
       blastRadius: e[key].combat?.blastRadius ?? fallback?.blastRadius,
-      blastAttackLevel: e[key].combat?.blastAttackLevel ?? fallback?.blastAttackLevel,
+      blastAttackLevel: e[key].combat?.blastAttackLevel === undefined ? fallback?.blastAttackLevel : e[key].combat!.blastAttackLevel! & 3,
       blastDefenseLevel: e[key].blastDefenseLevel ?? fallback?.blastDefenseLevel,
       heal: e[key].heal ?? fallback?.heal,
       // The repairer is the builder's own task unit; the villager carries it.
@@ -1361,6 +1437,12 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       deathSeconds: e[key].deathSeconds ?? fallback?.deathSeconds,
       corpseSeconds: e[key].corpseSeconds ?? fallback?.corpseSeconds,
       datId: e[key].id,
+      transportCapacity: e[key].transportCapacity ?? fallback?.transportCapacity,
+      selfDestruct: e[key].selfDestruct ?? fallback?.selfDestruct,
+      projectilesPerAttack: e[key].projectilesPerAttack ?? fallback?.projectilesPerAttack,
+      requires: e[key].requires,
+      tradeRatePerSecond: e[key].trade?.ratePerSecond ?? fallback?.tradeRatePerSecond,
+      tradeCapacity: e[key].trade?.capacity ?? fallback?.tradeCapacity,
       // A gatherer of its own kind: the fishing ship's rate, hold and
       // per-class factors, and the buildings the DAT lets it bank at (by
       // unit id, turned back into our kinds; a site not imported is dropped).
@@ -1369,6 +1451,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
           ratePerSecond: e[key].gather!.ratePerSecond,
           capacity: e[key].gather!.capacity,
           classFactors: e[key].gather!.classFactors!,
+          trapFactor: e[key].gather!.trapFactor,
         }
         : fallback?.gather,
       dropSites: e[key].dropSites && fallback?.dropSites
@@ -1578,6 +1661,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       deer: animal('deer'),
       boar: animal('boar'),
       'fishing-ship': unit('fishing-ship', 'dock'),
+      ...Object.fromEntries(Object.keys(NAVAL_RULES).map(key => [key, unit(key, 'dock')])) as Record<NavalUnitKind, UnitRules>,
       'trade-cart': {
         ...unit('trade-cart', 'market'),
         tradeRatePerSecond: e['trade-cart']?.trade?.ratePerSecond
@@ -1608,6 +1692,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       blacksmith: building('blacksmith', true),
       market: building('market', true),
       dock: building('dock', true),
+      'fish-trap': { ...building('fish-trap', true), builderKind: 'fishing-ship',
+        fishTrapAmount: e['fish-trap']?.foodAmount ?? FALLBACK_RULES.buildings['fish-trap'].fishTrapAmount },
       stable: building('stable', true),
       monastery: building('monastery', true),
       'siege-workshop': building('siege-workshop', true),
@@ -1632,6 +1718,13 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       stone: e['villager-stonemason']?.gather?.ratePerSecond ?? FALLBACK_RULES.gatherRatePerSecond.stone,
     },
     carryCapacity: e['villager-forager']?.gather?.capacity ?? FALLBACK_RULES.carryCapacity,
+    villagerGather: Object.fromEntries(Object.entries(FALLBACK_RULES.villagerGather).map(([task, fallback]) => {
+      const gather = e[`villager-${task}`]?.gather;
+      return [task, {
+        ratePerSecond: gather?.ratePerSecond ?? fallback.ratePerSecond,
+        capacity: gather?.capacity ?? fallback.capacity,
+      }];
+    })) as Record<VillagerGatherTask, VillagerGatherRules>,
     repairCostFraction: {
       building: manifest.playerAttributes?.buildingRepairCost ?? FALLBACK_RULES.repairCostFraction.building,
       unit: manifest.playerAttributes?.unitRepairCost ?? FALLBACK_RULES.repairCostFraction.unit,
@@ -1703,8 +1796,8 @@ const BUILDING_KINDS = new Set<string>([
   'palisade-wall', 'palisade-gate',
 ]);
 
-export const isUnit = (kind: EntityKind): kind is UnitKind => UNIT_KINDS.has(kind);
-export const isBuilding = (kind: EntityKind): kind is BuildingKind => BUILDING_KINDS.has(kind);
+export const isUnit = (kind: EntityKind): kind is UnitKind => UNIT_KINDS.has(kind) || kind in NAVAL_RULES;
+export const isBuilding = (kind: EntityKind): kind is BuildingKind => BUILDING_KINDS.has(kind) || kind === 'fish-trap';
 const ANIMAL_KINDS = new Set<string>(['sheep', 'deer', 'boar']);
 export const isAnimal = (kind: EntityKind): kind is AnimalKind => ANIMAL_KINDS.has(kind);
 

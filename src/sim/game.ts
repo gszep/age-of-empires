@@ -4,7 +4,7 @@ import {
   terrainAllows, NODE_OF_RESOURCE,
 } from './data';
 import type {
-  AttackValue, BuildingRules, Cost, GameRules, NodeKind, TechEffect, TechKey, UnitRules,
+  AttackValue, BuildingRules, Cost, GameRules, NodeKind, TechEffect, TechKey, UnitRules, VillagerGatherTask,
 } from './data';
 import { MAPS, generateMap } from './mapgen';
 import {
@@ -303,37 +303,19 @@ function reseedFarm(state: GameState, builder: Entity, fallow: Entity): Entity |
  * own unit -- so Gold Shaft Mining is a work-rate change to `villager-goldminer`
  * and Wheelbarrow a carry-capacity change to every one of them.
  */
-const GATHER_VARIANT: Record<ResourceKind, string> = {
-  food: 'villager-forager', wood: 'villager-lumberjack',
-  gold: 'villager-goldminer', stone: 'villager-stonemason',
+const GATHER_TASK: Record<ResourceKind, VillagerGatherTask> = {
+  food: 'forager', wood: 'lumberjack', gold: 'goldminer', stone: 'stonemason',
 };
 
 export function gatherRateFor(
   state: GameState, owner: Entity['owner'], resource: ResourceKind,
 ): number {
-  let rate = state.rules.gatherRatePerSecond[resource];
-  if (owner === 0) return rate;
-  const variant = GATHER_VARIANT[resource];
-  for (const key of state.players[owner as PlayerId].researched) {
-    for (const effect of state.rules.technologies[key]?.effects ?? []) {
-      if (effect.attribute !== 'workRate' || effect.unit !== variant) continue;
-      rate = combine(effect.operation, rate, effect.amount);
-    }
-  }
-  return rate;
+  const task = GATHER_TASK[resource];
+  return researchedAttribute(state, owner, `villager-${task}`, 'workRate', state.rules.villagerGather[task].ratePerSecond);
 }
 
-export function carryCapacityFor(state: GameState, owner: Entity['owner']): number {
-  let capacity = state.rules.carryCapacity;
-  if (owner === 0) return capacity;
-  for (const key of state.players[owner as PlayerId].researched) {
-    for (const effect of state.rules.technologies[key]?.effects ?? []) {
-      // The DAT states it once per villager variant; they all carry the same.
-      if (effect.attribute !== 'carryCapacity' || effect.unit !== 'villager-forager') continue;
-      capacity = combine(effect.operation, capacity, effect.amount);
-    }
-  }
-  return capacity;
+export function carryCapacityFor(state: GameState, owner: Entity['owner'], task: VillagerGatherTask = 'forager'): number {
+  return researchedAttribute(state, owner, `villager-${task}`, 'carryCapacity', state.rules.villagerGather[task].capacity);
 }
 
 /** A technology's running change to one attribute of one unit key. */
@@ -351,13 +333,24 @@ function researchedAttribute(
   return value;
 }
 
-/**
- * What this gatherer holds: a villager's capacity, or a fishing ship's hold
- * with Fishing Lines and Gillnets on it.
- */
-export function holdOf(state: GameState, entity: Entity): number {
+/** Task identity is about the food source, not the shared food stockpile. */
+function villagerTaskOn(state: GameState, node: Entity): VillagerGatherTask {
+  if (node.kind === 'farm') return 'farmer';
+  if (isAnimal(node.kind)) return state.rules.units[node.kind].herdRange !== undefined ? 'shepherd' : 'hunter';
+  if (isFishNode(node)) return 'fisher';
+  return GATHER_TASK[node.resourceKind ?? 'food'];
+}
+
+/** The task's capacity, including its own technology effects. The load keeps
+ * its task when a depleted target disappears during the walk to a drop site. */
+export function holdOf(state: GameState, entity: Entity, node?: Entity): number {
   const own = state.rules.units[entity.kind as UnitKind]?.gather;
-  if (!own) return carryCapacityFor(state, entity.owner);
+  if (!own) {
+    const targetId = entity.order.kind === 'gather' ? entity.order.targetId : undefined;
+    const target = node ?? state.entities.find(e => e.id === targetId);
+    const task = target ? villagerTaskOn(state, target) : entity.carrying?.task ?? 'forager';
+    return carryCapacityFor(state, entity.owner, task);
+  }
   return researchedAttribute(state, entity.owner, entity.kind, 'carryCapacity', own.capacity);
 }
 
@@ -365,17 +358,19 @@ export function holdOf(state: GameState, entity: Entity): number {
  * How fast this gatherer works this node. A fishing ship is its own DAT
  * gatherer: its work rate times the task factor for the node's class (a deep
  * fish 1.75, a shore fish 1.0), under its own technologies. A villager on a
- * fish is the fisherman task unit's rate; on anything else, the resource's.
+ * fish is the fisherman task unit; farms, game and herdables have distinct
+ * task variants too, with distinct rates and technology effects.
  */
 export function rateOn(state: GameState, entity: Entity, node: Entity): number {
   const own = state.rules.units[entity.kind as UnitKind]?.gather;
-  const rules = state.rules.nodes[nodeOf(node)];
   if (own) {
-    const factor = rules?.datClass !== undefined ? own.classFactors[String(rules.datClass)] ?? 1 : 1;
+    const rules = node.kind === 'resource' ? state.rules.nodes[nodeOf(node)] : undefined;
+    const factor = node.kind === 'fish-trap' ? own.trapFactor ?? 1
+      : rules?.datClass !== undefined ? own.classFactors[String(rules.datClass)] ?? 1 : 1;
     return researchedAttribute(state, entity.owner, entity.kind, 'workRate', own.ratePerSecond) * factor;
   }
-  if (rules?.villagerRatePerSecond !== undefined) return rules.villagerRatePerSecond;
-  return gatherRateFor(state, entity.owner, node.resourceKind ?? rules.resource);
+  const task = villagerTaskOn(state, node);
+  return researchedAttribute(state, entity.owner, `villager-${task}`, 'workRate', state.rules.villagerGather[task].ratePerSecond);
 }
 
 /** A completed building that shoots, so it can be given a target. */
@@ -438,7 +433,8 @@ export function placementLegal(
     // what a table of terrains alone cannot say.
     const admitsWater = rowAdmitsWater(state.rules, row);
     if (admitsWater && wet === 0) return rejected('placement does not reach the water');
-    if (admitsWater && dry === 0) return rejected('placement does not touch the shore');
+    if (building === 'fish-trap' && dry > 0) return rejected('fish traps must be on water');
+    if (admitsWater && dry === 0 && building !== 'fish-trap') return rejected('placement does not touch the shore');
   }
   // Units are ignored: real AoE nudges them off foundations (recorded approximation).
   for (const entity of state.entities) {
@@ -469,7 +465,7 @@ export function isCarcass(entity: Entity): boolean {
 function farmAvailable(state: GameState, farm: Entity, gatherer: Entity): boolean {
   let farmer: Entity | undefined;
   for (const worker of state.entities) {
-    if (worker.dead || worker.kind !== 'villager' || worker.owner !== farm.owner
+    if (worker.dead || worker.kind !== (farm.kind === 'fish-trap' ? 'fishing-ship' : 'villager') || worker.owner !== farm.owner
       || worker.order.kind !== 'gather' || worker.order.targetId !== farm.id) continue;
     if (!farmer || worker.id < farmer.id) farmer = worker;
   }
@@ -480,7 +476,9 @@ function isGatherable(state: GameState, entity: Entity, gatherer: Entity): boole
   // A boat gathers fish and nothing else; a villager casts for fish from the
   // bank as it picks a bush, and its reach is what decides which fish.
   if (gatherer.kind !== 'villager' && gatherer.kind !== 'fishing-ship') return false;
-  if (gatherer.kind === 'fishing-ship') return isFishNode(entity) && (entity.amount ?? 0) > 0;
+  if (gatherer.kind === 'fishing-ship') return (isFishNode(entity) || (entity.kind === 'fish-trap'
+    && entity.owner === gatherer.owner && entity.buildProgress === undefined && farmAvailable(state, entity, gatherer)))
+    && !entity.dead && (entity.amount ?? 0) > 0;
   if (entity.kind === 'resource') return true;
   if (isAnimal(entity.kind)) {
     // A carcass is food for whoever reaches it. A live herdable is food only
@@ -500,7 +498,7 @@ function nearbyFreeFarm(state: GameState, worker: Entity, origin: Point): Entity
   let best: Entity | undefined;
   let bestDistance = autoContinueRange(state, worker);
   for (const candidate of state.entities) {
-    if (candidate.kind !== 'farm' || !isGatherable(state, candidate, worker)
+    if (candidate.kind !== (worker.kind === 'fishing-ship' ? 'fish-trap' : 'farm') || !isGatherable(state, candidate, worker)
       || !isEntityVisible(state, worker.owner as PlayerId, candidate)) continue;
     const d = distance(origin, candidate.position);
     if (d < bestDistance || (d === bestDistance && (!best || candidate.id < best.id))) {
@@ -518,14 +516,16 @@ function isHuntable(state: GameState, entity: Entity): boolean {
 }
 
 function assignOrder(state: GameState, entity: Entity, target: Point, targetEntity?: Entity): void {
+  entity.fishingPosition = undefined;
   const unitRules = isUnit(entity.kind) ? state.rules.units[entity.kind as UnitKind] : undefined;
   // A unit with no attack is never given one by a right-click: a monk sent at
   // a boar would otherwise stand over it forever, swinging nothing.
   const armed = !unitRules || combatOf(state, entity).attacks.some(attack => attack.amount > 0);
-  if (entity.kind === 'trade-cart' && targetEntity && isTradePartner(state, entity, targetEntity)) {
+  if ((entity.kind === 'trade-cart' || entity.kind === 'trade-cog') && targetEntity && isTradePartner(state, entity, targetEntity)) {
     entity.order = { kind: 'trade', targetId: targetEntity.id };
     entity.carrying = undefined;
-  } else if (entity.kind === 'villager' && targetEntity?.kind === 'farm'
+  } else if (((entity.kind === 'villager' && targetEntity?.kind === 'farm')
+    || (entity.kind === 'fishing-ship' && targetEntity?.kind === 'fish-trap'))
     && !targetEntity.dead && targetEntity.owner === entity.owner
     && targetEntity.buildProgress === undefined && (targetEntity.amount ?? 0) > 0) {
     const farm = isGatherable(state, targetEntity, entity)
@@ -554,7 +554,8 @@ function assignOrder(state: GameState, entity: Entity, target: Point, targetEnti
     entity.order = { kind: 'attack', targetId: targetEntity.id };
   } else if (
     targetEntity && targetEntity.owner === entity.owner &&
-    isBuilding(targetEntity.kind) && targetEntity.buildProgress !== undefined && entity.kind === 'villager'
+    isBuilding(targetEntity.kind) && targetEntity.buildProgress !== undefined
+    && entity.kind === (state.rules.buildings[targetEntity.kind].builderKind ?? 'villager')
   ) {
     entity.order = { kind: 'build', targetId: targetEntity.id };
   } else if (targetEntity && isRepairable(state, entity, targetEntity)) {
@@ -614,6 +615,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
         entity.order = { kind: 'idle' };
         entity.activity = 'idle';
         entity.orderQueue = undefined;
+        entity.fishingPosition = undefined;
       } else if (command.queue && entity.order.kind !== 'idle') {
         // Shift-click: fall in behind what it is doing. Only a unit already
         // busy has anything to queue behind -- an idle one takes the order
@@ -656,11 +658,10 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (unitRules.trainedAt !== building.kind) return rejected(`${building.kind} cannot train ${command.unit}`);
     const player = state.players[command.player];
     if ((unitRules.age ?? 0) > player.age) return rejected(`${command.unit} needs a later age`);
-    // What is already queued is already spoken for: counting only the units on
-    // the map would let fifteen villagers be ordered into five places.
-    if (player.population + committedPopulation(state, building) + unitRules.popCost > player.populationCap) {
-      return rejected('population cap reached');
-    }
+    const missingUnitTech = unitRules.requires?.find(key => !player.researched.includes(key));
+    if (missingUnitTech) return rejected(`${command.unit} needs ${missingUnitTech} first`);
+    // Housing gates emergence, not the paid queue (#143). A completed unit
+    // waits in its building until population has room for it.
     const paid = spend(state, command.player, command.unit);
     if (!paid.ok) return paid;
     // Paid for when it is asked for, as in AoE2, and refunded if cancelled.
@@ -720,6 +721,12 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
     if (!building) return rejected(`building ${command.buildingId} is not owned`);
     if (!building.garrison?.length) return rejected('nobody is garrisoned');
+    if (isUnit(building.kind) && state.rules.units[building.kind].transportCapacity && command.target) {
+      if (!Number.isFinite(command.target.x) || !Number.isFinite(command.target.y)) return rejected('target is not a point');
+      building.order = { kind: 'unload', target: { ...command.target } };
+      clearPath(building);
+      return { ok: true };
+    }
     ungarrisonAll(state, building);
     return { ok: true };
   }
@@ -799,9 +806,9 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     return rejected(`${command.building} needs a later age`);
   }
   const builders = state.entities.filter(
-    e => !e.dead && command.builderIds.includes(e.id) && e.owner === command.player && e.kind === 'villager',
+    e => !e.dead && command.builderIds.includes(e.id) && e.owner === command.player && e.kind === (rules.builderKind ?? 'villager'),
   );
-  if (!builders.length) return rejected('builders must be owned villagers');
+  if (!builders.length) return rejected(rules.builderKind === 'fishing-ship' ? 'builders must be owned fishing ships' : 'builders must be owned villagers');
   const orientation = command.orientation ?? 'x';
   const legal = placementLegal(state, command.building, command.target, orientation);
   if (!legal.ok) return legal;
@@ -1109,16 +1116,25 @@ function autoContinueRange(state: GameState, entity: Entity): number {
 /**
  * Whether anything can stand next to a node to work it. A wood is a solid
  * clump of tiles, so the trees inside it are nobody's to cut until the ones
- * around them come down — and a villager sent at one walks to the edge, finds
- * it cannot get closer, and gives up. Asking the grid first is four lookups
- * against a pathfind over the whole wood.
+ * around them come down. Test outside the whole footprint: a deep fish has
+ * radius 1, so the four tiles beside its centre can all be the fish itself.
  */
 function hasElbowRoom(grid: NavGrid, node: Entity): boolean {
   const x = Math.floor(node.position.x);
   const y = Math.floor(node.position.y);
   if (!isBlocked(grid, x, y)) return true;
-  return !isBlocked(grid, x + 1, y) || !isBlocked(grid, x - 1, y)
-    || !isBlocked(grid, x, y + 1) || !isBlocked(grid, x, y - 1);
+  const half = halfExtent(node);
+  const minX = Math.floor(node.position.x - half.x + 1e-6);
+  const maxX = Math.ceil(node.position.x + half.x - 1e-6) - 1;
+  const minY = Math.floor(node.position.y - half.y + 1e-6);
+  const maxY = Math.ceil(node.position.y + half.y - 1e-6) - 1;
+  for (let xx = minX; xx <= maxX; xx++) {
+    if (!isBlocked(grid, xx, minY - 1) || !isBlocked(grid, xx, maxY + 1)) return true;
+  }
+  for (let yy = minY; yy <= maxY; yy++) {
+    if (!isBlocked(grid, minX - 1, yy) || !isBlocked(grid, maxX + 1, yy)) return true;
+  }
+  return false;
 }
 
 /**
@@ -1162,6 +1178,33 @@ function nextToWork(
   return best;
 }
 
+/** #79's construction continuation is narrower than food drop-off acceptance:
+ * a mill recruits foragers/farmers, never hunters, shepherds or fishermen. */
+function workAfterBuilding(state: GameState, grid: NavGrid, builder: Entity, site: Entity): Entity | undefined {
+  if (builder.dead || builder.kind !== 'villager' || builder.owner !== site.owner
+    || builder.activity !== 'building' || builder.orderQueue?.length) return;
+  if (site.kind !== 'lumber-camp' && site.kind !== 'mining-camp' && site.kind !== 'mill') return;
+  let best: Entity | undefined;
+  let bestDistance = Infinity;
+  for (const candidate of state.entities) {
+    const node = candidate.kind === 'resource' ? nodeOf(candidate) : undefined;
+    const appropriate = site.kind === 'lumber-camp' ? node === 'tree'
+      : site.kind === 'mining-camp' ? node === 'gold' || node === 'stone'
+      : node === 'berries' || candidate.kind === 'farm';
+    if (!appropriate || candidate.dead || (candidate.amount ?? 0) <= 0
+      || !isGatherable(state, candidate, builder)
+      || !isEntityVisible(state, builder.owner as PlayerId, candidate)
+      || !hasElbowRoom(grid, candidate)) continue;
+    const d = distance(builder.position, candidate.position);
+    if (d > autoContinueRange(state, builder)) continue;
+    if (d < bestDistance - 1e-9 || (Math.abs(d - bestDistance) <= 1e-9 && best && candidate.id < best.id)) {
+      best = candidate;
+      bestDistance = d;
+    }
+  }
+  return best;
+}
+
 /**
  * Nearest completed building of the owner that accepts `resource`. Drop-site
  * buildings are what make mills and camps worth placing: they shorten the walk
@@ -1199,6 +1242,7 @@ function becomeIdle(entity: Entity): void {
   entity.gatherProgress = 0;
   entity.lastWorked = undefined;
   entity.lastResource = undefined;
+  entity.fishingPosition = undefined;
   entity.attackWindup = undefined;
   entity.path = undefined;
   entity.pathGoal = undefined;
@@ -1210,7 +1254,9 @@ export function computeDamage(attacks: AttackValue[], armors: AttackValue[]): nu
   for (const attack of attacks) {
     const armor = armors.find(a => a.class === attack.class);
     if (!armor) continue;
-    total += Math.max(0, attack.amount - armor.amount);
+    // The Hulk's -3 against standard buildings is a damage penalty, not an
+    // absent bonus. Positive attacks still cannot become negative via armour.
+    total += attack.amount < 0 ? attack.amount - armor.amount : Math.max(0, attack.amount - armor.amount);
   }
   return Math.max(1, total);
 }
@@ -1234,7 +1280,10 @@ const FALLBACK_CORPSE_SECONDS = 3;
 function kill(state: GameState, entity: Entity): void {
   // Whoever was sheltering inside comes out as it falls, as the reference's
   // do from a razed town center or castle.
-  if (entity.garrison?.length) ungarrisonAll(state, entity);
+  if (entity.dead) return;
+  const transport = isUnit(entity.kind) && state.rules.units[entity.kind].transportCapacity;
+  if (transport) entity.garrison = undefined; // a sinking transport loses its passengers
+  else if (entity.garrison?.length) ungarrisonAll(state, entity);
   entity.dead = true;
   entity.activity = 'dying';
   entity.order = { kind: 'idle' };
@@ -1253,12 +1302,18 @@ function kill(state: GameState, entity: Entity): void {
   );
   entity.decayTicks = Math.round(seconds * TICKS_PER_SECOND);
   clearPath(entity);
+  if (isUnit(entity.kind) && state.rules.units[entity.kind].selfDestruct && entity.hp <= 0) {
+    const combat = unitRulesFor(state, entity.owner, entity.kind);
+    applyBlast(state, entity.position, combat.blastRadius ?? 0, combat.blastAttackLevel ?? 2,
+      combat.attacks, entity.id, entity.owner as PlayerId);
+  }
+  recalculatePopulation(state);
 }
 
 function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'gather') return;
   const assignedId = entity.order.targetId;
-  const assignedFarm = state.entities.find(e => e.id === assignedId && e.kind === 'farm');
+  const assignedFarm = state.entities.find(e => e.id === assignedId && (e.kind === 'farm' || e.kind === 'fish-trap'));
   if (assignedFarm && !farmAvailable(state, assignedFarm, entity)) {
     // Repair old snapshots before either gathering or banking. An incumbent's
     // load and progress are untouched; the duplicate keeps any carried food.
@@ -1290,6 +1345,23 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   let node = state.entities.find(e => e.id === targetId
     && (e.amount ?? 0) > 0 && (!e.dead || isCarcass(e)));
   if (!node) {
+    // A full hold took the ship to a dock while its fish was swept away. Its
+    // order still means this fishing ground, not whatever the dock can see.
+    // Remember our own working position, never hidden fish: once back, the
+    // ordinary bounded visible-target search below chooses what is left.
+    if (entity.kind === 'fishing-ship' && !carrying?.amount && entity.fishingPosition) {
+      const at = entity.fishingPosition;
+      if (distance(entity.position, at) > 0.12) {
+        entity.activity = 'moving';
+        if (moveAlong(state, grid, entity, at, speed)) {
+          entity.fishingPosition = undefined;
+          clearPath(entity);
+        }
+        return;
+      }
+      entity.fishingPosition = undefined;
+      clearPath(entity);
+    }
     // A farm that has gone fallow is sown again where it stood, by the
     // villager who emptied it, if its owner has asked for that and can pay
     // the wood. AoE2's own words for a farm are that it "must be rebuilt";
@@ -1356,20 +1428,25 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   if (isAnimal(node.kind) && !node.dead) kill(state, node);
 
   entity.activity = 'gathering';
+  if (entity.kind === 'fishing-ship') entity.fishingPosition = { ...entity.position };
   entity.lastWorked = node.kind;
   const resource = node.resourceKind!;
   entity.lastResource = resource;
+  // Automatic continuation may have changed tasks since the banking check.
+  const activeCapacity = holdOf(state, entity, node);
+  if ((entity.carrying?.amount ?? 0) >= activeCapacity) return;
   entity.gatherProgress = (entity.gatherProgress ?? 0) + rateOn(state, entity, node) * TICK_SECONDS;
-  while ((entity.gatherProgress ?? 0) >= 1 && (node.amount ?? 0) > 0 && (entity.carrying?.amount ?? 0) < capacity) {
+  while ((entity.gatherProgress ?? 0) >= 1 && (node.amount ?? 0) > 0 && (entity.carrying?.amount ?? 0) < activeCapacity) {
     entity.gatherProgress! -= 1;
     node.amount! -= 1;
     // Switching resource types discards the old load, as in AoE2.
     if (!entity.carrying || entity.carrying.kind !== resource) entity.carrying = { kind: resource, amount: 0 };
     entity.carrying.amount += 1;
-    if (node.kind === 'resource') entity.carrying.node = nodeOf(node);
+    entity.carrying.node = node.kind === 'resource' ? nodeOf(node) : undefined;
+    if (entity.kind === 'villager') entity.carrying.task = villagerTaskOn(state, node);
   }
   // A worked-out farm is consumed, as in AoE2 where it must be rebuilt.
-  if (node.kind === 'farm' && (node.amount ?? 0) <= 0) kill(state, node);
+  if ((node.kind === 'farm' || node.kind === 'fish-trap') && (node.amount ?? 0) <= 0) kill(state, node);
 }
 
 /**
@@ -1378,7 +1455,7 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
  * counterparty, so this is what makes an order a trade order rather than a walk.
  */
 function isTradePartner(state: GameState, cart: Entity, target: Entity): boolean {
-  return target.kind === 'market' && !target.dead
+  return target.kind === (cart.kind === 'trade-cog' ? 'dock' : 'market') && !target.dead
     && target.buildProgress === undefined && target.owner !== cart.owner && target.owner !== 0;
 }
 
@@ -1387,7 +1464,7 @@ function homeMarket(state: GameState, entity: Entity): Entity | undefined {
   let best: Entity | undefined;
   let bestDistance = Infinity;
   for (const candidate of state.entities) {
-    if (candidate.dead || candidate.kind !== 'market') continue;
+    if (candidate.dead || candidate.kind !== (entity.kind === 'trade-cog' ? 'dock' : 'market')) continue;
     if (candidate.owner !== entity.owner || candidate.buildProgress !== undefined) continue;
     const d = distance(entity.position, candidate.position);
     if (d < bestDistance || (d === bestDistance && best && candidate.id < best.id)) {
@@ -1410,7 +1487,7 @@ function homeMarket(state: GameState, entity: Entity): Entity | undefined {
  */
 function updateTrader(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'trade') return;
-  const rules = state.rules.units['trade-cart'];
+  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
   const rate = rules.tradeRatePerSecond ?? 0;
   const capacity = rules.tradeCapacity ?? 0;
   const goods = () => Math.min(capacity, Math.floor(entity.gatherProgress ?? 0));
@@ -1512,7 +1589,7 @@ function updateBuilder(state: GameState, grid: NavGrid, entity: Entity, builderC
   if (!site || site.buildProgress === undefined) { becomeIdle(entity); return; }
   if (!inRange(entity, site, 0.4)) {
     entity.activity = 'moving';
-    moveAlong(state, grid, entity, site.position, state.rules.units.villager.speed, interactionRange(site));
+    moveAlong(state, grid, entity, site.position, unitRulesFor(state, entity.owner, entity.kind as UnitKind).speed, interactionRange(site));
     return;
   }
   clearPath(entity);
@@ -1598,10 +1675,10 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
   entity.attackWindup -= 1;
   if (entity.attackWindup <= 0) {
     const combat = combatOf(state, entity);
-    releaseAttack(
-      state, entity, target, combat.attacks,
-      profile.projectileSpeed, profile.launchHeight, combat,
-    );
+    if (rules.selfDestruct) { entity.hp = 0; kill(state, entity); return; }
+    for (let shot = 0; shot < (rules.projectilesPerAttack ?? 1); shot++) {
+      releaseAttack(state, entity, target, combat.attacks, profile.projectileSpeed, profile.launchHeight, combat);
+    }
     entity.attackWindup = undefined;
     entity.attackCooldown = Math.max(1, Math.round(combat.reloadSeconds * TICKS_PER_SECOND) - Math.max(1, Math.round(releaseSeconds * TICKS_PER_SECOND)));
   }
@@ -1718,8 +1795,14 @@ function garrisonCategory(state: GameState, unit: Entity): number {
  * names the unit's category, and room left.
  */
 export function canGarrison(state: GameState, unit: Entity, building: Entity): boolean {
-  if (!isUnit(unit.kind) || !isBuilding(building.kind) || building.dead) return false;
+  if (!isUnit(unit.kind) || unit.dead || building.dead || unit.id === building.id) return false;
   if (building.owner !== unit.owner || building.buildProgress !== undefined) return false;
+  if (isUnit(building.kind)) {
+    const capacity = unitRulesFor(state, building.owner, building.kind).transportCapacity;
+    return !!capacity && !unit.unpacked && !rowAdmitsWater(state.rules, restrictionOf(state.rules, unit))
+      && (building.garrison?.length ?? 0) < capacity;
+  }
+  if (!isBuilding(building.kind)) return false;
   const garrison = state.rules.buildings[building.kind as BuildingKind].garrison;
   if (!garrison || garrison.capacity <= 0) return false;
   if (!(garrison.types & garrisonCategory(state, unit))) return false;
@@ -1768,7 +1851,7 @@ function updateGarrisoner(state: GameState, grid: NavGrid, entity: Entity): void
   // In: off the map and into the building. A villager's load is banked on
   // the way, as the reference banks it.
   clearPath(entity);
-  if (entity.carrying) {
+  if (entity.carrying && isBuilding(building.kind)) {
     state.players[entity.owner as PlayerId][entity.carrying.kind] += entity.carrying.amount;
     entity.carrying = undefined;
   }
@@ -1804,6 +1887,27 @@ function updateGarrison(state: GameState, building: Entity): void {
  */
 export function ungarrisonAll(state: GameState, building: Entity): Entity[] {
   const inside = building.garrison ?? [];
+  if (isUnit(building.kind) && state.rules.units[building.kind].transportCapacity) {
+    const released: Entity[] = [];
+    for (const unit of inside) {
+      let landing: Point | undefined;
+      // Adjacent coast only: cargo must not teleport across a strip of water.
+      for (let step = 0; step < 32 && !landing; step++) {
+        const angle = step * 2 * Math.PI / 32;
+        const reach = building.radius + unit.radius + 0.6;
+        const at = { x: building.position.x + Math.cos(angle) * reach, y: building.position.y + Math.sin(angle) * reach };
+        if (spawnFree(state, at, unit.radius, restrictionOf(state.rules, unit))) landing = at;
+      }
+      if (!landing) continue;
+      unit.position = landing;
+      becomeIdle(unit);
+      state.entities.push(unit);
+      released.push(unit);
+    }
+    building.garrison = inside.filter(unit => !released.includes(unit));
+    if (!building.garrison.length) building.garrison = undefined;
+    return released;
+  }
   building.garrison = undefined;
   if (!inside.length) return [];
   const half = halfExtent(building);
@@ -1867,6 +1971,7 @@ function updateConverter(state: GameState, grid: NavGrid, entity: Entity): void 
   const ticksLeft = Math.max(1, Math.round((convert.maxSeconds - seconds) / TICK_SECONDS) + 1);
   if (random01(state) >= 1 / ticksLeft) return;
   target.owner = entity.owner;
+  for (const passenger of target.garrison ?? []) passenger.owner = entity.owner;
   becomeIdle(target);
   clearPath(target);
   target.convertTicks = undefined;
@@ -1979,6 +2084,8 @@ function releaseAttack(
     origin: { ...shooter.position },
     targetId: target.id,
     shooterId: shooter.id,
+    art: isUnit(shooter.kind) ? (shooter.unpacked ? state.rules.units[shooter.kind].unpacked?.projectileArt
+      : state.rules.units[shooter.kind].projectileArt) : undefined,
     attacks: attacks.map(a => ({ ...a })),
     speed: projectileSpeed,
     launchHeight,
@@ -2021,10 +2128,11 @@ function shooterLeadsTarget(state: GameState, shooter: Entity): boolean {
  */
 function applyBlast(
   state: GameState, at: Point, radius: number, attackLevel: number, attacks: AttackValue[],
-  directHitId: number,
+  directHitId: number, excludeOwner?: Entity['owner'],
 ): void {
   for (const other of [...state.entities]) {
     if (other.dead || other.id === directHitId) continue;
+    if (excludeOwner !== undefined && other.owner === excludeOwner) continue;
     if (blastDefenseLevelOf(state, other) < attackLevel) continue;
     if (distance(other.position, at) - other.radius > radius) continue;
     if (other.kind === 'resource') {
@@ -2272,6 +2380,14 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
     assignOrder(state, entity, next.target, target);
   }
   switch (entity.order.kind) {
+    case 'unload': {
+      entity.activity = 'moving';
+      if (moveAlong(state, grid, entity, entity.order.target, state.rules.units[entity.kind as UnitKind].speed)) {
+        ungarrisonAll(state, entity);
+        becomeIdle(entity);
+      }
+      return;
+    }
     case 'move': {
       entity.activity = 'moving';
       const rules = state.rules.units[entity.kind as UnitKind];
@@ -2378,7 +2494,7 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
   for (const upgrade of tech.upgrades ?? []) {
     const to = state.rules.units[upgrade.to as UnitKind];
     if (!to) continue;
-    for (const entity of state.entities) {
+    for (const entity of state.entities.flatMap(e => [e, ...(e.garrison ?? [])])) {
       if (entity.dead || entity.owner !== owner) continue;
       if (entity.training?.kind === upgrade.from) entity.training.kind = upgrade.to as UnitKind;
       if (entity.trainingQueue) entity.trainingQueue = entity.trainingQueue.map(kind =>
@@ -2398,7 +2514,7 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
   // is next asked for, so nothing has to be walked.
   for (const effect of tech.effects) {
     if (effect.attribute !== 'hitPoints') continue;
-    for (const entity of state.entities) {
+    for (const entity of state.entities.flatMap(e => [e, ...(e.garrison ?? [])])) {
       if (entity.dead || entity.owner !== owner || entity.kind !== effect.unit) continue;
       const raised = combine(effect.operation, entity.maxHp, effect.amount);
       const gained = raised - entity.maxHp;
@@ -2421,15 +2537,6 @@ function updateBuildingResearch(state: GameState, entity: Entity): void {
 export const queuedCount = (entity: Entity): number =>
   (entity.training ? 1 : 0) + (entity.trainingQueue?.length ?? 0);
 
-/** The population every unit this building has been paid for will take. */
-function committedPopulation(state: GameState, entity: Entity): number {
-  const kinds = [
-    ...(entity.training ? [entity.training.kind] : []),
-    ...(entity.trainingQueue ?? []),
-  ];
-  return kinds.reduce((total, kind) => total + state.rules.units[kind].popCost, 0);
-}
-
 /**
  * How many units may be waiting at one building, the one being trained
  * included. AoE2's own limit, and the number the request asked for.
@@ -2438,12 +2545,12 @@ export const TRAINING_QUEUE_LIMIT = 15;
 
 function updateBuildingProduction(state: GameState, entity: Entity): void {
   if (!entity.training) return;
-  entity.training.remainingTicks -= 1;
+  entity.training.remainingTicks = Math.max(0, entity.training.remainingTicks - 1);
   if (entity.training.remainingTicks > 0) return;
   const kind = entity.training.kind;
   const player = state.players[entity.owner as PlayerId];
   if (player.population + state.rules.units[kind].popCost > player.populationCap) {
-    entity.training.remainingTicks = 1; // hold the finished unit until room exists
+    // Keep the finished unit at 100%, with the rest of the queue untouched.
     return;
   }
   entity.training = undefined;
@@ -2649,8 +2756,25 @@ export function stepGame(state: GameState): void {
           }
         }
       }
+      if (site.kind === 'fish-trap') {
+        site.resourceKind = 'food';
+        site.amount = state.rules.buildings['fish-trap'].fishTrapAmount;
+        for (const builder of state.entities) {
+          if (!builder.dead && builder.kind === 'fishing-ship' && builder.owner === site.owner
+            && builder.order.kind === 'build' && builder.order.targetId === site.id && farmAvailable(state, site, builder)) {
+            builder.order = { kind: 'gather', targetId: site.id };
+            builder.activity = 'moving';
+          }
+        }
+      }
       for (const builder of state.entities) {
         if (builder.order.kind === 'build' && builder.order.targetId === site.id) {
+          const work = workAfterBuilding(state, grid, builder, site);
+          if (work) {
+            assignOrder(state, builder, work.position, work);
+            continue;
+          }
+          if (builder.orderQueue?.length) { becomeIdle(builder); continue; }
           const next = adjacentSite(state, site, builder);
           if (next) { builder.order = { kind: 'build', targetId: next.id }; builder.activity = 'moving'; }
           else becomeIdle(builder);

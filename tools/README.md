@@ -124,6 +124,9 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | what a blast may hurt | `unit.type_50.blast_attack_level` on the shooter against `unit.blast_defense_level` on the bystander — hit when defense ≥ attack. Units 3, buildings 2, trees 1, bushes and mines 0; mangonel 2, onager line and trebuchet 1 (issue #46) |
 | villager tasks (gather/build) | `unit.bird.tasks[*]` — `.action_type`, `.class_id`, `.unit_id`, `.resource_in/_out`; rates on `unit.bird.work_rate`; drop-offs in `unit.bird.drop_sites` |
 | carried resources | `unit.resource_storages`, `unit.resource_capacity` |
+| naval capacity, volleys and fish traps | `unit.garrison_capacity` (transport 545: 20), `unit.creatable.total_projectiles` (Hulk 2626: 3); trap food is `dat.civs[n].resources[88]` (700), not trap 199's 15-food storage; fishing-ship tasks name trap gather/build factors in `work_value_1` |
+| composite ship art | `graphic.deltas` plus `offset_x/_y` and `graphic.layer`; W/X placeholder parents and SLP -1 parents may have no source despite a filename. File-bearing hull/sail children have independent frame clocks; `naval.graphic_layers` resolves them |
+| shared naval upgrades | research 35 has `effect_id = -1`; automatic techs 911 and 246 have no research location and sole prerequisite 35. Resolve their type-3 commands; do not discard the research or offer its child upgrades as separate buttons |
 | building construction / annexes | `unit.building.construction_graphic_id`, `unit.building.annexes` |
 | corpse / rubble / stump | `unit.dead_unit_id` — the unit whose `standing_graphic` is the decay art |
 | player colour and contour | `dat.player_colours[i].player_color_base` (start of the eight-shade block in `original.pal`), `.minimap_color`, `.unit_outline_color` |

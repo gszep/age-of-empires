@@ -49,6 +49,7 @@ export interface DebugContext {
     playerColor?: string;
     color: { mesh?: { visible?: boolean; material?: unknown } };
     annexColors?: { mesh?: { visible?: boolean } }[];
+    annexes?: { mesh?: { visible?: boolean } }[];
   }>;
 }
 
@@ -140,6 +141,7 @@ export function installDebug(context: DebugContext): void {
       onScreen: screen.x >= 0 && screen.x < canvas.clientWidth && screen.y >= 0 && screen.y < canvas.clientHeight,
       rendered: view !== undefined,
       bodyVisible: view?.body?.mesh?.visible ?? false,
+      layersVisible: Number(!!view?.body?.mesh?.visible) + (view?.annexes?.filter(p => p.mesh?.visible).length ?? 0),
       animation: view?.animationState,
       frame: view?.frameIndex,
       facing: view ? round(view.facing) : undefined,
@@ -277,6 +279,10 @@ export function installDebug(context: DebugContext): void {
         }])),
         entities: counts,
         projectiles: game.projectiles.length,
+        projectileViews: game.projectiles.slice(0, 200).map(p => ({
+          id: p.id, shooterId: p.shooterId, art: p.art,
+          rendered: !!context.views.get(`p${p.id}`)?.body?.mesh?.visible,
+        })),
         selected: context.selectedIds(),
         // Which entity's marker is blinking as the last order's target: the
         // rule is "somebody else's only", and this is how that is checked

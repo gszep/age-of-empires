@@ -152,15 +152,14 @@ exhaustion, banks food at the dock, and never leaves water; the observation and
 command schemas name the new kinds, and the guard test in `observe.test.ts`
 proves it.
 
-## Deliberately out of scope
+## Outside the initial coast slice
 
-Warships, transports and the naval half of the tech tree; fish traps (unit 199
-is `enabled 0` in this DAT and is a Feudal technology's business); the
-non-navigable beach family; ice; and any map script. Water is a coast on a
-generated map, not a map type.
+Warships, transports and fish traps were outside this initial slice and are now
+implemented by #97 (see `status.md`, with inferred mechanics in `ledger.md`).
+Fish Trap 199 is enabled by the Feudal age. The non-navigable beach family and
+ice remain outside this design note; map-script work is tracked separately.
 
 ## What is next
 
-The naval half is a coast with a working economy on it. What remains is out
-of this note's scope by its own terms: warships and transports, fish traps,
-and a strategy that builds a dock.
+The next naval strategy gap is #91: the example AI still does not build a dock
+or manage a fishing economy. The playable naval units are covered by #97.

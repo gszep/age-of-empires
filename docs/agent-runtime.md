@@ -30,6 +30,17 @@ The simulation owns state transitions. The agent gateway owns the stable public 
 
 The canonical observation is structured and versioned. Screenshots are optional presentation evidence, never the primary input.
 
+The current **observation version is 3** (`PROTOCOL_VERSION`). Version 2 added
+`buildTargetId` for the player's own units with a build order, including while
+walking to the foundation. Enemy and remembered entities never expose that
+assignment. Strategies can therefore distinguish an abandoned house from one
+with a builder on the way. Version 3 adds the naval unit kinds, `fish-trap`, and
+the `unload` order. `ungarrison` accepts an optional `target` for a transport's
+destination shore; `buildingId` names the carrier as well as ordinary buildings.
+Match-config, result and recording formats remain version 1 (`MATCH_FORMAT_VERSION`).
+`buildProgress` being present means a foundation is unfinished, even when its
+rounded display value is 1.
+
 An observation includes only information legitimately observable by that player unless the caller has an explicit evaluator/debug capability:
 
 - simulation time, tick, player, civilization, age, and population;

@@ -32,6 +32,38 @@ describe('surveyed elevation', () => {
   });
 });
 
+describe('naval composite sprites (#97)', () => {
+  it('draws offset hull/sails, grows layers on upgrade, and leaves no sails when an unanimated body is removed', () => {
+    const state = createGame();
+    const entity: Entity = { id: state.nextId++, kind: 'galley', owner: 1, position: { x: 20, y: 20 },
+      hp: 110, maxHp: 110, radius: 0.5, order: { kind: 'idle' }, activity: 'idle' };
+    const assets = fakeAssets();
+    const anim = { frames: 1, directions: 1, frameSeconds: 0, mirroringMode: 0 };
+    const atlas = (image: string): Atlas => ({ image, size: [16, 16], framesInFile: 1,
+      frames: [{ x: 0, y: 0, w: 16, h: 16, cx: 8, cy: 8 }] });
+    for (const key of ['hull', 'sail', 'extra']) assets.textures.set(key, new THREE.Texture());
+    const imported = { category: 'unit', animations: { idle: anim, sail: anim, extra: anim },
+      atlases: { idle: atlas('hull'), sail: atlas('sail'), extra: atlas('extra') },
+      animationLayers: { idle: [{ animation: 'idle', x: 0, y: 0 }, { animation: 'sail', x: 4, y: -13 }] } };
+    assets.entities.galley = imported;
+    assets.entities.galleon = { ...imported, animationLayers: { idle: [...imported.animationLayers.idle,
+      { animation: 'extra', x: -7, y: -23 }] } };
+    const view = createEntityView(assets, entity);
+    updateEntityView(view, assets, state, entity, 0);
+    expect(view.annexes[0].mesh.visible).toBe(true);
+    expect(view.annexes[0].mesh.position.x - view.body.mesh.position.x).toBe(4);
+    expect(view.annexes[0].mesh.position.y - view.body.mesh.position.y).toBe(13);
+    entity.kind = 'galleon';
+    updateEntityView(view, assets, state, entity, 1);
+    expect(view.annexes).toHaveLength(2);
+    expect(view.annexes[1].mesh.visible).toBe(true);
+    entity.dead = true;
+    updateEntityView(view, assets, state, entity, 2);
+    expect(view.body.mesh.visible).toBe(false);
+    expect(view.annexes.every(p => !p.mesh.visible)).toBe(true);
+  });
+});
+
 describe('tree chopping stages', () => {
   it('stands until the first wood is taken', () => {
     const state = createGame();

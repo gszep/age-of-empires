@@ -6,6 +6,7 @@
     "treeFile": "BRITONS.json"
   },
   "gaiaIndex": 0,
+  "naval": true,
   "playerColors": [
     "blue",
     "red",

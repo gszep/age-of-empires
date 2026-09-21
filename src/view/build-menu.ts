@@ -59,6 +59,7 @@ export const pageOf = (kind: string): BuildPage =>
 export function buildMenu(rules: GameRules, age: number, page: BuildPage): BuildingKind[] {
   return (Object.keys(rules.buildings) as BuildingKind[])
     .filter(kind => rules.buildings[kind].buildable
+      && (rules.buildings[kind].builderKind ?? 'villager') === 'villager'
       && (rules.buildings[kind].age ?? 0) <= age
       && pageOf(kind) === page)
     .sort((a, b) => {

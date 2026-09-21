@@ -219,9 +219,9 @@ def resolve_graphic_id(unit: Any, animation: dict[str, Any], civ_units: Any, dat
             # 415) -- an exhausted bush is removed, it does not leave a tree
             # stump. Asking for the slot anyway is a spec error, not a silent
             # fallback (issue #12).
-            if unit.dying_graphic is None or unit.dying_graphic < 0:
+            if (unit.dying_graphic is None or unit.dying_graphic < 0) and unit.hit_points <= 0:
                 raise ValueError(
-                    f"unit {unit.id} has no dying graphic, so it never reaches "
+                    f"unit {unit.id} has no hit points or dying graphic, so it never reaches "
                     f"its dead unit {unit.dead_unit_id}"
                 )
             return civ_units[unit.dead_unit_id].standing_graphic[0]
@@ -342,10 +342,12 @@ def particle_effects(
         atlas = Path(definition["AtlasFile"].replace("\\", "/"))
         table_path = particles_dir / atlas.with_suffix(".json")
         image_path = particles_dir / atlas.with_suffix(".png")
+        if not image_path.is_file():
+            image_path = particles_dir / atlas  # some shipped flipbooks are DDS-only
         if atlas.name not in tables:
             tables[atlas.name] = json.loads(table_path.read_text())
             hashes[f"particles/{atlas.with_suffix('.json').as_posix()}"] = sha256(table_path)
-            hashes[f"particles/{atlas.with_suffix('.png').as_posix()}"] = sha256(image_path)
+            hashes[f"particles/{image_path.relative_to(particles_dir).as_posix()}"] = sha256(image_path)
         table = tables[atlas.name]
         first, count = int(definition["ImageFirst"]), int(definition["ImageCount"])
         frames = table["frames"][first:first + count]
@@ -353,10 +355,11 @@ def particle_effects(
             raise ValueError(f"particle {name}: {count} frames from {first} outrun the atlas table")
         effects[name] = {
             "atlas": str(image_path),
-            "scale": rounded(definition.get("Scale", 1.0)),
+            "scale": rounded(definition.get("Scale", (definition.get("ScaleStart1", 1.0) + definition.get("ScaleStart2", 1.0)) / 2)),
             "flipHorizontal": bool(definition.get("FlipH", False)),
             "loop": definition.get("Type") == "Loop",
-            "cycleSeconds": [rounded(definition["Duration1"]), rounded(definition["Duration2"])],
+            "cycleSeconds": [rounded(definition.get("Duration1", definition.get("Duration", 1.0))),
+                             rounded(definition.get("Duration2", definition.get("Duration", 1.0)))],
             "fadeInSeconds": rounded(definition.get("StartDuration", 0.0)),
             "fadeOutSeconds": rounded(definition.get("StopDuration", 0.0)),
             "frames": [
@@ -746,8 +749,43 @@ def extract_entity(
             ),
             hashes,
         )
-        for name, animation in spec["animations"].items()
+        for name, animation in spec["animations"].items() if not spec.get("composite")
     }
+    if spec.get("composite"):
+        from naval import graphic_layers
+        entity["animationLayers"] = {}
+        for name, animation in spec["animations"].items():
+            graphic_id = resolve_graphic_id(unit, animation, civ_units, dat)
+            layers = graphic_layers(dat, graphic_id)
+            layers.sort(key=lambda layer: dat.graphics[layer[0]].layer)
+            if not layers:
+                continue
+            entity["animationLayers"][name] = []
+            for index, (graphic_id, x, y) in enumerate(layers):
+                key = name if index == 0 else f"{name}-layer-{index}"
+                entity["animations"][key] = animation_entry(dat, graphics_dir, graphic_id, hashes)
+                if "(Underwater)" in dat.graphics[graphic_id].name:
+                    entity["animations"][key]["alphaPalette"] = "n_alpha_underwater.palx"
+                entity["animationLayers"][name].append({"animation": key, "x": x, "y": y})
+
+    if spec["key"] == "fish-trap":
+        entity["foodAmount"] = rounded(dat.civs[1].resources[88])
+        task = find_task(civ_units[13], {"actionType": 101, "unitId": 199})
+        entity["build"]["seconds"] = rounded(entity["build"]["seconds"] / (civ_units[13].bird.work_rate * task.work_value_1))
+    if spec["key"] == "fishing-ship":
+        entity["gather"]["trapFactor"] = rounded(find_task(unit, {"actionType": 5, "unitId": 199}).work_value_1)
+    if spec["key"] == "transport-ship":
+        entity["transportCapacity"] = unit.garrison_capacity
+    if spec.get("composite") and category == "unit":
+        entity["projectilesPerAttack"] = max(1, int(unit.creatable.total_projectiles))
+    if spec["key"].startswith(("demolition-", "heavy-demolition-")):
+        entity["selfDestruct"] = True
+    if spec["key"] == "trade-cog":
+        entity["trade"] = {"ratePerSecond": rounded(unit.bird.work_rate), "capacity": unit.resource_capacity, "buildingId": 45}
+    if spec["key"] == "naval-fire":
+        # Projectile 676 is file-less (SLP 4193); use the owned flame flipbook.
+        # The binding/one-puff representation is inferred, recorded in the ledger.
+        entity["particleEffect"] = "flamethrower_flame"
 
     # Ageing up replaces the building with the next age's unit, so the art for
     # each age is that unit's standing graphic (issue #13) -- and its own
@@ -1003,7 +1041,7 @@ def effects_of(
     effects: list[dict[str, Any]] = []
     unmodelled: set[str] = set()
     unreached: set[str] = set()
-    for command in dat.effects[tech.effect_id].effect_commands:
+    for command in (dat.effects[tech.effect_id].effect_commands if tech.effect_id >= 0 else []):
         if command.type == 1:
             # A player attribute: `a` names the resource, `b` chooses write or
             # add, `d` is the amount. `c` is a bookkeeping slot this does not
@@ -1059,13 +1097,13 @@ def technology_entry(
 ) -> dict[str, Any]:
     """One researchable technology: what it costs, where, and what it changes."""
     tech = dat.techs[spec["techId"]]
-    effect = dat.effects[tech.effect_id]
-    if "effect" in spec and effect.name != spec["effect"]:
+    effect = dat.effects[tech.effect_id] if tech.effect_id >= 0 else None
+    if "effect" in spec and effect is not None and effect.name != spec["effect"]:
         raise ValueError(f"tech {spec['techId']} effect is {effect.name!r}, not {spec['effect']!r}")
     location = next(l for l in tech.research_locations if l.location_id >= 0)
     entry: dict[str, Any] = {
         "techId": spec["techId"],
-        "name": effect.name,
+        "name": effect.name if effect else tech.name,
         "cost": {RESOURCE_NAMES[c.type]: int(c.amount) for c in tech.resource_costs
                  if c.flag and c.type in RESOURCE_NAMES},
         "researchSeconds": location.research_time,
@@ -1209,7 +1247,9 @@ def technologies_from_tree(
     }
     keep: dict[str, Any] = {}
     skipped: list[dict[str, str]] = []
-    for node in tree_nodes(dat_path, spec):
+    nodes = tree_nodes(dat_path, spec)
+    research_ids = {int(n["Node ID"]) for n in nodes if n["Node Type"] == "Research"}
+    for node in nodes:
         # A `UnitUpgrade` node is a technology too -- it just replaces one unit
         # with another rather than adding to it, and the tree names the
         # technology that does it separately from the unit it produces. A
@@ -1221,6 +1261,8 @@ def technologies_from_tree(
             continue
         name = node["Name"]
         tech_id = int(node["Trigger Tech ID"]) if upgrade else int(node["Node ID"])
+        if upgrade and tech_id in research_ids:
+            continue  # one shared Warships button, not three identical upgrades
         if node["Node Status"] == "NotAvailable":
             skipped.append({"name": name, "techId": tech_id,
                             "reason": f"the {civilization['name']} do not have it"})
@@ -1234,29 +1276,37 @@ def technologies_from_tree(
         # locations are all -1) or nothing to do (the Galleon's effect is -1)
         # is listed but not offered.
         tech = dat.techs[tech_id]
-        if not any(l.location_id >= 0 for l in tech.research_locations) or tech.effect_id < 0:
+        if not any(l.location_id >= 0 for l in tech.research_locations):
+            if {int(r) for r in tech.required_techs if r >= 0}.issubset(research_ids):
+                continue  # automatic child of a research button below
             skipped.append({"name": name, "techId": tech_id,
                             "reason": "the DAT gives it no research location or no effect"})
             continue
         entry = technology_entry(
             dat, {"techId": tech_id, "entities": entities}, hashes, strings
         )
-        if upgrade:
-            # What it turns into, from the DAT's own `upgrade unit` command --
-            # the same command the age technologies use on buildings.
-            becomes = [
-                {"from": units[int(c.a)], "to": units[int(c.b)]}
-                for c in dat.effects[dat.techs[tech_id].effect_id].effect_commands
-                if c.type == EFFECT_UPGRADE_UNIT
-                and int(c.a) in units and int(c.b) in units
-            ]
-            if not becomes:
-                missing = units.get(int(node.get("Link ID", -1)), f"unit {node['Node ID']}")
-                skipped.append({"name": name, "techId": tech_id,
-                                "reason": f"upgrades to a unit that is not imported ({missing})"})
-                continue
+        commands = list(dat.effects[tech.effect_id].effect_commands) if tech.effect_id >= 0 else []
+        # Heavy Warships (35) has no effect itself: automatic technologies
+        # 911 and 246, whose sole prerequisite is 35, upgrade its ships.
+        for child in dat.techs:
+            if child.effect_id >= 0 and child.civ in (-1, spec["civIndex"]) \
+                    and not any(l.location_id >= 0 for l in child.research_locations) \
+                    and {int(r) for r in child.required_techs if r >= 0} == {tech_id}:
+                commands.extend(dat.effects[child.effect_id].effect_commands)
+        becomes = [
+            {"from": units[int(c.a)], "to": units[int(c.b)]}
+            for c in commands
+            if c.type == EFFECT_UPGRADE_UNIT
+            and int(c.a) in units and int(c.b) in units
+        ]
+        if upgrade and not becomes:
+            missing = units.get(int(node.get("Link ID", -1)), f"unit {node['Node ID']}")
+            skipped.append({"name": name, "techId": tech_id,
+                            "reason": f"upgrades to a unit that is not imported ({missing})"})
+            continue
+        if becomes:
             entry["upgrades"] = becomes
-        elif not entry.get("effects") and "grantsAge" not in entry:
+        if not entry.get("effects") and "grantsAge" not in entry and not entry.get("upgrades"):
             # Say what it was actually asking for. "None of its effects reach
             # anything imported" is true of twenty technologies and tells the
             # next reader nothing about which twenty or why.
@@ -1505,6 +1555,9 @@ def extract(
     depot is downloaded: every animation whose `_x2` twin it holds is then
     sourced from the pack at scale 2 (issue #151).
     """
+    if spec.get("naval"):
+        from naval import specs
+        spec = {**spec, "entities": [*spec["entities"], *specs()]}
     dat = DatFile.parse(dat_path)
     graphics = Graphics.of(graphics_dir, uhd_dir)
     hashes: dict[str, str] = {"dat": sha256(dat_path)}
@@ -1529,12 +1582,28 @@ def extract(
         for stage in stages
         for flame in stage["flames"]
     }
+    flame_names.update(e["particleEffect"] for e in entities.values() if "particleEffect" in e)
     particles = particle_effects(dat_path.parent.parent / "particles", flame_names, hashes)
     skin_chances(dat_path, entities, hashes)
     civilization = civilization_entry(dat, dat_path, spec, hashes, strings)
     technologies, skipped_technologies = technologies_from_tree(
         dat, dat_path, spec, entities, civilization, hashes, strings
     )
+    by_tech_id = {value["techId"]: key for key, value in technologies.items()}
+    by_unit_id = {value["id"]: value for value in entities.values() if value.get("category") in ("unit", "building")}
+    from naval import NAVAL_UNITS
+    naval_ids = {*NAVAL_UNITS.values(), 199}
+    for node in tree_nodes(dat_path, spec):
+        if node.get("Use Type") not in ("Unit", "Building") or int(node["Node ID"]) not in naval_ids:
+            continue
+        entity = by_unit_id.get(int(node["Node ID"]))
+        if entity is None:
+            continue
+        entity["age"] = int(node["Age ID"]) - 1
+        if node["Node Type"] == "Unit":
+            requires = [by_tech_id[i] for i in node.get("Prerequisite IDs", []) if i in by_tech_id]
+            if requires:
+                entity["requires"] = requires
     palette_path = palettes_dir / "original.pal"
     palette = read_jasc_pal(palette_path) if palette_path.is_file() else None
     # An animation drawn through one of the engine's alpha palettes: the
@@ -1549,6 +1618,12 @@ def extract(
             palx = palettes_dir / animation["alphaPalette"]
             hashes[f"palettes/{palx.name}"] = sha256(palx)
             entities[entity_spec["key"]]["animations"][name]["alpha"] = palx_alpha(palx)
+    for entity in entities.values():
+        for animation in entity["animations"].values():
+            if "alphaPalette" in animation:
+                palx = palettes_dir / animation.pop("alphaPalette")
+                hashes[f"palettes/{palx.name}"] = sha256(palx)
+                animation["alpha"] = palx_alpha(palx)
     # A gaia object's own minimap dot, where the DAT gives one: gold (255,
     # 199, 0), stone (145, 145, 145), the huntables, herdables, fish and
     # bushes (165, 196, 108), the relic white -- each a palette index, and
@@ -1605,6 +1680,7 @@ def extract(
             for name, string_id in (
                 ("notEnoughFood", 3001), ("notEnoughWood", 3002), ("notEnoughStone", 3003),
                 ("notEnoughGold", 3004), ("needMoreHouses", 3005),
+                ("unload", 4107), ("unloadWhere", 3053),
                 ("creating", 4310), ("stopCreating", 42105),
                 # Map setup labels and the three shipped random-map names (#144).
                 ("mapType", 9691), ("mapSeed", 10658), ("startGame", 9472),

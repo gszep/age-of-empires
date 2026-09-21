@@ -75,6 +75,9 @@
             "light-cavalry",
             "trade-cart",
             "fishing-ship",
+            "galley", "war-galley", "galleon", "hulk", "war-hulk",
+            "fire-galley", "fire-ship", "fast-fire-ship", "demolition-raft",
+            "demolition-ship", "heavy-demolition-ship", "cannon-galleon", "transport-ship", "trade-cog",
             "knight",
             "cavalier",
             "cavalry-archer",
@@ -169,7 +172,7 @@
             "university",
             "wonder",
             "palisade-wall",
-            "palisade-gate"
+            "palisade-gate", "fish-trap"
           ]
         },
         "target": {
@@ -353,6 +356,10 @@
         "buildingId": {
           "type": "integer",
           "$comment": "Everybody sheltering in this building of the player's comes out onto the ground round it."
+        },
+        "target": {
+          "$ref": "#/definitions/point",
+          "$comment": "For transports: sail to this shoreline before unloading."
         }
       },
       "required": [

@@ -1,7 +1,10 @@
 import type { Activity, Command, EntityKind, Order, PlayerId, ResourceKind, UnitKind } from '../sim/types';
 import type { NodeKind } from '../sim/data';
 
-export const PROTOCOL_VERSION = 1;
+/** Player observation contract; v3 adds naval kinds and the unload order. */
+export const PROTOCOL_VERSION = 3;
+/** Commands, match configuration and recordings retain their v1 formats. */
+export const MATCH_FORMAT_VERSION = 1;
 
 export interface ObservedEntity {
   id: number;
@@ -18,6 +21,8 @@ export interface ObservedEntity {
   /** Own entities only; hidden from opponents. */
   activity?: Activity;
   order?: Order['kind'];
+  /** Own builders only, including those still walking to the foundation. */
+  buildTargetId?: number;
   carrying?: { kind: ResourceKind; amount: number; node?: NodeKind };
   training?: { kind: UnitKind; remainingSeconds: number };
   /** What it is researching; own buildings only, like `training`. */
@@ -63,7 +68,7 @@ export interface RejectedCommand {
 }
 
 export interface MatchConfig {
-  version: typeof PROTOCOL_VERSION;
+  version: typeof MATCH_FORMAT_VERSION;
   seed: number;
   maxTimeSeconds?: number;
   decideIntervalSeconds?: number;
@@ -92,7 +97,7 @@ export interface PlayerSummary {
 }
 
 export interface MatchResult {
-  version: typeof PROTOCOL_VERSION;
+  version: typeof MATCH_FORMAT_VERSION;
   seed: number;
   timeSeconds: number;
   winner?: PlayerId;
@@ -118,7 +123,7 @@ export interface RememberedEntityObservation {
 
 /** Everything needed to reproduce a match tick-for-tick. */
 export interface MatchRecord {
-  version: typeof PROTOCOL_VERSION;
+  version: typeof MATCH_FORMAT_VERSION;
   seed: number;
   rulesOrigin: 'fallback' | 'imported';
   /**

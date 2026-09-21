@@ -71,6 +71,8 @@ export interface EntityView {
   annexes: Piece[];
   /** Player-colour mask over each annex, in the same order. */
   annexColors: Piece[];
+  layerShadows?: Piece[];
+  layerOutlines?: Piece[];
   fallback: boolean;
   animationState?: string;
   animationStartedAt?: number;
@@ -161,8 +163,10 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
     leap = makePiece();
     group.add(leap.mesh);
   }
-  if (imported?.annexes) {
-    for (const _ of imported.annexes) {
+  if (imported?.annexes || imported?.animationLayers) {
+    const count = Math.max(imported.annexes?.length ?? 0,
+      ...Object.values(imported.animationLayers ?? {}).map(layers => layers.length - 1));
+    for (let i = 0; i < count; i++) {
       const piece = makePiece();
       annexes.push(piece);
       group.add(piece.mesh);
@@ -420,10 +424,10 @@ export function chooseAnimation(state: ReadonlyGameState, entity: Entity): { key
     if (entity.activity === 'attacking') return { key: kind, name: 'attack' };
     // A fishing ship at work casts its net (the gather task's own graphic);
     // laden, it is the same boat, as the DAT gives it no carrying art.
-    if (kind === 'fishing-ship' && entity.activity === 'gathering') return { key: kind, name: 'work' };
+    if (kind === 'fishing-ship' && (entity.activity === 'gathering' || entity.activity === 'building')) return { key: kind, name: 'work' };
     // A laden trade cart has its own art: the DAT gives the trade task a
     // carrying graphic, which is the full cart on the road.
-    if (entity.carrying && kind !== 'fishing-ship') return { key: kind, name: 'carry' };
+    if (entity.carrying && kind === 'trade-cart') return { key: kind, name: 'carry' };
     if (entity.activity === 'moving' || entity.activity === 'carrying') return { key: kind, name: 'walk' };
     return { key: kind, name: 'idle' };
   }
@@ -527,7 +531,7 @@ function configureShadow(piece: Piece, assets: ContentAssets): void {
 export function refreshEntityTextures(view: EntityView, assets: ContentAssets | undefined): void {
   if (!assets) return;
   for (const piece of [view.body, view.shadow, view.color, view.damage, view.leap,
-    ...view.annexes, ...view.annexColors, ...view.flames, view.outline]) {
+    ...view.annexes, ...view.annexColors, ...(view.layerShadows ?? []), ...(view.layerOutlines ?? []), ...view.flames, view.outline]) {
     if (!piece?.pendingTexture) continue;
     const texture = spriteTexture(assets, piece.pendingTexture);
     if (!texture) continue;
@@ -543,7 +547,7 @@ export function refreshEntityTextures(view: EntityView, assets: ContentAssets | 
  * through their trunks. Shadows and farm patches already receive ground fog. */
 export function dimFogSnapshot(view: EntityView): void {
   for (const piece of [view.body, view.color, view.outline, view.damage, view.leap,
-    ...view.annexes, ...view.annexColors, ...view.flames]) {
+    ...view.annexes, ...view.annexColors, ...(view.layerShadows ?? []), ...view.flames]) {
     if (piece) (piece.mesh.material as THREE.MeshBasicMaterial).color.multiplyScalar(1 - FOG_EXPLORED);
   }
 }
@@ -779,6 +783,14 @@ export function updateProjectileView(
   groundHeightPixels = 0,
 ): void {
   const arrow = assets?.entities[projectileKey] ?? assets?.entities['arrow'];
+  const flame = arrow?.particleEffect ? assets?.particles?.[arrow.particleEffect] : undefined;
+  if (assets && flame) {
+    const frame = Math.min(flame.atlas.framesInFile - 1, Math.floor(progress * flame.atlas.framesInFile));
+    applyFrame(view.body, assets, flame.atlas, frame, position, 0xffffff);
+    view.body.mesh.position.y += groundHeightPixels + launchHeight * HEIGHT_PIXELS;
+    view.body.mesh.renderOrder = 4000 + isoDepth(position.x, position.y);
+    return;
+  }
   const atlas = arrow?.atlases['idle'];
   const animation = arrow?.animations['idle'];
   if (!assets || !atlas || !animation) { view.body.mesh.visible = false; return; }
@@ -867,6 +879,7 @@ export function updateOcclusion(views: Map<string, EntityView>, state: ReadonlyG
       return o.depth > depth && overlapX > 0 && overlapY > 0
         && (overlapX * overlapY) / area >= HIDDEN_FRACTION;
     });
+    for (const part of view.layerOutlines ?? []) part.mesh.visible = mesh.visible && !!part.atlasKey;
   }
 }
 
@@ -985,7 +998,11 @@ export function updateEntityView(
     // one for something that has died: a worked-out forage bush has no death
     // and leaves nothing (the DAT gives it no dying graphic at all), and
     // drawing its living self there is worse than drawing nothing (issue #12).
-    if (entity.dead) { view.body.mesh.visible = false; return; }
+    if (entity.dead) {
+      for (const piece of [view.body, view.color, view.shadow, view.outline, ...view.annexes, ...view.annexColors,
+        ...(view.layerShadows ?? []), ...(view.layerOutlines ?? [])]) piece.mesh.visible = false;
+      return;
+    }
     animation = imported?.animations['idle'];
     atlas = imported?.atlases['idle'];
   }
@@ -1075,12 +1092,12 @@ export function updateEntityView(
     applyFrame(view.color, assets, colorAtlas, frameIndex, entity.position, colorTint);
     view.color.mesh.renderOrder = 1000 + depth * 10 + 1;
     (view.color.mesh.material as THREE.MeshBasicMaterial).opacity =
-      entity.buildProgress !== undefined ? 0.85 : 1;
+      (entity.buildProgress !== undefined ? 0.85 : 1) * (animation.alpha ?? 1);
   } else {
     view.color.mesh.visible = false;
   }
   (view.body.mesh.material as THREE.MeshBasicMaterial).opacity =
-    entity.buildProgress !== undefined ? 0.85 : 1;
+    (entity.buildProgress !== undefined ? 0.85 : 1) * (animation.alpha ?? 1);
 
   updateDamage(view, assets, state, entity, imported, choice.name, frameIndex, depth, time);
 
@@ -1097,10 +1114,68 @@ export function updateEntityView(
   view.outline.mesh.visible = false;
 
   const annexes = imported?.annexes ?? [];
+  // Upgrading a ship can add masts/sails to the same entity id and view.
+  const needed = (imported?.animationLayers?.[choice.name]?.length ?? 1) - 1;
+  while (view.annexes.length < needed) {
+    const piece = makePiece();
+    const ramp = assets.playerRamps.get(entity.owner);
+    const colorPiece = ramp ? makeRampPiece(ramp) : makePiece();
+    view.annexes.push(piece); view.annexColors.push(colorPiece);
+    view.group.add(piece.mesh, colorPiece.mesh);
+  }
+  if (imported?.animationLayers) {
+    view.layerShadows ??= []; view.layerOutlines ??= [];
+    while (view.layerShadows.length < view.annexes.length) {
+      const shadow = makePiece(), outline = makePiece();
+      view.layerShadows.push(shadow); view.layerOutlines.push(outline);
+      view.group.add(shadow.mesh, outline.mesh);
+    }
+    for (const piece of [...view.layerShadows, ...view.layerOutlines]) { piece.mesh.visible = false; piece.atlasKey = undefined; }
+  }
   // The town center's four annex pieces are upgraded by the same age
   // technology as the building itself, so each follows the same chain.
   const annexAge = isBuilding(entity.kind) ? ageChain(state, entity) : ['idle'];
   for (const [index, piece] of view.annexes.entries()) {
+    const layer = imported?.animationLayers?.[choice.name]?.[index + 1];
+    if (imported?.animationLayers) {
+      const colorPiece = view.annexColors[index];
+      piece.mesh.visible = false;
+      if (colorPiece) colorPiece.mesh.visible = false;
+      const anim = layer && imported.animations[layer.animation];
+      const sheet = layer && imported.atlases[layer.animation];
+      if (!layer || !anim || !sheet) continue;
+      const directions = Math.max(1, Math.floor(sheet.framesInFile / Math.max(1, anim.frames)));
+      const phase = Math.floor(elapsed / (anim.frameSeconds || 0.1));
+      const frame = (directionIndex(view.facing, anim.directions) % directions) * anim.frames
+        + (entity.dead ? Math.min(phase, anim.frames - 1) : phase % Math.max(1, anim.frames));
+      const order = 1000 + depth * 10 + 2 + index * 2;
+      applyFrame(piece, assets, sheet, frame, entity.position, 0xffffff);
+      piece.mesh.position.x += layer.x;
+      piece.mesh.position.y -= layer.y;
+      piece.mesh.renderOrder = order;
+      (piece.mesh.material as THREE.MeshBasicMaterial).opacity = anim.alpha ?? 1;
+      for (const [suffix, part, tint] of [
+        ['shadow', view.layerShadows![index], 0x000000],
+        ['outline', view.layerOutlines![index], view.outlineColor ?? 0xffffff],
+      ] as const) {
+        const maskSheet = imported.atlases[`${layer.animation}-${suffix}`];
+        if (!maskSheet || entity.dead) continue;
+        applyFrame(part, assets, maskSheet, frame, entity.position, tint);
+        part.mesh.position.x += layer.x; part.mesh.position.y -= layer.y;
+        if (suffix === 'shadow') {
+          part.mesh.renderOrder = groundLayerOrder(500, depth); configureShadow(part, assets);
+        } else { part.mesh.renderOrder = 4500 + depth; part.mesh.visible = false; }
+      }
+      const mask = imported.atlases[`${layer.animation}-playercolor`];
+      if (colorPiece && mask && entity.owner !== 0) {
+        applyFrame(colorPiece, assets, mask, frame, entity.position, colorPiece.mapNode ? 0xffffff : PLAYER_COLORS[entity.owner]);
+        colorPiece.mesh.position.x += layer.x;
+        colorPiece.mesh.position.y -= layer.y;
+        colorPiece.mesh.renderOrder = order + 1;
+        (colorPiece.mesh.material as THREE.MeshBasicMaterial).opacity = anim.alpha ?? 1;
+      }
+      continue;
+    }
     const annex = annexes[index];
     const annexName = annexAge.find(name => annex?.atlases[`annex${index}-${name}`]) ?? 'idle';
     const annexAtlas = annex?.atlases[`annex${index}-${annexName}`];
@@ -1134,5 +1209,6 @@ export function updateEntityView(
   const raise = elevationAt(state, entity.position.x, entity.position.y) * ELEVATION_PIXELS;
   for (const piece of [
     view.shadow, view.body, view.color, view.outline, ...view.annexes, ...view.annexColors,
+    ...(view.layerShadows ?? []), ...(view.layerOutlines ?? []),
   ]) piece.mesh.position.y += raise;
 }

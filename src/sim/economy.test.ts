@@ -783,8 +783,8 @@ describe('a building\'s training queue', () => {
   /**
    * Room to train into. The houses are what keeps the cap high once the game
    * recomputes it -- which it does whenever a unit spawns or a building
-   * finishes, not on a bare tick -- and the direct set covers the queue-time
-   * checks that happen before any of that.
+   * finishes, not on a bare tick -- and the direct set makes the fixture's
+   * extra housing visible before any of that.
    */
   const roomFor = (state: GameState, houses: number) => {
     const rules = state.rules.buildings.house;
@@ -886,8 +886,7 @@ describe('a building\'s training queue', () => {
     expect(tc.trainingQueue).toEqual(['spearman']);
   });
 
-  it('counts what is queued against the population cap', () => {
-    // Otherwise fifteen villagers could be ordered into five places.
+  it('lets the queue outgrow the population cap', () => {
     const state = createGame(143);
     const tc = centre(state);
     state.players[1].food = 10_000;
@@ -899,7 +898,8 @@ describe('a building\'s training queue', () => {
         `villager ${i + 1} of ${room}`).toBe(true);
     }
     expect(applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' }))
-      .toEqual({ ok: false, reason: 'population cap reached' });
+      .toEqual({ ok: true });
+    expect(queuedCount(tc)).toBe(room + 1);
   });
 
   it('replays identically through a queue', () => {

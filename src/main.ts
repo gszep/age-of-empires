@@ -114,6 +114,7 @@ let selectedIds: number[] = [];
 let buildMode: BuildingKind | undefined;
 /** The villager's Repair button is down: the next click names what to mend. */
 let repairMode = false;
+let unloadShips: number[] = [];
 let paused = false;
 /**
  * Debug: draw the whole board as if seen. Strictly a view-side override --
@@ -199,6 +200,7 @@ function startReplay(raw: unknown): void {
   selectedIds = [];
   buildMode = undefined;
   repairMode = false;
+  unloadShips = [];
   paused = false;
   hud.hideEnd();
   for (const entityView of views.values()) scene.remove(entityView.group);
@@ -365,14 +367,14 @@ function disposeGhost(): void {
 /** A rejected command, reported and sounded the way the game does. */
 /**
  * Say why an order was refused. The simulation's reasons are its own words;
- * where the reference has a line for the same refusal -- "Not enough wood.",
- * "You need to build more houses." -- that line is shown instead (issue #70).
+ * where the reference has a line for the same refusal -- "Not enough wood."
+ * -- that line is shown instead (issue #70).
  */
 function reject(reason: string): void {
   const short = /^not enough (food|wood|stone|gold)$/.exec(reason)?.[1];
   const said = short
     ? messages[`notEnough${short[0].toUpperCase()}${short.slice(1)}`]
-    : reason === 'population cap reached' ? messages.needMoreHouses : undefined;
+    : undefined;
   hud.showMessage(said ?? reason);
   playSound('error');
 }
@@ -509,6 +511,7 @@ function resetMatchView(): void {
   selectedIds = [];
   buildMode = undefined;
   repairMode = false;
+  unloadShips = [];
   wallStart = undefined;
   orderFlash = undefined;
   aiClock = 0;
@@ -559,8 +562,8 @@ function runUiCommand(id: string, shift = false): void {
     const building = selection.find(e => isBuilding(e.kind) && e.buildProgress === undefined
       && rules.units[unit]?.trainedAt === e.kind);
     if (!building) return;
-    // Shift asks for five, or as many of the five as the queue, the price and
-    // the housing allow (issue #76): each goes through the same command a
+    // Shift asks for five, or as many of the five as the queue and the price
+    // allow (issue #76): each goes through the same command a
     // single click sends, and the first refusal ends the batch. The refusal
     // is only news when nothing at all was queued.
     const wanted = shift ? BATCH_TRAIN_COUNT : 1;
@@ -574,6 +577,11 @@ function runUiCommand(id: string, shift = false): void {
     return;
   }
   if (id === 'ungarrison') {
+    unloadShips = selection.filter(e => isUnit(e.kind) && rules.units[e.kind].transportCapacity && e.garrison?.length).map(e => e.id);
+    if (unloadShips.length) {
+      hud.showMessage(messages.unloadWhere ?? 'Click where you want the transport to unload.');
+      return;
+    }
     for (const building of selection.filter(e => isBuilding(e.kind) && e.garrison?.length)) {
       const result = applyCommand(game, { kind: 'ungarrison', player: localPlayer, buildingId: building.id });
       if (!result.ok) reject(result.reason);
@@ -616,7 +624,7 @@ function runUiCommand(id: string, shift = false): void {
   if (id === 'page-economic') { buildPage = 'economic'; return; }
   if (id === 'page-military') { buildPage = 'military'; return; }
   if (id === 'page-back') { buildPage = undefined; return; }
-  if (id === 'cancel') { buildMode = undefined; repairMode = false; }
+  if (id === 'cancel') { buildMode = undefined; repairMode = false; unloadShips = []; }
   if (id === 'repair') { repairMode = true; return; }
 }
 
@@ -710,7 +718,7 @@ function orientationOf(kind: BuildingKind, at: Point): 'x' | 'y' {
 }
 
 function placeBuilding(kind: BuildingKind, targets: Point[]): void {
-  const builders = ownSelected().filter(e => e.kind === 'villager').map(e => e.id);
+  const builders = ownSelected().filter(e => e.kind === (rules.buildings[kind].builderKind ?? 'villager')).map(e => e.id);
   if (!builders.length) { reject('Select a villager first'); return; }
   let failure: string | undefined;
   for (const target of targets) {
@@ -726,6 +734,14 @@ function placeBuilding(kind: BuildingKind, targets: Point[]): void {
 renderer.domElement.addEventListener('pointerdown', event => {
   const point = screenToWorld(event.clientX, event.clientY);
   if (event.button === 0) {
+    if (unloadShips.length && !replay) {
+      for (const id of unloadShips) {
+        const result = applyCommand(game, { kind: 'ungarrison', player: localPlayer, buildingId: id, target: point });
+        if (!result.ok) reject(result.reason);
+      }
+      unloadShips = [];
+      return;
+    }
     if (buildMode && isWall(buildMode) && !replay) {
       // A wall is dragged: the first press only anchors the line.
       wallStart = snapPlacement(point, rules.buildings[buildMode].radius);
@@ -898,6 +914,7 @@ addEventListener('keydown', event => {
   }
   if (key.startsWith('Arrow')) { heldKeys.add(key); event.preventDefault(); return; }
   if (key === 'Escape') {
+    if (unloadShips.length) { unloadShips = []; event.preventDefault(); return; }
     if (buildMode) { buildMode = undefined; wallStart = undefined; }
     else if (repairMode) repairMode = false;
     else if (hud.menuOpen) hud.toggleMenu(false);
@@ -1088,6 +1105,12 @@ function currentCommands(): CommandButton[] {
   if (selection.some(e => isUnit(e.kind))) {
     buttons.push({ id: 'stop', label: 'Stop', slot: GRID_SLOT.stop, enabled: true, icon: hud.actionIcon(ACTION_ICON.stop) });
   }
+  if (selection.some(e => e.kind === 'fishing-ship') && player.age >= (rules.buildings['fish-trap'].age ?? 0)) {
+    const trap = rules.buildings['fish-trap'];
+    buttons.push({ id: 'build-fish-trap', label: `${createLabel('fish-trap', 'Build')} (${costLabel(trap.cost)})`,
+      help: helpFor('fish-trap', trap.cost), slot: trap.buildButton, enabled: true,
+      icon: hud.iconFor('Buildings', assets?.entities['fish-trap']?.iconId, localPlayer) });
+  }
   // A siege engine that has to be set up before it can shoot.
   const engines = selection.filter(e => isUnit(e.kind)
     && rules.units[e.kind as UnitKind].unpacked !== undefined);
@@ -1105,10 +1128,10 @@ function currentCommands(): CommandButton[] {
   }
   // A building with somebody inside offers the reference's "Ungarrison All
   // Units" (`buttons.json`: action 78, cell 9, icon 2) (issue #75).
-  if (selection.some(e => isBuilding(e.kind) && e.garrison?.length)) {
+  if (selection.some(e => e.garrison?.length)) {
     buttons.push({
-      id: 'ungarrison', label: 'Ungarrison all units', icon: hud.actionIcon(ACTION_ICON.ungarrison),
-      slot: GRID_SLOT.ungarrison, enabled: true,
+      id: 'ungarrison', label: selection.some(e => e.kind === 'transport-ship') ? messages.unload ?? 'Unload' : 'Ungarrison all units', icon: hud.actionIcon(ACTION_ICON.ungarrison),
+      slot: selection.some(e => e.kind === 'transport-ship') ? 1 : GRID_SLOT.ungarrison, enabled: true,
     });
   }
   // Every completed production building offers the units the rules train there.
@@ -1205,6 +1228,7 @@ let buildPage: BuildPage | undefined;
 const trainableAt = (building: BuildingKind): UnitKind[] =>
   (Object.keys(rules.units) as UnitKind[]).filter(kind =>
     rules.units[kind].trainedAt === building && (rules.units[kind].age ?? 0) <= game.players[localPlayer].age
+    && (rules.units[kind].requires ?? []).every(key => game.players[localPlayer].researched.includes(key))
     && !isAnimal(kind)
     // A unit that has been upgraded past is gone from the panel, not greyed
     // out: the barracks offers the man-at-arms in place of the militia.
@@ -1368,7 +1392,8 @@ function selectionInfo(): SelectionInfo | undefined {
   if (entity.kind === 'town-center' && entity.owner === localPlayer) details.push(AGE_NAMES[game.players[localPlayer].age]);
   if (entity.amount !== undefined) details.push(`${Math.floor(entity.amount)} ${entity.resourceKind}`);
   if (entity.garrison?.length) {
-    const capacity = rules.buildings[entity.kind as BuildingKind]?.garrison?.capacity;
+    const capacity = isUnit(entity.kind) ? rules.units[entity.kind].transportCapacity
+      : rules.buildings[entity.kind as BuildingKind]?.garrison?.capacity;
     details.push(`${entity.garrison.length}${capacity ? `/${capacity}` : ''} garrisoned`);
   }
   if (entity.carrying) details.push(`Carrying ${entity.carrying.amount} ${entity.carrying.kind}`);
@@ -1386,7 +1411,9 @@ function selectionInfo(): SelectionInfo | undefined {
     const total = rules.units[entity.training.kind].trainSeconds / TICK_SECONDS;
     const fraction = Math.max(0, Math.min(1, 1 - entity.training.remainingTicks / total));
     progress = {
-      label: `${messages.creating ?? 'Creating'} ${Math.floor(fraction * 100)}%`,
+      label: entity.training.remainingTicks <= 0
+        ? messages.needMoreHouses ?? 'You need to build more houses.'
+        : `${messages.creating ?? 'Creating'} ${Math.floor(fraction * 100)}%`,
       name: displayName(entity.training.kind),
       fraction,
     };
@@ -1542,7 +1569,10 @@ function syncScene(time: number): void {
   announceTrained();
   // Alerts and feedback, read out of what the view can already see. The
   // simulation never raises them: it does not know about sound.
-  for (const cue of view.pollCues(cueWatcher, game, localPlayer, gameTimeSeconds(game))) playSound(cue);
+  for (const cue of view.pollCues(cueWatcher, game, localPlayer, gameTimeSeconds(game))) {
+    playSound(cue);
+    if (cue === 'pop_capped') hud.showMessage(messages.needMoreHouses ?? 'You need to build more houses.');
+  }
 
   // Contours for units something else is drawing in front of, once every
   // piece this frame has been placed.

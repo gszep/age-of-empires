@@ -1,8 +1,12 @@
-import type { GameRules, NodeKind } from './data';
+import type { GameRules, NodeKind, VillagerGatherTask } from './data';
 import type { PlayerVisibility } from './visibility';
 
 export type PlayerId = 1 | 2;
 export type ResourceKind = 'food' | 'wood' | 'gold' | 'stone';
+export type NavalUnitKind = 'galley' | 'war-galley' | 'galleon' | 'hulk' | 'war-hulk'
+  | 'fire-galley' | 'fire-ship' | 'fast-fire-ship'
+  | 'demolition-raft' | 'demolition-ship' | 'heavy-demolition-ship'
+  | 'cannon-galleon' | 'transport-ship' | 'trade-cog';
 export type UnitKind =
   | 'villager' | 'militia' | 'man-at-arms' | 'long-swordsman'
   | 'two-handed-swordsman' | 'champion'
@@ -13,7 +17,7 @@ export type UnitKind =
   | 'longbowman' | 'elite-longbowman'
   | 'battering-ram' | 'capped-ram' | 'mangonel' | 'onager' | 'scorpion' | 'heavy-scorpion' | 'monk'
   | 'trebuchet'
-  | AnimalKind;
+  | AnimalKind | NavalUnitKind;
 /** Gaia's food on the hoof: herded, or hunted where it stands. */
 export type AnimalKind = 'sheep' | 'deer' | 'boar';
 export type BuildingKind =
@@ -22,7 +26,7 @@ export type BuildingKind =
   | 'outpost' | 'watch-tower'
   | 'archery-range' | 'blacksmith' | 'market' | 'stable'
   | 'monastery' | 'siege-workshop' | 'castle' | 'university' | 'wonder' | 'dock'
-  | 'palisade-wall' | 'palisade-gate';
+  | 'palisade-wall' | 'palisade-gate' | 'fish-trap';
 export type EntityKind = UnitKind | BuildingKind | 'resource';
 export type Activity =
   | 'idle' | 'moving' | 'gathering' | 'carrying' | 'building' | 'attacking' | 'dying'
@@ -48,7 +52,8 @@ export type Order =
   /** A villager mending its own side's building or siege engine. */
   | { kind: 'repair'; targetId: number }
   /** A unit walking into its own side's building to shelter there. */
-  | { kind: 'garrison'; targetId: number };
+  | { kind: 'garrison'; targetId: number }
+  | { kind: 'unload'; target: Point };
 
 export interface Entity {
   id: number;
@@ -68,7 +73,7 @@ export interface Entity {
   node?: NodeKind;
   /** Villagers and fishing ships: the load, and which node it came off, since
    * a dock takes fish and not berries. */
-  carrying?: { kind: ResourceKind; amount: number; node?: NodeKind };
+  carrying?: { kind: ResourceKind; amount: number; node?: NodeKind; task?: VillagerGatherTask };
   /** Fractional progress towards the next whole unit: a villager's gathering,
    * or a trade cart's goods earned on the road. */
   gatherProgress?: number;
@@ -96,6 +101,9 @@ export interface Entity {
    * kept it (issue #32).
    */
   lastResource?: ResourceKind;
+  /** Last working position at sea. A fish can disappear during a dock trip;
+   * return here before looking for a visible replacement (#87). */
+  fishingPosition?: Point;
   /**
    * Clicks waiting behind the current order, in the order they were given.
    *
@@ -268,7 +276,7 @@ export type Command =
   /** Take the last unit off a building's queue and refund it. */
   | { kind: 'cancel-train'; player: PlayerId; buildingId: number; index?: number }
   /** Everybody sheltering in this building comes out onto the ground round it. */
-  | { kind: 'ungarrison'; player: PlayerId; buildingId: number }
+  | { kind: 'ungarrison'; player: PlayerId; buildingId: number; target?: Point }
   /**
    * Destroy your own things, as the reference's Delete does: a unit you no
    * longer want, or a building in the way. Nothing is refunded and nothing

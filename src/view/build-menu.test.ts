@@ -12,7 +12,8 @@ const importedRules: GameRules | undefined = existsSync(MANIFEST_PATH)
   : undefined;
 
 const buildable = (rules: GameRules) =>
-  (Object.keys(rules.buildings) as BuildingKind[]).filter(k => rules.buildings[k].buildable);
+  (Object.keys(rules.buildings) as BuildingKind[]).filter(k => rules.buildings[k].buildable
+    && (rules.buildings[k].builderKind ?? 'villager') === 'villager');
 
 describe('the villager build menu', () => {
   // Issue #25. The DAT gives each building the villager can put up a build
@@ -55,7 +56,7 @@ describe('the villager build menu', () => {
     }
   });
 
-  it('puts every buildable building on exactly one page', () => {
+  it('puts every villager-buildable building on exactly one page', () => {
     // A kind added without a page would land silently on the economic one;
     // this is what says so.
     for (const rules of [FALLBACK_RULES, ...(importedRules ? [importedRules] : [])]) {

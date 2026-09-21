@@ -5,7 +5,7 @@
   "type": "object",
   "properties": {
     "version": {
-      "const": 1
+      "const": 3
     },
     "time": {
       "type": "number",
@@ -93,6 +93,9 @@
               "light-cavalry",
               "trade-cart",
               "fishing-ship",
+              "galley", "war-galley", "galleon", "hulk", "war-hulk",
+              "fire-galley", "fire-ship", "fast-fire-ship", "demolition-raft",
+              "demolition-ship", "heavy-demolition-ship", "cannon-galleon", "transport-ship", "trade-cog",
               "knight",
               "cavalier",
               "cavalry-archer",
@@ -131,6 +134,7 @@
               "wonder",
               "palisade-wall",
               "palisade-gate",
+              "fish-trap",
               "resource"
             ]
           },
@@ -214,6 +218,10 @@
           "id": {
             "type": "integer"
           },
+          "buildTargetId": {
+            "description": "Own builder's assigned foundation, including while approaching it.",
+            "type": "integer"
+          },
           "kind": {
             "enum": [
               "villager",
@@ -234,6 +242,9 @@
               "light-cavalry",
               "trade-cart",
               "fishing-ship",
+              "galley", "war-galley", "galleon", "hulk", "war-hulk",
+              "fire-galley", "fire-ship", "fast-fire-ship", "demolition-raft",
+              "demolition-ship", "heavy-demolition-ship", "cannon-galleon", "transport-ship", "trade-cog",
               "knight",
               "cavalier",
               "cavalry-archer",
@@ -272,6 +283,7 @@
               "wonder",
               "palisade-wall",
               "palisade-gate",
+              "fish-trap",
               "resource"
             ]
           },
@@ -347,7 +359,7 @@
               "heal",
               "convert",
               "repair",
-              "garrison"
+              "garrison", "unload"
             ]
           },
           "garrisoned": {
@@ -410,6 +422,9 @@
                   "light-cavalry",
                   "trade-cart",
                   "fishing-ship",
+                  "galley", "war-galley", "galleon", "hulk", "war-hulk",
+                  "fire-galley", "fire-ship", "fast-fire-ship", "demolition-raft",
+                  "demolition-ship", "heavy-demolition-ship", "cannon-galleon", "transport-ship", "trade-cog",
                   "knight",
                   "cavalier",
                   "cavalry-archer",

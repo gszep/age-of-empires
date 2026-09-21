@@ -150,12 +150,16 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 - **Anything a tile grid reads is snapped when placed, not rounded when
   read.** Fractional resources blocked four tiles each.
 - **When an obstacle becomes real, the target picker learns it too**, with a
-  four-lookup "can anything stand here" rather than a path per tick.
+  cheap footprint-perimeter check rather than a path per tick. Check outside
+  the whole footprint: four lookups beside a deep fish's centre were still
+  inside the fish itself, so automatic continuation rejected it (#87).
 - **An automatic continuation is bounded by sight.** If nothing is visible
   within a stated distance, idle is the right answer; reaching further is a
   decision and belongs to the player.
 - **A memory kept because the thing can vanish covers everything read off
-  it.** `lastWorked` remembered the kind and not the resource, for a year.
+  it.** `lastWorked` remembered the kind and not the resource, for a year;
+  fishing also needed the working position after a node vanished during banking
+  (#87), so its replacement search happened at sea rather than at the dock.
 - **A condition gated on a "something happened" flag needs proof the flag
   covers every way it happens.** Combat never set `newlyDead`; a razed town
   ran the full half hour.
@@ -259,6 +263,18 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 - **`convert_sld.py --terrain-only` for a terrain slot**; the full pipeline
   for everything else, and always the pipeline, never one step.
 - **The gate runs on an idle machine.**
+- **Managed restart loops are workload too.** Inspect `systemctl --user`
+  state and `NRestarts`, not just a momentary process list: the shared host
+  retried an incompatible checkpoint thousands of times while session-start
+  reported nothing running (#157/#158).
+- **Guest free space is not backing-drive headroom.** Ubuntu showed 891 GiB
+  available inside its expandable VHD while Windows C: had 5.9 GiB left.
+  Check the host volume before large imports/build copies; deletion inside
+  Linux does not necessarily shrink the VHD immediately. This establishes
+  storage pressure, not the cause of a machine-check panic.
+- **After a disconnect or reboot, recheck the job handle before waiting.**
+  An interrupted gate left a NUL-filled log and no process; an old tool wait
+  was not evidence of a live job. Use a new named log/exit file when restarting.
 - **An asset set that grows fourfold breaks whatever loaded it all at
   once.** The pack's 5.5 GB of sprite pages, fetched up front as the x1
   set had been, took the WSL VM down inside the gate's browser step (the

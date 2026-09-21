@@ -14,6 +14,10 @@ for the human's current solo QA, or the same path through
 **https://ysgramor.tail6e864b.ts.net:5173/**. Removing `solo=1` joins the shared
 match. Artemis joins through its own **http://localhost:5174/** gateway.
 
+The managed shared host is currently stopped after a saved-checkpoint/rules
+mismatch (#158/#157); the saved match is preserved. The verification below
+used private servers and does not imply that shared deployment is running.
+
 For a fresh standalone installation:
 
 ```bash
@@ -58,13 +62,62 @@ the trebuchet packed and unpacked (#28); scorpions and the Heavy Scorpion
 upgrade with pass-through bolts and DAT-backed collateral damage (#127);
 monks that heal and convert;
 palisade walls and owner-only gates; the wonder (no victory, #110); the
-trade cart; the dock, fishing ship and fish on the DAT's `terrain_restrictions`
+trade cart; the dock, naval roster and fish on the DAT's `terrain_restrictions`
 (#81); fog with explored memory and legal last-seen observations.
 
 Shore fish honour the DAT's neighbouring-beach placement requirement (#145).
+The current Britons dock roster is implemented (#97): galley/galleon, fire,
+demolition and hulk lines; Cannon Galleon gated by Chemistry; Transport Ship
+and Trade Cog. The shared Medium/Heavy Warships researches include the DAT's
+automatic child upgrades. Transports carry twenty land units, preserve loads
+and population, unload at shore through the public command/UI, and lose cargo
+when sunk. Fishing ships build and exclusively work 700-food Fish Traps.
+Owned hull/sail composites, colour/shadow/outline masks and trap underwater art
+are imported; fire shots use the owned flame flipbook with an inferred binding.
+`src/sim/naval-units.test.ts` checks training, combat, research, cargo, trade and
+trap income under both rule modes; `tools/naval_units_smoke.mts` checks dock
+buttons/upgrades, real boarding/unload targeting, trap placement and visible
+fire shots. Observation v3 adds the naval kinds and unload order.
+Fishing ships carry on to deep fish using footprint-aware clearance and remember
+their working position when a fish disappears during a dock trip (#87).
+`src/sim/fishing-continuation.test.ts` covers full/partial loads, another ship
+depleting the node, JSON reload determinism, visibility/range bounds and Stop;
+`tools/fishing_continuation_smoke.mts` exercises the round trip from a real click.
 Farms reserve one farmer through travel and drop-off; group orders, construction
 completion, queued orders and automatic continuation respect occupancy (#82).
+Villagers use each DAT task variant's gathering rate and carry capacity (#132),
+including hunter 0.41/s into 35 and farmer 0.53/s into 10, with variant-specific
+research effects. `src/sim/villager-gather.test.ts` checks actual collection and
+banking across all eight tasks, both rule modes, task switches, vanished carcasses
+and JSON replay; `tools/villager_gather_smoke.mts` checks hunter/farmer banked loads
+from real browser right-clicks. Whole-resource capacity rounding remains inferred.
+Resource-camp builders automatically gather nearby visible trees, gold/stone,
+or (mills) berries/free farms, respecting queued orders (#79); regression tests
+in `src/sim/build-gather.test.ts` cover selection, exclusions and actual banking.
+`tools/build_gather_smoke.mts` checks real right-click construction-to-gathering
+with imported content for all three camps. The AI retains active builders and
+tries its other existing placement lists when house/range locations fill up;
+the passive-opponent regression keeps its original 2400-second bound.
+The AI also resumes paid, unstaffed house foundations without spending wood
+again (#146), gives separate houses distinct workers, and keeps building orders
+out of its demolition force. Own `buildTargetId` in observation v2 distinguishes
+an approaching builder from abandonment; a rounded 100% foundation is still
+unfinished. `src/sim/ai-house-recovery.test.ts` covers recovery, assignment
+privacy and JSON replay; `tools/ai_house_recovery_smoke.mts` verifies the page's
+AI replaces a deleted builder and completes the same house with zero wood.
+AI drop-site planning rejects redundant nearby mills across the entire placement
+cycle, searches onward for distinct unserved patches, excludes fish from mill
+targets, and respects unfinished camps even when their progress rounds to 100%
+(#147). Useful closer lumber/mining camps remain eligible. Ten regressions in
+`src/sim/ai-camps.test.ts` cover these cases; `tools/ai_camps_smoke.mts` verifies
+the page AI completes a mill at the separate berry patch with wood still available.
 Upgrades replace active and waiting training entries as well as living units.
+Paid training queues can exceed available housing (#143); completed units wait
+at 100% without advancing the queue until their population cost fits. The HUD
+shows the owned housing message. `src/sim/population-training.test.ts` covers
+payments, refunds, housing completion, simultaneous producers and JSON replay;
+`tools/population_queue_smoke.mts` checks real Shift-click queueing, the blocked
+status, portrait cancellation and resumption after a house is built.
 
 **Board** (`src/sim/mapgen.ts`): the original's two primitives from the owned
 RMS scripts — cost-ordered clump growth and banded candidate scans — with
@@ -176,15 +229,17 @@ comparable because the board changed under them.
   local SLD decoder is byte-identical to openage's on all 29,783 frames it
   replaced; every modelled unit's stats match the DAT (487 values, 0
   mismatches, #36).
-- **Tests**: 453 vitest (≈150–210 s on six workers), 81 import tests, and the
+- **Tests**: 602 vitest, 82 import tests, and the
   browser smoke (`tools/debug_smoke.mjs`: a private server, real clicks and
   keys). Fidelity assertions skip without the owned content; the gate says
   how many skipped.
 
-Latest full working-tree gate: GREEN, `.local/tree-fog-gate.log`
-(2026-09-20), including the screenshot-driven #88 correction, #82/#84 and the
-waiting-only #140 count correction.
-Dedicated browser checks pass single-farmer group orders, live/fog-memory
+Latest full working-tree gate: GREEN, `.local/issue97-final-d1646.log`
+(2026-09-21, after moving Ubuntu to D:). The four issue-specific naval browser
+scenarios also passed in `.local/issue97-naval-final-d1659.log`: dock buttons
+and upgrades, boarding and shore unloading, fish-trap construction/income,
+and visible fire shots.
+Earlier dedicated browser checks cover single-farmer group orders, live/fog-memory
 minimap marker pixels, counted queues (imported and fallback), scorpions, and
 delayed tree-shadow texture arrival, complete visible/remembered canopies and
 visible shadow coverage against the owned mask and Default strength.

@@ -115,7 +115,7 @@ describe('one villager per farm (#82)', () => {
     const replay = JSON.parse(JSON.stringify(state)) as GameState;
     for (let i = 0; i < 200; i++) { stepGame(state); stepGame(replay); }
     expect(farmers(state, farm)).toHaveLength(1);
-    expect(100 - farm.amount!).toBe(3);
+    expect(100 - farm.amount!).toBe(5); // one farmer at the DAT's 0.53/s for 10 seconds
     expect(checksumState(state)).toBe(checksumState(replay));
   });
 });

@@ -3,6 +3,7 @@ import { isEntityVisible } from './visibility';
 import { isUnit } from './data';
 import type { Entity, GameState, PlayerId } from './types';
 import type { ObservedEntity, PlayerObservation, RememberedEntityObservation } from '../protocol/types';
+import { PROTOCOL_VERSION } from '../protocol/types';
 
 function observeEntity(entity: Entity, player: PlayerId): ObservedEntity {
   const observed: ObservedEntity = {
@@ -22,7 +23,13 @@ function observeEntity(entity: Entity, player: PlayerId): ObservedEntity {
     // Orders, activities, carried loads, and production stay hidden from opponents.
     observed.activity = entity.activity;
     observed.order = entity.order.kind;
-    if (entity.carrying) observed.carrying = { ...entity.carrying };
+    if (entity.order.kind === 'build') observed.buildTargetId = entity.order.targetId;
+    if (entity.carrying) {
+      // Task identity is simulation memory for a depleted target, not part of
+      // the public resource-load schema.
+      const { task, ...load } = entity.carrying;
+      observed.carrying = load;
+    }
     if (entity.garrison?.length) observed.garrisoned = entity.garrison.length;
     if (entity.training) {
       observed.training = {
@@ -66,7 +73,7 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
     explored.push(visibility.explored.slice(y * state.width, (y + 1) * state.width).join(''));
   }
   const observation: PlayerObservation = {
-    version: 1,
+    version: PROTOCOL_VERSION,
     time: Math.round(state.tick * TICK_SECONDS * 100) / 100,
     player,
     mapWidth: state.width,

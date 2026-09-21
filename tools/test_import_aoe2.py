@@ -525,14 +525,13 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertIn("Thumb Ring", skipped)
         self.assertIn("do not have it", skipped["Thumb Ring"])
         self.assertNotIn("Ballistics", skipped)
-        # The dock is imported, so its two fishing technologies are offered;
-        # its warship lines are listed with the DAT's own reason -- the Fast
-        # Fire Ship has no research location, the Galleon no effect.
+        # Heavy Warships is a research trigger: automatic children give the
+        # Galleon/fast-fire upgrades despite its own empty effect (#97).
         self.assertNotIn("Fishing Lines", skipped)
         self.assertIn("fishing-lines", self.result["technologies"])
         self.assertIn("gillnets", self.result["technologies"])
-        self.assertIn("no research location or no effect", skipped["Fast Fire Ship"])
-        self.assertIn("no research location or no effect", skipped["Galleon"])
+        self.assertIn({"from": "war-galley", "to": "galleon"}, techs["heavy-warships"]["upgrades"])
+        self.assertIn({"from": "fire-ship", "to": "fast-fire-ship"}, techs["heavy-warships"]["upgrades"])
         for reason in skipped.values():
             self.assertTrue(reason)
 
@@ -759,17 +758,19 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # A building whose Feudal picture is its Dark Age one has one list.
         self.assertEqual(list(entities["lumber-camp"]["damageStages"]), ["idle"])
         for key, entity in entities.items():
-            if entity["category"] == "building" and key != "farm":
+            if entity["category"] == "building" and _dat().civs[SPEC["civIndex"]].units[entity["id"]].building.can_burn:
                 self.assertIn("damageStages", entity, key)
         # The particles: six flipbooks of sixty frames from the fire atlas,
         # at half scale, the right-handed ones mirrored, cycling about three
         # seconds and fading in over three quarters of one.
         particles = self.result["particles"]
-        self.assertEqual(sorted(particles), [
+        fires = [
             "fire_large_left", "fire_large_right", "fire_medium_left",
             "fire_medium_right", "fire_small_left", "fire_small_right",
-        ])
-        for name, effect in particles.items():
+        ]
+        self.assertTrue(set(fires).issubset(particles))
+        for name in fires:
+            effect = particles[name]
             self.assertEqual(len(effect["frames"]), 60, name)
             self.assertEqual(effect["scale"], 0.5, name)
             self.assertEqual(effect["flipHorizontal"], name.endswith("_right"), name)
@@ -793,14 +794,22 @@ class ContentImportIntegrationTest(unittest.TestCase):
         for name in self.result["particles"]:
             effect = published["particles"][name]
             atlas = effect["atlas"]
-            self.assertEqual(atlas["framesInFile"], 60, name)
-            self.assertEqual(len(atlas["frames"]), 60, name)
+            source = self.result["particles"][name]
+            self.assertEqual(atlas["framesInFile"], len(source["frames"]), name)
+            self.assertEqual(len(atlas["frames"]), len(source["frames"]), name)
             self.assertTrue((manifest.parent / atlas["image"]).is_file(), name)
-            # Half scale of a 512 canvas: nothing taller than 256.
+            # Each flipbook keeps its own source canvas and scale. Building
+            # fires are 60 frames at half scale; the naval flame is not.
+            width = max(round(f["sourceW"] * source["scale"]) for f in source["frames"])
+            height = max(round(f["sourceH"] * source["scale"]) for f in source["frames"])
+            self.assertTrue(any(frame["w"] > 0 for frame in atlas["frames"]), name)
             for frame in atlas["frames"]:
-                self.assertLessEqual(frame["h"], 256, name)
-                self.assertLessEqual(frame["w"], 256, name)
-                self.assertGreater(frame["w"], 0, name)
+                self.assertLessEqual(frame["h"], height, name)
+                self.assertLessEqual(frame["w"], width, name)
+                if source["loop"]:
+                    self.assertGreater(frame["w"], 0, name)
+                else:
+                    self.assertGreaterEqual(frame["w"], 0, name)  # one-shot fades may include empty frames
             self.assertEqual(effect["cycleSeconds"], self.result["particles"][name]["cycleSeconds"])
         house = published["entities"]["house"]["atlases"]
         self.assertIn("idle-damage", house)
@@ -910,9 +919,8 @@ class ContentImportIntegrationTest(unittest.TestCase):
 
     def test_a_miss_lands_the_dat_dispersion_away(self):
         # Issue #45: the DAT states how far a shot that fails its accuracy
-        # roll lands from the aim. Everything that can miss carries it, and
-        # nothing that cannot does -- a 0 here would leave a shooter missing
-        # onto its own target.
+        # roll lands from the aim. Preserve what it states even at accuracy
+        # 100: the cannon galleon still carries dispersion 0.1 (#97).
         entities = self.result["entities"]
         for key in ("archer", "crossbowman", "arbalester", "skirmisher", "elite-skirmisher",
                     "cavalry-archer", "heavy-cavalry-archer", "longbowman", "elite-longbowman"):
@@ -927,7 +935,12 @@ class ContentImportIntegrationTest(unittest.TestCase):
             # shoots: it is the set-up unit's numbers that a shot carries.
             if combat["accuracyPercent"] < 100 and combat["attacks"] and key != "trebuchet":
                 self.assertIn("accuracyDispersion", combat, key)
-            if combat["accuracyPercent"] >= 100:
+            entity = entities[key]
+            civ = 0 if entity["category"] in ("resource", "animal") else SPEC["civIndex"]
+            spread = _dat().civs[civ].units[entity["id"]].type_50.accuracy_dispersion
+            if spread > 0:
+                self.assertEqual(combat["accuracyDispersion"], round(spread, 6), key)
+            else:
                 self.assertNotIn("accuracyDispersion", combat, key)
 
     def test_a_shot_flies_at_its_projectile_units_own_speed(self):
@@ -1018,8 +1031,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
         for key, entity in entities.items():
             if entity["category"] != "building":
                 continue
-            spec = next(e for e in SPEC["entities"] if e["key"] == key)
-            for age in age_variants(dat, spec["unitId"]):
+            for age in age_variants(dat, entity["id"]):
                 self.assertIn(f"idle-{age}", entity["animations"], f"{key} {age}")
                 checked += 1
         self.assertGreater(checked, 12)
@@ -1075,10 +1087,9 @@ class ContentImportIntegrationTest(unittest.TestCase):
         for key, entity in entities.items():
             if "decay" not in entity["animations"]:
                 continue
-            spec = next(e for e in SPEC["entities"] if e["key"] == key)
-            civ = 0 if spec.get("civ") == "gaia" else SPEC["civIndex"]
-            unit = dat.civs[civ].units[spec["unitId"]]
-            self.assertGreaterEqual(unit.dying_graphic, 0, key)
+            civ = 0 if entity["category"] in ("resource", "animal") else SPEC["civIndex"]
+            unit = dat.civs[civ].units[entity["id"]]
+            self.assertTrue(unit.dying_graphic >= 0 or unit.hit_points > 0, key)
 
         # And the importer refuses rather than quietly handing over the stump.
         from import_content import resolve_graphic_id
@@ -1317,6 +1328,27 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(set(rows["6"]), {1, 2, 23})
         self.assertEqual(set(rows["13"]), {1, 2, 23})
         self.assertEqual(set(rows["19"]), {1, 23})
+
+    def test_naval_composites_transport_and_trap_keep_owned_rules(self):
+        entities = self.result["entities"]
+        galley = entities["galley"]
+        self.assertEqual(galley["animations"]["idle"]["graphicId"], 4057)
+        self.assertEqual(galley["animations"]["idle-layer-1"]["graphicId"], 3937)
+        self.assertEqual(galley["animationLayers"]["idle"][1], {"animation": "idle-layer-1", "x": 0, "y": -13})
+        self.assertEqual(entities["transport-ship"]["transportCapacity"], 20)
+        self.assertEqual(entities["hulk"]["projectilesPerAttack"], 3)
+        self.assertTrue(entities["demolition-ship"]["selfDestruct"])
+        self.assertEqual(entities["demolition-ship"]["combat"]["blastRadius"], 3)
+        trap = entities["fish-trap"]
+        self.assertEqual(trap["foodAmount"], 700)
+        self.assertEqual(trap["build"]["builderId"], 13)
+        self.assertEqual(trap["age"], 1)
+        self.assertEqual(trap["corpseSeconds"], 60)
+        self.assertEqual(trap["animations"]["decay"]["graphicId"], 3150)
+        self.assertEqual(trap["animations"]["idle"]["alpha"], round(86 / 255, 4))
+        self.assertEqual(entities["fishing-ship"]["gather"]["trapFactor"], 1.45)
+        self.assertEqual(entities["cannon-galleon"]["requires"], ["chemistry"])
+        self.assertIn("flamethrower_flame", self.result["particles"])
 
     def test_scorpion_line_and_piercing_bolts_are_owned_content(self):
         entities = self.result["entities"]
