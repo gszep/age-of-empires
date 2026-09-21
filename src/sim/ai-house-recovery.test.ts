@@ -34,7 +34,7 @@ describe('AI house completion (#146)', () => {
   it('reports an own builder’s target over JSON, hides enemy assignments and clears stopped orders', () => {
     const { state, workers, house } = fixture();
     const own = JSON.parse(JSON.stringify(observe(state, 1)));
-    expect(own.version).toBe(3);
+    expect(own.version).toBe(4);
     expect(validateObservation(own)).toBe(true);
     expect(own.entities.find((e: Entity) => e.id === workers[0].id).buildTargetId).toBe(house.id);
     state.visibility[2].visible.fill(1);

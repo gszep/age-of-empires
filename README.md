@@ -109,6 +109,8 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 - From Feudal Age, select a fishing ship and use **Build Fish Trap** to place one on water. A trap costs **100 wood**, supplies **700 food**, and reserves one fishing ship while it gathers and banks at the dock. Rebuild an exhausted trap with another build order.
 - A **Trade Cog** trades with another player's dock and banks the gold at your own dock, like a trade cart's sea-going counterpart.
 - Shore fish spawn only beside beach tiles; start a new Islands match to apply placement changes to an older saved board.
+- Killed sheep and deer lose **0.25 food per game second**, and boar lose **0.4**,
+  even unattended. The example AI finishes one herd animal before killing the next.
 - Sheep join whoever walks up to them and then stand where they are: select them
   and walk them home like any other unit — a villager sent onto one works it with a shepherd's crook. Villagers hunt with a bow, so game that is walking away still gets shot: a deer startles only when something comes within a tile, hops a short way, and then grazes for a quarter of a minute. A boar charges whoever wounds it, arrow or not, so send more than one villager. Click a carcass to see how much food is left on it, and right-click any villager onto it to help eat it.
 - Gather food, wood, gold, and stone. Mills, lumber camps, and mining camps shorten the walk for the resources they accept; the town center takes all four. Farms keep food coming once the berries run out, and watch towers (stone) shoot on their own.

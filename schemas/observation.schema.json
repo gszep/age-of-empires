@@ -5,7 +5,7 @@
   "type": "object",
   "properties": {
     "version": {
-      "const": 3
+      "const": 4
     },
     "time": {
       "type": "number",
@@ -220,6 +220,10 @@
           },
           "buildTargetId": {
             "description": "Own builder's assigned foundation, including while approaching it.",
+            "type": "integer"
+          },
+          "gatherTargetId": {
+            "description": "Own gatherer's resource target, including travel and drop-off.",
             "type": "integer"
           },
           "kind": {

@@ -1,6 +1,6 @@
 import { TICK_SECONDS } from './data';
 import { isEntityVisible } from './visibility';
-import { isUnit } from './data';
+import { isAnimal, isUnit } from './data';
 import type { Entity, GameState, PlayerId } from './types';
 import type { ObservedEntity, PlayerObservation, RememberedEntityObservation } from '../protocol/types';
 import { PROTOCOL_VERSION } from '../protocol/types';
@@ -12,7 +12,7 @@ function observeEntity(entity: Entity, player: PlayerId): ObservedEntity {
     owner: entity.owner,
     x: Math.round(entity.position.x * 100) / 100,
     y: Math.round(entity.position.y * 100) / 100,
-    hp: Math.max(0, Math.ceil(entity.hp)),
+    hp: entity.dead ? 0 : Math.max(0, Math.ceil(entity.hp)),
     maxHp: entity.maxHp,
   };
   if (entity.resourceKind) observed.resource = entity.resourceKind;
@@ -24,6 +24,7 @@ function observeEntity(entity: Entity, player: PlayerId): ObservedEntity {
     observed.activity = entity.activity;
     observed.order = entity.order.kind;
     if (entity.order.kind === 'build') observed.buildTargetId = entity.order.targetId;
+    if (entity.order.kind === 'gather') observed.gatherTargetId = entity.order.targetId;
     if (entity.carrying) {
       // Task identity is simulation memory for a depleted target, not part of
       // the public resource-load schema.
@@ -57,7 +58,8 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
   const visibleIds = new Set<number>();
   const entities: ObservedEntity[] = [];
   for (const entity of state.entities) {
-    if (entity.dead || !isEntityVisible(state, player, entity)) continue;
+    if ((entity.dead && !(isAnimal(entity.kind) && (entity.amount ?? 0) > 0))
+      || !isEntityVisible(state, player, entity)) continue;
     visibleIds.add(entity.id);
     entities.push(observeEntity(entity, player));
   }

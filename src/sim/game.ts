@@ -1169,7 +1169,14 @@ function nextToWork(
     // Same kind first, then distance. Adding a whole range to everything else
     // orders the two groups without a second pass, and ids break exact ties so
     // two runs of the same match choose the same thing.
-    const key = d + (candidate.kind === was ? 0 : range + 1);
+    // Finish a carcass before opening another live animal. When the old one
+    // runs out, follow a fellow worker's next animal rather than each killing
+    // whichever member of the flock happens to be closest (#85).
+    const alreadyWorked = isAnimal(candidate.kind) && state.entities.some(worker =>
+      worker.owner === entity.owner && !worker.dead && worker.order.kind === 'gather'
+      && worker.order.targetId === candidate.id);
+    const herdPriority = isAnimal(candidate.kind) ? candidate.dead ? 0 : alreadyWorked ? 1 : 2 : 0;
+    const key = d + (candidate.kind === was ? 0 : 4 * (range + 1)) + herdPriority * (range + 1);
     if (key < bestKey - 1e-9 || (Math.abs(key - bestKey) <= 1e-9 && best && candidate.id < best.id)) {
       best = candidate;
       bestKey = key;
@@ -2707,6 +2714,13 @@ export function stepGame(state: GameState): void {
   for (const entity of [...state.entities]) {
     if (entity.dead) {
       entity.decayTicks = (entity.decayTicks ?? 0) - 1;
+      if (isAnimal(entity.kind) && (entity.amount ?? 0) > 0) {
+        const rate = state.rules.units[entity.kind].foodDecayPerSecond ?? 0;
+        const progress = (entity.foodDecayProgress ?? 0) + rate * TICK_SECONDS;
+        const spoiled = Math.floor(progress + 1e-9);
+        entity.foodDecayProgress = Math.max(0, progress - spoiled);
+        entity.amount = Math.max(0, entity.amount! - spoiled);
+      }
       continue;
     }
     if (isUnit(entity.kind)) {

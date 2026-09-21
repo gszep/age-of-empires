@@ -180,6 +180,8 @@ export interface UnitRules {
   minimapColor?: [number, number, number];
   /** Animals: the food their carcass holds. */
   foodAmount?: number;
+  /** Food lost per game second after death (live animal DAT resource_decay). */
+  foodDecayPerSecond?: number;
   /** Animals: how close a player's unit must come to claim a herdable. */
   herdRange?: number;
   /**
@@ -667,7 +669,7 @@ export const FALLBACK_RULES: GameRules = {
       datClass: 58,
       attacks: [], armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 0, attackReleaseSeconds: 0,
-      foodAmount: 100, herdRange: 2.5,
+      foodAmount: 100, foodDecayPerSecond: 0.25, herdRange: 2.5,
       fogVisibility: 1,
     },
     deer: {
@@ -677,7 +679,7 @@ export const FALLBACK_RULES: GameRules = {
       datClass: 9,
       attacks: [], armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 0, attackReleaseSeconds: 0,
-      foodAmount: 140,
+      foodAmount: 140, foodDecayPerSecond: 0.25,
       fogVisibility: 1,
       startle: { range: 1, distance: 1.5, restSeconds: [14, 20] },
     },
@@ -688,7 +690,7 @@ export const FALLBACK_RULES: GameRules = {
       attacks: [{ class: 4, amount: 7 }, { class: 29, amount: 4 }, { class: 8, amount: 3 }, { class: 30, amount: 8 }],
       armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }, { class: 24, amount: 0 }],
       attackReloadSeconds: 2, attackReleaseSeconds: 0,
-      foodAmount: 340,
+      foodAmount: 340, foodDecayPerSecond: 0.4,
       fogVisibility: 1,
     },
     skirmisher: {
@@ -1312,6 +1314,7 @@ interface ManifestEntity {
   selfDestruct?: boolean;
   projectilesPerAttack?: number;
   foodAmount?: number;
+  foodDecayPerSecond?: number;
   requires?: string[];
   gather?: { resource: ResourceKind; ratePerSecond: number; capacity: number; classFactors?: Record<string, number>; trapFactor?: number };
   dropSites?: number[];
@@ -1466,6 +1469,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       ...unit(key, fallback.trainedAt),
       popCost: 0,
       foodAmount: e[key]?.storage?.food ?? fallback.foodAmount,
+      foodDecayPerSecond: e[key]?.foodDecayPerSecond ?? fallback.foodDecayPerSecond,
       // A herdable is claimed by whoever comes within its sight: the rule is
       // the reference's (inferred), the distance is the DAT's line of sight.
       herdRange: fallback.herdRange === undefined ? undefined : e[key]?.lineOfSight ?? fallback.herdRange,

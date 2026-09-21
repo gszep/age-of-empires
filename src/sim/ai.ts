@@ -4,7 +4,7 @@ import { distance } from './nav';
 import type { PlayerObservation } from '../protocol/types';
 
 interface Spotted {
-  id: number; kind: string; owner: number; x: number; y: number;
+  id: number; kind: string; owner: number; x: number; y: number; hp: number;
   resource?: ResourceKind; node?: string; amount?: number; training?: unknown; researching?: unknown;
   buildProgress?: number; order?: string;
 }
@@ -236,6 +236,17 @@ export function exampleAiCommands(
     commands.push({ kind: 'order', player, entityIds: [worker.id], target: { x: house.x, y: house.y }, targetId: house.id });
   }
 
+  // One shared dinner, not the closest live sheep to each worker. Keep the
+  // carcass visible in the observation and keep an already assigned animal
+  // stable while workers walk or bank food. Promisory/gatherers.per likewise
+  // tracks current-livestock by id instead of inferring work from proximity.
+  const foodTargets = new Set(villagers.map(v => v.gatherTargetId));
+  const dinner = known.filter(e => HERD.includes(e.kind) && (e.amount ?? 0) > 0
+    && (e.hp <= 0 || e.owner === player))
+    .sort((a, b) => Number(a.hp > 0) - Number(b.hp > 0)
+      || Number(!foodTargets.has(a.id)) - Number(!foodTargets.has(b.id))
+      || (tc ? distance(a, tc) - distance(b, tc) : 0) || a.id - b.id)[0];
+  let dinnerAssigned = !!dinner && foodTargets.has(dinner.id);
   for (const [index, villager] of villagers.entries()) {
     if (villager.order !== 'idle' || constructionWorkers.has(villager.id)) continue;
     const wanted = ASSIGNMENT[index % ASSIGNMENT.length];
@@ -247,17 +258,17 @@ export function exampleAiCommands(
     const node = known
       .filter(e => e.resource === wanted && (e.amount ?? 1) > 0
         && e.node !== 'fish' && e.node !== 'shore-fish'
-        && (e.kind === 'resource' || HERD.includes(e.kind)
+        && (e.kind === 'resource' || e.id === dinner?.id
           || (e.kind === 'farm' && e.owner === player && (e.buildProgress ?? 1) >= 1)))
       // A claimed herdable first, as the reference opening eats sheep before
       // berries -- and since the map's distance bands became the original's
       // boxes, the near sheep can stand in a band corner a few tiles beyond
       // the berries, where "nearest food wins" left every one of them to rot.
       .sort((a, b) =>
-        Number(!(HERD.includes(b.kind) && b.owner === player))
-          - Number(!(HERD.includes(a.kind) && a.owner === player))
+        Number(a.id !== dinner?.id) - Number(b.id !== dinner?.id)
         || distance(villager, a) - distance(villager, b) || a.id - b.id)[0];
     if (node) {
+      if (node.id === dinner?.id) dinnerAssigned = true;
       commands.push({
         kind: 'order', player, entityIds: [villager.id],
         target: { x: node.x, y: node.y }, targetId: node.id,
@@ -292,26 +303,20 @@ export function exampleAiCommands(
     });
   }
 
-  // A claimed sheep is dinner nobody idle will come to: villagers busy on
-  // berries never re-decide, so a flock the scout claims in minute five would
-  // stand untouched for the whole match. Pull one food villager onto the
-  // nearest claimed herdable that nobody is standing at -- the observation
-  // does not say what a villager is working, so "somebody is at it" is the
-  // proximity test, and one pull per decision keeps this from retasking the
-  // whole economy at once.
-  const dinner = known
-    .filter(e => HERD.includes(e.kind) && e.owner === player && (e.amount ?? 0) > 0
-      && !villagers.some(v => distance(v, e) < 2.5))
-    .sort((a, b) => (tc ? distance(a, tc) - distance(b, tc) : 0) || a.id - b.id)[0];
+  // Redirect other shepherds to the same dinner, and recruit one forager if
+  // nobody has begun it. Do not keep killing a new sheep each decision while
+  // the original worker is walking home with a load (#85).
   if (dinner) {
-    const puller = villagers
-      .filter((v, index) => !constructionWorkers.has(v.id) && ASSIGNMENT[index % ASSIGNMENT.length] === 'food' && v.order === 'gather')
-      .sort((a, b) => distance(a, dinner) - distance(b, dinner) || a.id - b.id)[0];
-    if (puller) {
+    for (const [index, worker] of villagers.entries()) {
+      if (constructionWorkers.has(worker.id) || ASSIGNMENT[index % ASSIGNMENT.length] !== 'food'
+        || worker.order !== 'gather' || worker.gatherTargetId === dinner.id) continue;
+      const current = known.find(e => e.id === worker.gatherTargetId);
+      if (dinnerAssigned && !HERD.includes(current?.kind ?? '')) continue;
       commands.push({
-        kind: 'order', player, entityIds: [puller.id],
+        kind: 'order', player, entityIds: [worker.id],
         target: { x: dinner.x, y: dinner.y }, targetId: dinner.id,
       });
+      dinnerAssigned = true;
     }
   }
 
@@ -636,7 +641,7 @@ export function exampleAiCommands(
   // joined the raze, and five militia were left to chew through a town center
   // with two thousand four hundred hit points on their own.
   const enemySoldiers = observation.entities.filter(
-    e => e.owner !== 0 && e.owner !== player && e.kind !== 'villager' && !isBuilding(e.kind as EntityKind),
+    e => e.hp > 0 && e.owner !== 0 && e.owner !== player && e.kind !== 'villager' && !isBuilding(e.kind as EntityKind),
   );
   const enemyTcVisible = known.find(e => e.kind === 'town-center' && e.owner !== 0 && e.owner !== player);
 

@@ -148,6 +148,8 @@ export interface Entity {
   /** Corpse state: plays the death animation, then despawns. */
   dead?: boolean;
   decayTicks?: number;
+  /** Fraction of the next whole food unit spoiled on an animal carcass. */
+  foodDecayProgress?: number;
   /** Navigation. */
   path?: Point[];
   pathGoal?: Point;

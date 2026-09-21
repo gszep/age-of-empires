@@ -705,6 +705,9 @@ def extract_entity(
             entity["dropSites"] = drop_sites
 
     if category == "animal" and unit.bird is not None:
+        # Food on the killed animal drains at the live unit's rate. The
+        # dead_unit_id instead names the later corpse's type-12 lifetime.
+        entity["foodDecayPerSecond"] = rounded(unit.resource_decay)
         # How close something has to come before the animal reacts. The deer's
         # 1.0 is exactly the one tile the reference startles it at; the sheep's
         # 4.0 is the reach of a different behaviour, so which animals flee is a

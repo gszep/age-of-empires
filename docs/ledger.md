@@ -48,7 +48,8 @@ off the reference; **measured** — fitted to a reference screenshot;
 | Shift-click route: an unshifted order or Stop clears the route | rule | inferred | `game.ts` | — |
 | Delete confirmation | `hero_mode` bit 32 | owned (corrected from "buildings ask") | `data.ts` | — |
 | Auto-continue bound | 3 × line of sight, visible only | chosen; the human asked for "approximately their line of sight" | `game.ts` | — |
-| Carcass keeps its food; decay follows food, not time | rule | chosen at the human's request (reference rots by time) | `game.ts` | — |
+| Carcass food spoilage | sheep/deer lose 0.25 food/s, boar 0.4 after death, independent of gathering; fractional progress removes whole food units | rates **owned**: live Gaia DAT units 594/65/48 `resource_decay`, distinct from dead-unit type-12 lifetime. Whole-food accounting and starting decay immediately on death **chosen** integration with integer gathering. Corpse remains edible until empty; existing corpse visual lifetime remains separate | `import_content.py`, `data.ts`, `game.ts` | #85 |
+| Coordinated herd feeding | AI chooses one known edible animal: carcass first, then an already assigned animal, then nearest home/id; automatic same-kind continuation prefers carcasses and already assigned animals within its existing visible bound | **human-requested** one-at-a-time policy in #85. Owned `Promisory/gatherers.per` 3753–3812 tracks current/next livestock and directs 1–7 shepherds to current livestock (8+ may use next); our single-target policy, rankings and corpse observation v4 are **chosen**, not a full import of that strategy. Own gather target IDs are public only to their owner | `ai.ts`, `observe.ts`, `game.ts` `nextToWork` | #85 |
 | A claimed sheep stands still | rule | chosen at the human's request (reference follows) | `game.ts` | #136 |
 | Corpse window, fallback rules only | 3 s | chosen | `game.ts` | — |
 | Animal think interval | 5 ticks | chosen | `game.ts` `ANIMAL_INTERVAL` | — |

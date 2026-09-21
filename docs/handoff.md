@@ -118,8 +118,10 @@ import processes remain running.
 
 ### Contract changes
 
-The observation contract is **version 3**. Version 2 added own-only
+The observation contract is **version 4**. Version 2 added own-only
 `buildTargetId`; v3 adds naval kinds, `fish-trap` and the `unload` order.
+Version 4 adds own-only `gatherTargetId` and exposes visible edible carcasses
+with zero HP and remaining food (#85).
 `ungarrison.target` optionally names a transport's destination shore.
 Match configuration, result and recording formats remain **version 1**.
 See `docs/agent-runtime.md` and the JSON schemas. Enemy build assignments stay

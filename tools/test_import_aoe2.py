@@ -620,6 +620,9 @@ class ContentImportIntegrationTest(unittest.TestCase):
             self.skipTest("no published manifest to check")
         published = json.loads(manifest.read_text())
         self.assertIn("technologies", published)
+        for animal in ("sheep", "deer", "boar"):
+            self.assertEqual(published["entities"][animal]["foodDecayPerSecond"],
+                             self.result["entities"][animal]["foodDecayPerSecond"])
         for key, tech in self.result["technologies"].items():
             self.assertIn(key, published["technologies"])
             self.assertEqual(published["technologies"][key], tech)
@@ -1469,6 +1472,11 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(entities["tree-oak"]["storage"], {"wood": 100})
         self.assertEqual(entities["town-center"]["collision"], [2.0, 2.0])
         self.assertTrue(entities["town-center"]["annexes"])
+
+    def test_animal_food_decay_uses_the_live_unit_not_the_corpse_clock(self):
+        for key, rate in (("sheep", 0.25), ("deer", 0.25), ("boar", 0.4)):
+            with self.subTest(animal=key):
+                self.assertEqual(self.result["entities"][key]["foodDecayPerSecond"], rate)
 
     def test_every_building_carries_armour_whether_or_not_it_fights(self):
         """Issue #26.

@@ -33,6 +33,8 @@ browser smoke and are maintained regression tools.
   and actual food gathering.
 - **`group_movement_smoke.mts`** — #83's real 25-unit ground right-click settles
   into a compact two-dimensional group with all arrivals rendered.
+- **`herd_food_smoke.mts`** — #85's AI eats one sheep, and an unattended carcass
+  loses food at the imported rate with real selection and the remaining-food HUD.
 - **`minimap_markers_smoke.mts`** — actual minimap pixels for live and remembered
   building dots, reveal parity, and the absence of a farm marker.
 

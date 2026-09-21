@@ -18,7 +18,13 @@ const tasks: [VillagerGatherTask, number, number][] = [
 ];
 
 function fixture(rules: GameRules, task: VillagerGatherTask) {
-  const state = createGame(132, rules);
+  // Measure collection/capacity independently of spoilage. #85 adds a second
+  // sink to animal food, exercised with real rates in herd-food.test.ts and
+  // the browser smoke; it must not masquerade as extra gathering here.
+  const state = createGame(132, { ...rules, units: { ...rules.units,
+    deer: { ...rules.units.deer, foodDecayPerSecond: 0 },
+    sheep: { ...rules.units.sheep, foodDecayPerSecond: 0 },
+  } });
   state.entities = state.entities.filter(e => e.owner !== 0);
   state.terrain = state.terrain.map(() => 0);
   const worker = state.entities.find(e => e.kind === 'villager' && e.owner === 1)!;

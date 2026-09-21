@@ -266,7 +266,8 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 - **Reduce workers before widening a test clock.** On 2026-09-21 two six-worker
   gates timed out in the existing full-match tests; the same tree passed with
   `VITEST_MAX_FORKS=3 VITEST_MAX_THREADS=3 tools/gate.sh`. Vitest's environment
-  overrides the configured ceiling. No fixture timeout needed changing.
+  overrides the configured ceiling. #85's full JSONL match subsequently needed
+  one worker for a contention-free gate. No fixture timeout needed changing.
 - **Managed restart loops are workload too.** Inspect `systemctl --user`
   state and `NRestarts`, not just a momentary process list: the shared host
   retried an incompatible checkpoint thousands of times while session-start

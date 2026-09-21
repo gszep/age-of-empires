@@ -129,6 +129,7 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | shared naval upgrades | research 35 has `effect_id = -1`; automatic techs 911 and 246 have no research location and sole prerequisite 35. Resolve their type-3 commands; do not discard the research or offer its child upgrades as separate buttons |
 | building construction / annexes | `unit.building.construction_graphic_id`, `unit.building.annexes` |
 | corpse / rubble / stump | `unit.dead_unit_id` — the unit whose `standing_graphic` is the decay art |
+| carcass food decay | live animal `unit.resource_decay`: Gaia sheep 594 and deer 65 = 0.25 food/s, boar 48 = 0.4. The `dead_unit_id` unit instead has type-12 lifetime storage at decay 1.0, not the food-loss rate |
 | player colour and contour | `dat.player_colours[i].player_color_base` (start of the eight-shade block in `original.pal`), `.minimap_color`, `.unit_outline_color` |
 | graphic playback | `graphic.file_name`, `.frame_count`, `.angle_count`, `.frame_duration`, `.mirroring_mode` |
 | a graphic with no unit behind it | `dat.graphics[*].name` — the gather-point flag is `WaypointFlag <Civ>` |

@@ -77,7 +77,8 @@ are imported; fire shots use the owned flame flipbook with an inferred binding.
 `src/sim/naval-units.test.ts` checks training, combat, research, cargo, trade and
 trap income under both rule modes; `tools/naval_units_smoke.mts` checks dock
 buttons/upgrades, real boarding/unload targeting, trap placement and visible
-fire shots. Observation v3 adds the naval kinds and unload order.
+fire shots. Observation v4 retains the naval kinds/unload order and adds own
+gather-target IDs plus edible carcasses (zero HP, remaining food).
 Fishing ships carry on to deep fish using footprint-aware clearance and remember
 their working position when a fish disappears during a dock trip (#87).
 `src/sim/fishing-continuation.test.ts` covers full/partial loads, another ship
@@ -229,13 +230,13 @@ comparable because the board changed under them.
   local SLD decoder is byte-identical to openage's on all 29,783 frames it
   replaced; every modelled unit's stats match the DAT (487 values, 0
   mismatches, #36).
-- **Tests**: 609 vitest, 83 Python/import tests, and the
+- **Tests**: 618 vitest, 84 Python/import tests, and the
   browser smoke (`tools/debug_smoke.mjs`: a private server, real clicks and
   keys). Fidelity assertions skip without the owned content; the gate says
   how many skipped.
 
-Latest full working-tree gate: GREEN, `.local/issues157-158-155-gate-r3.log`
-(2026-09-21, three Vitest workers; no fixture timeouts widened). The four issue-specific naval browser
+Latest full working-tree gate: GREEN, `.local/issue85-gate-r2.log`
+(2026-09-21, one Vitest worker; no fixture timeouts widened). The four issue-specific naval browser
 scenarios also passed in `.local/issue97-naval-final-d1659.log`: dock buttons
 and upgrades, boarding and shore unloading, fish-trap construction/income,
 and visible fire shots.
@@ -262,6 +263,17 @@ choice is still needed before that household match can run.
 The private two-browser shared smoke passed adoption, training, synchronization,
 reconnection and checkpoint restoration; a transient systemd probe recovered
 on its second attempt under the same restart policy.
+
+Herd food (#85): the AI shares one animal target and can see edible carcasses;
+automatic shepherd continuation finishes carcasses and follows an already chosen
+next animal. Sheep/deer spoil at the live DAT unit's 0.25 food/s, boar at 0.4,
+even when nobody gathers. The full cached import published those rates.
+`tools/herd_food_smoke.mts` verifies one AI sheep killed, a separately unattended
+carcass losing five food over twenty game seconds, real carcass selection, and
+the HUD showing 95 food. Regression tests cover automatic continuation without
+AI correction, hidden foreign carcasses, own-only target IDs and JSON replay.
+The older collection-rate fixtures explicitly disable spoilage to isolate
+collection/capacity; the new suite also accounts for both food sinks together.
 
 ## The reference's default zoom is 0.8 of ours
 

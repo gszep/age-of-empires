@@ -1,8 +1,8 @@
 import type { Activity, Command, EntityKind, Order, PlayerId, ResourceKind, UnitKind } from '../sim/types';
 import type { NodeKind } from '../sim/data';
 
-/** Player observation contract; v3 adds naval kinds and the unload order. */
-export const PROTOCOL_VERSION = 3;
+/** v4 exposes edible carcasses and own gather targets for coordinated food work. */
+export const PROTOCOL_VERSION = 4;
 /** Commands, match configuration and recordings retain their v1 formats. */
 export const MATCH_FORMAT_VERSION = 1;
 
@@ -23,6 +23,8 @@ export interface ObservedEntity {
   order?: Order['kind'];
   /** Own builders only, including those still walking to the foundation. */
   buildTargetId?: number;
+  /** Own gatherers only, including those walking to or banking from the node. */
+  gatherTargetId?: number;
   carrying?: { kind: ResourceKind; amount: number; node?: NodeKind };
   training?: { kind: UnitKind; remainingSeconds: number };
   /** What it is researching; own buildings only, like `training`. */
