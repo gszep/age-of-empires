@@ -1,208 +1,138 @@
-# Agent brief
+# Agent Brief
 
-Open Empires Lab: a deterministic, agent-native AoE2-compatible RTS slice.
-`README.md` covers play/commands; `docs/architecture.md` the design decisions;
-`docs/status.md` delivered scope and measurements; `docs/ledger.md` every
-value or rule that is approximated rather than read.
+Open Empires Lab is a deterministic TypeScript AoE2-compatible RTS slice. The
+browser and Node runners import the same simulation; Three.js is only a view.
 
-Start a work session with `tools/session_start.sh`: it prints the tree's
-state, the gate's last result, the manifest's age, what is running, and the
-open issues in working order. **The GitHub issue tracker is the work queue**
-(`docs/backlog.md` says how it is used); bugs the human files outrank
-everything. Then read `docs/lessons.md` (rules, grouped by the moment they
-apply). An autonomous run follows `docs/overnight.md`'s standing rules, one
-verified item at a time. When you notice a gap, file an issue then and there;
-when you need a call only the human can make, file it as a `decision` and
-ask by number. Before ending a session, prune `docs/lessons.md` and
-`docs/status.md` to what is still true. These repo files and the tracker are
-the project's memory — do not rely on any external memory system.
+## Start Here
 
-## Non-negotiable boundaries
+- Run `tools/session_start.sh` first. It reports git divergence, gate/import
+  freshness, relevant processes, and the GitHub issue queue. The tracker is the
+  work queue: human-filed bugs first, then answered `decision` issues, then
+  enhancements. File newly discovered gaps with evidence instead of leaving
+  them only in prose (`docs/backlog.md`).
+- Read `docs/lessons.md` before working; its rules are grouped by the moment
+  they apply. Autonomous runs also follow `docs/overnight.md`, one verified and
+  pushed item at a time.
+- Use `README.md` for play and command coverage, `docs/architecture.md` for
+  boundaries, `docs/status.md` for delivered scope/evidence, and
+  `docs/ledger.md` for every approximation. Prune stale status/lessons at
+  handoff rather than only appending.
 
-- `src/sim` is authoritative. Rendering, UI, agents, and imported assets never
-  mutate game state directly.
-- **Downloaded-content first:** before hand-authoring any gameplay value,
-  visual, layout, icon, string, animation timing, or audio cue, inspect the
-  patch-matched owned DAT/RMS/AI/XS, `widgetui`, graphics, localization, and
-  sound metadata, and use the original local asset through a deterministic
-  importer wherever it exists. Approximate only what the downloaded files do
-  not represent, and record each approximation in `docs/ledger.md` in the
-  same commit — an inferred rule is written as inferred even when it looks
-  right. Do not disassemble `AoE2DE_s.exe`.
-- Keep the open fallback functional for users without the owned game, but do
-  not let its limitations lower the fidelity of the imported mode.
+## Hard Boundaries
+
+- `src/sim/` is authoritative. Rendering, UI, agents, debug tools, and imported
+  assets may issue public commands but never mutate game state directly.
+- Before inventing any rule, value, string, layout, visual, timing, icon, or
+  cue, inspect the patch-matched owned DAT/RMS/AI/XS, `widgetui`, graphics,
+  localization, shader resources, and sound metadata. Import original content
+  deterministically where it exists. Record unavoidable approximations or
+  remembered behavior as inferred in `docs/ledger.md` in the same change.
+- Do not disassemble `AoE2DE_s.exe`. Compiled shader resources under
+  `resources/_common/shaders/d3d11` may be inspected; `tools/probes/sm2dis.py`
+  handles their documented Shader Model 2 chunks.
+- Preserve the open fallback for users without owned content, but do not lower
+  imported-mode fidelity to match it. Desktop is canonical; mobile is remote
+  QA only.
 - Never commit Steam credentials, game files, converted Microsoft assets,
-  `.local/`, `.tools/`, or `public/imported/`.
-- Preserve the current Tailscale routes and Vite mobile URL. Never run
-  `tailscale serve reset`.
-- Desktop is the canonical play experience, matched closely to AoE2DE's
-  presentation; mobile is a secondary remote-QA surface only.
-- Do not copy GPL/AGPL code into this MIT repository.
-- Never rebase or rewrite commits that exist on `origin/main`.
+  `.local/`, `.tools/`, or `public/imported/`. Do not copy GPL/AGPL code into
+  this MIT repository.
+- Preserve the existing Tailscale routes and Vite mobile URL; never run
+  `tailscale serve reset`. Never rebase or rewrite commits on `origin/main`.
 
-## Quality gate for every checkpoint
+## Commands And Verification
 
 ```bash
-tools/gate.sh          # npm test, build, test:import, debug:smoke (browser)
+npm install
+npm run dev
+npx vitest run src/sim/naval.test.ts
+npx vitest run src/sim/naval.test.ts -t "works a fish"
+uv run --locked python -m unittest discover -s tools -p 'test_import_aoe2.py' -k test_a_sheet_that_fits_keeps_the_one_page_shape -v
+tools/gate.sh > .local/gate.log 2>&1
 ```
 
-Run it through that script rather than by hand, with its output to a file
-(`tools/gate.sh > .local/gate.log 2>&1`), never through a pipe. On GREEN it
-writes `.local/gate.ok`; a `PreToolUse` hook (`tools/hooks/guard_commit.sh`)
-refuses `git commit` while any changed non-Markdown file is newer than that
-sentinel, because the prose version of this rule let a red build into
-`origin/main` twice. A commit that touches only `.md` files needs no gate.
+- `npm run build` is the typecheck (`tsc --noEmit`) plus Vite build; there is no
+  separate lint or formatter task. Python dependencies are locked by `uv`; use
+  `uv run --locked`, never ad-hoc `pip` installs.
+- The checkpoint gate is exactly `npm test`, build, owned-content import tests,
+  then the real-browser debug smoke. Run `tools/gate.sh` directly with output
+  redirected to a file, never through a pipe. It writes `.local/gate.ok` only
+  on GREEN, stamped at gate start; any later non-Markdown edit invalidates it.
+  Markdown-only commits need no gate. Commit only green work and push each
+  commit; model-provider tests remain opt-in.
+- Vitest intentionally uses at most six workers, a 30 s test timeout, and a
+  macrotask yield after each test. CPU contention can otherwise report a worker
+  RPC failure after every assertion passed. Run the full gate on an idle host.
+- For long jobs, keep a PID/file handle and wait with
+  `tools/wait_for.sh pid|file|gone <target> [timeout]`; do not use `pgrep -f`,
+  `pkill -f`, bare `sleep`, or sleep loops. After starting or killing work,
+  inspect the process table because wrapper termination can leave children.
 
-Commit only when the gate is green, and always push after committing. Keep
-model-provider tests opt-in.
-
-## Facts you cannot infer from the code
-
-- **Hot reload boundary:** edits to `src/view/{world,sprites,hud,assets}.ts`
-  hot-swap into the running match; edits to `src/main.ts`, `src/sim/`,
-  `src/protocol/`, or `src/view/iso.ts` force a full page reload (the live
-  match still resumes via the dev-session snapshot).
-- **Mask atlases are white RGB + alpha** because the renderer multiplies
-  `material.color` through them. Packing any other colour breaks player
-  colours/shadows silently; `test_import_aoe2.py` guards this.
-- **WebGPU does not render in Node.** Automated visual checks go through the
-  dev server's debug protocol (below) against a real browser; headless Chrome
-  with SwiftShader works at ~4 fps.
-- **Depot layout:** importer reads `AOE2DE_DEPOT_ROOT` (default
-  `~/Steam/steamapps/content/app_813780`), the SteamCMD depot tree — not a
-  normal game install. Pinned depot/manifest IDs live in
-  `tools/aoe2-source.json`; setup guide in `docs/owned-assets-setup.md`.
-- **The manifest is three steps** — `import_content.py` writes
-  `content.json`, `convert_sld.py` builds `manifest.json` from it,
-  `import_blends.py` adds `blends` — and re-running one step alone has
-  shipped a manifest with no shore twice. `tools/import_aoe2.sh` runs all
-  of them.
-- **The projection has AoE2's handedness since 2026-09-19:** +x runs
-  down-left on screen, +y down-right (`src/view/iso.ts`). Anything that
-  turns a tile direction into a screen direction -- the minimap's mapping,
-  a facing into a sprite frame, the blend-mask neighbour table, which tile
-  corner is east, the water's world frame, the surveyed boards' transpose
-  -- is listed in `docs/status.md` "The projection has AoE2's handedness".
-  To verify a change to any of it: mirror an earlier screenshot and set the
-  new one beside it -- layout must land on the mirror to the tile, sprites
-  must not be mirrored.
-- **Two frames, not one:** the tile frame and the shader's world frame. A
-  DAT field stated in tiles (footprints, gate axes, RMS) is in the first;
-  `water_def.json`'s `sun_direction` and `mapScale` are in the second,
-  which is the tile frame with x mirrored: the eye looks along world
-  (1, -1), the sun lies beyond the surface on that line, and a position is
-  normalised by the map before `mapScale` divides it (`water.ts`).
-- **The reference's text is a signed distance field atlas**
-  (`fonts/combined.txt`): Georgia Regular's glyph boxes drawn heavy, with
-  lining digits Georgia 2.05 lacks. The HUD approximates it as Georgia Bold
-  at 0.70 x PointSize with Palatino's digits (#92); fit a face by rendering
-  candidates over the reference crop at the same pixel scale, never by
-  width alone.
-- **A dev-session snapshot is declined when the URL fixes a map or seed**
-  (`src/dev-session.ts`): a probe that hands the page a staged state must
-  open the bare URL.
-- **The compiled shaders are readable:** `strings` on a `.so` under
-  `resources/_common/shaders/d3d11` names its inputs, and its `Aon9` chunk
-  is a Shader Model 2 build whose token stream is documented -- that is how
-  the water's colour formula was read. They are resources, not the
-  executable, which stays off limits.
-- **The atlas cache is keyed on the decoder's source:** `sld_layers.py` and
-  the `convert`/`convert_mask`/`page_path`/`save_pages` functions in
-  `convert_sld.py`. Any edit to those re-decodes every sprite — 57 minutes
-  for the pack's x2 on four workers (`--jobs`), masks included; editing the
-  manifest dict or anything else in the converter does not. Batch decoder
-  edits, and never restart the run.
-- **Sprites come from the Enhanced Graphics Pack when depot `1039811` is
-  beside the base depots** (`tools/depot.py`): every `source` is then a
-  `_x2.sld` at `scale` 2, drawn at half size, and a sheet over 8192 px
-  continues on `pages`. A test that names a source file uses the suite's
-  `sld(stem)`; a probe that reads a frame's box divides by `atlas.scale`.
-- **A tester's tab goes stale across re-imports:** the manifest is fetched
-  once per load. After regenerating `public/imported/`, ask for a reload
-  before investigating a report from an old tab.
-- **DAT field navigation:** see the genieutils cheat-sheet in
-  `tools/README.md` before touching `import_content.py` — do not guess
-  attribute names. When the sheet lacks a field, ask the DAT itself:
-  `uv run --locked python tools/datq.py fields|get|grep <expr>`,
-  then extend the sheet.
-
-## Visual debug protocol
-
-With `npm run dev` running and the game open in a browser (or headless
-Chrome), the dev server exposes a text-based window into the live match:
-
-```bash
-curl -s localhost:5173/__debug -d '{"type":"sim"}'                # tick, resources, entity counts
-curl -s localhost:5173/__debug -d '{"type":"entities","owner":2}' # positions, activity, screen boxes, frames
-# `entities` also reports `amount`/`resourceKind` (what is left on a node or a
-# carcass) and `frame` (the sprite index actually drawn); `sim` reports
-# `selected` and `flashTarget` (whose marker is blinking as the last order's
-# target) — a variant or highlight question is a field to read rather than a
-# screenshot to squint at.
-curl -s localhost:5173/__debug -d '{"type":"entities","dead":true}'  # corpses too
-curl -s localhost:5173/__debug -d '{"type":"pixels","entity":12}' # real rendered colours under an entity
-curl -s localhost:5173/__debug -d '{"type":"pixels","rect":[0,0,400,300],"match":"#0000ff","tolerance":8}'  # + count of one colour
-curl -s localhost:5173/__debug -d '{"type":"edge","from":[100,400],"to":[500,400]}'  # 10-90% width of a luminance edge
-# every pixel reply names its colour space; compare in that space or not at all
-curl -s "localhost:5173/__debug/screenshot?x=0&y=0&w=800&h=600" -o shot.png
-```
-
-The same endpoint plays the match, so a state that only exists once someone
-acts — a trained unit, a rally flag, a corpse — can be reached without a
-human. Commands go through `applyCommand`, the public entry every strategy
-uses, so nothing here reaches a state a player could not:
-
-```bash
-curl -s localhost:5173/__debug -d '{"type":"command","command":{"kind":"train","player":1,"buildingId":1,"unit":"villager"}}'
-curl -s localhost:5173/__debug -d '{"type":"select","ids":[1]}'   # what the HUD shows
-curl -s localhost:5173/__debug -d '{"type":"look","entity":12}'   # centre the camera
-```
-
-Two things about this endpoint that will waste an afternoon otherwise. It
-broadcasts to **every** page attached to the dev server and answers with
-whichever replies first, so a browser tab somebody left open on 5173 answers
-from its own match — for anything you intend to *measure*, start a private Vite
-server on its own port and open the only page attached to it (pass `root` and
-`configFile` to `createServer`, or it takes the working directory as the
-project and serves a 404). And `entities` returns at most 200 matches, which on
-a 120x120 map is well short of gaia's resources.
-
-`pixels` returns mean colour, a dominant-colour histogram and a matched
-count read back from the actual canvas; `edge` the softness of a contour.
-Verify rendering with them, against the reference crops in
-`.local/reference/` (`tools/probes/README.md` says what each is and at what
-scale) — three of the human's screenshots settled six defects that my own
-metrics had passed. **A failing number is never overruled by a picture**: a
-screenshot may add to a passing measurement, not replace a failing one.
-Use the PNG endpoint only when geometry genuinely needs eyes.
-
-## Working style
+## Working Style
 
 - Complete one playable behaviour end to end before broadening content. A
-  production building without its trainable unit, or a mechanic without its
-  feedback, is not complete — finish it or file the gap as an issue.
-- On a broad mandate, first turn it into an explicit checklist with a
-  verification step per item; report unmet items rather than stopping quietly.
-- Add tests for timing, state transitions, hidden information, replay
-  determinism, protocol compatibility, and prior regressions — and for any
-  convention that can fail silently. Do not test trivial getters or constants.
-- One way to wait: start the job with a handle (`run_in_background`, or
-  `job & echo $! > .local/job.pid`) and `tools/wait_for.sh pid|file|gone
-  <target> [timeout]`. `tools/hooks/guard_bash.sh` refuses `pgrep -f`,
-  `pkill -f`, bare `sleep` and `until`/`while … sleep` loops — each recurred
-  for three weeks with the rule written down. List processes with
-  `ps -eo pid,etime,args | grep <name>`. A run that started background work
-  ends with a hygiene pass from the process table: kill the litter, name
-  what deliberately survives.
-- In interactive sessions, verify lightly but always: before handing a change
-  over, run the tests that touch the changed code (the full gate still runs
-  at commit time), and first ask what the reference implementation actually
-  does — read the owned data, and search the internet when the owned files
-  do not answer. If still blocked on missing information, report it to the
-  human, who may provide it manually, rather than approximating.
+  production building needs its trainable unit, and a mechanic needs its
+  feedback; finish the missing part or file the gap as an issue.
+- Turn broad mandates into an explicit checklist with verification per item,
+  and report unmet items at handoff.
+- Before an interactive handoff, run the checks relevant to the changed code,
+  even when no commit is being made. The full gate still applies at commit time.
 - Prefer narrow maintained libraries over custom commodity infrastructure,
   fixture-tested before adoption (`docs/library-strategy.md`).
-- Keep documentation concise and current; delete superseded prose.
-- Continue autonomously unless blocked by credentials, legal ambiguity,
-  irreversible infrastructure changes, or a product decision with materially
-  different outcomes.
+
+## Imports
+
+- `npm run import:aoe2` is the only full regeneration entrypoint. It resolves
+  `AOE2DE_DEPOT_ROOT` (default SteamCMD app `813780` layout, not a normal game
+  install), then runs content, SLD, UI, blend, and optional audio import in the
+  required order. Never publish a manifest by running only one stage. Source
+  depot/manifest pins are in `tools/aoe2-source.json`; setup is in
+  `docs/owned-assets-setup.md`.
+- Before changing `import_content.py`, use the genieutils field table in
+  `tools/README.md`; do not guess attribute names. Query missing fields with
+  `uv run --locked python tools/datq.py fields|get|grep <expr>` and extend the
+  table. More than two or three questions should use one script because each
+  `datq.py` call reloads the DAT.
+- Editing `tools/sld_layers.py` or `convert`/`convert_mask`/`page_path`/
+  `save_pages` in `convert_sld.py` invalidates every atlas and costs about 57
+  minutes with four workers. Batch decoder edits and never restart a run before
+  checking the process table. `convert_sld.py --terrain-only` is only for a
+  terrain-slot change; otherwise run the full pipeline.
+- With depot `1039811` present, sprites use `_x2.sld` at manifest `scale: 2`
+  and draw at half size; sheets above 8192 px continue in `pages`. Probes must
+  divide frame boxes by `atlas.scale`, and source-name tests use the suite's
+  `sld(stem)` helper. The x2 import is about 5.5 GB, so watch memory during the
+  first browser smoke after art-size changes.
+- Tint masks must remain white/neutral RGB plus alpha because the renderer
+  multiplies material colour through them. Re-imported manifests are fetched
+  once per page load, so reload tester tabs before investigating stale art.
+
+## Rendering And Debugging
+
+- AoE2 handedness is `+x` down-left and `+y` down-right (`src/view/iso.ts`).
+  Direction-to-screen changes must also cover minimap mapping, sprite facing,
+  blend neighbours, tile corners, surveyed-map transpose, and water framing;
+  `docs/status.md` lists the full projection invariant. To verify a projection
+  change, compare against a mirrored earlier screenshot: layout must match to
+  the tile, while sprites themselves must not be mirrored.
+- Tile and shader-world frames differ. DAT footprints/gate axes/RMS use tile
+  space; water shader world space mirrors tile x. The eye is along world
+  `(1, -1)`, and water positions are normalized by map size before `mapScale`.
+- Edits to `src/view/{world,sprites,hud,assets}.ts` hot-swap. Changes to
+  `src/main.ts`, `src/sim/`, `src/protocol/`, or `src/view/iso.ts` require a
+  full reload; the dev-session snapshot restores the match. A URL containing
+  `?map=` or `?seed=` deliberately declines that snapshot.
+- WebGPU does not render in Node. Browser/render verification uses a real
+  browser through `/__debug`; headless Chrome uses SwiftShader. Probes and
+  measurements must start a private Vite server on a private port with explicit
+  `root` and `configFile`: the shared bridge broadcasts to every attached tab
+  and accepts whichever response arrives first. `entities` returns at most 200.
+- With a game page open, POST `{"type":"sim"}`, `{"type":"entities"}`,
+  `{"type":"pixels"}`, or `{"type":"edge"}` to `/__debug`; POST
+  `{"type":"command","command":...}`, `select`, or `look` to stage public
+  player actions. Use `/__debug/screenshot` only for geometry. Full examples
+  and probe-specific invariants are in `tools/probes/README.md`.
+- Pixel replies name their colour space; compare only in that space and at the
+  reference crop's scale. A screenshot may supplement a passing measurement,
+  never overrule a failing number. Reference captures and their settings are
+  indexed in `.local/reference/index.md`; current captures use the Enhanced
+  Graphics Pack.
