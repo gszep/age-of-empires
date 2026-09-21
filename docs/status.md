@@ -193,9 +193,8 @@ The screenshot-driven browser check measures opaque canopy pixels across F4,
 remembered-canopy brightness, and visible-ground shadow coverage against the
 owned mask. Final biome-specific grading/compositing is still #149.
 The human accepted this corrected presentation on 2026-09-20 (“ok, this is
-good”). The six issues completed in this session are included in the accepted
-checkpoint; `docs/handoff.md` records their verification and the pending
-shared-play rollout.
+good”). The acceptance evidence is recorded on #88 and in
+`tools/tree_fog_smoke.mts`; `docs/handoff.md` records current operational state.
 
 **Not drawn** (#149): DE's frame is composited offscreen through
 `CombineTerrainSpriteSMP` with bloom, the biome's colour grade, vignette and
@@ -204,8 +203,8 @@ straight to the canvas. Nor the ground's scatter and layer (#55).
 
 ## Deliberately omitted
 
-Other civilisations (#122) and their bonuses (#123); formations; warships,
-transports and fish traps (#97); campaigns; public multiplayer;
+Other civilisations (#122) and their bonuses (#123); selectable formations;
+campaigns; public multiplayer;
 diplomacy; relics (#130); stone walls; a genetic-algorithm framework;
 separate mobile gameplay. Skipped technologies are recorded individually, each
 with its reason in the manifest's `skippedTechnologies` (#128). The open
@@ -230,12 +229,12 @@ comparable because the board changed under them.
   local SLD decoder is byte-identical to openage's on all 29,783 frames it
   replaced; every modelled unit's stats match the DAT (487 values, 0
   mismatches, #36).
-- **Tests**: 622 vitest, 84 Python/import tests, and the
+- **Tests**: 624 vitest, 84 Python/import tests, and the
   browser smoke (`tools/debug_smoke.mjs`: a private server, real clicks and
   keys). Fidelity assertions skip without the owned content; the gate says
   how many skipped.
 
-Latest full working-tree gate: GREEN, `.local/issue86-gate.log`
+Latest full working-tree gate: GREEN, `.local/issue120-gate.log`
 (2026-09-21, one Vitest worker; no fixture timeouts widened). The four issue-specific naval browser
 scenarios also passed in `.local/issue97-naval-final-d1659.log`: dock buttons
 and upgrades, boarding and shore unloading, fish-trap construction/income,
@@ -283,6 +282,13 @@ and wins at 1813.05 before building its smith. The private browser fixture
 starts the AI with only 125 wood and verifies a completed, rendered, selectable
 blacksmith by tick 2672. Four regressions cover saving, construction completion,
 urgent housing and releasing the reserve; broader later-age strategy remains #124.
+
+Corpse resight (#120) uses the simulation's existing corpse countdown to recover
+death age, including from old JSON saves. A recreated view resumes the correct
+death frame or corpse stage; a paused match cannot advance that clock. Tests
+cover resight, reload and mid-death frames. The imported browser check moves a
+scout out of and back into sight, verifies the old view was removed, and reads
+`villager-female/decay` both before and after resight without replaying the death.
 
 ## The reference's default zoom is 0.8 of ours
 

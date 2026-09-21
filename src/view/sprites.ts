@@ -3,7 +3,7 @@ import { materialColor, materialOpacity, texture as textureNode, vec2 } from 'th
 import { skinnedKey } from './skins';
 import { atlasPage, spriteTexture, type ContentAssets, type Atlas, type AnimationInfo, type ImportedEntity } from './assets';
 import { isAnimal, isBuilding, isUnit } from '../sim/data';
-import { swingSeconds } from '../sim/game';
+import { corpseAgeSeconds, swingSeconds } from '../sim/game';
 import { createTerrainPatch, elevationAt, ELEVATION_PIXELS, elevatedWorldToIso, FOG_EXPLORED } from './world';
 import { groundLayerOrder } from './render-order';
 import { worldToIso, isoDepth, TILE_H } from './iso';
@@ -81,7 +81,7 @@ export interface EntityView {
    * carcass's stage of rot — is a field to read rather than a picture to
    * squint at. */
   frameIndex?: number;
-  /** When this entity was first seen dead, so the corpse chain can advance. */
+  /** Legacy fallback for staged entities without the simulation's corpse clock. */
   diedAt?: number;
   facing: number; // radians, world space
   lastPosition?: { x: number; y: number };
@@ -946,13 +946,17 @@ export function updateEntityView(
   // What is left behind is a chain in the DAT: the dying graphic plays once,
   // then the dead unit's own art lies there — a corpse rotting, a felled tree
   // reduced to its stump. Switch when the first has played out.
+  let deathElapsed: number | undefined;
+  let dyingSeconds = 0;
   if (entity.dead) {
     view.diedAt ??= time;
     const dying = imported?.animations[choice.name]
       ?? imported?.animations[ageChain(state, entity, 'death').find(name => imported.animations[name]) ?? 'death'];
     const played = dying ? dying.frames * dying.frameSeconds : 0;
+    dyingSeconds = played;
+    deathElapsed = corpseAgeSeconds(state, entity) ?? time - view.diedAt;
     const decay = ageChain(state, entity, 'decay').find(name => imported?.atlases[name]);
-    if (decay && time - view.diedAt >= played) choice.name = decay;
+    if (decay && deathElapsed >= played) choice.name = decay;
   } else {
     view.diedAt = undefined;
   }
@@ -1013,7 +1017,8 @@ export function updateEntityView(
     view.animationState = stateKey;
     view.animationStartedAt = time;
   }
-  const elapsed = time - (view.animationStartedAt ?? time);
+  const elapsed = deathElapsed === undefined ? time - (view.animationStartedAt ?? time)
+    : choice.name.startsWith('decay') ? Math.max(0, deathElapsed - dyingSeconds) : deathElapsed;
 
   let frameIndex: number;
   if (entity.kind === 'palisade-wall' && choice.name === 'idle') {
@@ -1038,15 +1043,15 @@ export function updateEntityView(
     const directionsInFile = Math.max(1, Math.floor(atlas.framesInFile / framesPerDirection));
     const direction = directionIndex(view.facing, animation.directions) % directionsInFile;
     const frameSeconds = animation.frameSeconds > 0 ? animation.frameSeconds : 0.1;
-    // A carcass rots by how much of it has been eaten rather than by the
-    // clock, so it is still recognisable while it is still worth gathering.
+    // Carcass art follows food left, whether gathered or spoiled, so it stays
+    // recognisable while it is still worth gathering.
     const eaten = choice.name === 'decay' ? decayFraction(state, entity) : undefined;
     let frameInDirection = eaten !== undefined
       ? Math.floor(eaten * framesPerDirection)
       : Math.floor((swing ?? elapsed) / frameSeconds);
     // Neither a death nor a corpse loops: both hold their last frame. Nor
     // does a swing the simulation is timing.
-    if (choice.name === 'death' || choice.name === 'decay' || swing !== undefined) {
+    if (choice.name.startsWith('death') || choice.name.startsWith('decay') || swing !== undefined) {
       frameInDirection = Math.min(frameInDirection, framesPerDirection - 1);
     }
     else frameInDirection %= framesPerDirection;

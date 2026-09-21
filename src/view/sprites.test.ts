@@ -803,6 +803,40 @@ describe('what a death leaves behind', () => {
     expect(view.shadow.mesh.visible).toBe(false);
   });
 
+  it('resumes a resighted or reloaded corpse at its simulation age, even before any view saw the death', () => {
+    const assets = corpseAssets();
+    const state = createGame();
+    const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    applyCommand(state, { kind: 'delete', player: 1, entityIds: [villager.id] });
+    run(state, 40); // two seconds: past this fixture's 1.5-second dying graphic
+    const restored = JSON.parse(JSON.stringify(state));
+    const corpse = restored.entities.find((e: Entity) => e.id === villager.id)!;
+    const view = createEntityView(assets, corpse);
+    updateEntityView(view, assets, restored, corpse, 200);
+    expect(view.animationState).toBe('villager/decay');
+    const resighted = createEntityView(assets, corpse);
+    updateEntityView(resighted, assets, restored, corpse, 500);
+    expect(resighted.animationState).toBe(view.animationState);
+    expect(resighted.frameIndex).toBe(view.frameIndex);
+  });
+
+  it('does not reset a partially played death or advance it while the simulation is paused', () => {
+    const assets = corpseAssets();
+    assets.entities.villager.animations.death = { frames: 4, directions: 1, frameSeconds: 0.25, mirroringMode: 0 };
+    const atlas = assets.entities.villager.atlases.death;
+    atlas.frames = Array.from({ length: 4 }, () => ({ ...atlas.frames[0] }));
+    atlas.framesInFile = 4;
+    const state = createGame();
+    const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    applyCommand(state, { kind: 'delete', player: 1, entityIds: [villager.id] });
+    run(state, 10);
+    const view = createEntityView(assets, villager);
+    updateEntityView(view, assets, state, villager, 100);
+    expect(view.frameIndex).toBe(2);
+    updateEntityView(view, assets, state, villager, 200);
+    expect(view.frameIndex).toBe(2);
+  });
+
   it('leaves nothing at all where a bush ran out', () => {
     // Issue #12: a spent bush briefly drew the generic tree stump, because the
     // spec asked for its `dead_unit_id` (415, STUMP -- the same unit the oak

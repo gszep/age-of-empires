@@ -15,7 +15,7 @@ import { buildingRulesFor, combine, unitRulesFor } from './rules';
 import { createVisibility, isEntityVisible, updateVisibility } from './visibility';
 import type {
   AnimalKind, BuildingKind, Command, Entity, GameState, PlayerId, Point, Projectile, ResourceKind,
-  UnitKind,
+  UnitKind, ReadonlyGameState, DeepReadonly,
 } from './types';
 
 
@@ -1284,6 +1284,20 @@ function armorsOf(state: GameState, entity: Entity): AttackValue[] {
  */
 const FALLBACK_CORPSE_SECONDS = 3;
 
+function corpseLifetimeTicks(state: ReadonlyGameState, entity: DeepReadonly<Entity>): number {
+  const rules = isBuilding(entity.kind)
+    ? state.rules.buildings[entity.kind]
+    : state.rules.units[entity.kind as UnitKind];
+  return Math.round(Math.max(rules?.corpseSeconds ?? FALLBACK_CORPSE_SECONDS,
+    rules?.deathSeconds ?? 0) * TICKS_PER_SECOND);
+}
+
+/** Death age survives view recreation and JSON saves in the existing corpse clock. */
+export function corpseAgeSeconds(state: ReadonlyGameState, entity: DeepReadonly<Entity>): number | undefined {
+  if (!entity.dead || entity.decayTicks === undefined) return undefined;
+  return Math.max(0, corpseLifetimeTicks(state, entity) - entity.decayTicks) * TICK_SECONDS;
+}
+
 function kill(state: GameState, entity: Entity): void {
   // Whoever was sheltering inside comes out as it falls, as the reference's
   // do from a razed town center or castle.
@@ -1300,14 +1314,7 @@ function kill(state: GameState, entity: Entity): void {
   entity.trainingQueue = undefined;
   // The DAT states how long a body lies there, on the corpse unit itself.
   // Never shorter than the death graphic, or the thing vanishes mid-fall.
-  const rules = isBuilding(entity.kind)
-    ? state.rules.buildings[entity.kind]
-    : state.rules.units[entity.kind as UnitKind];
-  const seconds = Math.max(
-    rules?.corpseSeconds ?? FALLBACK_CORPSE_SECONDS,
-    rules?.deathSeconds ?? 0,
-  );
-  entity.decayTicks = Math.round(seconds * TICKS_PER_SECOND);
+  entity.decayTicks = corpseLifetimeTicks(state, entity);
   clearPath(entity);
   if (isUnit(entity.kind) && state.rules.units[entity.kind].selfDestruct && entity.hp <= 0) {
     const combat = unitRulesFor(state, entity.owner, entity.kind);
