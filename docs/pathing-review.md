@@ -5,13 +5,20 @@ on the suspicion that it "likely relates to collision and building/unit/resource
 placement". This is that review: what was measured, what the reference practice
 is, what was changed, and what is still open.
 
-The short version: **the pathfinder is sound, and nine measurements failed to
-reproduce a defect.** One real cost was found and halved. What is missing is
-the case the report was written from — see "What is still open".
+At the time of this review, nine measurements did not reproduce the reported
+defect, and one measured cost was halved. These are historical measurements,
+not a current all-pass certificate.
+
+**2026-09-21 recheck:** the first probe's fixed seed-200 endpoints are now both
+blocked; tree #105 occupies its supposed open-ground goal (40.5,20.5). The
+walker becomes idle about one tile away, correctly failing the fixture's
+<0.6-tile arrival condition. Discover/assert clear terrain before reusing that
+metric. #83 separately reproduced and fixed the stationary separation line;
+its public-command and browser checks are recorded in `docs/status.md`.
 
 ## What was measured
 
-All figures from the imported rules on the current 120x120 board, in the
+Historical figures from the imported rules on the then-current 120x120 board, in the
 simulation with no browser. `tools/probes/pathing.ts` runs all nine; re-run it
 after anything that touches `nav.ts`, movement, or the cost of a tick.
 
@@ -116,8 +123,6 @@ Two known and recorded gaps sit next to it, neither of them the pathfinder:
   one free tile at a time leaves holes, so a wood reads as a blob with gaps
   rather than a solid mass. The pathfinder refuses to cut the corners between
   them; what is arguable is the shape of the wood.
-- **Units are nudged apart by separation** rather than reserving space, so a
-  crowd around one point settles into a ring 1.8 tiles wide rather than a
-  formation. AoE2 assigns each unit a slot in the group's destination. That is
-  a formation feature rather than a pathing one, and it has never been asked
-  for here.
+- **Units are nudged apart by separation** rather than reserving formation
+  slots. #83 now breaks collision ties in two dimensions and verifies compact
+  arrival; selectable formation geometry is still unimplemented.

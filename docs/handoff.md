@@ -91,10 +91,17 @@ unload commands remain. Match configuration/result/recording formats stay v1.
 spoilage accounting and herd/Feudal-building strategy policies. These are not
 claims of complete DE formation or AI equivalence.
 
-The historical `tools/probes/pathing.ts` first “open ground” case failed on the
-current generated board (seed 200, 4000 ticks, no arrival). Its hard-coded open
-ground precondition needs validation; evidence was added to **#5**. The remaining
-gap/courtyard checks passed and the ten-minute match had zero stuck ticks.
+The historical `tools/probes/pathing.ts` first “open ground” case has an invalid
+fixture on today's board: both endpoints are blocked and tree #105 occupies the
+goal (40.5,20.5). The walker correctly stops about one tile away. Evidence and
+the need to discover/assert clear fixtures are on **#5**; this non-arrival is not
+evidence of a new navigation regression. The remaining gap/courtyard checks
+passed and the ten-minute match had zero stuck ticks.
+`tools/morning_report.sh` still reads the old default gate and compares mixed-zone
+timestamp strings, omitting #83 from this run. **#159** records the defect.
+Direct GitHub date search confirmed all seven closures; the current gate record
+confirms the results above. Its timeout-diff count includes a new child-process
+timeout, not a widened existing fixture.
 The corpse visual fix does not address water/shore fidelity (#148/#113) or the
 blocked monk-outline decoder (#119).
 
