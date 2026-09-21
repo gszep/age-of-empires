@@ -35,6 +35,8 @@ browser smoke and are maintained regression tools.
   into a compact two-dimensional group with all arrivals rendered.
 - **`herd_food_smoke.mts`** — #85's AI eats one sheep, and an unattended carcass
   loses food at the imported rate with real selection and the remaining-food HUD.
+- **`ai_buildings_smoke.mts`** — #86's resource-constrained AI saves from 125
+  wood, completes a blacksmith, and renders a building the player can select.
 - **`minimap_markers_smoke.mts`** — actual minimap pixels for live and remembered
   building dots, reveal parity, and the absence of a farm marker.
 

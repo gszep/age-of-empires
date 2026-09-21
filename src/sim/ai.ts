@@ -465,6 +465,15 @@ export function exampleAiCommands(
   // arrived at minute eleven -- measured, on the real distance bands.
   const woodIsHandy = mine.some(e => e.kind === 'lumber-camp' && e.buildProgress === undefined)
     || (supply('wood').next().value?.walk ?? Infinity) <= CAMP_RANGE;
+  const range = mine.find(e => e.kind === 'archery-range');
+  const smith = mine.find(e => e.kind === 'blacksmith');
+  // Repeated 60-wood farms and extra 100-wood camps can spend every deposit
+  // before a newly unlocked military building becomes affordable (#86).
+  // Keep housing, first drop sites and the first farm available, but reserve
+  // the next range/smith's existing price against discretionary expansion.
+  const militaryWoodReserve = observation.age >= 1 && barracks
+    ? !range ? 175 : options.blacksmith !== false && !smith ? 150 : 0
+    : 0;
   for (const camp of CAMPS) {
     if (observation.wood < CAMP_COST_WOOD || !idleBuilder || !tc) continue;
     if (camp.resource !== 'wood' && !woodIsHandy) continue;
@@ -475,6 +484,7 @@ export function exampleAiCommands(
     // nineteen (also measured).
     if (camp.resource === 'gold' && !barracks) continue;
     const built = mine.filter(e => e.kind === camp.building);
+    if (built.length && observation.wood < CAMP_COST_WOOD + militaryWoodReserve) continue;
     if (built.length >= CAMPS_PER_RESOURCE) continue;
     // One of each until the barracks is up. Three camps and a mill is four
     // hundred wood, and a player who keeps buying them never saves the
@@ -507,7 +517,6 @@ export function exampleAiCommands(
   // twenty tiles from the nearest forest on a full-size map. (`woodIsHandy`
   // asks about a drop site near *known* wood, not the town center: a player
   // whose camp served a different wood once never built a barracks at all.)
-  const range = mine.find(e => e.kind === 'archery-range');
   if (!range && barracks && idleBuilder && observation.age >= 1 && observation.wood >= 175) {
     const spot = clearSpot(RANGE_SPOTS, 1.5) ?? clearSpot(BARRACKS_SPOTS, 1.5)
       ?? clearSpot(HOUSE_SPOTS, 1.5);
@@ -517,7 +526,6 @@ export function exampleAiCommands(
   // The blacksmith, after the range is up (Q2). Its lines arm the whole army
   // at once, and the strategy had never seen them: its wish list was three
   // technologies long against sixty-six researchable.
-  const smith = mine.find(e => e.kind === 'blacksmith');
   if (options.blacksmith !== false && !smith && range && idleBuilder
       && observation.age >= 1 && observation.wood >= 150) {
     // Any spot list will do -- on some boards the range's five candidates
@@ -562,7 +570,8 @@ export function exampleAiCommands(
   // a starving opening is not fatal; the rest afterwards.
   const mayFarm = barracks !== undefined || farms.length < 1;
   if ((!foodNearby || (observation.age >= 1 && foodShort)) && mayFarm && idleBuilder
-      && !farmsUnderway && farms.length < FARM_SPOTS.length && observation.wood >= 60) {
+      && !farmsUnderway && farms.length < FARM_SPOTS.length
+      && observation.wood >= 60 + (farms.length ? militaryWoodReserve : 0)) {
     const spot = clearSpot(FARM_SPOTS, 1.5);
     if (spot) build('farm', spot);
   }
@@ -630,7 +639,7 @@ export function exampleAiCommands(
     || observation.gold >= nextAge.gold + 100;
   if (
     range && (range.buildProgress ?? 1) >= 1 && !range.training && goldFree &&
-    observation.wood >= 25 && observation.gold >= 45 && headroom > 0
+    observation.wood >= 25 + militaryWoodReserve && observation.gold >= 45 && headroom > 0
   ) {
     commands.push({ kind: 'train', player, buildingId: range.id, unit: 'archer' });
   }

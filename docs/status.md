@@ -230,12 +230,12 @@ comparable because the board changed under them.
   local SLD decoder is byte-identical to openage's on all 29,783 frames it
   replaced; every modelled unit's stats match the DAT (487 values, 0
   mismatches, #36).
-- **Tests**: 618 vitest, 84 Python/import tests, and the
+- **Tests**: 622 vitest, 84 Python/import tests, and the
   browser smoke (`tools/debug_smoke.mjs`: a private server, real clicks and
   keys). Fidelity assertions skip without the owned content; the gate says
   how many skipped.
 
-Latest full working-tree gate: GREEN, `.local/issue85-gate-r2.log`
+Latest full working-tree gate: GREEN, `.local/issue86-gate.log`
 (2026-09-21, one Vitest worker; no fixture timeouts widened). The four issue-specific naval browser
 scenarios also passed in `.local/issue97-naval-final-d1659.log`: dock buttons
 and upgrades, boarding and shore unloading, fish-trap construction/income,
@@ -274,6 +274,15 @@ the HUD showing 95 food. Regression tests cover automatic continuation without
 AI correction, hidden foreign carcasses, own-only target IDs and JSON replay.
 The older collection-rate fixtures explicitly disable spoilage to isolate
 collection/capacity; the new suite also accounts for both food sinks together.
+
+AI Feudal construction (#86) now reserves wood against discretionary economic
+expansion and archer purchases. Fresh imported seeds 1/7 complete blacksmiths
+at 1300.2/1614.85 game seconds; before the change neither had a blacksmith by
+match end/the 1800-second probe cap. Seed 42 completes a range at 1570.2 seconds
+and wins at 1813.05 before building its smith. The private browser fixture
+starts the AI with only 125 wood and verifies a completed, rendered, selectable
+blacksmith by tick 2672. Four regressions cover saving, construction completion,
+urgent housing and releasing the reserve; broader later-age strategy remains #124.
 
 ## The reference's default zoom is 0.8 of ours
 
