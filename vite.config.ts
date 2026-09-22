@@ -1,5 +1,6 @@
 import type { Plugin } from 'vite';
 import { configDefaults, defineConfig } from 'vitest/config';
+import { gameCompression } from './tools/vite-compression';
 
 /**
  * Dev-only debug bridge: forwards HTTP requests on /__debug to the running
@@ -68,7 +69,7 @@ function gameDebug(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [gameDebug()],
+  plugins: [gameCompression(), gameDebug()],
   // Worktrees under .claude/ carry a full copy of the suite; collecting them
   // doubles every run and reports stale branches as if they were this tree.
   // A whole simulated match runs in a few seconds here, but the 5s default

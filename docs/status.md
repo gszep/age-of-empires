@@ -179,6 +179,17 @@ presentation and same-map recovery without scene rebuilding (#153).
 Artemis's local gateway serves its own assets while fetching code and
 match traffic from Ysgramor. See `docs/shared-play.md` for setup and evidence.
 
+Host HTTP modules now negotiate gzip/Brotli (#154); control routes and already
+compressed images are excluded, and the gateway preserves encoding headers.
+The 2,552,483-byte Three.js dependency transfers as 474,805 gzip / 445,736
+Brotli bytes, decoded byte-identically. On 2026-09-22 Artemis's direct private
+host probe completed Brotli in 14.0 s and gzip in 26.7 s; the uncompressed
+request timed out at 120 s after 2,209,922 bytes. These sequential network
+samples are variable-throughput observations, not a controlled speed ratio.
+`tools/compression_smoke.mts` verifies real cold/warm navigation and conditional
+304s; `tools/shared_smoke.mts` verifies commands, joins, reload and recovery
+through the local gateway with compression enabled.
+
 **Import** (`tools/`): patch-matched DAT rules, palettes, terrain, blend
 masks, overlay masks, water and foam atlases, widgets, fonts, strings,
 particles, hotkeys and audio through a byte-identical local pipeline
