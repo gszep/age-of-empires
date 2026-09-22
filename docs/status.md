@@ -310,6 +310,14 @@ runs). The large microbenchmark saving is not a claimed 20× match/FPS gain.
 Alternating board sizes, failed searches, cache-copy isolation, the maintained
 pathing measurements and the real 25-unit right-click smoke cover the change.
 
+Gatherers resolve their assigned target once per update (#167), reuse it for
+farm classification/capacity/depletion handling, and replace the local reference
+when reservation recovery redirects them. This removes full-array scans for
+ordinary non-farm targets. Against the workspace checkpoint, three-seed stepping
+fell 43.419 to 36.982 s and the full Windsor match 227.047 to 181.983 s; all
+recorded states stayed byte-identical. Existing economy regressions and actual
+deer/farm right-clicks verify 35/10 food banked and one-worker farm occupancy.
+
 The maintained open-ground pathing probe now discovers/asserts a clear
 20-tile corridor (#5) instead of using a seed-200 destination occupied by a
 tree. It reaches the goal in 485 ticks at a 0.97 travel ratio. The ten-minute

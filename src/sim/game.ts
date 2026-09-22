@@ -1359,18 +1359,22 @@ function kill(state: GameState, entity: Entity): void {
 function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'gather') return;
   const assignedId = entity.order.targetId;
-  const assignedFarm = state.entities.find(e => e.id === assignedId && (e.kind === 'farm' || e.kind === 'fish-trap'));
+  // Resolve the id once for this update. Searching for id AND farm kind scans
+  // the whole array for every ordinary tree/mineral gatherer (#167).
+  let assigned = state.entities.find(e => e.id === assignedId);
+  const assignedFarm = assigned && (assigned.kind === 'farm' || assigned.kind === 'fish-trap') ? assigned : undefined;
   if (assignedFarm && !farmAvailable(state, assignedFarm, entity)) {
     // Repair old snapshots before either gathering or banking. An incumbent's
     // load and progress are untouched; the duplicate keeps any carried food.
     const next = nearbyFreeFarm(state, entity, entity.position);
     if (!next) { becomeIdle(entity); return; }
     entity.order = { kind: 'gather', targetId: next.id };
+    assigned = next;
     entity.gatherProgress = 0;
     clearPath(entity);
   }
   const speed = unitRulesFor(state, entity.owner, entity.kind as UnitKind).speed;
-  const capacity = holdOf(state, entity);
+  const capacity = holdOf(state, entity, assigned);
   const carrying = entity.carrying;
 
   if (carrying && carrying.amount >= capacity) {
@@ -1387,9 +1391,7 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
     return;
   }
 
-  const targetId = (entity.order as { targetId: number }).targetId;
-  let node = state.entities.find(e => e.id === targetId
-    && (e.amount ?? 0) > 0 && (!e.dead || isCarcass(e)));
+  let node = assigned && (assigned.amount ?? 0) > 0 && (!assigned.dead || isCarcass(assigned)) ? assigned : undefined;
   if (!node) {
     // A full hold took the ship to a dock while its fish was swept away. Its
     // order still means this fishing ground, not whatever the dock can see.
@@ -1412,7 +1414,7 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
     // villager who emptied it, if its owner has asked for that and can pay
     // the wood. AoE2's own words for a farm are that it "must be rebuilt";
     // what the option removes is the clicking, not the cost (issue #24).
-    const fallow = state.entities.find(e => e.id === targetId && e.kind === 'farm');
+    const fallow = assigned?.kind === 'farm' ? assigned : undefined;
     if (fallow) {
       const sown = reseedFarm(state, entity, fallow);
       if (sown) {
@@ -1431,7 +1433,7 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
     // less than the walk to the drop site, so a lumberjack banked its load
     // and went idle at the camp with a wood all around it (issue #32). Both
     // memories therefore outlive the node itself.
-    const previous = state.entities.find(e => e.id === targetId);
+    const previous = assigned;
     const was = previous?.kind ?? entity.lastWorked;
     const wanted = carrying?.kind ?? previous?.resourceKind ?? entity.lastResource;
     node = wanted ? nextToWork(state, grid, entity, wanted, was) : undefined;
