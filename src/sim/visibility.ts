@@ -77,6 +77,11 @@ function remember(state: GameState, player: PlayerId, entity: Entity): void {
 }
 
 export function updateVisibility(state: GameState): void {
+  // The forget pass used to scan every entity for every remembered object.
+  // Keep this index local to the invocation, not to state.tick: a command can
+  // remove/claim an entity between visibility updates in the same tick (#165).
+  const livingById = new Map<number, Entity>();
+  for (const entity of state.entities) if (!entity.dead) livingById.set(entity.id, entity);
   for (const player of [1, 2] as PlayerId[]) {
     const visibility = state.visibility[player];
     visibility.visible.fill(0);
@@ -128,11 +133,10 @@ export function updateVisibility(state: GameState): void {
       const remembered = visibility.memory[Number(key)];
       const index = tileIndex(state, Math.floor(remembered.x), Math.floor(remembered.y));
       if (!visibility.visible[index]) continue;
-      const stillThere = state.entities.some(e => e.id === remembered.id && !e.dead);
-      if (!stillThere) delete visibility.memory[Number(key)];
+      const entity = livingById.get(remembered.id);
+      if (!entity) delete visibility.memory[Number(key)];
       else if (remembered.lastSeenAt !== state.tick) {
         // Seen tile but entity moved elsewhere invisible: drop the stale spot.
-        const entity = state.entities.find(e => e.id === remembered.id)!;
         if (!isEntityVisible(state, player, entity)) delete visibility.memory[Number(key)];
       }
     }

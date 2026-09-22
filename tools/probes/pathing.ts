@@ -10,10 +10,12 @@
  *   npx tsx tools/probes/pathing.ts
  */
 import { readFileSync, existsSync } from 'node:fs';
+import assert from 'node:assert/strict';
 import { FALLBACK_RULES, rulesFromManifest, type ContentManifest } from '../../src/sim/data';
 import { applyCommand, createGame, placementLegal, stepGame } from '../../src/sim/game';
 import { exampleAiCommands } from '../../src/sim/ai';
 import { observe } from '../../src/sim/observe';
+import { buildNavGrid, isBlocked } from '../../src/sim/nav';
 import type { Entity, GameState, Point } from '../../src/sim/types';
 
 const MANIFEST = 'public/imported/aoe2/manifest.json';
@@ -65,7 +67,25 @@ function walk(state: GameState, unit: Entity, to: Point, limit = 4000) {
 // 1. Open ground. A ratio near 1 means no detour and no dithering.
 {
   const state = createGame(200, rules);
-  const r = walk(state, putUnit(state, { x: 20.5, y: 20.5 }), { x: 40.5, y: 20.5 });
+  const grid = buildNavGrid(state, undefined, 1);
+  let corridor: { from: Point; to: Point } | undefined;
+  // The old hardcoded goal became a tree in the current generator (#5).
+  // Find a genuinely clear strip, including room for the walker's radius.
+  for (let y = 2; y < state.height - 2 && !corridor; y++) {
+    for (let x = 2; x < state.width - 22; x++) {
+      let clear = true;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 21; dx++) {
+        if (isBlocked(grid, x + dx, y + dy)) clear = false;
+      }
+      if (!clear || state.entities.some(e => !e.dead && e.position.x >= x - 1 && e.position.x <= x + 22
+        && Math.abs(e.position.y - (y + 0.5)) < 2)) continue;
+      corridor = { from: { x: x + 0.5, y: y + 0.5 }, to: { x: x + 20.5, y: y + 0.5 } };
+      break;
+    }
+  }
+  assert(corridor, 'the open-ground fixture needs a clear 20-tile corridor');
+  const r = walk(state, putUnit(state, corridor.from), corridor.to);
+  assert(r.arrived, 'a clear open-ground destination must be reached');
   console.log(`open ground:        ratio ${r.ratio.toFixed(2)}  ticks ${r.ticks}  arrived ${r.arrived}`);
 }
 
@@ -182,7 +202,7 @@ function walk(state: GameState, unit: Entity, to: Point, limit = 4000) {
   for (let tick = 0; tick < 12_000 && !state.winner; tick++) {
     if (tick % 100 === 0) {
       for (const player of [1, 2] as const) {
-        for (const command of exampleAiCommands(observe(state, player), player)) applyCommand(state, command);
+        for (const command of exampleAiCommands(observe(state, player))) applyCommand(state, command);
       }
     }
     stepGame(state);

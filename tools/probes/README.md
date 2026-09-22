@@ -65,6 +65,12 @@ browser smoke and are maintained regression tools.
 
 ## General probes
 
+- **`sim_performance.mts`** — record/compare path hashes and raw-JSON state
+  hashes every 1,000 ticks across three imported 12,000-tick AI matches. Run
+  `npx tsx tools/probes/sim_performance.mts record .local/sim-before.json`, then
+  `compare` after the optimization. Reports stepping/AI times without flaky
+  wall-clock assertions; use an idle host for measurements.
+
 - **`atlas_sharing.py`** — record/compare every sprite/particle PNG hash and
   non-URL manifest field before/after sharing. Run
   `uv run --locked python tools/probes/atlas_sharing.py record .local/atlas-before.json`,

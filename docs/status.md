@@ -288,6 +288,25 @@ the same single-worker settings and unchanged test limits after the earlier
 host-contention timeouts. The implementation and its documented approximations
 are included in the #96/#137 checkpoint.
 
+### Performance verification
+
+Fog-memory validation uses one invocation-local live-entity index instead of
+rescanning the entity array for each remembered record (#165). Three imported
+12,000-tick AI matches (seeds 3/7/19) produced identical raw-JSON state hashes
+at every 1,000-tick checkpoint. In paired profiled runs, stepping time fell
+from 16.629/15.976/17.482 s to 14.696/14.049/14.201 s (14% aggregate reduction).
+These are local measurements, not a frame-rate guarantee. Same-tick deletion,
+replacement, ownership and fog-resight regressions cover cache lifetime.
+`tools/probes/sim_performance.mts` records/compares the full traces; the real
+tree/fog browser test still preserves opaque canopy pixels and owned shadows.
+
+The maintained open-ground pathing probe now discovers/asserts a clear
+20-tile corridor (#5) instead of using a seed-200 destination occupied by a
+tree. It reaches the goal in 485 ticks at a 0.97 travel ratio. The ten-minute
+match probe records zero stuck ticks in 51,641 moving ticks; the other fixture
+results retain their reported wall counts rather than claiming a redesigned
+formation or generator.
+
 ### Earlier checkpoint measurements
 
 All on the 120x120 generated board unless stated; older figures are not
@@ -312,8 +331,8 @@ comparable because the board changed under them.
   keys). Fidelity assertions skip without the owned content; the gate says
   how many skipped.
 
-Latest green working-tree gate: `.local/issue137-gate-r3.log`
-(2026-09-22, one Vitest worker; no fixture timeouts widened). The four issue-specific naval browser
+The latest gate's actual log/status is recorded in `.local/gate.latest.json`
+and reported by `tools/session_start.sh`. The four issue-specific naval browser
 scenarios also passed in `.local/issue97-naval-final-d1659.log`: dock buttons
 and upgrades, boarding and shore unloading, fish-trap construction/income,
 and visible fire shots.
