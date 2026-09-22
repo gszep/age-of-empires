@@ -69,7 +69,9 @@ browser smoke and are maintained regression tools.
   hashes every 1,000 ticks across three imported 12,000-tick AI matches. Run
   `npx tsx tools/probes/sim_performance.mts record .local/sim-before.json`, then
   `compare` after the optimization. Reports stepping/AI times without flaky
-  wall-clock assertions; use an idle host for measurements.
+  wall-clock assertions; use an idle host for measurements. `MAP=windsor
+  SEEDS=3 TICKS=60000` exercises a full surveyed-map match (stops on victory);
+  use the same settings for record and compare.
 
 - **`atlas_sharing.py`** — record/compare every sprite/particle PNG hash and
   non-URL manifest field before/after sharing. Run

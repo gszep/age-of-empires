@@ -14,6 +14,11 @@ import { findPath } from '../../src/sim/nav.ts';
 const [mode, file] = process.argv.slice(2);
 assert(['record', 'compare'].includes(mode) && file, 'record|compare <baseline.json>');
 const rules = rulesFromManifest(JSON.parse(readFileSync('public/imported/aoe2/manifest.json', 'utf8')));
+const map = process.env.MAP ?? 'arabia';
+const seeds = (process.env.SEEDS ?? '3,7,19').split(',').map(Number);
+const ticks = Number(process.env.TICKS ?? 12_000);
+assert(seeds.every(Number.isSafeInteger) && Number.isSafeInteger(ticks) && ticks > 0);
+console.log(`map=${map} seeds=${seeds.join(',')} tick-limit=${ticks}`);
 const results: { paths: any[]; matches: any[] } = { paths: [], matches: [] };
 for (const size of [120, 392]) {
   for (const kind of ['short', 'unreachable']) {
@@ -38,11 +43,11 @@ for (const size of [120, 392]) {
     results.paths.push(result); console.log(JSON.stringify(result));
   }
 }
-for (const seed of [3, 7, 19]) {
-  const state = createGame(seed, rules);
+for (const seed of seeds) {
+  const state = createGame(seed, rules, undefined, map);
   const hashes = [];
   let stepMs = 0, aiMs = 0;
-  for (let i = 0; i < 12_000; i++) {
+  for (let i = 0; i < ticks && !state.winner; i++) {
     if (state.tick % 20 === 0) {
       const start = performance.now();
       for (const player of [1, 2] as const) for (const command of exampleAiCommands(observe(state, player))) applyCommand(state, command);
@@ -53,6 +58,7 @@ for (const seed of [3, 7, 19]) {
     stepMs += performance.now() - start;
     if ((i + 1) % 1000 === 0) hashes.push(createHash('sha256').update(JSON.stringify(state)).digest('hex'));
   }
+  if (state.tick % 1000 !== 0) hashes.push(createHash('sha256').update(JSON.stringify(state)).digest('hex'));
   const result = { seed, tick: state.tick, entities: state.entities.length, stepMs: Math.round(stepMs), aiMs: Math.round(aiMs), hashes };
   results.matches.push(result); console.log(JSON.stringify(result));
 }
@@ -62,5 +68,5 @@ else {
   const stable = (r: typeof results) => ({ paths: r.paths.map(({ ms, ...rest }) => rest),
     matches: r.matches.map(({ stepMs, aiMs, ...rest }) => rest) });
   assert.deepEqual(stable(results), stable(before), 'paths and raw-JSON full-state hashes must be byte-identical');
-  console.log('SIM PERFORMANCE PARITY GREEN: all path hashes and three 12,000-tick match traces are identical');
+  console.log(`SIM PERFORMANCE PARITY GREEN: all path hashes and ${seeds.length} match traces (limit ${ticks} ticks) are identical`);
 }

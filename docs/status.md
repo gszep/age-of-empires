@@ -300,6 +300,16 @@ replacement, ownership and fog-resight regressions cover cache lifetime.
 `tools/probes/sim_performance.mts` records/compares the full traces; the real
 tree/fog browser test still preserves opaque canopy pixels and owned shadows.
 
+A* reuses a bounded synchronous workspace and resets only visited cells (#166),
+preserving the f/h/tile total order. In paired profiled 392×392 short-route
+benchmarks, 2,000 uncached searches fell from 542 to 24 ms; exhaustive unreachable
+searches stayed comparable (345 to 327 ms). The three Arabia traces remain
+byte-identical. A full 392×392 Windsor match also retained every checkpoint and
+its terminal tick 34,231 / 5,735 entities (stepping 240.9 to 227.0 s in these
+runs). The large microbenchmark saving is not a claimed 20× match/FPS gain.
+Alternating board sizes, failed searches, cache-copy isolation, the maintained
+pathing measurements and the real 25-unit right-click smoke cover the change.
+
 The maintained open-ground pathing probe now discovers/asserts a clear
 20-tile corridor (#5) instead of using a seed-200 destination occupied by a
 tree. It reaches the goal in 485 ticks at a 0.97 travel ratio. The ten-minute

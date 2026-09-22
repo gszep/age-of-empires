@@ -262,6 +262,41 @@ export function findPath(grid: NavGrid, from: Point, to: Point): Point[] | undef
   return copyPath(path);
 }
 
+interface SearchWorkspace {
+  gScore: Float64Array;
+  parent: Int32Array;
+  closed: Uint8Array;
+  touched: Uint32Array;
+  used: number;
+}
+
+// Searches are synchronous and return independent waypoint objects. One
+// workspace per JS realm can therefore serve every grid/match; retaining only
+// the largest capacity bounds storage when matches alternate map sizes (#166).
+let workspace: SearchWorkspace | undefined;
+function prepareSearch(size: number): SearchWorkspace {
+  if (!workspace || workspace.gScore.length < size) {
+    workspace = {
+      gScore: new Float64Array(size).fill(Infinity),
+      parent: new Int32Array(size).fill(-1),
+      closed: new Uint8Array(size),
+      touched: new Uint32Array(size),
+      used: 0,
+    };
+  } else {
+    // A short walk on a 392x392 map should clear dozens of cells, not allocate
+    // and initialize two megabytes. Every discovered/closed cell is touched.
+    for (let i = 0; i < workspace.used; i++) {
+      const tile = workspace.touched[i];
+      workspace.gScore[tile] = Infinity;
+      workspace.parent[tile] = -1;
+      workspace.closed[tile] = 0;
+    }
+    workspace.used = 0;
+  }
+  return workspace;
+}
+
 function searchPath(grid: NavGrid, from: Point, to: Point): Point[] | undefined {
   const startTile = tileOf(from);
   const goal = nearestFreeTile(grid, to);
@@ -273,9 +308,8 @@ function searchPath(grid: NavGrid, from: Point, to: Point): Point[] | undefined 
     startTile.y = freeStart.y;
   }
   const size = grid.width * grid.height;
-  const gScore = new Float64Array(size).fill(Infinity);
-  const parent = new Int32Array(size).fill(-1);
-  const closed = new Uint8Array(size);
+  const scratch = prepareSearch(size);
+  const { gScore, parent, closed, touched } = scratch;
   const startIndex = index(grid, startTile.x, startTile.y);
   const goalIndex = index(grid, goal.x, goal.y);
 
@@ -293,6 +327,7 @@ function searchPath(grid: NavGrid, from: Point, to: Point): Point[] | undefined 
   // On a 32x18 board nobody could tell; on 120x120 one villager looking for a
   // way into a wood could cost a whole tick.
   const open = new Heap();
+  touched[scratch.used++] = startIndex;
   gScore[startIndex] = 0;
   open.push(startIndex, heuristic(startIndex), heuristic(startIndex));
   // The best the search actually reached, in case the goal is walled off.
@@ -323,6 +358,7 @@ function searchPath(grid: NavGrid, from: Point, to: Point): Point[] | undefined 
         if (closed[neighbor]) continue;
         const cost = gScore[current] + (dx !== 0 && dy !== 0 ? SQRT2 : 1);
         if (cost < gScore[neighbor] - 1e-9) {
+          if (gScore[neighbor] === Infinity) touched[scratch.used++] = neighbor;
           gScore[neighbor] = cost;
           parent[neighbor] = current;
           const h = heuristic(neighbor);

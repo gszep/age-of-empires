@@ -68,6 +68,31 @@ function insideAnyFootprint(state: GameState, point: Point, epsilon = 0.05): boo
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 
 describe('navigation compatibility suite', () => {
+  it('isolates search scratch across board sizes, failed searches and cached caller-owned paths', () => {
+    const board = (width: number, height: number): NavGrid => ({ width, height, blocked: new Uint8Array(width * height) });
+    const from = { x: 1.5, y: 1.5 }, to = { x: 8.5, y: 5.5 };
+    const small = board(12, 10);
+    const expected = findPath(small, from, to)!;
+    expect(expected.at(-1)).toEqual(to);
+    for (const [width, height] of [[392, 392], [9, 17], [120, 120], [4, 4]]) {
+      const sealed = board(width, height);
+      const x = width - 2, y = height - 2;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (dx || dy) sealed.blocked[(y + dy) * width + x + dx] = 1;
+      }
+      findPath(sealed, from, { x: x + 0.5, y: y + 0.5 }); // touches a broad frontier
+      const allBlocked = board(3, 3); allBlocked.blocked.fill(1);
+      expect(findPath(allBlocked, from, to)).toBeUndefined();
+      expect(findPath(board(12, 10), from, from)).toBeUndefined();
+      expect(findPath(board(12, 10), from, to)).toEqual(expected);
+      expect(findPath(small, from, to)).toEqual(expected); // result cache still owns a separate copy
+    }
+    const mutable = findPath(small, from, to)!;
+    mutable[0].x = -100;
+    mutable.shift();
+    expect(findPath(small, from, to)).toEqual(expected);
+  });
+
   it.each([10, 25])('a %i-unit ground order settles into a compact two-dimensional group', count => {
     const state = arena();
     state.entities = state.entities.filter(e => e.kind === 'town-center');
