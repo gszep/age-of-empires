@@ -1811,8 +1811,10 @@ const BUILDING_KINDS = new Set<string>([
   'palisade-wall', 'palisade-gate',
 ]);
 
-export const isUnit = (kind: EntityKind): kind is UnitKind => UNIT_KINDS.has(kind) || kind in NAVAL_RULES;
-export const isBuilding = (kind: EntityKind): kind is BuildingKind => BUILDING_KINDS.has(kind) || kind === 'fish-trap';
+// Resource nodes dominate surveyed boards and are neither actors nor buildings.
+// Reject that common case before probing general kind tables in hot loops.
+export const isUnit = (kind: EntityKind): kind is UnitKind => kind !== 'resource' && (UNIT_KINDS.has(kind) || kind in NAVAL_RULES);
+export const isBuilding = (kind: EntityKind): kind is BuildingKind => kind !== 'resource' && (BUILDING_KINDS.has(kind) || kind === 'fish-trap');
 const ANIMAL_KINDS = new Set<string>(['sheep', 'deer', 'boar']);
 export const isAnimal = (kind: EntityKind): kind is AnimalKind => ANIMAL_KINDS.has(kind);
 

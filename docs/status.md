@@ -318,6 +318,11 @@ fell 43.419 to 36.982 s and the full Windsor match 227.047 to 181.983 s; all
 recorded states stayed byte-identical. Existing economy regressions and actual
 deer/farm right-clicks verify 35/10 food banked and one-worker farm occupancy.
 
+Entity-kind guards reject the dominant `resource` case before general table
+lookups (#168). The same three-seed trace fell another 36.982 to 34.025 s, and
+Windsor 181.983 to 170.959 s, again with identical states. Across the recorded
+Arabia optimization sequence, stepping totals are 50.087 → 34.025 s (32%).
+
 The maintained open-ground pathing probe now discovers/asserts a clear
 20-tile corridor (#5) instead of using a seed-200 destination occupied by a
 tree. It reaches the goal in 485 ticks at a 0.97 travel ratio. The ten-minute
