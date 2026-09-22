@@ -32,6 +32,9 @@ browser smoke and are maintained regression tools.
 - **`atlas_sharing_smoke.mts`** — #162's ten-ship A/B with per-animation versus
   shared URLs: fewer decoded bytes/GPU textures, identical rendered PNG pixels
   and simulation hash. Internally rewrites legacy URLs to the same source bytes.
+- **`view_lifecycle_smoke.mts`** — #164's actual house-preview/cancel, restart
+  and reveal/retire cycles keep GPU geometry allocations bounded; same-seed
+  restart preserves pixels and simulation hash. Also run with `OPEN_FALLBACK=1`.
 - **`training_queue_smoke.mts`** — separate active unit plus counted waiting
   runs, source-scale 3/3/1 layout, refunds without interrupting the current
   unit, and fourteen waiting entries plus the active one. Also run with

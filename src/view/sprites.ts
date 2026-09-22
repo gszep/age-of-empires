@@ -906,7 +906,13 @@ function updateFarmView(
 ): void {
   const slot = entity.buildProgress !== undefined ? 'farm-construction' : 'farm';
   if (view.patchSlot !== slot) {
-    if (view.patch) { view.group.remove(view.patch); view.patch.geometry.dispose(); }
+    if (view.patch) {
+      view.group.remove(view.patch);
+      view.patch.geometry.dispose();
+      const material = view.patch.material;
+      if (Array.isArray(material)) material.forEach(entry => entry.dispose());
+      else material.dispose();
+    }
     // The north corner in world tiles, so the patch samples its texture by
     // absolute position like the ground does and two farms side by side are
     // not the same picture twice.

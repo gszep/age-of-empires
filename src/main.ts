@@ -203,7 +203,7 @@ function startReplay(raw: unknown): void {
   unloadShips = [];
   paused = false;
   hud.hideEnd();
-  for (const entityView of views.values()) scene.remove(entityView.group);
+  for (const entityView of views.values()) retireEntityView(entityView);
   views.clear();
   replay = {
     record,
@@ -357,7 +357,7 @@ function disposeGhost(): void {
     ghostFootprint = undefined;
   }
   if (ghostView) {
-    scene.remove(ghostView.group);
+    retireEntityView(ghostView);
     ghostView = undefined;
   }
   ghostKind = undefined;
@@ -1484,7 +1484,7 @@ function syncScene(time: number): void {
     // A herdable changes hands, and its player colour is bound into the view's
     // material when the view is built: a captured sheep needs a new one.
     if (entityView && entityView.owner !== entity.owner) {
-      scene.remove(entityView.group);
+      retireEntityView(entityView);
       entityView = undefined;
     }
     if (!entityView) {
@@ -1582,7 +1582,7 @@ function syncScene(time: number): void {
 
   for (const [key, entityView] of views) {
     if (!wanted.has(key)) {
-      scene.remove(entityView.group);
+      retireEntityView(entityView);
       views.delete(key);
     }
   }
@@ -1858,6 +1858,13 @@ function disposeObject(object: THREE.Object3D): void {
   });
 }
 
+/** Geometry/materials belong to this view; atlas and palette textures belong
+ * to ContentAssets and must survive for the next view using them (#164). */
+function retireEntityView(entityView: EntityView): void {
+  scene.remove(entityView.group);
+  disposeObject(entityView.group);
+}
+
 /** Recreate every view-owned object from the current simulation state. */
 function rebuildPresentation(): void {
   presentationRebuilds++;
@@ -1877,7 +1884,7 @@ function rebuildPresentation(): void {
   scene.add(fog.mesh);
   fog.update(game);
 
-  for (const entityView of views.values()) scene.remove(entityView.group);
+  for (const entityView of views.values()) retireEntityView(entityView);
   views.clear();
   disposeGhost();
 

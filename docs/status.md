@@ -221,6 +221,14 @@ ten-ship idle/attack browser A/B, decoded sprite residency fell from
 identical rendered sRGB PNGs and simulation hashes. `atlas_sharing_smoke.mts`
 recreates legacy URLs privately, so it also works with a fresh shared import.
 
+Retired entity/preview views dispose their own geometries and materials (#164),
+including ownership replacement, fog/view retirement, replay and presentation
+rebuilds. Shared atlas/palette textures survive. The real build-house/cancel
+and same-seed restart probe formerly grew GPU geometries by 3 per preview and
+19 per restart; it now stays at 38 in imported mode and 15 in open fallback.
+Repeated reveal/retire cycles also plateau. Recreated-world pixels and paused
+simulation hashes match; farm-patch replacement also releases its old material.
+
 Fog snapshots finish binding late sprite pages without changing their frozen
 pose or reading newer entity state (#88). In particular, a tree that leaves
 sight before its shadow sheet arrives no longer keeps a permanently missing
