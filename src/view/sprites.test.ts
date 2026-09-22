@@ -5,6 +5,7 @@ import { applyCommand, createGame, stepGame } from '../sim/game';
 import type { Entity, GameState } from '../sim/types';
 import { RAMP_LEVELS, rampLut, type AnimationInfo, type Atlas, type ContentAssets } from './assets';
 import { worldToIso } from './iso';
+import { SpriteResidency } from './sprite-residency';
 import { createFog, ELEVATION_PIXELS } from './world';
 import {
   PLAYER_COLORS, chooseAnimation, createEntityView, createFlagView, decayFraction, playerColorHex,
@@ -160,6 +161,32 @@ describe('late textures on frozen fog snapshots (#88)', () => {
     expect(view.shadow.pendingTexture).toBeUndefined();
     expect((view.body.mesh.material as THREE.MeshBasicMaterial).color.r).toBe(0.5);
     expect((view.body.mesh.material as THREE.MeshBasicMaterial).opacity).toBe(1);
+    // Frozen views must keep touching already-bound pages (#152), and rebind
+    // an evicted page without consulting the changed live tree.
+    let now = 0;
+    assets.spriteResidency = new SpriteResidency(assets.textures, () => now);
+    body.image = { width: 16, height: 12 };
+    shadow.image = { width: 16, height: 12 };
+    assets.spriteResidency.add('tree.png', body);
+    assets.spriteResidency.add('tree-shadow.png', shadow);
+    now = 130_000;
+    refreshEntityTextures(view, assets);
+    assets.spriteResidency.sweep();
+    expect(assets.spriteResidency.stats.evictions).toBe(0);
+    now += 130_000;
+    assets.spriteResidency.sweep();
+    expect(assets.spriteResidency.stats.evictions).toBe(2);
+    refreshEntityTextures(view, assets);
+    expect(view.body.mesh.visible).toBe(false);
+    const replacement = new THREE.Texture();
+    assets.textures.set('tree.png', replacement);
+    assets.textures.set('tree-shadow.png', new THREE.Texture());
+    refreshEntityTextures(view, assets);
+    expect((view.body.mesh.material as THREE.MeshBasicMaterial).map).toBe(replacement);
+    expect(view.body.mesh.visible).toBe(true);
+    expect((view.body.mesh.material as THREE.MeshBasicMaterial).color.r).toBe(0.5);
+    expect(view.animationState).toBe('tree-oak/idle');
+    expect(view.shadow.mesh.position).toEqual(position);
   });
 
   it('does not turn an intentionally empty shadow frame into a rectangle', () => {

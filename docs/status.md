@@ -14,9 +14,9 @@ for the human's current solo QA, or the same path through
 **https://ysgramor.tail6e864b.ts.net:5173/**. Removing `solo=1` joins the shared
 match. Artemis joins through its own **http://localhost:5174/** gateway.
 
-The managed shared host is currently stopped after a saved-checkpoint/rules
-mismatch (#158/#157); the saved match is preserved. The verification below
-used private servers and does not imply that shared deployment is running.
+The managed shared host was active at the 2026-09-22 autonomous-run preflight,
+with no restarts. Verification below uses private servers rather than the
+shared match.
 
 For a fresh standalone installation:
 
@@ -190,8 +190,13 @@ the base art's; sheets over 8192 px continue on pages. The base depots
 alone still import at x1. Sprite pages load on first use rather than all
 at start -- the pack's 1,839 sheets are 5.5 GB of PNG, and loading them
 up front took the machine down (WSL, 15 GB) -- so a sprite may be absent
-for a frame or two on its first appearance; nothing evicts a page once
-uploaded (#152). Every DE capture in the reference corpus was taken with
+for a frame or two on its first appearance. Unused pages now release both GPU
+textures and decoded images after two minutes, or after ten seconds under a
+512 MiB soft-budget pressure (#152). Current scene art (including frozen fog
+views) remains resident even above that budget; this is not a total-memory
+cap or camera-frustum streaming. `tools/sprite_residency_smoke.mts` verifies
+repeated walk/idle/evict/reload cycles, reduced GPU texture counts, unchanged
+paused pixels and simulation hashes. Every DE capture in the reference corpus was taken with
 the pack installed, so texture detail now compares like for like.
 
 Fog snapshots finish binding late sprite pages without changing their frozen

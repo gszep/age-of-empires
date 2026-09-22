@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { skinFamilies, type SkinFamily } from './skins';
+import { SpriteResidency } from './sprite-residency';
 
 /** A frame's box on its page, in the page's pixels; `page` indexes `Atlas.pages` and is absent on a one-page atlas. */
 export type Frame = { x: number; y: number; w: number; h: number; cx: number; cy: number; page?: number };
@@ -26,6 +27,7 @@ export function atlasPage(atlas: Atlas, frame: Frame): AtlasPage {
  * down, where a match draws a few dozen.
  */
 export function spriteTexture(assets: ContentAssets, image: string): THREE.Texture | undefined {
+  assets.spriteResidency?.touch(image);
   const texture = assets.textures.get(image);
   if (!texture) assets.loadTexture?.(image);
   return texture;
@@ -238,6 +240,8 @@ export interface ContentAssets {
   /** Starts fetching a sprite page that `textures` lacks; a page lands in
    * the map when decoded. Absent in the tests, which fill the map themselves. */
   loadTexture?: (image: string) => void;
+  /** Only lazy sprite pages; terrain, water and palette textures are pinned. */
+  spriteResidency?: SpriteResidency;
   playerColors?: PlayerColors;
   /** One 256-texel ramp per player, indexed by a sprite's own grey. */
   playerRamps: Map<number, THREE.DataTexture>;
@@ -357,6 +361,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   }>(`${CONTENT_BASE}manifest.json`);
   if (!manifest) return undefined;
   const textures = new Map<string, THREE.Texture>();
+  const spriteResidency = new SpriteResidency(textures);
   const loader = new THREE.TextureLoader();
   const jobs: Promise<void>[] = [];
   // Sprite pages load on demand (`spriteTexture`); this is what a miss starts.
@@ -395,7 +400,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
       // up in the player's ramp, so it must arrive as the byte the importer
       // wrote rather than as an sRGB colour to be decoded.
       if (/-playercolor(-p\d+)?\.png$/.test(image)) texture.colorSpace = THREE.NoColorSpace;
-      textures.set(image, texture);
+      spriteResidency.add(image, texture);
       failedAt.delete(image);
     }, error => {
       failedAt.set(image, performance.now());
@@ -512,7 +517,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     terrain, water: Object.keys(water).length ? water : undefined,
     shadows: manifest.shadows,
     foam: manifest.foam?.diag?.length ? manifest.foam : undefined,
-    textures, loadTexture, playerColors, playerRamps, blends, particles: manifest.particles,
+    textures, loadTexture, spriteResidency, playerColors, playerRamps, blends, particles: manifest.particles,
   };
 }
 

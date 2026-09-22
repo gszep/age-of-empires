@@ -87,6 +87,15 @@ off the reference; **measured** — fitted to a reference screenshot;
 
 ## View
 
+Sprite residency (#152): `sprite-residency.ts` uses a **chosen**, presentation-only
+512 MiB soft budget, 10-second warm grace, 120-second idle expiry and one-second
+sweep. These are application memory policy, not claimed DE runtime constants.
+The owned x2 manifest supplies page dimensions; a 22-building Castle Age fixture
+measured 1,073,946,240 decoded RGBA bytes across 84 pages. Current scene requests
+(including off-camera and remembered art) override the budget; terrain/water
+stay pinned. Reload uses the existing PNG loader, so returning expired art can
+be absent during its fetch/decode. Block-compressed upload remains future work.
+
 | What | Shipped as | Source | Where | Issue |
 |---|---|---|---|---|
 | Order-flash cadence and colour | 0.2 s on/off for 1.2 s, marker colour | chosen; `unit_selection_color_1/2` hold palette 0, no widget | `main.ts` `ORDER_FLASH_*` | — |

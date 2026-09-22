@@ -23,6 +23,9 @@ browser smoke and are maintained regression tools.
   shadow PNG until its tree enters fog memory, then verify texture arrival,
   frozen pose, sRGB darkening and unchanged simulation checksum. Passing this
   alone did **not** establish that #88's visible-canopy problem was fixed.
+- **`sprite_residency_smoke.mts`** — #152's repeated walk/idle/expiry/reload
+  cycles, decoded-byte and GPU-texture release, unchanged paused pixels and
+  synchronization hashes. A private transform advances only the cache clock.
 - **`training_queue_smoke.mts`** — separate active unit plus counted waiting
   runs, source-scale 3/3/1 layout, refunds without interrupting the current
   unit, and fourteen waiting entries plus the active one. Also run with

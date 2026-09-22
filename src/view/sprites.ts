@@ -34,6 +34,8 @@ interface Piece {
   atlasKey?: string;
   /** A valid frozen frame whose page has not arrived yet. */
   pendingTexture?: string;
+  /** Retained for frozen fog views, which do not apply their frame again. */
+  textureImage?: string;
   /**
    * Set on a piece drawn through a player's palette ramp: the sheet is bound to
    * the shader as a node rather than as `material.map`, so swapping animation
@@ -535,13 +537,22 @@ export function refreshEntityTextures(view: EntityView, assets: ContentAssets | 
   for (const piece of [view.body, view.shadow, view.color, view.damage, view.leap,
     ...view.annexes, ...view.annexColors, ...(view.layerShadows ?? []), ...(view.layerOutlines ?? []),
     ...(view.garrisonFlags ?? []), ...(view.garrisonColors ?? []), ...view.flames, view.outline]) {
-    if (!piece?.pendingTexture) continue;
-    const texture = spriteTexture(assets, piece.pendingTexture);
-    if (!texture) continue;
+    if (!piece) continue;
+    const contour = piece === view.outline || !!view.layerOutlines?.includes(piece);
+    if (!piece.mesh.visible && !piece.pendingTexture && !contour) continue;
+    const image = piece.textureImage ?? piece.pendingTexture;
+    if (!image) continue;
+    const texture = spriteTexture(assets, image);
+    if (!texture) {
+      piece.pendingTexture = image;
+      piece.mesh.visible = false;
+      continue;
+    }
+    const pending = !!piece.pendingTexture;
     bindTexture(piece, texture);
     piece.pendingTexture = undefined;
     // Contour visibility belongs to updateOcclusion, not to a texture load.
-    if (piece !== view.outline) piece.mesh.visible = true;
+    if (pending && !contour) piece.mesh.visible = true;
   }
 }
 
@@ -570,10 +581,12 @@ function applyFrame(
   // Shadow atlases hold zero-sized entries where a frame casts none.
   if (!page || !frame || frame.w === 0 || frame.h === 0) {
     piece.pendingTexture = undefined;
+    piece.textureImage = undefined;
     mesh.visible = false;
     return;
   }
   const texture = spriteTexture(assets, page.image);
+  piece.textureImage = page.image;
   piece.pendingTexture = texture ? undefined : page.image;
   mesh.visible = !!texture;
   const meshMaterial = mesh.material as THREE.MeshBasicMaterial;

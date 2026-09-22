@@ -1832,6 +1832,7 @@ renderer.setAnimationLoop(now => {
     if (!game.winner) ended = false;
   }
 
+  assets?.spriteResidency?.sweep();
   renderer.render(scene, camera);
 });
 
