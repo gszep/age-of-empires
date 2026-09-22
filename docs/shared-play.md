@@ -73,6 +73,15 @@ service does not retry that permanent failure. Restore the matching game
 rules/version to resume it, or explicitly move the checkpoint aside to start
 a new match. The diagnostic prints the exact saved path.
 
+**Standing permission (human, 2026-09-21):** when neither Artemis nor Ysgramor
+has accessed the shared match for at least one hour, an agent may terminate
+that match without asking again. Verify inactivity from connection/access
+evidence; checkpoint modification time alone is not last access, since the
+host saves periodically. A host continuously down for over an hour also
+establishes that neither machine could have accessed its match. Archive the
+checkpoint when ending it and leave the host available for a new match. This
+is operational permission, not an automatic expiry timer in the application.
+
 ## Operations
 
 ```bash

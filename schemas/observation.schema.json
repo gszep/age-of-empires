@@ -5,7 +5,7 @@
   "type": "object",
   "properties": {
     "version": {
-      "const": 4
+      "const": 5
     },
     "time": {
       "type": "number",
@@ -185,6 +185,7 @@
             "minimum": 0,
             "maximum": 1
           },
+          "hasGarrison": { "type": "boolean" },
           "lastSeenAt": {
             "type": "number",
             "minimum": 0
@@ -226,6 +227,8 @@
             "description": "Own gatherer's resource target, including travel and drop-off.",
             "type": "integer"
           },
+          "hasGarrison": { "type": "boolean" },
+          "townBell": { "type": "boolean" },
           "kind": {
             "enum": [
               "villager",

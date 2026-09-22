@@ -751,6 +751,50 @@ describe('what a villager wears at a farm', () => {
   });
 });
 
+describe('garrison flag overlays (#137)', () => {
+  it('uses owned age offsets and x2 scale, colours the flag, and hides it when empty or dead', () => {
+    const assets = annexedAssets();
+    const state = createGame();
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const worker = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const source = assets.entities['town-center'];
+    source.animations.flag = { frames: 1, directions: 1, frameSeconds: 0.1, mirroringMode: 0 };
+    const atlas: Atlas = { image: 'flag.png', scale: 2, size: [8, 8], framesInFile: 1,
+      frames: [{ x: 0, y: 0, w: 8, h: 8, cx: 4, cy: 4 }] };
+    source.atlases.flag = atlas;
+    source.atlases['flag-playercolor'] = { ...atlas, image: 'flag-color.png' };
+    assets.textures.set('flag.png', new THREE.Texture());
+    assets.textures.set('flag-color.png', new THREE.Texture());
+    source.garrisonFlags = { idle: [{ animation: 'flag', x: 12, y: -40 }],
+      'idle-feudal': [{ animation: 'flag', x: -7, y: -80 }, { animation: 'flag', x: 21, y: -65 }] };
+    tc.garrison = [worker];
+    const view = createEntityView(assets, tc);
+    const before = JSON.stringify(state);
+    updateEntityView(view, assets, state, tc, 0);
+    const iso = worldToIso(tc.position.x, tc.position.y);
+    expect(view.garrisonFlags![0].mesh.visible).toBe(true);
+    expect(view.garrisonFlags![0].mesh.scale.x).toBe(4);
+    expect(view.garrisonFlags![0].mesh.position.x).toBe(iso.x + 12);
+    expect(view.garrisonFlags![0].mesh.position.y).toBe(iso.y + 40);
+    expect(view.garrisonColors![0].mesh.visible).toBe(true);
+    expect(JSON.stringify(state)).toBe(before);
+    state.players[1].age = 1;
+    updateEntityView(view, assets, state, tc, 1);
+    expect(view.garrisonFlags!.filter(p => p.mesh.visible)).toHaveLength(2);
+    expect(view.garrisonFlags![0].mesh.position.y).toBe(iso.y + 80);
+    tc.garrison = undefined;
+    updateEntityView(view, assets, state, tc, 2);
+    expect(view.garrisonFlags!.every(p => !p.mesh.visible)).toBe(true);
+    expect(view.garrisonColors!.every(p => !p.mesh.visible)).toBe(true);
+    // A remembered occupancy flag is independent of the unseen live count.
+    updateEntityView(view, assets, state, tc, 0, true);
+    expect(view.garrisonFlags!.filter(p => p.mesh.visible)).toHaveLength(2);
+    tc.dead = true;
+    updateEntityView(view, assets, state, tc, 3, true);
+    expect(view.garrisonFlags!.every(p => !p.mesh.visible)).toBe(true);
+  });
+});
+
 describe('what a death leaves behind', () => {
   /** A villager and an oak with the DAT's death-then-decay chain. */
   function corpseAssets(): ContentAssets {

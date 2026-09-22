@@ -1,8 +1,8 @@
 import type { Activity, Command, EntityKind, Order, PlayerId, ResourceKind, UnitKind } from '../sim/types';
 import type { NodeKind } from '../sim/data';
 
-/** v4 exposes edible carcasses and own gather targets for coordinated food work. */
-export const PROTOCOL_VERSION = 4;
+/** v5 adds the town-bell command/state and the publicly visible garrison flag. */
+export const PROTOCOL_VERSION = 5;
 /** Commands, match configuration and recordings retain their v1 formats. */
 export const MATCH_FORMAT_VERSION = 1;
 
@@ -31,6 +31,10 @@ export interface ObservedEntity {
   researching?: { tech: string; remainingSeconds: number };
   /** How many shelter inside; own buildings only. They are not in the list. */
   garrisoned?: number;
+  /** A visible flag reveals occupancy, not the private count or passengers. */
+  hasGarrison?: boolean;
+  /** Own town centers only. */
+  townBell?: boolean;
 }
 
 export interface PlayerObservation {
@@ -121,6 +125,7 @@ export interface RememberedEntityObservation {
   buildProgress?: number;
   /** Seconds of game time when this entity was last seen. */
   lastSeenAt: number;
+  hasGarrison?: boolean;
 }
 
 /** Everything needed to reproduce a match tick-for-tick. */

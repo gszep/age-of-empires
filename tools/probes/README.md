@@ -39,8 +39,17 @@ browser smoke and are maintained regression tools.
   wood, completes a blacksmith, and renders a building the player can select.
 - **`corpse_resight_smoke.mts`** — #120's old corpse survives JSON reload and a
   real scout move out of/back into sight without replaying its death animation.
+- **`garrison_edges_smoke.mts`** — #137's real bell/return buttons, production
+  self-rally and training, ram boarding/unload, plus rendered player-colour pixels
+  in the imported garrison flag rectangles reported through `entities`.
 - **`minimap_markers_smoke.mts`** — actual minimap pixels for live and remembered
   building dots, reveal parity, and the absence of a farm marker.
+- **`minimap_relief_smoke.mts`** — #96's actual sRGB canvas pixels for all three
+  imported grass/forest shades, live/remembered tree overlays, fog/reveal, flat
+  water, fallback/old/replaced palettes and a 392×392 board. The isolated browser
+  fixture checks state immutability and a four-sided hill's screen-right lighting
+  against the human's editor reference. It verifies the coarse orientation and
+  palette use, not DE's exact diagonal/corner slope classification.
 
 ## General probes
 

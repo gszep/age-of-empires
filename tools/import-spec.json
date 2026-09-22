@@ -2305,6 +2305,8 @@
       "pop_capped",
       "farm_depleted",
       "gatherpoint_set",
+      "townbell_start",
+      "townbell_stop",
       "error",
       "age_up",
       "tech_researched",

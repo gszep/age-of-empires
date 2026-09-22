@@ -263,6 +263,12 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 - **`convert_sld.py --terrain-only` for a terrain slot**; the full pipeline
   for everything else, and always the pipeline, never one step.
 - **The gate runs on an idle machine.**
+- **WSL idle CPU is not host idle CPU.** On 2026-09-22 Linux reported 85–87%
+  idle while Windows reported Cyberpunk at 584% CPU. Two gate runs timed out
+  in different existing long tests; the sheep test passed alone at 21 s against
+  its unchanged 30 s limit. Once the human freed the host, all 658 tests and the
+  full gate passed with unchanged limits. Inspect host load before retrying or
+  widening clocks.
 - **Reduce workers before widening a test clock.** On 2026-09-21 two six-worker
   gates timed out in the existing full-match tests; the same tree passed with
   `VITEST_MAX_FORKS=3 VITEST_MAX_THREADS=3 tools/gate.sh`. Vitest's environment

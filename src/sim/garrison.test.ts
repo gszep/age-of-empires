@@ -127,7 +127,7 @@ describe('garrison', () => {
     expect(canGarrison(state, militia, site)).toBe(false);
   });
 
-  it('shoots for its garrison: nothing empty, an arrow a villager, capped at eleven', () => {
+  it('shoots for its garrison: nothing empty, villager DPS, and no phantom primary arrow', () => {
     const state = createGame(97);
     const tc = townCenter(state);
     const enemy = spawn(state, 'militia', 2, { x: tc.position.x + 4, y: tc.position.y });
@@ -136,22 +136,23 @@ describe('garrison', () => {
     const hp = enemy.hp;
     run(state, 4 * TICKS_PER_SECOND);
     expect(enemy.hp).toBe(hp);
-    expect(volleyArrows(state, tc)).toBe(1);
+    expect(volleyArrows(state, tc)).toBe(0);
     const [a, b, c] = villagers(state);
     tc.garrison = [a, b, c];
     state.entities = state.entities.filter(e => ![a, b, c].includes(e));
-    expect(volleyArrows(state, tc)).toBe(4);
+    expect(volleyArrows(state, tc)).toBe(3);
     run(state, 4 * TICKS_PER_SECOND);
     expect(enemy.hp).toBeLessThan(hp);
     // Fifteen inside: the DAT's cap, not fifteen arrows.
     tc.garrison = Array.from({ length: 15 }, (_, i) => ({ ...a, id: 91000 + i }));
-    expect(volleyArrows(state, tc)).toBe(11);
+    expect(volleyArrows(state, tc)).toBe(10);
     // A castle empty shoots its five.
     const castle = place(state, 'castle');
     expect(volleyArrows(state, castle)).toBe(5);
     const archer = spawn(state, 'archer', 1, castle.position);
     castle.garrison = [archer];
-    expect(volleyArrows(state, castle)).toBe(6);
+    // One archer's DPS is below one castle arrow's DPS.
+    expect(volleyArrows(state, castle)).toBe(5);
   });
 
   it('heals those inside, and lets them out when it falls', () => {

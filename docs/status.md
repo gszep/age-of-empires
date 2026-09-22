@@ -151,6 +151,19 @@ audio.
 
 Minimap buildings use compact, equal-sized live and fog-memory markers (#84),
 with farms hidden according to the DAT's `minimap_mode`.
+Minimap relief (#96) now consumes each terrain's imported
+three-shade palette. Live/remembered woods use the Forest palette, with flat
+sRGB (21,118,21), instead of the old sampled (41,140,33). Plateaus, old manifests
+and the open fallback stay usable; palette changes refresh the cache. Nine
+focused tests, the sRGB browser pixel probe `tools/minimap_relief_smoke.mts`,
+the existing minimap-marker browser check and typecheck pass. The pixel probe
+also checks fog/reveal, state immutability and a 392×392 buffer (roughly 9–16 ms
+draw samples). The human's editor reference supplied on 2026-09-22 corrected the
+provisional axis: screen-right-facing hill slopes are light and left-facing
+slopes dark. A four-sided-hill regression and actual canvas pixels pin both
+front faces and both back faces. The precise discrete slope classifier remains
+inferred, as recorded in the ledger; this is not a pixel-identical recreation of
+the editor's unknown height grid. The current green working-tree gate includes these edits.
 
 **Agents and protocol**: versioned JSON contracts; browser, built-in AI,
 JSONL subprocess, deadline subprocess, WebSocket and MCP strategies share
@@ -212,6 +225,36 @@ fallback stops at the Castle Age (#125).
 
 ## Measurements
 
+### Garrison follow-on (#137)
+
+The town bell recalls workers into its selected town center and restores their
+previous orders/routes on release; its icons, cell, labels and start/stop audio
+come from owned UI/sound metadata. Production self-rally holds newly trained
+units up to capacity. Rams carry six infantry/villager passengers and can unload
+or release them on destruction. Garrison flags use recursively resolved DAT
+graphics, per-age positions and player-colour masks, including remembered
+occupancy without exposing passenger counts. Observation v5 adds the bell command,
+own bell state and public flag presence.
+
+The villager's negative firepower now contributes flat DPS according to the
+community attribute documentation; actual volley tests cover researched building
+damage and the town center's absent primary arrow. Exact engine classifications
+and bell routing assumptions are recorded in the ledger. Crew speed/attack
+bonuses are the explicit follow-on #161.
+
+Dedicated browser check `tools/garrison_edges_smoke.mts` passes real bell toggles,
+work return, self-rally/training/unload, ram right-click boarding/unload, and
+rendered blue flag pixels (TC 54, barracks 55, ram 105 in that fixture).
+The final browser check also verifies `1/6 garrisoned` on a loaded ram and both
+owned bell audio requests. The full gate is **GREEN**,
+`.local/issue137-gate-r3.log`: **658** Vitest tests, production build, **85**
+Python/import tests and general browser smoke. The idle-host retry passed with
+the same single-worker settings and unchanged test limits after the earlier
+host-contention timeouts. The implementation and its documented approximations
+are included in the #96/#137 checkpoint.
+
+### Earlier checkpoint measurements
+
 All on the 120x120 generated board unless stated; older figures are not
 comparable because the board changed under them.
 
@@ -229,13 +272,13 @@ comparable because the board changed under them.
   local SLD decoder is byte-identical to openage's on all 29,783 frames it
   replaced; every modelled unit's stats match the DAT (487 values, 0
   mismatches, #36).
-- **Tests**: 624 vitest, 84 Python/import tests, and the
+- **Tests**: 658 vitest, 85 Python/import tests, and the
   browser smoke (`tools/debug_smoke.mjs`: a private server, real clicks and
   keys). Fidelity assertions skip without the owned content; the gate says
   how many skipped.
 
-Latest full working-tree gate: GREEN, `.local/issue120-gate.log`
-(2026-09-21, one Vitest worker; no fixture timeouts widened). The four issue-specific naval browser
+Latest green working-tree gate: `.local/issue137-gate-r3.log`
+(2026-09-22, one Vitest worker; no fixture timeouts widened). The four issue-specific naval browser
 scenarios also passed in `.local/issue97-naval-final-d1659.log`: dock buttons
 and upgrades, boarding and shore unloading, fish-trap construction/income,
 and visible fire shots.
@@ -257,8 +300,10 @@ also bounds transient retries, and session-start reports its failed/running
 state and restart count (#155). CLI regressions cover version/rules mismatch,
 malformed JSON, retryable port conflicts and compatible checkpoint restoration.
 Ysgramor's incompatible checkpoint was preserved byte-for-byte while its service
-entered `failed/78` without increasing the restart count; an explicit recovery
-choice is still needed before that household match can run.
+entered `failed/78` without increasing the restart count. At 21:37 BST the human
+authorized ending matches unused by both machines for one hour. After over three
+hours down, that checkpoint was archived and the host restored; localhost and
+the existing Tailscale shared endpoints respond, with zero restarts.
 The private two-browser shared smoke passed adoption, training, synchronization,
 reconnection and checkpoint restoration; a transient systemd probe recovered
 on its second attempt under the same restart policy.

@@ -50,6 +50,7 @@ export interface DebugContext {
     color: { mesh?: { visible?: boolean; material?: unknown } };
     annexColors?: { mesh?: { visible?: boolean } }[];
     annexes?: { mesh?: { visible?: boolean } }[];
+    garrisonFlags?: { mesh: { visible: boolean; position: Point; scale: Point } }[];
   }>;
 }
 
@@ -144,6 +145,17 @@ export function installDebug(context: DebugContext): void {
       layersVisible: Number(!!view?.body?.mesh?.visible) + (view?.annexes?.filter(p => p.mesh?.visible).length ?? 0),
       animation: view?.animationState,
       frame: view?.frameIndex,
+      garrisonFlags: view?.garrisonFlags?.map(piece => {
+        const zoom = context.zoom();
+        const center = context.cameraCenter();
+        const width = piece.mesh.scale.x * zoom;
+        const height = piece.mesh.scale.y * zoom;
+        return { visible: piece.mesh.visible, rect: [
+          Math.round((piece.mesh.position.x - center.x) * zoom + canvas.clientWidth / 2 - width / 2),
+          Math.round(-(piece.mesh.position.y - center.y) * zoom + canvas.clientHeight / 2 - height / 2),
+          Math.max(1, Math.round(width)), Math.max(1, Math.round(height)),
+        ] };
+      }),
       facing: view ? round(view.facing) : undefined,
       // What a wall or gate believes it is joined to. The frame index alone
       // answers this only if you remember which delta is which; the tag says

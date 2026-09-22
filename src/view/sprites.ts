@@ -73,6 +73,8 @@ export interface EntityView {
   annexColors: Piece[];
   layerShadows?: Piece[];
   layerOutlines?: Piece[];
+  garrisonFlags?: Piece[];
+  garrisonColors?: Piece[];
   fallback: boolean;
   animationState?: string;
   animationStartedAt?: number;
@@ -531,7 +533,8 @@ function configureShadow(piece: Piece, assets: ContentAssets): void {
 export function refreshEntityTextures(view: EntityView, assets: ContentAssets | undefined): void {
   if (!assets) return;
   for (const piece of [view.body, view.shadow, view.color, view.damage, view.leap,
-    ...view.annexes, ...view.annexColors, ...(view.layerShadows ?? []), ...(view.layerOutlines ?? []), ...view.flames, view.outline]) {
+    ...view.annexes, ...view.annexColors, ...(view.layerShadows ?? []), ...(view.layerOutlines ?? []),
+    ...(view.garrisonFlags ?? []), ...(view.garrisonColors ?? []), ...view.flames, view.outline]) {
     if (!piece?.pendingTexture) continue;
     const texture = spriteTexture(assets, piece.pendingTexture);
     if (!texture) continue;
@@ -547,7 +550,8 @@ export function refreshEntityTextures(view: EntityView, assets: ContentAssets | 
  * through their trunks. Shadows and farm patches already receive ground fog. */
 export function dimFogSnapshot(view: EntityView): void {
   for (const piece of [view.body, view.color, view.outline, view.damage, view.leap,
-    ...view.annexes, ...view.annexColors, ...(view.layerShadows ?? []), ...view.flames]) {
+    ...view.annexes, ...view.annexColors, ...(view.layerShadows ?? []),
+    ...(view.garrisonFlags ?? []), ...(view.garrisonColors ?? []), ...view.flames]) {
     if (piece) (piece.mesh.material as THREE.MeshBasicMaterial).color.multiplyScalar(1 - FOG_EXPLORED);
   }
 }
@@ -906,14 +910,69 @@ function updateFarmView(
   view.patch.visible = !entity.dead;
 }
 
+function updateGarrisonFlags(
+  view: EntityView, assets: ContentAssets | undefined, state: ReadonlyGameState,
+  entity: Entity, time: number, occupied: boolean,
+): void {
+  if (!occupied && !view.garrisonFlags?.length) return;
+  for (const piece of [...(view.garrisonFlags ?? []), ...(view.garrisonColors ?? [])]) {
+    piece.mesh.visible = false;
+    piece.pendingTexture = undefined;
+  }
+  if (!occupied || entity.dead || entity.buildProgress !== undefined) return;
+  const imported = assets?.entities[entityKey(entity)];
+  const flags = ageChain(state, entity, 'idle').map(name => imported?.garrisonFlags?.[name]).find(Boolean) ?? [];
+  const count = assets && imported ? flags.length : 1;
+  const bodies = view.garrisonFlags ??= [];
+  const colors = view.garrisonColors ??= [];
+  const ramp = assets?.playerRamps.get(entity.owner);
+  while (bodies.length < count) {
+    const body = makePiece();
+    const color = ramp ? makeRampPiece(ramp) : makePiece();
+    bodies.push(body); colors.push(color);
+    view.group.add(body.mesh, color.mesh);
+  }
+  const raise = elevationAt(state, entity.position.x, entity.position.y) * ELEVATION_PIXELS;
+  for (let i = 0; i < count; i++) {
+    const body = bodies[i], color = colors[i], flag = flags[i];
+    const order = 1000 + isoDepth(entity.position.x, entity.position.y) * 10 + 2;
+    if (!assets || !imported) {
+      const iso = worldToIso(entity.position.x, entity.position.y);
+      body.mesh.visible = true;
+      body.mesh.scale.set(8, 5, 1);
+      body.mesh.position.set(iso.x + 4, iso.y + entity.radius * 32 + raise, 0);
+      (body.mesh.material as THREE.MeshBasicMaterial).color.set(PLAYER_COLORS[entity.owner] ?? 0xffffff);
+      body.mesh.renderOrder = order;
+      continue;
+    }
+    const animation = imported.animations[flag.animation];
+    const atlas = imported.atlases[flag.animation];
+    if (!animation || !atlas) continue;
+    const frame = Math.floor(time / (animation.frameSeconds || 0.1)) % Math.max(1, animation.frames);
+    applyFrame(body, assets, atlas, frame, entity.position, 0xffffff);
+    body.mesh.position.x += flag.x;
+    body.mesh.position.y += raise - flag.y;
+    body.mesh.renderOrder = order;
+    const mask = imported.atlases[`${flag.animation}-playercolor`];
+    if (mask && entity.owner !== 0) {
+      applyFrame(color, assets, mask, frame, entity.position, color.mapNode ? 0xffffff : PLAYER_COLORS[entity.owner]);
+      color.mesh.position.x += flag.x;
+      color.mesh.position.y += raise - flag.y;
+      color.mesh.renderOrder = order + 0.1;
+    }
+  }
+}
+
 export function updateEntityView(
   view: EntityView,
   assets: ContentAssets | undefined,
   state: ReadonlyGameState,
   entity: Entity,
   time: number,
+  hasGarrison = !!entity.garrison?.length,
 ): void {
   const depth = isoDepth(entity.position.x, entity.position.y);
+  updateGarrisonFlags(view, assets, state, entity, time, hasGarrison);
   if (entity.kind === 'farm') {
     updateFarmView(view, assets, state, entity);
     return;

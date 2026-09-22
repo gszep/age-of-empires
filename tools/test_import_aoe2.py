@@ -1478,6 +1478,35 @@ class ContentImportIntegrationTest(unittest.TestCase):
             with self.subTest(animal=key):
                 self.assertEqual(self.result["entities"][key]["foodDecayPerSecond"], rate)
 
+    def test_garrison_capacity_flags_and_bell_strings_are_published(self):
+        entities = self.result["entities"]
+        self.assertEqual(entities["town-center"]["garrisonFlags"]["idle"],
+                         [{"animation": "garrison-4472", "x": -31, "y": -158}])
+        self.assertEqual(entities["barracks"]["garrisonFlags"]["idle"], [
+            {"animation": "garrison-4472", "x": 84, "y": -59},
+            {"animation": "garrison-4472", "x": -7, "y": -101}])
+        for key in ("battering-ram", "capped-ram"):
+            self.assertEqual(entities[key]["infantryCapacity"], 6)
+            self.assertEqual(entities[key]["garrisonFlags"]["idle"],
+                             [{"animation": "garrison-11385", "x": 2, "y": -24}])
+        for key in ("barracks", "archery-range", "stable", "siege-workshop", "monastery"):
+            self.assertEqual(entities[key]["garrison"]["capacity"], 10)
+            self.assertEqual(entities[key]["garrison"]["types"], 0)
+        self.assertEqual(self.result["strings"]["townBell"], "Ring Town Bell")
+        self.assertIn("back to work", self.result["strings"]["townBellHelp"].lower())
+        path = Path("public/imported/aoe2/manifest.json")
+        if not path.is_file():
+            self.skipTest("no published manifest to check")
+        published = json.loads(path.read_text())
+        for key, entity in entities.items():
+            if "garrisonFlags" not in entity:
+                continue
+            self.assertEqual(published["entities"][key]["garrisonFlags"], entity["garrisonFlags"])
+            for flags in entity["garrisonFlags"].values():
+                for flag in flags:
+                    self.assertIn(flag["animation"], published["entities"][key]["atlases"])
+                    self.assertIn(flag["animation"] + "-playercolor", published["entities"][key]["atlases"])
+
     def test_every_building_carries_armour_whether_or_not_it_fights(self):
         """Issue #26.
 

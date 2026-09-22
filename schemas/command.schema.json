@@ -6,6 +6,17 @@
     {
       "type": "object",
       "properties": {
+        "kind": { "const": "town-bell" },
+        "player": { "enum": [1, 2] },
+        "buildingId": { "type": "integer" },
+        "enabled": { "type": "boolean" }
+      },
+      "required": ["kind", "player", "buildingId", "enabled"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
         "kind": {
           "const": "order"
         },

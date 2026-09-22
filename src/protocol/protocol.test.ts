@@ -15,7 +15,7 @@ const OBSERVATION_KEYS = [
 ];
 const OBSERVATION_ALWAYS = OBSERVATION_KEYS.filter(k => !['autoReseedFarms', 'winner'].includes(k));
 const ENTITY_KEYS = [
-  'activity', 'amount', 'buildProgress', 'buildTargetId', 'gatherTargetId', 'carrying', 'garrisoned', 'hp', 'id', 'kind', 'maxHp', 'node', 'order',
+  'activity', 'amount', 'buildProgress', 'buildTargetId', 'gatherTargetId', 'carrying', 'garrisoned', 'hasGarrison', 'townBell', 'hp', 'id', 'kind', 'maxHp', 'node', 'order',
   'owner', 'researching', 'resource', 'training', 'x', 'y',
 ];
 const ENTITY_ALWAYS = ['activity', 'hp', 'id', 'kind', 'maxHp', 'order', 'owner', 'x', 'y'];
@@ -25,7 +25,7 @@ describe('the observation contract', () => {
     const state = createGame(7);
     const observation = observe(state, 1);
     expect(observation.version).toBe(PROTOCOL_VERSION);
-    expect(PROTOCOL_VERSION).toBe(4);
+    expect(PROTOCOL_VERSION).toBe(5);
     for (const key of Object.keys(observation)) {
       expect(OBSERVATION_KEYS, `${key} is new to the contract: bump PROTOCOL_VERSION`).toContain(key);
     }

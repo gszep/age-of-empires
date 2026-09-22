@@ -67,6 +67,8 @@ export interface ImportedEntity {
   animations: Record<string, AnimationInfo>;
   atlases: Record<string, Atlas>;
   animationLayers?: Record<string, { animation: string; x: number; y: number }[]>;
+  /** File-bearing garrison graphic deltas, indexed by the carrier's age art. */
+  garrisonFlags?: Record<string, { animation: string; x: number; y: number }[]>;
   particleEffect?: string;
   annexes?: { unitId: number; misplacement: [number, number]; animations: Record<string, AnimationInfo>; atlases: Record<string, Atlas> }[];
   /**

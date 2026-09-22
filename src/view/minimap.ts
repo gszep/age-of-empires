@@ -1,14 +1,13 @@
 import type { EntityKind, GameState, PlayerId, Point, ResourceKind, UnitKind, ReadonlyGameState } from '../sim/types';
 import { isBuilding, NODE_OF_RESOURCE, type NodeKind } from '../sim/data';
-import type { ContentAssets } from './assets';
+import type { ContentAssets, ImportedTerrain } from './assets';
 import { playerColorHex } from './sprites';
 
 /**
  * Resource dots without owned content. With it, the DAT's own
- * `minimap_color` per node is drawn (`ResourceNodeRules.minimapColor`);
- * trees carry none there, and DE draws them at (41, 140, 33) -- read off a
- * screenshot of its Islands minimap, where every wood is that one flat
- * tone -- which no owned field states.
+ * `minimap_color` per node is drawn (`ResourceNodeRules.minimapColor`).
+ * Trees carry none, so their wood overlay uses the owned Forest terrain's
+ * palette instead of overriding it with a colour sampled from a scaled image.
  */
 const RESOURCE_COLORS: Record<string, string> = {
   food: '#c4506e',
@@ -16,10 +15,14 @@ const RESOURCE_COLORS: Record<string, string> = {
   gold: '#e8c04a',
   stone: '#9aa0a6',
 };
-function resourceColor(state: ReadonlyGameState, resource: string | undefined, node?: NodeKind): string {
+function resourceColor(
+  state: ReadonlyGameState, resource: string | undefined, node?: NodeKind,
+  woodShade?: readonly [number, number, number],
+): string {
   const kind = resource ?? 'wood';
   const own = state.rules.nodes[node ?? NODE_OF_RESOURCE[kind as ResourceKind]]?.minimapColor;
-  return own ? `rgb(${own[0]},${own[1]},${own[2]})` : RESOURCE_COLORS[kind];
+  const color = own ?? (kind === 'wood' ? woodShade : undefined);
+  return color ? `rgb(${color[0]},${color[1]},${color[2]})` : RESOURCE_COLORS[kind];
 }
 /** A gaia animal in the DAT's own dot -- a sheep is food-green, not white. */
 function gaiaColor(state: ReadonlyGameState, kind: string): string | undefined {
@@ -35,6 +38,28 @@ const WATER = [0x38, 0x78, 0xa8] as const;
 const ROAD = [0xa8, 0x7d, 0x4e] as const;
 const FOREST = [0x31, 0x5f, 0x35] as const;
 const REMEMBERED_FACTOR = 0.55;
+
+/** DAT shade index: light, flat, dark. The human's editor reference (2026-09-22)
+ * shows light on screen-right-facing slopes. With +x down-left and +y
+ * down-right, the corresponding height gradient is +dx - dy, not -dx - dy.
+ * The discrete gradient classifier remains an approximation (ledger #96). */
+export function minimapReliefShade(
+  state: Pick<ReadonlyGameState, 'width' | 'height' | 'elevation'>, x: number, y: number,
+): 0 | 1 | 2 {
+  const tx = Math.max(0, Math.min(state.width - 1, Math.floor(x)));
+  const ty = Math.max(0, Math.min(state.height - 1, Math.floor(y)));
+  const centre = state.elevation?.[ty * state.width + tx] ?? 0;
+  const sample = (dx: number, dy: number) => state.elevation?.[
+    Math.max(0, Math.min(state.height - 1, ty + dy)) * state.width
+    + Math.max(0, Math.min(state.width - 1, tx + dx))
+  ] ?? centre;
+  const gradient = sample(1, 0) - sample(-1, 0) + sample(0, -1) - sample(0, 1);
+  return gradient > 1e-6 ? 0 : gradient < -1e-6 ? 2 : 1;
+}
+
+function reliefColor(state: ReadonlyGameState, x: number, y: number, slot: ImportedTerrain) {
+  return slot.minimapShades?.[minimapReliefShade(state, x, y)] ?? slot.minimapColor;
+}
 
 /** Compact building dot: 2 backing pixels become about 3px in the owned
  * 2000px-wide HUD (MapView is 720 reference pixels, our buffer 240).
@@ -74,16 +99,18 @@ export class Minimap {
    * board was grass, forest, water and road; a biome dresses the ground in a
    * dozen terrains and every one of them drew as plain ground.
    */
-  private terrainColors(assets?: ContentAssets): Map<number, readonly [number, number, number]> {
-    if (this.colors) return this.colors;
-    const colors = new Map<number, readonly [number, number, number]>();
+  private terrainColors(assets?: ContentAssets): Map<number, ImportedTerrain> {
+    if (this.colors && this.colorSource === assets?.terrain) return this.colors;
+    const colors = new Map<number, ImportedTerrain>();
     for (const slot of Object.values(assets?.terrain ?? {})) {
-      if (slot.minimapColor) colors.set(slot.terrainId, slot.minimapColor);
+      if (slot.minimapColor) colors.set(slot.terrainId, slot);
     }
     this.colors = colors;
+    this.colorSource = assets?.terrain;
     return colors;
   }
-  private colors?: Map<number, readonly [number, number, number]>;
+  private colors?: Map<number, ImportedTerrain>;
+  private colorSource?: ContentAssets['terrain'];
 
   private terrain(state: ReadonlyGameState, reveal: boolean, assets?: ContentAssets): HTMLCanvasElement {
     if (this.tiles?.image.width !== state.width || this.tiles.image.height !== state.height) {
@@ -100,7 +127,8 @@ export class Minimap {
     const pixels = this.tiles.image.data;
     for (let index = 0; index < state.width * state.height; index++) {
       const terrain = state.terrain[index] ?? 0;
-      const base = palette.get(terrain)
+      const slot = palette.get(terrain);
+      const base = (slot && reliefColor(state, index % state.width, Math.floor(index / state.width), slot))
         ?? (terrain === 1 ? WATER : terrain === 24 ? ROAD : terrain === 10 ? FOREST : IN_SIGHT);
       const unexplored = !reveal && visibility.explored[index] !== 1;
       const remembered = !reveal && !unexplored && visibility.visible[index] !== 1;
@@ -153,6 +181,8 @@ export class Minimap {
       playerColorHex(assets, owner) ?? '#ffffff';
     const visibility = state.visibility[this.player];
     const resourceDotSize = minimapResourceDotSize(state.width, state.height);
+    const forest = this.terrainColors(assets).get(10); // owned Forest terrain slot
+    const woodShade = (x: number, y: number) => forest && reliefColor(state, x, y, forest);
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     // Terrain and fog, as one image under the same mapping `toCanvas` applies:
@@ -189,7 +219,8 @@ export class Minimap {
       if (entity.owner !== this.player && !visible) continue;
       if (entity.owner === this.player || visible) {
         const color = entity.kind === 'resource'
-          ? resourceColor(state, entity.resourceKind, entity.node)
+          ? resourceColor(state, entity.resourceKind, entity.node,
+            entity.resourceKind === 'wood' ? woodShade(entity.position.x, entity.position.y) : undefined)
           : (entity.owner === 0 && gaiaColor(state, entity.kind)) || ownerColor(entity.owner);
         if (drawBuilding(entity.kind, entity.position.x, entity.position.y, color)) continue;
         const size = entity.kind === 'resource' ? resourceDotSize : 2.5;
@@ -200,7 +231,8 @@ export class Minimap {
       const index = Math.floor(remembered.y) * state.width + Math.floor(remembered.x);
       if (visibility.visible[index] === 1) continue;
       const color = remembered.kind === 'resource'
-        ? resourceColor(state, remembered.resource)
+        ? resourceColor(state, remembered.resource, remembered.node,
+          remembered.resource === 'wood' ? woodShade(remembered.x, remembered.y) : undefined)
         : (remembered.owner === 0 && gaiaColor(state, remembered.kind)) || ownerColor(remembered.owner);
       if (drawBuilding(remembered.kind, remembered.x, remembered.y, color)) continue;
       drawDot(

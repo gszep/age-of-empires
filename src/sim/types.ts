@@ -86,6 +86,9 @@ export interface Entity {
    * unit, and the building shoots for them (issue #75).
    */
   garrison?: Entity[];
+  /** Town-bell state, and the worker's interrupted public order/route. */
+  townBell?: boolean;
+  bellReturn?: { townCenterId: number; order: Order; queue?: Entity['orderQueue'] };
   /**
    * What this worker last put its hands on, so "another of the same first"
    * survives the thing itself being gone. A carcass is removed once it is
@@ -279,6 +282,7 @@ export type Command =
   | { kind: 'cancel-train'; player: PlayerId; buildingId: number; index?: number }
   /** Everybody sheltering in this building comes out onto the ground round it. */
   | { kind: 'ungarrison'; player: PlayerId; buildingId: number; target?: Point }
+  | { kind: 'town-bell'; player: PlayerId; buildingId: number; enabled: boolean }
   /**
    * Destroy your own things, as the reference's Delete does: a unit you no
    * longer want, or a building in the way. Nothing is refunded and nothing

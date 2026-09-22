@@ -84,10 +84,8 @@ export interface UnitRules {
   datClass?: number;
   /**
    * What this unit adds to the volley of a building it sits in (issue #75):
-   * the DAT's `garrison_firepower`, an arrow apiece for the archers. The
-   * villagers' -2.5 is an encoding the owned files do not explain; the
-   * simulation reads any negative value as the one arrow the reference's
-   * rule gives a garrisoned villager.
+    * the DAT's `garrison_firepower`: positive multiplies ranged DPS, negative
+    * adds its magnitude as flat DPS (UGC attribute 130; ledger #137).
    */
   garrisonFirepower?: number;
   /**
@@ -156,6 +154,8 @@ export interface UnitRules {
   tradeRatePerSecond?: number;
   tradeCapacity?: number;
   transportCapacity?: number;
+  /** Land siege carriers: the DAT's capacity, separate from naval transports. */
+  infantryCapacity?: number;
   selfDestruct?: boolean;
   projectilesPerAttack?: number;
   requires?: string[];
@@ -864,6 +864,7 @@ export const FALLBACK_RULES: GameRules = {
       },
     },
     'capped-ram': {
+      infantryCapacity: 6,
       age: 3,
       hp: 200, radius: 0.45, speed: 0.6, lineOfSight: 3.0,
       cost: cost(0, 160, 75, 0), trainSeconds: 36,
@@ -947,6 +948,7 @@ export const FALLBACK_RULES: GameRules = {
     // Siege: slow, fragile against soldiers, and murderous against walls. The
     // ram's 150 against buildings and its -3 pierce armour are both the DAT's.
     'battering-ram': {
+      infantryCapacity: 6,
       age: 2,
       hp: 175, radius: 0.45, speed: 0.6, lineOfSight: 3, cost: cost(0, 160, 75), trainSeconds: 36,
       trainedAt: 'siege-workshop', popCost: 1, trainButton: 1,
@@ -1023,6 +1025,7 @@ export const FALLBACK_RULES: GameRules = {
       },
     },
     barracks: {
+      garrison: { capacity: 10, types: 0, healRate: 0.5 },
       hp: 1200, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
@@ -1085,6 +1088,7 @@ export const FALLBACK_RULES: GameRules = {
       },
     },
     'archery-range': {
+      garrison: { capacity: 10, types: 0, healRate: 0.5 },
       age: 1,
       hp: 1500, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
       popSupport: 0, buildable: true, accepts: [],
@@ -1099,6 +1103,7 @@ export const FALLBACK_RULES: GameRules = {
       buildButton: 7,
     },
     market: {
+      garrison: { capacity: 10, types: 0, healRate: 0 },
       age: 1,
       hp: 1800, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 60,
       popSupport: 0, buildable: true, accepts: [],
@@ -1120,6 +1125,7 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 2 }, { class: 3, amount: 4 }],
     },
     stable: {
+      garrison: { capacity: 10, types: 0, healRate: 0.25 },
       age: 1,
       hp: 1500, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
       popSupport: 0, buildable: true, accepts: [],
@@ -1127,6 +1133,7 @@ export const FALLBACK_RULES: GameRules = {
       buildButton: 3,
     },
     monastery: {
+      garrison: { capacity: 10, types: 0, healRate: 1.5 },
       age: 2,
       hp: 2100, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 40,
       popSupport: 0, buildable: true, accepts: [],
@@ -1135,6 +1142,7 @@ export const FALLBACK_RULES: GameRules = {
       confirmDelete: true,
     },
     'siege-workshop': {
+      garrison: { capacity: 10, types: 0, healRate: 0 },
       age: 2,
       hp: 1500, radius: 2, lineOfSight: 6, cost: cost(0, 200), buildSeconds: 40,
       popSupport: 0, buildable: true, accepts: [],
@@ -1142,6 +1150,7 @@ export const FALLBACK_RULES: GameRules = {
       buildButton: 4,
     },
     dock: {
+      garrison: { capacity: 10, types: 0, healRate: 0 },
       terrainRestriction: 6,
       hp: 1800, radius: 1.5, lineOfSight: 8, cost: cost(0, 150), buildSeconds: 35,
       popSupport: 0, buildable: true, accepts: ['food'],
@@ -1311,6 +1320,7 @@ interface ManifestEntity {
   convert?: { minSeconds: number; maxSeconds: number; range: number };
   searchRadius?: number;
   transportCapacity?: number;
+  infantryCapacity?: number;
   selfDestruct?: boolean;
   projectilesPerAttack?: number;
   foodAmount?: number;
@@ -1441,6 +1451,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       corpseSeconds: e[key].corpseSeconds ?? fallback?.corpseSeconds,
       datId: e[key].id,
       transportCapacity: e[key].transportCapacity ?? fallback?.transportCapacity,
+      infantryCapacity: e[key].infantryCapacity ?? fallback?.infantryCapacity,
       selfDestruct: e[key].selfDestruct ?? fallback?.selfDestruct,
       projectilesPerAttack: e[key].projectilesPerAttack ?? fallback?.projectilesPerAttack,
       requires: e[key].requires,

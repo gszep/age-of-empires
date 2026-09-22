@@ -582,10 +582,22 @@ function runUiCommand(id: string, shift = false): void {
       hud.showMessage(messages.unloadWhere ?? 'Click where you want the transport to unload.');
       return;
     }
-    for (const building of selection.filter(e => isBuilding(e.kind) && e.garrison?.length)) {
+    for (const building of selection.filter(e => e.garrison?.length)) {
       const result = applyCommand(game, { kind: 'ungarrison', player: localPlayer, buildingId: building.id });
       if (!result.ok) reject(result.reason);
     }
+    return;
+  }
+  if (id === 'town-bell') {
+    const centers = selection.filter(e => e.kind === 'town-center' && e.buildProgress === undefined);
+    const enabled = centers.some(e => !e.townBell);
+    let accepted = false;
+    for (const tc of centers) {
+      const result = applyCommand(game, { kind: 'town-bell', player: localPlayer, buildingId: tc.id, enabled });
+      if (!result.ok) reject(result.reason);
+      else accepted = true;
+    }
+    if (accepted) playSound(enabled ? 'townbell_start' : 'townbell_stop');
     return;
   }
   if (id === 'cancel-train') {
@@ -1134,6 +1146,14 @@ function currentCommands(): CommandButton[] {
       slot: selection.some(e => e.kind === 'transport-ship') ? 1 : GRID_SLOT.ungarrison, enabled: true,
     });
   }
+  const bellCenters = selection.filter(e => e.kind === 'town-center' && e.buildProgress === undefined);
+  if (bellCenters.length) {
+    const ringing = bellCenters.every(e => e.townBell);
+    buttons.push({ id: 'town-bell', slot: 14, enabled: true,
+      label: ringing ? messages.backToWork ?? 'Back to work' : messages.townBell ?? 'Ring town bell',
+      help: ringing ? messages.backToWorkHelp : messages.townBellHelp,
+      icon: hud.actionIcon(ringing ? 61 : 49) });
+  }
   // Every completed production building offers the units the rules train there.
   const producer = selection.find(e => isBuilding(e.kind) && e.buildProgress === undefined
     && trainableAt(e.kind as BuildingKind).length > 0);
@@ -1391,8 +1411,9 @@ function selectionInfo(): SelectionInfo | undefined {
     : undefined;
   if (entity.kind === 'town-center' && entity.owner === localPlayer) details.push(AGE_NAMES[game.players[localPlayer].age]);
   if (entity.amount !== undefined) details.push(`${Math.floor(entity.amount)} ${entity.resourceKind}`);
-  if (entity.garrison?.length) {
-    const capacity = isUnit(entity.kind) ? rules.units[entity.kind].transportCapacity
+  if (entity.owner === localPlayer && entity.garrison?.length) {
+    const capacity = isUnit(entity.kind)
+      ? rules.units[entity.kind].transportCapacity ?? rules.units[entity.kind].infantryCapacity
       : rules.buildings[entity.kind as BuildingKind]?.garrison?.capacity;
     details.push(`${entity.garrison.length}${capacity ? `/${capacity}` : ''} garrisoned`);
   }
@@ -1490,7 +1511,7 @@ function syncScene(time: number): void {
         resourceKind: remembered.resource, amount: remembered.amount,
       };
       entityView = view.createEntityView(assets, fake);
-      view.updateEntityView(entityView, assets, game, fake, 0);
+      view.updateEntityView(entityView, assets, game, fake, 0, !!remembered.hasGarrison);
       view.dimFogSnapshot(entityView);
       views.set(key, entityView);
       scene.add(entityView.group);

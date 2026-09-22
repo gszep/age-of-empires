@@ -607,6 +607,8 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       const defensive = canShoot(state, entity);
       if (!isUnit(entity.kind) && !defensive) continue;
       matched++;
+      // A new player order supersedes a bell's remembered work assignment.
+      if (entity.bellReturn) entity.bellReturn = undefined;
       // Retasking aborts a swing in progress -- the reference's own rule, and
       // the reason the windup survives a target drifting out of reach but not
       // an order.
@@ -717,6 +719,34 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     return { ok: true };
   }
 
+  if (command.kind === 'town-bell') {
+    const tc = state.entities.find(e => e.id === command.buildingId && !e.dead
+      && e.owner === command.player && e.kind === 'town-center' && e.buildProgress === undefined);
+    if (!tc) return rejected('town bell requires an owned completed town center');
+    if (typeof command.enabled !== 'boolean') return rejected('town bell needs an enabled state');
+    if (!!tc.townBell === command.enabled) return { ok: true };
+    if (!command.enabled) {
+      releaseTownBell(state, tc);
+    } else {
+      tc.townBell = true;
+      const capacity = state.rules.buildings['town-center'].garrison?.capacity ?? 0;
+      const reserved = state.entities.filter(e => !e.dead && e.order.kind === 'garrison' && e.order.targetId === tc.id).length;
+      const places = Math.max(0, capacity - (tc.garrison?.length ?? 0) - reserved);
+      const workers = state.entities.filter(e => !e.dead && e.owner === command.player && e.kind === 'villager'
+        && !e.bellReturn && e.order.kind !== 'garrison')
+        .sort((a, b) => distance(a.position, tc.position) - distance(b.position, tc.position) || a.id - b.id);
+      for (const worker of workers.slice(0, places)) {
+        worker.bellReturn = { townCenterId: tc.id, order: structuredClone(worker.order),
+          ...(worker.orderQueue ? { queue: structuredClone(worker.orderQueue) } : {}) };
+        worker.order = { kind: 'garrison', targetId: tc.id };
+        worker.orderQueue = undefined;
+        worker.attackWindup = undefined;
+        clearPath(worker);
+      }
+    }
+    return { ok: true };
+  }
+
   if (command.kind === 'ungarrison') {
     const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
     if (!building) return rejected(`building ${command.buildingId} is not owned`);
@@ -727,7 +757,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       clearPath(building);
       return { ok: true };
     }
-    ungarrisonAll(state, building);
+    for (const unit of ungarrisonAll(state, building)) unit.bellReturn = undefined;
     return { ok: true };
   }
 
@@ -1302,6 +1332,8 @@ function kill(state: GameState, entity: Entity): void {
   // Whoever was sheltering inside comes out as it falls, as the reference's
   // do from a razed town center or castle.
   if (entity.dead) return;
+  if (entity.bellReturn) entity.bellReturn = undefined;
+  if (entity.kind === 'town-center' && entity.townBell) releaseTownBell(state, entity);
   const transport = isUnit(entity.kind) && state.rules.units[entity.kind].transportCapacity;
   if (transport) entity.garrison = undefined; // a sinking transport loses its passengers
   else if (entity.garrison?.length) ungarrisonAll(state, entity);
@@ -1812,7 +1844,12 @@ export function canGarrison(state: GameState, unit: Entity, building: Entity): b
   if (!isUnit(unit.kind) || unit.dead || building.dead || unit.id === building.id) return false;
   if (building.owner !== unit.owner || building.buildProgress !== undefined) return false;
   if (isUnit(building.kind)) {
-    const capacity = unitRulesFor(state, building.owner, building.kind).transportCapacity;
+    const carrier = unitRulesFor(state, building.owner, building.kind);
+    if (carrier.infantryCapacity) {
+      const category = state.rules.units[unit.kind].datClass;
+      return (category === 4 || category === 6) && (building.garrison?.length ?? 0) < carrier.infantryCapacity;
+    }
+    const capacity = carrier.transportCapacity;
     return !!capacity && !unit.unpacked && !rowAdmitsWater(state.rules, restrictionOf(state.rules, unit))
       && (building.garrison?.length ?? 0) < capacity;
   }
@@ -1823,22 +1860,52 @@ export function canGarrison(state: GameState, unit: Entity, building: Entity): b
   return (building.garrison?.length ?? 0) < garrison.capacity;
 }
 
+function restoreBellWork(unit: Entity): void {
+  const saved = unit.bellReturn;
+  if (!saved) return;
+  unit.bellReturn = undefined;
+  unit.order = saved.order;
+  unit.orderQueue = saved.queue;
+  unit.activity = 'idle';
+  clearPath(unit);
+}
+
+function releaseTownBell(state: GameState, tc: Entity): void {
+  tc.townBell = false;
+  // Only this bell's workers leave. Manually garrisoned units stay inside.
+  const shelter = tc.garrison ?? [];
+  tc.garrison = shelter.filter(e => e.bellReturn?.townCenterId === tc.id);
+  const released = ungarrisonAll(state, tc);
+  tc.garrison = [...(tc.garrison ?? []), ...shelter.filter(e => e.bellReturn?.townCenterId !== tc.id)];
+  if (!tc.garrison.length) tc.garrison = undefined;
+  for (const worker of released) restoreBellWork(worker);
+  for (const worker of state.entities) {
+    if (!worker.dead && worker.owner === tc.owner && worker.bellReturn?.townCenterId === tc.id) restoreBellWork(worker);
+  }
+}
+
 /**
  * How many arrows a building's volley has: the DAT's base plus what those
- * inside add, capped at its maximum. An archer adds its `garrison_firepower`
- * of 1.0; a villager's is the DAT's -2.5, an encoding the owned files do not
- * explain, and it counts here as the one arrow the reference's rule gives
- * it (recorded in docs/ledger.md).
+ * inside add, capped at its maximum. Positive firepower multiplies ranged DPS;
+ * negative firepower adds its absolute value as flat DPS (UGC attribute 130).
+ * The town center's absent primary projectile contributes neither its nominal
+ * base arrow nor the corresponding slot in the DAT maximum.
  */
 export function volleyArrows(state: GameState, building: Entity): number {
   const volley = state.rules.buildings[building.kind as BuildingKind].garrison?.volley;
   if (!volley) return 1;
-  let arrows = volley.base;
+  const attack = buildingRulesFor(state, building.owner, building.kind as BuildingKind).attack;
+  const buildingDps = (attack?.attacks.find(a => a.class === 3)?.amount ?? 0) / (attack?.reloadSeconds || 1);
+  let power = 0;
   for (const unit of building.garrison ?? []) {
-    const firepower = state.rules.units[unit.kind as UnitKind].garrisonFirepower ?? 0;
-    arrows += firepower < 0 ? 1 : firepower;
+    const rules = unitRulesFor(state, unit.owner, unit.kind as UnitKind);
+    const firepower = rules.garrisonFirepower ?? 0;
+    const dps = (rules.attacks.find(a => a.class === 3)?.amount ?? 0) / (rules.attackReloadSeconds || 1);
+    power += firepower < 0 ? dps - firepower : dps * firepower;
   }
-  return Math.min(volley.max, Math.floor(arrows));
+  const base = volley.ownProjectile ? volley.base : 0;
+  const max = volley.max - (volley.ownProjectile ? 0 : 1);
+  return Math.max(0, Math.min(max, Math.floor(base + (buildingDps > 0 ? power / buildingDps : 0))));
 }
 
 /**
@@ -1922,33 +1989,36 @@ export function ungarrisonAll(state: GameState, building: Entity): Entity[] {
     if (!building.garrison.length) building.garrison = undefined;
     return released;
   }
-  building.garrison = undefined;
   if (!inside.length) return [];
   const half = halfExtent(building);
-  const spots: Point[] = [];
-  for (let ring = 0; ring < 4 && spots.length < inside.length * 2; ring++) {
-    const rx = half.x + 0.5 + ring;
-    const ry = half.y + 0.5 + ring;
-    const steps = 8 + ring * 8;
-    for (let step = 0; step < steps; step++) {
-      const angle = step * 2 * Math.PI / steps;
-      const spot = { x: building.position.x + Math.cos(angle) * rx, y: building.position.y + Math.sin(angle) * ry };
-      if (spot.x < 0.5 || spot.y < 0.5 || spot.x > state.width - 0.5 || spot.y > state.height - 0.5) continue;
-      const blocked = state.entities.some(e => !e.dead && e.id !== building.id
-        && (isBuilding(e.kind) || e.kind === 'resource')
-        && footprintsOverlap(spot, { x: 0.3, y: 0.3 }, e.position, halfExtent(e)));
-      if (!blocked) spots.push(spot);
+  const released: Entity[] = [];
+  for (const unit of inside) {
+    let spot: Point | undefined;
+    for (let ring = 0; ring < 4 && !spot; ring++) {
+      const rx = half.x + unit.radius + 0.5 + ring;
+      const ry = half.y + unit.radius + 0.5 + ring;
+      const steps = 8 + ring * 8;
+      for (let step = 0; step < steps; step++) {
+        const angle = step * 2 * Math.PI / steps;
+        const candidate = { x: building.position.x + Math.cos(angle) * rx, y: building.position.y + Math.sin(angle) * ry };
+        if (spawnFree(state, candidate, unit.radius, restrictionOf(state.rules, unit))
+          && released.every(other => distance(other.position, candidate) >= other.radius + unit.radius)) {
+          spot = candidate;
+          break;
+        }
+      }
     }
-  }
-  for (const [index, unit] of inside.entries()) {
-    const spot = spots[index % Math.max(1, spots.length)] ?? building.position;
+    if (!spot) continue;
     unit.position = { x: spot.x, y: spot.y };
     unit.gatherProgress = 0;
     unit.activity = 'idle';
     unit.order = { kind: 'idle' };
     state.entities.push(unit);
+    released.push(unit);
   }
-  return inside;
+  building.garrison = inside.filter(unit => !released.includes(unit));
+  if (!building.garrison.length) building.garrison = undefined;
+  return released;
 }
 
 /**
@@ -2481,6 +2551,22 @@ function spawnTrainedUnit(state: GameState, building: Entity, kind: UnitKind): v
   const rules = unitRulesFor(state, building.owner, kind);
   const spawn = spawnPoint(state, building, rules.radius, rules.terrainRestriction ?? LAND_RESTRICTION);
   const unit = addEntity(state, kind, building.owner, spawn, rules);
+  const capacity = state.rules.buildings[building.kind as BuildingKind].garrison?.capacity ?? 0;
+  if ((building.rally?.targetId === building.id || (building.townBell && kind === 'villager'))
+    && (building.garrison?.length ?? 0) < capacity) {
+    unit.position = { ...building.position };
+    if (building.townBell && kind === 'villager') {
+      const target = state.entities.find(e => e.id === building.rally?.targetId);
+      if (building.rally && target?.id !== building.id) assignOrder(state, unit, building.rally.target, target);
+      unit.bellReturn = { townCenterId: building.id, order: structuredClone(unit.order) };
+      becomeIdle(unit);
+    }
+    state.entities = state.entities.filter(e => e.id !== unit.id);
+    (building.garrison ??= []).push(unit);
+    return;
+  }
+  // Overflow appears outside rather than disappearing or walking into itself.
+  if (building.rally?.targetId === building.id) return;
   if (building.rally) {
     const target = building.rally.targetId
       ? state.entities.find(e => e.id === building.rally!.targetId)

@@ -615,6 +615,8 @@ def extract_entity(
     # owned files do not explain; it is carried as the number it is.
     if category in ("unit", "unit-variant") and unit.type_50 is not None:
         entity["garrisonFirepower"] = rounded(unit.type_50.garrison_firepower)
+    if category == "unit" and unit.class_ == 13 and unit.garrison_capacity > 0:
+        entity["infantryCapacity"] = int(unit.garrison_capacity)
 
     if category == "projectile" and unit.projectile is not None:
         # `projectile_arc` is a fraction of the shot's distance. Its sign varies
@@ -799,6 +801,21 @@ def extract_entity(
     # the Castle one) is left to the renderer's age chain rather than decoded
     # twice. The hit points the variants also carry are a simulation change
     # and are not read here; see docs/backlog.md.
+    def garrison_flags(carrier, age_key):
+        from naval import graphic_layers
+        if carrier.creatable is None or carrier.garrison_capacity <= 0:
+            return
+        layers = graphic_layers(dat, carrier.creatable.garrison_graphic)
+        flags = []
+        for graphic_id, x, y in layers:
+            name = f"garrison-{graphic_id}"
+            if name not in entity["animations"]:
+                entity["animations"][name] = animation_entry(dat, graphics_dir, graphic_id, hashes)
+            flags.append({"animation": name, "x": x, "y": y})
+        if flags:
+            entity.setdefault("garrisonFlags", {})[age_key] = flags
+
+    garrison_flags(unit, "idle")
     if category == "building":
         # What it burns with as it loses hit points (issue #73): the DAT's
         # `damage_graphics` are one composite per threshold whose deltas are
@@ -815,6 +832,7 @@ def extract_entity(
             if variant is None or variant.standing_graphic[0] < 0:
                 continue
             standing = variant.standing_graphic[0]
+            garrison_flags(variant, f"idle-{age}")
             entity["animations"][f"idle-{age}"] = animation_entry(
                 dat, graphics_dir, base_graphic(dat, variant, standing) if composed else standing, hashes
             )
@@ -1684,6 +1702,8 @@ def extract(
                 ("notEnoughFood", 3001), ("notEnoughWood", 3002), ("notEnoughStone", 3003),
                 ("notEnoughGold", 3004), ("needMoreHouses", 3005),
                 ("unload", 4107), ("unloadWhere", 3053),
+                ("townBell", 40111), ("townBellHelp", 41111),
+                ("backToWork", 40015), ("backToWorkHelp", 41015),
                 ("creating", 4310), ("stopCreating", 42105),
                 # Map setup labels and the three shipped random-map names (#144).
                 ("mapType", 9691), ("mapSeed", 10658), ("startGame", 9472),
