@@ -199,8 +199,8 @@ without any of it. With the Enhanced Graphics Pack downloaded (depot
 and drawn at half size, where its drawn pixels land within one x1 pixel of
 the base art's; sheets over 8192 px continue on pages. The base depots
 alone still import at x1. Sprite pages load on first use rather than all
-at start -- the pack's 1,839 sheets are 5.5 GB of PNG, and loading them
-up front took the machine down (WSL, 15 GB) -- so a sprite may be absent
+at start -- loading the whole pack up front took the machine down (WSL,
+15 GB) -- so a sprite may be absent
 for a frame or two on its first appearance. Unused pages now release both GPU
 textures and decoded images after two minutes, or after ten seconds under a
 512 MiB soft-budget pressure (#152). Current scene art (including frozen fog
@@ -209,6 +209,17 @@ cap or camera-frustum streaming. `tools/sprite_residency_smoke.mts` verifies
 repeated walk/idle/evict/reload cycles, reduced GPU texture counts, unchanged
 paused pixels and simulation hashes. Every DE capture in the reference corpus was taken with
 the pack installed, so texture detail now compares like for like.
+
+Identical source-SHA/frame-count/layer atlases share one canonical URL (#162),
+with per-use frame layout and scale intact. The import now references 1,930
+sprite/particle pages instead of 2,767 (5.71 GB PNG versus 6.92 GB). Existing
+legacy files are retained; this is a fresh-output/reference reduction, not a
+claim that migration deleted 1.21 GB from disk. The full PNG/layout audit and
+a repeated import were byte-identical after normalizing only URLs. In the
+ten-ship idle/attack browser A/B, decoded sprite residency fell from
+3,881,869,760 to 874,990,464 bytes and GPU texture count from 128 to 65, with
+identical rendered sRGB PNGs and simulation hashes. `atlas_sharing_smoke.mts`
+recreates legacy URLs privately, so it also works with a fresh shared import.
 
 Fog snapshots finish binding late sprite pages without changing their frozen
 pose or reading newer entity state (#88). In particular, a tree that leaves

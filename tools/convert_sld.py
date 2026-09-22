@@ -313,6 +313,30 @@ def atlas_jobs(imported: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+AtlasWork = tuple[str, dict[str, Any], str, str | None]
+
+
+def shared_atlas_jobs(jobs: list[dict[str, Any]], hashes: dict[str, str]) -> list[list[AtlasWork]]:
+    """One conversion per identical source/played-frame-count/layer (#162).
+
+    The lexically first semantic name owns the URL. Scale stays on each
+    published atlas: it changes display size, never the decoded pixels.
+    Missing source hashes cannot establish identity and are never shared.
+    """
+    groups: dict[tuple[Any, ...], list[AtlasWork]] = {}
+    for job in jobs:
+        for layer in (None, *job["layers"]):
+            suffix = "" if layer is None else f"-{layer}"
+            identifier = f"{job['key']}:{job['name']}" + ("" if layer is None else f":{layer}")
+            image = f"{job['key']}/{job['name']}{suffix}.png"
+            digest = hashes.get(job["source"])
+            identity = ("sha256", digest) if digest else ("unhashed", identifier)
+            key = (identity, job["expected"], layer)
+            groups.setdefault(key, []).append((identifier, job, image, layer))
+    return sorted((sorted(group, key=lambda work: work[0]) for group in groups.values()),
+                  key=lambda group: group[0][0])
+
+
 def _convert_one(work: tuple[str, str, str, int, str | None]) -> tuple[str, dict[str, Any] | None, str | None]:
     """One sheet, in a worker process: the main layer when `layer` is None,
     else that mask. Returns the atlas, or the error a mask raised."""
@@ -389,6 +413,8 @@ def main() -> None:
             return None
         if entry["source"] != source_hashes.get(job["source"]) or entry["expected"] != job["expected"]:
             return None
+        if entry.get("image", image) != image:
+            return None
         atlas = entry["atlas"]
         if atlas and not all(page_path(args.out / image, page).is_file()
                              for page in range(len(atlas.get("pages", [0])))):
@@ -403,20 +429,26 @@ def main() -> None:
     # its masks. A mask failure costs that entity one mask and is recorded,
     # never fatal.
     mask_skipped: list[str] = []
-    pending: list[tuple[str, dict[str, Any], str, str | None]] = []
-    for job in jobs:
-        for layer in (None, *job["layers"]):
+    pending: list[list[AtlasWork]] = []
+
+    def publish_group(group: list[AtlasWork], atlas: dict[str, Any]) -> None:
+        image = group[0][2]
+        for identifier, job, _alias_image, layer in group:
             suffix = "" if layer is None else f"-{layer}"
-            identifier = f"{job['key']}:{job['name']}" + ("" if layer is None else f":{layer}")
-            image = f"{job['key']}/{job['name']}{suffix}.png"
-            atlas = cached(identifier, job, image)
-            if atlas is None:
-                pending.append((identifier, job, image, layer))
-                continue
-            reused += 1
-            cache[identifier] = {"source": source_hashes.get(job["source"]), "expected": job["expected"], "atlas": atlas}
+            cache[identifier] = {"source": source_hashes.get(job["source"]), "expected": job["expected"],
+                                 "image": image, "atlas": atlas}
             if atlas:
                 atlases.setdefault(job["key"], {})[f"{job['name']}{suffix}"] = published(atlas, image, job["scale"])
+
+    groups = shared_atlas_jobs(jobs, source_hashes)
+    for group in groups:
+        identifier, job, image, _layer = group[0]
+        atlas = cached(identifier, job, image)
+        if atlas is None:
+            pending.append(group)
+            continue
+        reused += 1
+        publish_group(group, atlas)
 
     # The sheets are independent, so they convert in parallel: a worker per
     # `--jobs`, each decoding one source and writing its pages. The order
@@ -425,21 +457,20 @@ def main() -> None:
     from multiprocessing import Pool
 
     work = [(identifier, str(graphics.path(job["source"])), str(args.out / image), job["expected"], layer)
-            for identifier, job, image, layer in pending]
-    by_identifier = {identifier: (job, image, layer) for identifier, job, image, layer in pending}
+            for group in pending for identifier, job, image, layer in [group[0]]]
+    by_identifier = {group[0][0]: group for group in pending}
     with Pool(processes=args.jobs) as pool:
         for identifier, atlas, error in pool.imap_unordered(_convert_one, work):
-            job, image, layer = by_identifier[identifier]
-            suffix = "" if layer is None else f"-{layer}"
+            group = by_identifier[identifier]
+            layer = group[0][3]
             if error is not None:
                 if layer is None:
                     raise RuntimeError(f"{identifier}: {error}")
-                mask_skipped.append(identifier)
+                mask_skipped.extend(member[0] for member in group)
                 print(f"skipped {identifier}: {error}")
                 continue
-            cache[identifier] = {"source": source_hashes.get(job["source"]), "expected": job["expected"], "atlas": atlas}
-            if atlas:
-                atlases.setdefault(job["key"], {})[f"{job['name']}{suffix}"] = published(atlas, image, job["scale"])
+            assert atlas is not None
+            publish_group(group, atlas)
             print(identifier)
 
     entities: dict[str, Any] = {}
@@ -513,6 +544,7 @@ def main() -> None:
     cache_path.write_text(json.dumps({"decoder": fingerprint, "atlases": cache},
                                      separators=(",", ":"), sort_keys=True) + "\n")
     print(f"{reused} atlases reused from {cache_path.name}")
+    print(f"{sum(len(group) - 1 for group in groups)} identical source/layer aliases share atlas URLs")
     print(manifest_path)
 
 

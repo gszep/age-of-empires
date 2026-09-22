@@ -29,6 +29,9 @@ browser smoke and are maintained regression tools.
 - **`compression_smoke.mts`** — #154's actual Three.js wire sizes, decoded
   byte identity, gzip/Brotli negotiation, cache validation and cold/warm browser
   navigation. Uses open fallback to isolate module transfer from owned artwork.
+- **`atlas_sharing_smoke.mts`** — #162's ten-ship A/B with per-animation versus
+  shared URLs: fewer decoded bytes/GPU textures, identical rendered PNG pixels
+  and simulation hash. Internally rewrites legacy URLs to the same source bytes.
 - **`training_queue_smoke.mts`** — separate active unit plus counted waiting
   runs, source-scale 3/3/1 layout, refunds without interrupting the current
   unit, and fourteen waiting entries plus the active one. Also run with
@@ -58,6 +61,12 @@ browser smoke and are maintained regression tools.
   palette use, not DE's exact diagonal/corner slope classification.
 
 ## General probes
+
+- **`atlas_sharing.py`** — record/compare every sprite/particle PNG hash and
+  non-URL manifest field before/after sharing. Run
+  `uv run --locked python tools/probes/atlas_sharing.py record .local/atlas-before.json`,
+  regenerate through `npm run import:aoe2`, then run the same command with
+  `compare` instead of `record`. Reports unique page, RGBA and PNG byte counts.
 
 - **`snapshot.ts`** — build a state in Node through the simulation's own
   `applyCommand`/entity list, hand it to the page as a dev-session snapshot,
