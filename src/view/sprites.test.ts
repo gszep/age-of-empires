@@ -1296,6 +1296,36 @@ describe('player colour through the imported ramp', () => {
     expect(villagerView.outline.mesh.visible).toBe(true);
     expect((villagerView.outline.mesh.material as THREE.MeshBasicMaterial).color.getHex())
       .toBe(0x0000ff);
+
+    // Switch to art with no contour, then let the old page expire (#172).
+    let now = 0;
+    assets.spriteResidency = new SpriteResidency(assets.textures, () => now);
+    assets.spriteResidency.add('villager/idle-outline.png', texture);
+    assets.entities.villager.animations.walk = assets.entities.villager.animations.idle;
+    assets.entities.villager.atlases.walk = assets.entities.villager.atlases.idle;
+    villager.activity = 'moving';
+    updateEntityView(villagerView, assets, state, villager, 1);
+    expect(villagerView.animationState).toBe('villager/walk');
+    now = 121_000; assets.spriteResidency.sweep();
+    expect(texture.image).toBeNull();
+    updateOcclusion(views, state);
+    expect(villagerView.outline.mesh.visible).toBe(false);
+
+    // Returning to a valid animation waits for its page instead of reviving
+    // the disposed binding. An intentionally empty frame stays hidden too.
+    villager.activity = 'idle';
+    updateEntityView(villagerView, assets, state, villager, 2);
+    updateOcclusion(views, state);
+    expect(villagerView.outline.pendingTexture).toBe('villager/idle-outline.png');
+    expect(villagerView.outline.mesh.visible).toBe(false);
+    assets.textures.set('villager/idle-outline.png', new THREE.DataTexture(new Uint8Array(64), 4, 4));
+    updateEntityView(villagerView, assets, state, villager, 3);
+    updateOcclusion(views, state);
+    expect(villagerView.outline.mesh.visible).toBe(true);
+    frames[0].w = 0;
+    updateEntityView(villagerView, assets, state, villager, 4);
+    updateOcclusion(views, state);
+    expect(villagerView.outline.mesh.visible).toBe(false);
   });
 
   it('records the owner so a view can be rebuilt when a sheep changes hands', () => {

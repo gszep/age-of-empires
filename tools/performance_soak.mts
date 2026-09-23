@@ -3,12 +3,13 @@
  * No simulation shortcuts, skipped rendering, artificial cache clock or GC. */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sampleDelay } from 'node:timers/promises';
 import { createServer } from 'vite';
 import puppeteer from 'puppeteer';
+import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sampleMs = Number(process.env.SAMPLE_MS ?? 60_000);
@@ -21,6 +22,25 @@ assert(speeds.length && speeds.every(index => Number.isInteger(index) && index >
 const port = Number(process.env.PROBE_PORT ?? 5238);
 const instrumentation = `
 const soakSamples = { frame: [], interval: [], step: [], ai: [], sync: [], render: [] };
+let soakBindingFailure;
+const soakGetBindings = renderer._bindings.getForRender.bind(renderer._bindings);
+renderer._bindings.getForRender = renderObject => {
+  try { return soakGetBindings(renderObject); } catch (error) {
+    if (!soakBindingFailure) {
+      const entry = [...views].find(([key, view]) => view.group.children.includes(renderObject.object));
+      soakBindingFailure = { key: entry?.[0], animation: entry?.[1].animationState,
+        parts: entry && Object.entries(entry[1]).filter(([key, value]) => value?.mesh === renderObject.object).map(([key]) => key),
+        name: renderObject.object.name, type: renderObject.material.type,
+        map: renderObject.material.map?.uuid, alphaMap: renderObject.material.alphaMap?.uuid,
+        bindings: renderObject.getBindings().flatMap(group => group.bindings.filter(binding => binding.isSampledTexture).map(binding => ({
+          name: binding.name, texture: binding.texture?.uuid, nodeValue: binding.textureNode?.value?.uuid,
+          nodeType: binding.textureNode?.constructor.name, reference: binding.textureNode?.referenceNode?.constructor.name,
+          property: binding.textureNode?.referenceNode?.property
+        }))) };
+    }
+    throw error;
+  }
+};
 const soakDistribution = values => {
   const sorted = values.splice(0).sort((a,b) => a-b);
   const pick = q => Math.round((sorted[Math.min(sorted.length-1, Math.floor(sorted.length*q))] ?? 0)*100)/100;
@@ -30,9 +50,15 @@ const soakDistribution = values => {
 Object.assign(globalThis, { __performanceSoak: () => ({
   timings: Object.fromEntries(Object.entries(soakSamples).map(([key, values]) => [key, soakDistribution(values)])),
   gpu: { ...renderer.info.memory }, sprites: assets?.spriteResidency?.stats,
+  bindingFailure: soakBindingFailure,
   spritePolicy: { ...assets?.spriteResidency?.policy },
   heap: performance.memory?.usedJSHeapSize, views: views.size, tick: game.tick,
   missingBodies: [...views.values()].filter(view => view.body.pendingTexture).length, speed: gameSpeed(),
+  invalidBindings: [...views].flatMap(([key, view]) => Object.entries(view).flatMap(([part, piece]) => {
+    if (!piece?.mesh?.visible) return [];
+    const texture = piece.mapNode?.value ?? piece.mesh.material.map;
+    return texture?.source?.data === null ? [{ key, part, image: piece.textureImage, pending: piece.pendingTexture }] : [];
+  })),
   entities: game.entities.length, winner: game.winner, setup: activeSetup,
   ages: [game.players[1].age, game.players[2].age],
   look: game.entities.find(e => e.owner === 1 && !e.dead && e.activity === 'attacking')?.id
@@ -75,7 +101,13 @@ console.log(JSON.stringify({ event: 'working-tree', changes: execFileSync('git',
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 800 });
-  page.on('pageerror', error => errors.push(String(error)));
+  page.on('pageerror', error => {
+    const detail = error.stack ?? String(error);
+    if (!errors.includes(detail)) {
+      errors.push(detail);
+      console.log(JSON.stringify({ event: 'page-error', at: new Date().toISOString(), error: detail }));
+    }
+  });
   page.on('error', error => errors.push(`page crash: ${error}`));
   page.on('response', response => {
     if (response.url().includes('/imported/') && response.status() >= 400) errors.push(`${response.status()} ${response.url()}`);
@@ -104,6 +136,13 @@ try {
     const available = Number(free.split('\n').find(line => line.startsWith('Mem:'))!.trim().split(/\s+/).at(-1));
     console.log(JSON.stringify({ event: 'sample', at: new Date().toISOString(), round: rounds, roundAgeMs: Date.now() - roundStarted, available, ...metrics }));
     samples++;
+    if (errors.length) {
+      const state = await query({ type: 'snapshot' });
+      const { rules, ...saved } = state;
+      const file = `${root}.local/performance-soak-failure-${process.pid}.json`;
+      writeFileSync(file, JSON.stringify({ version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved, metrics, errors }) + '\n');
+      console.log(JSON.stringify({ event: 'failure-snapshot', file }));
+    }
     assert.deepEqual(errors, [], 'no page crashes, script failures or missing owned assets');
     assert(available > 1.5 * 1024 ** 3, 'stop workload before exhausting the host memory envelope');
     stalled = metrics.tick === lastTick && !metrics.winner ? stalled + 1 : 0;

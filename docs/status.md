@@ -346,6 +346,19 @@ windows, not hardware FPS or identical wall-time tick counts. Idle expiry and
 eviction/reload pixel invariants still pass; the full multi-map soak resumes
 with the longer grace.
 
+The sustained run then exposed a Three r180 sampler-lifetime failure (#172):
+after texture A was replaced by B and A expired, a newly rendered object could
+clone the cached template's cleared sampler despite having a valid B material.
+Sprite builder-cache keys now include the texture UUID/lifetime; ramp pieces
+invalidate bindings when changing pages. A real-renderer A→B→expire A→new B
+fixture reproduces the original WeakMap exception before the fix and preserves
+pixels/state after it, for basic and player-ramp materials. Missing/pending/empty
+contours also cannot revive retired bindings. The eight-minute 10x rerun passed
+two full victories plus a partial third match with no page errors or missing-body
+samples. Earlier failed segments remain failed evidence; the multi-map run is
+separate. Soak failures now retain unique stacks, sampler diagnostics and a
+versioned state snapshot rather than only hundreds of repeated error strings.
+
 The maintained open-ground pathing probe now discovers/asserts a clear
 20-tile corridor (#5) instead of using a seed-200 destination occupied by a
 tree. It reaches the goal in 485 ticks at a 0.97 travel ratio. The ten-minute

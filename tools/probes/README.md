@@ -26,6 +26,12 @@ browser smoke and are maintained regression tools.
 - **`sprite_residency_smoke.mts`** — #152's repeated walk/idle/expiry/reload
   cycles, decoded-byte and GPU-texture release, unchanged paused pixels and
   synchronization hashes. A private transform advances only the cache clock.
+- **`outline_residency_smoke.mts`** — #172's late occlusion after an old contour
+  page expires. Missing current art stays hidden and the real renderer continues
+  returning pixels without reviving the disposed binding.
+- **`sampler_residency_smoke.mts`** — #172's exact Three sampler-cache failure:
+  draw page A, switch to B, expire A, then create another B object. Real basic
+  and player-ramp rendering must retain identical pixels and unchanged state.
 - **`compression_smoke.mts`** — #154's actual Three.js wire sizes, decoded
   byte identity, gzip/Brotli negotiation, cache validation and cold/warm browser
   navigation. Uses open fallback to isolate module transfer from owned artwork.

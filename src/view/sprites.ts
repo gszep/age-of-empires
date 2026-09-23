@@ -34,7 +34,7 @@ interface Piece {
   atlasKey?: string;
   /** A valid frozen frame whose page has not arrived yet. */
   pendingTexture?: string;
-  /** Retained for frozen fog views, which do not apply their frame again. */
+  /** Current nonempty frame's page; also retained by frozen fog views. */
   textureImage?: string;
   /**
    * Set on a piece drawn through a player's palette ramp: the sheet is bound to
@@ -98,7 +98,21 @@ export interface EntityView {
  */
 const HEIGHT_PIXELS = TILE_H / 2;
 
-const material = () => new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false });
+/** Three r180's cached sampler template retains its first texture; disposing
+ * that page clears the template even after materials have moved to another
+ * page. A new render object can then clone a null sampler (#172). Scope the
+ * builder cache to the actual page lifetime, including reload generations.
+ * Compiled shader code can still be shared; pixel/shader math is unchanged. */
+function scopePageBindings(material: THREE.Material, current: () => THREE.Texture | null): void {
+  const baseKey = material.customProgramCacheKey.bind(material);
+  material.customProgramCacheKey = () => `${baseKey()}:sprite-page:${current()?.uuid ?? 'none'}`;
+}
+
+const material = () => {
+  const result = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false });
+  scopePageBindings(result, () => result.map);
+  return result;
+};
 
 function makePiece(): Piece {
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material());
@@ -139,6 +153,7 @@ function makeRampPiece(ramp: THREE.Texture): Piece {
   });
   nodeMaterial.colorNode = textureNode(ramp).sample(vec2(u, 0.5)).rgb.mul(materialColor);
   nodeMaterial.opacityNode = sheet.a.mul(materialOpacity);
+  scopePageBindings(nodeMaterial, () => sheet.value);
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), nodeMaterial);
   mesh.visible = false;
   return { mesh, mapNode: sheet };
@@ -514,7 +529,10 @@ export function gatherTargetResource(state: ReadonlyGameState, entity: Entity) {
 function bindTexture(piece: Piece, texture: THREE.Texture): void {
   const material = piece.mesh.material as THREE.MeshBasicMaterial;
   if (piece.mapNode) {
-    if (piece.mapNode.value !== texture) piece.mapNode.value = texture;
+    if (piece.mapNode.value !== texture) {
+      piece.mapNode.value = texture;
+      material.needsUpdate = true;
+    }
   } else if (material.map !== texture) {
     material.map = texture;
     material.needsUpdate = true;
@@ -888,7 +906,7 @@ export function updateOcclusion(views: Map<string, EntityView>, state: ReadonlyG
     // Most of the unit has to be behind the thing, not a sliver of it: a
     // sprite's box includes its transparent margins, so brushing past a tree
     // would otherwise light the contour up.
-    mesh.visible = area > 0 && occluders.some(o => {
+    const covered = area > 0 && occluders.some(o => {
       const overlapX = Math.min(o.x + o.width / 2, body.position.x + body.scale.x / 2)
         - Math.max(o.x - o.width / 2, body.position.x - body.scale.x / 2);
       const overlapY = Math.min(o.y + o.height / 2, body.position.y + body.scale.y / 2)
@@ -896,7 +914,12 @@ export function updateOcclusion(views: Map<string, EntityView>, state: ReadonlyG
       return o.depth > depth && overlapX > 0 && overlapY > 0
         && (overlapX * overlapY) / area >= HIDDEN_FRACTION;
     });
-    for (const part of view.layerOutlines ?? []) part.mesh.visible = mesh.visible && !!part.atlasKey;
+    // Occlusion may choose to show a contour, but cannot make an absent,
+    // pending or retired frame drawable. Its old texture may be evicted (#172).
+    mesh.visible = covered && !!view.outline.textureImage && !view.outline.pendingTexture;
+    for (const part of view.layerOutlines ?? []) {
+      part.mesh.visible = covered && !!part.atlasKey && !!part.textureImage && !part.pendingTexture;
+    }
   }
 }
 
@@ -991,6 +1014,11 @@ export function updateEntityView(
   hasGarrison = !!entity.garrison?.length,
 ): void {
   const depth = isoDepth(entity.position.x, entity.position.y);
+  // A new animation may have no contour. Do not leave the previous animation
+  // eligible for updateOcclusion to revive after its texture expires.
+  view.outline.mesh.visible = false;
+  view.outline.textureImage = undefined;
+  view.outline.pendingTexture = undefined;
   updateGarrisonFlags(view, assets, state, entity, time, hasGarrison);
   if (entity.kind === 'farm') {
     updateFarmView(view, assets, state, entity);
