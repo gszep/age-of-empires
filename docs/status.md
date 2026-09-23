@@ -194,6 +194,15 @@ samples are variable-throughput observations, not a controlled speed ratio.
 304s; `tools/shared_smoke.mts` verifies commands, joins, reload and recovery
 through the local gateway with compression enabled.
 
+Shared-match snapshots also negotiate WebSocket DEFLATE (#174), with independent
+compression streams and ordinary server tick/control messages explicitly plain.
+The actual imported Windsor snapshot was 3,162,658 wire bytes without the
+extension and 95,679 with it; decoded 3,162,648-byte JSON and SHA-256 matched.
+Sequential private-host transfers to Artemis measured 4.504 s and 1.501 s on
+that run. These are network observations, not fixed speedup guarantees. Clients
+declining compression still work; a real-host fixture checks a large uncompressed
+50-command tick as well as snapshot identity and negotiation.
+
 **Import** (`tools/`): patch-matched DAT rules, palettes, terrain, blend
 masks, overlay masks, water and foam atlases, widgets, fonts, strings,
 particles, hotkeys and audio through a byte-identical local pipeline

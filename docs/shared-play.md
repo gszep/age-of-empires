@@ -39,6 +39,12 @@ sorts object fields and preserves array order: JSON transport drops undefined
 properties, so insertion order is not a reliable state invariant (#153).
 Legacy v1 replay checksums remain unchanged. Art never selects rules.
 
+Large snapshots negotiate the standard WebSocket `permessage-deflate` extension
+with independent streams (#174); clients without it receive the same plain JSON.
+Ordinary host ticks, settings and errors explicitly bypass compression, so their
+delivery does not acquire compression buffering. Snapshot-backlog acknowledgement
+and the application protocol version are unchanged.
+
 Incoming ticks enter a 100 ms wall-clock buffer, independent of game speed.
 Scheduled tasks drain at most a 4 ms work batch (one expensive tick/hash can
 exceed that budget), yielding between batches so a catch-up burst does not

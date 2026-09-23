@@ -10,6 +10,7 @@ import { validateCommand } from '../protocol/validate';
 import type { PlayerId } from '../sim/types';
 import { SharedMatch } from './match';
 import { SHARED_SPEEDS, SHARED_VERSION, type HostMessage } from './protocol';
+import { SNAPSHOT_COMPRESSION } from './snapshot-compression';
 
 /** EX_CONFIG: retrying cannot repair a saved match; leave it for its owner. */
 export class SharedCheckpointError extends Error {
@@ -47,7 +48,8 @@ export function sharedMatchPlugin(root: string, checkpointPath = resolve(root, '
         match.humanTwo = saved.humanTwo;
         match.setup = validMatchSetup(saved.setup) ? saved.setup : undefined;
       }
-      const sockets = new WebSocketServer({ noServer: true, maxPayload: 32 * 1024 * 1024 });
+      const sockets = new WebSocketServer({ noServer: true, maxPayload: 32 * 1024 * 1024,
+        perMessageDeflate: SNAPSHOT_COMPRESSION });
       const players = new Map<WebSocket, PlayerId>();
       const snapshotBytes = new Map<WebSocket, number>();
       const send = (socket: WebSocket, message: HostMessage) => {
@@ -56,7 +58,7 @@ export function sharedMatchPlugin(root: string, checkpointPath = resolve(root, '
         // A surveyed-map snapshot can exceed the ordinary tick-backlog budget.
         // Keep its allowance until the browser acknowledges receiving it.
         if (message.type === 'snapshot') snapshotBytes.set(socket, Buffer.byteLength(data));
-        socket.send(data);
+        socket.send(data, { compress: message.type === 'snapshot' });
       };
       const broadcast = (message: HostMessage) => {
         if (message.type === 'snapshot') {
@@ -67,7 +69,7 @@ export function sharedMatchPlugin(root: string, checkpointPath = resolve(root, '
         for (const socket of players.keys()) {
           // A suspended browser reconnects from a snapshot instead of retaining an unbounded tick backlog.
           if (socket.bufferedAmount > (snapshotBytes.get(socket) ?? 0) + 1024 * 1024) socket.terminate();
-          else if (socket.readyState === WebSocket.OPEN) socket.send(data);
+          else if (socket.readyState === WebSocket.OPEN) socket.send(data, { compress: false });
         }
       };
       const save = () => {

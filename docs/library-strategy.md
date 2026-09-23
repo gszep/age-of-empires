@@ -19,7 +19,7 @@ The project should not build commodity infrastructure from scratch, but it also 
 | RMS parsing | Evaluate MIT-licensed Mangudai before writing a parser | Native JS/TS AST; use `rms-check` externally as a GPL compatibility oracle |
 | Browser concurrency | Native Web Workers and structured clone first | Standard platform API; add Comlink only if message boilerplate becomes material |
 | MCP strategies | `@modelcontextprotocol/sdk` 1.30 | Maintained protocol handshake and stdio transport behind one strategy adapter; fixture-tested with a real MCP server/tool |
-| WebSocket strategies | `ws` 8.18 for Node test/server fixtures; native `WebSocket` client | Narrow transport boundary using the same versioned messages as JSONL |
+| WebSocket strategies/shared play | `ws` 8.21 for Node test/server fixtures; native `WebSocket` client | Narrow transport boundary; negotiated snapshot-only DEFLATE is fixture-tested for real wire bytes, byte identity, plain controls and extension opt-out (#174) |
 | Dev-host HTTP compression | `compression` 1.8.2 (MIT) | Maintained gzip/Brotli negotiation and streaming; fixture-tested byte identity, conditional requests, opt-out, HEAD/range and uncompressed assets/control routes before adoption (#154) |
 
 `aoe2-genie-tooling` 1.2.4 was also tested, but rejected for this pinned manifest because its parser reported 22,449 trailing bytes. This is why every library choice needs a real fixture rather than relying only on advertised format support.
