@@ -323,6 +323,15 @@ lookups (#168). The same three-seed trace fell another 36.982 to 34.025 s, and
 Windsor 181.983 to 170.959 s, again with identical states. Across the recorded
 Arabia optimization sequence, stepping totals are 50.087 → 34.025 s (32%).
 
+`tools/performance_soak.mts` supplies sustained, private real-browser workloads
+(#169): two existing AIs issuing public commands, actual speed/map controls,
+camera moves and normal cache clocks. JSON samples separate transition time
+from subsequent frame/step/AI/scene/render distributions and record resident
+sprite bytes, evictions, GPU allocations, JS heap and available host memory.
+Short validation exercised all four maps and all three speed modes; SIGTERM
+emits an interrupted result and closes the private browser/server. Sustained
+run evidence is recorded separately from these harness checks.
+
 The maintained open-ground pathing probe now discovers/asserts a clear
 20-tile corridor (#5) instead of using a seed-200 destination occupied by a
 tree. It reaches the goal in 485 ticks at a 0.97 travel ratio. The ten-minute

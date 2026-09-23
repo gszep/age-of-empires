@@ -65,6 +65,18 @@ browser smoke and are maintained regression tools.
 
 ## General probes
 
+- **`performance_soak.mts`** (under `tools/`) — sustained Linux/SwiftShader
+  two-AI browser workload using public commands and actual speed/map controls.
+  `SOAK_MINUTES=30 npx tsx tools/performance_soak.mts` cycles Arabia, Windsor,
+  Black Forest and Senlac; `SOAK_UNTIL=<ISO timestamp>` supplies a hard run end.
+  `SOAK_SPEEDS=1,3,5` selects Normal/Extra Fast/10x stress indices; samples report
+  the actual multiplier. `MATCH_TICKS`, `SOAK_MAPS` and `SAMPLE_MS` control the
+  workload. JSON lines separate startup/transitions, steady samples, victory or
+  tick/wall-limit endings, completion and interruption. Samples include timing
+  distributions, sprite bytes/evictions, GPU allocations, JS heap and Linux
+  available memory. No artificial cache clock or forced GC; stops before host
+  memory exhaustion. SIGINT/SIGTERM close the private browser/server.
+
 - **`sim_performance.mts`** — record/compare path hashes and raw-JSON state
   hashes every 1,000 ticks across three imported 12,000-tick AI matches. Run
   `npx tsx tools/probes/sim_performance.mts record .local/sim-before.json`, then
