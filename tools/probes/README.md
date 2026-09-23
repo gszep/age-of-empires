@@ -47,6 +47,11 @@ browser smoke and are maintained regression tools.
   `OPEN_FALLBACK=1` for the open-content UI.
 - **`scorpion_smoke.mts`** — real training/research clicks, Heavy Scorpion art
   and attack display, then a right-click attack.
+- **`elevation_placement_smoke.mts`** — #176's real barracks build buttons and
+  clicks: red steep-site preview rejects without spending or changing state;
+  green one-level ramp preview creates a paid, rendered foundation. Also run
+  with `OPEN_FALLBACK=1`. Private accessors read the actual preview material and
+  camera projection; building input still goes through the normal UI.
 - **`farm_occupancy_smoke.mts`** — group right-click on a farm gives one farmer
   and actual food gathering.
 - **`group_movement_smoke.mts`** — #83's real 25-unit ground right-click settles
@@ -68,6 +73,20 @@ browser smoke and are maintained regression tools.
   fixture checks state immutability and a four-sided hill's screen-right lighting
   against the human's editor reference. It verifies the coarse orientation and
   palette use, not DE's exact diagonal/corner slope classification.
+- **`world_relief_smoke.mts`** — #160's production world-terrain meshes in a
+  private Three.js browser fixture (`world_relief_fixture.ts`). A symmetric hill
+  has both screen-right faces brighter than both left faces. Uses 5×5
+  linear-sRGB crops at 2/3 native projection scale, normalized by an unshaded
+  draw of identical geometry/UVs to cancel texture variation. Checks imported
+  grass and open fallback, unchanged geometry/UVs and simulation checksum.
+  Orientation is reference-informed; neither exact DE lighting strength nor
+  the missing original reference RGB is asserted.
+- **`shore_blend_smoke.mts`** — #148's real production loader/ground geometry/
+  blend material against the imported DE water-shape alpha bytes: 31 mask
+  configurations and 775 linear-sRGB samples. Diagnostic red beach/cyan water
+  isolate alpha from animated water, terrain texture and foam. Also exercises
+  the classic-manifest fallback and asserts simulation immutability. Source
+  sampling correctness is measured; exact DE engine UV selection is inferred.
 
 ## General probes
 

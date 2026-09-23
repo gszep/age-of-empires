@@ -9,6 +9,7 @@ DEPOT_ROOT="$(uv run --project "$ROOT" --locked python "$ROOT/tools/depot.py")"
 DAT="$DEPOT_ROOT/depot_813781/resources/_common/dat/empires2_x2_p1.dat"
 SOUNDS="$DEPOT_ROOT/depot_813781/resources/_common/dat/sounds.json"
 BLENDOMATIC="$DEPOT_ROOT/depot_813781/resources/_common/dat/blendomatic_x1.dat"
+DE_BLENDS="$DEPOT_ROOT/depot_813782/resources/_common/terrain/blends"
 HOTKEYS="$DEPOT_ROOT/depot_813781/resources/_common/dat/hotkeys.json"
 STRINGS="$DEPOT_ROOT/depot_813781/resources/en/strings/key-value/key-value-strings-utf8.txt"
 PALETTES="$DEPOT_ROOT/depot_813781/resources/_common/palettes"
@@ -43,7 +44,7 @@ uv run --project "$ROOT" --locked python "$ROOT/tools/convert_sld.py" \
 uv run --project "$ROOT" --locked python "$ROOT/tools/import_ui.py" \
   --widgetui "$WIDGETUI" --sounds "$SOUNDS" --hotkeys "$HOTKEYS" --fonts "$FONTS"
 uv run --project "$ROOT" --locked python "$ROOT/tools/import_blends.py" \
-  --blendomatic "$BLENDOMATIC"
+  --blendomatic "$BLENDOMATIC" --de-blends "$DE_BLENDS"
 
 if [ -f "$AUDIO_PACK" ]; then
   if ! command -v vgmstream-cli >/dev/null; then

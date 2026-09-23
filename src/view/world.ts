@@ -2,11 +2,14 @@ import * as THREE from 'three/webgpu';
 import { attribute, floor, fract, smoothstep as smoothstepNode, texture as textureNode, uv, vec2 } from 'three/tsl';
 import { TILE_W, TILE_H, worldToIso } from './iso';
 import { isOpenWater } from '../sim/mapgen';
+import { elevationAt } from '../sim/elevation';
 import { maskU, type ContentAssets, type ImportedTerrain } from './assets';
 import { createFoam } from './foam';
 import { GROUND_FOG_ORDER } from './render-order';
 import { createWaterMaterial, surfaceOpacity, waterPresetFor } from './water';
 import type { GameState, ReadonlyGameState, PlayerId } from '../sim/types';
+
+export { elevationAt } from '../sim/elevation';
 
 /**
  * Ground plane in the dimetric projection. With imported content the DAT's
@@ -17,15 +20,6 @@ import type { GameState, ReadonlyGameState, PlayerId } from '../sim/types';
 // One terrain level uses the same vertical scale as one world-height unit for
 // projectiles: half a tile face in this dimetric projection.
 export const ELEVATION_PIXELS = TILE_H / 2;
-
-/** Height at a world point, in authored levels. Tile means are deliberately
- * sampled rather than invented slopes for entities; ground vertices average
- * their adjacent means so every tile shares exactly the same edge. */
-export function elevationAt(state: ReadonlyGameState, x: number, y: number): number {
-  const tx = Math.max(0, Math.min(state.width - 1, Math.floor(x)));
-  const ty = Math.max(0, Math.min(state.height - 1, Math.floor(y)));
-  return state.elevation?.[ty * state.width + tx] ?? 0;
-}
 
 export function elevatedWorldToIso(state: ReadonlyGameState, x: number, y: number) {
   const iso = worldToIso(x, y);
@@ -92,10 +86,10 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
       state, Math.max(0, Math.min(state.width, px)), Math.max(0, Math.min(state.height, py)),
     );
     const level = sample(x, y);
-    // Geometry provides the rise. This restrained north-west hillshade and
-    // altitude tone merely make broad slopes legible in an otherwise unlit,
-    // orthographic scene instead of letting the texture read as a flat sheet.
-    const across = sample(x - 1, y) - sample(x + 1, y);
+    // The editor reference lights screen-right-facing slopes (#160), as does
+    // minimapReliefShade: with +x down-left / +y down-right, use +dx - dy.
+    // Strength and altitude tone remain approximations, not DE's lightmap.
+    const across = sample(x + 1, y) - sample(x - 1, y);
     const down = sample(x, y - 1) - sample(x, y + 1);
     const altitude = maxElevation ? level / maxElevation * 0.16 : 0.16;
     return Math.max(0.68, Math.min(1, 0.82 + altitude + (across + down) * 0.035));
@@ -166,7 +160,7 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
   const blendType = (id: number): number => byId.get(id)?.slot.blendType ?? 0;
   /** Blend quads per (overlying terrain id, mode), drawn in priority order. */
   const overlays = new Map<string, {
-    id: number; mode: number; back: boolean; gated: boolean; positions: number[]; uvs: number[];
+    id: number; mode: number; back: boolean; gated: boolean; native: boolean; positions: number[]; uvs: number[];
     uv1s: number[]; colors: number[]; weights: number[];
   }>();
   if (blends) {
@@ -195,19 +189,20 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
           const texture = slot && assets?.textures.get(slot.image);
           if (!texture) continue;
           const mode = blendModeFor(blendType(here), blendType(there));
+          const native = (isOpenWater(here) || isOpenWater(there)) && !!blends.native?.modes[mode];
+          const maskSheet = native ? blends.native! : blends;
           const gated = masked(here, there);
-          const key = `${there}:${mode}:${back ? 'back' : gated ? 'masked' : 'over'}`;
+          const key = `${there}:${mode}:${native ? 'native' : 'classic'}:${back ? 'back' : gated ? 'masked' : 'over'}`;
           let bucket = overlays.get(key);
           if (!bucket) {
-            bucket = { id: there, mode, back, gated, positions: [], uvs: [], uv1s: [], colors: [], weights: [] };
+            bucket = { id: there, mode, back, gated, native, positions: [], uvs: [], uv1s: [], colors: [], weights: [] };
             overlays.set(key, bucket);
           }
           const [spanX, spanY] = slot.dimensions;
           for (const column of blendMasksFor(bits, x, y)) {
-            // The mask is one diamond in a row of them: its four points are
-            // the tile's four corners, so the column is a scale and an
-            // offset on u.
-            const mu = (t: number): number => maskU(blends, column, t);
+            // One mask column, either a classic diamond or a DE tile-axis
+            // square. The corners below select the corresponding UV frame.
+            const mu = (t: number): number => maskU(maskSheet, column, t);
             const point = (px: number, py: number, u1: number, v1: number) => {
               const iso = worldToIso(px, py);
               iso.y += cornerElevation(state, px, py) * ELEVATION_PIXELS;
@@ -223,7 +218,11 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
             // against the mask's own top, left, bottom and right points. The
             // texture is flipped on load, so v runs up from the bottom and
             // the north corner takes v = 1.
-            const corners: [number, number, number, number][] = [
+            const corners: [number, number, number, number][] = native ? [
+              // Square DE windows follow tile axes: +x down-left, +y down-right.
+              // PNG rows go down; texture v goes up. They are not iso diamonds.
+              [x, y, 0, 1], [x + 1, y, 1, 1], [x + 1, y + 1, 1, 0], [x, y + 1, 0, 0],
+            ] : [
               [x, y, 0.5, 1], [x + 1, y, 0, 0.5], [x + 1, y + 1, 0.5, 0], [x, y + 1, 1, 0.5],
             ];
             for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]] as const) {
@@ -273,7 +272,8 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
     if (!bucket.positions.length) return;
     const slot = byId.get(bucket.id)!.slot;
     const texture = assets!.textures.get(slot.image)!;
-    const mask = blends!.modes[bucket.mode] ?? blends!.modes[0];
+    const mask = bucket.native ? blends!.native!.modes[bucket.mode]!
+      : blends!.modes[bucket.mode] ?? blends!.modes[0];
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(bucket.positions, 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(bucket.uvs, 2));

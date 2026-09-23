@@ -1243,6 +1243,19 @@ class ContentImportIntegrationTest(unittest.TestCase):
                 with Image.open(manifest.parent / image) as atlas:
                     self.assertEqual((atlas.mode, atlas.size), ("L", (2048, 2048)), image)
 
+    def test_building_hill_modes_survive_publication(self):
+        """The DAT distinguishes flat-only TCs from farms/houses and normal buildings."""
+        expected = {"town-center": 2, "house": 0, "farm": 0, "palisade-gate": 0,
+                    "watch-tower": 0, "barracks": 3, "mill": 3, "lumber-camp": 3,
+                    "mining-camp": 3, "dock": 3, "castle": 3}
+        for key, mode in expected.items():
+            self.assertEqual(self.result["entities"][key]["hillMode"], mode, key)
+        manifest = Path("public/imported/aoe2/manifest.json")
+        if manifest.is_file():
+            published = json.loads(manifest.read_text())["entities"]
+            for key, mode in expected.items():
+                self.assertEqual(published[key]["hillMode"], mode, key)
+
     def test_terrain_restrictions_are_the_dats_table(self):
         """Who may stand where is a table in the DAT, read per row and cut to
         the shipped terrains. Row 7 is the villager's: every land terrain,
@@ -1974,6 +1987,72 @@ class UiImportIntegrationTest(unittest.TestCase):
         surrounded = decoded[0][30]
         self.assertGreater(int(surrounded[24, 44:53].mean()), 120)
         self.assertLess(int(surrounded[24, 0:4].mean()), 20)
+
+    def test_de_blend_windows_face_their_neighbours_and_keep_authored_contours(self):
+        import numpy as np
+        from import_blends import DE_FAMILIES, de_masks
+        directory = ROOT / "depot_813782/resources/_common/terrain/blends"
+        for family in DE_FAMILIES.values():
+            masks = de_masks(directory / f"{family}.png")
+            self.assertEqual(len(masks), 31)
+            for index, mask in enumerate(masks[:16]):
+                # Sample the middle of the edge to exclude its two corner fades.
+                edges = [mask[-8:, 16:48].mean(), mask[16:48, :8].mean(),
+                         mask[16:48, -8:].mean(), mask[:8, 16:48].mean()]
+                facing = index // 4
+                opposite = [3, 2, 1, 0][facing]
+                self.assertGreater(edges[facing] - edges[opposite], 150, (family, index))
+            for index, corner in [(16, 3), (17, 2), (18, 0), (19, 1)]:
+                mask = masks[index]
+                corners = [mask[:8, :8].mean(), mask[:8, -8:].mean(),
+                           mask[-8:, -8:].mean(), mask[-8:, :8].mean()]
+                self.assertEqual(int(np.argmax(corners)), corner, (family, index))
+            self.assertLess(masks[30][28:36, 28:36].mean(), 30, family)
+            self.assertGreater(masks[30][:8, :8].mean(), 220, family)
+            # Adjacent edge pairs leave only the opposite corner uncovered.
+            for index, low_corner in [(22, 3), (23, 2), (24, 0), (25, 1)]:
+                mask = masks[index]
+                corners = [mask[:4, :4].mean(), mask[:4, -4:].mean(),
+                           mask[-4:, -4:].mean(), mask[-4:, :4].mean()]
+                self.assertEqual(int(np.argmin(corners)), low_corner, (family, index))
+            for index, missing in [(26, 3), (27, 1), (28, 0), (29, 2)]:
+                mask = masks[index]
+                edges = [mask[-4:, 28:36].mean(), mask[28:36, :4].mean(),
+                         mask[28:36, -4:].mean(), mask[:4, 28:36].mean()]
+                for edge in range(4):
+                    if edge != missing:
+                        self.assertGreater(edges[edge] - edges[missing], 40, (family, index))
+            # The source's 50%-alpha contour varies within a tile. It must not
+            # turn into a synthetic constant-width diagonal feather.
+            crossings = (masks[0][:, 4:-4] >= 128).argmax(axis=0)
+            self.assertGreater(int(crossings.max() - crossings.min()), 4, family)
+
+    def test_de_blend_publication_is_deterministic_and_contains_original_samples(self):
+        import numpy as np
+        from import_blends import DE_FAMILIES, DE_TILE, GUTTER, de_masks, publish_de_masks
+        directory = ROOT / "depot_813782/resources/_common/terrain/blends"
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "blends").mkdir()
+            metadata, hashes = publish_de_masks(directory, out)
+            first = {entry["image"]: (out / entry["image"]).read_bytes() for entry in metadata["modes"].values()}
+            again, again_hashes = publish_de_masks(directory, out)
+            self.assertEqual((metadata, hashes), (again, again_hashes))
+            for name, data in first.items():
+                self.assertEqual(data, (out / name).read_bytes())
+            for mode, family in DE_FAMILIES.items():
+                entry = metadata["modes"][str(mode)]
+                sheet = np.asarray(Image.open(out / entry["image"]))
+                for index, mask in enumerate(de_masks(directory / f"{family}.png")):
+                    x = index * (DE_TILE + 2 * GUTTER)
+                    self.assertTrue(np.array_equal(sheet[:, x + GUTTER:x + GUTTER + DE_TILE], mask))
+                    self.assertTrue((sheet[:, x:x + GUTTER] == mask[:, :1]).all())
+            published = Path("public/imported/aoe2/manifest.json")
+            if published.is_file():
+                manifest = json.loads(published.read_text())
+                self.assertEqual(manifest["blends"]["native"], metadata)
+                for key, value in hashes.items():
+                    self.assertEqual(manifest["source"]["sha256"][key], value)
 
     def test_blend_atlas_carries_each_mask_out_to_its_gutter(self):
         """Outside the diamond the file has nothing, and a zero there drew a

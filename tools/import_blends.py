@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Import the owned terrain blend masks from `blendomatic_x1.dat`.
+"""Import classic blendomatic masks and DE's square water-family windows.
+
+DE's waterwater/watershore/shallowswater PNGs are sampled in tile-axis space.
+Their inferred window layout is recorded by `de_masks`; the classic masks
+remain published for land transitions, farms and older-import compatibility.
 
 Terrain-to-terrain edges in the reference are not hard tile boundaries: where
 two terrains meet, the higher-priority one is drawn over its neighbour through
@@ -60,6 +64,66 @@ TILE_W, TILE_H = 97, 49
 GUTTER = 2
 #: Quadrant order is the world neighbour each one faces.
 NEIGHBOURS = ("+x", "+y", "-x", "-y")
+
+# DE's square blend families, using the existing engine family indices.
+DE_FAMILIES = {0: "waterwater", 1: "watershore", 7: "shallowswater"}
+DE_TILE = 64
+
+
+def de_masks(path: Path) -> list[np.ndarray]:
+    """Window the owned 512-square sheet in tile-axis space, not screen space.
+
+    Window interpretation is inferred (ledger #148). The sheet supplies four
+    border fades, outside corners, the four quarters of its inner diamond,
+    and an isolated centre hole. Opposite/three-edge masks union the authored
+    edge fades: no new noise or hand-painted coastline is synthesized.
+    """
+    with Image.open(path) as image:
+        if image.size != (512, 512):
+            raise ValueError(f"unexpected DE blend sheet size: {path}: {image.size}")
+        source = np.asarray(image.convert("RGB"))[:, :, 0]
+    def window(x: int, y: int) -> np.ndarray:
+        return source[y:y + DE_TILE, x:x + DE_TILE].copy()
+    masks = [
+        # +y, -x, +x, -y: alpha rises toward that world-tile edge.
+        *[window(x, 0) for x in (64, 128, 192, 320)],
+        *[window(448, y) for y in (64, 192, 320, 384)],
+        *[window(0, y) for y in (64, 128, 192, 320)],
+        *[window(x, 448) for x in (64, 192, 320, 384)],
+        # Diagonal neighbour: -x/+y, +x/+y, -x/-y, +x/-y.
+        window(448, 0), window(0, 0), window(448, 448), window(0, 448),
+    ]
+    masks.extend([
+        np.maximum(masks[4], masks[8]),  # opposite x edges
+        np.maximum(masks[0], masks[12]),  # opposite y edges
+        window(320, 256),  # +x/-y: three white corners, low -x/+y corner
+        window(256, 256),  # -x/-y
+        window(320, 320),  # +x/+y
+        window(256, 320),  # -x/+y
+        np.maximum.reduce([masks[0], masks[4], masks[8]]),
+        np.maximum.reduce([masks[0], masks[8], masks[12]]),
+        np.maximum.reduce([masks[4], masks[8], masks[12]]),
+        np.maximum.reduce([masks[0], masks[4], masks[12]]),
+        window(128, 128),  # four higher neighbours, low centre
+    ])
+    return masks
+
+
+def publish_de_masks(directory: Path, out: Path) -> tuple[dict, dict[str, str]]:
+    """Keep original alpha bytes in square windows, with edge-replicated gutters."""
+    modes, hashes = {}, {}
+    pitch = DE_TILE + 2 * GUTTER
+    for mode, name in DE_FAMILIES.items():
+        path = directory / f"{name}.png"
+        masks = de_masks(path)
+        masks.append(np.full((DE_TILE, DE_TILE), 255, dtype=np.uint8))
+        sheet = np.concatenate([np.pad(mask, ((0, 0), (GUTTER, GUTTER)), mode="edge") for mask in masks], axis=1)
+        assert sheet.shape == (DE_TILE, pitch * len(masks))
+        image = f"blends/de-{name}.png"
+        Image.fromarray(sheet).save(out / image, optimize=True)
+        modes[str(mode)] = {"image": image, "masks": len(masks), "source": f"{name}.png"}
+        hashes[f"blend-{name}"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return {"tile": [DE_TILE, DE_TILE], "gutter": GUTTER, "modes": modes}, hashes
 
 
 def row_widths() -> list[int]:
@@ -183,6 +247,8 @@ def main() -> None:
         default=depot_root() / "depot_813781/resources/_common/dat/blendomatic_x1.dat",
     )
     parser.add_argument("--out", type=Path, default=root / "public/imported/aoe2")
+    parser.add_argument("--de-blends", type=Path,
+                        default=depot_root() / "depot_813782/resources/_common/terrain/blends")
     args = parser.parse_args()
     if not args.blendomatic.is_file():
         raise SystemExit(f"no blendomatic at {args.blendomatic}; see docs/owned-assets-setup.md")
@@ -237,6 +303,10 @@ def main() -> None:
         # The column past the owned masks: the whole diamond, opaque. Ours.
         "solid": len(modes[0]),
     }
+    native, source_hashes = publish_de_masks(args.de_blends, args.out)
+    manifest["blends"]["native"] = native
+    manifest.setdefault("source", {}).setdefault("sha256", {}).update(source_hashes)
+    print(f"{len(native['modes'])} DE water families x 31 square windows -> {args.out / 'blends'}")
     manifest.setdefault("source", {}).setdefault("sha256", {})["blendomatic"] = hashlib.sha256(
         args.blendomatic.read_bytes()).hexdigest()
     manifest_path.write_text(json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n")

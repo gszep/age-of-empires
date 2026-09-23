@@ -7,6 +7,7 @@ import type {
   AttackValue, BuildingRules, Cost, GameRules, NodeKind, TechEffect, TechKey, UnitRules, VillagerGatherTask,
 } from './data';
 import { MAPS, generateMap } from './mapgen';
+import { elevationAt, elevationAllowsPlacement, elevationDamageMultiplier, levelStartingFootprint } from './elevation';
 import {
   buildNavGrid, distance, entityGrid, findPath, halfExtent, isBlocked, separateUnits, terrainLayer, tileOf, type NavGrid,
 } from './nav';
@@ -149,6 +150,11 @@ export function createGame(
   );
   state.terrain = terrain;
   state.elevation = elevation;
+  for (const home of state.entities) {
+    if (home.kind === 'town-center' && home.owner !== 0) {
+      levelStartingFootprint(state, home.position, buildingFootprint(state, home.kind));
+    }
+  }
 
   recalculatePopulation(state);
   updateVisibility(state);
@@ -435,6 +441,10 @@ export function placementLegal(
     if (admitsWater && wet === 0) return rejected('placement does not reach the water');
     if (building === 'fish-trap' && dry > 0) return rejected('fish traps must be on water');
     if (admitsWater && dry === 0 && building !== 'fish-trap') return rejected('placement does not touch the shore');
+  }
+  const hillMode = state.rules.buildings[building].hillMode ?? FALLBACK_RULES.buildings[building].hillMode ?? 0;
+  if (!elevationAllowsPlacement(state, target, half, hillMode)) {
+    return rejected('placement is on unsuitable elevation');
   }
   // Units are ignored: real AoE nudges them off foundations (recorded approximation).
   for (const entity of state.entities) {
@@ -2072,8 +2082,11 @@ function updateConverter(state: GameState, grid: NavGrid, entity: Entity): void 
  */
 function applyDamage(
   state: GameState, target: Entity, attacks: AttackValue[], attackerId: number,
+  origin: Point,
 ): void {
-  target.hp -= computeDamage(attacks, armorsOf(state, target));
+  target.hp -= computeDamage(attacks, armorsOf(state, target)) * elevationDamageMultiplier(
+    elevationAt(state, origin.x, origin.y), elevationAt(state, target.position.x, target.position.y),
+  );
   if (target.hp <= 0) {
     kill(state, target);
     return;
@@ -2134,7 +2147,7 @@ function releaseAttack(
   shot: Shot = {},
 ): void {
   if (!projectileSpeed) {
-    applyDamage(state, target, attacks, shooter.id);
+    applyDamage(state, target, attacks, shooter.id, shooter.position);
     return;
   }
   // A shot is aimed once and then flies. Without Ballistics it goes to where
@@ -2214,7 +2227,7 @@ function shooterLeadsTarget(state: GameState, shooter: Entity): boolean {
  */
 function applyBlast(
   state: GameState, at: Point, radius: number, attackLevel: number, attacks: AttackValue[],
-  directHitId: number, excludeOwner?: Entity['owner'],
+  directHitId: number, excludeOwner?: Entity['owner'], origin: Point = at,
 ): void {
   for (const other of [...state.entities]) {
     if (other.dead || other.id === directHitId) continue;
@@ -2227,7 +2240,9 @@ function applyBlast(
       other.amount = 0;
       continue;
     }
-    other.hp -= computeDamage(attacks, armorsOf(state, other));
+    other.hp -= computeDamage(attacks, armorsOf(state, other)) * elevationDamageMultiplier(
+      elevationAt(state, origin.x, origin.y), elevationAt(state, other.position.x, other.position.y),
+    );
     if (other.hp <= 0) kill(state, other);
   }
 }
@@ -2289,7 +2304,7 @@ function updateProjectiles(state: GameState): void {
         if (other.dead || other.kind === 'resource' || other.owner === projectile.owner || bolt.hitIds.includes(other.id)) continue;
         if (pointToSegment(other.position, projectile.position, next) > other.radius + bolt.radius) continue;
         bolt.hitIds.push(other.id);
-        applyDamage(state, other, other.id === projectile.targetId ? projectile.attacks : bolt.attacks, projectile.shooterId);
+        applyDamage(state, other, other.id === projectile.targetId ? projectile.attacks : bolt.attacks, projectile.shooterId, projectile.origin);
       }
       if (!landing) {
         projectile.position = next;
@@ -2304,10 +2319,10 @@ function updateProjectiles(state: GameState): void {
       && !e.dead && e.owner !== projectile.owner);
     if (intended && pointToSegment(intended.position, projectile.position, next) <= intended.radius) {
       const at = { ...intended.position };
-      applyDamage(state, intended, projectile.attacks, projectile.shooterId);
+      applyDamage(state, intended, projectile.attacks, projectile.shooterId, projectile.origin);
       if (projectile.blastRadius) {
         applyBlast(state, at, projectile.blastRadius, projectile.blastAttackLevel ?? 0,
-          projectile.attacks, intended.id);
+          projectile.attacks, intended.id, undefined, projectile.origin);
       }
       continue;
     }
@@ -2318,10 +2333,10 @@ function updateProjectiles(state: GameState): void {
     }
     const at = { ...projectile.aim };
     const struck = struckBy(state, projectile, at);
-    if (struck) applyDamage(state, struck, projectile.attacks, projectile.shooterId);
+    if (struck) applyDamage(state, struck, projectile.attacks, projectile.shooterId, projectile.origin);
     if (projectile.blastRadius) {
       applyBlast(state, at, projectile.blastRadius, projectile.blastAttackLevel ?? 0,
-        projectile.attacks, struck?.id ?? -1);
+        projectile.attacks, struck?.id ?? -1, undefined, projectile.origin);
     }
   }
   state.projectiles = remaining;

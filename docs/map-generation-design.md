@@ -270,11 +270,30 @@ the only route between the two clearings, and the pathfinder finds it.
 Water maps still wait on `water-design.md` W2, because a water land is only a
 map once something floats.
 
-**M5. Elevation and cliffs.** Defer, and know why: elevation is not decoration.
-The original gives a damage bonus for attacking downhill (widely quoted as
-±25%, and it is in the DAT — read it rather than trust the number), and it
-changes the renderer's tile geometry and the minimap. That is a combat and a
-view subsystem, not a map one.
+**M5. Elevation and cliffs (partially implemented, #134).** Combat now uses
+the same authoritative tile levels as entities in the view: ×1.25 downhill,
+×0.75 uphill, unchanged on equal ground. Melee, projectile impacts, splash and
+piercing victims all participate; a projectile uses its retained launch point.
+Terrain/fog geometry and minimap relief already consume the elevation array,
+which participates in checksums and JSON snapshots.
+
+The old claim that the base ±25% is in the DAT was wrong. Owned XS resources
+211/212/272/273 identify civilisation modifiers and are zero for Britons;
+owned tutorial string 73020 confirms the advantage but not its size. The base
+multipliers are community-documented, recorded as inferred in the ledger.
+
+Arabia's global hill roll and Black Forest's clearing/forest hill passes now
+use the owned RMS heights/counts with mirrored cost-grown footprints and
+inward terraces. Growth, scaling and start protection remain approximations;
+Arabia's biome-specific spawn hill rolls and exact engine elevation cleaning
+are not implemented. Islands still has no hill pass. Baked surveys retain
+their authored levels outside the initial TC footprints, which #176 levels to
+their centre sample at match creation. Ordinary slopes remain traversable; no slope slowdown
+or cliff threshold has been inferred from the DEM. M5 still needs explicit
+cliff geometry/obstructions and reference-verified elevation legality. Building
+placement now reads DAT `hill_mode` (#176), enforcing flat-only or one-level
+relief over the footprint while exempting unrestricted buildings; exact discrete
+slope/corner correspondence to DE still needs reference measurement.
 
 ## The things to decide before starting
 

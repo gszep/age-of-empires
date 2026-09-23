@@ -126,13 +126,35 @@ RMS scripts — cost-ordered clump growth and banded candidate scans — with
 Black Forest; Islands with the engine's beach sweep and the water-masking
 depth chain; leaf litter and the script's aesthetic scatter; painted boards
 and two surveyed boards (Windsor, Senlac) from Environment Agency LIDAR with
-visual elevation; mirror-symmetric halves; the match seed mixed before any
-draw (#44).
+combat elevation; mirror-symmetric generated halves; the match seed mixed
+before any draw (#44). #134 adds deterministic Arabia global hills and Black
+Forest clearing/forest hills using owned RMS parameters with approximate
+terraced growth. Combat and entity rendering share `sim/elevation.ts`: fixed
+×1.25 downhill / ×0.75 uphill, including projectile, splash and piercing hits
+after the shooter disappears. The array is already checksummed and serialized.
+`elevation.test.ts` verifies HP loss, launch-point persistence/JSON replay,
+ordinary hill traversal, deterministic mirrored terraces and checksums;
+`economy.test.ts` also checks imported building damage on flat/raised ground.
+M5 remains open for explicit cliffs, exact hill-generation/legality rules and
+the remaining map-specific elevation passes. Approximation evidence is in
+`ledger.md`; a height difference alone does not create an impassable cliff.
+Elevation-aware placement (#176) imports each building's DAT `hill_mode`:
+town centers require level ground, ordinary buildings allow one level of relief,
+and houses/farms/gates/towers retain unrestricted hill placement. The public build
+command, preview and wall preview share this check; rejected sites spend nothing.
+Both Windsor starting TC footprints are minimally levelled during match creation,
+without changing survey sources or later construction ground. Tile-centre/corner
+interpretation remains an approximation rather than a DE runtime calibration.
+`elevation-placement.test.ts` covers imported/open rules, legal ramps/corners,
+steep/uneven sites, rotated footprints, completed construction and all map starts;
+`tools/elevation_placement_smoke.mts` verifies actual preview colours and rejected/
+accepted build clicks in both content modes. Additional TC construction remains
+unavailable independently of placement legality (#177).
 
 **View** (`src/view`, never mutates state): dimetric projection with AoE2's
-handedness (below); DAT terrain textures with blendomatic edge blending
-(#42) and DE's overlay masks across land crossings (#116; the water's edge
-is still blendomatic's, #148); fog as a rounded per-tile contour with
+handedness (below); DAT terrain textures with classic land edge blending
+(#42), DE's overlay masks across land crossings (#116), and square DE
+water-family shape windows (#148); fog as a rounded per-tile contour with
 `colorcorrection.json`'s levels; the reference's water shader read whole from its SM2 build (the
 height field, its drifts, the dome, the glint) over the tile in linear light;
 shore foam from the reference's own frame atlases, one to a shore tile (#89);
@@ -163,7 +185,33 @@ provisional axis: screen-right-facing hill slopes are light and left-facing
 slopes dark. A four-sided-hill regression and actual canvas pixels pin both
 front faces and both back faces. The precise discrete slope classifier remains
 inferred, as recorded in the ledger; this is not a pixel-identical recreation of
-the editor's unknown height grid. The current green working-tree gate includes these edits.
+the editor's unknown height grid. These minimap edits were included in the
+#96/#137 checkpoint.
+
+World terrain hillshade now follows the same screen-right lighting axis (#160),
+including blend-overlay vertices. The previous `-dx-dy` term lit both front
+faces; `+dx-dy` lights both right-facing slopes and shades both left-facing ones.
+`world.test.ts` pins all four equal-altitude faces, their unchanged positions/UVs
+and matching blend shades. `tools/world_relief_smoke.mts` renders the production
+ground meshes in a private real browser, normalizing 5×5 linear-sRGB crops by an
+unshaded draw of the identical geometry/UVs. Imported right-face factors are
+0.946/0.948 versus left 0.809/0.809; the pre-fix front pair were both ≈0.949.
+Both content modes pass, as do state-immutability checks. The existing altitude
+tone and shading strength remain approximations; this verifies the reference's
+orientation, not its unavailable absolute pixel values or full DE lightmap.
+
+Water boundaries (#148) now use the owned `watershore`, `waterwater` and
+`shallowswater` alpha artwork in square tile-axis windows rather than classic
+isometric mask columns. The full importer publishes deterministic derived sheets
+and source hashes; older manifests still use their classic masks. The inferred
+window/compound-mask interpretation is explicit in `ledger.md`; exact engine UV
+selection and a pixel-identical reference coastline are not claimed.
+`tools/shore_blend_smoke.mts` checks the production loader/geometry/material in a
+real browser: 31 configurations, 775 linear-sRGB alpha samples, maximum error
+0.002 against the imported artwork, and 603 samples visibly different from the
+classic path. State/terrain geometry is unchanged. Import tests verify source
+contour variation, edge/corner orientation, repeated byte-identical publication
+and the live manifest. Land/farm DE shape families remain #116.
 
 **Agents and protocol**: versioned JSON contracts; browser, built-in AI,
 JSONL subprocess, deadline subprocess, WebSocket and MCP strategies share
@@ -272,6 +320,17 @@ with its reason in the manifest's `skippedTechnologies` (#128). The open
 fallback stops at the Castle Age (#125).
 
 ## Measurements
+
+### Mapping checkpoint (#134/#176/#160/#148)
+
+The combined checkpoint gate is **GREEN**, `.local/mapping-checkpoint-final-gate.log`:
+**728 Vitest tests / 55 files**, production build, **92 Python/import tests**,
+and the real-browser debug smoke. It ran on 2026-09-24 from 00:11 +01:00 after
+final source review. Three Vitest workers were used on the
+idle host; no fixture timeout was widened. Dedicated placement (both content
+modes), world-relief, minimap-relief and shoreline-alpha browser checks also
+passed. Exact engine elevation topology, native blend UV choices and full DE
+lighting/compositing remain the explicit ledgered limits described above.
 
 ### Garrison follow-on (#137)
 

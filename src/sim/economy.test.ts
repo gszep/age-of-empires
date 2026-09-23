@@ -2036,8 +2036,9 @@ describe('what a blow does to a building', () => {
     expect(computeDamage(importedRules!.units.archer.attacks, house)).toBe(1);
   });
 
-  it.skipIf(!importedRules)('lands that damage in a real match, not just in the rules', () => {
+  it.skipIf(!importedRules).each([0, 2])('lands building damage in a real match from elevation %s', level => {
     const state = createGame(83, importedRules);
+    state.elevation.fill(0);
     const rules = state.rules.buildings.house;
     const home = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
     const house: Entity = {
@@ -2049,6 +2050,7 @@ describe('what a blow does to a building', () => {
     state.entities.push(house);
     const soldier = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
     soldier.position = { x: house.position.x + house.radius + soldier.radius, y: house.position.y };
+    state.elevation[Math.floor(soldier.position.y) * state.width + Math.floor(soldier.position.x)] = level;
     applyCommand(state, {
       kind: 'order', player: 2, entityIds: [soldier.id],
       target: house.position, targetId: house.id,
@@ -2058,7 +2060,7 @@ describe('what a blow does to a building', () => {
     expect(expected).toBeGreaterThan(1);
     const start = house.hp;
     for (let i = 0; i < 400 && house.hp === start; i++) stepGame(state);
-    expect(start - house.hp).toBe(expected);
+    expect(start - house.hp).toBe(expected * (level > 0 ? 1.25 : 1));
   });
 
   it.skipIf(!importedRules)('lands the upgrade on the target, not only in the rules', () => {

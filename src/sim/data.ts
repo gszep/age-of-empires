@@ -215,6 +215,8 @@ export interface BuildingRules {
   lineOfSight: number;
   /** As `UnitRules.terrainRestriction`; buildings are row 4, walls row 10. */
   terrainRestriction?: number;
+  /** DAT hill_mode: 0 unrestricted, 2 flat only, 3 one level of relief. */
+  hillMode?: number;
   cost: Cost;
   buildSeconds: number;
   popSupport: number;
@@ -1003,12 +1005,13 @@ export const FALLBACK_RULES: GameRules = {
     },
   },
   buildings: {
-    'fish-trap': { hp: 250, radius: 0.5, lineOfSight: 1, terrainRestriction: 13,
+    'fish-trap': { hp: 250, radius: 0.5, lineOfSight: 1, terrainRestriction: 13, hillMode: 0,
       cost: cost(0, 100), buildSeconds: 40 / (0.24 * 3.57), popSupport: 0, buildable: true,
       builderKind: 'fishing-ship', buildButton: 1, age: 1, accepts: [], fishTrapAmount: 700,
       passable: true, blastDefenseLevel: 2, corpseSeconds: 60,
       armors: [{ class: 4, amount: 1 }, { class: 3, amount: 1 }, { class: 11, amount: 10 }, { class: 21, amount: 0 }] },
     'town-center': {
+      hillMode: 2,
       hp: 2400, radius: 2, lineOfSight: 8, cost: cost(0, 275), buildSeconds: 100,
       popSupport: 5, buildable: false, accepts: ['food', 'wood', 'gold', 'stone'],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 3 }, { class: 3, amount: 5 }],
@@ -1025,6 +1028,7 @@ export const FALLBACK_RULES: GameRules = {
       },
     },
     barracks: {
+      hillMode: 3,
       garrison: { capacity: 10, types: 0, healRate: 0.5 },
       hp: 1200, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
       popSupport: 0, buildable: true, accepts: [],
@@ -1032,30 +1036,35 @@ export const FALLBACK_RULES: GameRules = {
       buildButton: 1,
     },
     house: {
+      hillMode: 0,
       hp: 550, radius: 1, lineOfSight: 2, cost: cost(0, 25), buildSeconds: 25,
       popSupport: 5, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: -2 }, { class: 3, amount: 7 }],
       buildButton: 1,
     },
     mill: {
+      hillMode: 3,
       hp: 600, radius: 1, lineOfSight: 6, cost: cost(0, 100), buildSeconds: 35,
       popSupport: 0, buildable: true, accepts: ['food'],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
       buildButton: 2,
     },
     'lumber-camp': {
+      hillMode: 3,
       hp: 600, radius: 1, lineOfSight: 6, cost: cost(0, 100), buildSeconds: 35,
       popSupport: 0, buildable: true, accepts: ['wood'],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
       buildButton: 4,
     },
     'mining-camp': {
+      hillMode: 3,
       hp: 600, radius: 1, lineOfSight: 6, cost: cost(0, 100), buildSeconds: 35,
       popSupport: 0, buildable: true, accepts: ['gold', 'stone'],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 7 }],
       buildButton: 3,
     },
     farm: {
+      hillMode: 0,
       minimapMode: 0,
       hp: 480, radius: 1.5, lineOfSight: 1, cost: cost(0, 60), buildSeconds: 15,
       // Nothing walks round a farm: the DAT gives it no collision height and
@@ -1066,12 +1075,14 @@ export const FALLBACK_RULES: GameRules = {
       buildButton: 6,
     },
     outpost: {
+      hillMode: 0,
       hp: 500, radius: 0.5, lineOfSight: 12, cost: cost(0, 25, 0, 5), buildSeconds: 15,
       popSupport: 0, buildable: true, accepts: [],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 3 }],
       buildButton: 6,
     },
     'watch-tower': {
+      hillMode: 0,
       age: 1,
       hp: 850, radius: 0.5, lineOfSight: 8, cost: cost(0, 25, 0, 125), buildSeconds: 27,
       popSupport: 0, buildable: true, accepts: [],
@@ -1088,6 +1099,7 @@ export const FALLBACK_RULES: GameRules = {
       },
     },
     'archery-range': {
+      hillMode: 3,
       garrison: { capacity: 10, types: 0, healRate: 0.5 },
       age: 1,
       hp: 1500, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
@@ -1096,6 +1108,7 @@ export const FALLBACK_RULES: GameRules = {
       buildButton: 2,
     },
     blacksmith: {
+      hillMode: 3,
       age: 1,
       hp: 1800, radius: 1.5, lineOfSight: 6, cost: cost(0, 150), buildSeconds: 40,
       popSupport: 0, buildable: true, accepts: [],
@@ -1103,6 +1116,7 @@ export const FALLBACK_RULES: GameRules = {
       buildButton: 7,
     },
     market: {
+      hillMode: 3,
       garrison: { capacity: 10, types: 0, healRate: 0 },
       age: 1,
       hp: 1800, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 60,
@@ -1111,6 +1125,7 @@ export const FALLBACK_RULES: GameRules = {
       buildButton: 8,
     },
     'palisade-wall': {
+      hillMode: 0,
       terrainRestriction: 10,
       hp: 150, radius: 0.5, lineOfSight: 2, cost: cost(0, 3), buildSeconds: 7,
       popSupport: 0, buildable: true, accepts: [],
@@ -1118,6 +1133,7 @@ export const FALLBACK_RULES: GameRules = {
       buildButton: 7,
     },
     'palisade-gate': {
+      hillMode: 0,
       terrainRestriction: 10,
       hp: 240, radius: 1, footprint: { x: 1, y: 0.5 }, passableForOwner: true,
       lineOfSight: 6, cost: cost(0, 30), buildSeconds: 30,
@@ -1125,6 +1141,7 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 2 }, { class: 3, amount: 4 }],
     },
     stable: {
+      hillMode: 3,
       garrison: { capacity: 10, types: 0, healRate: 0.25 },
       age: 1,
       hp: 1500, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 50,
@@ -1133,6 +1150,7 @@ export const FALLBACK_RULES: GameRules = {
       buildButton: 3,
     },
     monastery: {
+      hillMode: 3,
       garrison: { capacity: 10, types: 0, healRate: 1.5 },
       age: 2,
       hp: 2100, radius: 1.5, lineOfSight: 6, cost: cost(0, 175), buildSeconds: 40,
@@ -1142,6 +1160,7 @@ export const FALLBACK_RULES: GameRules = {
       confirmDelete: true,
     },
     'siege-workshop': {
+      hillMode: 3,
       garrison: { capacity: 10, types: 0, healRate: 0 },
       age: 2,
       hp: 1500, radius: 2, lineOfSight: 6, cost: cost(0, 200), buildSeconds: 40,
@@ -1150,6 +1169,7 @@ export const FALLBACK_RULES: GameRules = {
       buildButton: 4,
     },
     dock: {
+      hillMode: 3,
       garrison: { capacity: 10, types: 0, healRate: 0 },
       terrainRestriction: 6,
       hp: 1800, radius: 1.5, lineOfSight: 8, cost: cost(0, 150), buildSeconds: 35,
@@ -1160,6 +1180,7 @@ export const FALLBACK_RULES: GameRules = {
     // Trains nothing; it is where the technologies that do not belong to a
     // barracks or a blacksmith are researched, Ballistics chief among them.
     university: {
+      hillMode: 3,
       age: 2,
       hp: 2100, radius: 2, lineOfSight: 6, cost: cost(0, 200), buildSeconds: 60,
       popSupport: 0, buildable: true, accepts: [],
@@ -1175,6 +1196,7 @@ export const FALLBACK_RULES: GameRules = {
      * `backlog.md` and deliberately not built (issue #27).
      */
     wonder: {
+      hillMode: 3,
       age: 3,
       hp: 4800, radius: 2.5, lineOfSight: 8, cost: cost(0, 1000, 1000, 1000),
       buildSeconds: 3500,
@@ -1187,6 +1209,7 @@ export const FALLBACK_RULES: GameRules = {
     // Stone, slow to raise, and the only building besides the town center that
     // both shoots and houses people: the DAT gives it 20 population support.
     castle: {
+      hillMode: 3,
       age: 2,
       hp: 4800, radius: 2, lineOfSight: 11, cost: cost(0, 0, 0, 650), buildSeconds: 200,
       popSupport: 20, buildable: true, accepts: [],
@@ -1271,6 +1294,7 @@ export const FALLBACK_RULES: GameRules = {
 };
 
 interface ManifestEntity {
+  hillMode?: number;
   minimapMode?: number;
   projectile?: { hitMode?: number; vanishMode?: number };
   placementSideTerrain?: number[];
@@ -1504,6 +1528,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       radius: e[key].collision[0],
       lineOfSight: e[key].lineOfSight,
       terrainRestriction: e[key].terrainRestriction ?? fallback.terrainRestriction,
+      hillMode: e[key].hillMode ?? fallback.hillMode,
       minimapMode: e[key].minimapMode ?? fallback.minimapMode,
       cost: manifestCost(e[key]),
       buildSeconds: e[key].build?.seconds ?? 25,

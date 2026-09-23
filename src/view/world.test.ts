@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { worldToIso } from './iso';
 import { FARM_TILES_PER_SPAN, FOG_EDGE_INNER, FOG_EDGE_OUTER, FOG_EXPLORED, FOG_UNSEEN, blendInfluences, blendMasksFor, blendModeFor, createFog, fogAlpha, createFootprint, createGround, createSelectionOutline, createTerrainPatch, insetConvex, updateSelectionOutline } from './world';
 import { createGame } from '../sim/game';
+import { checksumState } from '../sim/checksum';
 import { maskU, type ContentAssets } from './assets';
 
 /** Perpendicular distance from a point to the infinite line through a and b. */
@@ -170,6 +171,95 @@ describe('meshes that lie on the ground', () => {
       expect(material.side, `${name} is wound clockwise and would be culled`)
         .not.toBe(THREE.FrontSide);
     }
+  });
+
+  it('lights both screen-right hill faces and shades both left faces at equal altitude', () => {
+    const state = createGame(160);
+    state.width = state.height = 16;
+    state.terrain = new Array(256).fill(0);
+    state.elevation = state.terrain.map((_, i) => Math.max(0,
+      6 - Math.max(Math.abs(i % 16 + 0.5 - 8), Math.abs(Math.floor(i / 16) + 0.5 - 8))));
+    const before = checksumState(state);
+    for (const assets of [undefined, groundAssets()]) {
+      const ground = createGround(state, assets);
+      const mesh = ground.getObjectByName('terrain-ground') as THREE.Mesh;
+      const color = mesh.geometry.getAttribute('color');
+      const position = mesh.geometry.getAttribute('position');
+      const uv = mesh.geometry.getAttribute('uv');
+      const shade = (x: number, y: number) => {
+        const index = (y * 16 + x) * 6; // north vertex of the requested tile
+        const iso = worldToIso(x, y);
+        expect(position.getX(index)).toBe(iso.x);
+        expect(position.getY(index)).toBe(iso.y + 48); // all four vertices at level 2
+        expect(uv.getX(index)).toBeCloseTo(x / (assets ? 6 : 1));
+        expect(uv.getY(index)).toBeCloseTo(y / (assets ? 6 : 1));
+        return color.getX(index);
+      };
+      const upperRight = shade(4, 8), lowerRight = shade(8, 12);
+      const lowerLeft = shade(12, 8), upperLeft = shade(8, 4);
+      expect(lowerRight).toBeGreaterThan(lowerLeft);
+      expect(upperRight).toBeGreaterThan(upperLeft);
+      expect(upperRight).toBeCloseTo(lowerRight);
+      expect(upperLeft).toBeCloseTo(lowerLeft);
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+    }
+    expect(checksumState(state)).toBe(before);
+  });
+
+  it('gives terrain blend vertices the same hillshade as the ground underneath', () => {
+    const state = createGame(160);
+    state.width = state.height = 16;
+    state.terrain = Array.from({ length: 256 }, (_, i) => (i % 16 + Math.floor(i / 16)) % 2 ? 7 : 0);
+    state.elevation = state.terrain.map((_, i) => Math.max(0,
+      6 - Math.max(Math.abs(i % 16 + 0.5 - 8), Math.abs(Math.floor(i / 16) + 0.5 - 8))));
+    const ground = createGround(state, groundAssets());
+    const shades = new Map<string, number>();
+    const meshes = ground.children as THREE.Mesh[];
+    for (const mesh of meshes.filter(m => m.name.startsWith('terrain-'))) {
+      const p = mesh.geometry.getAttribute('position'), c = mesh.geometry.getAttribute('color');
+      for (let i = 0; i < p.count; i++) shades.set(`${p.getX(i)},${p.getY(i)}`, c.getX(i));
+    }
+    const blends = meshes.filter(m => m.name.startsWith('blend-'));
+    expect(blends.length).toBeGreaterThan(0);
+    for (const mesh of blends) {
+      const p = mesh.geometry.getAttribute('position'), c = mesh.geometry.getAttribute('color');
+      for (let i = 0; i < p.count; i++) expect(c.getX(i)).toBe(shades.get(`${p.getX(i)},${p.getY(i)}`));
+    }
+    for (const mesh of meshes) {
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+    }
+  });
+
+  it('uses square DE UVs at a water boundary and preserves classic UVs for old imports', () => {
+    const state = createGame(148);
+    state.width = state.height = 2;
+    state.terrain = [0, 1, 0, 1];
+    state.elevation = [0, 0, 0, 0];
+    const before = checksumState(state);
+    const assets = groundAssets();
+    assets.terrain.water = { ...assets.terrain.ground, terrainId: 1, blendType: 3, blendPriority: 200 };
+    assets.blends!.native = { tile: [64, 64], gutter: 2, masksPerMode: 32,
+      modes: { 1: new THREE.DataTexture(new Uint8Array(4), 1, 1) } };
+    const native = createGround(state, assets).getObjectByName('blend-water') as THREE.Mesh;
+    const uv = native.geometry.getAttribute('uv1');
+    // Tile (0,0) has water across +x: mask 8. Square TL/TR/BR/BL maps
+    // to north/west/south/east in the projected world, with PNG v inverted.
+    expect(uv.getX(0)).toBeCloseTo(maskU(assets.blends!.native, 8, 0));
+    expect(uv.getX(1)).toBeCloseTo(maskU(assets.blends!.native, 8, 1));
+    expect(uv.getY(0)).toBe(1);
+    expect(uv.getY(1)).toBe(1);
+    expect(uv.getY(2)).toBe(0);
+    delete assets.blends!.native;
+    const classic = createGround(state, assets).getObjectByName('blend-water') as THREE.Mesh;
+    const oldUv = classic.geometry.getAttribute('uv1');
+    expect(oldUv.getX(0)).toBeCloseTo(maskU(assets.blends!, 8, 0.5));
+    expect(oldUv.getX(1)).toBeCloseTo(maskU(assets.blends!, 8, 0));
+    expect(oldUv.getY(1)).toBe(0.5);
+    expect(native.geometry.getAttribute('position').array).toEqual(classic.geometry.getAttribute('position').array);
+    expect(native.geometry.getAttribute('uv').array).toEqual(classic.geometry.getAttribute('uv').array);
+    expect(checksumState(state)).toBe(before);
   });
 
   it('gives a farm the reference\'s own furrow scale, whatever the sheet says', () => {

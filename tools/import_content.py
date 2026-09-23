@@ -423,6 +423,7 @@ def extract_entity(
         # stand on. Land units are row 7, buildings row 4, walls row 10 --
         # and the table, not a rule, is what keeps a villager out of a pond.
         "terrainRestriction": unit.terrain_restriction,
+        "hillMode": unit.hill_mode,
         "minimapMode": unit.minimap_mode,
         "placementSideTerrain": [terrain for terrain in unit.placement_side_terrain if terrain >= 0],
         "collision": [rounded(unit.collision_size_x), rounded(unit.collision_size_y)],

@@ -65,7 +65,13 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    click-sound aliases from `sounds.json`, `UIColors.json`, and the faces the
    spec names from `--fonts`) into `public/imported/aoe2/ui/`, converting DDS
    through Pillow and copying PNG and TTF byte-identically.
-5. When sound depot 813783 and `vgmstream-cli` are available,
+5. `import_blends.py` publishes the classic blendomatic masks plus square DE
+   water-family windows from `terrain/blends/{watershore,waterwater,shallowswater}.png`.
+   `blends.native` carries their dimensions/gutters/modes; source hashes are in
+   the manifest. The 64-pixel window interpretation and edge unions are inferred
+   (ledger #148); their alpha bytes are owned. These sheets use tile-axis UVs,
+   while the classic sheets use isometric-diamond UVs. No SLD decoding changes.
+6. When sound depot 813783 and `vgmstream-cli` are available,
    `import_audio.py` follows consumed cues through the owned PCK/BNK HIRC
    graph, extracts only referenced DIDX media, and writes deterministic
    browser-playable WAV cues under `public/imported/aoe2/audio/`. Widget cues
@@ -111,6 +117,7 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 |---|---|
 | id, name, HP, LOS, icon | `unit.id`, `.name`, `.hit_points`, `.line_of_sight`, `.icon_id` |
 | footprint / clearance | `unit.collision_size_x/_y`, `unit.clearance_size` |
+| building elevation placement | `unit.hill_mode`: Briton town center 109 = 2, house 70/farm 50/walls/towers/gates = 0, barracks 12/mill 68/camps 562/584/dock 45/castle 82 = 3. Thracian barracks = 0, TC = 2. Mode meaning is community-documented UGC attribute 187: 0 unrestricted, 2 flat only, 3 allows one elevation difference (1 unused/no hill corners). DAT owns the per-building choice, not our tile-height range interpretation (#176) |
 | selection marker shape and size | `unit.obstruction_type` (5 = round unit outline, others square/footprint), `unit.outline_size_x/_y` (half-extents in tiles, can exceed the collision box) |
 | movement speed, walk graphic | `unit.speed`; `unit.dead_fish.walking_graphic` |
 | idle / death graphics | `unit.standing_graphic`, `unit.dying_graphic` |
@@ -137,6 +144,7 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | a technology's cost, time and place | `tech.resource_costs`; `tech.research_locations[*].location_id` and `.research_time` — **not** `tech.research_time`, which does not exist |
 | what a technology does | `dat.effects[tech.effect_id].effect_commands` — **not** `.effect_configs`. `command.type`: 0 set, 1 **resource modifier** (player attribute: `a` = resource id, `b` = 0 set / 1 add, `d` = amount), 2 enable unit, 3 upgrade unit, 4 add, 5 multiply |
 | where a player attribute starts | `dat.civs[i].resources[id]` — a farm's food is resource 36 and starts at 175, which is why the mill's technologies can change it |
+| elevation modifiers, not the base hill rule | `dat.civs[i].resources[211/212/272/273]`; owned `Constants.xs` names attack higher/lower and damage higher/lower. All four are 0 for Gaia/Britons/Franks. Tatar elevation effect adds 0.25 to resource 211; Georgian defense effect adds −0.15 to 273. Do not mistake these for the base ×1.25/×0.75 engine rule (#134) |
 | a terrain slot | `dat.terrain_block.terrains[i]` — `.name_2` is the texture, `.terrain_dimensions` the frame grid, `.frame_data[0].frame_count` the flat-tile frames (always the product of the dimensions), `.blend_type`/`.blend_priority`, `.colors` three `original.pal` indices — the minimap shade for a tile sloping up, flat, and sloping down (flat is `[1]`), `.is_water` the water class (4 shallow, 1 medium, 2 deep, 8 walkable shallows, 16 beach, 32 land) |
 | a unit's minimap dot | `unit.minimap_color`, an `original.pal` index (may be negative: take it mod 256); gaia's resources and animals carry one, trees 0 |
 | a task's numbers | `bird.tasks[*].work_value_1/_2` and `.work_range` — note the underscores; there is no `work_value1` or `target_diff` |

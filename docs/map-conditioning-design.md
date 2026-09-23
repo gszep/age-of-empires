@@ -581,10 +581,15 @@ descriptor; neither adds a runtime dependency.
   OS sheet without rotating either; the descriptor's `source.orientation`
   records this and `source.centre` the diamond's centre. Baked ground is deliberately unmirrored — DE's own Real
   World shape — while the object pass still mirrors.
-- **Surveyed relief now reaches the screen, but not gameplay.** `senlac.json`
+- **Surveyed relief reaches both the screen and combat (#134).** `senlac.json`
   and `windsor.json` carry quantised levels plus datum and metres-per-level;
-  shared terrain/fog vertices and entities draw those levels. M5 remains open
-  for slope-aware pathing, cliffs and the original's downhill combat rule.
+  shared terrain/fog vertices and entities draw those levels. Combat compares
+  the same tile levels for the fixed uphill/downhill damage multipliers.
+  Ordinary slopes remain walkable; explicit cliffs and reference-verified
+  elevation legality remain M5 work, rather than an arbitrary DEM slope cutoff.
+  Building placement now checks DAT hill modes (#176); the match generator
+  levels only each initial TC footprint to its centre sample so Windsor's two
+  uneven starting sites are legal. The baked source elevations remain intact.
 - **The global Copernicus/WorldCover backend is not built.** Both AWS COGs
   answer range reads (checked), so the fallback path is open; Britain-first
   consumed the night. Recorded in `backlog.md`.

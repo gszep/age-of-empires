@@ -1,106 +1,127 @@
-# Agent handoff — 2026-09-23
+# Agent handoff — mapping checkpoint
 
-## Completed request
+## Request and stopping point
 
-The human authorized a **ten-hour autonomous performance run**, starting with
-#152. Window: **2026-09-22 21:54:39 → 2026-09-23 07:54:39 +01:00**.
-Live unattended preflight/read/write/shell/GitHub probes passed; no approval
-prompt blocked the run. Implementation base `1f9913f`, implementation checkpoint
-`15de1d5`; all 14 implementation/tooling/deployment commits were gated as
-required and pushed. This documentation handoff follows them.
+The user asked for #134, then #176, then #160, and resumed the recommended
+#148 shoreline work after a network outage. They explicitly requested updated
+docs, a commit/push, and a handoff when that work was done. No further unattended
+run is authorized. The earlier ten-hour performance run is historical; its
+inventory and measurements remain in [the performance report](reviews/2026-09-23-performance.md).
 
-The generated inventory, measurements, failed-run findings and verification
-limits are in [the run report](reviews/2026-09-23-performance.md).
+Implementation base: `e415493`. This handoff accompanies the mapping checkpoint;
+use `git log -1`, `git status` and `tools/session_start.sh` for the actual commit,
+tree and gate state. Do not infer current service state from old PIDs.
 
-## Delivered performance changes
+## Delivered changes
 
-- **Sprite memory (#152/#162/#170):** lazy pages expire, identical source/frame/
-  layer atlases share URLs, and warm retention avoids churn between worker trips.
-  Policy: 512 MiB **soft** budget, 60 s warm grace, 120 s idle expiry; current
-  scene art may exceed the budget. HD fleet estimated RGBA footprint fell
-  **3.88 GB → 875 MB**, with identical pixels; GPU textures **128 → 65**.
-- **Renderer lifetime (#164/#172):** retired entity/preview geometry and materials
-  are disposed; texture-lifetime builder keys avoid Three r180's cleared sampler
-  template; unavailable contours cannot revive expired bindings. Actual preview/
-  restart geometry counts now stay flat. Basic/ramp pixels remain identical.
-- **Simulation (#165–168):** invocation-local fog-memory lookup, reusable bounded
-  A* workspace, one gather-target lookup per update, resource-kind fast path.
-  Three 12,000-tick imported traces remain byte-identical; total stepping time
-  **50.087 → 34.025 s (32%)**. Full Windsor terminal state also matches.
-- **Loading (#154/#174):** HTTP gzip/Brotli for host modules; negotiated snapshot-
-  only WebSocket DEFLATE. Three.js chunk **2.55 MB → 446 KB**. Actual Windsor
-  snapshot **3.16 MB → 95.7 KB wire bytes**, with identical decoded JSON/SHA.
-  Ordinary tick/control messages remain plain and extension opt-out works.
-- **Tooling (#159/#169):** accurate timestamp/pagination/latest-gate reporting;
-  sustained browser workloads with metrics, full error stacks and failure
-  snapshots. The old open-ground pathing fixture now discovers a clear route.
+- **#134, partial:** shared authoritative tile-level sampling for combat/view;
+  ×1.25 downhill and ×0.75 uphill damage, including melee, missed projectiles,
+  splash and piercing victims. Projectiles retain the launch point after the
+  shooter disappears. Arabia global hills and Black Forest clearing/forest
+  hills are deterministic and mirrored; surveyed relief now affects combat.
+- **#176:** import DAT `hill_mode` into building rules. Flat-only TCs, one-level
+  relief for ordinary buildings, unrestricted houses/farms/gates/towers. Public
+  placement, preview and wall preview share the rule. Rejection does not spend
+  or retask. Initial TC footprints are minimally levelled to their centre sample
+  (needed at Windsor's two starts); source survey arrays are untouched.
+- **#160:** world terrain and blend-overlay hillshade use `+dx-dy`, lighting
+  screen-right slopes and shading left slopes. Projection, height data,
+  altitude tone and shading strength are unchanged by this correction.
+- **#148:** DE `watershore`, `waterwater`, `shallowswater` PNG alpha windows now
+  supply water-boundary shapes. The importer publishes square mask sheets and
+  source hashes; renderer UVs follow tile axes instead of the classic iso
+  diamond. Land/farm paths and older manifests retain classic masks.
+- **#125, decision resolved:** retain the Dark-through-Castle open fallback;
+  no Imperial expansion planned. Both household computers have owned assets.
 
-## Verification
+## Relevant files
 
-Latest implementation gate: `.local/snapshot-compression-gate.log`, **GREEN**,
-started **2026-09-23 04:47:14 +01:00**:
+- `src/sim/elevation.ts`, `game.ts`, `mapgen.ts` — sampling, damage, starting pads,
+  construction checks and hill generation.
+- `src/sim/data.ts`, `tools/import_content.py` — DAT hill-mode transport/defaults.
+- `src/view/world.ts`, `assets.ts`, `tools/import_blends.py` — hillshade,
+  square-vs-diamond mask UVs, owned-water mask import/selection.
+- `src/sim/elevation{,-placement}.test.ts`, `src/view/world.test.ts`,
+  `tools/test_import_aoe2.py` — gameplay, map, mesh and import regressions.
+- `docs/ledger.md` — every approximation; `docs/status.md` — delivered scope.
 
-- **683 Vitest tests / 53 files**;
-- TypeScript/Vite build;
-- **89 Python/import tests**;
-- real-browser debug smoke.
+## Verification and evidence
 
-Only Markdown changed afterward. Use `.local/gate.latest.json` or
-`tools/session_start.sh` for the current gate record. **No existing fixture
-clock or timeout was widened.**
+Final combined gate: **GREEN**, `.local/mapping-checkpoint-final-gate.log`, run
+on **2026-09-24 from 00:11 +01:00** after final source review:
+**728 Vitest tests / 55 files**, production TypeScript/Vite build, **92 Python/
+import tests**, and the real-browser debug smoke. Run directly with
+`VITEST_MAX_FORKS=3 VITEST_MAX_THREADS=3 tools/gate.sh` on the idle host.
+No test clock/timeout has been widened. Only Markdown was edited after GREEN.
 
-Final uninterrupted browser run: **156.67 minutes**, **156 samples**, all four
-maps and 1.5×/2×/10× speeds, **exit 0**. Eight workloads ended (six victories,
-one tick limit, one wall-clock limit), plus one partial at cutoff. **No page/
-asset errors or invalid-binding samples**. Available host memory stayed above
-**9.14 GiB**; 4,135 evictions completed. Three samples had pending body pages,
-so zero first-use pop-in is not claimed. Earlier failed/interrupted segments
-remain explicitly separate in the report.
+Maintained acceptance checks (all run through private Vite/browser fixtures):
 
-Maintained acceptance tools include `sprite_residency_smoke.mts`,
-`atlas_sharing_smoke.mts`, `view_lifecycle_smoke.mts`,
-`outline_residency_smoke.mts`, `sampler_residency_smoke.mts`,
-`compression_smoke.mts`, `shared_smoke.mts` and `performance_soak.mts`, all under
-`tools/`. `tools/probes/sim_performance.mts` records/compares full-state traces.
+- `tools/elevation_placement_smoke.mts`, including `OPEN_FALLBACK=1`: actual red
+  invalid-slope preview/rejection/no spend, green ramp preview/paid rendered
+  foundation. An initial probe raced the next render frame; it now waits for
+  the foundation to be rendered rather than asserting immediately after input.
+- `tools/world_relief_smoke.mts`: equal-height, identical-terrain world pixels;
+  normalized linear-sRGB right-face factors 0.946/0.948, left 0.809/0.809. The
+  pre-fix front pair were both ≈0.949. Geometry/UVs/checksum remain unchanged.
+- `tools/minimap_relief_smoke.mts`: exact sRGB palette/fog pixels and state
+  immutability, including the 392×392 board.
+- `tools/shore_blend_smoke.mts`: production loader/geometry/material, all 31
+  mask configurations, 775 linear-sRGB alpha samples; max source-sampling error
+  **0.002**, 603 samples visibly differ from classic masks. State unchanged.
+- Full owned regeneration completed with 1,984 sprite atlas entries reused;
+  native mask publication is byte-identical on repeated generation.
+- Islands geometry crops: `.local/probes/issue148-{before,after}/coast.png`.
+  They supplement alpha measurements, not a matched-reference contour proof.
 
-## Deployment and retained state
+Named logs live under `.local/issue{134,176,160,148}-*`. The earlier #176 full
+suite had 724 passes and one 150-second headless timeout while Windows was
+running Cyberpunk at ~421% CPU. The unchanged test passed alone in 58.3 seconds.
+The build, all then-current 90 import tests, and browser checks passed separately.
+That failed gate is historical, not proof of the final checkpoint's result.
 
-- Ysgramor's managed host is **active**, **NRestarts=0**, restarted onto the
-  optimized code. No saved shared checkpoint existed at restart; the pristine
-  host was retained. A handshake-only Artemis check negotiated compression
-  without joining a match. Existing routes and ports are intact.
+## Remaining work, evidence limits and next task
+
+- **#134 stays open:** explicit cliffs/obstructions, exact engine elevation
+  cleaning/topology, Arabia spawn-specific elevation and remaining map passes.
+  Ordinary slopes are traversable; no invented slope speed or DEM cutoff.
+- **#177:** extra/replacement town centers are independently disabled by
+  `building('town-center', false)`. Inspect age/prerequisite rules before exposing
+  the action; TC slope legality is tested directly, UI acceptance uses barracks.
+- **#116/#113:** remaining DE land/farm shape families and visual calibration.
+  Shore window locations and opposite/three-edge max-alpha unions are inferred,
+  not a recovered engine UV table. The reference still differs in water/foam
+  calibration (#94) and final compositing (#149).
+- Base hill damage factors are community-sourced: DAT resources 211/212/272/273
+  are civilisation modifiers, zero for Britons, not the base ±25% rule. Exact
+  slope/corner construction behavior and minimal starting pads are also ledgered.
+- **Suggested next mapping task: #93**, regenerate Windsor/Senlac surveys to
+  remove pre-transpose spare clearings. Preserve orientation/source attribution,
+  verify starting sites and compare the boards. Ask the user before starting.
+  General bug-first priority still applies outside their chosen mapping focus.
+- Physical-GPU/desktop FPS and pixel-identical DE coastline/lighting were not
+  measured. Browser checks use SwiftShader; the editor lighting reference has
+  no local image bytes or original height grid.
+
+## Operations and constraints
+
+- Ysgramor's managed shared host survived/restarted normally after the user's
+  reboot; preserve its saved match, service and routes. Check live status before
+  restarting anything. No deliberate deployment restart accompanied this work.
 - Play: <https://ysgramor.tail6e864b.ts.net:5173/>; solo adds `?solo=1`.
-  Artemis continues at **http://localhost:5174/**. Reload a page to fetch the
-  refreshed manifest and current code.
-- Artemis's active base-asset runtime is
+  Artemis remains <http://localhost:5174/>. Its gateway proxies current code
+  from Ysgramor but serves local assets. Re-run `npm run import:aoe2` in its
+  active owned-assets runtime to receive `hillMode` and `blends.native`; this
+  session regenerated Ysgramor only. Reload tabs after regeneration.
+- Last documented Artemis active asset runtime:
   `/home/gszep/Documents/repos/age-of-empires/.local/performance-runtime-bebb06e/public`.
-  It has 117 entities, shared atlas URLs and garrison metadata for 13 entities.
-  Full base gate and fleet/garrison pixel checks passed. The optional Enhanced
-  Graphics Pack-only test was skipped there (88 Python passes, one skip).
-- Artemis's earlier `.local/shared-runtime/public` and main-clone local changes
-  remain intact. Its gateway always fetches application code from Ysgramor;
-  the runtime directory's commit label does not pin that proxied browser code.
-- The old archived match remains at
-  `.local/shared-match-expired-20260921-2137.json`. No saved matches or owned
-  assets were committed. Shared-match expiry standing permission and setup are
-  in `docs/shared-play.md`.
-- Process inspection found no temporary local browser, Vite, import or test
-  jobs. Both managed household services deliberately survive. Recheck process/
-  service state at the next session rather than trusting historical PIDs.
-
-## Remaining work and limits
-
-- **#175:** Windsor seed 10 at diagnostic 10× had step-p95 spikes up to 189.1 ms
-  and still finished a victory. Replaying the first 7,000 ticks with the browser's
-  AI cadence reproduced p95 125.37 ms / 464 ticks above 50 ms. A* search/frontier
-  work dominated the profile; identify the triggering queries before optimizing.
-- **#163:** GPU block-compressed sprite uploads remain unimplemented. The cache
-  budget is soft, and footprint estimates are not total RSS/VRAM measurements.
-- **#173:** composite ship contours check an unassigned `atlasKey`; this separate
-  visual gap was filed with code evidence. **#119**'s monk decoder issue remains.
-- Physical-GPU/desktop FPS was not measured; browser checks used SwiftShader.
-  Network timings are observations, not fixed guarantees. Cache and transport
-  thresholds are chosen engineering policies recorded in the ledger.
-- General human-filed visual bugs **#160/#148/#113**, ram crew bonuses **#161**,
-  and other gameplay/content work remain in the tracker. This run did not
-  authorize a further unattended window beyond its deadline.
+  Verify it before changing it; preserve older runtimes and local changes.
+- The interruption was investigated read-only. Tests had finished at 19:48 BST;
+  Windows logged a TP-Link USB Wi-Fi driver disconnect at 22:27, failed reconnects,
+  and successful reconnection after the 23:16 restart. Intel Ethernet resets and
+  DHCP failures predated this session and continued after reboot. No IP-conflict
+  or resource-exhaustion event was found in the checked window. No network,
+  driver, DHCP, DNS, firewall or Tailscale settings were changed.
+- Do not commit owned/converted content, `.local/`, credentials or saved matches.
+  Do not reset Tailscale, rewrite published history, or disassemble the game exe.
+- No Paseo agent-launch tool/CLI is available in this session. This file is the
+  self-contained receiving-agent briefing; no new agent is claimed to be running.

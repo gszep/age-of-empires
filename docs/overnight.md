@@ -98,5 +98,3 @@ Named here so a run does not re-derive the reason; each has an issue.
   trustworthy.
 - **Relics** (#130) and **the wonder's victory** (#110) — mechanics the
   human has not asked for; a relic today would be invisible scenery.
-- **The open fallback's Imperial Age** (#125) — undecided whether the
-  fallback grows a third age or stays a demonstration.

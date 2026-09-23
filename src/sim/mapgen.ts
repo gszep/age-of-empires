@@ -253,6 +253,11 @@ export interface MapDescriptor {
   playerForest?: ForestSpec;
   neutral?: NeutralSpec;
   ponds?: PondSpec;
+  /** Owned RMS elevation passes. Heights are relative to the flat baseline;
+   * counts are whole-board quotas at this generator's 100x100 reference size. */
+  hills?: { ground: 'land' | 'forest' | 'clearing'; levels: {
+    chance: number; rise: number; tiles: number; clumps: number;
+  }[] }[];
   /**
    * A fixed terrain layer, produced offline (tools/paint_map.py) and
    * committed beside the rules: geography is data the generator reads, not
@@ -288,6 +293,14 @@ export interface MapDescriptor {
 export const ARABIA: MapDescriptor = {
   base: 'grass',
   biomes: ARABIA_BIOMES,
+  // Arabia.rms 265-278, 897-925: non-extreme global elevation roll.
+  // Flat editor level is 2 (owned help 30534); our flat baseline is zero.
+  hills: [{ ground: 'land', levels: [
+    { chance: 5, rise: 2, tiles: 1096, clumps: 64 },
+    { chance: 65, rise: 3, tiles: 1728, clumps: 96 },
+    { chance: 20, rise: 4, tiles: 2304, clumps: 134 },
+    { chance: 10, rise: 5, tiles: 3072, clumps: 168 },
+  ] }],
   // The spawn wood: two clumps sized as the 1999 include's smallest
   // PLAYER_FOREST (55 tiles x 2 clumps); spacing between them borrows the DE
   // script's forest spacing of 6, which the include does not state.
@@ -332,6 +345,11 @@ export const ARABIA: MapDescriptor = {
  */
 export const BLACK_FOREST: MapDescriptor = {
   base: 'forest',
+  // Black_Forest.rms 298-315: separate clearing and forest passes.
+  hills: [
+    { ground: 'clearing', levels: [{ chance: 100, rise: 1, tiles: 32, clumps: 4 }] },
+    { ground: 'forest', levels: [{ chance: 100, rise: 5, tiles: 1024, clumps: 32 }] },
+  ],
   // The owned script's own numbers: `create_player_lands` at land_percent 44
   // shared across both players (~1580 tiles each on this board), a circular
   // base of 14, clumping_factor 2 -- a round core with a soft ragged fringe --
@@ -698,6 +716,7 @@ export function generateMap(
   // that only decides what colour the ground is. The stream is derived from
   // the match seed, so it is still the same dressing every time.
   const dressing = { seed: seedFrom(ctx.rng.seed ^ 0x5ee_d1) };
+  const relief = { ...ctx, rng: { seed: seedFrom(ctx.rng.seed ^ 0xe1e_4) } };
   const biome = descriptor.biomes?.length
     ? descriptor.biomes[randInt(dressing, descriptor.biomes.length)]
     : undefined;
@@ -970,6 +989,10 @@ export function generateMap(
     }
   }
 
+  if (!descriptor.baked && descriptor.hills) {
+    generateHills(relief, descriptor.hills, elevation, terrain, mask, starts, mirror);
+  }
+
   // The script's water masking: the sea keeps its base terrain as a rim
   // along every coast and turns to medium water beyond it. The include
   // grows it as clumps at land percentages well over what the water can
@@ -1114,6 +1137,65 @@ export function generateMap(
   }
 
   return { terrain, elevation };
+}
+
+/** Cost-grown hill footprints, then inward terraces with at most one level
+ * between eight-neighbours. This is an explicit approximation of RMS elevation
+ * growth/cleaning, not a reproduction of the closed engine (ledger #134).
+ * Mirroring preserves the paired-match layout; hills use their own RNG stream. */
+function generateHills(
+  ctx: MapgenContext, passes: NonNullable<MapDescriptor['hills']>, elevation: number[],
+  terrain: number[], forest: Uint8Array, starts: Point[], mirror: (p: Point) => Point,
+): void {
+  const half = Math.floor(ctx.width / 2);
+  const scale = ctx.width * ctx.height / 10_000;
+  for (const pass of passes) {
+    const roll = randInt(ctx.rng, 100);
+    let sum = 0;
+    const level = pass.levels.find(entry => (sum += entry.chance) > roll) ?? pass.levels[0];
+    const tiles = Math.round(level.tiles * scale / 2);
+    if (!tiles) continue;
+    const count = Math.max(1, Math.round(level.clumps * scale / 2));
+    const ok = (x: number, y: number): boolean => {
+      if (x < 0 || y < 0 || x >= half || y >= ctx.height) return false;
+      const tile = y * ctx.width + x;
+      // Keep the starting TC and immediate opening flat; cliffs are not inferred
+      // from a height difference, and no arbitrary slope movement cost is added.
+      if (OPEN_WATER.has(terrain[tile]) || tooClose(starts, x, y, 4)) return false;
+      return pass.ground === 'land' || (pass.ground === 'forest') === Boolean(forest[tile]);
+    };
+    const seeds: { x: number; y: number }[] = [];
+    const separation = Math.floor(2 * Math.sqrt(tiles / count));
+    for (const tile of candidateOrderBox(ctx, 0, 0, half - 1, ctx.height - 1)) {
+      const x = tile % ctx.width, y = Math.floor(tile / ctx.width);
+      if (!ok(x, y) || seeds.some(s => Math.abs(s.x - x) < separation && Math.abs(s.y - y) < separation)) continue;
+      seeds.push({ x, y });
+      if (seeds.length === count) break;
+    }
+    let layer = new Uint8Array(elevation.length);
+    growClumps(ctx, layer, seeds, tiles, ok);
+    // Reflect before terracing, so the symmetry seam is not a valley.
+    for (let y = 0; y < ctx.height; y++) for (let x = 0; x < half; x++) {
+      if (!layer[y * ctx.width + x]) continue;
+      const other = mirror(tileCentre(x, y));
+      layer[Math.floor(other.y) * ctx.width + Math.floor(other.x)] = 1;
+    }
+    for (let rise = 1; rise <= level.rise; rise++) {
+      const inner = new Uint8Array(layer.length);
+      for (let y = 0; y < ctx.height; y++) for (let x = 0; x < ctx.width; x++) {
+        const tile = y * ctx.width + x;
+        if (!layer[tile]) continue;
+        elevation[tile] = Math.max(elevation[tile], rise);
+        let surrounded = true;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= ctx.width || ny >= ctx.height || !layer[ny * ctx.width + nx]) surrounded = false;
+        }
+        if (surrounded) inner[tile] = 1;
+      }
+      layer = inner;
+    }
+  }
 }
 
 /**

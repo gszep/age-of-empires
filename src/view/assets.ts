@@ -161,13 +161,17 @@ export interface BlendMasks {
   gutter: number;
   /** The column past the owned masks: the whole diamond, opaque. Ours. */
   solid: number;
+  /** DE square tile-axis windows for water families; absent in old imports. */
+  native?: Pick<BlendMasks, 'tile' | 'gutter' | 'masksPerMode'> & {
+    modes: Partial<Record<number, THREE.Texture>>;
+  };
 }
 
 /**
  * The atlas u of a point `t` (0..1) across mask `column`: the column's
  * pitch is the tile plus its gutters, and `t` spans the tile only.
  */
-export function maskU(blends: BlendMasks, column: number, t: number): number {
+export function maskU(blends: Pick<BlendMasks, 'tile' | 'gutter' | 'masksPerMode'>, column: number, t: number): number {
   const pitch = blends.tile[0] + 2 * blends.gutter;
   return (column * pitch + blends.gutter + t * blends.tile[0]) / (pitch * blends.masksPerMode);
 }
@@ -492,25 +496,35 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   // so they must not repeat or filter across a column boundary: clamped, and
   // linear only within a mask.
   let blends: BlendMasks | undefined;
-  const blendSpec = (manifest as { blends?: { tile: [number, number]; gutter?: number; modes: { image: string; masks: number }[]; edges: Record<string, number[]>; solid: number } }).blends;
+  type BlendEntry = { image: string; masks: number };
+  const blendSpec = (manifest as { blends?: { tile: [number, number]; gutter?: number; modes: BlendEntry[];
+    edges: Record<string, number[]>; solid: number;
+    native?: { tile: [number, number]; gutter: number; modes: Record<string, BlendEntry> };
+  } }).blends;
   if (blendSpec?.modes?.length) {
-    const modes = await Promise.all(blendSpec.modes.map(mode =>
-      loader.loadAsync(CONTENT_BASE + mode.image).then(texture => {
-        texture.colorSpace = THREE.NoColorSpace;
-        texture.wrapS = THREE.ClampToEdgeWrapping;
-        texture.wrapT = THREE.ClampToEdgeWrapping;
-        texture.magFilter = THREE.LinearFilter;
-        texture.minFilter = THREE.LinearFilter;
-        texture.generateMipmaps = false;
-        // The mask rides in the mesh's second UV set; the terrain it fades
-        // keeps the first.
-        texture.channel = 1;
-        return texture;
-      })));
+    const loadMask = (mode: BlendEntry) => loader.loadAsync(CONTENT_BASE + mode.image).then(texture => {
+      texture.colorSpace = THREE.NoColorSpace;
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
+      // The mask rides in the mesh's second UV set; the terrain it fades
+      // keeps the first.
+      texture.channel = 1;
+      return texture;
+    });
+    const modes = await Promise.all(blendSpec.modes.map(loadMask));
     blends = {
       tile: blendSpec.tile, modes, edges: blendSpec.edges,
       masksPerMode: blendSpec.modes[0].masks, gutter: blendSpec.gutter ?? 0, solid: blendSpec.solid,
     };
+    if (blendSpec.native && Object.keys(blendSpec.native.modes).length) {
+      const entries = Object.entries(blendSpec.native.modes);
+      const nativeModes = await Promise.all(entries.map(async ([mode, entry]) => [Number(mode), await loadMask(entry)]));
+      blends.native = { tile: blendSpec.native.tile, gutter: blendSpec.native.gutter,
+        masksPerMode: entries[0][1].masks, modes: Object.fromEntries(nativeModes) };
+    }
   }
   return {
     entities: manifest.entities, skins: skinFamilies(manifest.entities), ages: manifest.ages ?? [],

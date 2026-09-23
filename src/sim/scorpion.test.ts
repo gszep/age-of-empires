@@ -21,6 +21,7 @@ function arena(rules: GameRules): GameState {
   const state = createGame(127, rules);
   state.entities = state.entities.filter(e => e.owner !== 0);
   state.terrain.fill(0);
+  state.elevation.fill(0); // isolate bolt/armour rules from generated hill bonuses
   return state;
 }
 
