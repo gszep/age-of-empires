@@ -1,124 +1,106 @@
-# Agent handoff — 2026-09-22
+# Agent handoff — 2026-09-23
 
-## Checkpoint and next action
+## Completed request
 
-The human requested **#96**, supplied the editor elevation reference, then
-requested **#137** and a next-issue recommendation. Both implementations are
-verified. The final request was to commit the pending changes, update docs and
-prepare this handoff. Checkpoint base: `1b17202`; the implementation commit is
-named **“Complete garrison controls and minimap relief (#137, #96)”**.
+The human authorized a **ten-hour autonomous performance run**, starting with
+#152. Window: **2026-09-22 21:54:39 → 2026-09-23 07:54:39 +01:00**.
+Live unattended preflight/read/write/shell/GitHub probes passed; no approval
+prompt blocked the run. Implementation base `1f9913f`, implementation checkpoint
+`15de1d5`; all 14 implementation/tooling/deployment commits were gated as
+required and pushed. This documentation handoff follows them.
 
-**Recommended next: #161 — infantry speed/attack bonuses for occupied rams.**
-Carrying, capacity, unloading and flags now work. Owned help strings
-26094/26289/26446 explicitly describe crew bonuses, but the per-passenger
-constants and villager participation need patch-matched evidence. Test actual
-travel distance and building HP loss, unload reversal and replay determinism.
-This is a recommendation, not authorization for another autonomous run.
+The generated inventory, measurements, failed-run findings and verification
+limits are in [the run report](reviews/2026-09-23-performance.md).
 
-Other live follow-ons: **#160** world terrain hillshade still uses the old
-lighting axis; **#159** morning-report timestamp/gate reporting; **#148/#113**
-water/shore fidelity. The monk outline decoder remains blocked under **#119**.
-The tracker, not this summary, is the complete queue.
+## Delivered performance changes
 
-## Delivered
-
-### #96 — minimap relief and woods
-
-- Terrain consumes its imported light/flat/dark `minimapShades`.
-- Live and remembered woods use the owned Forest palette, flat sRGB
-  **(21,118,21)**, replacing the old scaled-image sample **(41,140,33)**.
-- The human's 2000×1125 editor screenshot corrected the provisional axis to
-  **screen-right lighting**, `dHeight/dx - dHeight/dy`. Four-face hill tests
-  pin both front and both back faces. The attachment is indexed in
-  `.local/reference/index.md`; raw image bytes/height grid are unavailable.
-- Palette cache refresh, fog/reveal, fallback/old manifests, neutral plateaus
-  and 392×392 buffers are covered. Exact diagonal/corner classification,
-  equal gradient weights and tree-overlay binding remain documented inferences.
-- `src/view/world.ts` was not changed to match this axis; that is **#160**.
-
-### #137 — garrison controls and feedback
-
-- Town bell uses owned cell **14**, icons **49/61**, text/help and start/stop
-  audio. It recalls the nearest eligible workers up to reserved free capacity,
-  remembers jobs/routes, and restores them on release. Later player orders
-  supersede recall; dead workers are not restored; manually sheltered units stay.
-- Self-rally production holds newly trained units at the DAT capacity. Type-0
-  buildings refuse outside returning units; overflow emerges outside.
-- Battering/Capped Rams carry **six** infantry/villager passengers, reject
-  archers/cavalry, move with cargo, unload on passable land and release on
-  destruction where an exit exists. The HUD displays capacity.
-- Garrison flags resolve `creatable.garrison_graphic` through owned graphic
-  deltas, with per-age offsets, x2 scale and player-colour masks. Fog remembers
-  occupancy without revealing counts or identities.
-- Negative `garrison_firepower` uses the community-documented flat-DPS meaning;
-  positive values multiply ranged DPS. Actual volley tests cover researched
-  building damage and the town center's absent primary projectile.
-
-**Observation protocol is v5**: `town-bell` command (`player`, `buildingId`,
-`enabled`), own town-center `townBell`, and public `hasGarrison` on visible and
-remembered entities. Counts remain own-only. Match/config/result/replay formats
-remain v1. See `docs/agent-runtime.md` and the schemas.
-
-The ledger explicitly records bell selection without a radius cutoff,
-reservation/overflow/egress policy, ram passenger classes, and volley formula
-assumptions. These are not claims of exact DE engine equivalence. Ram crew
-speed/attack bonuses remain **#161**.
+- **Sprite memory (#152/#162/#170):** lazy pages expire, identical source/frame/
+  layer atlases share URLs, and warm retention avoids churn between worker trips.
+  Policy: 512 MiB **soft** budget, 60 s warm grace, 120 s idle expiry; current
+  scene art may exceed the budget. HD fleet estimated RGBA footprint fell
+  **3.88 GB → 875 MB**, with identical pixels; GPU textures **128 → 65**.
+- **Renderer lifetime (#164/#172):** retired entity/preview geometry and materials
+  are disposed; texture-lifetime builder keys avoid Three r180's cleared sampler
+  template; unavailable contours cannot revive expired bindings. Actual preview/
+  restart geometry counts now stay flat. Basic/ramp pixels remain identical.
+- **Simulation (#165–168):** invocation-local fog-memory lookup, reusable bounded
+  A* workspace, one gather-target lookup per update, resource-kind fast path.
+  Three 12,000-tick imported traces remain byte-identical; total stepping time
+  **50.087 → 34.025 s (32%)**. Full Windsor terminal state also matches.
+- **Loading (#154/#174):** HTTP gzip/Brotli for host modules; negotiated snapshot-
+  only WebSocket DEFLATE. Three.js chunk **2.55 MB → 446 KB**. Actual Windsor
+  snapshot **3.16 MB → 95.7 KB wire bytes**, with identical decoded JSON/SHA.
+  Ordinary tick/control messages remain plain and extension opt-out works.
+- **Tooling (#159/#169):** accurate timestamp/pagination/latest-gate reporting;
+  sustained browser workloads with metrics, full error stacks and failure
+  snapshots. The old open-ground pathing fixture now discovers a clear route.
 
 ## Verification
 
-**Full gate GREEN:** `.local/issue137-gate-r3.log`, exit **0** in its matching
-`.exit`, started **2026-09-22 21:17 BST**:
+Latest implementation gate: `.local/snapshot-compression-gate.log`, **GREEN**,
+started **2026-09-23 04:47:14 +01:00**:
 
-- **658 tests across 48 Vitest files**;
-- TypeScript typecheck and Vite production build;
-- **85 Python/import tests**;
+- **683 Vitest tests / 53 files**;
+- TypeScript/Vite build;
+- **89 Python/import tests**;
 - real-browser debug smoke.
 
-It covers both features and the final killed-worker/capacity-display fixes.
-Only Markdown changed afterward. Gate freshness was checked before commit.
-Use `.local/gate.latest.json` and `tools/session_start.sh`; the old
-`tools/morning_report.sh` still needs #159's fix.
+Only Markdown changed afterward. Use `.local/gate.latest.json` or
+`tools/session_start.sh` for the current gate record. **No existing fixture
+clock or timeout was widened.**
 
-Dedicated checks (all passed; each starts/closes a private server/browser):
+Final uninterrupted browser run: **156.67 minutes**, **156 samples**, all four
+maps and 1.5×/2×/10× speeds, **exit 0**. Eight workloads ended (six victories,
+one tick limit, one wall-clock limit), plus one partial at cutoff. **No page/
+asset errors or invalid-binding samples**. Available host memory stayed above
+**9.14 GiB**; 4,135 evictions completed. Three samples had pending body pages,
+so zero first-use pop-in is not claimed. Earlier failed/interrupted segments
+remain explicitly separate in the report.
 
-| Command | What it verifies |
-|---|---|
-| `npx tsx tools/minimap_relief_smoke.mts` | Exact sRGB palettes, four hill faces, live/remembered woods, fog/reveal, old/fallback/replaced palettes, state immutability, large buffer |
-| `npx tsx tools/minimap_markers_smoke.mts` | Compact live/memory building dots, reveal parity, no farm marker |
-| `npx tsx tools/garrison_edges_smoke.mts` | Real bell/work-return clicks, self-rally training/unload, ram boarding/unload, `1/6` capacity, blue flag pixels and both bell audio requests |
+Maintained acceptance tools include `sprite_residency_smoke.mts`,
+`atlas_sharing_smoke.mts`, `view_lifecycle_smoke.mts`,
+`outline_residency_smoke.mts`, `sampler_residency_smoke.mts`,
+`compression_smoke.mts`, `shared_smoke.mts` and `performance_soak.mts`, all under
+`tools/`. `tools/probes/sim_performance.mts` records/compares full-state traces.
 
-The final full import is `.local/issue137-import-audio.log` (exit 0), with
-**2,845 cached atlases reused**. New flag art/metadata and bell audio are published
-locally; no decoder edit or wholesale atlas regeneration was required.
+## Deployment and retained state
 
-Two earlier gates timed out in different existing long tests while Windows
-ran a CPU-heavy game. After the human freed the host, the same
-`VITEST_MAX_FORKS=1 VITEST_MAX_THREADS=1 tools/gate.sh` passed. **No fixture
-timeout was widened.** WSL idle CPU is not proof that the Windows host is idle.
+- Ysgramor's managed host is **active**, **NRestarts=0**, restarted onto the
+  optimized code. No saved shared checkpoint existed at restart; the pristine
+  host was retained. A handshake-only Artemis check negotiated compression
+  without joining a match. Existing routes and ports are intact.
+- Play: <https://ysgramor.tail6e864b.ts.net:5173/>; solo adds `?solo=1`.
+  Artemis continues at **http://localhost:5174/**. Reload a page to fetch the
+  refreshed manifest and current code.
+- Artemis's active base-asset runtime is
+  `/home/gszep/Documents/repos/age-of-empires/.local/performance-runtime-bebb06e/public`.
+  It has 117 entities, shared atlas URLs and garrison metadata for 13 entities.
+  Full base gate and fleet/garrison pixel checks passed. The optional Enhanced
+  Graphics Pack-only test was skipped there (88 Python passes, one skip).
+- Artemis's earlier `.local/shared-runtime/public` and main-clone local changes
+  remain intact. Its gateway always fetches application code from Ysgramor;
+  the runtime directory's commit label does not pin that proxied browser code.
+- The old archived match remains at
+  `.local/shared-match-expired-20260921-2137.json`. No saved matches or owned
+  assets were committed. Shared-match expiry standing permission and setup are
+  in `docs/shared-play.md`.
+- Process inspection found no temporary local browser, Vite, import or test
+  jobs. Both managed household services deliberately survive. Recheck process/
+  service state at the next session rather than trusting historical PIDs.
 
-## Live service, saved matches and imports
+## Remaining work and limits
 
-- Workspace `/home/fraser/repos/age-of-empires`, branch `main`.
-- Ysgramor's `open-empires-shared.service` deliberately remains **active/running**,
-  **NRestarts=0**. It was reloaded for this code while no checkpoint or connections
-  existed, so no joined match was discarded. Preserve existing Tailscale routes.
-- Shared URL: <https://ysgramor.tail6e864b.ts.net:5173/>; solo adds `?solo=1`.
-- **Standing human permission:** end a shared match once neither Artemis nor
-  Ysgramor has accessed it for one hour. Establish inactivity from access evidence,
-  not checkpoint modification time; archive its save. This is permission, not
-  an implemented automatic expiry timer (`docs/shared-play.md`).
-- The old incompatible match is intact at
-  `.local/shared-match-expired-20260921-2137.json`, SHA-256
-  `25cce32d50c6e76b96d3f290aa2ae774d3ea38d1d5474f7ef2d621a37fc236db`.
-- **Artemis import/presentation parity was not verified.** Its local asset
-  gateway needs the complete updated import before claiming flag/audio parity.
-  Hardware-GPU acceptance was not performed; browser checks used headless Chrome.
-- No temporary import, test or browser processes should remain. Recheck actual
-  Git/service/process state at the next session; preserve unfamiliar changes.
-
-Earlier delivered worker/naval and autonomous-run evidence lives in
-`docs/status.md`, issue threads and Git history. Ubuntu remains under
-`D:\WSL\Ubuntu`; Linux paths are unchanged. Local-only crash evidence remains
-in `.local/wsl-crashes/`, with cause unproven. The historical pathing probe's
-“open ground” seed-200 endpoints are blocked; **#5** records that fixture defect.
-Never commit owned assets, saved matches, credentials or crash dumps.
+- **#175:** Windsor seed 10 at diagnostic 10× had step-p95 spikes up to 189.1 ms
+  and still finished a victory. Replaying the first 7,000 ticks with the browser's
+  AI cadence reproduced p95 125.37 ms / 464 ticks above 50 ms. A* search/frontier
+  work dominated the profile; identify the triggering queries before optimizing.
+- **#163:** GPU block-compressed sprite uploads remain unimplemented. The cache
+  budget is soft, and footprint estimates are not total RSS/VRAM measurements.
+- **#173:** composite ship contours check an unassigned `atlasKey`; this separate
+  visual gap was filed with code evidence. **#119**'s monk decoder issue remains.
+- Physical-GPU/desktop FPS was not measured; browser checks used SwiftShader.
+  Network timings are observations, not fixed guarantees. Cache and transport
+  thresholds are chosen engineering policies recorded in the ledger.
+- General human-filed visual bugs **#160/#148/#113**, ram crew bonuses **#161**,
+  and other gameplay/content work remain in the tracker. This run did not
+  authorize a further unattended window beyond its deadline.

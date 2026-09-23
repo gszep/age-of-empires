@@ -14,9 +14,9 @@ for the human's current solo QA, or the same path through
 **https://ysgramor.tail6e864b.ts.net:5173/**. Removing `solo=1` joins the shared
 match. Artemis joins through its own **http://localhost:5174/** gateway.
 
-The managed shared host was active at the 2026-09-22 autonomous-run preflight,
-with no restarts. Verification below uses private servers rather than the
-shared match.
+Both managed household services were active with zero automatic restarts at
+the 2026-09-23 performance handoff. Verification uses private servers rather
+than altering the shared match; current deployment details are in `handoff.md`.
 
 For a fresh standalone installation:
 
@@ -214,7 +214,7 @@ the base art's; sheets over 8192 px continue on pages. The base depots
 alone still import at x1. Sprite pages load on first use rather than all
 at start -- loading the whole pack up front took the machine down (WSL,
 15 GB) -- so a sprite may be absent
-for a frame or two on its first appearance. Unused pages now release both GPU
+until its page finishes loading. Unused pages now release both GPU
 textures and decoded images after two minutes, or after one minute under a
 512 MiB soft-budget pressure (#152). Current scene art (including frozen fog
 views) remains resident even above that budget; this is not a total-memory
@@ -303,70 +303,38 @@ are included in the #96/#137 checkpoint.
 
 ### Performance verification
 
-Fog-memory validation uses one invocation-local live-entity index instead of
-rescanning the entity array for each remembered record (#165). Three imported
-12,000-tick AI matches (seeds 3/7/19) produced identical raw-JSON state hashes
-at every 1,000-tick checkpoint. In paired profiled runs, stepping time fell
-from 16.629/15.976/17.482 s to 14.696/14.049/14.201 s (14% aggregate reduction).
-These are local measurements, not a frame-rate guarantee. Same-tick deletion,
-replacement, ownership and fog-resight regressions cover cache lifetime.
-`tools/probes/sim_performance.mts` records/compares the full traces; the real
-tree/fog browser test still preserves opaque canopy pixels and owned shadows.
+The 2026-09-23 run replaced repeated fog-memory scans with an invocation-local
+live index (#165), reused bounded A* scratch storage without changing its f/h/tile
+order (#166), reused each gatherer's target lookup (#167), and fast-pathed resource
+kind checks (#168). Three imported 12,000-tick matches (seeds 3/7/19) retained
+identical raw-JSON state hashes every 1,000 ticks while stepping fell
+**50.087 → 34.025 s (32%)**. A full Windsor match retained its terminal state at
+tick 34,231. The 392×392 short-search microbenchmark fell 542 → 24 ms for 2,000
+queries; this is not a 20× whole-game/FPS claim. Same-tick fog changes, alternating
+board sizes, failed searches, cache-copy isolation, economy regressions and real
+movement/gathering browser actions cover the changes.
 
-A* reuses a bounded synchronous workspace and resets only visited cells (#166),
-preserving the f/h/tile total order. In paired profiled 392×392 short-route
-benchmarks, 2,000 uncached searches fell from 542 to 24 ms; exhaustive unreachable
-searches stayed comparable (345 to 327 ms). The three Arabia traces remain
-byte-identical. A full 392×392 Windsor match also retained every checkpoint and
-its terminal tick 34,231 / 5,735 entities (stepping 240.9 to 227.0 s in these
-runs). The large microbenchmark saving is not a claimed 20× match/FPS gain.
-Alternating board sizes, failed searches, cache-copy isolation, the maintained
-pathing measurements and the real 25-unit right-click smoke cover the change.
+Sustained verification found and fixed two additional lifetime problems. A
+60-second warm grace avoids worker-trip churn (#170): seven-minute evictions
+586 → 44, at an estimated sprite footprint of 1,051 → 1,459 MiB. Sprite builder
+keys now follow texture UUID/lifetime (#172), preventing Three r180 from cloning
+a cleared sampler after A→B→expire A→new B. Basic/ramp pixels remain identical;
+missing, pending and empty contours cannot revive retired bindings.
 
-Gatherers resolve their assigned target once per update (#167), reuse it for
-farm classification/capacity/depletion handling, and replace the local reference
-when reservation recovery redirects them. This removes full-array scans for
-ordinary non-farm targets. Against the workspace checkpoint, three-seed stepping
-fell 43.419 to 36.982 s and the full Windsor match 227.047 to 181.983 s; all
-recorded states stayed byte-identical. Existing economy regressions and actual
-deer/farm right-clicks verify 35/10 food banked and one-worker farm occupancy.
+The final **156.67-minute** private browser run (#169) completed with **156
+samples, no page/asset errors and no invalid bindings**, across all four maps
+and 1.5×/2×/10× speeds. Six victories, one tick limit and one wall limit ended
+eight workloads; the ninth was partial at cutoff. Estimated sprite footprint
+peaked 3,329.88 MiB and ended 2,065.58 MiB; host available memory stayed above
+9.14 GiB. Three samples had pending body pages, so zero first-use pop-in is not
+claimed. Windsor seed 10 at 10× retained step spikes (worst sampled p95 189.1 ms),
+tracked in **#175**. Earlier failures and interrupted segments are not counted as
+passes. These SwiftShader measurements do not establish physical-GPU FPS.
 
-Entity-kind guards reject the dominant `resource` case before general table
-lookups (#168). The same three-seed trace fell another 36.982 to 34.025 s, and
-Windsor 181.983 to 170.959 s, again with identical states. Across the recorded
-Arabia optimization sequence, stepping totals are 50.087 → 34.025 s (32%).
-
-`tools/performance_soak.mts` supplies sustained, private real-browser workloads
-(#169): two existing AIs issuing public commands, actual speed/map controls,
-camera moves and normal cache clocks. JSON samples separate transition time
-from subsequent frame/step/AI/scene/render distributions and record resident
-sprite bytes, evictions, GPU allocations, JS heap and available host memory.
-Short validation exercised all four maps and all three speed modes; SIGTERM
-emits an interrupted result and closes the private browser/server. Sustained
-run evidence is recorded separately from these harness checks.
-
-The first sustained segment exposed cache churn between ordinary worker trips
-(#170). Increasing warm grace from 10 to 60 seconds reduced seven-minute
-evictions from 586 to 44 (63.3 → 4.51 per 1,000 ticks); mean JS frame work fell
-17.14 → 9.61 ms and the final minute's maximum render call 692.6 → 7.5 ms.
-The tradeoff was 1,051 → 1,459 MiB resident sprite data; minimum host available
-memory was still 11.38 GiB. These are matched normal-speed Arabia workload
-windows, not hardware FPS or identical wall-time tick counts. Idle expiry and
-eviction/reload pixel invariants still pass; the full multi-map soak resumes
-with the longer grace.
-
-The sustained run then exposed a Three r180 sampler-lifetime failure (#172):
-after texture A was replaced by B and A expired, a newly rendered object could
-clone the cached template's cleared sampler despite having a valid B material.
-Sprite builder-cache keys now include the texture UUID/lifetime; ramp pieces
-invalidate bindings when changing pages. A real-renderer A→B→expire A→new B
-fixture reproduces the original WeakMap exception before the fix and preserves
-pixels/state after it, for basic and player-ramp materials. Missing/pending/empty
-contours also cannot revive retired bindings. The eight-minute 10x rerun passed
-two full victories plus a partial third match with no page errors or missing-body
-samples. Earlier failed segments remain failed evidence; the multi-map run is
-separate. Soak failures now retain unique stacks, sampler diagnostics and a
-versioned state snapshot rather than only hundreds of repeated error strings.
+The generated [run report](reviews/2026-09-23-performance.md) contains the exact
+workload table, byte/timing comparisons, deployment and verification limits.
+`tools/performance_soak.mts` records timing/residency data and failure snapshots;
+`tools/probes/sim_performance.mts` records and compares deterministic traces.
 
 The maintained open-ground pathing probe now discovers/asserts a clear
 20-tile corridor (#5) instead of using a seed-200 destination occupied by a
