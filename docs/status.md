@@ -178,6 +178,10 @@ fog; transport-stable checksums, bounded buffered playback, interpolated
 presentation and same-map recovery without scene rebuilding (#153).
 Artemis's local gateway serves its own assets while fetching code and
 match traffic from Ysgramor. See `docs/shared-play.md` for setup and evidence.
+Its isolated base-asset runtime was refreshed on 2026-09-23 (#171): the live
+gateway now serves 117 entities, no redundant source/frame/layer atlas URLs,
+and garrison flags for 13 entities. Full base-content gate and fleet/garrison
+pixel probes passed; the optional Enhanced Graphics Pack test was skipped.
 
 Host HTTP modules now negotiate gzip/Brotli (#154); control routes and already
 compressed images are excluded, and the gateway preserves encoding headers.

@@ -14,9 +14,17 @@ play again.
 - Artemis: the same user-service name runs `tools/shared-join.mjs` on
   localhost:5174. Open **http://localhost:5174/** on Artemis.
 - Artemis's current import is generated from its owned base depots under
-  `/home/gszep/Documents/repos/age-of-empires/.local/shared-runtime/public`.
+  `/home/gszep/Documents/repos/age-of-empires/.local/performance-runtime-bebb06e/public`
+  (#171). This detached runtime also owns the join service script. The earlier
+  `.local/shared-runtime/public` remains available for rollback.
   Ysgramor uses its own `public/imported/` HD import. The manifests keep each
   machine's frame metadata and image scale together.
+- The 2026-09-23 base import has 117 entities, shared atlas URLs and 13 entities'
+  garrison-flag metadata. Its gate passed 681 Vitest tests, build and browser
+  smoke, plus 88 Python/import tests; the Enhanced Graphics Pack-only test was
+  skipped because that optional pack is not installed on Artemis. The
+  x1 fleet A/B retained identical pixels while reducing estimated RGBA page
+  footprint from 1,014,989,440 to 228,268,096 bytes (GPU textures 128 → 65).
 - The gateway serves `/imported/` locally and proxies everything else,
   including the application code and match WebSocket, to Ysgramor. There is
   no need to update Artemis's application clone for each code change.
