@@ -77,10 +77,11 @@ in `git log` and `docs/status.md`.
 - **Hygiene pass, last of all**: list what is running by the process table,
   not by memory; kill the litter; name what deliberately survives.
 - **The morning report is generated, not recalled**:
-  `tools/morning_report.sh <start-commit>` prints the commits, the issues
+  `tools/morning_report.sh <start-commit> [since-ISO-time]` prints the commits, the issues
   closed and opened, the gate, the ledger rows added and a *not verified*
   section to fill in by hand — every claim the run could not check, every
-  approximation, every fixture clock widened. Counts recalled from memory
+  approximation, every fixture clock widened. Pass the recorded run-start time
+  when it differs from the start commit's timestamp. Counts recalled from memory
   were wrong in four of the last five reports.
 - Update `docs/lessons.md` (rules, grouped by trigger, only if the tracker
   cannot hold it) and `docs/status.md` (what shipped and its evidence), and

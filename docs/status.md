@@ -355,7 +355,11 @@ comparable because the board changed under them.
   how many skipped.
 
 The latest gate's actual log/status is recorded in `.local/gate.latest.json`
-and reported by `tools/session_start.sh`. The four issue-specific naval browser
+and shared by session-start and morning-report through `tools/report-data.mjs`
+(#159). Tracker windows compare timestamp instants, paginate all updated issues,
+and include issues opened and closed within the same run. Timeout-related added
+diff lines are review candidates, not a claim that fixture clocks were widened.
+The four issue-specific naval browser
 scenarios also passed in `.local/issue97-naval-final-d1659.log`: dock buttons
 and upgrades, boarding and shore unloading, fish-trap construction/income,
 and visible fire shots.

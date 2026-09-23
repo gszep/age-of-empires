@@ -87,17 +87,9 @@ off the reference; **measured** — fitted to a reference screenshot;
 
 ## View
 
-Sprite residency (#152): `sprite-residency.ts` uses a **chosen**, presentation-only
-512 MiB soft budget, 10-second warm grace, 120-second idle expiry and one-second
-sweep. These are application memory policy, not claimed DE runtime constants.
-The owned x2 manifest supplies page dimensions; a 22-building Castle Age fixture
-measured 1,073,946,240 decoded RGBA bytes across 84 pages. Current scene requests
-(including off-camera and remembered art) override the budget; terrain/water
-stay pinned. Reload uses the existing PNG loader, so returning expired art can
-be absent during its fetch/decode. Block-compressed upload remains future work.
-
 | What | Shipped as | Source | Where | Issue |
 |---|---|---|---|---|
+| Sprite page residency | 512 MiB soft budget, 10 s warm grace, 120 s idle expiry, 1 s sweep; scene requests override the budget, terrain/water pinned | **chosen** application memory policy, not DE runtime constants. Owned x2 dimensions supply byte estimates; pre-sharing Castle Age fixture measured 1,073,946,240 bytes / 84 pages. Off-camera and remembered art remain active; expired art may be absent during PNG reload. Compressed upload remains #163 | `sprite-residency.ts` | #152 |
 | Order-flash cadence and colour | 0.2 s on/off for 1.2 s, marker colour | chosen; `unit_selection_color_1/2` hold palette 0, no widget | `main.ts` `ORDER_FLASH_*` | — |
 | Occlusion contour threshold | ≥ half the sprite's box covered | chosen (stands in for the per-pixel test) | `sprites.ts` `HIDDEN_FRACTION` | — |
 | Sprite shadow profile/composition | imported Default `shadow_strength` (1.0) and black `shadow_color`, applied to the owned mask over the ground | values **owned**, imported from `colorcorrection.json`; using Default for every biome and direct alpha blending rather than DE's final compositor remains **inferred**. The extra 0.55 multiplier was removed after the human rejected #88's first visual fix | `sprites.ts` `configureShadow`, `import_content.py` `shadow_profile` | #149 |

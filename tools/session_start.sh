@@ -35,32 +35,7 @@ dirty=$(git status --porcelain | wc -l)
 [ "$behind" != "0" ] && [ "$behind" != "?" ] && echo "-> git pull before starting; another session has pushed."
 
 section "gate"
-if [ -f .local/gate.latest.json ]; then
-  python3 - <<'PY'
-import datetime, json
-from pathlib import Path
-try:
-    run = json.loads(Path('.local/gate.latest.json').read_text())
-    status = run['status']
-    if status == 'running':
-        try:
-            command = Path(f"/proc/{run['pid']}/cmdline").read_bytes()
-            if b'gate.sh' not in command: status = 'interrupted (gate process is gone)'
-        except OSError:
-            status = 'interrupted (gate process is gone)'
-    stamp = datetime.datetime.fromtimestamp(run['started']).astimezone().isoformat(timespec='seconds')
-    print(f"latest run started {stamp}: {status}; log {run['log']}")
-    if status == 'green' and not Path('.local/gate.ok').exists():
-        print('-> green run has no gate sentinel; rerun before committing code')
-except (OSError, ValueError, KeyError, TypeError) as error:
-    print(f'cannot read latest gate record: {error}; run tools/gate.sh')
-PY
-elif [ -f .local/gate.log ]; then
-  echo "legacy default log only (named runs may be newer):"
-  echo "last run $(date -r .local/gate.log '+%Y-%m-%d %H:%M'): $(grep -E 'GATE (GREEN|FAILED)' .local/gate.log | tail -1)"
-else
-  echo "no gate log in .local/ — run tools/gate.sh before the first commit"
-fi
+node tools/report-data.mjs gate
 
 section "imported content"
 m=public/imported/aoe2/manifest.json

@@ -21,20 +21,12 @@ echo "## Commits"
 git log --reverse --format='- `%h` %s' "$start"..HEAD
 echo
 if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then
-  echo "## Issues closed since $since"
-  gh issue list --state closed --limit 100 --json number,title,closedAt --jq ".[] | select(.closedAt >= \"$since\") | \"- #\(.number) \(.title)\"" | sort -t'#' -k2 -n
-  echo
-  echo "## Issues opened since $since"
-  gh issue list --state open --limit 100 --json number,title,createdAt,labels --jq ".[] | select(.createdAt >= \"$since\") | \"- #\(.number) [\(.labels|map(.name)|join(\",\"))] \(.title)\"" | sort -t'#' -k2 -n
-  echo
-  echo "## Still open, bugs first"
-  gh issue list --state open --label bug --limit 100 --json number,title --jq '.[] | "- #\(.number) \(.title)"'
-  echo
+  node tools/report-data.mjs issues "$since"
 fi
 echo "## Tests and gate"
-echo "- last gate: $(grep -E 'GATE (GREEN|FAILED)' .local/gate.log 2>/dev/null | tail -1 || echo 'no log') at $(date -r .local/gate.log '+%H:%M' 2>/dev/null || echo '?')"
+node tools/report-data.mjs gate
 echo "- test files changed: $(git diff --name-only "$start"..HEAD | grep -cE '\.test\.ts$|test_import' )"
-echo "- fixture clocks or timeouts changed (check each): $(git diff "$start"..HEAD -- 'src/**/*.test.ts' vite.config.ts | grep -cE '^\+.*(timeout|maxTimeSeconds|maxTicks|Ticks\b.*[0-9]{4,})' )"
+echo "- timeout/clock-related added diff lines (review candidates, not a count of widened clocks): $(git diff "$start"..HEAD -- 'src/**/*.test.ts' vite.config.ts | grep -cE '^\+.*(timeout|maxTimeSeconds|maxTicks|Ticks\b.*[0-9]{4,})' )"
 echo
 echo "## Ledger rows added"
 git diff "$start"..HEAD -- docs/ledger.md | grep -E '^\+\|' | grep -vE '^\+\|( What |-+\|)' | sed 's/^+/- /' || true
