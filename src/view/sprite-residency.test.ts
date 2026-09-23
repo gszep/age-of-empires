@@ -66,4 +66,24 @@ describe('sprite page residency (#152)', () => {
     f.residency.sweep();
     expect(f.residency.stats).toEqual({ pages: 1, bytes: 256, evictions: 99 });
   });
+
+  it('keeps alternating work/carry art warm under pressure, then expires it once the worker stops (#170)', () => {
+    let now = 0;
+    const textures = new Map<string, Texture>();
+    const residency = new SpriteResidency(textures, () => now, { ...SPRITE_CACHE_POLICY, budgetBytes: 0 });
+    for (const image of ['work', 'carry']) residency.add(image, new Texture({ width: 8, height: 8 } as HTMLImageElement));
+    const loadTexture = vi.fn();
+    const assets = { textures, spriteResidency: residency, loadTexture } as unknown as ContentAssets;
+    for (let trip = 1; trip <= 8; trip++) {
+      now = trip * 20_000;
+      expect(spriteTexture(assets, trip % 2 ? 'carry' : 'work')).toBeDefined();
+      residency.sweep();
+    }
+    expect(loadTexture).not.toHaveBeenCalled();
+    expect(residency.stats.evictions).toBe(0);
+    now += 121_000;
+    residency.sweep();
+    expect(residency.stats.pages).toBe(0);
+    expect(residency.stats.evictions).toBe(2);
+  });
 });

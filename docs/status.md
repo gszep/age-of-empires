@@ -202,7 +202,7 @@ alone still import at x1. Sprite pages load on first use rather than all
 at start -- loading the whole pack up front took the machine down (WSL,
 15 GB) -- so a sprite may be absent
 for a frame or two on its first appearance. Unused pages now release both GPU
-textures and decoded images after two minutes, or after ten seconds under a
+textures and decoded images after two minutes, or after one minute under a
 512 MiB soft-budget pressure (#152). Current scene art (including frozen fog
 views) remains resident even above that budget; this is not a total-memory
 cap or camera-frustum streaming. `tools/sprite_residency_smoke.mts` verifies
@@ -331,6 +331,16 @@ sprite bytes, evictions, GPU allocations, JS heap and available host memory.
 Short validation exercised all four maps and all three speed modes; SIGTERM
 emits an interrupted result and closes the private browser/server. Sustained
 run evidence is recorded separately from these harness checks.
+
+The first sustained segment exposed cache churn between ordinary worker trips
+(#170). Increasing warm grace from 10 to 60 seconds reduced seven-minute
+evictions from 586 to 44 (63.3 → 4.51 per 1,000 ticks); mean JS frame work fell
+17.14 → 9.61 ms and the final minute's maximum render call 692.6 → 7.5 ms.
+The tradeoff was 1,051 → 1,459 MiB resident sprite data; minimum host available
+memory was still 11.38 GiB. These are matched normal-speed Arabia workload
+windows, not hardware FPS or identical wall-time tick counts. Idle expiry and
+eviction/reload pixel invariants still pass; the full multi-map soak resumes
+with the longer grace.
 
 The maintained open-ground pathing probe now discovers/asserts a clear
 20-tile corridor (#5) instead of using a seed-200 destination occupied by a

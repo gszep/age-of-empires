@@ -30,6 +30,7 @@ const soakDistribution = values => {
 Object.assign(globalThis, { __performanceSoak: () => ({
   timings: Object.fromEntries(Object.entries(soakSamples).map(([key, values]) => [key, soakDistribution(values)])),
   gpu: { ...renderer.info.memory }, sprites: assets?.spriteResidency?.stats,
+  spritePolicy: { ...assets?.spriteResidency?.policy },
   heap: performance.memory?.usedJSHeapSize, views: views.size, tick: game.tick,
   missingBodies: [...views.values()].filter(view => view.body.pendingTexture).length, speed: gameSpeed(),
   entities: game.entities.length, winner: game.winner, setup: activeSetup,
@@ -70,6 +71,7 @@ let rounds = 0, samples = 0;
 const started = new Date().toISOString();
 console.log(JSON.stringify({ event: 'start', pid: process.pid, started, until: new Date(until).toISOString(), maps, speeds, tickLimit, sampleMs,
   commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), backend: 'WebGL2/SwiftShader' }));
+console.log(JSON.stringify({ event: 'working-tree', changes: execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim() }));
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 800 });

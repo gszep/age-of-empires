@@ -6,7 +6,7 @@ import type { Texture } from 'three/webgpu';
 export const SPRITE_CACHE_POLICY = {
   budgetBytes: 512 * 1024 * 1024,
   idleMs: 120_000,
-  graceMs: 10_000,
+  graceMs: 60_000,
   sweepMs: 1000,
 };
 
