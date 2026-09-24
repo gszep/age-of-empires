@@ -10,6 +10,10 @@ session does not have to infer it.
   is answered; the answer is recorded as a comment and the issue closed.
   `enhancement` is scope the game does not have yet; `documentation` is a
   gap in the owned data's reading; `process` is the harness itself.
+  `civilisation` groups the per-civilisation implementation issues under
+  [#122](https://github.com/gszep/age-of-empires/issues/122). Its first milestone
+  is Britons completion (#179) plus Franks (#180); the other roster issues follow
+  that verified pair, with Antiquity civilisations in a separate era-dependent phase.
 - **Filing.** When the agent notices a gap, it files an issue then and there
   with the evidence (the DAT field, the file, the measurement) and the fix
   path, in the repo's voice. A gap noted only in prose is a gap the next

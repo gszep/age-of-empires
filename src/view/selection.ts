@@ -4,8 +4,39 @@
  * The camera and the canvas decide what "on screen" means; this decides what
  * to do with the answer.
  */
-import { isUnit } from '../sim/data';
-import type { Entity, PlayerId, Point } from '../sim/types';
+import { isAnimal, isBuilding, isUnit, NODE_OF_RESOURCE } from '../sim/data';
+import type { DeepReadonly, Entity, PlayerId, Point, ReadonlyGameState, UnitKind } from '../sim/types';
+
+/** The same knowledge boundary as rendering: owned/visible live entities, or
+ * last-seen Gaia snapshots. Unexplored resources must not leak via a cursor.
+ * Snapshot positions must not be interpolated through a hidden live entity.
+ */
+export function* contextTargets(state: ReadonlyGameState, player: PlayerId, reveal = false): Generator<{
+  entity: DeepReadonly<Entity>; remembered: boolean;
+}> {
+  const visibility = state.visibility[player];
+  const visible = (at: Point) => visibility.visible[Math.floor(at.y) * state.width + Math.floor(at.x)] === 1;
+  const live = new Set<number>();
+  for (const entity of state.entities) {
+    if (!reveal && entity.owner !== player && !visible(entity.position)) continue;
+    live.add(entity.id);
+    yield { entity, remembered: false };
+  }
+  if (reveal) return;
+  for (const memory of Object.values(visibility.memory)) {
+    if (memory.owner !== 0 || live.has(memory.id) || visible(memory)) continue;
+    const rule = memory.kind === 'resource'
+      ? state.rules.nodes[memory.node ?? NODE_OF_RESOURCE[memory.resource ?? 'food']]
+      : isBuilding(memory.kind) ? state.rules.buildings[memory.kind] : state.rules.units[memory.kind as UnitKind];
+    yield { remembered: true, entity: {
+      id: memory.id, kind: memory.kind, owner: 0, position: { x: memory.x, y: memory.y },
+      hp: memory.hp, maxHp: memory.maxHp, radius: rule.radius,
+      activity: 'idle', order: { kind: 'idle' }, resourceKind: memory.resource,
+      node: memory.node, amount: memory.amount, buildProgress: memory.buildProgress,
+      ...(isAnimal(memory.kind) && memory.hp <= 0 ? { dead: true } : {}),
+    } };
+  }
+}
 
 /**
  * Every unit of the same kind as `target` that its owner can presently see on

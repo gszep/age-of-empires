@@ -71,3 +71,17 @@ and technologies, monks and siege, replay verification, and concurrent headless
 batches are all in. `docs/status.md` is the accurate
 inventory; the issue tracker lists the known gaps (`docs/backlog.md` says how it is used). Desktop/laptop remains the
 canonical play target and mobile a remote verification surface only.
+
+The immutable match rules bundle holds a default civilisation plus optional
+complete additional profiles. `sim/civilizations.ts` resolves player-owned rules;
+Gaia and map generation use the root. Commands, per-player research lookups,
+placement/navigation and UI read through that boundary. The importer currently
+publishes an empty additional catalogue: synthetic mixed-profile acceptance is
+implemented, while real Frankish roster/art/bonuses and conversion inheritance
+remain tracked work. See `docs/civilization-coverage.md`.
+
+Rendering uses bounded pass-local sort keys (`view/render-order.ts`): ground,
+fog, sprite bodies, projectiles, contours, rally flags and placement overlays keep
+their relative passes regardless of map extent. Body piece offsets are applied
+before bounding, preserving their existing depth order. This is a view-only
+implementation policy, not a substitute for the reference compositor (#149).

@@ -1,0 +1,170 @@
+# Civilisation expansion: audit and first playable slice
+
+Tracking: [#122](https://github.com/gszep/age-of-empires/issues/122) is the parent
+of 59 individual civilisation issues, each with source-specific findings and an
+acceptance checklist. Start with [Britons #179](https://github.com/gszep/age-of-empires/issues/179)
+and [Franks #180](https://github.com/gszep/age-of-empires/issues/180). The tracker
+separates 53 base-era profiles from the six Antiquity-era profiles; shared engine
+dependencies remain under #123, #129, #128, #126 and #178.
+
+## Audit checkpoint
+
+The 2026-09-24 audit covers **59 non-Gaia civilisations** in the pinned source:
+**53 base-era**, **6 antiquity-era**. It inventories every owned civilisation
+tree, tree/team effect, offered research and civilisation-specific automatic
+technology candidate against the current imported roster and effect decoder.
+It does not make additional civilisations selectable.
+
+Verification: `.local/civilization-audit-gate.log` is **GREEN**: 735 Vitest
+tests, 100 Python/import tests, production build and real-browser debug smoke.
+Focused tests also verify full owned-tree coverage, deterministic audit output,
+foreign metadata detection, prerequisite classification, building work-rate
+classification and public-command rejection without spending. The browser check
+is the existing smoke, not a mixed-civilisation acceptance test. No test timeouts
+were widened. This foundation is included in the combined wrap-up checkpoint;
+`docs/handoff.md` records its final verification and remaining work.
+
+Reproduce with:
+
+```bash
+uv run --locked python tools/audit_civilizations.py --markdown .local/civilizations-audit.md
+```
+
+## Per-player rules foundation
+
+`civilizations.ts` now resolves each player's complete ruleset by its civilisation
+key. The root remains the default civilisation and shared Gaia/map input.
+Additional `GameRules.civilizations` / manifest `civilizations` entries are complete
+profiles, not patches over the enemy's rules. The importer publishes an empty
+additional catalogue until real roster/art/bonus imports are ready.
+
+Owner-specific consumers now include initial resources/stats, population,
+training/queues/refunds, research/upgrade effects, construction costs/HP/footprints,
+farm food, gathering, repair, combat, sight, garrison, terrain passability and
+completion continuations. Terrain-layer caches include the owning rules table;
+separation uses each unit's navigation grid. The HUD resolves local commands and
+selected/enemy entity information separately. Restarts preserve the selected sides,
+and dev reload declines a saved civilisation whose profile is no longer loaded.
+
+`src/sim/civilizations.test.ts` uses **synthetic contrasting profiles**, not
+invented Franks bonuses. It checks actual deductions, completed units/buildings,
+food collected, target HP loss, visible tiles, cache isolation, research on
+garrisoned units, JSON continuation and a headless mixed-record replay.
+`tools/civilization_rules_smoke.mts` injects a private synthetic profile into the
+normal owned manifest loader and resumes both sides. Real clicks verify prices,
+unavailable unit/research filtering, trained HP and placement footprint/cost.
+The owned sprite set is shared by that fixture; it is not Frankish-art acceptance.
+
+Foundation verification: `.local/civilization-rules-gate.log` is **GREEN**:
+747 Vitest tests / 57 files, 100 Python/import tests, build and general browser
+smoke. The dedicated browser result is `.local/civilization-rules-smoke-r2.log`;
+the first attempt checked a button before the HUD refresh, fixed by waiting for
+that element. Full regeneration succeeded in `.local/civilization-rules-import.log`
+with all 1,984 cached sprite atlases reused. No timeouts were widened.
+
+**Conversion remains a blocker before real mixed selection (#178).** Existing
+conversion changes owner and preserves stored HP/maxHP, while derived rules read
+the recipient. A public-order diagnostic changed a synthetic unit from rule HP
+80 / attack 20 to rule HP 40 / attack 4, retaining stored maxHP 80. No donor- versus
+recipient-inheritance rule has been invented here. Reference evidence and explicit
+stat/upgrade handling are required before declaring a real mixed match complete.
+
+## Reading the audit output
+
+The JSON and per-civilisation Markdown reports stay in `.local/`. They include
+source hashes, effect/attribute counts, missing unit/building IDs, prerequisite
+choices and metadata inconsistencies. Counts are source-reference occurrences,
+not counts of distinct missing mechanics. A missing unit ID may be an age
+variant or supporting tree node. Recognised encodings are not a gameplay
+fidelity certificate.
+
+## Findings that change the implementation plan
+
+1. **Rules must be selected per player.** At audit time `GameState.rules` contained
+   one civilisation's roster and technology table. Changing
+   `players[p].civilization` alone changes neither of them. Previously `civHas`
+   returned true when the player's key differed from the loaded civilisation.
+   The foundation above now provides that rule-selection boundary and rejects
+   unloaded keys. Publishing real additional profiles and selecting them remains
+   #122 work.
+2. **Bonuses have a lifecycle.** `civs[i].tech_tree_id` and `.team_bonus_id`
+   are effect IDs. Many other bonuses are automatic technologies with
+   `tech.civ`, `required_techs` and `required_tech_count`. A positive required
+   count with only -1 slots is not an unconditional bonus; scenario/game-mode
+   candidates must not all run at match creation.
+3. **Decoder support is not consumer support.** Attribute 13 is decoded as
+   `workRate`, but production buildings do not consume it. Britons' team effect
+   399 multiplies archery-range work rate by 1.1. A generic effect importer
+   would currently claim success without speeding up training.
+4. **Costs and free research need shared support.** Attribute 100 changes all
+   unit/building resource costs; 103–106 address individual costs. Franks'
+   tree effect also changes farm technologies' research cost/time. These must
+   affect public-command deductions, availability, refunds and displayed prices.
+5. **Prerequisite lists are not conjunctions.** The audit finds required-count
+   choices across the roster. Some involve age/bookkeeping nodes rather than
+   alternatives visible to the player. #129 must preserve that distinction and
+   must not satisfy unknown prerequisites by silently dropping them.
+6. **Alternate-era metadata is not a reliable unique-tech catalogue.**
+   Achaemenid, Athenian and Spartan definitions reference Italian unique-tech
+   IDs 499/494. Macedonian, Thracian and Puru definitions reference Wei IDs
+   1062/1061. The audit records these foreign references explicitly. Use each
+   civilisation's actual tree and DAT gates before importing playable research.
+7. **Some tracker wording is stale.** Briton Yeomen is DAT technology 3,
+   researched at the castle for 750 wood / 450 gold with a 60-second research
+   time; it is not free.
+   The patch's Frankish cavalry HP bonus is gated on Feudal Age, and its castle
+   discount is staged across Castle and Imperial. Do not import remembered
+   descriptions in place of these commands.
+
+## First contrasting civilisation: Franks
+
+Choose **Britons versus Franks** for #122/#123. Both use the owned `CivWest`
+HUD family; Franks test costs, automatic research, age gates and health while
+Britons test range, gathering and production rate. Sharing a HUD family does
+not establish that every castle, flag, voice or sprite is shared.
+
+| Source | What it exercises | Acceptance outcome |
+|---|---|---|
+| Briton automatic tech 383 | shepherd work rate ×1.25 | more food actually gathered/banked, only by its owner |
+| Briton 381 | Castle-Age TC wood cost ×0.5 | actual paid construction cost, requiring #177 availability work |
+| Briton 382/403 | Castle/Imperial foot-archer range and sight, with skirmisher reversals | real attack reach and visibility at each age |
+| Briton team effect 399 | archery-range work rate ×1.1 | earlier unit completion; no benefit to the opponent |
+| Frankish 524 | forager work rate ×1.15 | more food actually gathered/banked, only by its owner |
+| Frankish 290 | cavalry HP ×1.2, gated on Feudal Age | existing, newly trained and garrisoned cavalry agree |
+| Frankish 325/330 | staged castle cost multipliers | public build deductions and HUD prices agree in both ages |
+| Frankish tree effect 258 | farm-research cost/time modifiers | eligible farm upgrades arrive once, without charging research |
+| Frankish team effect 403 | knight-line sight | actual revealed tiles, including after upgrades |
+
+Franks also require their own unit availability and unique-unit/upgrade art.
+Missing roster IDs are in the detailed report; copying Britons' longbowman
+button into the Frankish castle is not a valid partial implementation.
+Specifically, `FRANKS.json` has no Longbowman unit node: its node ID 8 is **Town
+Watch, Use Type Tech**, not unit 8. The next importer must account for imported
+trainable definitions absent from that civilisation's tree, not only explicit
+`NotAvailable` nodes. Rule definitions needed for captured units are distinct
+from permission to train them.
+
+## Implementation checklist
+
+- [x] Reproducible all-civilisation coverage inventory with source provenance.
+- [x] Select a contrasting second civilisation from the owned data.
+- [x] Reject unloaded civilisation labels instead of silently granting the
+  currently loaded rules and unrestricted availability.
+- [x] Resolve rules and technology availability per player throughout simulation,
+  command pricing, HUD and visibility; preserve the civilisation in AI observations
+  and reject unavailable keys. Verified with synthetic profiles.
+- [ ] Resolve real per-civilisation sprite/voice/icon bindings and conversion
+  inheritance (#178) before enabling the real additional profile.
+- [ ] Import passive/team effects and their activation gates; implement supported
+  unit/building costs and building production-rate consumers.
+- [ ] Handle required-count prerequisites and eligible free research without
+  treating scenario-only or inactive automatic candidates as unconditional.
+- [ ] Complete the second civilisation's playable roster/art and selection UI.
+- [ ] Verify mixed matches, age changes, already-paid queues/refunds, conversions,
+  garrisons, JSON save/reload and deterministic replay through public actions.
+- [ ] Verify the actual selection/command UI in a private browser and run the gate.
+
+Conversion deserves a separate reference check: changing owner must not silently
+recompute the captured unit using the wrong civilisation's base stats or bonuses.
+The audit inventories data; it does not establish the closed engine's conversion
+inheritance behavior, free-research timing or rounding of discounted integer costs.

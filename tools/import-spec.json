@@ -2282,6 +2282,7 @@
     }
   ],
   "ui": {
+    "cursors": ["default", "attack", "hunt", "chop", "mine_gold", "mine_stone", "gather", "gather_meat", "fish", "build", "repair", "heal", "convert", "garrison", "board", "unboard", "flag", "action"],
     "style": "West",
     "panels": [
       "blanktoppanel",

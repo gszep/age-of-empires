@@ -1,127 +1,151 @@
-# Agent handoff — mapping checkpoint
+# Agent handoff — player rules and interaction/rendering checkpoint
 
-## Request and stopping point
+## Task and stopping point
 
-The user asked for #134, then #176, then #160, and resumed the recommended
-#148 shoreline work after a network outage. They explicitly requested updated
-docs, a commit/push, and a handoff when that work was done. No further unattended
-run is authorized. The earlier ten-hour performance run is historical; its
-inventory and measurements remain in [the performance report](reviews/2026-09-23-performance.md).
+The user's final instruction was: **“fix 238 then wrap up — commit, update docs,
+hand off.”** Finish this checkpoint and wait for the next user instruction;
+there is no authorization to start an unattended roster-expansion run.
 
-Implementation base: `e415493`. This handoff accompanies the mapping checkpoint;
-use `git log -1`, `git status` and `tools/session_start.sh` for the actual commit,
-tree and gate state. Do not infer current service state from old PIDs.
+This document accompanies the combined checkpoint based on `b9c9d8a`. Use
+`git log -1`, `git status` and `tools/session_start.sh` for its final commit,
+remote divergence and gate status. The receiving agent starts with this briefing,
+`docs/status.md`, `docs/ledger.md`, and the live GitHub tracker.
 
-## Delivered changes
+## Delivered scope
 
-- **#134, partial:** shared authoritative tile-level sampling for combat/view;
-  ×1.25 downhill and ×0.75 uphill damage, including melee, missed projectiles,
-  splash and piercing victims. Projectiles retain the launch point after the
-  shooter disappears. Arabia global hills and Black Forest clearing/forest
-  hills are deterministic and mirrored; surveyed relief now affects combat.
-- **#176:** import DAT `hill_mode` into building rules. Flat-only TCs, one-level
-  relief for ordinary buildings, unrestricted houses/farms/gates/towers. Public
-  placement, preview and wall preview share the rule. Rejection does not spend
-  or retask. Initial TC footprints are minimally levelled to their centre sample
-  (needed at Windsor's two starts); source survey arrays are untouched.
-- **#160:** world terrain and blend-overlay hillshade use `+dx-dy`, lighting
-  screen-right slopes and shading left slopes. Projection, height data,
-  altitude tone and shading strength are unchanged by this correction.
-- **#148:** DE `watershore`, `waterwater`, `shallowswater` PNG alpha windows now
-  supply water-boundary shapes. The importer publishes square mask sheets and
-  source hashes; renderer UVs follow tile axes instead of the classic iso
-  diamond. Land/farm paths and older manifests retain classic masks.
-- **#125, decision resolved:** retain the Dark-through-Castle open fallback;
-  no Imperial expansion planned. Both household computers have owned assets.
-
-## Relevant files
-
-- `src/sim/elevation.ts`, `game.ts`, `mapgen.ts` — sampling, damage, starting pads,
-  construction checks and hill generation.
-- `src/sim/data.ts`, `tools/import_content.py` — DAT hill-mode transport/defaults.
-- `src/view/world.ts`, `assets.ts`, `tools/import_blends.py` — hillshade,
-  square-vs-diamond mask UVs, owned-water mask import/selection.
-- `src/sim/elevation{,-placement}.test.ts`, `src/view/world.test.ts`,
-  `tools/test_import_aoe2.py` — gameplay, map, mesh and import regressions.
-- `docs/ledger.md` — every approximation; `docs/status.md` — delivered scope.
+- **#53 — named player attributes:** import the complete named XS/DAT initial
+  table, resource IDs and source hash. `playerAttributeFor` applies completed
+  research to farm capacity and repair costs. Unknown names remain undefined;
+  importing other attributes does not implement their mechanics or live counters.
+- **Civilisation foundation, not a finished second civilisation:** complete
+  per-player rulesets resolve through `src/sim/civilizations.ts`. Gameplay,
+  costs, availability, placement/navigation, HUD and save/restart/replay use the
+  appropriate owner. Gaia/map generation still use the root. The additional
+  manifest catalogue remains empty until real source-backed profiles are ready.
+- **All-civilisation audit and tracker:** 59 non-Gaia definitions, 53 base-era
+  and six Antiquity-era. #122 is the parent of 59 individual issues, labelled
+  `civilisation`. Start the first real matchup with Britons completion **#179**
+  and Franks **#180**, after their shared dependencies. Full plan and audit
+  interpretation: `docs/civilization-coverage.md`.
+- **#173 — composite contours:** retire old layer-mask references every frame
+  and use the same nonempty/loaded-page contract as ordinary contours; remove
+  the never-assigned `atlasKey` gate. Missing, delayed and empty masks cannot
+  revive disposed bindings.
+- **#51 — context cursors:** 18 byte-identical native CUR files with actual
+  header dimensions/hotspots. Hover and right-click share pure command/order
+  classification. Hover does not reserve farms or reset work. Picking and
+  selection read visible entities or last-seen Gaia metadata, not hidden live
+  positions/stocks; vanished remembered Gaia targets fall back to movement.
+- **#52 — drop sites:** derive building `accepts` and task-specific
+  `gather.dropSites` from DAT lists plus JSON worker/target/resource selectors.
+  Raw DAT lists remain provenance. Carried tasks survive source disappearance;
+  authoritative empty lists stay empty. Livestock acceptance is metadata only.
+- **#238 — map-independent ordering:** bound the existing render passes using
+  the monotone mapping already used for ground layers. Sprite bodies/scatter,
+  piece offsets, projectiles, contours and rally flags retain their within-pass
+  order without crossing fog or placement overlays on larger maps. Piece offsets
+  must be applied **before** compression; normal sprite groups keep default order.
+- **#5:** closed at the user's request pending a concrete recurrence. The user
+  will reopen with evidence; this does not declare all pathing reference-perfect.
 
 ## Verification and evidence
 
-Final combined gate: **GREEN**, `.local/mapping-checkpoint-final-gate.log`, run
-on **2026-09-24 from 00:11 +01:00** after final source review:
-**728 Vitest tests / 55 files**, production TypeScript/Vite build, **92 Python/
-import tests**, and the real-browser debug smoke. Run directly with
-`VITEST_MAX_FORKS=3 VITEST_MAX_THREADS=3 tools/gate.sh` on the idle host.
-No test clock/timeout has been widened. Only Markdown was edited after GREEN.
+Final full gate **GREEN**, `.local/wrapup-gate.log`: **775 Vitest tests / 60 files**,
+production TypeScript/Vite build, **103 Python/import tests**, and real-browser
+debug smoke. It ran with three Vitest workers on the idle host. All source/test
+edits preceded the run; only Markdown changed afterward. No timeouts were widened.
 
-Maintained acceptance checks (all run through private Vite/browser fixtures):
+Maintained acceptance checks completed for this checkpoint:
 
-- `tools/elevation_placement_smoke.mts`, including `OPEN_FALLBACK=1`: actual red
-  invalid-slope preview/rejection/no spend, green ramp preview/paid rendered
-  foundation. An initial probe raced the next render frame; it now waits for
-  the foundation to be rendered rather than asserting immediately after input.
-- `tools/world_relief_smoke.mts`: equal-height, identical-terrain world pixels;
-  normalized linear-sRGB right-face factors 0.946/0.948, left 0.809/0.809. The
-  pre-fix front pair were both ≈0.949. Geometry/UVs/checksum remain unchanged.
-- `tools/minimap_relief_smoke.mts`: exact sRGB palette/fog pixels and state
-  immutability, including the 392×392 board.
-- `tools/shore_blend_smoke.mts`: production loader/geometry/material, all 31
-  mask configurations, 775 linear-sRGB alpha samples; max source-sampling error
-  **0.002**, 603 samples visibly differ from classic masks. State unchanged.
-- Full owned regeneration completed with 1,984 sprite atlas entries reused;
-  native mask publication is byte-identical on repeated generation.
-- Islands geometry crops: `.local/probes/issue148-{before,after}/coast.png`.
-  They supplement alpha measurements, not a matched-reference contour proof.
+- `tools/composite_outline_smoke.mts`: near and far, with default Galley and
+  `CONTOUR_KIND=villager`; use `CONTOUR_FAR=1` for the far 392×392 fixture.
+  Before #238 the far ship body/contour/occluder orders were **6150 / 5015 / 6205**
+  and only **32** blue contour pixels survived. Afterward the Galley gives **321**
+  blue pixels at both positions; the villager gives **147** at both positions.
+  All **153 / 89** opaque contour samples respectively are covered correctly by
+  the real placement-footprint mesh. Camera round trips preserve identical PNGs;
+  delayed loading, retirement/expiry/reload, empty frames and simulation hashes pass.
+  Logs: `.local/issue238-before-repro.log`, `.local/issue238-{near,far}-{composite,unit}-verified.log`.
+- `tools/tree_fog_smoke.mts`: 620 opaque canopy samples unchanged by reveal,
+  owned shadow alpha mean error 0.0029 across 190 samples, remembered-canopy error
+  below one sRGB byte. `.local/issue238-fog-regression.log`.
+- `tools/outline_residency_smoke.mts`: ordinary contour retirement remains safe.
+  `.local/quickwins-outline-regression.log`.
+- `tools/context_cursor_smoke.mts`, owned and `OPEN_FALLBACK=1`: 15 real
+  hover/right-click outcomes, last-seen resource selection, hover immutability,
+  native requests/hotspots or CSS fallback. `.local/issue51-{owned,fallback}-smoke-final.log`.
+- `tools/civilization_rules_smoke.mts`: real commands/UI through a private
+  synthetic second profile; **not** real Frankish art or bonus acceptance.
+  `.local/civilization-rules-smoke-r2.log`.
+- Full owned regeneration completed in `.local/quickwins-import-r2.log`, reusing
+  all 1,984 sprite atlas entries. #238 changes only rendering; no further import
+  is needed for its ordering helpers. No fixture timeouts were widened.
 
-Named logs live under `.local/issue{134,176,160,148}-*`. The earlier #176 full
-suite had 724 passes and one 150-second headless timeout while Windows was
-running Cyberpunk at ~421% CPU. The unchanged test passed alone in 58.3 seconds.
-The build, all then-current 90 import tests, and browser checks passed separately.
-That failed gate is historical, not proof of the final checkpoint's result.
+Browser/render measurements use a real private Chrome page with SwiftShader.
+They do not establish physical-GPU FPS or full DE compositor equivalence.
 
-## Remaining work, evidence limits and next task
+## What was learned / failed attempts
 
-- **#134 stays open:** explicit cliffs/obstructions, exact engine elevation
-  cleaning/topology, Arabia spawn-specific elevation and remaining map passes.
-  Ordinary slopes are traversable; no invented slope speed or DEM cutoff.
-- **#177:** extra/replacement town centers are independently disabled by
-  `building('town-center', false)`. Inspect age/prerequisite rules before exposing
-  the action; TC slope legality is tested directly, UI acceptance uses barracks.
-- **#116/#113:** remaining DE land/farm shape families and visual calibration.
-  Shore window locations and opposite/three-edge max-alpha unions are inferred,
-  not a recovered engine UV table. The reference still differs in water/foam
-  calibration (#94) and final compositing (#149).
-- Base hill damage factors are community-sourced: DAT resources 211/212/272/273
-  are civilisation modifiers, zero for Britons, not the base ±25% rule. Exact
-  slope/corner construction behavior and minimal starting pads are also ledgered.
-- **Suggested next mapping task: #93**, regenerate Windsor/Senlac surveys to
-  remove pre-transpose spare clearings. Preserve orientation/source attribution,
-  verify starting sites and compare the boards. Ask the user before starting.
-  General bug-first priority still applies outside their chosen mapping focus.
-- Physical-GPU/desktop FPS and pixel-identical DE coastline/lighting were not
-  measured. Browser checks use SwiftShader; the editor lighting reference has
-  no local image bytes or original height grid.
+- Counting any contour pixels was too weak: the far-map bug still left 32.
+  Require proper pass ordering and compare translated near/far results.
+- Animated water/foam confounded contour A/B measurements. The diagnostic hides
+  ground while retaining the actual native ship/unit and TC occluder.
+- Browser-decoded images can bypass a second network event. Reload-delay tests
+  hold the asset-loader boundary; the first-load test holds the actual request.
+- `flag32x32.cur` is **48×48**, hotspot **(9,43)**; convert's hotspot is (15,15).
+  Preserve header metadata, not filename assumptions.
+- Gold/stone task targets can be Gaia-only; player DAT slots may be empty.
+  Resolve their classes from the imported entities. The first drop-site attempt
+  missed these; regression coverage now catches that case.
+- One old exact farmer-metadata assertion needed the new owned drop-site IDs.
+  No gameplay expectations or timeout bounds were weakened to get a green gate.
 
-## Operations and constraints
+## Remaining work — requires a new user task
 
-- Ysgramor's managed shared host survived/restarted normally after the user's
-  reboot; preserve its saved match, service and routes. Check live status before
-  restarting anything. No deliberate deployment restart accompanied this work.
-- Play: <https://ysgramor.tail6e864b.ts.net:5173/>; solo adds `?solo=1`.
-  Artemis remains <http://localhost:5174/>. Its gateway proxies current code
-  from Ysgramor but serves local assets. Re-run `npm run import:aoe2` in its
-  active owned-assets runtime to receive `hillMode` and `blends.native`; this
-  session regenerated Ysgramor only. Reload tabs after regeneration.
-- Last documented Artemis active asset runtime:
-  `/home/gszep/Documents/repos/age-of-empires/.local/performance-runtime-bebb06e/public`.
-  Verify it before changing it; preserve older runtimes and local changes.
-- The interruption was investigated read-only. Tests had finished at 19:48 BST;
-  Windows logged a TP-Link USB Wi-Fi driver disconnect at 22:27, failed reconnects,
-  and successful reconnection after the 23:16 restart. Intel Ethernet resets and
-  DHCP failures predated this session and continued after reboot. No IP-conflict
-  or resource-exhaustion event was found in the checked window. No network,
-  driver, DHCP, DNS, firewall or Tailscale settings were changed.
-- Do not commit owned/converted content, `.local/`, credentials or saved matches.
-  Do not reset Tailscale, rewrite published history, or disassemble the game exe.
-- No Paseo agent-launch tool/CLI is available in this session. This file is the
-  self-contained receiving-agent briefing; no new agent is claimed to be running.
+1. **#178, conversion inheritance:** stored HP/maxHP survives conversion while
+   derived rules currently use the recipient. A public-order synthetic case
+   changed rule HP 80/attack 20 to rule HP 40/attack 4 while stored maxHP stayed 80.
+   Establish reference inheritance before enabling real mixed-civilisation play;
+   do not guess donor/recipient retention or future-upgrade behavior.
+2. **#123/#129:** gated passive/team effects, cost and production-rate consumers,
+   required-count prerequisites and automatic/free research. Some automatic
+   candidates have impossible slots or game-mode gates and must not run by default.
+3. **#179/#180:** real Britons–Franks roster/art/voice/icon and selection work.
+   Imported definitions absent from a civ's tree must not become trainable:
+   Frankish node 8 is Town Watch (`Use Type Tech`), not the Longbowman unit.
+   Extra/replacement TC construction **#177** is needed to exercise the Briton discount.
+4. Existing map/render work remains: #134 cliffs/exact elevation topology,
+   #113/#116 terrain blending, #94 water, #149 compositor, #93 survey regeneration.
+   Older mapping/performance evidence is in `docs/status.md`, `docs/ledger.md`
+   and `docs/reviews/2026-09-23-performance.md`.
+
+## Relevant files
+
+- `src/sim/{civilizations,rules,data,game}.ts` — owner rules, attributes, commands,
+  pure context planning, gathering and deposits.
+- `src/view/{render-order,sprites,scatter}.ts` — bounded passes and mask lifetime.
+- `src/view/{cursors,selection}.ts`, `src/main.ts` — native pointers and visible/
+  remembered interaction without simulation mutation.
+- `tools/{import_content,import_ui,audit_civilizations}.py`, `tools/import-spec.json`
+  — source-backed data/cursors and the repeatable coverage inventory.
+- `src/sim/{civilizations,player-attributes,drop-sites}.test.ts`,
+  `src/view/{cursors,render-order,sprites}.test.ts`, `tools/test_import_aoe2.py`
+  — focused outcome/import regressions. The browser scripts above are maintained.
+
+## Constraints and operations
+
+- Run session-start and read the lessons before continuing. Use public commands;
+  simulation state belongs to `src/sim`. Inspect owned sources before inventing
+  mechanics/values; all approximations remain in the ledger.
+- Preserve the open fallback, Steam credentials, owned/converted assets, `.local/`
+  and saved matches. None belong in Git. No disassembly of the game executable.
+- Preserve the managed shared host and Tailscale routes; do not reset/restart
+  deployment as part of a code-only handoff. This checkpoint did not deliberately
+  restart the shared service or update Artemis's separate asset runtime.
+- Play: `https://ysgramor.tail6e864b.ts.net:5173/` (`?solo=1` for solo QA);
+  Artemis uses `http://localhost:5174/`. Refresh imported assets only through
+  `npm run import:aoe2`, then reload tabs. Verify active runtime paths first.
+- Use private Vite ports for probes, and PID/exit-file handles for long jobs.
+  Never rewrite published history. Commit only green work and push each commit.
+- No Paseo agent-launch tool/CLI is available here. This is the self-contained
+  receiving-agent briefing; no new agent is claimed to have been launched.

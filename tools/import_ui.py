@@ -13,6 +13,7 @@ import hashlib
 import json
 import re
 import shutil
+import struct
 from pathlib import Path
 from typing import Any
 
@@ -224,6 +225,31 @@ def extract_hotkeys(hotkeys_path: Path, wanted: dict[str, Any]) -> dict[str, Any
     }
 
 
+def import_cursors(directory: Path, names: list[str], out_root: Path, hashes: dict[str, str]) -> dict[str, Any]:
+    """Copy native CUR bytes and read their actual dimensions/hotspot.
+
+    The owned flag32x32.cur is 48x48, so filenames are not size metadata.
+    These consumed files have one CUR directory entry (ICONDIR + ICONDIRENTRY).
+    """
+    result = {}
+    for name in sorted(names):
+        source = directory / f"{name}32x32.cur"
+        data = source.read_bytes()
+        if len(data) < 22 or struct.unpack_from("<HHH", data) != (0, 2, 1):
+            raise ValueError(f"{source.name}: expected a single-image CUR")
+        width, height, _, _, x, y, size, offset = struct.unpack_from("<BBBBHHII", data, 6)
+        width, height = width or 256, height or 256
+        if not (x < width and y < height and offset >= 22 and offset + size <= len(data)):
+            raise ValueError(f"{source.name}: invalid CUR directory bounds/hotspot")
+        relative = f"cursors/{source.name}"
+        target = out_root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        hashes[relative] = sha256(source)
+        result[name] = {"image": relative, "size": [width, height], "hotspot": [x, y]}
+    return result
+
+
 def extract_ui(
     widgetui: Path,
     sounds_path: Path,
@@ -232,6 +258,7 @@ def extract_ui(
     out_root: Path,
     hotkeys_path: Path | None = None,
     fonts_dir: Path | None = None,
+    cursors_dir: Path | None = None,
 ) -> dict[str, Any]:
     ui_spec = spec["ui"]
     style = ui_spec["style"]
@@ -386,6 +413,8 @@ def extract_ui(
         "style": style,
         "fonts": fonts,
         "colors": colors,
+        "cursors": import_cursors(cursors_dir or sounds_path.parent.parent / "cursors",
+                                  ui_spec.get("cursors", []), out_root, hashes),
         "rawTextures": raw_textures,
         "layouts": layouts,
         "materials": resolved_materials,
@@ -424,6 +453,7 @@ def main() -> None:
         default=home / "Steam/steamapps/content/app_813780/depot_813781/resources/_common/fonts",
     )
     parser.add_argument("--spec", type=Path, default=Path(__file__).with_name("import-spec.json"))
+    parser.add_argument("--cursors", type=Path, help="owned native CUR directory (defaults beside dat)")
     parser.add_argument("--content", type=Path, default=root / ".local/aoe2de/content.json")
     parser.add_argument("--out", type=Path, default=root / "public/imported/aoe2/ui")
     args = parser.parse_args()
@@ -436,6 +466,7 @@ def main() -> None:
         args.out,
         args.hotkeys if args.hotkeys.is_file() else None,
         args.fonts if args.fonts.is_dir() else None,
+        args.cursors,
     )
     args.out.mkdir(parents=True, exist_ok=True)
     manifest_path = args.out / "manifest.json"

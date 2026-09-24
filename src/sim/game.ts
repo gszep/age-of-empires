@@ -12,10 +12,11 @@ import {
   buildNavGrid, distance, entityGrid, findPath, halfExtent, isBlocked, separateUnits, terrainLayer, tileOf, type NavGrid,
 } from './nav';
 import { random01, seedFrom } from './random';
-import { buildingRulesFor, combine, unitRulesFor } from './rules';
+import { buildingRulesFor, combine, playerAttributeFor, unitRulesFor } from './rules';
+import { civilizationRules, rulesForPlayer } from './civilizations';
 import { createVisibility, isEntityVisible, updateVisibility } from './visibility';
 import type {
-  AnimalKind, BuildingKind, Command, Entity, GameState, PlayerId, Point, Projectile, ResourceKind,
+  AnimalKind, BuildingKind, Command, Entity, GameState, Order, PlayerId, Point, Projectile, ResourceKind,
   UnitKind, ReadonlyGameState, DeepReadonly,
 } from './types';
 
@@ -91,6 +92,13 @@ export function createGame(
   civilizations: Record<PlayerId, string> = { 1: rules.civilization.key, 2: rules.civilization.key },
   map = 'arabia',
 ): GameState {
+  // A civilisation label is not a ruleset; both players must resolve before
+  // generating the map or spending any resources.
+  for (const player of [1, 2] as const) {
+    if (!civilizationRules(rules, civilizations[player])) {
+      throw new Error(`civilisation ${civilizations[player]} is not loaded for player ${player}`);
+    }
+  }
   const descriptor = MAPS[map];
   if (!descriptor) throw new Error(`unknown map type ${map}`);
   const width = descriptor.baked?.width ?? MAP_TILES;
@@ -101,11 +109,11 @@ export function createGame(
     entities: [], projectiles: [], terrain: [], elevation: [],
     players: {
       1: {
-        id: 1, civilization: civilizations[1], ...rules.startingResources,
+        id: 1, civilization: civilizations[1], ...civilizationRules(rules, civilizations[1])!.startingResources,
         age: 0, researched: [], population: 0, populationCap: 0,
       },
       2: {
-        id: 2, civilization: civilizations[2], ...rules.startingResources,
+        id: 2, civilization: civilizations[2], ...civilizationRules(rules, civilizations[2])!.startingResources,
         age: 0, researched: [], population: 0, populationCap: 0,
       },
     },
@@ -115,6 +123,7 @@ export function createGame(
   const mirror = (point: Point): Point => ({ x: state.width - point.x, y: point.y });
 
   for (const player of [1, 2] as PlayerId[]) {
+    const rules = rulesForPlayer(state, player);
     const at = (point: Point) => player === 1 ? point : mirror(point);
     addEntity(state, 'town-center', player, at(start), rules.buildings['town-center']);
     for (const dy of [-1, 0, 1]) {
@@ -152,7 +161,7 @@ export function createGame(
   state.elevation = elevation;
   for (const home of state.entities) {
     if (home.kind === 'town-center' && home.owner !== 0) {
-      levelStartingFootprint(state, home.position, buildingFootprint(state, home.kind));
+      levelStartingFootprint(state, home.position, buildingFootprint(state, home.kind, 'x', home.owner));
     }
   }
 
@@ -165,17 +174,18 @@ export const gameTimeSeconds = (state: GameState): number => state.tick * TICK_S
 
 function recalculatePopulation(state: GameState): void {
   for (const player of [1, 2] as PlayerId[]) {
+    const rules = rulesForPlayer(state, player);
     state.players[player].population = state.entities
       .filter(e => !e.dead && e.owner === player && isUnit(e.kind))
-      .reduce((sum, e) => sum + state.rules.units[e.kind as UnitKind].popCost, 0)
+      .reduce((sum, e) => sum + rules.units[e.kind as UnitKind].popCost, 0)
       // A unit inside a building is out of the list and still a person.
       + state.entities
         .filter(e => !e.dead && e.owner === player && e.garrison?.length)
         .reduce((sum, e) => sum + e.garrison!.reduce(
-          (inner, unit) => inner + state.rules.units[unit.kind as UnitKind].popCost, 0), 0);
-    state.players[player].populationCap = state.rules.startingPopulationCap + state.entities
+          (inner, unit) => inner + rules.units[unit.kind as UnitKind].popCost, 0), 0);
+    state.players[player].populationCap = rules.startingPopulationCap + state.entities
       .filter(e => !e.dead && e.owner === player && isBuilding(e.kind) && e.buildProgress === undefined)
-      .reduce((sum, e) => sum + state.rules.buildings[e.kind as BuildingKind].popSupport, 0);
+      .reduce((sum, e) => sum + rules.buildings[e.kind as BuildingKind].popSupport, 0);
   }
 }
 
@@ -201,7 +211,8 @@ function spendCost(state: GameState, player: PlayerId, cost: Cost): CommandResul
 }
 
 function spend(state: GameState, player: PlayerId, kind: UnitKind | BuildingKind): CommandResult {
-  return spendCost(state, player, isUnit(kind) ? state.rules.units[kind].cost : state.rules.buildings[kind].cost);
+  return spendCost(state, player, isUnit(kind)
+    ? unitRulesFor(state, player, kind).cost : buildingRulesFor(state, player, kind).cost);
 }
 
 /**
@@ -215,16 +226,14 @@ export function civHas(
   state: GameState, player: PlayerId,
   table: 'technologies' | 'units' | 'buildings', datId: number | undefined,
 ): boolean {
+  const civilization = civilizationRules(state.rules, state.players[player].civilization)?.civilization;
+  if (!civilization) return false;
   if (datId === undefined) return true;
-  const civilization = state.rules.civilization;
-  if (state.players[player].civilization !== civilization.key) return true;
   return !civilization.unavailable[table].includes(datId);
 }
 
 const civNameOf = (state: GameState, player: PlayerId): string =>
-  state.players[player].civilization === state.rules.civilization.key
-    ? state.rules.civilization.name
-    : state.players[player].civilization;
+  rulesForPlayer(state, player).civilization.name;
 
 /**
  * Has this player upgraded past this unit? AoE2 does not let a barracks keep
@@ -233,7 +242,7 @@ const civNameOf = (state: GameState, player: PlayerId): string =>
  */
 export function upgradedAway(state: GameState, player: PlayerId, kind: string): boolean {
   for (const key of state.players[player].researched) {
-    for (const upgrade of state.rules.technologies[key]?.upgrades ?? []) {
+    for (const upgrade of rulesForPlayer(state, player).technologies[key]?.upgrades ?? []) {
       if (upgrade.from === kind) return true;
     }
   }
@@ -249,7 +258,7 @@ export function upgradedAway(state: GameState, player: PlayerId, kind: string): 
  */
 export function notYetUpgradedInto(state: GameState, player: PlayerId, kind: string): boolean {
   let isUpgradeTarget = false;
-  for (const [key, tech] of Object.entries(state.rules.technologies)) {
+  for (const [key, tech] of Object.entries(rulesForPlayer(state, player).technologies)) {
     for (const upgrade of tech.upgrades ?? []) {
       if (upgrade.to !== kind) continue;
       isUpgradeTarget = true;
@@ -262,7 +271,8 @@ export function notYetUpgradedInto(state: GameState, player: PlayerId, kind: str
 // unitRulesFor and buildingRulesFor live in rules.ts (visibility needs them
 // too); re-exported here because every consumer of the sim imports them from
 // the game module.
-export { buildingRulesFor, unitRulesFor } from './rules';
+export { buildingRulesFor, playerAttributeFor, unitRulesFor } from './rules';
+export { rulesForPlayer } from './civilizations';
 
 /**
  * How much food a farm this player builds now holds. The DAT keeps it as a
@@ -273,16 +283,8 @@ export { buildingRulesFor, unitRulesFor } from './rules';
  * the research pays off on the next one sown.
  */
 export function farmFoodAmountFor(state: GameState, owner: Entity['owner']): number | undefined {
-  const base = state.rules.buildings.farm.farmAmount;
-  if (base === undefined || owner === 0) return base;
-  let amount = base;
-  for (const key of state.players[owner as PlayerId].researched) {
-    for (const effect of state.rules.technologies[key]?.effects ?? []) {
-      if (effect.resource !== 'farmFoodAmount') continue;
-      amount = combine(effect.operation, amount, effect.amount);
-    }
-  }
-  return Math.round(amount);
+  const amount = playerAttributeFor(state, owner, 'farmFoodAmount');
+  return amount === undefined ? undefined : Math.round(amount);
 }
 
 /**
@@ -295,9 +297,9 @@ function reseedFarm(state: GameState, builder: Entity, fallow: Entity): Entity |
   const owner = builder.owner;
   if (owner === 0 || !state.players[owner as PlayerId].autoReseedFarms) return undefined;
   const at = { ...fallow.position };
-  if (!placementLegal(state, 'farm', at).ok) return undefined;
+  if (!placementLegal(state, 'farm', at, 'x', owner).ok) return undefined;
   if (!spend(state, owner as PlayerId, 'farm').ok) return undefined;
-  const rules = state.rules.buildings.farm;
+  const rules = buildingRulesFor(state, owner, 'farm');
   const site = addEntity(state, 'farm', owner, at, rules, { hp: 1, buildProgress: 0 });
   site.maxHp = rules.hp;
   return site;
@@ -317,11 +319,11 @@ export function gatherRateFor(
   state: GameState, owner: Entity['owner'], resource: ResourceKind,
 ): number {
   const task = GATHER_TASK[resource];
-  return researchedAttribute(state, owner, `villager-${task}`, 'workRate', state.rules.villagerGather[task].ratePerSecond);
+  return researchedAttribute(state, owner, `villager-${task}`, 'workRate', rulesForPlayer(state, owner).villagerGather[task].ratePerSecond);
 }
 
 export function carryCapacityFor(state: GameState, owner: Entity['owner'], task: VillagerGatherTask = 'forager'): number {
-  return researchedAttribute(state, owner, `villager-${task}`, 'carryCapacity', state.rules.villagerGather[task].capacity);
+  return researchedAttribute(state, owner, `villager-${task}`, 'carryCapacity', rulesForPlayer(state, owner).villagerGather[task].capacity);
 }
 
 /** A technology's running change to one attribute of one unit key. */
@@ -331,7 +333,7 @@ function researchedAttribute(
   let value = base;
   if (owner === 0) return value;
   for (const key of state.players[owner as PlayerId].researched) {
-    for (const effect of state.rules.technologies[key]?.effects ?? []) {
+    for (const effect of rulesForPlayer(state, owner).technologies[key]?.effects ?? []) {
       if (effect.attribute !== attribute || effect.unit !== unit) continue;
       value = combine(effect.operation, value, effect.amount);
     }
@@ -342,7 +344,7 @@ function researchedAttribute(
 /** Task identity is about the food source, not the shared food stockpile. */
 function villagerTaskOn(state: GameState, node: Entity): VillagerGatherTask {
   if (node.kind === 'farm') return 'farmer';
-  if (isAnimal(node.kind)) return state.rules.units[node.kind].herdRange !== undefined ? 'shepherd' : 'hunter';
+  if (isAnimal(node.kind)) return rulesForPlayer(state, node.owner).units[node.kind].herdRange !== undefined ? 'shepherd' : 'hunter';
   if (isFishNode(node)) return 'fisher';
   return GATHER_TASK[node.resourceKind ?? 'food'];
 }
@@ -350,7 +352,7 @@ function villagerTaskOn(state: GameState, node: Entity): VillagerGatherTask {
 /** The task's capacity, including its own technology effects. The load keeps
  * its task when a depleted target disappears during the walk to a drop site. */
 export function holdOf(state: GameState, entity: Entity, node?: Entity): number {
-  const own = state.rules.units[entity.kind as UnitKind]?.gather;
+  const own = rulesForPlayer(state, entity.owner).units[entity.kind as UnitKind]?.gather;
   if (!own) {
     const targetId = entity.order.kind === 'gather' ? entity.order.targetId : undefined;
     const target = node ?? state.entities.find(e => e.id === targetId);
@@ -368,7 +370,7 @@ export function holdOf(state: GameState, entity: Entity, node?: Entity): number 
  * task variants too, with distinct rates and technology effects.
  */
 export function rateOn(state: GameState, entity: Entity, node: Entity): number {
-  const own = state.rules.units[entity.kind as UnitKind]?.gather;
+  const own = rulesForPlayer(state, entity.owner).units[entity.kind as UnitKind]?.gather;
   if (own) {
     const rules = node.kind === 'resource' ? state.rules.nodes[nodeOf(node)] : undefined;
     const factor = node.kind === 'fish-trap' ? own.trapFactor ?? 1
@@ -376,13 +378,13 @@ export function rateOn(state: GameState, entity: Entity, node: Entity): number {
     return researchedAttribute(state, entity.owner, entity.kind, 'workRate', own.ratePerSecond) * factor;
   }
   const task = villagerTaskOn(state, node);
-  return researchedAttribute(state, entity.owner, `villager-${task}`, 'workRate', state.rules.villagerGather[task].ratePerSecond);
+  return researchedAttribute(state, entity.owner, `villager-${task}`, 'workRate', rulesForPlayer(state, entity.owner).villagerGather[task].ratePerSecond);
 }
 
 /** A completed building that shoots, so it can be given a target. */
 function canShoot(state: GameState, entity: Entity): boolean {
   return isBuilding(entity.kind) && entity.buildProgress === undefined
-    && state.rules.buildings[entity.kind as BuildingKind].attack !== undefined;
+    && rulesForPlayer(state, entity.owner).buildings[entity.kind as BuildingKind].attack !== undefined;
 }
 
 /** Axis-aligned square-footprint overlap for placement legality. */
@@ -397,17 +399,18 @@ function footprintsOverlap(
  * gate, which is two tiles by one and lies whichever way it was placed.
  */
 export function buildingFootprint(
-  state: GameState, building: BuildingKind, orientation: 'x' | 'y' = 'x',
+  state: GameState, building: BuildingKind, orientation: 'x' | 'y' = 'x', owner: Entity['owner'] = 0,
 ): { x: number; y: number } {
-  const rules = state.rules.buildings[building];
+  const rules = buildingRulesFor(state, owner, building);
   const half = rules.footprint ?? { x: rules.radius, y: rules.radius };
   return orientation === 'y' ? { x: half.y, y: half.x } : { ...half };
 }
 
 export function placementLegal(
-  state: GameState, building: BuildingKind, target: Point, orientation: 'x' | 'y' = 'x',
+  state: GameState, building: BuildingKind, target: Point, orientation: 'x' | 'y' = 'x', owner: Entity['owner'] = 0,
 ): CommandResult {
-  const half = buildingFootprint(state, building, orientation);
+  const half = buildingFootprint(state, building, orientation, owner);
+  const rules = rulesForPlayer(state, owner);
   if (target.x - half.x < 0 || target.x + half.x > state.width
     || target.y - half.y < 0 || target.y + half.y > state.height) {
     return rejected('placement is outside the map');
@@ -416,7 +419,7 @@ export function placementLegal(
   // the DAT's restriction row for it (4 for a house, 10 for a wall), which
   // is what keeps a house out of a pond and would put a dock on the shore.
   if (state.terrain.length === state.width * state.height) {
-    const row = state.rules.buildings[building].terrainRestriction ?? BUILDING_RESTRICTION;
+    const row = rules.buildings[building].terrainRestriction ?? BUILDING_RESTRICTION;
     const minX = Math.max(0, Math.floor(target.x - half.x + 1e-6));
     const maxX = Math.min(state.width - 1, Math.ceil(target.x + half.x - 1e-6) - 1);
     const minY = Math.max(0, Math.floor(target.y - half.y + 1e-6));
@@ -426,7 +429,7 @@ export function placementLegal(
     for (let y = minY; y <= maxY; y++) {
       for (let x = minX; x <= maxX; x++) {
         const terrain = state.terrain[y * state.width + x];
-        if (!terrainAllows(state.rules, row, terrain)) {
+        if (!terrainAllows(rules, row, terrain)) {
           return rejected('placement is on ground that cannot take it');
         }
         if (OPEN_WATER_TERRAINS.has(terrain)) wet++;
@@ -437,12 +440,12 @@ export function placementLegal(
     // and beach -- is a shore building: it has to reach the water and to
     // touch the land, which is the engine's own placement rule for it and
     // what a table of terrains alone cannot say.
-    const admitsWater = rowAdmitsWater(state.rules, row);
+    const admitsWater = rowAdmitsWater(rules, row);
     if (admitsWater && wet === 0) return rejected('placement does not reach the water');
     if (building === 'fish-trap' && dry > 0) return rejected('fish traps must be on water');
     if (admitsWater && dry === 0 && building !== 'fish-trap') return rejected('placement does not touch the shore');
   }
-  const hillMode = state.rules.buildings[building].hillMode ?? FALLBACK_RULES.buildings[building].hillMode ?? 0;
+  const hillMode = rules.buildings[building].hillMode ?? FALLBACK_RULES.buildings[building].hillMode ?? 0;
   if (!elevationAllowsPlacement(state, target, half, hillMode)) {
     return rejected('placement is on unsuitable elevation');
   }
@@ -496,7 +499,7 @@ function isGatherable(state: GameState, entity: Entity, gatherer: Entity): boole
     // hunted down first.
     if ((entity.amount ?? 0) <= 0) return false;
     if (entity.dead) return true;
-    return state.rules.units[entity.kind].herdRange !== undefined && entity.owner === gatherer.owner;
+    return rulesForPlayer(state, entity.owner).units[entity.kind].herdRange !== undefined && entity.owner === gatherer.owner;
   }
   return entity.kind === 'farm' && entity.owner === gatherer.owner
     && !entity.dead && entity.buildProgress === undefined && (entity.amount ?? 0) > 0
@@ -522,60 +525,70 @@ function nearbyFreeFarm(state: GameState, worker: Entity, origin: Point): Entity
 /** A live animal a hunter has to kill before there is anything to carry. */
 function isHuntable(state: GameState, entity: Entity): boolean {
   return isAnimal(entity.kind) && !entity.dead && (entity.amount ?? 0) > 0
-    && state.rules.units[entity.kind].herdRange === undefined;
+    && rulesForPlayer(state, entity.owner).units[entity.kind].herdRange === undefined;
 }
 
-function assignOrder(state: GameState, entity: Entity, target: Point, targetEntity?: Entity): void {
-  entity.fishingPosition = undefined;
-  const unitRules = isUnit(entity.kind) ? state.rules.units[entity.kind as UnitKind] : undefined;
+/** Pure right-click classification, shared by execution and cursor feedback.
+ * In particular, checking a hover must not reserve farms or reset work progress.
+ */
+export function resolveUnitOrder(state: GameState, entity: Entity, target: Point, targetEntity?: Entity): Order {
+  const unitRules = isUnit(entity.kind) ? unitRulesFor(state, entity.owner, entity.kind) : undefined;
   // A unit with no attack is never given one by a right-click: a monk sent at
   // a boar would otherwise stand over it forever, swinging nothing.
   const armed = !unitRules || combatOf(state, entity).attacks.some(attack => attack.amount > 0);
   if ((entity.kind === 'trade-cart' || entity.kind === 'trade-cog') && targetEntity && isTradePartner(state, entity, targetEntity)) {
-    entity.order = { kind: 'trade', targetId: targetEntity.id };
-    entity.carrying = undefined;
+    return { kind: 'trade', targetId: targetEntity.id };
   } else if (((entity.kind === 'villager' && targetEntity?.kind === 'farm')
     || (entity.kind === 'fishing-ship' && targetEntity?.kind === 'fish-trap'))
     && !targetEntity.dead && targetEntity.owner === entity.owner
     && targetEntity.buildProgress === undefined && (targetEntity.amount ?? 0) > 0) {
     const farm = isGatherable(state, targetEntity, entity)
       ? targetEntity : nearbyFreeFarm(state, entity, targetEntity.position);
-    if (!farm) { becomeIdle(entity); return; }
-    entity.order = { kind: 'gather', targetId: farm.id };
+    return farm ? { kind: 'gather', targetId: farm.id } : { kind: 'idle' };
   } else if (targetEntity && isGatherable(state, targetEntity, entity)) {
-    entity.order = { kind: 'gather', targetId: targetEntity.id };
+    return { kind: 'gather', targetId: targetEntity.id };
   } else if (
     unitRules?.heal && targetEntity && targetEntity.id !== entity.id
     && targetEntity.owner === entity.owner && isUnit(targetEntity.kind)
     && targetEntity.hp < targetEntity.maxHp
   ) {
-    entity.order = { kind: 'heal', targetId: targetEntity.id };
+    return { kind: 'heal', targetId: targetEntity.id };
   } else if (
     // Conversion reaches somebody else's soldiers only. Buildings need
     // Redemption, which is not researchable here.
     unitRules?.convert && targetEntity && isUnit(targetEntity.kind)
     && targetEntity.owner !== 0 && targetEntity.owner !== entity.owner
   ) {
-    entity.order = { kind: 'convert', targetId: targetEntity.id };
-    entity.convertTicks = undefined;
+    return { kind: 'convert', targetId: targetEntity.id };
   } else if (targetEntity && isHuntable(state, targetEntity) && armed) {
     // Gaia owns it, so the usual "somebody else's" test never fires; hunting
     // is what an order onto a live deer or boar means.
-    entity.order = { kind: 'attack', targetId: targetEntity.id };
+    return { kind: 'attack', targetId: targetEntity.id };
   } else if (
     targetEntity && targetEntity.owner === entity.owner &&
     isBuilding(targetEntity.kind) && targetEntity.buildProgress !== undefined
-    && entity.kind === (state.rules.buildings[targetEntity.kind].builderKind ?? 'villager')
+    && entity.kind === (rulesForPlayer(state, targetEntity.owner).buildings[targetEntity.kind].builderKind ?? 'villager')
   ) {
-    entity.order = { kind: 'build', targetId: targetEntity.id };
+    return { kind: 'build', targetId: targetEntity.id };
   } else if (targetEntity && isRepairable(state, entity, targetEntity)) {
-    entity.order = { kind: 'repair', targetId: targetEntity.id };
-    entity.repaired = 0;
+    return { kind: 'repair', targetId: targetEntity.id };
   } else if (targetEntity && canGarrison(state, entity, targetEntity)) {
-    entity.order = { kind: 'garrison', targetId: targetEntity.id };
+    return { kind: 'garrison', targetId: targetEntity.id };
   } else if (targetEntity && targetEntity.owner !== 0 && targetEntity.owner !== entity.owner && armed) {
-    entity.order = { kind: 'attack', targetId: targetEntity.id };
-  } else {
+    return { kind: 'attack', targetId: targetEntity.id };
+  }
+  return { kind: 'move', target: { ...target } };
+}
+
+function assignOrder(state: GameState, entity: Entity, target: Point, targetEntity?: Entity): void {
+  const order = resolveUnitOrder(state, entity, target, targetEntity);
+  entity.fishingPosition = undefined;
+  if (order.kind === 'idle') { becomeIdle(entity); return; }
+  if (order.kind === 'trade') entity.carrying = undefined;
+  if (order.kind === 'convert') entity.convertTicks = undefined;
+  if (order.kind === 'repair') entity.repaired = 0;
+  if (order.kind === 'move') {
+    const unitRules = isUnit(entity.kind) ? unitRulesFor(state, entity.owner, entity.kind) : undefined;
     // Told to go somewhere, a siege engine that is set up packs itself away
     // first, as the reference does. An order to *attack* does not: an engine
     // in range should shoot rather than fold up.
@@ -583,13 +596,48 @@ function assignOrder(state: GameState, entity: Entity, target: Point, targetEnti
       entity.packingTicks = Math.max(
         1, Math.round(unitRules.unpacked.seconds * TICKS_PER_SECOND));
     }
-    entity.order = { kind: 'move', target: { ...target } };
   }
+  entity.order = order;
   entity.activity = 'moving';
   entity.gatherProgress = 0;
 }
 
+/** The command grid and right-click use the same trainability test. */
+export function trainableUnitsAt(state: GameState, player: PlayerId, building: BuildingKind): UnitKind[] {
+  const rules = rulesForPlayer(state, player);
+  return (Object.keys(rules.units) as UnitKind[]).filter(kind => {
+    const unit = rules.units[kind];
+    return unit.trainedAt === building && (unit.age ?? 0) <= state.players[player].age
+      && (unit.requires ?? []).every(key => state.players[player].researched.includes(key))
+      && !isAnimal(kind) && civHas(state, player, 'units', unit.datId)
+      && !upgradedAway(state, player, kind) && !notYetUpgradedInto(state, player, kind);
+  });
+}
+
+/** Read-only dispatch shared by actual right-clicks and their hover cursor. */
+export function planContextCommand(
+  state: GameState, player: PlayerId, selection: Entity[], target: Point, targetEntity?: Entity, queue = false,
+): Command | undefined {
+  const own = selection.filter(e => !e.dead && e.owner === player);
+  const units = own.filter(e => isUnit(e.kind));
+  if (units.length) return { kind: 'order', player, entityIds: units.map(e => e.id), target,
+    targetId: targetEntity && targetEntity.id !== units[0].id ? targetEntity.id : undefined,
+    ...(queue ? { queue: true } : {}) };
+  const hostile = targetEntity !== undefined && targetEntity.owner !== 0 && targetEntity.owner !== player;
+  const towers = own.filter(e => canShoot(state, e)
+    && (hostile || trainableUnitsAt(state, player, e.kind as BuildingKind).length === 0));
+  if (towers.length) return { kind: 'order', player, entityIds: towers.map(e => e.id), target,
+    targetId: hostile ? targetEntity!.id : undefined };
+  const building = own.find(e => isBuilding(e.kind) && e.buildProgress === undefined
+    && trainableUnitsAt(state, player, e.kind as BuildingKind).length > 0);
+  if (building) return { kind: 'rally', player, buildingId: building.id, target, targetId: targetEntity?.id };
+  return undefined;
+}
+
 export function applyCommand(state: GameState, command: Command): CommandResult {
+  if (!civilizationRules(state.rules, state.players[command.player]?.civilization)) {
+    return rejected(`civilisation is not loaded for player ${command.player}`);
+  }
   if (state.winner) return rejected('match is over');
   if (command.player !== 1 && command.player !== 2) return rejected('unknown player');
 
@@ -601,7 +649,11 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       ? state.entities.find(e => e.id === command.targetId && (!e.dead || isCarcass(e)))
       : undefined;
     if (command.kind === 'order' && command.targetId && !targetEntity) {
-      return rejected(`target ${command.targetId} does not exist`);
+      // A remembered Gaia object may have vanished out of sight. Keep walking
+      // to the clicked last-seen location instead of exposing that via a refusal.
+      if (state.visibility[command.player].memory[command.targetId]?.owner !== 0) {
+        return rejected(`target ${command.targetId} does not exist`);
+      }
     }
     // A point with no numbers in it is refused here, at the one entry every
     // caller shares. The schema keeps it from a strategy; the debug bridge
@@ -657,7 +709,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (!building) return rejected(`building ${command.buildingId} is not owned`);
     if (building.buildProgress !== undefined) return rejected('building is under construction');
     if (queuedCount(building) >= TRAINING_QUEUE_LIMIT) return rejected('training queue is full');
-    const unitRules = state.rules.units[command.unit];
+    const unitRules = unitRulesFor(state, command.player, command.unit);
     if (upgradedAway(state, command.player, command.unit)) {
       return rejected(`${command.unit} has been upgraded`);
     }
@@ -722,7 +774,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       startNextTraining(state, building);
     }
     if (!refund) return rejected('nothing is being trained');
-    const cost = state.rules.units[refund].cost;
+    const cost = unitRulesFor(state, command.player, refund).cost;
     const player = state.players[command.player];
     player.food += cost.food; player.wood += cost.wood;
     player.gold += cost.gold; player.stone += cost.stone;
@@ -739,7 +791,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       releaseTownBell(state, tc);
     } else {
       tc.townBell = true;
-      const capacity = state.rules.buildings['town-center'].garrison?.capacity ?? 0;
+      const capacity = buildingRulesFor(state, command.player, 'town-center').garrison?.capacity ?? 0;
       const reserved = state.entities.filter(e => !e.dead && e.order.kind === 'garrison' && e.order.targetId === tc.id).length;
       const places = Math.max(0, capacity - (tc.garrison?.length ?? 0) - reserved);
       const workers = state.entities.filter(e => !e.dead && e.owner === command.player && e.kind === 'villager'
@@ -761,7 +813,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
     if (!building) return rejected(`building ${command.buildingId} is not owned`);
     if (!building.garrison?.length) return rejected('nobody is garrisoned');
-    if (isUnit(building.kind) && state.rules.units[building.kind].transportCapacity && command.target) {
+    if (isUnit(building.kind) && unitRulesFor(state, building.owner, building.kind).transportCapacity && command.target) {
       if (!Number.isFinite(command.target.x) || !Number.isFinite(command.target.y)) return rejected('target is not a point');
       building.order = { kind: 'unload', target: { ...command.target } };
       clearPath(building);
@@ -776,7 +828,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (!building) return rejected(`building ${command.buildingId} is not owned`);
     if (building.buildProgress !== undefined) return rejected('building is under construction');
     if (building.researching) return rejected('building is already researching');
-    const tech = state.rules.technologies[command.tech as TechKey];
+    const tech = rulesForPlayer(state, command.player).technologies[command.tech as TechKey];
     if (!tech) return rejected(`unknown technology ${command.tech}`);
     if (!civHas(state, command.player, 'technologies', tech.techId)) {
       return rejected(`the ${civNameOf(state, command.player)} do not have ${command.tech}`);
@@ -850,11 +902,11 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
   );
   if (!builders.length) return rejected(rules.builderKind === 'fishing-ship' ? 'builders must be owned fishing ships' : 'builders must be owned villagers');
   const orientation = command.orientation ?? 'x';
-  const legal = placementLegal(state, command.building, command.target, orientation);
+  const legal = placementLegal(state, command.building, command.target, orientation, command.player);
   if (!legal.ok) return legal;
   const paid = spend(state, command.player, command.building);
   if (!paid.ok) return paid;
-  const footprint = buildingFootprint(state, command.building, orientation);
+  const footprint = buildingFootprint(state, command.building, orientation, command.player);
   const site = addEntity(state, command.building, command.player, command.target, rules, {
     hp: 1,
     buildProgress: 0,
@@ -924,7 +976,7 @@ function moveDirect(grid: NavGrid, entity: Entity, destination: Point, speed: nu
  * walker is as close as the ground lets it come.
  */
 function moveTowardOnGround(state: GameState, entity: Entity, target: Point, speed: number): boolean {
-  const layer = terrainLayer(state, restrictionOf(state.rules, entity));
+  const layer = terrainLayer(state, restrictionOf(rulesForPlayer(state, entity.owner), entity), entity.owner);
   const refused = (p: Point): boolean => {
     const tile = tileOf(p);
     return tile.x < 0 || tile.y < 0 || tile.x >= state.width || tile.y >= state.height
@@ -1149,7 +1201,7 @@ const interactionRange = (target: Entity): number => target.radius + 1.6;
  * the map to a bush somebody scouted an hour ago.
  */
 function autoContinueRange(state: GameState, entity: Entity): number {
-  const los = isUnit(entity.kind) ? state.rules.units[entity.kind as UnitKind].lineOfSight : 0;
+  const los = isUnit(entity.kind) ? unitRulesFor(state, entity.owner, entity.kind).lineOfSight : 0;
   return los * 3;
 }
 
@@ -1263,15 +1315,19 @@ function nearestDropSite(state: GameState, entity: Entity, resource?: ResourceKi
   // villager wherever the building takes the resource -- except that the
   // dock takes fish and not berries, which is the fisherman's own site list
   // (town center, mill, dock) against the forager's (town center, mill).
-  const sites = state.rules.units[entity.kind as UnitKind]?.dropSites;
   const fishOnly = new Set<NodeKind>(['shore-fish', 'fish']);
+  const rules = rulesForPlayer(state, entity.owner);
+  const task = entity.carrying?.task
+    ?? (fishOnly.has(entity.carrying?.node ?? 'berries') ? 'fisher' : GATHER_TASK[wanted ?? 'food']);
+  const sites = entity.kind === 'villager' ? rules.villagerGather[task].dropSites
+    : rules.units[entity.kind as UnitKind]?.dropSites;
   let best: Entity | undefined;
   let bestDistance = Infinity;
   for (const candidate of state.entities) {
     if (candidate.dead || candidate.owner !== entity.owner || candidate.buildProgress !== undefined) continue;
     if (!isBuilding(candidate.kind)) continue;
     if (sites && !sites.includes(candidate.kind as BuildingKind)) continue;
-    const accepts = state.rules.buildings[candidate.kind as BuildingKind].accepts;
+    const accepts = rulesForPlayer(state, candidate.owner).buildings[candidate.kind as BuildingKind].accepts;
     if (!wanted || !accepts.includes(wanted)) continue;
     if (!sites && candidate.kind === 'dock' && !fishOnly.has(entity.carrying?.node ?? 'berries')) continue;
     const d = distance(entity.position, candidate.position);
@@ -1326,8 +1382,8 @@ const FALLBACK_CORPSE_SECONDS = 3;
 
 function corpseLifetimeTicks(state: ReadonlyGameState, entity: DeepReadonly<Entity>): number {
   const rules = isBuilding(entity.kind)
-    ? state.rules.buildings[entity.kind]
-    : state.rules.units[entity.kind as UnitKind];
+    ? rulesForPlayer(state, entity.owner).buildings[entity.kind]
+    : rulesForPlayer(state, entity.owner).units[entity.kind as UnitKind];
   return Math.round(Math.max(rules?.corpseSeconds ?? FALLBACK_CORPSE_SECONDS,
     rules?.deathSeconds ?? 0) * TICKS_PER_SECOND);
 }
@@ -1344,7 +1400,7 @@ function kill(state: GameState, entity: Entity): void {
   if (entity.dead) return;
   if (entity.bellReturn) entity.bellReturn = undefined;
   if (entity.kind === 'town-center' && entity.townBell) releaseTownBell(state, entity);
-  const transport = isUnit(entity.kind) && state.rules.units[entity.kind].transportCapacity;
+  const transport = isUnit(entity.kind) && unitRulesFor(state, entity.owner, entity.kind).transportCapacity;
   if (transport) entity.garrison = undefined; // a sinking transport loses its passengers
   else if (entity.garrison?.length) ungarrisonAll(state, entity);
   entity.dead = true;
@@ -1358,7 +1414,7 @@ function kill(state: GameState, entity: Entity): void {
   // Never shorter than the death graphic, or the thing vanishes mid-fall.
   entity.decayTicks = corpseLifetimeTicks(state, entity);
   clearPath(entity);
-  if (isUnit(entity.kind) && state.rules.units[entity.kind].selfDestruct && entity.hp <= 0) {
+  if (isUnit(entity.kind) && unitRulesFor(state, entity.owner, entity.kind).selfDestruct && entity.hp <= 0) {
     const combat = unitRulesFor(state, entity.owner, entity.kind);
     applyBlast(state, entity.position, combat.blastRadius ?? 0, combat.blastAttackLevel ?? 2,
       combat.attacks, entity.id, entity.owner as PlayerId);
@@ -1749,7 +1805,7 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
  */
 function updateHealer(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'heal') return;
-  const rules = state.rules.units[entity.kind as UnitKind];
+  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
   const heal = rules.heal;
   const target = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
   if (!heal || !target || target.owner !== entity.owner || target.hp >= target.maxHp) {
@@ -1777,20 +1833,20 @@ function updateHealer(state: GameState, grid: NavGrid, entity: Entity): void {
  * any) -- and only while there is something to mend (issue #74).
  */
 export function isRepairable(state: GameState, repairer: Entity, target: Entity): boolean {
-  const repair = state.rules.units[repairer.kind as UnitKind]?.repair;
+  const repair = rulesForPlayer(state, repairer.owner).units[repairer.kind as UnitKind]?.repair;
   if (!repair || target.dead || target.owner !== repairer.owner || target.id === repairer.id) return false;
   if (target.hp >= target.maxHp) return false;
   if (isBuilding(target.kind)) return target.buildProgress === undefined;
   if (!isUnit(target.kind)) return false;
-  const datClass = state.rules.units[target.kind as UnitKind].datClass;
+  const datClass = rulesForPlayer(state, target.owner).units[target.kind as UnitKind].datClass;
   return datClass !== undefined && String(datClass) in repair.classFactors;
 }
 
 /** The DAT's rate for mending this target: a building whole, siege by its class. */
 export function repairRateFor(state: GameState, repairer: Entity, target: Entity): number {
-  const repair = state.rules.units[repairer.kind as UnitKind].repair!;
+  const repair = rulesForPlayer(state, repairer.owner).units[repairer.kind as UnitKind].repair!;
   if (isBuilding(target.kind)) return repair.hitPointsPerSecond;
-  const datClass = state.rules.units[target.kind as UnitKind].datClass;
+  const datClass = rulesForPlayer(state, target.owner).units[target.kind as UnitKind].datClass;
   return repair.hitPointsPerSecond * (repair.classFactors[String(datClass)] ?? 1);
 }
 
@@ -1804,7 +1860,7 @@ export function repairRateFor(state: GameState, repairer: Entity, target: Entity
  */
 function updateRepairer(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'repair') return;
-  const rules = state.rules.units[entity.kind as UnitKind];
+  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
   const target = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
   if (!rules.repair || !target || !isRepairable(state, entity, target)) {
     entity.repaired = undefined;
@@ -1822,10 +1878,10 @@ function updateRepairer(state: GameState, grid: NavGrid, entity: Entity): void {
   const whole = Math.min(Math.floor(entity.gatherProgress), target.maxHp - target.hp);
   if (whole < 1) return;
   const price = isBuilding(target.kind)
-    ? state.rules.buildings[target.kind as BuildingKind].cost
-    : state.rules.units[target.kind as UnitKind].cost;
-  const fraction = isBuilding(target.kind)
-    ? state.rules.repairCostFraction.building : state.rules.repairCostFraction.unit;
+    ? buildingRulesFor(state, target.owner, target.kind as BuildingKind).cost
+    : unitRulesFor(state, target.owner, target.kind as UnitKind).cost;
+  const fraction = playerAttributeFor(state, entity.owner,
+    isBuilding(target.kind) ? 'buildingRepairCost' : 'unitRepairCost')!;
   const before = entity.repaired ?? 0;
   const after = before + whole;
   const due = (amount: number): number =>
@@ -1843,7 +1899,7 @@ function updateRepairer(state: GameState, grid: NavGrid, entity: Entity): void {
 
 /** The garrison category a unit falls in, from the editor's table by DAT class. */
 function garrisonCategory(state: GameState, unit: Entity): number {
-  const datClass = state.rules.units[unit.kind as UnitKind]?.datClass;
+  const datClass = rulesForPlayer(state, unit.owner).units[unit.kind as UnitKind]?.datClass;
   return datClass === undefined ? 0 : GARRISON_CATEGORY[datClass] ?? 0;
 }
 
@@ -1858,15 +1914,16 @@ export function canGarrison(state: GameState, unit: Entity, building: Entity): b
   if (isUnit(building.kind)) {
     const carrier = unitRulesFor(state, building.owner, building.kind);
     if (carrier.infantryCapacity) {
-      const category = state.rules.units[unit.kind].datClass;
+      const category = rulesForPlayer(state, unit.owner).units[unit.kind].datClass;
       return (category === 4 || category === 6) && (building.garrison?.length ?? 0) < carrier.infantryCapacity;
     }
     const capacity = carrier.transportCapacity;
-    return !!capacity && !unit.unpacked && !rowAdmitsWater(state.rules, restrictionOf(state.rules, unit))
+    const rules = rulesForPlayer(state, unit.owner);
+    return !!capacity && !unit.unpacked && !rowAdmitsWater(rules, restrictionOf(rules, unit))
       && (building.garrison?.length ?? 0) < capacity;
   }
   if (!isBuilding(building.kind)) return false;
-  const garrison = state.rules.buildings[building.kind as BuildingKind].garrison;
+  const garrison = buildingRulesFor(state, building.owner, building.kind as BuildingKind).garrison;
   if (!garrison || garrison.capacity <= 0) return false;
   if (!(garrison.types & garrisonCategory(state, unit))) return false;
   return (building.garrison?.length ?? 0) < garrison.capacity;
@@ -1904,7 +1961,7 @@ function releaseTownBell(state: GameState, tc: Entity): void {
  * base arrow nor the corresponding slot in the DAT maximum.
  */
 export function volleyArrows(state: GameState, building: Entity): number {
-  const volley = state.rules.buildings[building.kind as BuildingKind].garrison?.volley;
+  const volley = rulesForPlayer(state, building.owner).buildings[building.kind as BuildingKind].garrison?.volley;
   if (!volley) return 1;
   const attack = buildingRulesFor(state, building.owner, building.kind as BuildingKind).attack;
   const buildingDps = (attack?.attacks.find(a => a.class === 3)?.amount ?? 0) / (attack?.reloadSeconds || 1);
@@ -1926,14 +1983,14 @@ export function volleyArrows(state: GameState, building: Entity): number {
  * fire until the garrison gives it one. A tower and a castle carry their own.
  */
 function volleyFires(state: GameState, building: Entity): boolean {
-  const volley = state.rules.buildings[building.kind as BuildingKind].garrison?.volley;
+  const volley = rulesForPlayer(state, building.owner).buildings[building.kind as BuildingKind].garrison?.volley;
   if (!volley || volley.ownProjectile) return true;
   return (building.garrison?.length ?? 0) > 0 && volleyArrows(state, building) >= 1;
 }
 
 function updateGarrisoner(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'garrison') return;
-  const rules = state.rules.units[entity.kind as UnitKind];
+  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
   const building = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
   if (!building || !canGarrison(state, entity, building)) { becomeIdle(entity); return; }
   if (!inRange(entity, building, 0.4)) {
@@ -1961,7 +2018,7 @@ function updateGarrisoner(state: GameState, grid: NavGrid, entity: Entity): void
  * time; the fraction rides on each unit's own progress counter.
  */
 function updateGarrison(state: GameState, building: Entity): void {
-  const garrison = state.rules.buildings[building.kind as BuildingKind].garrison;
+  const garrison = buildingRulesFor(state, building.owner, building.kind as BuildingKind).garrison;
   if (!garrison || !building.garrison?.length || garrison.healRate <= 0) return;
   for (const unit of building.garrison) {
     if (unit.hp >= unit.maxHp) continue;
@@ -1980,7 +2037,7 @@ function updateGarrison(state: GameState, building: Entity): void {
  */
 export function ungarrisonAll(state: GameState, building: Entity): Entity[] {
   const inside = building.garrison ?? [];
-  if (isUnit(building.kind) && state.rules.units[building.kind].transportCapacity) {
+  if (isUnit(building.kind) && unitRulesFor(state, building.owner, building.kind).transportCapacity) {
     const released: Entity[] = [];
     for (const unit of inside) {
       let landing: Point | undefined;
@@ -1989,7 +2046,7 @@ export function ungarrisonAll(state: GameState, building: Entity): Entity[] {
         const angle = step * 2 * Math.PI / 32;
         const reach = building.radius + unit.radius + 0.6;
         const at = { x: building.position.x + Math.cos(angle) * reach, y: building.position.y + Math.sin(angle) * reach };
-        if (spawnFree(state, at, unit.radius, restrictionOf(state.rules, unit))) landing = at;
+        if (spawnFree(state, at, unit.radius, restrictionOf(rulesForPlayer(state, unit.owner), unit), unit.owner)) landing = at;
       }
       if (!landing) continue;
       unit.position = landing;
@@ -2013,7 +2070,7 @@ export function ungarrisonAll(state: GameState, building: Entity): Entity[] {
       for (let step = 0; step < steps; step++) {
         const angle = step * 2 * Math.PI / steps;
         const candidate = { x: building.position.x + Math.cos(angle) * rx, y: building.position.y + Math.sin(angle) * ry };
-        if (spawnFree(state, candidate, unit.radius, restrictionOf(state.rules, unit))
+        if (spawnFree(state, candidate, unit.radius, restrictionOf(rulesForPlayer(state, unit.owner), unit), unit.owner)
           && released.every(other => distance(other.position, candidate) >= other.radius + unit.radius)) {
           spot = candidate;
           break;
@@ -2043,7 +2100,7 @@ export function ungarrisonAll(state: GameState, building: Entity): Entity[] {
  */
 function updateConverter(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'convert') return;
-  const rules = state.rules.units[entity.kind as UnitKind];
+  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
   const convert = rules.convert;
   const target = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
   if (!convert || !target || target.owner === 0 || target.owner === entity.owner) {
@@ -2095,7 +2152,7 @@ function applyDamage(
   // a decision rather than a formality. It hangs off taking damage rather than
   // off the swing that dealt it: villagers hunt with a bow, so the blow that
   // angers a boar usually arrives as an arrow.
-  if (isAnimal(target.kind) && state.rules.units[target.kind].attacks.some(a => a.amount > 0)
+  if (isAnimal(target.kind) && unitRulesFor(state, target.owner, target.kind).attacks.some(a => a.amount > 0)
     && target.order.kind !== 'attack') {
     const attacker = state.entities.find(e => e.id === attackerId && !e.dead);
     if (attacker && attacker.owner !== target.owner) {
@@ -2137,7 +2194,7 @@ function velocityOf(state: GameState, entity: Entity): Point {
   const dy = next.y - entity.position.y;
   const gap = Math.hypot(dx, dy);
   if (gap < 1e-6) return { x: 0, y: 0 };
-  const speed = isUnit(entity.kind) ? state.rules.units[entity.kind as UnitKind].speed : 0;
+  const speed = isUnit(entity.kind) ? unitRulesFor(state, entity.owner, entity.kind).speed : 0;
   return { x: dx / gap * speed, y: dy / gap * speed };
 }
 
@@ -2183,8 +2240,8 @@ function releaseAttack(
     origin: { ...shooter.position },
     targetId: target.id,
     shooterId: shooter.id,
-    art: isUnit(shooter.kind) ? (shooter.unpacked ? state.rules.units[shooter.kind].unpacked?.projectileArt
-      : state.rules.units[shooter.kind].projectileArt) : undefined,
+    art: isUnit(shooter.kind) ? (shooter.unpacked ? unitRulesFor(state, shooter.owner, shooter.kind).unpacked?.projectileArt
+      : unitRulesFor(state, shooter.owner, shooter.kind).projectileArt) : undefined,
     attacks: attacks.map(a => ({ ...a })),
     speed: projectileSpeed,
     launchHeight,
@@ -2207,7 +2264,7 @@ function releaseAttack(
 function shooterLeadsTarget(state: GameState, shooter: Entity): boolean {
   if (shooter.owner === 0) return false;
   for (const key of state.players[shooter.owner as PlayerId].researched) {
-    for (const effect of state.rules.technologies[key]?.effects ?? []) {
+    for (const effect of rulesForPlayer(state, shooter.owner).technologies[key]?.effects ?? []) {
       if (effect.attribute === 'leadsTarget' && effect.amount >= 1) return true;
     }
   }
@@ -2253,12 +2310,12 @@ function applyBlast(
  * 3, every building 2, a tree 1 and any other node 0.
  */
 function blastDefenseLevelOf(state: GameState, entity: Entity): number {
-  if (isBuilding(entity.kind)) return state.rules.buildings[entity.kind].blastDefenseLevel ?? 2;
+  if (isBuilding(entity.kind)) return rulesForPlayer(state, entity.owner).buildings[entity.kind].blastDefenseLevel ?? 2;
   if (entity.kind === 'resource') {
     const node = Object.values(state.rules.nodes).find(n => n.resource === entity.resourceKind);
     return node?.blastDefenseLevel ?? (entity.resourceKind === 'wood' ? 1 : 0);
   }
-  return state.rules.units[entity.kind as UnitKind]?.blastDefenseLevel ?? 3;
+  return rulesForPlayer(state, entity.owner).units[entity.kind as UnitKind]?.blastDefenseLevel ?? 3;
 }
 
 /** Closest approach of the segment a->b to a point, for a swept hit test. */
@@ -2362,7 +2419,7 @@ function struckBy(state: GameState, projectile: Projectile, at: Point): Entity |
 /** Idle military units acquire the nearest living enemy in line of sight. */
 function autoAcquire(state: GameState, entity: Entity): void {
   if (!isMilitary(entity.kind) || entity.order.kind !== 'idle') return;
-  const los = state.rules.units[entity.kind as UnitKind].lineOfSight;
+  const los = unitRulesFor(state, entity.owner, entity.kind as UnitKind).lineOfSight;
   let best: Entity | undefined;
   let bestDistance = Infinity;
   for (const candidate of state.entities) {
@@ -2432,7 +2489,7 @@ function updateTower(state: GameState, entity: Entity): void {
   }
   entity.attackWindup -= 1;
   if (entity.attackWindup <= 0) {
-    const volley = state.rules.buildings[entity.kind as BuildingKind].garrison?.volley;
+    const volley = rulesForPlayer(state, entity.owner).buildings[entity.kind as BuildingKind].garrison?.volley;
     // The building's own arrow first, where it has one...
     if (!volley || volley.ownProjectile) {
       releaseAttack(state, entity, target, attack.attacks, attack.projectileSpeed, attack.launchHeight,
@@ -2483,7 +2540,7 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
   switch (entity.order.kind) {
     case 'unload': {
       entity.activity = 'moving';
-      if (moveAlong(state, grid, entity, entity.order.target, state.rules.units[entity.kind as UnitKind].speed)) {
+      if (moveAlong(state, grid, entity, entity.order.target, unitRulesFor(state, entity.owner, entity.kind as UnitKind).speed)) {
         ungarrisonAll(state, entity);
         becomeIdle(entity);
       }
@@ -2491,7 +2548,7 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
     }
     case 'move': {
       entity.activity = 'moving';
-      const rules = state.rules.units[entity.kind as UnitKind];
+      const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
       if (moveAlong(state, grid, entity, entity.order.target, rules.speed)) becomeIdle(entity);
       return;
     }
@@ -2510,14 +2567,16 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
 }
 
 /** A spot clear of the map edge and of every building and resource footprint. */
-function spawnFree(state: GameState, point: Point, radius: number, restriction = LAND_RESTRICTION): boolean {
+function spawnFree(
+  state: GameState, point: Point, radius: number, restriction = LAND_RESTRICTION, owner: Entity['owner'] = 0,
+): boolean {
   if (point.x - radius < 0 || point.x + radius > state.width) return false;
   if (point.y - radius < 0 || point.y + radius > state.height) return false;
   // Nothing appears on ground it could not walk to. The generator asks this
   // before the board has terrain, and a board without terrain is all land.
   if (state.terrain.length === state.width * state.height) {
     const tile = Math.floor(point.y) * state.width + Math.floor(point.x);
-    if (!groundAllows(state.rules, restriction, state.terrain[tile])) return false;
+    if (!groundAllows(rulesForPlayer(state, owner), restriction, state.terrain[tile])) return false;
   }
   for (const entity of state.entities) {
     if (entity.dead) continue;
@@ -2556,7 +2615,7 @@ function spawnPoint(
         x: building.position.x + Math.cos(angle) * distance,
         y: building.position.y + Math.sin(angle) * distance,
       };
-      if (spawnFree(state, point, unitRadius, restriction)) return point;
+      if (spawnFree(state, point, unitRadius, restriction, building.owner)) return point;
     }
   }
   // Hemmed in on every side: place it on the building and let separation sort
@@ -2568,7 +2627,7 @@ function spawnTrainedUnit(state: GameState, building: Entity, kind: UnitKind): v
   const rules = unitRulesFor(state, building.owner, kind);
   const spawn = spawnPoint(state, building, rules.radius, rules.terrainRestriction ?? LAND_RESTRICTION);
   const unit = addEntity(state, kind, building.owner, spawn, rules);
-  const capacity = state.rules.buildings[building.kind as BuildingKind].garrison?.capacity ?? 0;
+  const capacity = rulesForPlayer(state, building.owner).buildings[building.kind as BuildingKind].garrison?.capacity ?? 0;
   if ((building.rally?.targetId === building.id || (building.townBell && kind === 'villager'))
     && (building.garrison?.length ?? 0) < capacity) {
     unit.position = { ...building.position };
@@ -2599,7 +2658,7 @@ function spawnTrainedUnit(state: GameState, building: Entity, kind: UnitKind): v
  * already have.
  */
 function completeResearch(state: GameState, owner: PlayerId, key: string): void {
-  const tech = state.rules.technologies[key as TechKey];
+  const tech = rulesForPlayer(state, owner).technologies[key as TechKey];
   const player = state.players[owner];
   if (!tech || player.researched.includes(key)) return;
   player.researched.push(key);
@@ -2609,7 +2668,7 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
   // promotion. AoE2 does the same, and it is why the barracks stops offering
   // the militia at all afterwards (see `upgradedAway`).
   for (const upgrade of tech.upgrades ?? []) {
-    const to = state.rules.units[upgrade.to as UnitKind];
+    const to = rulesForPlayer(state, owner).units[upgrade.to as UnitKind];
     if (!to) continue;
     for (const entity of state.entities.flatMap(e => [e, ...(e.garrison ?? [])])) {
       if (entity.dead || entity.owner !== owner) continue;
@@ -2666,7 +2725,7 @@ function updateBuildingProduction(state: GameState, entity: Entity): void {
   if (entity.training.remainingTicks > 0) return;
   const kind = entity.training.kind;
   const player = state.players[entity.owner as PlayerId];
-  if (player.population + state.rules.units[kind].popCost > player.populationCap) {
+  if (player.population + unitRulesFor(state, entity.owner, kind).popCost > player.populationCap) {
     // Keep the finished unit at 100%, with the rest of the queue untouched.
     return;
   }
@@ -2684,15 +2743,16 @@ function startNextTraining(state: GameState, entity: Entity): void {
     entity.trainingQueue = queue.length > 1 ? queue.slice(1) : undefined;
     entity.training = {
       kind: next,
-      remainingTicks: Math.round(state.rules.units[next].trainSeconds * TICKS_PER_SECOND),
+      remainingTicks: Math.round(unitRulesFor(state, entity.owner, next).trainSeconds * TICKS_PER_SECOND),
     };
   }
 }
 
 /** Whether the rules train any unit at this kind of building. */
-function trainsAnything(state: GameState, kind: Entity['kind']): boolean {
+function trainsAnything(state: GameState, kind: Entity['kind'], player: PlayerId): boolean {
   if (!isBuilding(kind)) return false;
-  return Object.values(state.rules.units).some(rules => rules.trainedAt === kind);
+  return Object.values(rulesForPlayer(state, player).units)
+    .some(rules => rules.trainedAt === kind && civHas(state, player, 'units', rules.datId));
 }
 
 function isDefeated(state: GameState, player: PlayerId): boolean {
@@ -2705,7 +2765,7 @@ function isDefeated(state: GameState, player: PlayerId): boolean {
     if (isUnit(entity.kind) || entity.garrison?.length) unit = true;
     // "Can still produce" is asked of the rules, not of a list of building
     // names: a player left with only a stable or a castle is not beaten.
-    if (entity.buildProgress === undefined && trainsAnything(state, entity.kind)) production = true;
+    if (entity.buildProgress === undefined && trainsAnything(state, entity.kind, player)) production = true;
   }
   // Domination: no units and nothing that can produce them (approximation of
   // AoE2 conquest, which requires razing everything).
@@ -2735,7 +2795,7 @@ function updateAnimals(state: GameState): void {
   if (!animals.length || !units.length) return;
   for (const animal of animals) {
     if (animal.order.kind === 'attack') continue;
-    const rules = state.rules.units[animal.kind as AnimalKind];
+    const rules = rulesForPlayer(state, animal.owner).units[animal.kind as AnimalKind];
     let nearest: Entity | undefined;
     let nearestDistance = Infinity;
     let claimant: PlayerId | 0 = 0;
@@ -2799,12 +2859,12 @@ export function stepGame(state: GameState): void {
   const gateOwners = new Set<PlayerId>();
   for (const entity of state.entities) {
     if (entity.dead || entity.owner === 0 || entity.buildProgress !== undefined) continue;
-    if (!state.rules.buildings[entity.kind as BuildingKind]?.passableForOwner) continue;
+    if (!rulesForPlayer(state, entity.owner).buildings[entity.kind as BuildingKind]?.passableForOwner) continue;
     gateOwners.add(entity.owner as PlayerId);
   }
   const grids = new Map<Uint8Array, Map<PlayerId | 0, NavGrid>>([[land, new Map([[0, grid]])]]);
   const gridFor = (entity: Entity): NavGrid => {
-    const layer = terrainLayer(state, restrictionOf(state.rules, entity));
+    const layer = terrainLayer(state, restrictionOf(rulesForPlayer(state, entity.owner), entity), entity.owner);
     const owner = entity.owner !== 0 && gateOwners.has(entity.owner as PlayerId)
       ? entity.owner as PlayerId : 0;
     let byOwner = grids.get(layer);
@@ -2825,7 +2885,7 @@ export function stepGame(state: GameState): void {
     if (entity.dead) {
       entity.decayTicks = (entity.decayTicks ?? 0) - 1;
       if (isAnimal(entity.kind) && (entity.amount ?? 0) > 0) {
-        const rate = state.rules.units[entity.kind].foodDecayPerSecond ?? 0;
+        const rate = rulesForPlayer(state, entity.owner).units[entity.kind].foodDecayPerSecond ?? 0;
         const progress = (entity.foodDecayProgress ?? 0) + rate * TICK_SECONDS;
         const spoiled = Math.floor(progress + 1e-9);
         entity.foodDecayProgress = Math.max(0, progress - spoiled);
@@ -2843,13 +2903,14 @@ export function stepGame(state: GameState): void {
       updateTower(state, entity);
     }
   }
-  separateUnits(state, movable, grid);
+  separateUnits(state, movable, gridFor);
   updateProjectiles(state);
   for (const site of state.entities) {
     if (site.buildProgress === undefined) continue;
     const builders = builderCounts.get(site.id) ?? 0;
     if (!builders) continue;
-    const seconds = state.rules.buildings[site.kind as BuildingKind].buildSeconds;
+    const siteRules = buildingRulesFor(state, site.owner, site.kind as BuildingKind);
+    const seconds = siteRules.buildSeconds;
     // AoE2 rule: k builders finish in 3T/(k+2) seconds.
     const delta = TICK_SECONDS * (builders + 2) / (3 * seconds);
     site.buildProgress = Math.min(1, site.buildProgress + delta);
@@ -2861,7 +2922,7 @@ export function stepGame(state: GameState): void {
       // technologies raise, but whether this building stores any at all is
       // still the building's own rule -- asking the player attribute first
       // turned every finished wall into a farm.
-      const farmAmount = state.rules.buildings[site.kind as BuildingKind].farmAmount === undefined
+      const farmAmount = siteRules.farmAmount === undefined
         ? undefined
         : farmFoodAmountFor(state, site.owner);
       if (farmAmount !== undefined) {
@@ -2882,7 +2943,7 @@ export function stepGame(state: GameState): void {
       }
       if (site.kind === 'fish-trap') {
         site.resourceKind = 'food';
-        site.amount = state.rules.buildings['fish-trap'].fishTrapAmount;
+        site.amount = siteRules.fishTrapAmount;
         for (const builder of state.entities) {
           if (!builder.dead && builder.kind === 'fishing-ship' && builder.owner === site.owner
             && builder.order.kind === 'build' && builder.order.targetId === site.id && farmAvailable(state, site, builder)) {
@@ -2893,7 +2954,7 @@ export function stepGame(state: GameState): void {
       }
       for (const builder of state.entities) {
         if (builder.order.kind === 'build' && builder.order.targetId === site.id) {
-          const work = workAfterBuilding(state, grid, builder, site);
+          const work = workAfterBuilding(state, gridFor(builder), builder, site);
           if (work) {
             assignOrder(state, builder, work.position, work);
             continue;

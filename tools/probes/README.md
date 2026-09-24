@@ -14,6 +14,12 @@ These scripts live directly under `tools/` and start private Vite/browser
 fixtures. Run `npx tsx tools/<name>.mts`; they supplement the gate's general
 browser smoke and are maintained regression tools.
 
+- **`civilization_rules_smoke.mts`** — private synthetic second profile through
+  the real owned-manifest loader: resumed mixed sides, owner-specific command
+  prices, forbidden unit/research filtering, actual training HP, and real house
+  placement with the profile's footprint/cost. It proves catalogue plumbing,
+  not real Frankish bonuses, unique-unit artwork or conversion inheritance.
+
 - **`tree_fog_smoke.mts`** — #88's accepted visual correction: opaque canopy
   pixels must be identical with ground fog on and F4 reveal, remembered trees
   retain full silhouettes at half linear brightness, and visible shadows match
@@ -29,6 +35,20 @@ browser smoke and are maintained regression tools.
 - **`outline_residency_smoke.mts`** — #172's late occlusion after an old contour
   page expires. Missing current art stays hidden and the real renderer continues
   returning pixels without reviving the disposed binding.
+- **`composite_outline_smoke.mts`** — #173's actual owned Galley sail contour
+  behind the native town-center occluder, measured in sRGB against the same frame
+  with only the layer mask hidden. Animated ground is excluded from the A/B.
+  Delays the first page request, retires/expires the old page, holds/reloads at the
+  asset-loader boundary (decoded browser images may bypass network), and tests
+  an empty frame without changing simulation state.
+  For #238, `CONTOUR_FAR=1` repeats it at a far 392×392 surveyed-map position;
+  `CONTOUR_KIND=villager` tests an ordinary contour. Run all four combinations.
+  Each also checks actual draw orders, every opaque contour sample under a real
+  placement-footprint mesh, and pixel-identical camera round trips.
+- **`context_cursor_smoke.mts`** — #51's native CUR requests and embedded
+  hotspots, 15 real hover/right-click action cases, read-only hover, unexplored
+  Gaia rejection, and remembered-resource position/stock instead of hidden live
+  data. Also run with `OPEN_FALLBACK=1` for CSS fallback and the same public orders.
 - **`sampler_residency_smoke.mts`** — #172's exact Three sampler-cache failure:
   draw page A, switch to B, expire A, then create another B object. Real basic
   and player-ramp rendering must retain identical pixels and unchanged state.

@@ -5,6 +5,7 @@
  * visibility, so they moved here to keep the import graph acyclic.
  */
 import type { BuildingRules, TechEffect, UnitRules } from './data';
+import { rulesForPlayer } from './civilizations';
 import type { BuildingKind, Entity, GameState, PlayerId, UnitKind } from './types';
 
 /** Apply one number to one attribute, in the way the DAT's command says. */
@@ -14,15 +15,39 @@ export function combine(operation: TechEffect['operation'], current: number, amo
   return current + amount;
 }
 
+/** Initial DAT value plus completed research, in completion order. Unknown
+ * names stay undefined. These are rule parameters, not live stockpiles or
+ * counters: e.g. imported `food` is not the player's current food bank.
+ * Legacy fields preserve open rules and snapshots made before issue #53.
+ */
+export function playerAttributeFor(
+  state: GameState, owner: Entity['owner'], name: string,
+): number | undefined {
+  const rules = rulesForPlayer(state, owner);
+  const legacy = name === 'farmFoodAmount' ? rules.buildings.farm.farmAmount
+    : name === 'unitRepairCost' ? rules.repairCostFraction.unit
+      : name === 'buildingRepairCost' ? rules.repairCostFraction.building : undefined;
+  const attributes = rules.playerAttributes;
+  let value = (attributes && Object.hasOwn(attributes, name) ? attributes[name] : undefined) ?? legacy;
+  if (value === undefined || owner === 0) return value;
+  for (const key of state.players[owner as PlayerId].researched) {
+    for (const effect of rules.technologies[key]?.effects ?? []) {
+      if (effect.resource === name) value = combine(effect.operation, value, effect.amount);
+    }
+  }
+  return value;
+}
+
 /** What a player has researched, applied to one unit kind's rules. */
 export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: UnitKind): UnitRules {
-  const base = state.rules.units[kind];
+  const source = rulesForPlayer(state, owner);
+  const base = source.units[kind];
   if (owner === 0) return base;
   const researched = state.players[owner as PlayerId].researched;
   if (!researched.length) return base;
   let rules = base;
   for (const key of researched) {
-    for (const effect of state.rules.technologies[key]?.effects ?? []) {
+    for (const effect of source.technologies[key]?.effects ?? []) {
       if (base.piercing && effect.unit === base.piercing.unit && effect.attribute === 'attack') {
         const attacks = (rules.piercing ?? base.piercing).attacks.map(a => ({ ...a }));
         const entry = attacks.find(a => a.class === effect.armorClass);
@@ -95,13 +120,14 @@ function applyEffect(rules: UnitRules, effect: TechEffect): void {
 export function buildingRulesFor(
   state: GameState, owner: Entity['owner'], kind: BuildingKind,
 ): BuildingRules {
-  const base = state.rules.buildings[kind];
+  const source = rulesForPlayer(state, owner);
+  const base = source.buildings[kind];
   if (owner === 0) return base;
   const researched = state.players[owner as PlayerId].researched;
   if (!researched.length) return base;
   let rules = base;
   for (const key of researched) {
-    for (const effect of state.rules.technologies[key]?.effects ?? []) {
+    for (const effect of source.technologies[key]?.effects ?? []) {
       if (effect.unit !== kind) continue;
       if (rules === base) {
         rules = {

@@ -2327,6 +2327,27 @@ describe('what a shot is aimed at', () => {
 });
 
 describe('civilisations', () => {
+  it('rejects an unloaded civilisation instead of relabelling the shared rules', () => {
+    for (const rules of [FALLBACK_RULES, importedRules].filter(Boolean) as GameRules[]) {
+      for (const player of [1, 2] as const) {
+        const civilizations = { 1: rules.civilization.key, 2: rules.civilization.key };
+        civilizations[player] = 'unloaded-fixture';
+        expect(() => createGame(91, rules, civilizations))
+          .toThrow(`civilisation unloaded-fixture is not loaded for player ${player}`);
+      }
+    }
+  });
+
+  it('does not grant every unit to an unsupported civilisation in a restored state', () => {
+    const state = createGame(91);
+    state.players[1].civilization = 'unloaded-fixture';
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const before = state.players[1].food;
+    expect(applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'villager' }).ok).toBe(false);
+    expect(state.players[1].food).toBe(before);
+    expect(tc.training).toBeUndefined();
+  });
+
   it('starts both players on the civilisation the content was imported for', () => {
     const state = createGame(91, importedRules ?? FALLBACK_RULES);
     expect(state.players[1].civilization).toBe(state.rules.civilization.key);

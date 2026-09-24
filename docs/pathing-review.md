@@ -3,17 +3,24 @@
 Issue #5 asked for the pathing to be *reviewed*, with best practice researched,
 on the suspicion that it "likely relates to collision and building/unit/resource
 placement". This is that review: what was measured, what the reference practice
-is, what was changed, and what is still open.
+is, what was changed, and the remaining limits.
+
+**2026-09-24 disposition:** #5 was closed at the user's request, pending a
+concrete recurrence. The user will reopen it with evidence if the symptom returns.
+This is not a claim that every pathing or formation behavior matches DE.
 
 At the time of this review, nine measurements did not reproduce the reported
 defect, and one measured cost was halved. These are historical measurements,
 not a current all-pass certificate.
 
-**2026-09-21 recheck:** the first probe's fixed seed-200 endpoints are now both
+**2026-09-21 recheck:** the first probe's fixed seed-200 endpoints were both
 blocked; tree #105 occupies its supposed open-ground goal (40.5,20.5). The
 walker becomes idle about one tile away, correctly failing the fixture's
-<0.6-tile arrival condition. Discover/assert clear terrain before reusing that
-metric. #83 separately reproduced and fixed the stationary separation line;
+<0.6-tile arrival condition. **2026-09-22 correction:** the probe now discovers
+and asserts an open corridor; it reported arrival at ratio 0.97, 12/12 through
+the gap, zero stuck ticks in 51,641 moving ticks and an 8.47 ms 50-unit order.
+These are recorded measurements, not a fresh run at closure.
+#83 separately reproduced and fixed the stationary separation line;
 its public-command and browser checks are recorded in `docs/status.md`.
 
 ## What was measured
@@ -109,13 +116,11 @@ path into straight segments), is worth less here than it usually is: the
 measured detour ratios are 1.14 around a building and 2.18 around a wall whose
 geometric detour is 2.0, so there is very little staircase left to remove.
 
-## What is still open
+## Disposition and adjacent gaps
 
-**The case the report was written from.** Nine measurements did not reproduce
-"poor pathing", so the review cannot say what the human saw, and guessing at it
-would be inventing a defect to fix. The question is on issue #5: which units,
-doing what, and what did they do that looked wrong? A single description turns
-this from a review into a bug.
+**A concrete recurrence.** The umbrella report is closed for now. A reopened
+#5 should identify the map/seed, units, order and observed failure, with a
+recording or snapshot where possible, so the reported behavior can be reproduced.
 
 Two known and recorded gaps sit next to it, neither of them the pathfinder:
 

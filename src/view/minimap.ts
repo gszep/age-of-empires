@@ -1,5 +1,6 @@
 import type { EntityKind, GameState, PlayerId, Point, ResourceKind, UnitKind, ReadonlyGameState } from '../sim/types';
 import { isBuilding, NODE_OF_RESOURCE, type NodeKind } from '../sim/data';
+import { rulesForPlayer } from '../sim/civilizations';
 import type { ContentAssets, ImportedTerrain } from './assets';
 import { playerColorHex } from './sprites';
 
@@ -201,9 +202,9 @@ export class Minimap {
       ctx.fillStyle = color;
       ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
     };
-    const drawBuilding = (kind: EntityKind, x: number, y: number, color: string): boolean => {
+    const drawBuilding = (kind: EntityKind, owner: PlayerId | 0, x: number, y: number, color: string): boolean => {
       if (!isBuilding(kind)) return false;
-      if (state.rules.buildings[kind].minimapMode !== 0) {
+      if (rulesForPlayer(state, owner).buildings[kind].minimapMode !== 0) {
         const p = this.toCanvas(state, x, y);
         ctx.fillStyle = color;
         // Snapping prevents an extra antialiased fringe around a two-pixel dot.
@@ -222,7 +223,7 @@ export class Minimap {
           ? resourceColor(state, entity.resourceKind, entity.node,
             entity.resourceKind === 'wood' ? woodShade(entity.position.x, entity.position.y) : undefined)
           : (entity.owner === 0 && gaiaColor(state, entity.kind)) || ownerColor(entity.owner);
-        if (drawBuilding(entity.kind, entity.position.x, entity.position.y, color)) continue;
+        if (drawBuilding(entity.kind, entity.owner, entity.position.x, entity.position.y, color)) continue;
         const size = entity.kind === 'resource' ? resourceDotSize : 2.5;
         drawDot(entity.position.x, entity.position.y, color, size);
       }
@@ -234,7 +235,7 @@ export class Minimap {
         ? resourceColor(state, remembered.resource, remembered.node,
           remembered.resource === 'wood' ? woodShade(remembered.x, remembered.y) : undefined)
         : (remembered.owner === 0 && gaiaColor(state, remembered.kind)) || ownerColor(remembered.owner);
-      if (drawBuilding(remembered.kind, remembered.x, remembered.y, color)) continue;
+      if (drawBuilding(remembered.kind, remembered.owner, remembered.x, remembered.y, color)) continue;
       drawDot(
         remembered.x, remembered.y, color,
         remembered.kind === 'resource' ? resourceDotSize : 3,

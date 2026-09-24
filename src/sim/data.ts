@@ -224,6 +224,8 @@ export interface BuildingRules {
   armors: AttackValue[];
   /** Resources villagers may deposit here; empty for buildings that take none. */
   accepts: ResourceKind[];
+  /** Owned drop-site metadata; importing it does not implement livestock delivery. */
+  acceptsLivestock?: boolean;
   /** Food a farm holds; undefined for everything else. */
   farmAmount?: number;
   fishTrapAmount?: number;
@@ -369,11 +371,14 @@ export const GARRISON_CATEGORY: Record<number, number> = {
 
 export type VillagerGatherTask = 'forager' | 'farmer' | 'hunter' | 'shepherd'
   | 'fisher' | 'lumberjack' | 'goldminer' | 'stonemason';
-export interface VillagerGatherRules { ratePerSecond: number; capacity: number }
+export interface VillagerGatherRules { ratePerSecond: number; capacity: number; dropSites?: BuildingKind[] }
 
 export interface GameRules {
   origin: 'fallback' | 'imported';
   civilization: CivilizationRules;
+  /** Additional complete player rulesets. Gaia and map generation use the root.
+   * A catalogue entry cannot contain another catalogue or override its key. */
+  civilizations?: Record<string, Omit<GameRules, 'civilizations'>>;
   startingResources: Cost;
   startingPopulationCap: number;
   units: Record<UnitKind, UnitRules>;
@@ -388,6 +393,8 @@ export interface GameRules {
    * hit points come back (issue #74).
    */
   repairCostFraction: { building: number; unit: number };
+  /** Named DAT initial values; presence does not imply a supported mechanic. */
+  playerAttributes: Partial<Record<string, number>>;
   technologies: Record<TechKey, TechRules>;
   /**
    * The DAT's passability table: for each restriction row something here
@@ -562,7 +569,9 @@ export interface TechEffect {
 }
 
 /**
- * A player-level attribute a technology can change. `farmFoodAmount` is
+ * A modelled player-level attribute a technology can change. The imported
+ * initial table is broader; importing a value does not enable its effects.
+ * `farmFoodAmount` is
  * resource 36 in the DAT, where civ 1 starts it at 175 -- the number the open
  * fallback had hand-written before anybody looked.
  */
@@ -1244,16 +1253,17 @@ export const FALLBACK_RULES: GameRules = {
   gatherRatePerSecond: { food: 0.31, wood: 0.39, gold: 0.38, stone: 0.36 },
   carryCapacity: 10,
   villagerGather: {
-    forager: { ratePerSecond: 0.31, capacity: 10 },
-    farmer: { ratePerSecond: 0.53, capacity: 10 },
-    hunter: { ratePerSecond: 0.41, capacity: 35 },
-    shepherd: { ratePerSecond: 0.33, capacity: 10 },
-    fisher: { ratePerSecond: 0.43, capacity: 10 },
-    lumberjack: { ratePerSecond: 0.39, capacity: 10 },
-    goldminer: { ratePerSecond: 0.38, capacity: 10 },
-    stonemason: { ratePerSecond: 0.36, capacity: 10 },
+    forager: { ratePerSecond: 0.31, capacity: 10, dropSites: ['town-center', 'mill'] },
+    farmer: { ratePerSecond: 0.53, capacity: 10, dropSites: ['town-center', 'mill'] },
+    hunter: { ratePerSecond: 0.41, capacity: 35, dropSites: ['town-center', 'mill'] },
+    shepherd: { ratePerSecond: 0.33, capacity: 10, dropSites: ['town-center', 'mill'] },
+    fisher: { ratePerSecond: 0.43, capacity: 10, dropSites: ['town-center', 'mill', 'dock'] },
+    lumberjack: { ratePerSecond: 0.39, capacity: 10, dropSites: ['town-center', 'lumber-camp'] },
+    goldminer: { ratePerSecond: 0.38, capacity: 10, dropSites: ['town-center', 'mining-camp'] },
+    stonemason: { ratePerSecond: 0.36, capacity: 10, dropSites: ['town-center', 'mining-camp'] },
   },
   repairCostFraction: { building: 0.5, unit: 0.5 },
+  playerAttributes: {},
   terrainRestrictions: {
     3: [1, 2, 4, 22, 23, 35, 59], 15: [1, 2, 4, 22, 23, 35, 59], 30: [1, 2, 4, 22, 23, 35, 59],
     1: FALLBACK_LAND_TERRAINS, 4: FALLBACK_LAND_TERRAINS, 7: FALLBACK_SHORE_TERRAINS,
@@ -1294,6 +1304,8 @@ export const FALLBACK_RULES: GameRules = {
 };
 
 interface ManifestEntity {
+  accepts?: ResourceKind[];
+  acceptsLivestock?: boolean;
   hillMode?: number;
   minimapMode?: number;
   projectile?: { hitMode?: number; vanishMode?: number };
@@ -1350,7 +1362,7 @@ interface ManifestEntity {
   foodAmount?: number;
   foodDecayPerSecond?: number;
   requires?: string[];
-  gather?: { resource: ResourceKind; ratePerSecond: number; capacity: number; classFactors?: Record<string, number>; trapFactor?: number };
+  gather?: { resource: ResourceKind; ratePerSecond: number; capacity: number; classFactors?: Record<string, number>; trapFactor?: number; dropSites?: number[] };
   dropSites?: number[];
   class?: number;
   trade?: { ratePerSecond: number; capacity: number; buildingId: number };
@@ -1387,10 +1399,14 @@ interface ManifestTech {
 
 export interface ContentManifest {
   entities: Record<string, ManifestEntity>;
+  /** Complete per-civilisation profiles; no implicit inheritance from a rival. */
+  civilizations?: Record<string, Omit<ContentManifest, 'civilizations'> & { civilization: CivilizationRules }>;
   technologies?: Record<string, ManifestTech>;
   civilization?: CivilizationRules & { datIndex?: number; treeFile?: string };
-  /** Where each modelled player attribute starts, from the civ's own table. */
-  playerAttributes?: Partial<Record<PlayerAttribute, number>>;
+  /** All named initial player attributes, including unmodelled mechanics. */
+  playerAttributes?: Partial<Record<string, number>>;
+  /** Manifest key -> DAT resource index, named by the owned Constants.xs. */
+  playerAttributeIds?: Record<string, number>;
   /** Per restriction row, the shipped terrain ids it may stand on. */
   terrainRestrictions?: Record<string, number[]>;
 }
@@ -1492,7 +1508,9 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
           trapFactor: e[key].gather!.trapFactor,
         }
         : fallback?.gather,
-      dropSites: e[key].dropSites && fallback?.dropSites
+      dropSites: e[key].gather?.dropSites !== undefined
+        ? e[key].gather!.dropSites!.map(id => buildingKindOf.get(id)).filter((kind): kind is BuildingKind => !!kind)
+        : e[key].dropSites && fallback?.dropSites
         ? e[key].dropSites!.map(id => buildingKindOf.get(id)).filter((kind): kind is BuildingKind => !!kind)
         : fallback?.dropSites,
     };
@@ -1537,7 +1555,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       armors: attackValues(e[key].combat?.armors),
       // Which resources a drop site takes, what a farm holds, and whether a
       // building shoots are gameplay roles, not DAT fields the importer reads.
-      accepts: fallback.accepts,
+      accepts: e[key].accepts ?? fallback.accepts,
+      acceptsLivestock: e[key].acceptsLivestock,
       farmAmount: e[key].storage?.food ?? fallback.farmAmount,
       buildButton: e[key].build?.button ?? fallback.buildButton,
       // The DAT's collision box is a pair of half-extents; only a gate's two
@@ -1595,10 +1614,10 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
         : e['villager-fisher']?.gather?.ratePerSecond ?? FALLBACK_RULES.nodes[fallbackKey].villagerRatePerSecond,
     };
   };
-  return {
+  const result: GameRules = {
     origin: 'imported',
-    // The importer reads one civilisation's units and one civilisation's tree,
-    // so the content names which; without it, nothing is withheld.
+    // Each profile names its own units and tree. The root is also Gaia/map
+    // input; alternative profiles never inherit its player-specific rules.
     civilization: manifest.civilization
       ? {
         key: manifest.civilization.key,
@@ -1763,17 +1782,30 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       return [task, {
         ratePerSecond: gather?.ratePerSecond ?? fallback.ratePerSecond,
         capacity: gather?.capacity ?? fallback.capacity,
+        dropSites: gather?.dropSites !== undefined
+          ? gather.dropSites.map(id => buildingKindOf.get(id)).filter((kind): kind is BuildingKind => !!kind)
+          : fallback.dropSites,
       }];
     })) as Record<VillagerGatherTask, VillagerGatherRules>,
     repairCostFraction: {
       building: manifest.playerAttributes?.buildingRepairCost ?? FALLBACK_RULES.repairCostFraction.building,
       unit: manifest.playerAttributes?.unitRepairCost ?? FALLBACK_RULES.repairCostFraction.unit,
     },
+    playerAttributes: { ...manifest.playerAttributes },
     technologies: technologies(manifest, e),
     terrainRestrictions: manifest.terrainRestrictions
       ? Object.fromEntries(Object.entries(manifest.terrainRestrictions).map(([row, ids]) => [Number(row), ids]))
       : FALLBACK_RULES.terrainRestrictions,
   };
+  if (manifest.civilizations) {
+    result.civilizations = Object.fromEntries(Object.entries(manifest.civilizations).map(([key, profile]) => {
+      if (profile.civilization?.key !== key || key === result.civilization.key) {
+        throw new Error(`invalid civilisation profile ${key}`);
+      }
+      return [key, rulesFromManifest({ ...profile, civilizations: undefined })];
+    }));
+  }
+  return result;
 }
 
 /**

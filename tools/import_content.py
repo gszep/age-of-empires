@@ -1007,21 +1007,48 @@ ATTRIBUTE_NAMES = {
 PACKED_ATTRIBUTES = {"armor", "attack"}
 OPERATION_NAMES = {0: "set", 4: "add", 5: "multiply"}
 
-# Effect command type 1 changes a *player* attribute rather than a unit's, and
-# addresses it by resource id. The civ's own `resources` table holds the
-# starting value, which is how a number nobody could find turns out to be
-# stated: a farm's food is resource 36 and civ 1 starts it at 175, exactly the
-# figure the open fallback had hand-written. Horse Collar adds 75 to it and
-# Heavy Plow 125, which is the whole of what those technologies do here.
-RESOURCE_ATTRIBUTES = {
-    36: "farmFoodAmount",
-    # Constants.xs: cAttributeUnitRepairCost 270, cAttributeBuildingRepairCost
-    # 271 -- the fraction of the price a full repair costs (issue #74).
-    270: "unitRepairCost",
-    271: "buildingRepairCost",
-}
+# Importing a starting value does not implement the mechanic. Only these
+# attributes have simulation consumers for research effects (issue #53).
+SUPPORTED_PLAYER_ATTRIBUTES = {"farmFoodAmount", "unitRepairCost", "buildingRepairCost"}
 # `b` on a type 1 command: 0 writes the value, 1 adds to it.
 RESOURCE_OPERATIONS = {0: "set", 1: "add"}
+
+
+def player_attribute_ids(text: str) -> dict[str, int]:
+    """Names from Constants.xs's Attributes section, not its later effect enums.
+
+    Keep the existing farmFoodAmount manifest spelling for cAttributeFarmFood;
+    every other key lowercases only the first letter of the owned name.
+    """
+    section = re.search(r"// Attributes\s*\n(.*?)// Player Age\b", text, re.DOTALL)
+    if section is None:
+        raise ValueError("Constants.xs: missing Attributes / Player Age section boundaries")
+    result: dict[str, int] = {}
+    for line in section[1].splitlines():
+        declaration = line.split("//", 1)[0].strip()
+        if not declaration:
+            continue
+        match = re.fullmatch(r"extern\s+const\s+int\s+cAttribute(\w+)\s*=\s*(\d+)\s*;", declaration)
+        if match is None:
+            raise ValueError(f"Constants.xs: unsupported player attribute declaration: {declaration}")
+        source_name, index = match.groups()
+        name = "farmFoodAmount" if source_name == "FarmFood" else source_name[0].lower() + source_name[1:]
+        if name in result:
+            raise ValueError(f"Constants.xs: duplicate player attribute {name}")
+        result[name] = int(index)
+    if not result:
+        raise ValueError("Constants.xs: empty player attribute table")
+    return dict(sorted(result.items()))
+
+
+def player_attributes(resources: list[float], ids: dict[str, int]) -> dict[str, float]:
+    """The configured civilisation's initial values; never guess an absent slot."""
+    result = {}
+    for name, index in ids.items():
+        if not 0 <= index < len(resources):
+            raise ValueError(f"player attribute {name}: resource {index} outside DAT table ({len(resources)})")
+        result[name] = rounded(resources[index])
+    return result
 
 
 def slug(name: str) -> str:
@@ -1033,8 +1060,8 @@ def slug(name: str) -> str:
 
 
 def effects_of(
-    dat: DatFile, tech_id: int, entities: dict[str, Any]
-) -> tuple[list[dict[str, Any]], list[str]]:
+    dat: DatFile, tech_id: int, entities: dict[str, Any], attribute_ids: dict[str, int],
+) -> tuple[list[dict[str, Any]], list[str], list[str]]:
     """Decode one technology's effect commands against the entities we have.
 
     A command is addressed either to a unit (`a`) or to a whole unit class
@@ -1061,6 +1088,7 @@ def effects_of(
             by_class.setdefault(entity["class"], []).append(key)
 
     effects: list[dict[str, Any]] = []
+    resource_names = {index: name for name, index in attribute_ids.items()}
     unmodelled: set[str] = set()
     unreached: set[str] = set()
     for command in (dat.effects[tech.effect_id].effect_commands if tech.effect_id >= 0 else []):
@@ -1068,10 +1096,12 @@ def effects_of(
             # A player attribute: `a` names the resource, `b` chooses write or
             # add, `d` is the amount. `c` is a bookkeeping slot this does not
             # read.
-            resource = RESOURCE_ATTRIBUTES.get(int(command.a))
+            resource = resource_names.get(int(command.a))
             resource_operation = RESOURCE_OPERATIONS.get(int(command.b))
-            if resource is None or resource_operation is None:
-                unreached.add(f"resource {int(command.a)} at the player level")
+            if resource not in SUPPORTED_PLAYER_ATTRIBUTES or resource_operation is None:
+                name = f" ({resource})" if resource is not None else ""
+                reason = "not modelled" if resource not in SUPPORTED_PLAYER_ATTRIBUTES else f"unsupported operation {int(command.b)}"
+                unreached.add(f"resource {int(command.a)}{name} at the player level: {reason}")
                 continue
             effects.append({
                 "resource": resource,
@@ -1115,7 +1145,8 @@ def effects_of(
 
 
 def technology_entry(
-    dat: DatFile, spec: dict[str, Any], hashes: dict[str, str], strings: dict[int, str] | None = None,
+    dat: DatFile, spec: dict[str, Any], hashes: dict[str, str], attribute_ids: dict[str, int],
+    strings: dict[int, str] | None = None,
 ) -> dict[str, Any]:
     """One researchable technology: what it costs, where, and what it changes."""
     tech = dat.techs[spec["techId"]]
@@ -1153,7 +1184,7 @@ def technology_entry(
 
     # What it changes, decoded from the effect commands against the entities
     # this game actually has, rather than transcribed into the spec.
-    effects, unmodelled, unreached = effects_of(dat, spec["techId"], spec["entities"])
+    effects, unmodelled, unreached = effects_of(dat, spec["techId"], spec["entities"], attribute_ids)
     if effects:
         entry["effects"] = effects
     if unmodelled or (effects and unreached):
@@ -1247,6 +1278,7 @@ def technologies_from_tree(
     entities: dict[str, Any],
     civilization: dict[str, Any],
     hashes: dict[str, str],
+    attribute_ids: dict[str, int],
     strings: dict[int, str] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
     """Every technology the civilisation's tree offers that this game can hold.
@@ -1305,7 +1337,7 @@ def technologies_from_tree(
                             "reason": "the DAT gives it no research location or no effect"})
             continue
         entry = technology_entry(
-            dat, {"techId": tech_id, "entities": entities}, hashes, strings
+            dat, {"techId": tech_id, "entities": entities}, hashes, attribute_ids, strings
         )
         commands = list(dat.effects[tech.effect_id].effect_commands) if tech.effect_id >= 0 else []
         # Heavy Warships (35) has no effect itself: automatic technologies
@@ -1562,6 +1594,64 @@ def skin_chances(dat_path: Path, entities: dict[str, Any], hashes: dict[str, str
             entity["chance"] = replaced_by[entity["id"]]
 
 
+def import_drop_sites(
+    dat_path: Path, civ_units: Any, entities: dict[str, Any], hashes: dict[str, str],
+) -> None:
+    """Intersect worker DAT sites with dropsites.json's worker/target rows.
+
+    The base villager's sites are not the lumberjack's or fisher's. Keep the
+    raw DAT list for provenance; gather.dropSites is the modelled intersection.
+    Farms appear in the JSON but not in the farmer's DAT return-site list.
+    """
+    path = dat_path.parent / "dropsites.json"
+    rows = json.loads(path.read_text())["drop_site_list"]
+    hashes["dropsites.json"] = sha256(path)
+    resources = {**RESOURCE_NAMES, 15: "food", 16: "food"}  # XS Meat/Berries -> food stockpile
+    buildings = {e["id"]: e for e in entities.values() if e.get("category") == "building"}
+    # Task targets include Gaia-only resources: their slots in a player's unit
+    # table may be absent. The already extracted entity has the correct origin.
+    target_classes = {e["id"]: e["class"] for e in entities.values() if "id" in e and "class" in e}
+    accepted: dict[int, set[str]] = {index: set() for index in buildings}
+    for index, building in buildings.items():
+        building["acceptsLivestock"] = any(row["building_id"] == index and row.get("accepts_livestock", False) for row in rows)
+    for worker in entities.values():
+        gather = worker.get("gather")
+        if not gather:
+            continue
+        unit = civ_units[worker["id"]]
+        classes: set[int] = set()
+        for task in unit.bird.tasks:
+            if task.action_type != gather["task"]["actionType"]:
+                continue
+            resource = resources.get(task.resource_out if task.resource_out >= 0 else task.resource_in)
+            if resource != gather["resource"]:
+                continue
+            if task.class_id >= 0:
+                classes.add(task.class_id)
+            if task.unit_id in target_classes:
+                classes.add(target_classes[task.unit_id])
+            elif task.unit_id >= 0 and civ_units[task.unit_id] is not None:
+                classes.add(civ_units[task.unit_id].class_)
+        sites: set[int] = set()
+        for row in rows:
+            index = row["building_id"]
+            if index not in buildings or index not in worker.get("dropSites", []):
+                continue
+            if "worker_object_group" in row and row["worker_object_group"] != worker["class"]:
+                continue
+            if "worker_object_list" in row and worker["id"] not in row["worker_object_list"]:
+                continue
+            if not any(target.get("object_group") in classes
+                       and resources.get(target.get("attribute_type")) == gather["resource"]
+                       for target in row["target_list"]):
+                continue
+            sites.add(index)
+            accepted[index].add(gather["resource"])
+        gather["dropSites"] = sorted(sites)
+    for index, building in buildings.items():
+        building["accepts"] = [resource for resource in ("food", "wood", "gold", "stone") if resource in accepted[index]]
+
+
 def extract(
     dat_path: Path,
     graphics_dir: Path,
@@ -1583,6 +1673,12 @@ def extract(
     dat = DatFile.parse(dat_path)
     graphics = Graphics.of(graphics_dir, uhd_dir)
     hashes: dict[str, str] = {"dat": sha256(dat_path)}
+    constants_path = dat_path.parent.parent / "xs/Constants.xs"
+    attribute_ids = player_attribute_ids(constants_path.read_text(encoding="utf-8-sig"))
+    hashes["xs/Constants.xs"] = sha256(constants_path)
+    attributes = player_attributes(dat.civs[spec["civIndex"]].resources, attribute_ids)
+    if not SUPPORTED_PLAYER_ATTRIBUTES.issubset(attributes):
+        raise ValueError("Constants.xs: missing supported player attributes")
     strings: dict[int, str] | None = None
     if strings_path is not None and strings_path.is_file():
         strings = read_strings(strings_path)
@@ -1595,6 +1691,7 @@ def extract(
         )
     for effect_spec in spec.get("effects", []):
         entities[effect_spec["key"]] = effect_entry(dat, graphics, effect_spec, hashes)
+    import_drop_sites(dat_path, dat.civs[spec["civIndex"]].units, entities, hashes)
     # The particle definitions the buildings' fires name, from the directory
     # beside the DAT's.
     flame_names = {
@@ -1609,7 +1706,7 @@ def extract(
     skin_chances(dat_path, entities, hashes)
     civilization = civilization_entry(dat, dat_path, spec, hashes, strings)
     technologies, skipped_technologies = technologies_from_tree(
-        dat, dat_path, spec, entities, civilization, hashes, strings
+        dat, dat_path, spec, entities, civilization, hashes, attribute_ids, strings
     )
     by_tech_id = {value["techId"]: key for key, value in technologies.items()}
     by_unit_id = {value["id"]: value for value in entities.values() if value.get("category") in ("unit", "building")}
@@ -1684,13 +1781,14 @@ def extract(
         "ages": ages_of(dat_path, strings),
         "audio": spec.get("audio", {}),
         "civilization": civilization,
-        # Where a player-level attribute starts, from the civ's own resource
-        # table. A farm's food has always been 175 here and was hand-written;
-        # it is resource 36, and the DAT has been stating it all along.
-        "playerAttributes": {
-            name: rounded(dat.civs[spec["civIndex"]].resources[resource_id])
-            for resource_id, name in sorted(RESOURCE_ATTRIBUTES.items())
-        },
+        # Complete additional player profiles. The catalogue contract is in
+        # place; source-verified roster/art/bonus imports must populate it before
+        # another civilisation is offered (#122/#123).
+        "civilizations": {},
+        # Complete named initial table, including attributes whose mechanics
+        # are not yet modelled. IDs and source hash keep each value traceable.
+        "playerAttributes": attributes,
+        "playerAttributeIds": attribute_ids,
         "technologies": technologies,
         "particles": particles,
         # The reference's own words for a refused order (issue #70): the

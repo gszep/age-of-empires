@@ -23,7 +23,9 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
 2. `import_content.py` reads the declarative `import-spec.json` and extracts the
    entities, technologies, ages, civilisation and player attributes from the
    patch-matched DAT and the JSON beside it (`eras.json`, `objreplacement.json`,
-   `civilizations.json`), with the reference's names, button text and tooltips
+    `civilizations.json`), plus the complete named initial player-attribute table
+    from `xs/Constants.xs` and the configured civilisation's DAT resources (#53),
+    with the reference's names, button text and tooltips
     from `--strings` (`resources/en/strings/key-value/key-value-strings-utf8.txt`).
     Current metadata also includes node `placementSideTerrain`, building
     `minimapMode`, and `shadows` from the owned `colorcorrection.json` Default
@@ -63,8 +65,11 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
 4. `import_ui.py` extracts the WEST widget-UI subset (resource/command/map/
    bottom/menu/score panels, materials, entity + action + stat icons,
    click-sound aliases from `sounds.json`, `UIColors.json`, and the faces the
-   spec names from `--fonts`) into `public/imported/aoe2/ui/`, converting DDS
-   through Pillow and copying PNG and TTF byte-identically.
+    spec names from `--fonts`) into `public/imported/aoe2/ui/`, converting DDS
+    through Pillow and copying PNG and TTF byte-identically.
+    It also copies the spec's native CUR files from `--cursors` (default beside
+    the sounds DAT directory), retaining actual header dimensions/hotspots and
+    source hashes. File suffixes are not size metadata: `flag32x32.cur` is 48×48.
 5. `import_blends.py` publishes the classic blendomatic masks plus square DE
    water-family windows from `terrain/blends/{watershore,waterwater,shallowswater}.png`.
    `blends.native` carries their dimensions/gutters/modes; source hashes are in
@@ -130,6 +135,7 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | whether Delete asks first, and what a monk may not take | `unit.creatable.hero_mode`, a flag field: 1 full heal, **2 cannot be converted**, 4 regenerates, 8 defensive stance, 16 protected formation, **32 asks before Delete**, 64 hero glow. Reads 0, 32 or 34 across this roster: the town center, watch tower, monastery, castle and wonder ask; the town center, monastery, castle and wonder cannot be converted (issue #47) |
 | what a blast may hurt | `unit.type_50.blast_attack_level` on the shooter against `unit.blast_defense_level` on the bystander — hit when defense ≥ attack. Units 3, buildings 2, trees 1, bushes and mines 0; mangonel 2, onager line and trebuchet 1 (issue #46) |
 | villager tasks (gather/build) | `unit.bird.tasks[*]` — `.action_type`, `.class_id`, `.unit_id`, `.resource_in/_out`; rates on `unit.bird.work_rate`; drop-offs in `unit.bird.drop_sites` |
+| drop-site acceptance | `resources/_common/dat/dropsites.json`: intersect `building_id`, `worker_object_group`/`worker_object_list`, target `object_group`/`attribute_type` with each gather variant's DAT `bird.drop_sites` and same-action gather tasks. Targets such as gold 66 and stone 102 are Gaia-only; use the already extracted entity's `class`, not the player's possibly empty unit slot. `gather.dropSites` is the resolved imported-building subset; raw `dropSites` remains provenance. Building `accepts` is the supported resource union, including authoritative empty lists. XS Meat 15/Berries 16/Fish 17 normalize to food. `acceptsLivestock` is metadata; target-state flags are not simulated (#52) |
 | carried resources | `unit.resource_storages`, `unit.resource_capacity` |
 | naval capacity, volleys and fish traps | `unit.garrison_capacity` (transport 545: 20), `unit.creatable.total_projectiles` (Hulk 2626: 3); trap food is `dat.civs[n].resources[88]` (700), not trap 199's 15-food storage; fishing-ship tasks name trap gather/build factors in `work_value_1` |
 | composite ship art | `graphic.deltas` plus `offset_x/_y` and `graphic.layer`; W/X placeholder parents and SLP -1 parents may have no source despite a filename. File-bearing hull/sail children have independent frame clocks; `naval.graphic_layers` resolves them |
@@ -143,12 +149,14 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | a unit's build slot in the villager menu | `unit.creatable.train_locations[*].button_id` — the DAT states the *slot*; which page it is on is engine behaviour, and two buildings share a slot only when they are on different pages |
 | a technology's cost, time and place | `tech.resource_costs`; `tech.research_locations[*].location_id` and `.research_time` — **not** `tech.research_time`, which does not exist |
 | what a technology does | `dat.effects[tech.effect_id].effect_commands` — **not** `.effect_configs`. `command.type`: 0 set, 1 **resource modifier** (player attribute: `a` = resource id, `b` = 0 set / 1 add, `d` = amount), 2 enable unit, 3 upgrade unit, 4 add, 5 multiply |
-| where a player attribute starts | `dat.civs[i].resources[id]` — a farm's food is resource 36 and starts at 175, which is why the mill's technologies can change it |
+| where a player attribute starts | `dat.civs[i].resources[id]`, with names/indices from the **Attributes** section of `resources/_common/xs/Constants.xs` (later `cAttributeSet/Enable/...` are effect enums, not player attributes). Published as `playerAttributes` plus `playerAttributeIds`, with the XS SHA-256. Keys lowercase the first letter only; legacy `farmFoodAmount` retains the spelling for `cAttributeFarmFood` (36). Preserve zeros, negatives and the source's spelling, including `startingScoutID`. Reject absent DAT slots rather than substituting defaults (#53) |
+| civilisation effects and automatic technology gates | `dat.civs[i].tech_tree_id` and `.team_bonus_id` index **effects**, not technologies. `dat.techs[t].civ`, `.required_techs`, `.required_tech_count`, `.research_locations[*].location_id` distinguish civ-specific automatic candidates from research. A positive required count with only -1 slots is not an unconditional bonus. The pinned `civilizations.json` list pairs with DAT order for inventory, but alternate-era metadata can reference another civ's unique techs (Achaemenid entries reuse Italian IDs); the audit records these rather than importing them as rules (#122/#123) |
 | elevation modifiers, not the base hill rule | `dat.civs[i].resources[211/212/272/273]`; owned `Constants.xs` names attack higher/lower and damage higher/lower. All four are 0 for Gaia/Britons/Franks. Tatar elevation effect adds 0.25 to resource 211; Georgian defense effect adds −0.15 to 273. Do not mistake these for the base ×1.25/×0.75 engine rule (#134) |
 | a terrain slot | `dat.terrain_block.terrains[i]` — `.name_2` is the texture, `.terrain_dimensions` the frame grid, `.frame_data[0].frame_count` the flat-tile frames (always the product of the dimensions), `.blend_type`/`.blend_priority`, `.colors` three `original.pal` indices — the minimap shade for a tile sloping up, flat, and sloping down (flat is `[1]`), `.is_water` the water class (4 shallow, 1 medium, 2 deep, 8 walkable shallows, 16 beach, 32 land) |
 | a unit's minimap dot | `unit.minimap_color`, an `original.pal` index (may be negative: take it mod 256); gaia's resources and animals carry one, trees 0 |
 | a task's numbers | `bird.tasks[*].work_value_1/_2` and `.work_range` — note the underscores; there is no `work_value1` or `target_diff` |
 | a unit's class | `unit.class_` with the trailing underscore; `unit.unit_class` does not exist |
+| DAT unit type | `unit.type` (archery range 87 = 80, building); distinct from `.class_`. The civilisation audit distinguishes a building's production `workRate` from a villager task's gathering consumer |
 | an attack or armour | `unit.type_50.attacks[*]` / `.armours[*]` — `.class_` and `.amount`; there is no `.type`, and `armours` is British-spelled |
 | whether anything walks round a building | `unit.collision_size_z` (0 means no height to walk into) **and** `unit.obstruction_class` (0) **and** no annexes. All three: the town center reads 0 and 0 like a farm, and obstructs through its four annexes (see `docs/ledger.md`, issue #40) |
 | a building's annexes | `unit.building.annexes[*].unit_id`, with 0 meaning an empty slot |
@@ -175,9 +183,33 @@ asks the stricter question against the importers alone). Run it before
 writing "not in the owned files" anywhere: the same audit by hand found
 sixteen gaps in an hour on 2026-09-17.
 
+`uv run --locked python tools/audit_civilizations.py --markdown .local/civilizations-audit.md`
+inventories every owned civilisation against the current roster/decoder without
+publishing assets or enabling unsupported civilisations. It writes detailed JSON
+and a Markdown coverage matrix under `.local/`; the interpretation and first
+mixed-civilisation acceptance plan are in `docs/civilization-coverage.md`.
+
+The published manifest's `civilization`/`entities`/`technologies` describe the
+root/default profile. `civilizations` is an additional catalogue keyed by each
+profile's `civilization.key`; entries contain complete rule metadata rather than
+inheriting the root player's values. It is currently empty in owned regeneration.
+The runtime and private mixed-profile smoke support it; source-matched Frankish
+roster, art, bonuses and selection must be completed before populating it.
+
 `tools/datq.py` reloads the whole DAT on every invocation, which takes tens of
 seconds. Asking it more than two or three questions is slower than writing a
 one-shot script that parses once and prints everything you want.
+
+The named table is **initial data**, not live food/population/score counters.
+`rules.ts`'s `playerAttributeFor` reads it and applies completed research in
+completion order. Farm capacity and unit/building repair costs consume this
+lookup; open rules and older snapshots retain their existing field fallbacks.
+Importing a name does not implement its mechanic: `SUPPORTED_PLAYER_ATTRIBUTES`
+in `import_content.py` gates type-1 effects to those three consumers. Other
+effects remain in `unmodelled`/`skippedTechnologies`, now with names as well as
+resource IDs. To add a supported attribute, wire the gameplay consumer and
+verify its observable outcome before extending that set and the TypeScript
+`PlayerAttribute` union. New mechanics such as relic income remain separate work.
 
 When a needed field is missing here, look it up once —
 `uv run --locked python tools/datq.py fields 'dat.civs[1].units[128]'`

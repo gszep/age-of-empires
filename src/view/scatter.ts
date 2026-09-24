@@ -16,6 +16,7 @@
  * wood. Which object each pass strews is the biome's, from `MAP_CONSTANTS`.
  */
 import * as THREE from 'three/webgpu';
+import { spriteLayerOrder } from './render-order';
 import { ARABIA_BIOMES, TERRAIN_BEACH, isOpenWater, type BiomeSpec } from '../sim/mapgen';
 import { random01, seedFrom } from '../sim/random';
 import type { GameState, ReadonlyGameState, PlayerId } from '../sim/types';
@@ -168,7 +169,7 @@ export function createScatter(state: ReadonlyGameState, assets: ContentAssets | 
     mesh.position.set(iso.x + w / 2 - frame.cx / scale, iso.y - h / 2 + frame.cy / scale, 0);
     // Among the entity bodies, at its own depth, so a villager walks in
     // front of a bush and behind the next one.
-    mesh.renderOrder = 1000 + isoDepth(x, y) * 10;
+    mesh.renderOrder = spriteLayerOrder(isoDepth(x, y));
     mesh.name = `scatter-${key}`;
     group.add(mesh);
   }

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGame } from './sim/game';
 import { checksumState } from './sim/checksum';
 import { loadSession, loadSessionSetup, saveSession } from './dev-session';
+import { FALLBACK_RULES } from './sim/data';
 
 beforeEach(() => {
   const data = new Map<string, string>();
@@ -29,4 +30,15 @@ it('keeps older matches playable without inventing a seed for them', () => {
   expect(loadSessionSetup(state.rules)).toBeUndefined();
   saveSession(state, { map: 'arabia', seed: 2 });
   expect(loadSessionSetup(state.rules)).toBeUndefined();
+});
+
+it('restores mixed selections only while both civilisation rulesets remain loaded', () => {
+  const rules = structuredClone(FALLBACK_RULES);
+  const other = structuredClone(FALLBACK_RULES);
+  other.civilization.key = 'fixture-other';
+  rules.civilizations = { 'fixture-other': other };
+  const state = createGame(122, rules, { 1: 'open', 2: 'fixture-other' });
+  saveSession(state);
+  expect(loadSession(rules)?.players[2].civilization).toBe('fixture-other');
+  expect(loadSession(FALLBACK_RULES)).toBeUndefined();
 });

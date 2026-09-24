@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
 import { observe } from './sim/observe';
-import { TRAINING_QUEUE_LIMIT, applyCommand as applyLocalCommand, buildingFootprint, createGame, gameTimeSeconds, isCarcass, isRepairable, placementLegal, queuedCount, shortfall, stepGame, upgradedAway, notYetUpgradedInto } from './sim/game';
+import { TRAINING_QUEUE_LIMIT, applyCommand as applyLocalCommand, buildingFootprint, civHas, createGame, gameTimeSeconds, isCarcass, isRepairable, placementLegal, planContextCommand, queuedCount, shortfall, stepGame, trainableUnitsAt, rulesForPlayer } from './sim/game';
 import { connectSharedMatch } from './shared/client';
 import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, rulesFromManifest, type AttackValue, type ContentManifest, type Cost, type GameRules, type TechKey, type UnitRules } from './sim/data';
 import { MAPS } from './sim/mapgen';
@@ -11,7 +11,7 @@ import { checksumState } from './sim/checksum';
 import type { MatchRecord } from './protocol/types';
 import type { BuildingKind, Entity, GameState, PlayerId, Point, UnitKind } from './sim/types';
 import { buildMenu, type BuildPage } from './view/build-menu';
-import { sameKindOnScreen } from './view/selection';
+import { contextTargets, sameKindOnScreen } from './view/selection';
 import { clearSession, loadSession, loadSessionSetup, saveSession } from './dev-session';
 import { loadMapPreference, saveMapPreference, mapChoices, validMatchSetup, MAX_MAP_SEED, type MatchSetup } from './match-setup';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
@@ -20,6 +20,7 @@ import { buildingRulesFor, unitRulesFor } from './sim/rules';
 import { gridKey, placeCommands } from './view/command-grid';
 import type { ResourceStatus, ScoreRow } from './view/hud';
 import { costLabel, displayName as nameFrom, plainHelp } from './view/names';
+import { contextCursor, cursorCss } from './view/cursors';
 import { artKey, chooseAnimation, createEntityView, refreshEntityTextures, dimFogSnapshot, gatherTargetResource, playerColorHex, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline, elevatedWorldToIso, elevationAt, ELEVATION_PIXELS } from './view/world';
 import { createScatter, fillScatter } from './view/scatter';
@@ -100,6 +101,7 @@ loading.remove();
 const localPlayer: PlayerId = shared?.player ?? 1;
 if (shared) rules = shared.state.rules;
 let game = shared?.state ?? restored ?? createGame(initialSetup.seed, rules, undefined, initialSetup.map);
+const playerRules = (owner: Entity['owner'] = localPlayer): GameRules => rulesForPlayer(game, owner);
 let activeSetup: MatchSetup = shared?.setup ?? (restored ? savedSetup : undefined) ?? initialSetup;
 let setupKnown = shared ? shared.setup !== undefined : !restored || savedSetup !== undefined;
 const renderPosition = (entity: Entity): Point => shared?.renderPosition(entity) ?? entity.position;
@@ -108,7 +110,12 @@ const renderEntity = (entity: Entity): Entity => {
   return position === entity.position ? entity : { ...entity, position };
 };
 let presentationRebuilds = 0;
-const applyCommand: typeof applyLocalCommand = (state, command) => shared ? shared.command(command) : applyLocalCommand(state, command);
+let cursorStamp = '';
+const applyCommand: typeof applyLocalCommand = (state, command) => {
+  const result = shared ? shared.command(command) : applyLocalCommand(state, command);
+  cursorStamp = ''; // commands may change hover meaning even while paused
+  return result;
+};
 if (restored) console.info(`[dev] resumed match at tick ${restored.tick}; menu restart starts a new one`);
 let selectedIds: number[] = [];
 let buildMode: BuildingKind | undefined;
@@ -339,12 +346,13 @@ function acknowledge(): void {
 
 /** A stand-in entity so the preview reuses the normal building rendering. */
 function ghostEntity(kind: BuildingKind, at: Point): Entity {
+  const rules = playerRules();
   return {
     id: 0, kind, owner: localPlayer, position: at,
     hp: 1, maxHp: 1, radius: rules.buildings[kind].radius,
     activity: 'idle', order: { kind: 'idle' },
     ...(rules.buildings[kind].footprint
-      ? { footprint: buildingFootprint(game, kind, orientationOf(kind, at)) }
+      ? { footprint: buildingFootprint(game, kind, orientationOf(kind, at), localPlayer) }
       : {}),
   };
 }
@@ -497,7 +505,8 @@ function restart(setup: MatchSetup | undefined = setupKnown ? activeSetup : unde
   clearSession();
   activeSetup = setup;
   setupKnown = true;
-  game = createGame(setup.seed, rules, undefined, setup.map);
+  game = createGame(setup.seed, rules,
+    { 1: game.players[1].civilization, 2: game.players[2].civilization }, setup.map);
   saveMapPreference(setup);
   saveSession(game, setup);
   paused = false;
@@ -539,13 +548,14 @@ function selectIdleVillager(): void {
 const BATCH_TRAIN_COUNT = 5;
 
 function runUiCommand(id: string, shift = false): void {
+  const rules = playerRules();
   if (replay) return;
   const selection = ownSelected();
   if (id.startsWith('build-')) {
     const kind = id.slice('build-'.length) as BuildingKind;
     // The reference lets the press through and says what is short rather
     // than greying the button (issue #70); nothing is placed until it is paid.
-    const short = shortfall(game, localPlayer, rules.buildings[kind].cost);
+    const short = shortfall(game, localPlayer, buildingRulesFor(game, localPlayer, kind).cost);
     if (short) { reject(`not enough ${short}`); return; }
     if (kind === buildMode && rules.buildings[kind].footprint) {
       gateOrientation = gateOrientation === 'x' ? 'y' : 'x';
@@ -672,16 +682,16 @@ function screenToWorld(clientX: number, clientY: number): Point {
 function pickEntity(point: Point): Entity | undefined {
   let best: Entity | undefined;
   let bestDistance = Infinity;
-  for (const entity of game.entities) {
+  for (const candidate of contextTargets(game, localPlayer, revealMap)) {
+    const entity = candidate.entity as Entity;
     // A carcass is still food, and a player is entitled to click it and read
     // how much is left; a corpse with nothing on it stays unclickable, so a
     // battlefield of dead soldiers never gets in the way of the living.
     if (entity.dead && !isCarcass(entity)) continue;
-    if (!revealMap && entity.owner !== localPlayer && entity.owner !== 0 && !isTileVisible(game, localPlayer, entity.position.x, entity.position.y)) continue;
     // Nearest to the click wins, carcass or not. Preferring the living sounds
     // reasonable and is not: villagers eating a carcass stand right on it, so
     // any bias at all puts the corpse back out of reach, which is the bug.
-    const at = renderPosition(entity);
+    const at = candidate.remembered ? entity.position : renderPosition(entity);
     const d = Math.hypot(at.x - point.x, at.y - point.y) - entity.radius;
     if (d < Math.min(bestDistance, 0.9)) {
       best = entity;
@@ -720,7 +730,7 @@ let wallStart: Point | undefined;
 let gateOrientation: 'x' | 'y' = 'x';
 
 function orientationOf(kind: BuildingKind, at: Point): 'x' | 'y' {
-  if (!rules.buildings[kind].footprint) return 'x';
+  if (!playerRules().buildings[kind].footprint) return 'x';
   const joins = (dx: number, dy: number) => game.entities.some(e => !e.dead && e.owner === localPlayer
     && e.kind === 'palisade-wall'
     && Math.abs(e.position.x - (at.x + dx)) < 0.6 && Math.abs(e.position.y - (at.y + dy)) < 0.6);
@@ -730,7 +740,7 @@ function orientationOf(kind: BuildingKind, at: Point): 'x' | 'y' {
 }
 
 function placeBuilding(kind: BuildingKind, targets: Point[]): void {
-  const builders = ownSelected().filter(e => e.kind === (rules.buildings[kind].builderKind ?? 'villager')).map(e => e.id);
+  const builders = ownSelected().filter(e => e.kind === (playerRules().buildings[kind].builderKind ?? 'villager')).map(e => e.id);
   if (!builders.length) { reject('Select a villager first'); return; }
   let failure: string | undefined;
   for (const target of targets) {
@@ -756,7 +766,7 @@ renderer.domElement.addEventListener('pointerdown', event => {
     }
     if (buildMode && isWall(buildMode) && !replay) {
       // A wall is dragged: the first press only anchors the line.
-      wallStart = snapPlacement(point, rules.buildings[buildMode].radius);
+      wallStart = snapPlacement(point, playerRules().buildings[buildMode].radius);
       return;
     }
     if (buildMode && !replay) {
@@ -781,7 +791,13 @@ renderer.domElement.addEventListener('pointerdown', event => {
     contextOrder(point, event.clientX, event.clientY, event.shiftKey);
   }
 });
+let pointerOnCanvas = false;
+let cursorPoint = { x: 0, y: 0 };
+let cursorGame: GameState | undefined;
+renderer.domElement.addEventListener('pointerenter', () => { pointerOnCanvas = true; cursorStamp = ''; });
+renderer.domElement.addEventListener('pointerleave', () => { pointerOnCanvas = false; cursorStamp = ''; });
 addEventListener('pointermove', event => {
+  cursorPoint = { x: event.clientX, y: event.clientY };
   if (event.target === renderer.domElement || dragStart) {
     pointerWorld = screenToWorld(event.clientX, event.clientY);
   }
@@ -797,7 +813,7 @@ addEventListener('pointermove', event => {
 addEventListener('pointerup', event => {
   if (event.button === 0 && wallStart && buildMode) {
     const end = screenToWorld(event.clientX, event.clientY);
-    placeBuilding(buildMode, wallLine(wallStart, end, rules.buildings[buildMode].radius));
+    placeBuilding(buildMode, wallLine(wallStart, end, playerRules().buildings[buildMode].radius));
     wallStart = undefined;
     buildMode = undefined;
     return;
@@ -846,56 +862,32 @@ function contextOrder(point: Point, _clientX: number, _clientY: number, queue = 
   if (replay) return; // spectating: inputs must not perturb the command stream
   const selection = ownSelected();
   const target = pickEntity(point);
-  const units = selection.filter(e => isUnit(e.kind));
-  if (units.length) {
-    const targetId = target && target.id !== units[0].id ? target.id : undefined;
-    const result = applyCommand(game, {
-      kind: 'order', player: localPlayer, entityIds: units.map(e => e.id),
-      target: point, targetId,
-      // Shift-click falls in behind what they are doing, as the reference does.
-      ...(queue ? { queue: true } : {}),
-    });
-    if (!result.ok) reject(result.reason);
-    else {
-      acknowledge();
-      // Only somebody else's: the flash says "this is what you just told them
-      // to attack", so firing it on a tree, a bush or your own mill is noise
-      // over the one case it exists to answer.
-      if (target && isHostile(target)) {
-        orderFlash = { entityId: target.id, startedAt: gameTimeSeconds(game) };
-      }
-    }
-    return;
-  }
-  // Defensive buildings take a target the same way units do — but a castle
-  // both shoots and trains, and in AoE2 a right-click on the ground with one
-  // selected plants its gather point. So the shot is what a click on somebody
-  // hostile means, and everything else is the flag (issue #8).
-  const hostile = target !== undefined && isHostile(target);
-  const towers = selection.filter(e => rules.buildings[e.kind as BuildingKind]?.attack
-    && e.buildProgress === undefined
-    && (hostile || trainableAt(e.kind as BuildingKind).length === 0));
-  if (towers.length) {
-    const result = applyCommand(game, {
-      kind: 'order', player: localPlayer, entityIds: towers.map(e => e.id),
-      target: point, targetId: hostile ? target!.id : undefined,
-    });
-    if (!result.ok) reject(result.reason);
-    else {
-      hud.showMessage(hostile ? 'Target set' : 'Target cleared');
-      if (hostile) orderFlash = { entityId: target!.id, startedAt: gameTimeSeconds(game) };
-    }
-    return;
-  }
-  // Any building that trains something takes a gather point, which is the
-  // rule rather than the two buildings that happened to train units first.
-  const building = selection.find(e => isBuilding(e.kind) && e.buildProgress === undefined
-    && trainableAt(e.kind as BuildingKind).length > 0);
-  if (building) {
-    applyCommand(game, { kind: 'rally', player: localPlayer, buildingId: building.id, target: point, targetId: target?.id });
+  const command = planContextCommand(game, localPlayer, selection, point, target, queue);
+  if (!command) return;
+  const result = applyCommand(game, command);
+  if (!result.ok) { reject(result.reason); return; }
+  if (command.kind === 'rally') {
     hud.showMessage('Rally point set');
     playSound('gatherpoint_set');
+    return;
   }
+  const hostile = target !== undefined && isHostile(target);
+  if (selection.some(e => isUnit(e.kind))) acknowledge();
+  else hud.showMessage(hostile ? 'Target set' : 'Target cleared');
+  if (hostile) orderFlash = { entityId: target!.id, startedAt: gameTimeSeconds(game) };
+}
+
+function updateContextCursor(): void {
+  const stamp = `${pointerOnCanvas}/${game.tick}/${selectedIds.join(',')}/${buildMode}/${repairMode}/${unloadShips.length}/${!!replay}/${cursorPoint.x}/${cursorPoint.y}/${cameraCenter.x}/${cameraCenter.y}/${zoom}`;
+  if (game === cursorGame && stamp === cursorStamp) return;
+  cursorGame = game; cursorStamp = stamp;
+  const point = screenToWorld(cursorPoint.x, cursorPoint.y);
+  const selection = pointerOnCanvas ? ownSelected() : [];
+  const target = pointerOnCanvas && selection.length ? pickEntity(point) : undefined;
+  const name = pointerOnCanvas ? contextCursor(game, localPlayer, selection, point, target,
+    { build: !!buildMode, repair: repairMode, unload: !!unloadShips.length, replay: !!replay }) : 'default';
+  const css = cursorCss(uiAssets, name);
+  if (renderer.domElement.style.cursor !== css) renderer.domElement.style.cursor = css;
 }
 
 /**
@@ -971,7 +963,7 @@ addEventListener('keydown', event => {
     // castle and wonder and on nothing else, so a house or a barracks goes on
     // the keypress as a soldier does (issue #47).
     const asked = mine.filter(e =>
-      isBuilding(e.kind) && game.rules.buildings[e.kind as BuildingKind].confirmDelete);
+      isBuilding(e.kind) && playerRules(e.owner).buildings[e.kind as BuildingKind].confirmDelete);
     const doomed = asked.length && !confirm(
       asked.length === 1
         ? `Delete your ${displayName(asked[0].kind)}? This cannot be undone.`
@@ -1063,6 +1055,7 @@ function panCamera(dt: number): void {
 // ---------------------------------------------------------------------------
 // Command grid derived from the current selection and player resources.
 function currentCommands(): CommandButton[] {
+  const rules = playerRules();
   const selection = ownSelected();
   const player = game.players[localPlayer];
   const buttons: CommandButton[] = [];
@@ -1098,7 +1091,8 @@ function currentCommands(): CommandButton[] {
       });
     } else {
       for (const kind of buildMenu(rules, player.age, buildPage)) {
-        const building = rules.buildings[kind];
+        const building = buildingRulesFor(game, localPlayer, kind);
+        if (!civHas(game, localPlayer, 'buildings', building.datId)) continue;
         buttons.push({
           id: `build-${kind}`,
           label: `${createLabel(kind, 'Build')} (${costLabel(building.cost)})`,
@@ -1118,7 +1112,7 @@ function currentCommands(): CommandButton[] {
     buttons.push({ id: 'stop', label: 'Stop', slot: GRID_SLOT.stop, enabled: true, icon: hud.actionIcon(ACTION_ICON.stop) });
   }
   if (selection.some(e => e.kind === 'fishing-ship') && player.age >= (rules.buildings['fish-trap'].age ?? 0)) {
-    const trap = rules.buildings['fish-trap'];
+    const trap = buildingRulesFor(game, localPlayer, 'fish-trap');
     buttons.push({ id: 'build-fish-trap', label: `${createLabel('fish-trap', 'Build')} (${costLabel(trap.cost)})`,
       help: helpFor('fish-trap', trap.cost), slot: trap.buildButton, enabled: true,
       icon: hud.iconFor('Buildings', assets?.entities['fish-trap']?.iconId, localPlayer) });
@@ -1159,7 +1153,7 @@ function currentCommands(): CommandButton[] {
     && trainableAt(e.kind as BuildingKind).length > 0);
   if (producer) {
     for (const kind of trainableAt(producer.kind as BuildingKind)) {
-      const unitRules = rules.units[kind];
+      const unitRules = unitRulesFor(game, localPlayer, kind);
       buttons.push({
         id: `train-${kind}`,
         label: `${createLabel(kind, 'Train')} (${costLabel(unitRules.cost)})`,
@@ -1191,6 +1185,7 @@ function currentCommands(): CommandButton[] {
   // Technologies the selected building researches, in the DAT's own order.
   const player1 = game.players[localPlayer];
   for (const [key, tech] of Object.entries(rules.technologies) as [TechKey, typeof rules.technologies[TechKey]][]) {
+    if (!civHas(game, localPlayer, 'technologies', tech.techId)) continue;
     const building = selection.find(e => e.kind === tech.researchedAt && e.buildProgress === undefined);
     if (!building) continue;
     if (player1.researched.includes(key)) continue;
@@ -1216,7 +1211,7 @@ function currentCommands(): CommandButton[] {
     const on = player1.autoReseedFarms === true;
     buttons.push({
       id: 'reseed',
-      label: `Auto-reseed farms: ${on ? 'on' : 'off'} (${costLabel(rules.buildings.farm.cost)} each)`,
+      label: `Auto-reseed farms: ${on ? 'on' : 'off'} (${costLabel(buildingRulesFor(game, localPlayer, 'farm').cost)} each)`,
       icon: hud.actionIcon(on ? ACTION_ICON.reseedOn : ACTION_ICON.reseedOff),
       enabled: true,
     });
@@ -1245,15 +1240,9 @@ const GRID_SLOT = { buildEconomic: 1, buildMilitary: 2, repair: 3, ungarrison: 9
  */
 let buildPage: BuildPage | undefined;
 
-const trainableAt = (building: BuildingKind): UnitKind[] =>
-  (Object.keys(rules.units) as UnitKind[]).filter(kind =>
-    rules.units[kind].trainedAt === building && (rules.units[kind].age ?? 0) <= game.players[localPlayer].age
-    && (rules.units[kind].requires ?? []).every(key => game.players[localPlayer].researched.includes(key))
-    && !isAnimal(kind)
-    // A unit that has been upgraded past is gone from the panel, not greyed
-    // out: the barracks offers the man-at-arms in place of the militia.
-    && !upgradedAway(game, localPlayer, kind)
-    && !notYetUpgradedInto(game, localPlayer, kind));
+const trainableAt = (building: BuildingKind): UnitKind[] => {
+  return trainableUnitsAt(game, localPlayer, building);
+};
 
 /**
  * What the reference calls this entity key: its own string where the manifest
@@ -1266,6 +1255,7 @@ const trainableAt = (building: BuildingKind): UnitKind[] =>
  * with its shield and how far the next one has come.
  */
 function resourceStatus(): ResourceStatus {
+  const rules = playerRules();
   const workers = { wood: 0, food: 0, gold: 0, stone: 0 };
   let idle = 0;
   let villagers = 0;
@@ -1345,9 +1335,11 @@ function playerColorName(player: PlayerId): string | undefined {
 }
 
 function scoreRows(): ScoreRow[] {
-  const names = rules.civilization.computerNames ?? [];
-  const computer = names.length ? names[(game.matchSeed ?? 0) % names.length] : 'Computer';
-  return ([1, 2] as const).map(player => ({
+  return ([1, 2] as const).map(player => {
+    const rules = playerRules(player);
+    const names = rules.civilization.computerNames ?? [];
+    const computer = names.length ? names[(game.matchSeed ?? 0) % names.length] : 'Computer';
+    return {
     number: player,
     name: shared ? (player === 1 ? 'Ysgramor' : 'Artemis') : player === 1 ? 'Player 1' : computer,
     color: playerColorHex(assets, player) ?? (player === 1 ? '#3b64ff' : '#ff3b3b'),
@@ -1356,7 +1348,8 @@ function scoreRows(): ScoreRow[] {
     // reference's own name for it (`BritonsIcon`).
     civIcon: assets && rules.civilization.displayName ? `${rules.civilization.displayName}Icon` : undefined,
     age: game.players[player].age,
-  }));
+    };
+  });
 }
 
 function displayName(key: string): string {
@@ -1388,9 +1381,11 @@ function helpFor(key: string, cost: Cost): string | undefined {
 function selectionInfo(): SelectionInfo | undefined {
   const selection = ownSelected().length
     ? ownSelected()
-    : game.entities.filter(e => selectedIds.includes(e.id) && (!e.dead || isCarcass(e)));
+    : [...contextTargets(game, localPlayer, revealMap)].map(candidate => candidate.entity as Entity)
+      .filter(e => selectedIds.includes(e.id) && (!e.dead || isCarcass(e)));
   const entity = selection[0];
   if (!entity) return undefined;
+  const rules = playerRules(entity.owner);
   // Without the imported strings, the few names the slug cannot spell.
   const names: Record<string, string> = {
     berries: 'Forage Bush', gold: 'Gold Mine', stone: 'Stone Mine', 'tree-oak': 'Tree', boar: 'Wild Boar',
@@ -1571,7 +1566,7 @@ function syncScene(time: number): void {
     // an arrow (issue #30 -- the rock's art existed and was never drawn).
     const shooter = game.entities.find(e => e.id === projectile.shooterId);
     const shooterRules = shooter
-      ? (game.rules.units as Partial<Record<string, UnitRules>>)[shooter.kind]
+      ? (playerRules(shooter.owner).units as Partial<Record<string, UnitRules>>)[shooter.kind]
       : undefined;
     const art = projectile.art ?? shooterRules?.unpacked?.projectileArt ?? shooterRules?.projectileArt ?? 'arrow';
     view.updateProjectileView(
@@ -1652,7 +1647,7 @@ function syncScene(time: number): void {
 
   // Placement preview.
   if (buildMode) {
-    const shape = buildingFootprint(game, buildMode, orientationOf(buildMode, placementTarget()));
+    const shape = buildingFootprint(game, buildMode, orientationOf(buildMode, placementTarget()), localPlayer);
     if (ghostKind !== buildMode || ghostShape !== `${shape.x},${shape.y}`) {
       disposeGhost();
       ghostKind = buildMode;
@@ -1664,7 +1659,7 @@ function syncScene(time: number): void {
       scene.add(ghostView.group);
     }
     const target = placementTarget();
-    const legal = placementLegal(game, buildMode, target, orientationOf(buildMode, target)).ok;
+    const legal = placementLegal(game, buildMode, target, orientationOf(buildMode, target), localPlayer).ok;
     const tint = legal ? 0x7fff9e : 0xff5f5f;
     const iso = elevatedWorldToIso(game, target.x, target.y);
     ghostFootprint!.visible = true;
@@ -1696,6 +1691,7 @@ function syncScene(time: number): void {
     disposeGhost();
   }
   updateWallPreview();
+  updateContextCursor();
 }
 
 /**
@@ -1704,6 +1700,7 @@ function syncScene(time: number): void {
  */
 const wallGhosts: THREE.Mesh[] = [];
 function updateWallPreview(): void {
+  const rules = playerRules();
   const tiles = buildMode && wallStart && isWall(buildMode)
     ? wallLine(wallStart, pointerWorld, rules.buildings[buildMode].radius)
     : [];
@@ -1719,7 +1716,7 @@ function updateWallPreview(): void {
     if (!tile) continue;
     const iso = elevatedWorldToIso(game, tile.x, tile.y);
     mesh.position.set(iso.x, iso.y, 0);
-    const legal = placementLegal(game, buildMode!, tile).ok;
+    const legal = placementLegal(game, buildMode!, tile, 'x', localPlayer).ok;
     (mesh.material as THREE.MeshBasicMaterial).color.set(legal ? 0x7fff9e : 0xff5f5f);
   }
 }
@@ -1727,8 +1724,8 @@ function updateWallPreview(): void {
 /** Where the pending building would actually land, snapped to the tile grid. */
 function placementTarget(): Point {
   if (!buildMode) return pointerWorld;
-  const rough = snapPlacement(pointerWorld, rules.buildings[buildMode].radius);
-  return snapPlacement(pointerWorld, buildingFootprint(game, buildMode, orientationOf(buildMode, rough)));
+  const rough = snapPlacement(pointerWorld, playerRules().buildings[buildMode].radius);
+  return snapPlacement(pointerWorld, buildingFootprint(game, buildMode, orientationOf(buildMode, rough), localPlayer));
 }
 
 function resize(): void {

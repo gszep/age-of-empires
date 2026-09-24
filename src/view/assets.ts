@@ -280,6 +280,8 @@ export interface ImportedHotkey { key: string; control?: boolean; shift?: boolea
 
 export interface UiAssets {
   base: string;
+  /** Native owned CUR files; dimensions and hotspots come from the CUR header. */
+  cursors?: Record<string, { image: string; size: [number, number]; hotspot: [number, number] }>;
   /** The reference's faces, copied as they ship: file name -> path under `base`. */
   fonts?: Record<string, string>;
   /** `UIColors.json`: per player colour name, the tints its text and bars use. */

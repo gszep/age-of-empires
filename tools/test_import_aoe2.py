@@ -1,18 +1,22 @@
 from functools import lru_cache
 from pathlib import Path
 import json
+import re
 import shutil
+import struct
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 
 from PIL import Image
 
 from depot import Graphics, depot_root, uhd_graphics_dir
-from import_content import extract
+from import_content import effects_of, extract, import_drop_sites, player_attribute_ids, player_attributes, sha256
 from import_ui import extract_ui
 from import_audio import import_audio, read_banks, resolve_event
 from convert_sld import convert, convert_terrain
+from audit_civilizations import audit as audit_civilizations, classify_command, markdown as civilization_report, prerequisites
 
 
 ROOT = depot_root()
@@ -50,11 +54,149 @@ def _dat():
     return DatFile.parse(DAT)
 
 
+class CivilizationAuditTest(unittest.TestCase):
+    def test_prerequisite_choices_and_disabled_slots_are_distinct(self):
+        choice = prerequisites(SimpleNamespace(required_techs=(1, 2, 3, -1), required_tech_count=2))
+        self.assertEqual(choice, {"ids": [1, 2, 3], "count": 2, "choice": True, "unsatisfiedSlots": False})
+        inactive = prerequisites(SimpleNamespace(required_techs=(-1, -1), required_tech_count=1))
+        self.assertTrue(inactive["unsatisfiedSlots"])
+        unconditional = prerequisites(SimpleNamespace(required_techs=(-1, -1), required_tech_count=0))
+        self.assertFalse(unconditional["unsatisfiedSlots"])
+        self.assertFalse(unconditional["choice"])
+
+    def test_building_work_rate_is_not_mistaken_for_a_supported_gather_bonus(self):
+        units = [SimpleNamespace(type=70, class_=4), SimpleNamespace(type=80, class_=3)]
+        gather = SimpleNamespace(type=5, a=0, b=-1, c=13)
+        production = SimpleNamespace(type=5, a=1, b=-1, c=13)
+        self.assertEqual(classify_command(gather, units, {0, 1}, {}), "decoded-unit-effect")
+        self.assertEqual(classify_command(production, units, {0, 1}, {}), "unmodelled-building-work-rate")
+        self.assertEqual(classify_command(gather, units, {1}, {}), "target-outside-roster")
+
+    def test_a_named_resource_and_an_enabled_unit_do_not_imply_runtime_support(self):
+        resources = {36: "farmFoodAmount", 191: "relicRate"}
+        self.assertEqual(classify_command(SimpleNamespace(type=1, a=36, b=1), [], set(), resources),
+                         "decoded-player-effect")
+        self.assertEqual(classify_command(SimpleNamespace(type=1, a=191, b=1), [], set(), resources),
+                         "unmodelled-player-attribute")
+        self.assertEqual(classify_command(SimpleNamespace(type=2), [], set(), resources),
+                         "enable-disable-needs-runtime")
+        self.assertEqual(classify_command(SimpleNamespace(type=7), [], set(), resources),
+                         "unmodelled-command-type")
+
+
+class DropSiteImportTest(unittest.TestCase):
+    def test_worker_sites_worker_filters_and_target_classes_are_all_required(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rows = [
+                {"building_id": 10, "worker_object_group": 4, "worker_object_list": [1, 2, 4],
+                 "target_list": [{"object_group": 7, "attribute_type": 16}, {"object_group": 49, "attribute_type": 16},
+                                 {"object_group": 32, "attribute_type": 3}]},
+                {"building_id": 20, "worker_object_group": 4,
+                 "target_list": [{"object_group": 33, "attribute_type": 17}]},
+                {"building_id": 20, "worker_object_group": 21,
+                 "target_list": [{"object_group": 33, "attribute_type": 17}]},
+                {"building_id": 30, "worker_object_group": 4,
+                 "target_list": [{"object_group": 49, "attribute_type": 16}]},
+            ]
+            (root / "dropsites.json").write_text(json.dumps({"drop_site_list": rows}))
+            units = [None] * 67
+            units[50] = SimpleNamespace(class_=49)
+            entities = {f"building-{i}": {"category": "building", "id": i} for i in (10, 20, 30, 40)}
+            entities["gold"] = {"id": 66, "class": 32, "category": "resource"}
+            for index, group, target_class, target_unit, sites in (
+                (1, 4, 7, -1, [10, 20]),  # food alone must not let berries into a fish-only dock
+                (2, 4, -1, 50, [10]),  # JSON farm row is not a DAT return site
+                (3, 21, 33, -1, [10, 20]),  # boats cannot use the villager mill row
+                (4, 4, -1, 66, [10]),  # Gaia-only target: player's slot 66 is None
+            ):
+                units[index] = SimpleNamespace(bird=SimpleNamespace(tasks=[SimpleNamespace(
+                    action_type=5, resource_out=3 if index == 4 else 0, resource_in=16, class_id=target_class, unit_id=target_unit)]))
+                entities[f"worker-{index}"] = {"id": index, "class": group, "dropSites": sites,
+                    "gather": {"resource": "gold" if index == 4 else "food", "task": {"actionType": 5}}}
+            hashes = {}
+            import_drop_sites(root / "fixture.dat", units, entities, hashes)
+            self.assertEqual(entities["worker-1"]["gather"]["dropSites"], [10])
+            self.assertEqual(entities["worker-2"]["gather"]["dropSites"], [10])
+            self.assertEqual(entities["worker-3"]["gather"]["dropSites"], [20])
+            self.assertEqual(entities["worker-4"]["gather"]["dropSites"], [10])
+            self.assertEqual(entities["building-20"]["accepts"], ["food"])
+            self.assertEqual(entities["building-30"]["accepts"], [])
+            self.assertEqual(entities["building-40"]["accepts"], [])
+            self.assertEqual(hashes["dropsites.json"], sha256(root / "dropsites.json"))
+
+
+class PlayerAttributeTest(unittest.TestCase):
+    def test_names_come_only_from_the_player_section_and_preserve_legacy_keys(self):
+        text = """// Attributes
+extern const int cAttributeFarmFood = 2;
+extern const int cAttributeStartingScoutID = 4; // source spelling
+extern const int cAttributeUnitRepairCost = 3;
+// Player Age
+extern const int cAttributeSet = 0;
+"""
+        ids = player_attribute_ids(text)
+        self.assertEqual(ids, {"farmFoodAmount": 2, "startingScoutID": 4, "unitRepairCost": 3})
+        self.assertEqual(player_attributes([99, 99, 175, 0, -1], ids),
+                         {"farmFoodAmount": 175, "startingScoutID": -1, "unitRepairCost": 0})
+        with self.assertRaisesRegex(ValueError, "outside DAT table"):
+            player_attributes([99], ids)
+
+    def test_malformed_or_ambiguous_source_is_not_silently_filtered(self):
+        for text in ("", "// Attributes\n// Player Age",
+                     "// Attributes\nextern const int cAttributeFood = unknown;\n// Player Age",
+                     "// Attributes\nextern const int cAttributeFood = 0;\n"
+                     "extern const int cAttributeFood = 1;\n// Player Age"):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                player_attribute_ids(text)
+
+    def test_type_one_effects_use_source_ids_but_only_enable_modelled_mechanics(self):
+        # Synthetic IDs prove the decoder uses the source map, not the old
+        # 36/270/271 allow-list. Unimplemented attributes remain diagnostic.
+        ids = {"farmFoodAmount": 8, "unitRepairCost": 9, "buildingRepairCost": 10, "tradeVigRate": 11}
+        commands = [SimpleNamespace(type=1, a=a, b=b, d=d) for a, b, d in (
+            (8, 1, 75), (9, 0, 0), (10, 1, -0.25), (11, 0, 0.1), (999, 0, 1), (9, 2, 1),
+        )]
+        dat = SimpleNamespace(techs=[SimpleNamespace(effect_id=0)],
+                              effects=[SimpleNamespace(effect_commands=commands)])
+        effects, _, unreached = effects_of(dat, 0, {}, ids)
+        self.assertEqual(effects, [
+            {"resource": "farmFoodAmount", "operation": "add", "amount": 75},
+            {"resource": "unitRepairCost", "operation": "set", "amount": 0},
+            {"resource": "buildingRepairCost", "operation": "add", "amount": -0.25},
+        ])
+        self.assertIn("resource 11 (tradeVigRate) at the player level: not modelled", unreached)
+        self.assertIn("resource 999 at the player level: not modelled", unreached)
+        self.assertIn("resource 9 (unitRepairCost) at the player level: unsupported operation 2", unreached)
+
+
 @unittest.skipUnless(DAT.is_file(), "owned AoE2DE fixture is not installed")
 class ContentImportIntegrationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.result = extracted_content()
+
+    def test_civilization_audit_covers_every_owned_tree_and_reports_foreign_metadata(self):
+        common = DAT.parent.parent
+        report = audit_civilizations(_dat(), common, SPEC)
+        definitions = json.loads((common / "dat/civilizations.json").read_text())["civilization_list"][1:]
+        self.assertEqual([row["name"] for row in report["civilizations"]],
+                         [definition["internal_name"] for definition in definitions])
+        for definition in definitions:
+            name = definition["tech_tree_name"]
+            self.assertEqual(report["sourceHashes"][f"CivTechTrees/{name}.json"],
+                             sha256(common / f"dat/CivTechTrees/{name}.json"))
+        by_name = {row["name"]: row for row in report["civilizations"]}
+        self.assertTrue(by_name["Achaemenids"]["metadataWarnings"])
+        self.assertEqual(by_name["Franks"]["metadataWarnings"], [])
+        self.assertGreater(by_name["Britons"]["coverage"]["unmodelled-building-work-rate"], 0)
+        self.assertGreater(by_name["Franks"]["coverage"]["unmodelled-unit-attribute"], 0)
+        self.assertIn(290, by_name["Franks"]["automaticCivTechIds"])
+        self.assertNotIn(83, by_name["Franks"]["automaticCivTechIds"])
+        self.assertEqual(report, audit_civilizations(_dat(), common, SPEC))
+        text = civilization_report(report)
+        self.assertIn("not playable civilisation support", text)
+        self.assertIn("Achaemenids", text)
 
     def test_shadow_layer_decodes_against_its_own_block_counts(self):
         # The command array must account for every block in the layer grid, and
@@ -630,11 +772,13 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # food), which the game read off the fallback's identical 175 for a
         # month. Every key the game reads rules from, not only the one that
         # bit first.
-        for key in ("playerAttributes", "civilization", "ages", "playerColors", "terrainRestrictions", "shadows"):
+        for key in ("playerAttributes", "playerAttributeIds", "civilization", "civilizations", "ages", "playerColors", "terrainRestrictions", "shadows"):
             self.assertIn(key, published, key)
             self.assertEqual(published[key], self.result[key], key)
         self.assertEqual(published["shadows"], {"profile": "Default", "strength": 1.0, "color": [0.0, 0.0, 0.0]})
         self.assertIn("terrain/colorcorrection.json", published["source"]["sha256"])
+        self.assertEqual(published["source"]["sha256"]["xs/Constants.xs"],
+                         self.result["source"]["sha256"]["xs/Constants.xs"])
         # And `blends`, which import_blends.py adds *after* the atlas step:
         # re-running the atlas step alone rebuilt the dict without it, and
         # every terrain edge went hard with no error anywhere.
@@ -840,9 +984,9 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(farmer["animations"]["work"]["source"], sld("u_vil_male_farmer_taskA"))
         self.assertEqual(farmer["animations"]["carry"]["source"], sld("u_vil_male_farmer_carrywalkA"))
         self.assertEqual(farmer["gather"], {"resource": "food", "ratePerSecond": 0.53, "capacity": 10,
-                                            "task": {"actionType": 5, "unitId": 50},
-                                            # The farm task names a unit, not a class: no factor.
-                                            "classFactors": {}})
+                                             "task": {"actionType": 5, "unitId": 50},
+                                             # The farm task names a unit, not a class: no factor.
+                                             "classFactors": {}, "dropSites": [68, 109]})
         self.assertEqual(entities["villager-female-farmer"]["skinOf"], "villager-farmer")
         self.assertEqual(entities["villager-female-farmer"]["id"], 214)
 
@@ -1544,6 +1688,56 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # A building that never fights is still given no attack of its own.
         self.assertEqual(entities["house"]["combat"]["attacks"], [])
 
+    def test_every_named_player_attribute_keeps_its_dat_value_and_provenance(self):
+        constants = DAT.parent.parent / "xs/Constants.xs"
+        section = constants.read_text().split("// Player Age")[0]
+        rows = re.findall(r"cAttribute(\w+)\s*=\s*(\d+)\s*;", section)
+        ids = self.result["playerAttributeIds"]
+        values = self.result["playerAttributes"]
+        resources = _dat().civs[SPEC["civIndex"]].resources
+        self.assertEqual(len(ids), len(rows))
+        self.assertEqual(set(ids), set(values))
+        for name, index in rows:
+            key = "farmFoodAmount" if name == "FarmFood" else name[0].lower() + name[1:]
+            self.assertEqual(ids[key], int(index))
+            self.assertEqual(values[key], round(resources[int(index)], 6), key)
+        for key in ("tradeVigRate", "militaryConversionChance", "relicRate", "feudalTownCenterLimit"):
+            self.assertIn(key, values)
+        self.assertNotIn("set", ids)  # later effect enum, not a player attribute
+        self.assertEqual(self.result["source"]["sha256"]["xs/Constants.xs"], sha256(constants))
+        # Merely importing the baseline must not expose ineffective research.
+        for key in ("coinage", "banking", "guilds", "faith", "devotion", "theocracy"):
+            self.assertNotIn(key, self.result["technologies"])
+        self.assertTrue(any("tradeVigRate" in tech["reason"]
+                            for tech in self.result["skippedTechnologies"]))
+
+    def test_drop_sites_publish_building_acceptance_and_each_worker_variant(self):
+        entities = self.result["entities"]
+        expected = {"town-center": ["food", "wood", "gold", "stone"], "mill": ["food"],
+                    "lumber-camp": ["wood"], "mining-camp": ["gold", "stone"], "dock": ["food"]}
+        for key, entity in entities.items():
+            if entity.get("category") == "building":
+                self.assertEqual(entity["accepts"], expected.get(key, []), key)
+        self.assertTrue(entities["mill"]["acceptsLivestock"])
+        self.assertTrue(entities["town-center"]["acceptsLivestock"])
+        for task in ("forager", "farmer", "hunter", "shepherd"):
+            self.assertEqual(entities[f"villager-{task}"]["gather"]["dropSites"], [68, 109])
+        self.assertEqual(entities["villager-fisher"]["gather"]["dropSites"], [45, 68, 109])
+        self.assertEqual(entities["villager-lumberjack"]["gather"]["dropSites"], [109, 562])
+        for task in ("goldminer", "stonemason"):
+            self.assertEqual(entities[f"villager-{task}"]["gather"]["dropSites"], [109, 584])
+        self.assertEqual(entities["fishing-ship"]["gather"]["dropSites"], [45])
+        self.assertEqual(self.result["source"]["sha256"]["dropsites.json"], sha256(DAT.parent / "dropsites.json"))
+        path = Path("public/imported/aoe2/manifest.json")
+        if path.is_file():
+            published = json.loads(path.read_text())
+            for key, entity in entities.items():
+                if "accepts" in entity:
+                    self.assertEqual(published["entities"][key]["accepts"], entity["accepts"])
+                    self.assertEqual(published["entities"][key]["acceptsLivestock"], entity["acceptsLivestock"])
+                if "gather" in entity:
+                    self.assertEqual(published["entities"][key]["gather"]["dropSites"], entity["gather"]["dropSites"])
+
     def test_the_mill_technologies_change_a_player_attribute(self):
         """Issue #23.
 
@@ -1827,6 +2021,28 @@ class UiImportIntegrationTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.directory.cleanup()
+
+    def test_context_cursors_preserve_owned_bytes_dimensions_hotspots_and_publication(self):
+        cursors = self.result["cursors"]
+        self.assertEqual(set(cursors), set(SPEC["ui"]["cursors"]))
+        for name, cursor in cursors.items():
+            source = SOUNDS.parent.parent / "cursors" / f"{name}32x32.cur"
+            data = source.read_bytes()
+            self.assertEqual((Path(self.directory.name) / cursor["image"]).read_bytes(), data)
+            self.assertEqual(cursor["hotspot"], list(struct.unpack_from("<HH", data, 10)))
+            with Image.open(source) as image:
+                self.assertEqual(cursor["size"], list(image.size))
+            self.assertEqual(self.result["source"]["sha256"][cursor["image"]], sha256(source))
+        self.assertEqual(cursors["flag"]["size"], [48, 48])
+        self.assertEqual(cursors["flag"]["hotspot"], [9, 43])
+        self.assertEqual(cursors["convert"]["hotspot"], [15, 15])
+        path = Path("public/imported/aoe2/ui/manifest.json")
+        if path.is_file():
+            published = json.loads(path.read_text())
+            self.assertEqual(published["cursors"], cursors)
+            for cursor in cursors.values():
+                self.assertEqual((path.parent / cursor["image"]).read_bytes(),
+                                 (Path(self.directory.name) / cursor["image"]).read_bytes())
 
     def test_panels_keep_source_geometry_and_materials(self):
         layouts = self.result["layouts"]

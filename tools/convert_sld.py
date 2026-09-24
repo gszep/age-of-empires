@@ -514,6 +514,8 @@ def main() -> None:
         # identical 175. `test_the_published_manifest_carries_the_technologies`
         # now asserts every rule-bearing key.
         "playerAttributes": imported.get("playerAttributes", {}),
+        "playerAttributeIds": imported.get("playerAttributeIds", {}),
+        "civilizations": imported.get("civilizations", {}),
         "ages": imported.get("ages", []),
         "terrain": terrain,
         # The water presets and their textures (issue: the surface).

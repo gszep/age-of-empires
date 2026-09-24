@@ -16,6 +16,7 @@ import type { GameRules } from './sim/data';
 import type { GameState } from './sim/types';
 import { validMatchSetup, type MatchSetup } from './match-setup';
 import { seedFrom } from './sim/random';
+import { civilizationRules } from './sim/civilizations';
 
 const KEY = 'open-empires-lab:dev-session';
 /**
@@ -58,6 +59,7 @@ export function loadSession(rules: GameRules): GameState | undefined {
     // Rules are not restored: a re-import must take effect, and a snapshot
     // taken under different content would resume against mismatched entities.
     if (snapshot.version !== VERSION || snapshot.rulesOrigin !== rules.origin) return undefined;
+    if (![1, 2].every(player => civilizationRules(rules, snapshot.state.players[player as 1 | 2]?.civilization))) return undefined;
     return { ...snapshot.state, rules };
   } catch {
     return undefined;

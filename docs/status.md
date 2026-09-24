@@ -38,6 +38,16 @@ npm run dev
 Controls and hotkeys are in `README.md`. `F10 → Load replay…` plays a
 headless record and checks its periodic hashes.
 
+Context cursors (#51) use 18 owned native CUR files and their embedded hotspots.
+Hover and actual right-clicks share pure dispatch/order classification, including
+gathering, hunting, construction, repair, healing, conversion, transport boarding,
+garrison and rally points. Hover never reserves farms or resets worker progress.
+Unseen Gaia is no longer pickable by live coordinates: remembered objects use
+last-seen position/status in cursors and selection info. The open fallback uses
+ordinary CSS cursors. `cursors.test.ts` and `tools/context_cursor_smoke.mts`
+verify read-only hover, command outcomes, fog memory, native requests and hotspots;
+the browser script also runs with `OPEN_FALLBACK=1`.
+
 `F10 → Game Settings` chooses the map and seed without editing a URL (#144).
 Start Game rebuilds the board and minimap; Random requests a fresh seed;
 Restart repeats the chosen setup. Solo sessions remember their setup across
@@ -65,6 +75,37 @@ palisade walls and owner-only gates; the wonder (no victory, #110); the
 trade cart; the dock, naval roster and fish on the DAT's `terrain_restrictions`
 (#81); fog with explored memory and legal last-seen observations.
 
+Named player attributes (#53) import the full `Constants.xs` Attributes section
+against the configured civilisation's DAT resource table, preserving the IDs
+and source hash through the published manifest. `playerAttributeFor` provides
+initial values plus completed research; farm capacity and repair bills use it.
+Unsupported mechanics remain explicit in technology diagnostics rather than
+becoming researchable merely because their values are imported. The table does
+not replace live stockpiles/counters. `player-attributes.test.ts` covers lookup,
+research ordering and older-rule compatibility; `repair.test.ts` exercises public
+research/repair commands, actual bills, owner isolation and deterministic replay;
+the mill tests verify completed farm food, and the import suite checks every
+named row against the owned source and its publication.
+The repair-discount researches are synthetic fixtures, not additions to the
+Britons' roster; discounted repair behavior is verified through simulation
+commands rather than a new browser button.
+
+Civilisation expansion begins with an all-source audit (#122/#123):
+`tools/audit_civilizations.py` inventories 59 non-Gaia definitions (53 base-era,
+6 antiquity-era), prerequisite choices, passive/team-effect candidates, missing
+roster IDs and unsupported effect families. It also flags foreign unique-tech
+references in alternate-era metadata. [The coverage checkpoint](civilization-coverage.md)
+selects Franks as the next contrasting civilisation and lists the mixed-match
+acceptance criteria. Match creation now rejects unloaded civilisation keys;
+availability checks no longer grant everything to a mismatched key in a restored
+state. The per-player rules foundation now resolves complete additional profiles
+for gameplay, placement/navigation, HUD prices/availability, selected-unit stats
+and save/restart/replay. Synthetic mixed-profile regressions and
+`tools/civilization_rules_smoke.mts` verify actual outcomes and real browser clicks.
+The published additional catalogue remains empty: real Franks roster/art, bonus
+activation, selection and reference-correct conversion inheritance (#178) remain
+implementation work.
+
 Shore fish honour the DAT's neighbouring-beach placement requirement (#145).
 The current Britons dock roster is implemented (#97): galley/galleon, fire,
 demolition and hulk lines; Cannon Galleon gated by Chemistry; Transport Ship
@@ -86,6 +127,15 @@ depleting the node, JSON reload determinism, visibility/range bounds and Stop;
 `tools/fishing_continuation_smoke.mts` exercises the round trip from a real click.
 Farms reserve one farmer through travel and drop-off; group orders, construction
 completion, queued orders and automatic continuation respect occupancy (#82).
+Drop-site acceptance (#52) is imported from `dropsites.json` intersected with
+each worker variant's DAT sites and gather target classes/resources. Building
+acceptance and worker-specific return lists both reach the published manifest
+and simulation: foragers cannot use fish-only docks, while fishermen can. Loads
+retain their task after their source disappears. `drop-sites.test.ts` checks
+actual banked resources for all eight villager tasks, rejected/unfinished/enemy
+sites, authoritative empty lists, open/imported parity and JSON continuation.
+Fishing ships use the same derived return-site contract; naval tests cover their
+round trips. Livestock acceptance metadata does not add the missing follow rule.
 Villagers use each DAT task variant's gathering rate and carry capacity (#132),
 including hunter 0.41/s into 35 and farmer 0.53/s into 10, with variant-specific
 research effects. `src/sim/villager-gather.test.ts` checks actual collection and
@@ -379,6 +429,34 @@ Sustained verification found and fixed two additional lifetime problems. A
 keys now follow texture UUID/lifetime (#172), preventing Three r180 from cloning
 a cleared sampler after A→B→expire A→new B. Basic/ramp pixels remain identical;
 missing, pending and empty contours cannot revive retired bindings.
+
+Composite ship contours (#173) now use that same current-frame readiness
+contract instead of the never-assigned `atlasKey`. Each update retires old layer
+mask references, including animations with fewer/no layers. The owned Galley
+browser fixture measures 321 changed sRGB pixels, all shifting toward the imported
+player-blue contour colour, behind the native TC occluder. Delayed pages,
+expiry/reload and empty frames pass without simulation changes. The fixture hides
+animated terrain/foam for the A/B comparison; the existing whole-hull box coverage
+threshold remains an approximation. `tools/composite_outline_smoke.mts` and the
+older `outline_residency_smoke.mts` cover both composite and ordinary contours.
+The large-map order crossover is fixed in #238. The existing pass bases now use
+bounded monotone within-pass keys, preserving sprite/piece depth order while
+keeping projectiles, contours, rally flags and placement overlays in their own
+passes. At depth 515 the former body/contour/occluder orders were 6150/5015/6205,
+leaving just 32 blue contour pixels. The corrected near/far fixtures both return
+321 Galley pixels; ordinary villager contours return 147 at both positions.
+Placement overlays cover all 153/89 opaque samples, camera round trips preserve
+identical PNGs, and delayed pages/expiry/empty frames retain simulation hashes.
+The independent canopy/fog/shadow browser regression also passes.
+
+The combined player-rule/#173/#51/#52/#238 checkpoint is GREEN in `.local/wrapup-gate.log`:
+775 Vitest tests / 60 files, build, 103 Python/import tests and browser smoke.
+Dedicated cursor checks pass 15 real hover/right-click cases in both owned and
+fallback modes, plus remembered-resource selection; composite and ordinary
+contour lifetime probes pass, including the near/far ordinary/composite matrix.
+`.local/quickwins-import-r2.log` records full owned regeneration with cached sprite
+reuse. No timeouts were widened. `docs/handoff.md` records the complete checkpoint
+and the remaining civilisation implementation work.
 
 The final **156.67-minute** private browser run (#169) completed with **156
 samples, no page/asset errors and no invalid bindings**, across all four maps

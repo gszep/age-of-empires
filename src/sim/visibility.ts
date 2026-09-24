@@ -5,6 +5,7 @@
  */
 import { isBuilding, isUnit, lingersInFog } from './data';
 import { buildingRulesFor, unitRulesFor } from './rules';
+import { rulesForPlayer } from './civilizations';
 import type { BuildingKind, Entity, GameState, PlayerId, UnitKind } from './types';
 
 export interface RememberedEntity {
@@ -125,7 +126,7 @@ export function updateVisibility(state: GameState): void {
         continue;
       }
       if (entity.dead) continue;
-      if (!lingersInFog(state.rules, entity)) continue;
+      if (!lingersInFog(rulesForPlayer(state, entity.owner), entity)) continue;
       if (isEntityVisible(state, player, entity)) remember(state, player, entity);
     }
     // Forget remembered entities whose last position is seen empty.

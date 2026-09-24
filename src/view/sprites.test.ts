@@ -1248,7 +1248,7 @@ describe('player colour through the imported ramp', () => {
     expect(view.annexColors[0].mapNode?.value)
       .toBe(assets.textures.get('tc/annex0-idle-playercolor.png'));
     // Over its own annex, and under the next annex in the display order.
-    expect(view.annexColors[0].mesh.renderOrder).toBe(view.annexes[0].mesh.renderOrder + 1);
+    expect(view.annexColors[0].mesh.renderOrder).toBeGreaterThan(view.annexes[0].mesh.renderOrder);
   });
 
   it('hides annex colour while a building is still going up', () => {
@@ -1326,6 +1326,70 @@ describe('player colour through the imported ramp', () => {
     updateEntityView(villagerView, assets, state, villager, 4);
     updateOcclusion(views, state);
     expect(villagerView.outline.mesh.visible).toBe(false);
+  });
+
+  it('draws current composite contours, retiring missing, empty and pending masks through page expiry', () => {
+    const assets = fakeAssets();
+    const sail = { image: 'ship/sail.png', size: [4, 4] as [number, number], framesInFile: 1,
+      frames: [{ x: 0, y: 0, w: 4, h: 4, cx: 2, cy: 2 }] };
+    const mask = { ...sail, image: 'ship/sail-outline.png', frames: sail.frames.map(f => ({ ...f })) };
+    const texture = new THREE.DataTexture(new Uint8Array(64).fill(255), 4, 4);
+    assets.textures.set(sail.image, new THREE.DataTexture(new Uint8Array(64).fill(255), 4, 4));
+    assets.textures.set(mask.image, texture);
+    assets.entities.galley = { ...assets.entities.villager,
+      animations: { ...assets.entities.villager.animations, sail: { frames: 1, directions: 1, frameSeconds: 1, mirroringMode: 0 } },
+      atlases: { ...assets.entities.villager.atlases, sail, 'sail-outline': mask },
+      animationLayers: { idle: [{ animation: 'idle', x: 0, y: 0 }, { animation: 'sail', x: 5, y: -9 }] } };
+    const state = createGame();
+    const ship = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    ship.kind = 'galley';
+    const house = state.entities.find(e => e.kind === 'town-center')!;
+    house.position = { x: ship.position.x + 2, y: ship.position.y + 2 };
+    const view = createEntityView(assets, ship), occluder = createEntityView(assets, house);
+    updateEntityView(view, assets, state, ship, 0);
+    occluder.body.mesh.visible = true;
+    occluder.body.mesh.position.copy(view.body.mesh.position);
+    occluder.body.mesh.scale.set(400, 400, 1);
+    const views = new Map([[`e${ship.id}`, view], [`e${house.id}`, occluder]]);
+    const contour = view.layerOutlines![0];
+    updateOcclusion(views, state);
+    expect(contour.mesh.visible).toBe(true);
+    expect((contour.mesh.material as THREE.MeshBasicMaterial).color.getHex()).toBe(0x0000ff);
+    expect(contour.mesh.renderOrder).toBeGreaterThan(occluder.body.mesh.renderOrder);
+    expect(contour.mesh.position.x).toBe(view.annexes[0].mesh.position.x);
+    expect(contour.mesh.position.y).toBe(view.annexes[0].mesh.position.y);
+    occluder.body.mesh.visible = false;
+    updateOcclusion(views, state);
+    expect(contour.mesh.visible).toBe(false);
+    occluder.body.mesh.visible = true;
+    let now = 0;
+    assets.spriteResidency = new SpriteResidency(assets.textures, () => now);
+    assets.spriteResidency.add(mask.image, texture);
+    delete assets.entities.galley.atlases['sail-outline'];
+    updateEntityView(view, assets, state, ship, 1);
+    now = 121_000; assets.spriteResidency.sweep();
+    updateOcclusion(views, state);
+    expect(contour.textureImage).toBeUndefined();
+    expect(contour.mesh.visible).toBe(false);
+    assets.entities.galley.atlases['sail-outline'] = mask;
+    updateEntityView(view, assets, state, ship, 2);
+    updateOcclusion(views, state);
+    expect(contour.pendingTexture).toBe(mask.image);
+    expect(contour.mesh.visible).toBe(false);
+    assets.textures.set(mask.image, new THREE.DataTexture(new Uint8Array(64).fill(255), 4, 4));
+    updateEntityView(view, assets, state, ship, 3);
+    updateOcclusion(views, state);
+    expect(contour.mesh.visible).toBe(true);
+    mask.frames[0].w = 0;
+    updateEntityView(view, assets, state, ship, 4);
+    updateOcclusion(views, state);
+    expect(contour.mesh.visible).toBe(false);
+    mask.frames[0].w = 4;
+    assets.entities.galley.animationLayers!.idle = [{ animation: 'idle', x: 0, y: 0 }];
+    updateEntityView(view, assets, state, ship, 5);
+    updateOcclusion(views, state);
+    expect(contour.textureImage).toBeUndefined();
+    expect(contour.mesh.visible).toBe(false);
   });
 
   it('records the owner so a view can be rebuilt when a sheep changes hands', () => {

@@ -8,7 +8,8 @@
  * reproduce AoE tile/clearance behavior deterministically, so the smallest
  * grid search is implemented instead (see docs/library-strategy.md).
  */
-import { groundAllows, isBuilding, LAND_RESTRICTION } from './data';
+import { groundAllows, isBuilding, LAND_RESTRICTION, type GameRules } from './data';
+import { rulesForPlayer } from './civilizations';
 import type { Entity, GameState, PlayerId, Point } from './types';
 
 /** A building's half-extents in tiles: square unless it says otherwise. */
@@ -42,7 +43,7 @@ export function buildNavGrid(
   state: GameState, ignoreEntityId?: number, forOwner?: PlayerId,
   restriction: number = LAND_RESTRICTION,
 ): NavGrid {
-  return entityGrid(state, ignoreEntityId, forOwner, terrainLayer(state, restriction));
+  return entityGrid(state, ignoreEntityId, forOwner, terrainLayer(state, restriction, forOwner ?? 0));
 }
 
 /**
@@ -51,22 +52,28 @@ export function buildNavGrid(
  * board and kept against the board's own array; building it per tick for
  * every row in play doubled the tick.
  */
-const terrainLayers = new WeakMap<number[], Map<number, Uint8Array>>();
-export function terrainLayer(state: GameState, restriction: number): Uint8Array {
+const terrainLayers = new WeakMap<number[], WeakMap<GameRules['terrainRestrictions'], Map<number, Uint8Array>>>();
+export function terrainLayer(state: GameState, restriction: number, owner: Entity['owner'] = 0): Uint8Array {
   const terrain = state.terrain;
-  let rows = terrainLayers.get(terrain);
+  const rules = rulesForPlayer(state, owner);
+  let tables = terrainLayers.get(terrain);
+  if (!tables) {
+    tables = new WeakMap();
+    terrainLayers.set(terrain, tables);
+  }
+  let rows = tables.get(rules.terrainRestrictions);
   if (!rows) {
     rows = new Map();
-    terrainLayers.set(terrain, rows);
+    tables.set(rules.terrainRestrictions, rows);
   }
   let layer = rows.get(restriction);
   if (layer) return layer;
   // Rows that agree over this board's terrains share one layer object -- the
   // scout's row 28 and the villager's row 7 differ only on shores no board
   // paints -- so a caller keying on the layer sees one map, not three.
-  const allowed = state.rules.terrainRestrictions[restriction];
+  const allowed = rules.terrainRestrictions[restriction];
   for (const [other, built] of rows) {
-    const otherAllowed = state.rules.terrainRestrictions[other];
+    const otherAllowed = rules.terrainRestrictions[other];
     const same = allowed === otherAllowed
       || (allowed !== undefined && otherAllowed !== undefined
         && allowed.length === otherAllowed.length && allowed.every(id => otherAllowed.includes(id)));
@@ -85,7 +92,7 @@ export function terrainLayer(state: GameState, restriction: number): Uint8Array 
       const id = terrain[tile];
       let blocked = refused.get(id);
       if (blocked === undefined) {
-        blocked = !groundAllows(state.rules, restriction, id);
+        blocked = !groundAllows(rules, restriction, id);
         refused.set(id, blocked);
       }
       if (blocked) layer[tile] = 1;
@@ -112,7 +119,7 @@ export function entityGrid(
   for (const entity of state.entities) {
     if (entity.dead || entity.id === ignoreEntityId) continue;
     if (!isBuilding(entity.kind) && entity.kind !== 'resource') continue;
-    const building = state.rules.buildings[entity.kind as keyof typeof state.rules.buildings];
+    const building = rulesForPlayer(state, entity.owner).buildings[entity.kind as keyof typeof state.rules.buildings];
     // A farm is a building nothing walks round, for either side and whether or
     // not it is finished — the DAT gives it no collision height and no
     // obstruction class (issue #40).
@@ -397,7 +404,7 @@ const isEngaged = (entity: Entity): boolean => entity.activity === 'attacking';
  * Traveling units pass through others (AoE2 lets crossing groups overlap in
  * motion); they spread out once they stop.
  */
-export function separateUnits(state: GameState, movable: Entity[], grid: NavGrid): void {
+export function separateUnits(state: GameState, movable: Entity[], grid: NavGrid | ((entity: Entity) => NavGrid)): void {
   for (let i = 0; i < movable.length; i++) {
     for (let j = i + 1; j < movable.length; j++) {
       const a = movable[i];
@@ -422,8 +429,8 @@ export function separateUnits(state: GameState, movable: Entity[], grid: NavGrid
       const normalLength = Math.hypot(nx, ny);
       const ux = nx / normalLength;
       const uy = ny / normalLength;
-      tryNudge(grid, a, -ux * push, -uy * push, state);
-      tryNudge(grid, b, ux * push, uy * push, state);
+      tryNudge(typeof grid === 'function' ? grid(a) : grid, a, -ux * push, -uy * push, state);
+      tryNudge(typeof grid === 'function' ? grid(b) : grid, b, ux * push, uy * push, state);
     }
   }
 }

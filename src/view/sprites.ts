@@ -3,9 +3,10 @@ import { materialColor, materialOpacity, texture as textureNode, vec2 } from 'th
 import { skinnedKey } from './skins';
 import { atlasPage, spriteTexture, type ContentAssets, type Atlas, type AnimationInfo, type ImportedEntity } from './assets';
 import { isAnimal, isBuilding, isUnit } from '../sim/data';
+import { rulesForPlayer } from '../sim/civilizations';
 import { corpseAgeSeconds, swingSeconds } from '../sim/game';
 import { createTerrainPatch, elevationAt, ELEVATION_PIXELS, elevatedWorldToIso, FOG_EXPLORED } from './world';
-import { groundLayerOrder } from './render-order';
+import { contourLayerOrder, groundLayerOrder, projectileLayerOrder, rallyLayerOrder, spriteLayerOrder } from './render-order';
 import { worldToIso, isoDepth, TILE_H } from './iso';
 import type { Entity, GameState, Point, ReadonlyGameState, DeepReadonly } from '../sim/types';
 
@@ -31,7 +32,6 @@ export function playerColorHex(assets: ContentAssets | undefined, owner: number)
 
 interface Piece {
   mesh: THREE.Mesh;
-  atlasKey?: string;
   /** A valid frozen frame whose page has not arrived yet. */
   pendingTexture?: string;
   /** Current nonempty frame's page; also retained by frozen fog views. */
@@ -268,7 +268,7 @@ export function entityKey(entity: Entity): string {
  */
 export function decayFraction(state: ReadonlyGameState, entity: Entity): number | undefined {
   if (!entity.dead || !isAnimal(entity.kind)) return undefined;
-  const total = state.rules.units[entity.kind].foodAmount ?? 0;
+  const total = rulesForPlayer(state, entity.owner).units[entity.kind].foodAmount ?? 0;
   if (total <= 0) return undefined;
   const left = Math.max(0, Math.min(total, entity.amount ?? 0));
   return 1 - left / total;
@@ -497,7 +497,7 @@ function animalVariant(state: ReadonlyGameState, entity: Entity): string | undef
   if (!target || !isAnimal(target.kind)) return undefined;
   // A herdable is walked home and milked where it stands; everything else on
   // four legs is hunted. The rules already draw that line for gathering.
-  return state.rules.units[target.kind].herdRange !== undefined
+  return rulesForPlayer(state, target.owner).units[target.kind].herdRange !== undefined
     ? 'villager-shepherd'
     : 'villager-hunter';
 }
@@ -659,7 +659,7 @@ function updateDamage(
   const damageAtlas = standing ? imported?.atlases[`${animationName}-damage`] : undefined;
   if (view.damage && damageAtlas) {
     applyFrame(view.damage, assets, damageAtlas, frameIndex, entity.position, 0x000000);
-    view.damage.mesh.renderOrder = 1000 + depth * 10 + 1.5;
+    view.damage.mesh.renderOrder = spriteLayerOrder(depth, 1.5);
     (view.damage.mesh.material as THREE.MeshBasicMaterial).opacity = lost;
   } else if (view.damage) {
     view.damage.mesh.visible = false;
@@ -703,7 +703,7 @@ function updateDamage(
     // down, and applyFrame anchored the hotspot at the origin.
     piece.mesh.position.x += iso.x + flame.offset[0];
     piece.mesh.position.y += iso.y - flame.offset[1];
-    piece.mesh.renderOrder = 1000 + depth * 10 + 9;
+    piece.mesh.renderOrder = spriteLayerOrder(depth, 9);
     const lit = time - (view.flameStageSince ?? time);
     (piece.mesh.material as THREE.MeshBasicMaterial).opacity =
       effect.fadeInSeconds > 0 ? Math.min(1, lit / effect.fadeInSeconds) : 1;
@@ -772,14 +772,14 @@ export function updateFlagView(
   // Over every sprite: the flag marks a point on the map, and a building
   // between the camera and that point must not swallow it.
   applyFrame(view.body, assets, atlas, frame, position, 0xffffff);
-  view.body.mesh.renderOrder = 4600 + depth;
+  view.body.mesh.renderOrder = rallyLayerOrder(depth);
   const colorAtlas = flag?.atlases['idle-playercolor'];
   if (colorAtlas && owner !== 0) {
     applyFrame(
       view.color, assets, colorAtlas, frame, position,
       view.color.mapNode ? 0xffffff : PLAYER_COLORS[owner],
     );
-    view.color.mesh.renderOrder = 4601 + depth;
+    view.color.mesh.renderOrder = rallyLayerOrder(depth, 1);
     (view.color.mesh.material as THREE.MeshBasicMaterial).opacity = 1;
   } else {
     view.color.mesh.visible = false;
@@ -823,7 +823,7 @@ export function updateProjectileView(
     const frame = Math.min(flame.atlas.framesInFile - 1, Math.floor(progress * flame.atlas.framesInFile));
     applyFrame(view.body, assets, flame.atlas, frame, position, 0xffffff);
     view.body.mesh.position.y += groundHeightPixels + launchHeight * HEIGHT_PIXELS;
-    view.body.mesh.renderOrder = 4000 + isoDepth(position.x, position.y);
+    view.body.mesh.renderOrder = projectileLayerOrder(isoDepth(position.x, position.y));
     return;
   }
   const atlas = arrow?.atlases['idle'];
@@ -860,7 +860,7 @@ export function updateProjectileView(
 
   applyFrame(view.body, assets, atlas, direction * framesPerDirection + frame, position, 0xffffff);
   view.body.mesh.position.y += height * HEIGHT_PIXELS + groundHeightPixels;
-  view.body.mesh.renderOrder = 4000 + isoDepth(position.x, position.y);
+  view.body.mesh.renderOrder = projectileLayerOrder(isoDepth(position.x, position.y));
 }
 
 /**
@@ -894,7 +894,6 @@ export function updateOcclusion(views: Map<string, EntityView>, state: ReadonlyG
       });
     }
   }
-  if (!occluders.length) return;
   for (const entity of state.entities) {
     if (entity.dead || !isUnit(entity.kind)) continue;
     const view = views.get(`e${entity.id}`);
@@ -918,7 +917,7 @@ export function updateOcclusion(views: Map<string, EntityView>, state: ReadonlyG
     // pending or retired frame drawable. Its old texture may be evicted (#172).
     mesh.visible = covered && !!view.outline.textureImage && !view.outline.pendingTexture;
     for (const part of view.layerOutlines ?? []) {
-      part.mesh.visible = covered && !!part.atlasKey && !!part.textureImage && !part.pendingTexture;
+      part.mesh.visible = covered && !!part.textureImage && !part.pendingTexture;
     }
   }
 }
@@ -977,7 +976,8 @@ function updateGarrisonFlags(
   const raise = elevationAt(state, entity.position.x, entity.position.y) * ELEVATION_PIXELS;
   for (let i = 0; i < count; i++) {
     const body = bodies[i], color = colors[i], flag = flags[i];
-    const order = 1000 + isoDepth(entity.position.x, entity.position.y) * 10 + 2;
+    const depth = isoDepth(entity.position.x, entity.position.y);
+    const order = spriteLayerOrder(depth, 2);
     if (!assets || !imported) {
       const iso = worldToIso(entity.position.x, entity.position.y);
       body.mesh.visible = true;
@@ -1000,7 +1000,7 @@ function updateGarrisonFlags(
       applyFrame(color, assets, mask, frame, entity.position, color.mapNode ? 0xffffff : PLAYER_COLORS[entity.owner]);
       color.mesh.position.x += flag.x;
       color.mesh.position.y += raise - flag.y;
-      color.mesh.renderOrder = order + 0.1;
+      color.mesh.renderOrder = spriteLayerOrder(depth, 2.1);
     }
   }
 }
@@ -1016,9 +1016,11 @@ export function updateEntityView(
   const depth = isoDepth(entity.position.x, entity.position.y);
   // A new animation may have no contour. Do not leave the previous animation
   // eligible for updateOcclusion to revive after its texture expires.
-  view.outline.mesh.visible = false;
-  view.outline.textureImage = undefined;
-  view.outline.pendingTexture = undefined;
+  for (const piece of [view.outline, ...(view.layerOutlines ?? [])]) {
+    piece.mesh.visible = false;
+    piece.textureImage = undefined;
+    piece.pendingTexture = undefined;
+  }
   updateGarrisonFlags(view, assets, state, entity, time, hasGarrison);
   if (entity.kind === 'farm') {
     updateFarmView(view, assets, state, entity);
@@ -1027,7 +1029,7 @@ export function updateEntityView(
   if (view.fallback || !assets) {
     const iso = elevatedWorldToIso(state, entity.position.x, entity.position.y);
     view.body.mesh.position.set(iso.x, iso.y + view.body.mesh.scale.y / 2, 0);
-    view.body.mesh.renderOrder = 1000 + depth * 10;
+    view.body.mesh.renderOrder = spriteLayerOrder(depth);
     (view.body.mesh.material as THREE.MeshBasicMaterial).opacity = entity.dead ? 0.4 : 1;
     return;
   }
@@ -1182,13 +1184,13 @@ export function updateEntityView(
 
   applyFrame(view.body, assets, atlas, frameIndex, entity.position, tint);
   view.frameIndex = frameIndex;
-  view.body.mesh.renderOrder = 1000 + depth * 10;
+  view.body.mesh.renderOrder = spriteLayerOrder(depth);
   (view.body.mesh.material as THREE.MeshBasicMaterial).opacity = animation.alpha ?? 1;
   // The leap over the school, on the same clock; its empty frames draw nothing.
   const leapAtlas = imported?.atlases['leap'];
   if (view.leap && leapAtlas && !entity.dead) {
     applyFrame(view.leap, assets, leapAtlas, frameIndex % leapAtlas.framesInFile, entity.position, tint);
-    view.leap.mesh.renderOrder = 1000 + depth * 10 + 2;
+    view.leap.mesh.renderOrder = spriteLayerOrder(depth, 2);
   } else if (view.leap) {
     view.leap.mesh.visible = false;
   }
@@ -1201,7 +1203,7 @@ export function updateEntityView(
     // without imported ramps the sheet is multiplied by the flat player colour.
     const colorTint = view.color.mapNode ? 0xffffff : PLAYER_COLORS[entity.owner];
     applyFrame(view.color, assets, colorAtlas, frameIndex, entity.position, colorTint);
-    view.color.mesh.renderOrder = 1000 + depth * 10 + 1;
+    view.color.mesh.renderOrder = spriteLayerOrder(depth, 1);
     (view.color.mesh.material as THREE.MeshBasicMaterial).opacity =
       (entity.buildProgress !== undefined ? 0.85 : 1) * (animation.alpha ?? 1);
   } else {
@@ -1218,9 +1220,9 @@ export function updateEntityView(
   const outlineAtlas = imported?.atlases[`${choice.name}-outline`];
   if (outlineAtlas && view.outlineColor !== undefined && isUnit(entity.kind) && !entity.dead) {
     applyFrame(view.outline, assets, outlineAtlas, frameIndex, entity.position, view.outlineColor);
-    // Above every body but under the fog, so a hidden unit reads through the
-    // building without reading through the dark.
-    view.outline.mesh.renderOrder = 4500 + depth;
+    // Above all bodies at every map depth. Visibility admits the whole entity;
+    // ground fog remains below sprites and unseen units have no live view.
+    view.outline.mesh.renderOrder = contourLayerOrder(depth);
   }
   view.outline.mesh.visible = false;
 
@@ -1241,7 +1243,7 @@ export function updateEntityView(
       view.layerShadows.push(shadow); view.layerOutlines.push(outline);
       view.group.add(shadow.mesh, outline.mesh);
     }
-    for (const piece of [...view.layerShadows, ...view.layerOutlines]) { piece.mesh.visible = false; piece.atlasKey = undefined; }
+    for (const piece of view.layerShadows) piece.mesh.visible = false;
   }
   // The town center's four annex pieces are upgraded by the same age
   // technology as the building itself, so each follows the same chain.
@@ -1259,7 +1261,7 @@ export function updateEntityView(
       const phase = Math.floor(elapsed / (anim.frameSeconds || 0.1));
       const frame = (directionIndex(view.facing, anim.directions) % directions) * anim.frames
         + (entity.dead ? Math.min(phase, anim.frames - 1) : phase % Math.max(1, anim.frames));
-      const order = 1000 + depth * 10 + 2 + index * 2;
+      const order = spriteLayerOrder(depth, 2 + index * 2);
       applyFrame(piece, assets, sheet, frame, entity.position, 0xffffff);
       piece.mesh.position.x += layer.x;
       piece.mesh.position.y -= layer.y;
@@ -1270,19 +1272,19 @@ export function updateEntityView(
         ['outline', view.layerOutlines![index], view.outlineColor ?? 0xffffff],
       ] as const) {
         const maskSheet = imported.atlases[`${layer.animation}-${suffix}`];
-        if (!maskSheet || entity.dead) continue;
+        if (!maskSheet || entity.dead || (suffix === 'outline' && view.outlineColor === undefined)) continue;
         applyFrame(part, assets, maskSheet, frame, entity.position, tint);
         part.mesh.position.x += layer.x; part.mesh.position.y -= layer.y;
         if (suffix === 'shadow') {
           part.mesh.renderOrder = groundLayerOrder(500, depth); configureShadow(part, assets);
-        } else { part.mesh.renderOrder = 4500 + depth; part.mesh.visible = false; }
+        } else { part.mesh.renderOrder = contourLayerOrder(depth); part.mesh.visible = false; }
       }
       const mask = imported.atlases[`${layer.animation}-playercolor`];
       if (colorPiece && mask && entity.owner !== 0) {
         applyFrame(colorPiece, assets, mask, frame, entity.position, colorPiece.mapNode ? 0xffffff : PLAYER_COLORS[entity.owner]);
         colorPiece.mesh.position.x += layer.x;
         colorPiece.mesh.position.y -= layer.y;
-        colorPiece.mesh.renderOrder = order + 1;
+        colorPiece.mesh.renderOrder = spriteLayerOrder(depth, 3 + index * 2);
         (colorPiece.mesh.material as THREE.MeshBasicMaterial).opacity = anim.alpha ?? 1;
       }
       continue;
@@ -1298,7 +1300,7 @@ export function updateEntityView(
     }
     // Annex art is anchored by its own frame hotspot; the DAT misplacement
     // is display-order metadata here, not an additional world offset.
-    const order = 1000 + depth * 10 + 1 + index * 2;
+    const order = spriteLayerOrder(depth, 1 + index * 2);
     applyFrame(piece, assets, annexAtlas, 0, entity.position, 0xffffff);
     piece.mesh.renderOrder = order;
     const annexColorAtlas = annex.atlases[`annex${index}-${annexName}-playercolor`]
@@ -1308,7 +1310,7 @@ export function updateEntityView(
         colorPiece, assets, annexColorAtlas, 0, entity.position,
         colorPiece.mapNode ? 0xffffff : PLAYER_COLORS[entity.owner],
       );
-      colorPiece.mesh.renderOrder = order + 1;
+      colorPiece.mesh.renderOrder = spriteLayerOrder(depth, 2 + index * 2);
       (colorPiece.mesh.material as THREE.MeshBasicMaterial).opacity = 1;
     } else if (colorPiece) {
       colorPiece.mesh.visible = false;

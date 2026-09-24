@@ -164,4 +164,58 @@ describe('repair', () => {
     expect(checksumState(a)).toBe(checksumState(b));
     expect(a.entities.find(e => e.kind === 'house')!.hp).toBe(a.rules.buildings.house.hp);
   });
+
+  it.each(['house', 'battering-ram'] as const)(
+    'completed player-attribute research changes actual %s repair bills only for its owner', kind => {
+      // A synthetic research fixture exercises set/add without claiming that
+      // the Britons have a repair-discount technology. Both mechanics exist.
+      const play = (research: boolean) => {
+        const rules = structuredClone(FALLBACK_RULES);
+        rules.playerAttributes = { buildingRepairCost: 0.5, unitRepairCost: 0.5 };
+        rules.technologies['repair-fixture'] = {
+          ...rules.technologies.loom, cost: { food: 0, wood: 0, gold: 0, stone: 0 },
+          researchSeconds: 0.1, effects: [
+            { resource: 'buildingRepairCost', operation: 'set', amount: 0.75 },
+            { resource: 'buildingRepairCost', operation: 'add', amount: -0.5 },
+            { resource: 'unitRepairCost', operation: 'set', amount: 0 },
+          ],
+        };
+        const state = createGame(94, rules);
+        const tc = state.entities.find(e => e.kind === 'town-center' && e.owner === 1)!;
+        if (research) expect(applyCommand(state, {
+          kind: 'research', player: 1, buildingId: tc.id, tech: 'repair-fixture',
+        }).ok).toBe(true);
+        run(state, 4);
+        expect(state.players[1].researched.includes('repair-fixture')).toBe(research);
+        expect(state.players[2].researched).not.toContain('repair-fixture');
+        const bills = [];
+        for (const owner of [1, 2] as const) {
+          const worker = state.entities.find(e => e.owner === owner && e.kind === 'villager')!;
+          const target = kind === 'house' ? place(state, kind, owner)
+            : spawn(state, kind, owner, { x: worker.position.x + 1, y: worker.position.y });
+          target.hp = 1;
+          state.players[owner].wood = 1000;
+          state.players[owner].gold = 1000;
+          expect(applyCommand(state, {
+            kind: 'order', player: owner, entityIds: [worker.id], target: target.position, targetId: target.id,
+          }).ok).toBe(true);
+          for (let tick = 0; tick < 2000 && target.hp < target.maxHp; tick++) stepGame(state);
+          expect(target.hp).toBe(target.maxHp);
+          const price = kind === 'house' ? rules.buildings.house.cost : rules.units[kind].cost;
+          const fraction = research && owner === 1 ? (kind === 'house' ? 0.25 : 0) : 0.5;
+          const bill = { wood: 1000 - state.players[owner].wood, gold: 1000 - state.players[owner].gold };
+          for (const resource of ['wood', 'gold'] as const) {
+            expect(bill[resource]).toBe(Math.floor((target.maxHp - 1) * price[resource] * fraction / target.maxHp));
+          }
+          bills.push(bill);
+        }
+        return { bills, checksum: checksumState(state) };
+      };
+      const base = play(false);
+      const upgraded = play(true);
+      expect(upgraded.bills[0].wood).toBeLessThan(base.bills[0].wood);
+      expect(upgraded.bills[1]).toEqual(base.bills[1]);
+      expect(play(true)).toEqual(upgraded);
+    },
+  );
 });

@@ -8,6 +8,7 @@
  * the state it can already see and answers with the aliases to play.
  */
 import { isBuilding } from '../sim/data';
+import { rulesForPlayer } from '../sim/civilizations';
 import type { TechKey } from '../sim/data';
 import type { GameState, PlayerId, ReadonlyGameState } from '../sim/types';
 
@@ -146,7 +147,7 @@ export function pollCues(
   const self = state.players[player];
   if (watcher.started) {
     for (const key of self.researched.slice(watcher.researched)) {
-      cues.push(state.rules.technologies[key as TechKey]?.grantsAge !== undefined
+      cues.push(rulesForPlayer(state, player).technologies[key as TechKey]?.grantsAge !== undefined
         ? 'age_up' : 'tech_researched');
     }
     const capped = self.populationCap > 0 && self.population >= self.populationCap;
