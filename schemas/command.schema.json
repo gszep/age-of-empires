@@ -164,6 +164,7 @@
         },
         "building": {
           "enum": [
+            "town-center",
             "barracks",
             "house",
             "mill",

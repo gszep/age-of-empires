@@ -20,6 +20,7 @@
  * | 8 | market | — |
  * | 9 | monastery | watch tower |
  * | 10 | university | — |
+ * | 11 | town center | — |
  * | 12 | wonder | — |
  * | 13 | — | castle |
  *

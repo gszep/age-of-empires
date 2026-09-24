@@ -77,8 +77,11 @@ complete additional profiles. `sim/civilizations.ts` resolves player-owned rules
 Gaia and map generation use the root. Commands, per-player research lookups,
 placement/navigation and UI read through that boundary. The importer currently
 publishes an empty additional catalogue: synthetic mixed-profile acceptance is
-implemented, while real Frankish roster/art/bonuses and conversion inheritance
-remain tracked work. See `docs/civilization-coverage.md`.
+implemented, while real Frankish roster/art/bonuses and conversion reference
+acceptance remain tracked work. Converted entities carry a plain-data unit-rule
+snapshot consumed by `unitRulesForEntity`; creation and player-level systems still
+resolve through the player's catalogue. The inheritance split is inferred, with
+remaining evidence gaps in `docs/civilization-coverage.md` and `docs/ledger.md`.
 
 Rendering uses bounded pass-local sort keys (`view/render-order.ts`): ground,
 fog, sprite bodies, projectiles, contours, rally flags and placement overlays keep

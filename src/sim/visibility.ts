@@ -4,9 +4,9 @@
  * entities. Observations and the viewer read only this state.
  */
 import { isBuilding, isUnit, lingersInFog } from './data';
-import { buildingRulesFor, unitRulesFor } from './rules';
+import { buildingRulesFor, unitRulesForEntity } from './rules';
 import { rulesForPlayer } from './civilizations';
-import type { BuildingKind, Entity, GameState, PlayerId, UnitKind } from './types';
+import type { BuildingKind, Entity, GameState, PlayerId } from './types';
 
 export interface RememberedEntity {
   id: number;
@@ -43,7 +43,7 @@ export function lineOfSightOf(state: GameState, entity: Entity): number {
   // on every building, and reading state.rules here left it doing nothing
   // (issue #29 -- the same shape as #26, where combat read the base table).
   if (isUnit(entity.kind)) {
-    return unitRulesFor(state, entity.owner, entity.kind as UnitKind).lineOfSight;
+    return unitRulesForEntity(state, entity).lineOfSight;
   }
   // A foundation is a claim on the ground, not a garrison: it sees nothing
   // until it is finished. The DAT carries one `line_of_sight` per unit and no

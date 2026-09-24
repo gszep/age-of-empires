@@ -1,4 +1,4 @@
-import type { GameRules, NodeKind, VillagerGatherTask } from './data';
+import type { GameRules, NodeKind, UnitRules, VillagerGatherTask } from './data';
 import type { PlayerVisibility } from './visibility';
 
 export type PlayerId = 1 | 2;
@@ -59,6 +59,10 @@ export interface Entity {
   id: number;
   kind: EntityKind;
   owner: PlayerId | 0;
+  /** Unit-local attributes locked at conversion, independent of either side's
+   * subsequent research. Player-level resources/tree permissions still follow
+   * owner. Plain data so saves and replays preserve the same inheritance. */
+  convertedRules?: UnitRules;
   position: Point;
   hp: number;
   maxHp: number;

@@ -221,6 +221,8 @@ export interface BuildingRules {
   buildSeconds: number;
   popSupport: number;
   buildable: boolean;
+  /** Before this age, only a replacement may be placed; foundations count. */
+  additionalAge?: number;
   armors: AttackValue[];
   /** Resources villagers may deposit here; empty for buildings that take none. */
   accepts: ResourceKind[];
@@ -446,11 +448,11 @@ export function groundAllows(rules: GameRules, row: number, terrain: number): bo
 }
 
 /** The restriction row an entity obeys: its own, or its category's default. */
-export function restrictionOf(rules: GameRules, entity: { kind: Entity['kind'] }): number {
+export function restrictionOf(rules: GameRules, entity: Pick<Entity, 'kind' | 'convertedRules'>): number {
   if (isBuilding(entity.kind)) {
     return rules.buildings[entity.kind as BuildingKind]?.terrainRestriction ?? BUILDING_RESTRICTION;
   }
-  return rules.units[entity.kind as UnitKind]?.terrainRestriction ?? LAND_RESTRICTION;
+  return (entity.convertedRules ?? rules.units[entity.kind as UnitKind])?.terrainRestriction ?? LAND_RESTRICTION;
 }
 
 /**
@@ -1021,8 +1023,9 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 4, amount: 1 }, { class: 3, amount: 1 }, { class: 11, amount: 10 }, { class: 21, amount: 0 }] },
     'town-center': {
       hillMode: 2,
-      hp: 2400, radius: 2, lineOfSight: 8, cost: cost(0, 275), buildSeconds: 100,
-      popSupport: 5, buildable: false, accepts: ['food', 'wood', 'gold', 'stone'],
+      hp: 2400, radius: 2, lineOfSight: 8, cost: cost(0, 275, 0, 100), buildSeconds: 150,
+      popSupport: 5, buildable: true, buildButton: 11, additionalAge: 2,
+      accepts: ['food', 'wood', 'gold', 'stone'],
       armors: [{ class: 21, amount: 0 }, { class: 11, amount: 0 }, { class: 4, amount: 3 }, { class: 3, amount: 5 }],
       confirmDelete: true,
       garrison: {
@@ -1321,7 +1324,7 @@ interface ManifestEntity {
   cost?: Partial<Record<ResourceKind, number>>;
   populationCost?: number;
   train?: { buildingId: number; seconds: number; button?: number };
-  build?: { builderId: number; seconds: number; button?: number };
+  build?: { builderId: number; seconds: number; button?: number; sourceId?: number; additionalAge?: number };
   combat?: {
     reloadSeconds: number;
     frameDelay: number;
@@ -1537,6 +1540,9 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
   const building = (key: string, buildable: boolean): BuildingRules => {
     const fallback = FALLBACK_RULES.buildings[key as BuildingKind];
     if (!e[key]) return { ...fallback, buildable };
+    // Pre-#177 manifests read the finished TC's unusable train row. Keep
+    // those playable with the source-matched open construction values.
+    const legacyTownCenter = key === 'town-center' && e[key].build?.sourceId === undefined;
     return {
       datId: e[key].id,
       deathSeconds: e[key].deathSeconds ?? fallback.deathSeconds,
@@ -1548,8 +1554,9 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       terrainRestriction: e[key].terrainRestriction ?? fallback.terrainRestriction,
       hillMode: e[key].hillMode ?? fallback.hillMode,
       minimapMode: e[key].minimapMode ?? fallback.minimapMode,
-      cost: manifestCost(e[key]),
-      buildSeconds: e[key].build?.seconds ?? 25,
+      cost: legacyTownCenter ? fallback.cost : manifestCost(e[key]),
+      buildSeconds: legacyTownCenter ? fallback.buildSeconds : e[key].build?.seconds ?? 25,
+      additionalAge: e[key].build?.additionalAge ?? fallback.additionalAge,
       popSupport: e[key].popSupport ?? 0,
       buildable,
       armors: attackValues(e[key].combat?.armors),
@@ -1730,7 +1737,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       },
     },
     buildings: {
-      'town-center': building('town-center', false),
+      'town-center': building('town-center', true),
       barracks: building('barracks', true),
       house: building('house', true),
       mill: building('mill', true),

@@ -12,7 +12,7 @@ import {
   buildNavGrid, distance, entityGrid, findPath, halfExtent, isBlocked, separateUnits, terrainLayer, tileOf, type NavGrid,
 } from './nav';
 import { random01, seedFrom } from './random';
-import { buildingRulesFor, combine, playerAttributeFor, unitRulesFor } from './rules';
+import { buildingLimitReached, buildingRulesFor, combine, inheritConvertedUnit, playerAttributeFor, unitRulesFor, unitRulesForEntity } from './rules';
 import { civilizationRules, rulesForPlayer } from './civilizations';
 import { createVisibility, isEntityVisible, updateVisibility } from './visibility';
 import type {
@@ -177,12 +177,12 @@ function recalculatePopulation(state: GameState): void {
     const rules = rulesForPlayer(state, player);
     state.players[player].population = state.entities
       .filter(e => !e.dead && e.owner === player && isUnit(e.kind))
-      .reduce((sum, e) => sum + rules.units[e.kind as UnitKind].popCost, 0)
+      .reduce((sum, e) => sum + unitRulesForEntity(state, e).popCost, 0)
       // A unit inside a building is out of the list and still a person.
       + state.entities
         .filter(e => !e.dead && e.owner === player && e.garrison?.length)
         .reduce((sum, e) => sum + e.garrison!.reduce(
-          (inner, unit) => inner + rules.units[unit.kind as UnitKind].popCost, 0), 0);
+          (inner, unit) => inner + unitRulesForEntity(state, unit).popCost, 0), 0);
     state.players[player].populationCap = rules.startingPopulationCap + state.entities
       .filter(e => !e.dead && e.owner === player && isBuilding(e.kind) && e.buildProgress === undefined)
       .reduce((sum, e) => sum + rules.buildings[e.kind as BuildingKind].popSupport, 0);
@@ -271,7 +271,7 @@ export function notYetUpgradedInto(state: GameState, player: PlayerId, kind: str
 // unitRulesFor and buildingRulesFor live in rules.ts (visibility needs them
 // too); re-exported here because every consumer of the sim imports them from
 // the game module.
-export { buildingRulesFor, playerAttributeFor, unitRulesFor } from './rules';
+export { buildingRulesFor, playerAttributeFor, unitRulesFor, unitRulesForEntity } from './rules';
 export { rulesForPlayer } from './civilizations';
 
 /**
@@ -532,7 +532,7 @@ function isHuntable(state: GameState, entity: Entity): boolean {
  * In particular, checking a hover must not reserve farms or reset work progress.
  */
 export function resolveUnitOrder(state: GameState, entity: Entity, target: Point, targetEntity?: Entity): Order {
-  const unitRules = isUnit(entity.kind) ? unitRulesFor(state, entity.owner, entity.kind) : undefined;
+  const unitRules = isUnit(entity.kind) ? unitRulesForEntity(state, entity) : undefined;
   // A unit with no attack is never given one by a right-click: a monk sent at
   // a boar would otherwise stand over it forever, swinging nothing.
   const armed = !unitRules || combatOf(state, entity).attacks.some(attack => attack.amount > 0);
@@ -588,7 +588,7 @@ function assignOrder(state: GameState, entity: Entity, target: Point, targetEnti
   if (order.kind === 'convert') entity.convertTicks = undefined;
   if (order.kind === 'repair') entity.repaired = 0;
   if (order.kind === 'move') {
-    const unitRules = isUnit(entity.kind) ? unitRulesFor(state, entity.owner, entity.kind) : undefined;
+    const unitRules = isUnit(entity.kind) ? unitRulesForEntity(state, entity) : undefined;
     // Told to go somewhere, a siege engine that is set up packs itself away
     // first, as the reference does. An order to *attack* does not: an engine
     // in range should shoot rather than fold up.
@@ -813,7 +813,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
     if (!building) return rejected(`building ${command.buildingId} is not owned`);
     if (!building.garrison?.length) return rejected('nobody is garrisoned');
-    if (isUnit(building.kind) && unitRulesFor(state, building.owner, building.kind).transportCapacity && command.target) {
+    if (isUnit(building.kind) && unitRulesForEntity(state, building).transportCapacity && command.target) {
       if (!Number.isFinite(command.target.x) || !Number.isFinite(command.target.y)) return rejected('target is not a point');
       building.order = { kind: 'unload', target: { ...command.target } };
       clearPath(building);
@@ -864,7 +864,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     for (const entity of state.entities) {
       if (entity.dead || !command.entityIds.includes(entity.id) || entity.owner !== command.player) continue;
       const setup = isUnit(entity.kind)
-        && unitRulesFor(state, entity.owner, entity.kind as UnitKind).unpacked;
+        && unitRulesForEntity(state, entity).unpacked;
       if (!setup) continue;
       matched++;
       if ((entity.unpacked === true) === command.unpacked) continue;  // already there
@@ -896,6 +896,9 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
   }
   if ((rules.age ?? 0) > state.players[command.player].age) {
     return rejected(`${command.building} needs a later age`);
+  }
+  if (buildingLimitReached(state, command.player, command.building)) {
+    return rejected(`${command.building} limit reached for this age`);
   }
   const builders = state.entities.filter(
     e => !e.dead && command.builderIds.includes(e.id) && e.owner === command.player && e.kind === (rules.builderKind ?? 'villager'),
@@ -1066,7 +1069,7 @@ function combatOf(state: GameState, entity: Entity): {
   reloadSeconds: number; releaseSeconds: number;
   projectileSpeed?: number; launchHeight?: number;
 } & Shot {
-  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
+  const rules = unitRulesForEntity(state, entity);
   const setup = rules.unpacked;
   if (setup) {
     return entity.unpacked
@@ -1112,7 +1115,7 @@ export function swingSeconds(state: GameState, entity: Entity): number | undefin
     releaseSeconds = attack.releaseSeconds;
     reloadSeconds = attack.reloadSeconds;
   } else {
-    const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
+    const rules = unitRulesForEntity(state, entity);
     const target = 'targetId' in entity.order
       ? state.entities.find(e => e.id === (entity.order as { targetId: number }).targetId)
       : undefined;
@@ -1162,7 +1165,7 @@ function attackProfile(
       releaseSeconds: attack?.releaseSeconds,
     };
   }
-  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
+  const rules = unitRulesForEntity(state, entity);
   if (rules.hunt && target && isAnimal(target.kind)) return { ...rules.hunt };
   const combat = combatOf(state, entity);
   return {
@@ -1201,7 +1204,7 @@ const interactionRange = (target: Entity): number => target.radius + 1.6;
  * the map to a bush somebody scouted an hour ago.
  */
 function autoContinueRange(state: GameState, entity: Entity): number {
-  const los = isUnit(entity.kind) ? unitRulesFor(state, entity.owner, entity.kind).lineOfSight : 0;
+  const los = isUnit(entity.kind) ? unitRulesForEntity(state, entity).lineOfSight : 0;
   return los * 3;
 }
 
@@ -1320,7 +1323,7 @@ function nearestDropSite(state: GameState, entity: Entity, resource?: ResourceKi
   const task = entity.carrying?.task
     ?? (fishOnly.has(entity.carrying?.node ?? 'berries') ? 'fisher' : GATHER_TASK[wanted ?? 'food']);
   const sites = entity.kind === 'villager' ? rules.villagerGather[task].dropSites
-    : rules.units[entity.kind as UnitKind]?.dropSites;
+    : unitRulesForEntity(state, entity)?.dropSites;
   let best: Entity | undefined;
   let bestDistance = Infinity;
   for (const candidate of state.entities) {
@@ -1365,7 +1368,7 @@ export function computeDamage(attacks: AttackValue[], armors: AttackValue[]): nu
 }
 
 function armorsOf(state: GameState, entity: Entity): AttackValue[] {
-  if (isUnit(entity.kind)) return unitRulesFor(state, entity.owner, entity.kind as UnitKind).armors;
+  if (isUnit(entity.kind)) return unitRulesForEntity(state, entity).armors;
   if (isBuilding(entity.kind)) {
     return buildingRulesFor(state, entity.owner, entity.kind as BuildingKind).armors;
   }
@@ -1383,7 +1386,7 @@ const FALLBACK_CORPSE_SECONDS = 3;
 function corpseLifetimeTicks(state: ReadonlyGameState, entity: DeepReadonly<Entity>): number {
   const rules = isBuilding(entity.kind)
     ? rulesForPlayer(state, entity.owner).buildings[entity.kind]
-    : rulesForPlayer(state, entity.owner).units[entity.kind as UnitKind];
+    : isUnit(entity.kind) ? unitRulesForEntity(state, entity) : undefined;
   return Math.round(Math.max(rules?.corpseSeconds ?? FALLBACK_CORPSE_SECONDS,
     rules?.deathSeconds ?? 0) * TICKS_PER_SECOND);
 }
@@ -1400,7 +1403,7 @@ function kill(state: GameState, entity: Entity): void {
   if (entity.dead) return;
   if (entity.bellReturn) entity.bellReturn = undefined;
   if (entity.kind === 'town-center' && entity.townBell) releaseTownBell(state, entity);
-  const transport = isUnit(entity.kind) && unitRulesFor(state, entity.owner, entity.kind).transportCapacity;
+  const transport = isUnit(entity.kind) && unitRulesForEntity(state, entity).transportCapacity;
   if (transport) entity.garrison = undefined; // a sinking transport loses its passengers
   else if (entity.garrison?.length) ungarrisonAll(state, entity);
   entity.dead = true;
@@ -1414,8 +1417,8 @@ function kill(state: GameState, entity: Entity): void {
   // Never shorter than the death graphic, or the thing vanishes mid-fall.
   entity.decayTicks = corpseLifetimeTicks(state, entity);
   clearPath(entity);
-  if (isUnit(entity.kind) && unitRulesFor(state, entity.owner, entity.kind).selfDestruct && entity.hp <= 0) {
-    const combat = unitRulesFor(state, entity.owner, entity.kind);
+  if (isUnit(entity.kind) && unitRulesForEntity(state, entity).selfDestruct && entity.hp <= 0) {
+    const combat = unitRulesForEntity(state, entity);
     applyBlast(state, entity.position, combat.blastRadius ?? 0, combat.blastAttackLevel ?? 2,
       combat.attacks, entity.id, entity.owner as PlayerId);
   }
@@ -1439,7 +1442,7 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
     entity.gatherProgress = 0;
     clearPath(entity);
   }
-  const speed = unitRulesFor(state, entity.owner, entity.kind as UnitKind).speed;
+  const speed = unitRulesForEntity(state, entity).speed;
   const capacity = holdOf(state, entity, assigned);
   const carrying = entity.carrying;
 
@@ -1601,7 +1604,7 @@ function homeMarket(state: GameState, entity: Entity): Entity | undefined {
  */
 function updateTrader(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'trade') return;
-  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
+  const rules = unitRulesForEntity(state, entity);
   const rate = rules.tradeRatePerSecond ?? 0;
   const capacity = rules.tradeCapacity ?? 0;
   const goods = () => Math.min(capacity, Math.floor(entity.gatherProgress ?? 0));
@@ -1703,7 +1706,7 @@ function updateBuilder(state: GameState, grid: NavGrid, entity: Entity, builderC
   if (!site || site.buildProgress === undefined) { becomeIdle(entity); return; }
   if (!inRange(entity, site, 0.4)) {
     entity.activity = 'moving';
-    moveAlong(state, grid, entity, site.position, unitRulesFor(state, entity.owner, entity.kind as UnitKind).speed, interactionRange(site));
+    moveAlong(state, grid, entity, site.position, unitRulesForEntity(state, entity).speed, interactionRange(site));
     return;
   }
   clearPath(entity);
@@ -1732,7 +1735,7 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
     becomeIdle(entity);
     return;
   }
-  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
+  const rules = unitRulesForEntity(state, entity);
   // A siege engine that is packed has no attack, and one that is set up cannot
   // walk to reach anything: either way there is nothing to do but stand.
   if (rules.unpacked) {
@@ -1805,7 +1808,7 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
  */
 function updateHealer(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'heal') return;
-  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
+  const rules = unitRulesForEntity(state, entity);
   const heal = rules.heal;
   const target = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
   if (!heal || !target || target.owner !== entity.owner || target.hp >= target.maxHp) {
@@ -1833,20 +1836,21 @@ function updateHealer(state: GameState, grid: NavGrid, entity: Entity): void {
  * any) -- and only while there is something to mend (issue #74).
  */
 export function isRepairable(state: GameState, repairer: Entity, target: Entity): boolean {
-  const repair = rulesForPlayer(state, repairer.owner).units[repairer.kind as UnitKind]?.repair;
+  if (!isUnit(repairer.kind)) return false;
+  const repair = unitRulesForEntity(state, repairer)?.repair;
   if (!repair || target.dead || target.owner !== repairer.owner || target.id === repairer.id) return false;
   if (target.hp >= target.maxHp) return false;
   if (isBuilding(target.kind)) return target.buildProgress === undefined;
   if (!isUnit(target.kind)) return false;
-  const datClass = rulesForPlayer(state, target.owner).units[target.kind as UnitKind].datClass;
+  const datClass = unitRulesForEntity(state, target).datClass;
   return datClass !== undefined && String(datClass) in repair.classFactors;
 }
 
 /** The DAT's rate for mending this target: a building whole, siege by its class. */
 export function repairRateFor(state: GameState, repairer: Entity, target: Entity): number {
-  const repair = rulesForPlayer(state, repairer.owner).units[repairer.kind as UnitKind].repair!;
+  const repair = unitRulesForEntity(state, repairer).repair!;
   if (isBuilding(target.kind)) return repair.hitPointsPerSecond;
-  const datClass = rulesForPlayer(state, target.owner).units[target.kind as UnitKind].datClass;
+  const datClass = unitRulesForEntity(state, target).datClass;
   return repair.hitPointsPerSecond * (repair.classFactors[String(datClass)] ?? 1);
 }
 
@@ -1860,7 +1864,7 @@ export function repairRateFor(state: GameState, repairer: Entity, target: Entity
  */
 function updateRepairer(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'repair') return;
-  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
+  const rules = unitRulesForEntity(state, entity);
   const target = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
   if (!rules.repair || !target || !isRepairable(state, entity, target)) {
     entity.repaired = undefined;
@@ -1879,7 +1883,7 @@ function updateRepairer(state: GameState, grid: NavGrid, entity: Entity): void {
   if (whole < 1) return;
   const price = isBuilding(target.kind)
     ? buildingRulesFor(state, target.owner, target.kind as BuildingKind).cost
-    : unitRulesFor(state, target.owner, target.kind as UnitKind).cost;
+    : unitRulesForEntity(state, target).cost;
   const fraction = playerAttributeFor(state, entity.owner,
     isBuilding(target.kind) ? 'buildingRepairCost' : 'unitRepairCost')!;
   const before = entity.repaired ?? 0;
@@ -1899,7 +1903,7 @@ function updateRepairer(state: GameState, grid: NavGrid, entity: Entity): void {
 
 /** The garrison category a unit falls in, from the editor's table by DAT class. */
 function garrisonCategory(state: GameState, unit: Entity): number {
-  const datClass = rulesForPlayer(state, unit.owner).units[unit.kind as UnitKind]?.datClass;
+  const datClass = unitRulesForEntity(state, unit)?.datClass;
   return datClass === undefined ? 0 : GARRISON_CATEGORY[datClass] ?? 0;
 }
 
@@ -1912,9 +1916,9 @@ export function canGarrison(state: GameState, unit: Entity, building: Entity): b
   if (!isUnit(unit.kind) || unit.dead || building.dead || unit.id === building.id) return false;
   if (building.owner !== unit.owner || building.buildProgress !== undefined) return false;
   if (isUnit(building.kind)) {
-    const carrier = unitRulesFor(state, building.owner, building.kind);
+    const carrier = unitRulesForEntity(state, building);
     if (carrier.infantryCapacity) {
-      const category = rulesForPlayer(state, unit.owner).units[unit.kind].datClass;
+      const category = unitRulesForEntity(state, unit).datClass;
       return (category === 4 || category === 6) && (building.garrison?.length ?? 0) < carrier.infantryCapacity;
     }
     const capacity = carrier.transportCapacity;
@@ -1967,7 +1971,7 @@ export function volleyArrows(state: GameState, building: Entity): number {
   const buildingDps = (attack?.attacks.find(a => a.class === 3)?.amount ?? 0) / (attack?.reloadSeconds || 1);
   let power = 0;
   for (const unit of building.garrison ?? []) {
-    const rules = unitRulesFor(state, unit.owner, unit.kind as UnitKind);
+    const rules = unitRulesForEntity(state, unit);
     const firepower = rules.garrisonFirepower ?? 0;
     const dps = (rules.attacks.find(a => a.class === 3)?.amount ?? 0) / (rules.attackReloadSeconds || 1);
     power += firepower < 0 ? dps - firepower : dps * firepower;
@@ -1990,7 +1994,7 @@ function volleyFires(state: GameState, building: Entity): boolean {
 
 function updateGarrisoner(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'garrison') return;
-  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
+  const rules = unitRulesForEntity(state, entity);
   const building = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
   if (!building || !canGarrison(state, entity, building)) { becomeIdle(entity); return; }
   if (!inRange(entity, building, 0.4)) {
@@ -2037,7 +2041,7 @@ function updateGarrison(state: GameState, building: Entity): void {
  */
 export function ungarrisonAll(state: GameState, building: Entity): Entity[] {
   const inside = building.garrison ?? [];
-  if (isUnit(building.kind) && unitRulesFor(state, building.owner, building.kind).transportCapacity) {
+  if (isUnit(building.kind) && unitRulesForEntity(state, building).transportCapacity) {
     const released: Entity[] = [];
     for (const unit of inside) {
       let landing: Point | undefined;
@@ -2100,7 +2104,7 @@ export function ungarrisonAll(state: GameState, building: Entity): Entity[] {
  */
 function updateConverter(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'convert') return;
-  const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
+  const rules = unitRulesForEntity(state, entity);
   const convert = rules.convert;
   const target = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
   if (!convert || !target || target.owner === 0 || target.owner === entity.owner) {
@@ -2123,8 +2127,7 @@ function updateConverter(state: GameState, grid: NavGrid, entity: Entity): void 
   if (seconds < convert.minSeconds) return;
   const ticksLeft = Math.max(1, Math.round((convert.maxSeconds - seconds) / TICK_SECONDS) + 1);
   if (random01(state) >= 1 / ticksLeft) return;
-  target.owner = entity.owner;
-  for (const passenger of target.garrison ?? []) passenger.owner = entity.owner;
+  inheritConvertedUnit(state, target, entity.owner as PlayerId);
   becomeIdle(target);
   clearPath(target);
   target.convertTicks = undefined;
@@ -2152,7 +2155,7 @@ function applyDamage(
   // a decision rather than a formality. It hangs off taking damage rather than
   // off the swing that dealt it: villagers hunt with a bow, so the blow that
   // angers a boar usually arrives as an arrow.
-  if (isAnimal(target.kind) && unitRulesFor(state, target.owner, target.kind).attacks.some(a => a.amount > 0)
+  if (isAnimal(target.kind) && unitRulesForEntity(state, target).attacks.some(a => a.amount > 0)
     && target.order.kind !== 'attack') {
     const attacker = state.entities.find(e => e.id === attackerId && !e.dead);
     if (attacker && attacker.owner !== target.owner) {
@@ -2194,7 +2197,7 @@ function velocityOf(state: GameState, entity: Entity): Point {
   const dy = next.y - entity.position.y;
   const gap = Math.hypot(dx, dy);
   if (gap < 1e-6) return { x: 0, y: 0 };
-  const speed = isUnit(entity.kind) ? unitRulesFor(state, entity.owner, entity.kind).speed : 0;
+  const speed = isUnit(entity.kind) ? unitRulesForEntity(state, entity).speed : 0;
   return { x: dx / gap * speed, y: dy / gap * speed };
 }
 
@@ -2240,8 +2243,8 @@ function releaseAttack(
     origin: { ...shooter.position },
     targetId: target.id,
     shooterId: shooter.id,
-    art: isUnit(shooter.kind) ? (shooter.unpacked ? unitRulesFor(state, shooter.owner, shooter.kind).unpacked?.projectileArt
-      : unitRulesFor(state, shooter.owner, shooter.kind).projectileArt) : undefined,
+    art: isUnit(shooter.kind) ? (shooter.unpacked ? unitRulesForEntity(state, shooter).unpacked?.projectileArt
+      : unitRulesForEntity(state, shooter).projectileArt) : undefined,
     attacks: attacks.map(a => ({ ...a })),
     speed: projectileSpeed,
     launchHeight,
@@ -2315,7 +2318,7 @@ function blastDefenseLevelOf(state: GameState, entity: Entity): number {
     const node = Object.values(state.rules.nodes).find(n => n.resource === entity.resourceKind);
     return node?.blastDefenseLevel ?? (entity.resourceKind === 'wood' ? 1 : 0);
   }
-  return rulesForPlayer(state, entity.owner).units[entity.kind as UnitKind]?.blastDefenseLevel ?? 3;
+  return isUnit(entity.kind) ? unitRulesForEntity(state, entity).blastDefenseLevel ?? 3 : 3;
 }
 
 /** Closest approach of the segment a->b to a point, for a swept hit test. */
@@ -2419,7 +2422,7 @@ function struckBy(state: GameState, projectile: Projectile, at: Point): Entity |
 /** Idle military units acquire the nearest living enemy in line of sight. */
 function autoAcquire(state: GameState, entity: Entity): void {
   if (!isMilitary(entity.kind) || entity.order.kind !== 'idle') return;
-  const los = unitRulesFor(state, entity.owner, entity.kind as UnitKind).lineOfSight;
+  const los = unitRulesForEntity(state, entity).lineOfSight;
   let best: Entity | undefined;
   let bestDistance = Infinity;
   for (const candidate of state.entities) {
@@ -2540,7 +2543,7 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
   switch (entity.order.kind) {
     case 'unload': {
       entity.activity = 'moving';
-      if (moveAlong(state, grid, entity, entity.order.target, unitRulesFor(state, entity.owner, entity.kind as UnitKind).speed)) {
+      if (moveAlong(state, grid, entity, entity.order.target, unitRulesForEntity(state, entity).speed)) {
         ungarrisonAll(state, entity);
         becomeIdle(entity);
       }
@@ -2548,7 +2551,7 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
     }
     case 'move': {
       entity.activity = 'moving';
-      const rules = unitRulesFor(state, entity.owner, entity.kind as UnitKind);
+      const rules = unitRulesForEntity(state, entity);
       if (moveAlong(state, grid, entity, entity.order.target, rules.speed)) becomeIdle(entity);
       return;
     }
@@ -2671,7 +2674,7 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
     const to = rulesForPlayer(state, owner).units[upgrade.to as UnitKind];
     if (!to) continue;
     for (const entity of state.entities.flatMap(e => [e, ...(e.garrison ?? [])])) {
-      if (entity.dead || entity.owner !== owner) continue;
+      if (entity.dead || entity.owner !== owner || entity.convertedRules) continue;
       if (entity.training?.kind === upgrade.from) entity.training.kind = upgrade.to as UnitKind;
       if (entity.trainingQueue) entity.trainingQueue = entity.trainingQueue.map(kind =>
         kind === upgrade.from ? upgrade.to as UnitKind : kind);
@@ -2691,7 +2694,7 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
   for (const effect of tech.effects) {
     if (effect.attribute !== 'hitPoints') continue;
     for (const entity of state.entities.flatMap(e => [e, ...(e.garrison ?? [])])) {
-      if (entity.dead || entity.owner !== owner || entity.kind !== effect.unit) continue;
+      if (entity.dead || entity.owner !== owner || entity.convertedRules || entity.kind !== effect.unit) continue;
       const raised = combine(effect.operation, entity.maxHp, effect.amount);
       const gained = raised - entity.maxHp;
       entity.maxHp = raised;

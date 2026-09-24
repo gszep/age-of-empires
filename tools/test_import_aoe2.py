@@ -1003,6 +1003,19 @@ class ContentImportIntegrationTest(unittest.TestCase):
         for key, value in expected.items():
             self.assertEqual(self.result["strings"][key], value)
 
+    def test_town_center_construction_uses_the_head_not_the_finished_building(self):
+        from import_content import extract_entity
+        spec = next(e for e in SPEC["entities"] if e["key"] == "town-center")
+        for civ in (1, 2):  # shared Briton/Frank prerequisite, no civ bonus
+            tc = extract_entity(_dat(), _dat().civs[civ].units, spec, GRAPHICS, {})
+            self.assertEqual(tc["id"], 109)
+            self.assertEqual(tc["cost"], {"wood": 275, "stone": 100})
+            self.assertEqual(tc["build"], {"sourceId": 621, "builderId": 118,
+                                          "seconds": 150, "button": 11, "additionalAge": 2})
+            self.assertEqual(tc["age"], 0)  # replacement is possible before Castle
+            self.assertEqual(tc["popSupport"], 5)
+            self.assertEqual(tc["hillMode"], 2)
+
     def test_map_setup_labels_and_names_are_imported(self):
         expected = {
             "mapType": "Map Type", "mapSeed": "Seed", "startGame": "Start Game",

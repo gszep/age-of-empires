@@ -126,8 +126,14 @@ for gameplay, placement/navigation, HUD prices/availability, selected-unit stats
 and save/restart/replay. Synthetic mixed-profile regressions and
 `tools/civilization_rules_smoke.mts` verify actual outcomes and real browser clicks.
 The published additional catalogue remains empty: real Franks roster/art, bonus
-activation, selection and reference-correct conversion inheritance (#178) remain
-implementation work.
+activation and selection remain implementation work. Conversion now snapshots
+resolved unit-local rules before ownership changes, including passengers, and
+excludes captures from later research/promotions. Public-command regressions
+measure wounds, damage/armour, movement, sight/range, reconversion, unloading,
+JSON continuation and replay; owned Loom cases check retained HP and actual
+damage before/after either player's research. The unit/player inheritance split
+remains inferred: #178 stays open for patch-matched DE evidence, especially
+economic/projectile exceptions and passenger/reconversion behaviour.
 
 Shore fish honour the DAT's neighbouring-beach placement requirement (#145).
 The current Britons dock roster is implemented (#97): galley/galleon, fire,
@@ -221,8 +227,15 @@ interpretation remains an approximation rather than a DE runtime calibration.
 `elevation-placement.test.ts` covers imported/open rules, legal ramps/corners,
 steep/uneven sites, rotated footprints, completed construction and all map starts;
 `tools/elevation_placement_smoke.mts` verifies actual preview colours and rejected/
-accepted build clicks in both content modes. Additional TC construction remains
-unavailable independently of placement legality (#177).
+accepted build clicks in both content modes. TC construction (#177) now follows
+the DAT construction head for cost, time and button: 275 wood / 100 stone,
+150 seconds, economic slot 11. Castle Age enables additional centers; Dark/Feudal
+can replace a lost center, counting foundations against the one-TC limit. The
+replacement-count interpretation is recorded as inferred in `ledger.md`.
+`town-center.test.ts` verifies construction, population, training, deposits and
+atomic rejection in open/owned rules; `tools/town_center_smoke.mts` presses the
+replacement/expansion buttons, rejects slopes and finishes a functioning TC in
+the private browser. No civilisation bonus is included in this prerequisite.
 
 **View** (`src/view`, never mutates state): dimetric projection with AoE2's
 handedness (below); DAT terrain textures with classic land edge blending

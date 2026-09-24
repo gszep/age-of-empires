@@ -62,12 +62,29 @@ the first attempt checked a button before the HUD refresh, fixed by waiting for
 that element. Full regeneration succeeded in `.local/civilization-rules-import.log`
 with all 1,984 cached sprite atlases reused. No timeouts were widened.
 
-**Conversion remains a blocker before real mixed selection (#178).** Existing
-conversion changes owner and preserves stored HP/maxHP, while derived rules read
-the recipient. A public-order diagnostic changed a synthetic unit from rule HP
-80 / attack 20 to rule HP 40 / attack 4, retaining stored maxHP 80. No donor- versus
-recipient-inheritance rule has been invented here. Reference evidence and explicit
-stat/upgrade handling are required before declaring a real mixed match complete.
+**Conversion reference acceptance remains a blocker before real mixed selection
+(#178).** Conversion now snapshots donor unit-local rules, retains wounds and
+excludes captures/passengers from future research and promotions, including after
+reconversion. Synthetic public-command outcomes and owned Loom regressions cover
+the implementation; JSON continuation/replay preserve the snapshot. The boundary
+between frozen unit attributes and live recipient economic/player/projectile
+systems is explicitly inferred in `ledger.md`. Patch-matched runtime evidence,
+including passenger and reconversion exceptions, is still required before
+declaring a real mixed match complete.
+
+The #177/#178 integration checkpoint passed **797 Vitest tests / 62 files**, the
+build, **108 owned-import tests**, and general browser smoke
+(`.local/civ-integration-gate.log`, single Vitest worker, unchanged timeouts).
+Full `npm run import:aoe2` regenerated the published manifest with 1,984 cached
+atlases reused (`.local/civ-integration-import.log`). The focused six-file run
+passed 147 tests (`.local/civ-integration-focused-final.log`); the private TC
+browser verified replacement/expansion, red/green previews, payment, foundation
+limits, completion, population and training against that manifest
+(`.local/civ-integration-tc-smoke-r5.log`). Earlier smoke attempts exposed probe
+camera-frame/button-click races, fixed with presentation-state waits and locator
+clicks. An initial added Loom assertion used the wrong remembered melee armour;
+the owned help/effect confirms +1, giving 3 damage from a 4-attack militia.
+No civilisation bonuses or roster expansion are included in this checkpoint.
 
 ## Reading the audit output
 

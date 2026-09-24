@@ -14,6 +14,55 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## Converted-unit inheritance (#178)
+
+- **Owned inspection (2026-09-24):** root resolved with the main checkout's
+  `tools/depot.py`. Pinned `depot_813781/resources/_common/dat/empires2_x2_p1.dat`
+  Briton/Frank unit records 8/83/125 were read, including unit-local HP, speed,
+  sight, attacks and terrain restriction. Longbowman 8 exists in both DAT civ
+  arrays (35 HP, speed ~0.96, sight 7), independently of train availability.
+  Loom effect 22 changes villager-class HP/armour; Ballistics effect 93 changes
+  projectile smart-mode, not the shooter. `xs/Constants.xs` distinguishes
+  `cUpgradeUnit = 3`, unit conversion modifiers, and player resources such as
+  `cAttributeConvertResistance = 77`. English help 4925 says conversion changes
+  player colour/control. These sources expose the data boundaries; none of
+  these inspected entries specifies runtime inheritance. The shipped English
+  AoK/TC PDFs were located, but text extraction is still unavailable on this
+  host (`pdftotext` absent, existing #60); they are **not** claimed inspected.
+- **Inferred, community-backed policy:** the AoE II section of
+  <https://ageofempires.fandom.com/wiki/Conversion> (read 2026-09-24) says
+  converted unit attributes lock, retain civilisation-specific properties and
+  no longer receive upgrades, with exceptions for civilisation/player-side
+  properties. This is not a patch-matched DE runtime measurement. `Entity`'s
+  `convertedRules` snapshots resolved unit-local rules before ownership changes;
+  `unitRulesForEntity` uses that snapshot, including for captured unique units
+  and passengers. HP/wounds are unchanged. Future research on either side and
+  later reconversions cannot promote or alter these captured unit attributes.
+  Research queues/production still use the receiving player's catalogue.
+- **Explicit remaining reference gaps:** player-level attributes, build/tree
+  permissions, economic gather rates/capacities and projectile Ballistics
+  currently follow the recipient's existing systems. The DAT's separate task
+  and projectile records motivate that distinction but do not prove the closed
+  runtime's conversion exceptions. Gather-task switching (villagers/fishing
+  ships), projectile smart-mode,
+  special future civilisation abilities, and reconversion/passenger inheritance
+  still need patch-matched DE captures before claiming full parity. No building
+  conversion support is added here. Pre-existing snapshots without conversion
+  provenance retain their legacy current-owner resolution; lost donor data
+  cannot be reconstructed.
+- **Evidence:** `src/sim/conversion-inheritance.test.ts` uses deliberately
+  synthetic contrasting profiles and public monk orders, research, movement,
+  combat, boarding/unloading and construction. It measures retained wounds,
+  damage/armour, sight/range, speed, promotion exclusion, recipient farm food,
+  JSON save continuation (transport-stable synchronization hash), and a recorded
+  train/convert/research replay. Waypoint/overlap separation costs up to part of
+  one initial movement tick, so the one-second displacement check allows 0.05
+  tiles (3 donor vs 0.6 recipient); no test timeout was widened. Two owned Loom
+  cases additionally measure preserved wounded HP and militia damage (3 with
+  donor Loom's +1 melee armour, 4 without), despite subsequent recipient/donor
+  research. Integration guards corpse/blast lookup for non-unit resource nodes;
+  animals remain valid unit-rule consumers.
+
 ## HUD feedback (#58)
 
 - **Owned notifications:** `notificationpanel.json` origin (40,305), 600-wide
@@ -105,6 +154,40 @@ off the reference; **measured** — fitted to a reference screenshot;
 
 ## Simulation
 
+### Town-center construction (#177)
+
+The importer follows completed unit 109's `building.head_unit` to 621, whose
+`stack_unit_id` points back to 109. **Owned** construction values (Britons and
+Franks): 275 wood + 100 stone, 150 seconds, villager builder 118, button 11.
+The finished unit retains its HP, annexes, hill mode 2, five population and
+drop-site roles. Tech-tree building connection 621 enables through tech 187,
+whose only prerequisite is Castle Age tech 102; there is no other building
+prerequisite. Connection 109 has no enabling research. The age upgrade effects
+also replace construction heads (621 → 617/484/597), with the same base cost,
+button and time. This change implements no civilisation discounts.
+
+**Inferred engine interpretation**, supported by owned data/scripts rather than
+a DE runtime capture: before that age, allow a replacement only if the player
+has no living TC, counting foundations immediately. `Constants.xs` names
+resource 218 `FeudalTownCenterLimit` (Briton/Frank initial value 1), and resource
+48 `TownCenterUnavailable` (0). `Promisory/buildings.per` 204–229 explicitly
+rebuilds when the TC count is below one and no pending TC exists, without an
+age condition; 399–413 additionally checks `town-center-foundation` (621).
+DAT shadow techs 308/722 name the foundation and early TC but contain no
+replacement predicate. We represent the finished building and foundation as
+one entity, so one live-entity count implements the slot reservation. Dead
+TCs/rubble do not consume it. Before-Castle construction has no additional
+building prerequisite in the inspected sources. The diagnostic limit message
+is project wording. Cuman early expansion and scenario TC prohibitions are
+outside this Briton/Frank prerequisite; resource 218 is not treated as a live
+counter. Old manifests missing construction-head metadata use the transcribed
+open-rule cost/time/button until regeneration.
+
+Verification: `src/sim/town-center.test.ts`, focused owned importer test
+`test_town_center_construction_uses_the_head_not_the_finished_building`, and
+`tools/town_center_smoke.mts` (private browser; `TC_CONTENT` optionally overlays
+freshly extracted TC metadata in memory without publishing a partial import).
+
 | What | Shipped as | Source | Where | Issue |
 |---|---|---|---|---|
 | Slope-sensitive building placement | DAT `hillMode` 0 allows any relief, 2 requires equal levels, 3 permits a maximum-minus-minimum of one level over every covered tile; old manifests use the transcribed open-rule modes. Unused/unrecognized nonzero modes use flat-only treatment | Building mode **owned** from `unit.hill_mode`, including Thracian barracks 0 versus Briton 3 and both TCs 2. Mode meanings **community-documented** in [UGC attribute 187](https://ugc.aoe2.rocks/general/attributes/attributes/#187-hill-mode). Applying them to half-open tile-centre samples, fractional survey differences and all one-level corner orientations is **inferred**, not a patch-matched runtime measurement of DE's discrete slope/corner topology. Existing red/green preview and rejected-click feedback reuse authoritative legality; diagnostic “placement is on unsuitable elevation” is project wording after inspecting owned placement messages 3094–3096 | `import_content.py`, `data.ts`, `elevation.ts`, `game.ts` | #176; exact topology remains #134 |
@@ -120,7 +203,7 @@ off the reference; **measured** — fitted to a reference screenshot;
 | Game-speed multipliers | 1.0 / 1.5 / 1.7 / 2.0 | inferred (Steam, AoEZone threads); the names and the Default are owned strings 20033-20036 | `main.ts` | — |
 | A foundation's line of sight | 0 | chosen against observed behaviour (issue #1); DAT has no construction-time LOS | `visibility.ts` | — |
 | Conversion odds | uniform over the DAT's 5-9 s window | chosen shape; both ends owned | `game.ts` | — |
-| Converted-unit stat inheritance | ownership and passenger ownership change; stored HP/maxHP persist, while derived rules resolve through the current owner | existing **inferred** integration, not verified DE inheritance. The per-player catalogue makes differing baselines observable; synthetic public-order reproduction retains stored maxHP 80 while the recipient rules say HP 40/attack 4 instead of the donor's HP 80/attack 20. Real additional civilisation selection remains unexposed pending source/reference-backed inheritance and future-upgrade handling | `game.ts` `updateConverter`, `civilizations.ts`, `rules.ts` | #178, blocks real mixed-civilisation acceptance |
+| Converted-unit stat inheritance | unit-local rules snapshot before ownership/passenger ownership changes; stored HP/wounds persist; later research/promotions skip captures | **Inferred**, community-backed policy; see the detailed source inspection and remaining economic/projectile/reconversion/passenger reference gaps above. Synthetic public-command outcomes, owned Loom combat/HP cases and JSON/replay checks verify this implementation, not DE parity | `game.ts` `updateConverter`, `rules.ts` `unitRulesForEntity`, `types.ts` | #178 remains open and blocks real mixed-civilisation acceptance |
 | Blast falloff | none inside `blast_width` | chosen; DAT states no falloff | `game.ts` | — |
 | Scorpion bolt travel and contact | swept circle, one hit per enemy, no friendly damage, full shooter attack on the intended target and projectile attacks on others; travels maximum range +3 | **inferred** engine interpretation of owned hit/vanish mode 1; extra three tiles and friendly immunity corroborated by [community Scorpion article](https://ageofempires.fandom.com/wiki/Scorpion_(Age_of_Empires_II)); radius, speed, primary/collateral attacks and upgrade effects owned | `game.ts` `releaseAttack`, `updateProjectiles` | #127 |
 | Miss scatter, fallback rules only | 1 tile | chosen; imported units use `accuracy_dispersion` | `game.ts` `MISS_TILES` | — |

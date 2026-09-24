@@ -5,8 +5,16 @@
  * visibility, so they moved here to keep the import graph acyclic.
  */
 import type { BuildingRules, TechEffect, UnitRules } from './data';
+import { isUnit } from './data';
 import { rulesForPlayer } from './civilizations';
-import type { BuildingKind, Entity, GameState, PlayerId, UnitKind } from './types';
+import type { BuildingKind, DeepReadonly, Entity, GameState, PlayerId, ReadonlyGameState, UnitKind } from './types';
+
+/** Shared by the build menu, placement preview and public build command. */
+export function buildingLimitReached(state: GameState, owner: PlayerId, kind: BuildingKind): boolean {
+  const age = buildingRulesFor(state, owner, kind).additionalAge;
+  return age !== undefined && state.players[owner].age < age
+    && state.entities.some(e => e.owner === owner && e.kind === kind && !e.dead);
+}
 
 /** Apply one number to one attribute, in the way the DAT's command says. */
 export function combine(operation: TechEffect['operation'], current: number, amount: number): number {
@@ -36,6 +44,26 @@ export function playerAttributeFor(
     }
   }
   return value;
+}
+
+/** Existing units may carry a conversion snapshot; creation/availability uses
+ * unitRulesFor instead. Never resolve a captured unique unit through its new
+ * owner's trainable catalogue. */
+export function unitRulesForEntity(state: GameState, entity: Entity): UnitRules;
+export function unitRulesForEntity(state: ReadonlyGameState, entity: DeepReadonly<Entity>): DeepReadonly<UnitRules>;
+export function unitRulesForEntity(state: ReadonlyGameState, entity: DeepReadonly<Entity>): DeepReadonly<UnitRules> {
+  return entity.convertedRules ?? unitRulesFor(state as GameState, entity.owner, entity.kind as UnitKind);
+}
+
+/** Capture before changing ownership, including passengers. A second conversion
+ * keeps the first snapshot, not either player's intervening upgrades. The
+ * locked-unit / live-player split is inferred; see ledger #178. */
+export function inheritConvertedUnit(state: GameState, entity: Entity, owner: PlayerId): void {
+  if (isUnit(entity.kind) && !entity.convertedRules) {
+    entity.convertedRules = structuredClone(unitRulesForEntity(state, entity));
+  }
+  for (const passenger of entity.garrison ?? []) inheritConvertedUnit(state, passenger, owner);
+  entity.owner = owner;
 }
 
 /** What a player has researched, applied to one unit kind's rules. */

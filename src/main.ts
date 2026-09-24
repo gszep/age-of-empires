@@ -16,7 +16,7 @@ import { clearSession, loadSession, loadSessionSetup, saveSession } from './dev-
 import { loadMapPreference, saveMapPreference, mapChoices, validMatchSetup, MAX_MAP_SEED, type MatchSetup } from './match-setup';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
-import { buildingRulesFor, unitRulesFor } from './sim/rules';
+import { buildingLimitReached, buildingRulesFor, unitRulesFor, unitRulesForEntity } from './sim/rules';
 import { gridKey, placeCommands } from './view/command-grid';
 import type { ConfirmationResult, ProductionItem, ResourceStatus, ScoreRow } from './view/hud';
 import { costLabel, displayName as nameFrom, plainHelp } from './view/names';
@@ -1107,6 +1107,7 @@ function currentCommands(): CommandButton[] {
       for (const kind of buildMenu(rules, player.age, buildPage)) {
         const building = buildingRulesFor(game, localPlayer, kind);
         if (!civHas(game, localPlayer, 'buildings', building.datId)) continue;
+        if (buildingLimitReached(game, localPlayer, kind)) continue;
         buttons.push({
           id: `build-${kind}`,
           label: `${createLabel(kind, 'Build')} (${costLabel(building.cost)})`,
@@ -1312,7 +1313,7 @@ function selectionStats(entity: Entity): SelectionInfo['stats'] {
   const attacksOf = (attacks: AttackValue[]) => attacks.find(a => a.class === 4 && a.amount > 0) ?? attacks.find(a => a.class === 3);
   const armourOf = (armors: AttackValue[], cls: number) => armors.find(a => a.class === cls)?.amount ?? 0;
   if (isUnit(entity.kind)) {
-    const unit = unitRulesFor(game, entity.owner, entity.kind as UnitKind);
+    const unit = unitRulesForEntity(game, entity);
     const attacks = entity.unpacked && unit.unpacked ? unit.unpacked.attacks : unit.attacks;
     const attack = attacksOf(attacks);
     if (attack && attack.amount > 0) stats.push({ icon: `${icons}${attack.class === 3 ? 'pierceAttack' : 'damage'}.png`, value: String(attack.amount), title: 'Attack' });
@@ -1707,7 +1708,8 @@ function syncScene(time: number): void {
       scene.add(ghostView.group);
     }
     const target = placementTarget();
-    const legal = placementLegal(game, buildMode, target, orientationOf(buildMode, target), localPlayer).ok;
+    const legal = !buildingLimitReached(game, localPlayer, buildMode)
+      && placementLegal(game, buildMode, target, orientationOf(buildMode, target), localPlayer).ok;
     const tint = legal ? 0x7fff9e : 0xff5f5f;
     const iso = elevatedWorldToIso(game, target.x, target.y);
     ghostFootprint!.visible = true;

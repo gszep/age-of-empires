@@ -511,14 +511,29 @@ def extract_entity(
         # division, not "buildings ask" (issue #47).
         if unit.creatable.hero_mode & HERO_CONFIRM_DELETE:
             entity["confirmDelete"] = True
-        cost, population = costs_of(unit.creatable)
+        # Stacked buildings expose a construction head, not the finished
+        # building's train row. TC 109 -> head 621 -> stack 109: the latter
+        # owns the paid stone, 150-second construction and villager button.
+        construction = unit
+        if category == "building" and unit.building.head_unit > 0:
+            head = civ_units[unit.building.head_unit]
+            if head.building and head.building.stack_unit_id == unit.id:
+                construction = head
+        cost, population = costs_of(construction.creatable)
         if cost:
             entity["cost"] = cost
         if population:
             entity["populationCost"] = population
-        train = unit.creatable.train_locations[0]
+        train = construction.creatable.train_locations[0]
         if category == "building":
             entity["build"] = {"builderId": train.unit_id, "seconds": train.train_time}
+            if construction is not unit:
+                entity["build"]["sourceId"] = construction.id
+            if unit.id == 109 and construction is not unit:
+                # The finished TC exists in Dark Age; its construction head
+                # is enabled by tech 187 (Castle Age). Replacement before
+                # that gate is a count-dependent engine rule (ledger #177).
+                entity["build"]["additionalAge"] = available_age(dat, construction.id)
             # Where it sits in the villager's build menu. The DAT states the
             # slot and not the page, but it states the page's *shape*: two
             # buildings may share a button id only if they are on different
