@@ -18,7 +18,7 @@ import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets'
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
 import { buildingRulesFor, unitRulesFor } from './sim/rules';
 import { gridKey, placeCommands } from './view/command-grid';
-import type { ResourceStatus, ScoreRow } from './view/hud';
+import type { ConfirmationResult, ResourceStatus, ScoreRow } from './view/hud';
 import { costLabel, displayName as nameFrom, plainHelp } from './view/names';
 import { contextCursor, cursorCss } from './view/cursors';
 import { artKey, chooseAnimation, createEntityView, refreshEntityTextures, dimFogSnapshot, gatherTargetResource, playerColorHex, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
@@ -909,6 +909,7 @@ function announceTrained(): void {
 // Keyboard: camera, hotkeys, menu.
 const heldKeys = new Set<string>();
 addEventListener('keydown', event => {
+  if (hud.confirmationOpen) return;
   const key = event.key;
   if (event.target instanceof HTMLElement && event.target.closest('input, select, textarea, [contenteditable="true"]')) {
     if (key === 'Escape' || key === 'F10') {
@@ -964,16 +965,24 @@ addEventListener('keydown', event => {
     // the keypress as a soldier does (issue #47).
     const asked = mine.filter(e =>
       isBuilding(e.kind) && playerRules(e.owner).buildings[e.kind as BuildingKind].confirmDelete);
-    const doomed = asked.length && !confirm(
-      asked.length === 1
-        ? `Delete your ${displayName(asked[0].kind)}? This cannot be undone.`
-        : `Delete ${asked.length} of your buildings? This cannot be undone.`)
-      ? mine.filter(e => !asked.includes(e))
-      : mine;
-    if (doomed.length) {
-      applyCommand(game, { kind: 'delete', player: localPlayer, entityIds: doomed.map(e => e.id) });
-      selectedIds = selectedIds.filter(id => !doomed.some(e => e.id === id));
-    }
+    const match = game;
+    const player = localPlayer;
+    const remove = (result: ConfirmationResult): void => {
+      if (result === 'aborted' || game !== match || localPlayer !== player) return;
+      const doomed = result === 'yes' ? mine : mine.filter(e => !asked.includes(e));
+      if (doomed.length) {
+        applyCommand(game, { kind: 'delete', player, entityIds: doomed.map(e => e.id) });
+        selectedIds = selectedIds.filter(id => !doomed.some(e => e.id === id));
+      }
+    };
+    if (asked.length) {
+      heldKeys.clear();
+      const question = asked.length === 1
+        ? messages.confirmDelete ?? 'Are you sure you want to delete this unit?'
+        : messages.confirmDeleteMany ?? 'Are you sure you want to delete these units?';
+      void hud.confirmDelete(question,
+        messages.yes, messages.no).then(remove);
+    } else remove('yes');
     event.preventDefault();
     return;
   }
@@ -1585,9 +1594,20 @@ function syncScene(time: number): void {
   announceTrained();
   // Alerts and feedback, read out of what the view can already see. The
   // simulation never raises them: it does not know about sound.
+  const researchedBefore = cueWatcher.researched;
+  const cuesStarted = cueWatcher.started;
   for (const cue of view.pollCues(cueWatcher, game, localPlayer, gameTimeSeconds(game))) {
     playSound(cue);
     if (cue === 'pop_capped') hud.showMessage(messages.needMoreHouses ?? 'You need to build more houses.');
+    if (cue === 'under_attack') hud.showMessage('Your units are under attack!');
+    if (cue === 'under_attack_town') hud.showMessage('Your town is under attack!');
+    if (cue === 'farm_depleted') hud.showMessage('Farm depleted.');
+  }
+  if (cuesStarted) {
+    for (const key of game.players[localPlayer].researched.slice(researchedBefore)) {
+      const name = playerRules(localPlayer).technologies[key as TechKey]?.name ?? key;
+      hud.showMessage((messages.researchComplete ?? '--%s Research Complete--').replace('%s', name));
+    }
   }
 
   // Contours for units something else is drawing in front of, once every

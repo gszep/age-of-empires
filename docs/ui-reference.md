@@ -4,7 +4,8 @@ The strongest UI specification is the patch-matched `widgetui` content already d
 
 ## What is explicit locally
 
-`~/Steam/steamapps/content/app_813780/depot_813782/widgetui/` contains 133 JSON screen/panel definitions and their textures.
+Resolve the owned root with `uv run --locked python tools/depot.py`; its
+`depot_813782/widgetui/` contains the JSON screen/panel definitions and textures.
 
 The files specify:
 
@@ -43,6 +44,23 @@ screenloadgame.json
 `screenmainmenu.json` defines the 3840×2160 screen, focus order, and named controls. `dialogingamemenu.json`, for example, explicitly specifies a centered 950×2000 collection, 950×720 background, 56×56 close button, Escape hotkey, fonts, colors, and material states.
 
 ## Art and icon resolution
+
+### Feedback source audit (#58)
+
+`GameMsgPanel.json` contains nine transparent screen anchors, no ticker text.
+`notificationpanel.json` defines event/chat Surrounds and MultiColorTextBoxes;
+the event box supplies the HUD's message stack. `GameNotificationPanel.json`
+instead defines a defeat announcement with player/civ widgets, and
+`popupmessage.json` is an OK-button modal, not a notification ticker.
+`dialogyesnoboxgeneral.json` has only a centred viewport; confirmation controls
+are reused from `dialogconfirmrestartreplay.json` with the approximation recorded
+in the ledger. Import assertions retain Box, TextBox, HotKey and per-state Color,
+in addition to the existing viewport/font/material fields.
+
+`UIColors.json` was already imported for player text before #58. The three
+`uicolors_*.json` variants and `dat/UiColors.txt` now accompany it, source-hashed,
+and populate `--ui-<tag>` / `--ui-<player-colour>-<role>` CSS custom properties.
+The existing `blanktoppanel` import already supplies the top strip.
 
 `materials.json` contains about 4,410 material definitions connecting widget states to texture references, blend modes, colors, and fonts. `icons.json` maps semantic/icon indexes to named materials. The corresponding local art is under:
 

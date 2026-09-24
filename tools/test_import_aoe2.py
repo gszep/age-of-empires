@@ -1012,6 +1012,15 @@ class ContentImportIntegrationTest(unittest.TestCase):
         for key, value in expected.items():
             self.assertEqual(self.result["strings"][key], value)
 
+    def test_feedback_strings_are_imported(self):
+        expected = {
+            "confirmDelete": "Are you sure you want to delete this unit?",
+            "confirmDeleteMany": "Are you sure you want to delete these units?",
+            "yes": "Yes", "no": "No", "researchComplete": "--%s Research Complete--",
+        }
+        for key, value in expected.items():
+            self.assertEqual(self.result["strings"][key], value)
+
     def test_names_and_tooltips_are_the_reference_strings(self):
         self.assertEqual(self.result["strings"]["creating"], "Creating")
         self.assertEqual(self.result["strings"]["stopCreating"], "Click to stop creating this unit.")
@@ -2048,7 +2057,7 @@ class UiImportIntegrationTest(unittest.TestCase):
         layouts = self.result["layouts"]
         self.assertEqual(
             set(layouts),
-            {"blanktoppanel", "resourcepanel", "commandpanel", "mappanel", "blankbottompanel", "menupanel", "scorepanel"},
+            set(SPEC["ui"]["panels"]),
         )
         # The score panel is a Surround anchored at the bottom right, its
         # bottom edge at y=1800 (issue #67).
@@ -2061,6 +2070,28 @@ class UiImportIntegrationTest(unittest.TestCase):
         self.assertIn('"ResourceWood"', dumped)
         self.assertIn('"ResourceFood"', dumped)
         self.assertIn('"ResourceGold"', dumped)
+
+    def test_feedback_fields_and_color_palettes_survive_extraction(self):
+        layouts = self.result["layouts"]
+        event = layouts["notificationpanel"]["widgets"][0]
+        self.assertEqual(event["Box"]["gridstep"], 32)
+        text = event["ChildWidgets"][0]
+        self.assertEqual(text["ViewPort"]["width"], 580)
+        self.assertEqual(text["TextBox"]["linesize"], 40)
+        self.assertEqual(text["StateMaterials"]["StateTextNormal"]["Font"]["PointSize"], 40)
+        self.assertEqual(layouts["GameMsgPanel"]["widgets"][0]["StateMaterials"]["StateNormal"]["Color"]["a"], 0)
+        self.assertEqual(layouts["dialogyesnoboxgeneral"]["widgets"], [])
+        self.assertEqual(layouts["dialogyesnoboxgeneral"]["viewPort"]["width"], 1280)
+        controls = layouts["dialogconfirmrestartreplay"]["widgets"][0]["ChildWidgets"]
+        self.assertEqual(controls[1]["HotKey"]["Key"], 13)
+        self.assertEqual(controls[2]["HotKey"]["Key"], 27)
+        self.assertEqual(controls[1]["StateMaterials"]["StateHover"]["Material"], "ButtonRedHover")
+        for name, palette in self.result["colorPalettes"].items():
+            path = WIDGETUI / f"uicolors_{name}.json"
+            self.assertEqual(palette, json.loads(path.read_text()))
+            self.assertEqual(self.result["source"]["sha256"][path.name], sha256(path))
+        self.assertEqual(self.result["colorTags"]["Black50"], [0, 0, 0, 127])
+        self.assertEqual(self.result["colorTags"]["LifeBarHealthy"], [0, 255, 0, 255])
 
     def test_player_coloured_icons_ship_opaque_with_their_weight_beside_them(self):
         # Every unit, building and technology icon material declares

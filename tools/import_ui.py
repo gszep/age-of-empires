@@ -37,6 +37,9 @@ WIDGET_KEYS = (
     "ClickSound",
     "Hidden",
     "Clipped",
+    "Box",
+    "TextBox",
+    "HotKey",
 )
 CIV_STYLE = re.compile(
     r"^Civ(Asia|West|East|Afri|Ande|Greek|Macedonian|Medi|Meso|Nomad|Orie|Persian|Puru|Seas|Slav|Thracian)"
@@ -84,6 +87,8 @@ def strip_widget(node: dict[str, Any], used_materials: set[str], used_sounds: se
                 used_materials.add(value["Material"])
             if "Font" in value:
                 entry["Font"] = value["Font"]
+            if "Color" in value:
+                entry["Color"] = value["Color"]
             if entry:
                 kept[state] = entry
         if kept:
@@ -408,11 +413,27 @@ def extract_ui(
         hashes["UIColors.json"] = sha256(colors_path)
         colors = json.loads(colors_path.read_text())
 
+    color_palettes = {}
+    for name in ("deuteranopia", "protanopia", "tritanopia"):
+        path = widgetui / f"uicolors_{name}.json"
+        hashes[path.name] = sha256(path)
+        color_palettes[name] = json.loads(path.read_text())
+    tags_path = sounds_path.parent / "UiColors.txt"
+    hashes["UiColors.txt"] = sha256(tags_path)
+    color_tags = {}
+    for line in tags_path.read_text().splitlines():
+        fields = line.split("//", 1)[0].split()
+        if fields:
+            name, *rgba = fields
+            color_tags[name] = [int(value) for value in rgba]
+
     return {
         "schemaVersion": spec["schemaVersion"],
         "style": style,
         "fonts": fonts,
         "colors": colors,
+        "colorPalettes": color_palettes,
+        "colorTags": color_tags,
         "cursors": import_cursors(cursors_dir or sounds_path.parent.parent / "cursors",
                                   ui_spec.get("cursors", []), out_root, hashes),
         "rawTextures": raw_textures,

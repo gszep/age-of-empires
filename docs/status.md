@@ -53,6 +53,20 @@ Start Game rebuilds the board and minimap; Random requests a fresh seed;
 Restart repeats the chosen setup. Solo sessions remember their setup across
 reloads, while shared selection belongs to the host and is sent to the guest.
 
+HUD feedback (#58) now shows attack, population, depleted-farm and named research
+alerts in a bounded, independently expiring notification stack. Delete-confirmed
+entities use an in-page modal with Yes/No/Escape and owned art, viewport and
+localized prompts. `tools/feedback_smoke.mts` exercises real combat/research
+alerts, repeated modal interactions, mixed-selection deletion, read-only HUD
+rebuilds, text-only messages, bounded history and overlapping expiry in imported
+and `OPEN_FALLBACK=1` modes. The imported run also measures notification background
+pixels at full opacity, guarding against losing the panel after its fade.
+The UI import carries the three owned colour-blind palettes plus `UiColors.txt`
+as CSS variables; `?solo=1&uiPalette=deuteranopia` (also `protanopia`, `tritanopia`)
+selects HUD text colours. This is not a full sprite/minimap colour-blind mode;
+an options-screen selector remains #141. Wonder countdown UI remains tied to
+#110, and objectives/tech-tree surfaces remain #138.
+
 ## Delivered scope
 
 **Simulation** (`src/sim`, authoritative, fixed 20 Hz tick, deterministic):

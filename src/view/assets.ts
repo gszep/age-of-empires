@@ -268,7 +268,11 @@ export interface UiLayoutWidget {
   ViewPort?: { xorigin: number; yorigin: number; width: number; height: number; alignment?: string };
   /** An `Anchor` widget carries a bare origin here instead of a ViewPort. */
   Anchor?: { xorigin: number; yorigin: number };
-  StateMaterials?: Record<string, { Material?: string }>;
+  StateMaterials?: Record<string, { Material?: string; Font?: {
+    PointSize: number; Style?: string; TextColor?: { r: number; g: number; b: number; a: number };
+  } }>;
+  Box?: { gridstep: number };
+  TextBox?: { linesize: number; linespacer: number };
   ChildWidgets?: UiLayoutWidget[];
 }
 export interface UiLayout {
@@ -286,6 +290,8 @@ export interface UiAssets {
   fonts?: Record<string, string>;
   /** `UIColors.json`: per player colour name, the tints its text and bars use. */
   colors?: { PresetColors?: Record<string, number[]>; ColorTables?: Record<string, Record<string, number[]>> };
+  colorPalettes?: Record<string, NonNullable<UiAssets['colors']>>;
+  colorTags?: Record<string, number[]>;
   /** Keys taken from the reference's own `hotkeys.json`, per action. */
   hotkeys?: { goto?: Record<string, ImportedHotkey>; selectAll?: Record<string, ImportedHotkey> };
   layouts: Record<string, UiLayout>;

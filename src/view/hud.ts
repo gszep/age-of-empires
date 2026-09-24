@@ -7,6 +7,7 @@
 import { materialUrl, iconUrl, ownedIconUrl, type PlayerColors, type UiAssets } from './assets';
 import { placeCommands } from './command-grid';
 import { widgetBox } from './layout';
+import { installUiColors, placeFeedback } from './feedback';
 import { Minimap } from './minimap';
 import type { GameState, PlayerId, Point, ReadonlyGameState } from '../sim/types';
 
@@ -99,6 +100,9 @@ export interface HudCallbacks {
 
 const REFERENCE_WIDTH = 3840;
 
+/** Teardown is not a player response and must never dispatch a command. */
+export type ConfirmationResult = 'yes' | 'no' | 'aborted';
+
 export class Hud {
   root: HTMLElement;
   minimap: Minimap;
@@ -106,6 +110,8 @@ export class Hud {
   private selectionPanel!: HTMLElement;
   private resourceValues: Record<string, HTMLElement> = {};
   private messageBox!: HTMLElement;
+  private messageTimers = new Map<HTMLElement, number>();
+  private resolveConfirmation?: (result: ConfirmationResult) => void;
   private menuDialog!: HTMLElement;
   private endDialog!: HTMLElement;
   private buttons = new Map<string, HTMLButtonElement>();
@@ -131,6 +137,8 @@ export class Hud {
     parent.appendChild(this.root);
     this.installFonts();
     this.build();
+    installUiColors(this.root, ui, new URLSearchParams(location.search).get('uiPalette') ?? 'default');
+    placeFeedback(this.root, ui);
     const canvas = this.root.querySelector<HTMLCanvasElement>('#minimap-canvas')!;
     this.minimap = new Minimap(canvas);
     this.applyScale();
@@ -169,11 +177,13 @@ export class Hud {
   /** The tint the reference gives a player colour's text, from `UIColors.json`. */
   textColor(colorName: string | undefined, fallback: string): string {
     const rgba = colorName ? this.ui?.colors?.ColorTables?.[colorName]?.Text : undefined;
-    return rgba ? `rgb(${rgba[0]}, ${rgba[1]}, ${rgba[2]})` : fallback;
+    return rgba ? `var(--ui-${colorName}-Text, rgb(${rgba[0]}, ${rgba[1]}, ${rgba[2]}))` : fallback;
   }
 
   /** Detach every DOM node and listener this HUD owns (hot reload rebuilds it). */
   destroy(): void {
+    this.resolveConfirmation?.('aborted');
+    for (const timer of this.messageTimers.values()) window.clearTimeout(timer);
     removeEventListener('resize', this.onResize);
     this.root.remove();
   }
@@ -220,7 +230,11 @@ export class Hud {
         <button class="map-button" data-widget="ButtonFilter" data-map="filter" title="Minimap filter (not yet available)" disabled></button>
       </div>
       <div id="score-panel"></div>
-      <div id="game-message"></div>
+      <div id="game-message"><div class="message-lines" role="log" aria-live="polite" aria-relevant="additions"></div></div>
+      <dialog id="confirm-dialog" aria-labelledby="confirm-message">
+        <p id="confirm-message"></p>
+        <button data-answer="yes">Yes</button><button data-answer="no">No</button>
+      </dialog>
       <div id="menu-dialog" class="dialog hidden">
         <h2>Menu</h2>
         <button data-menu="resume">Resume</button>
@@ -289,6 +303,19 @@ export class Hud {
     this.messageBox = this.root.querySelector('#game-message')!;
     this.menuDialog = this.root.querySelector('#menu-dialog')!;
     this.endDialog = this.root.querySelector('#end-dialog')!;
+    const confirmation = this.root.querySelector<HTMLDialogElement>('#confirm-dialog')!;
+    confirmation.addEventListener('cancel', event => { event.preventDefault(); this.resolveConfirmation?.('no'); });
+    confirmation.addEventListener('click', event => {
+      const answer = (event.target as HTMLElement).closest<HTMLElement>('[data-answer]')?.dataset.answer;
+      if (answer === 'yes' || answer === 'no') { this.callbacks.onSound('button_ui'); this.resolveConfirmation?.(answer); }
+    });
+    confirmation.addEventListener('keydown', event => {
+      if (!confirmation.open) return;
+      event.stopPropagation();
+      if (event.key === 'Enter' && !(event.target instanceof HTMLButtonElement)) {
+        event.preventDefault(); this.resolveConfirmation?.('yes');
+      }
+    });
     const mapForm = this.root.querySelector<HTMLFormElement>('#map-setup')!;
     const seedInput = this.root.querySelector<HTMLInputElement>('#map-seed')!;
     this.root.querySelector('#random-map-seed')!.addEventListener('click', () => {
@@ -505,9 +532,46 @@ export class Hud {
   }
 
   showMessage(text: string): void {
-    this.messageBox.textContent = text;
+    const lines = this.messageBox.querySelector<HTMLElement>('.message-lines')!;
+    const line = document.createElement('div');
+    line.textContent = text;
+    lines.append(line);
+    // Bounded recent stack; expiry belongs to each line, not the whole panel.
+    if (lines.children.length > 5) {
+      const oldest = lines.firstElementChild as HTMLElement;
+      window.clearTimeout(this.messageTimers.get(oldest));
+      this.messageTimers.delete(oldest);
+      oldest.remove();
+    }
     this.messageBox.classList.add('show');
-    window.setTimeout(() => this.messageBox.classList.remove('show'), 1600);
+    lines.scrollTop = lines.scrollHeight;
+    this.messageTimers.set(line, window.setTimeout(() => {
+      line.remove();
+      this.messageTimers.delete(line);
+      this.messageBox.classList.toggle('show', lines.childElementCount > 0);
+    }, 6000));
+  }
+
+  get confirmationOpen(): boolean { return this.root.querySelector<HTMLDialogElement>('#confirm-dialog')!.open; }
+
+  confirmDelete(text: string, yes = 'Yes', no = 'No'): Promise<ConfirmationResult> {
+    if (this.confirmationOpen) return Promise.resolve('aborted');
+    const dialog = this.root.querySelector<HTMLDialogElement>('#confirm-dialog')!;
+    dialog.querySelector('#confirm-message')!.textContent = text;
+    dialog.querySelector('[data-answer="yes"]')!.textContent = yes;
+    dialog.querySelector('[data-answer="no"]')!.textContent = no;
+    return new Promise(resolve => {
+      this.resolveConfirmation = result => {
+        this.resolveConfirmation = undefined;
+        dialog.close();
+        // Some browsers retain focus on a now-hidden dialog button when the
+        // previous focus was the canvas/body. Let subsequent game keys out.
+        if (dialog.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+        resolve(result);
+      };
+      dialog.showModal();
+      dialog.querySelector<HTMLButtonElement>('[data-answer="yes"]')!.focus();
+    });
   }
 
   setCommands(buttons: CommandButton[]): void {

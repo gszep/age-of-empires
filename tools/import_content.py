@@ -1804,6 +1804,9 @@ def extract(
                 ("townBell", 40111), ("townBellHelp", 41111),
                 ("backToWork", 40015), ("backToWorkHelp", 41015),
                 ("creating", 4310), ("stopCreating", 42105),
+                ("confirmDelete", 10213), ("yes", 4003), ("no", 4004),
+                ("confirmDeleteMany", 10214),
+                ("researchComplete", 37157),
                 # Map setup labels and the three shipped random-map names (#144).
                 ("mapType", 9691), ("mapSeed", 10658), ("startGame", 9472),
                 ("gameSettings", 9682), ("randomSeed", 10107),

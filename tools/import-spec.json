@@ -2291,7 +2291,11 @@
       "mappanel",
       "blankbottompanel",
       "menupanel",
-      "scorepanel"
+      "scorepanel",
+      "GameMsgPanel",
+      "notificationpanel",
+      "dialogyesnoboxgeneral",
+      "dialogconfirmrestartreplay"
     ],
     "iconCategories": {
       "Buildings": "entities",

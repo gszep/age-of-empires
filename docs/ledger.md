@@ -14,6 +14,37 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## HUD feedback (#58)
+
+- **Owned:** `notificationpanel.json` collection origin (40,305), EventBackground
+  600×250 nine-cell BlackPanel Surround with grid step 32, text inset (10,10),
+  point size 40; `dialogyesnoboxgeneral.json` centred 1280×720 viewport;
+  `dialogconfirmrestartreplay.json` background, message/button rectangles,
+  material states and point size 42. Localized prompts 10213/10214, Yes/No
+  4003/4004 and research template 37157. UIColors palettes and UiColors.txt tags
+  are imported verbatim, including alpha.
+- **Inferred composition:** the general yes/no file has no widgets, so its
+  controls reuse the replay confirmation's 1280×720 background and children.
+  This is not a measured DE deletion-dialog reconstruction. Native browser
+  modal focus/tab behavior is used; the simulation continues while it is open.
+  DAT confirmation eligibility and existing mixed-selection cancellation
+  semantics are preserved. Lifecycle teardown aborts the pending operation
+  without dispatching any deletion command. Shared/restarted matches revalidate captured match
+  identity before sending the public delete command.
+- **Chosen feedback policy:** five recent messages, six wall-clock seconds per
+  message, oldest overflow eviction, existing 250 ms panel fade; wrapping text
+  scrolls to the newest line. The template's brown MultiColorTextBox placeholder
+  is replaced with the owned White tag for readability over BlackPanel art.
+  Font-face/index mapping and 0.70 text scale reuse the existing HUD inference.
+  No screenshot-matched claim is made for notification composition/blending.
+  Attack/farm alert wording is project text after inspecting owned localization
+  and sound aliases; research uses the owned template with the researched name.
+- **Palette scope:** URL-selected CSS palette applies to player text; imported
+  tags supply lower-HUD healthy bars and modal backdrop. The UI variants do not
+  change sprite ramps, world health bars or minimap colours. #141 owns the
+  future options-screen control. `GameMsgPanel.json` supplies nine empty full-
+  screen anchors, not the message typography described in the original issue.
+
 ## Simulation
 
 | What | Shipped as | Source | Where | Issue |

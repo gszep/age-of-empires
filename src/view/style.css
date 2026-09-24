@@ -176,7 +176,7 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
   width: calc(240px * var(--ui-scale)); height: calc(14px * var(--ui-scale));
   background: #3a0d0d; border: 1px solid #000; margin-top: calc(8px * var(--ui-scale));
 }
-.hp-fill { height: 100%; background: #2ecc40; }
+.hp-fill { height: 100%; background: var(--ui-LifeBarHealthy, #2ecc40); }
 .object-hp, .object-detail { font-size: calc(32px * var(--text-scale)); color: #e8dcbc; }
 .progress-label { font-size: calc(28px * var(--text-scale)); color: #ffe9a8; margin-top: calc(6px * var(--ui-scale)); }
 /* On the parchment the widget files write in dark brown (57,28,27):
@@ -247,6 +247,25 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
   opacity: 0; transition: opacity 0.25s; pointer-events: none;
 }
 #game-message.show { opacity: 1; }
+#game-message.owned-notifications { transform: none; text-shadow: none; isolation: isolate; }
+.notification-surround { position: absolute; inset: 0; display: grid; z-index: -1; }
+.notification-surround span { background-size: 100% 100%; }
+.message-lines { height: 100%; overflow: hidden; overflow-wrap: anywhere; }
+#confirm-dialog {
+  position: fixed; inset: 0; margin: auto; pointer-events: auto;
+  width: calc(1280px * var(--ui-scale)); padding: calc(60px * var(--ui-scale));
+  background: #e0c89a; color: #391c1b; border: 0;
+  font: inherit; text-align: center;
+}
+#confirm-dialog::backdrop { background: var(--ui-Black50, rgba(0, 0, 0, 0.5)); }
+#confirm-dialog button { font: inherit; padding: 0.5em 2em; cursor: pointer; }
+#confirm-dialog.owned-confirmation { padding: 0; background-size: 100% 100%; }
+#confirm-dialog.owned-confirmation p { margin: 0; display: grid; place-items: center; }
+#confirm-dialog.owned-confirmation button {
+  border: 0; padding: 0; background: var(--normal) center / 100% 100%;
+}
+#confirm-dialog.owned-confirmation button:hover { background-image: var(--hover); }
+#confirm-dialog.owned-confirmation button:active { background-image: var(--pressed); }
 
 .dialog {
   position: absolute; left: 50%; top: 50%;
@@ -349,4 +368,4 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
   height: 3px;
   background: rgba(0, 0, 0, 0.6);
 }
-.member-hp-fill { display: block; height: 100%; background: #46c02c; }
+.member-hp-fill { display: block; height: 100%; background: var(--ui-LifeBarHealthy, #46c02c); }
