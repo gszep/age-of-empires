@@ -1017,6 +1017,10 @@ class ContentImportIntegrationTest(unittest.TestCase):
             "confirmDelete": "Are you sure you want to delete this unit?",
             "confirmDeleteMany": "Are you sure you want to delete these units?",
             "yes": "Yes", "no": "No", "researchComplete": "--%s Research Complete--",
+            "ok": "OK", "playerDefeated": "%s was defeated",
+            "productionHoused": "You need more houses to continue unit production.",
+            "unitCreated": "--%s Created--", "victoryTitle": "You are victorious!",
+            "defeatTitle": "You have been defeated!", "returnToMap": "Return to Map", "leaveMap": "Leave Map",
         }
         for key, value in expected.items():
             self.assertEqual(self.result["strings"][key], value)
@@ -2092,6 +2096,86 @@ class UiImportIntegrationTest(unittest.TestCase):
             self.assertEqual(self.result["source"]["sha256"][path.name], sha256(path))
         self.assertEqual(self.result["colorTags"]["Black50"], [0, 0, 0, 127])
         self.assertEqual(self.result["colorTags"]["LifeBarHealthy"], [0, 255, 0, 255])
+
+    def test_defeat_and_popup_consumed_fields_match_the_owned_widgets(self):
+        def find(widgets, name):
+            for widget in widgets:
+                if widget.get("Name") == name:
+                    return widget
+                found = find(widget.get("ChildWidgets", []), name)
+                if found:
+                    return found
+
+        defeat = self.result["layouts"]["GameNotificationPanel"]
+        self.assertEqual(defeat["viewPort"], {
+            "xorigin": 1140, "yorigin": 110, "width": 520, "height": 100, "alignment": "TopLeft",
+        })
+        background = find(defeat["widgets"], "Background")
+        self.assertEqual(background["Box"]["gridstep"], 32)
+        self.assertEqual(background["StateMaterials"]["StateCCNormal"]["Material"], "BlackPanel_CC")
+        self.assertEqual(find(defeat["widgets"], "DefeatAnchor")["Anchor"], {"xorigin": 0, "yorigin": 0})
+        self.assertEqual(find(defeat["widgets"], "PlayerCivIcon")["ViewPort"]["width"], 75)
+        badge = find(defeat["widgets"], "ButtonPlayerNumberIcon")
+        self.assertEqual(badge["ViewPort"]["width"], 42)
+        self.assertEqual(badge["StateMaterials"]["StateDisabled"]["Font"]["PointSize"], 30)
+        label = find(defeat["widgets"], "PlayerName")
+        self.assertEqual(label["ViewPort"]["xorigin"], 144.5)
+        self.assertEqual(label["TextBox"]["linesize"], 40)
+        popup = self.result["layouts"]["popupmessage"]
+        self.assertEqual(popup["viewPort"]["width"], 1280)
+        self.assertEqual(popup["viewPort"]["height"], 720)
+        self.assertEqual(find(popup["widgets"], "Background")["StateMaterials"]["StateNormal"]["Material"], "PoppupBackground_2")
+        message = find(popup["widgets"], "MessageBox")
+        self.assertEqual(message["ViewPort"]["width"], 1100)
+        self.assertEqual(message["StateMaterials"]["StateTextNormal"]["Font"]["PointSize"], 50)
+        button = find(popup["widgets"], "ButtonOk")
+        self.assertEqual(button["ViewPort"]["yorigin"], 575)
+        self.assertEqual(button["StateMaterials"]["StateHover"]["Font"]["PointSize"], 45)
+        self.assertEqual(button["StateMaterials"]["StateNormal"]["Font"]["PointSize"], 38)
+
+    def test_native_dialogs_read_xaml_fonts_and_keep_the_owned_nine_slice_pixels(self):
+        native = self.result["nativeFeedback"]
+        self.assertEqual(native["confirm"]["messageWidth"], 1100)
+        self.assertEqual(native["confirm"]["buttonWidth"], 560)
+        self.assertEqual(native["confirm"]["buttonMargin"], [0, 25, 40, 0])
+        self.assertEqual(native["confirm"]["fontSize"], 52)
+        self.assertEqual(native["confirm"]["close"], [85, 87])
+        self.assertIn("Times New Roman", native["fontFamilies"]["Body2"])
+        self.assertEqual(native["button"]["height"], 100)
+        self.assertEqual(native["button"]["border"], 4)
+        self.assertEqual(native["end"]["fontSize"], 200)
+        self.assertEqual(native["end"]["frame"], {"left": -660, "top": 316, "width": 5160, "height": 1352})
+        self.assertEqual(native["end"]["buttonWidth"], 626)
+        out = Path(self.directory.name)
+        for name, definition in (("dialog2_9slice", native["confirm"]["frame"]),
+                                 ("dialog_defeat", native["end"]["defeat"]),
+                                 ("dialog_victory", native["end"]["victory"])):
+            with Image.open(out / native["images"][name]) as source:
+                assembled = Image.new("RGBA", source.size)
+                y = 0
+                for row, height in enumerate(definition["rows"]):
+                    x = 0
+                    for col, width in enumerate(definition["columns"]):
+                        with Image.open(out / definition["images"][row * 3 + col]) as part:
+                            self.assertEqual(part.size, (width, height))
+                            assembled.paste(part, (int(x), int(y)))
+                        x += width
+                    y += height
+                self.assertEqual(assembled.tobytes(), source.convert("RGBA").tobytes())
+        for name, path in native["fonts"].items():
+            owned = SOUNDS.parent.parent / "wpfg" / path.removeprefix("wpfg/")
+            self.assertEqual((out / path).read_bytes(), owned.read_bytes(), name)
+        self.assertIn("wpfg/dialog/dialogyesnoboxgeneral.xaml", self.result["source"]["sha256"])
+        self.assertEqual(self.result["layouts"]["technologyprogresspanel"]["widgets"][0]["ViewPort"]["yorigin"], 115)
+        resource = self.result["layouts"]["resourcepanel"]
+        def walk(widgets):
+            for widget in widgets:
+                yield widget
+                yield from walk(widget.get("ChildWidgets", []))
+        flash = next(w for w in walk(resource["widgets"]) if w.get("Name") == "PopulationFlash")
+        self.assertEqual(flash["ViewPort"]["width"], 140)
+        self.assertEqual(flash["ViewPort"]["height"], 72)
+        self.assertEqual(flash["StateMaterials"]["StateNormal"]["Color"], {"r": 1, "g": 1, "b": 0, "a": 0.7})
 
     def test_player_coloured_icons_ship_opaque_with_their_weight_beside_them(self):
         # Every unit, building and technology icon material declares

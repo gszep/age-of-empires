@@ -9,6 +9,12 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 
 ## Before approximating anything
 
+- **An empty widget may have a complete XAML sibling.** `dialogyesnoboxgeneral`
+  looked viewport-only in widgetui, but its WPFG file specified the black/gold
+  in-game dialog. Reusing a parchment dialog was wrong until the human's capture
+  exposed it. Check WPFG templates, their resource dictionaries and fonts before
+  declaring controls engine-only or borrowing another screen's artwork.
+
 - **Dump the fields first.** A corpse's lifetime is a type-12 resource
   storage on the corpse unit; an age's building art is an `upgrade unit`
   command on the age technology; a civ's tree is a `Node Status` beside the

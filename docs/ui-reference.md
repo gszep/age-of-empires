@@ -51,16 +51,55 @@ screenloadgame.json
 `notificationpanel.json` defines event/chat Surrounds and MultiColorTextBoxes;
 the event box supplies the HUD's message stack. `GameNotificationPanel.json`
 instead defines a defeat announcement with player/civ widgets, and
-`popupmessage.json` is an OK-button modal, not a notification ticker.
-`dialogyesnoboxgeneral.json` has only a centred viewport; confirmation controls
-are reused from `dialogconfirmrestartreplay.json` with the approximation recorded
-in the ledger. Import assertions retain Box, TextBox, HotKey and per-state Color,
-in addition to the existing viewport/font/material fields.
+`popupmessage.json` is an OK-button modal, not a notification ticker. Both are
+now imported and used: the former announces the losing player's existing
+score-row identity at match end; the latter acknowledges replay-loading errors.
+Objective-change content belongs to #138. The full symbolic defeat template
+`IDS_GAME_NOTIFICATION_PANEL_DEFEAT` and numeric OK string 4001 are imported.
+`dialogyesnoboxgeneral.json` has only a centred viewport. Its sibling
+`resources/_common/wpfg/dialog/dialogyesnoboxgeneral.xaml` contains the actual
+in-game black/gold dialog. `tools/import_feedback.py` reads its children plus
+`DialogBackgroundRect`, ButtonLarge, text, font and image resources. It also
+imports `dialogendgame.xaml`, whose full-width crest/title screen supersedes
+the parchment placeholder in widgetui. The replay-dialog substitution is now
+only compatibility for older manifests. Import assertions retain Box, TextBox,
+HotKey and per-state Color as well as the native XAML metrics and original fonts.
 
 `UIColors.json` was already imported for player text before #58. The three
 `uicolors_*.json` variants and `dat/UiColors.txt` now accompany it, source-hashed,
 and populate `--ui-<tag>` / `--ui-<player-colour>-<role>` CSS custom properties.
 The existing `blanktoppanel` import already supplies the top strip.
+
+### Reference comparison (2026-09-24)
+
+The human supplied the missing captures in the conversation: options, TC Delete,
+full loss screen, Loom in progress/completed, and blocked housing. Settings:
+2560×1440, HUD 100%, tooltip 75%, Normal notification duration, Readability Panels
+on, colour-blind Off, unique player/health colours and Safe Delete on. Chat renders
+2000×1125 previews; original PNG bytes are not stored in the local corpus, so
+preview-derived measurements are not a raw-pixel oracle. The attachments and
+settings are indexed in `.local/reference/index.md`.
+
+| Surface | Reference observation / owned corroboration | Browser check |
+|---|---|---|
+| Completed research | box ≈(21,159), 312 wide, 32 high in preview; second line grows to ≈53 high | owned (40,305), width 600, `40*n+20` height; bold white text |
+| Blocked production | separate red warning ≈(889,860), 431×70 in preview | capture-derived 828×134, centre offset +200, bottom inset 374; no warning for cap alone |
+| Population flash | yellow region spans the count slot, not just its glyphs | owned `PopulationFlash` 140×72, normalized alpha 0.7 |
+| Delete | black/gold frame ≈(635,437), 730×252 in preview; close button; white message | XAML-derived width 1400, auto rows, original frame slices, 560-wide buttons, 52-point owned Times/Trajan fonts |
+| Loss | full-width lines, central crest, large grey title, divider and Return/Leave | owned XAML positions and textures; animated, view-only quadratic-falloff embers |
+
+The browser smoke writes 2560×1440 local confirmation, notification, housing and
+defeat screenshots under `.local/issue58-*-owned.png`, plus the generic popup at
+2000×1125. Numeric tests verify geometry, source image reconstruction, frame
+contribution at full opacity (sRGB 78,76,73 versus 240,240,240), and generic-popup
+alpha (120,120,120 matching the dimmed plane). The end-screen tests verify changing
+ember pixels and public Return/Leave behaviour without mutating the finished game.
+
+This corrects the screenshot-visible structural mismatches; it does not claim
+pixel-identical font rasterization, glint, dimmer values or ember trajectories.
+Those are explicit ledger approximations. The human could not reproduce the
+generic OK modal and accepted its owned widget artwork/layout without runtime
+capture; that verification limit does not block #58.
 
 `materials.json` contains about 4,410 material definitions connecting widget states to texture references, blend modes, colors, and fonts. `icons.json` maps semantic/icon indexes to named materials. The corresponding local art is under:
 

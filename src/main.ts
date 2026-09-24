@@ -18,7 +18,7 @@ import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets'
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
 import { buildingRulesFor, unitRulesFor } from './sim/rules';
 import { gridKey, placeCommands } from './view/command-grid';
-import type { ConfirmationResult, ResourceStatus, ScoreRow } from './view/hud';
+import type { ConfirmationResult, ProductionItem, ResourceStatus, ScoreRow } from './view/hud';
 import { costLabel, displayName as nameFrom, plainHelp } from './view/names';
 import { contextCursor, cursorCss } from './view/cursors';
 import { artKey, chooseAnimation, createEntityView, refreshEntityTextures, dimFogSnapshot, gatherTargetResource, playerColorHex, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
@@ -185,14 +185,14 @@ interface ReplayState {
 let replay: ReplayState | undefined;
 
 function startReplay(raw: unknown): void {
-  if (shared) { hud.showMessage('Open a standalone game to watch a replay'); return; }
+  if (shared) { hud.showPopup('Open a standalone game to watch a replay'); return; }
   const record = raw as MatchRecord;
   if (!record || record.version !== 1 || !Array.isArray(record.commands) || !Array.isArray(record.checksums)) {
-    hud.showMessage('Not a valid replay file');
+    hud.showPopup('Not a valid replay file');
     return;
   }
   if (record.rulesOrigin !== rules.origin) {
-    hud.showMessage(`Replay was recorded with ${record.rulesOrigin} rules; local rules are ${rules.origin}`);
+    hud.showPopup(`Replay was recorded with ${record.rulesOrigin} rules; local rules are ${rules.origin}`);
     return;
   }
   // A replay drives its own command stream; snapshotting it would resume a
@@ -428,7 +428,7 @@ function createHud(): Hud {
       history.replaceState(null, '', url);
       return true;
     },
-  });
+  }, messages);
   created.playerColors = assets?.playerColors;
   created.minimap.player = localPlayer;
   configureMapMenu(created);
@@ -896,20 +896,25 @@ function updateContextCursor(): void {
  */
 let cueWatcher = createCueWatcher();
 let knownOwnUnits = new Set<number>();
+let lastAnnouncedNextId = game.nextId;
 function announceTrained(): void {
   const current = new Set<number>();
   for (const entity of game.entities) {
     if (entity.dead || entity.owner !== localPlayer || !isUnit(entity.kind)) continue;
     current.add(entity.id);
     if (knownOwnUnits.size && !knownOwnUnits.has(entity.id)) playUnitSound(entity, 'train');
+    if (entity.id >= lastAnnouncedNextId) {
+      hud.showMessage((messages.unitCreated ?? '--%s Created--').replace('%s', () => displayName(entity.kind)));
+    }
   }
   knownOwnUnits = current;
+  lastAnnouncedNextId = game.nextId;
 }
 
 // Keyboard: camera, hotkeys, menu.
 const heldKeys = new Set<string>();
 addEventListener('keydown', event => {
-  if (hud.confirmationOpen) return;
+  if (hud.modalOpen) return;
   const key = event.key;
   if (event.target instanceof HTMLElement && event.target.closest('input, select, textarea, [contenteditable="true"]')) {
     if (key === 'Escape' || key === 'F10') {
@@ -1361,6 +1366,30 @@ function scoreRows(): ScoreRow[] {
   });
 }
 
+function productionItems(): ProductionItem[] {
+  const items: ProductionItem[] = [];
+  const self = game.players[localPlayer];
+  for (const entity of game.entities) {
+    if (entity.owner !== localPlayer || entity.dead) continue;
+    if (entity.researching) {
+      const tech = playerRules(localPlayer).technologies[entity.researching.tech as TechKey];
+      if (tech) items.push({ producer: entity.id, name: tech.name,
+        icon: hud.iconFor('Techs', tech.iconId, localPlayer),
+        fraction: Math.floor(100 * (1 - entity.researching.remainingTicks * TICK_SECONDS / tech.researchSeconds)) / 100,
+        blocked: false });
+    }
+    if (!entity.training) continue;
+    for (const [index, kind] of [entity.training.kind, ...(entity.trainingQueue ?? [])].entries()) {
+      const unit = unitRulesFor(game, localPlayer, kind);
+      items.push({ producer: entity.id, name: displayName(kind), icon: hud.iconFor('Units', assets?.entities[kind]?.iconId, localPlayer),
+        fraction: index ? 0 : Math.floor(100 * (1 - entity.training.remainingTicks * TICK_SECONDS / unit.trainSeconds)) / 100,
+        blocked: index === 0 && entity.training.remainingTicks <= 0 && self.population + unit.popCost > self.populationCap,
+        pending: index > 0, count: 1 });
+    }
+  }
+  return items;
+}
+
 function displayName(key: string): string {
   return nameFrom(key, assets?.entities[key]?.text?.name);
 }
@@ -1598,7 +1627,6 @@ function syncScene(time: number): void {
   const cuesStarted = cueWatcher.started;
   for (const cue of view.pollCues(cueWatcher, game, localPlayer, gameTimeSeconds(game))) {
     playSound(cue);
-    if (cue === 'pop_capped') hud.showMessage(messages.needMoreHouses ?? 'You need to build more houses.');
     if (cue === 'under_attack') hud.showMessage('Your units are under attack!');
     if (cue === 'under_attack_town') hud.showMessage('Your town is under attack!');
     if (cue === 'farm_depleted') hud.showMessage('Farm depleted.');
@@ -1835,6 +1863,7 @@ renderer.setAnimationLoop(now => {
   if (hudClock > 0.15) {
     hudClock = 0;
     hud.updateResources(game, localPlayer, resourceStatus());
+    hud.updateProduction(productionItems());
     hud.updateScore(scoreRows());
     hud.setCommands(currentCommands());
     hud.setSelection(selectionInfo());
@@ -1844,6 +1873,8 @@ renderer.setAnimationLoop(now => {
     }, assets, revealMap);
     if (game.winner && !ended) {
       ended = true;
+      const defeated = scoreRows().find(row => row.number !== game.winner)!;
+      hud.showDefeat(defeated);
       hud.showEnd(game.winner === localPlayer);
     }
     if (!game.winner) ended = false;
@@ -1906,14 +1937,16 @@ function rebuildPresentation(): void {
   disposeGhost();
 
   const menuWasOpen = hud.menuOpen;
+  const endWasOpen = hud.endOpen;
   hud.destroy();
   hud = createHud();
   if (menuWasOpen) hud.toggleMenu(true);
   hud.updateResources(game, localPlayer, resourceStatus());
+  hud.updateProduction(productionItems());
   hud.updateScore(scoreRows());
   hud.setCommands(currentCommands());
   hud.setSelection(selectionInfo());
-  if (game.winner) hud.showEnd(game.winner === localPlayer);
+  if (game.winner && endWasOpen) hud.showEnd(game.winner === localPlayer);
 
   syncScene(gameTimeSeconds(game));
 }

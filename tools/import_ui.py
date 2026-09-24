@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from PIL import Image
+from import_feedback import extract_feedback
 
 WIDGET_KEYS = (
     "Type",
@@ -434,6 +435,7 @@ def extract_ui(
         "colors": colors,
         "colorPalettes": color_palettes,
         "colorTags": color_tags,
+        "nativeFeedback": extract_feedback(sounds_path.parent.parent / "wpfg", out_root, hashes),
         "cursors": import_cursors(cursors_dir or sounds_path.parent.parent / "cursors",
                                   ui_spec.get("cursors", []), out_root, hashes),
         "rawTextures": raw_textures,

@@ -154,8 +154,8 @@ try {
         synchronizationHash: (await query({ type: 'sim' })).synchronizationHash }));
       rounds++;
       if (Date.now() >= until) break;
-      if (metrics.winner) await page.locator('#end-dialog [data-menu="restart"]').click();
-      await page.keyboard.press('F10');
+      if (metrics.winner) await page.locator('#end-dialog [data-end="leave"]').click();
+      else await page.keyboard.press('F10');
       await page.select('#map-choice', maps[rounds % maps.length]);
       await page.locator('#map-seed').fill(String(3 + rounds));
       await page.locator('#map-setup button[type="submit"]').click();

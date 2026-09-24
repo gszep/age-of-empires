@@ -16,34 +16,92 @@ off the reference; **measured** — fitted to a reference screenshot;
 
 ## HUD feedback (#58)
 
-- **Owned:** `notificationpanel.json` collection origin (40,305), EventBackground
-  600×250 nine-cell BlackPanel Surround with grid step 32, text inset (10,10),
-  point size 40; `dialogyesnoboxgeneral.json` centred 1280×720 viewport;
-  `dialogconfirmrestartreplay.json` background, message/button rectangles,
-  material states and point size 42. Localized prompts 10213/10214, Yes/No
-  4003/4004 and research template 37157. UIColors palettes and UiColors.txt tags
-  are imported verbatim, including alpha.
-- **Inferred composition:** the general yes/no file has no widgets, so its
-  controls reuse the replay confirmation's 1280×720 background and children.
-  This is not a measured DE deletion-dialog reconstruction. Native browser
-  modal focus/tab behavior is used; the simulation continues while it is open.
-  DAT confirmation eligibility and existing mixed-selection cancellation
-  semantics are preserved. Lifecycle teardown aborts the pending operation
-  without dispatching any deletion command. Shared/restarted matches revalidate captured match
-  identity before sending the public delete command.
+- **Owned notifications:** `notificationpanel.json` origin (40,305), 600-wide
+  BlackPanel Surround, grid step 32, inset (10,10), line size 40. The old 250-high
+  template is a maximum, not a fixed-height box: **human capture** (2026-09-24,
+  2560×1440, HUD 100%, Normal notifications, Readability Panels on) shows one
+  line at 60 reference pixels including padding, two at 100. Bold white text
+  replaces the template's brown placeholder; the HUD's existing 0.70 widget
+  text scale remains **inferred**. Localized prompts 10213/10214, Yes/No
+  4003/4004, research template 37157 and creation template 37159 are **owned**.
+  UIColors palettes and UiColors.txt tags retain source alpha.
+- **Native confirmation:** the empty `widgetui/dialogyesnoboxgeneral.json` has
+  a substantive sibling in `wpfg/dialog/dialogyesnoboxgeneral.xaml`. The latter,
+  `DialogBackgroundRect`, ButtonLarge and text/font resources now supply the
+  black/gold frame, 560-wide buttons, 85×87 close button, 52-point Times New Roman
+  Bold message and Trajan Pro Bold buttons. This supersedes reuse of the replay
+  parchment dialog. Nine-slice PNG pixels and source dimensions are imported;
+  auto row layout is mapped to CSS. Browser line-height 1.15, disabled kerning,
+  drop shadow and 92% black modal dimmer are **inferred** from the supplied
+  capture, not closed-runtime values. Browser focus/tab behaviour is used;
+  simulation continues while confirmation is open. DAT eligibility and explicit
+  mixed-selection No semantics are preserved; lifecycle abort dispatches no
+  command. Captured match identity is checked before deletion.
 - **Chosen feedback policy:** five recent messages, six wall-clock seconds per
   message, oldest overflow eviction, existing 250 ms panel fade; wrapping text
   scrolls to the newest line. The template's brown MultiColorTextBox placeholder
   is replaced with the owned White tag for readability over BlackPanel art.
   Font-face/index mapping and 0.70 text scale reuse the existing HUD inference.
-  No screenshot-matched claim is made for notification composition/blending.
   Attack/farm alert wording is project text after inspecting owned localization
-  and sound aliases; research uses the owned template with the researched name.
+  and sound aliases; research and newly created units use owned templates.
+- **Blocked production:** warning requires an owned producer whose paid unit
+  is ready but cannot fit under the population cap, matching the simulation's
+  actual wait condition. Being at the cap with no blocked producer does not
+  show it. Red wording 3075 is **owned**. The 828×134 panel, centre +200 from
+  viewport centre, bottom inset 374 and 34-reference-pixel bold Times text are
+  **human-capture-derived/inferred** from the supplied 2000×1125 preview of the
+  2560×1440 screenshot; the nine-cell art is owned. `PopulationFlash` supplies
+  its 140×72 box and normalized yellow alpha 0.7; one-second blinking is chosen.
+- **Global queue:** `technologyprogresspanel.json` supplies origin (0,115),
+  width 3050 and height 150. The screenshot's two-row setting gives 75×75 cells.
+  Research/unit art is owned; click selects the producer through the existing
+  view callback. One entry per paid slot, active/pending rows, green/yellow/red
+  overlay amounts and count typography are **inferred** integration, not a
+  complete reconstruction of engine aggregation. No production rules change.
 - **Palette scope:** URL-selected CSS palette applies to player text; imported
   tags supply lower-HUD healthy bars and modal backdrop. The UI variants do not
   change sprite ramps, world health bars or minimap colours. #141 owns the
   future options-screen control. `GameMsgPanel.json` supplies nine empty full-
   screen anchors, not the message typography described in the original issue.
+- **Defeat announcement:** collection origin (1140,110), 520×100 Surround,
+  75×75 civilisation icon, 42×42 number badge and label at x=144.5 are **owned**
+  from `GameNotificationPanel.json`; wording is the full symbolic localization
+  key `IDS_GAME_NOTIFICATION_PANEL_DEFEAT`. Substituting the loser's existing
+  score-row name/colour/civ icon for the template's Ashley/FlatColor/red
+  placeholders is **inferred** runtime binding. It appears when the current
+  two-player match reports a winner and expires after six wall-clock seconds
+  (**chosen**, matching the message policy); it does not change defeat rules.
+  The ObjectiveChangeAnchor belongs to future objectives work under #138.
+- **Full end screen:** `wpfg/dialog/dialogendgame.xaml` supplies the 5160×1352
+  frame at (-660,316), row layout, 200-point Trajan Pro title, divider and
+  626-wide Return/Leave buttons. Frame/crest PNGs, separator, fonts, gradients
+  and strings 9004/9005 plus `IDS_RETURN_TO_MAP`/`IDS_LEAVE_MAP` are **owned**.
+  Shiny2's centre-preserving horizontal slices are mapped to a CSS grid;
+  glint modulation is not reproduced. The supplied loss capture corroborates
+  the crest/line/button positions. Browser line metrics/kerning and dimmer
+  remain **inferred**. Return dismisses without changing the finished match;
+  Leave opens this project's existing match launcher, since it has no DE
+  postgame/main-menu shell. This is **chosen** navigation, not an imported
+  achievements screen. Dismissal survives view hot reload.
+- **End-screen embers:** `emberwindow.xaml` and `applicationwindow.xaml` bind
+  alpha/additive overlays; `ember_ps.so`'s documented SM2 stream supplies a
+  procedural capsule-distance quadratic fade. No ember emitter parameters or
+  texture were found in the enumerated WPFG/particle resources. The browser
+  pre-rasterizes that falloff and animates 900 independently seeded motes at
+  30 fps; distribution, velocity, warm colours and scale are **chosen/inferred**
+  from the human's animated-lights description and screenshot, not a measured
+  DE trajectory. It uses no simulation RNG and stops on dismissal/destruction.
+- **Generic OK popup:** `popupmessage.json` provides the centred 1280×720
+  viewport, parchment, message rectangle, 442×60 button at (420,575), normal
+  38-point and hover/pressed 45-point sizes; OK is owned string 4001. Using this
+  modal for malformed/incompatible replay files and shared-mode replay refusal
+  is **chosen project error presentation**, not an assertion about DE's error
+  routing. Existing diagnostic wording is retained. Imported parchment corners
+  preserve source alpha instead of painting the open-fallback beige behind it.
+  Native modal focus/Escape behaviour and the existing 0.70 text scale remain
+  approximations. The human explicitly accepted owned-source treatment without
+  a runtime screenshot on 2026-09-24; this is not a #58 blocker or a claim of
+  screenshot equivalence.
 
 ## Simulation
 

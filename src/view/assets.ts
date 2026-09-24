@@ -268,7 +268,7 @@ export interface UiLayoutWidget {
   ViewPort?: { xorigin: number; yorigin: number; width: number; height: number; alignment?: string };
   /** An `Anchor` widget carries a bare origin here instead of a ViewPort. */
   Anchor?: { xorigin: number; yorigin: number };
-  StateMaterials?: Record<string, { Material?: string; Font?: {
+  StateMaterials?: Record<string, { Material?: string; Color?: { r: number; g: number; b: number; a: number }; Font?: {
     PointSize: number; Style?: string; TextColor?: { r: number; g: number; b: number; a: number };
   } }>;
   Box?: { gridstep: number };
@@ -292,12 +292,25 @@ export interface UiAssets {
   colors?: { PresetColors?: Record<string, number[]>; ColorTables?: Record<string, Record<string, number[]>> };
   colorPalettes?: Record<string, NonNullable<UiAssets['colors']>>;
   colorTags?: Record<string, number[]>;
+  nativeFeedback?: {
+    images: Record<string, string>;
+    fonts: Record<string, string>;
+    button: { height: number; fontSize: number; border: number; borderColor: string; gradient: { color: string; offset: number }[] };
+    confirm: { messageWidth: number; fontSize: number; rows: string[]; buttonWidth: number; buttonMargin: number[];
+      side: number; close: number[]; gradient: { color: string; offset: number }[]; frame: NativeSlices };
+    end: { frame: { left: number; top: number; width: number; height: number }; defeat: NativeSlices; victory: NativeSlices;
+      gridTop: number; gridHeight: number; rows: { Height: string; MinHeight?: string }[]; titleRows: string[];
+      fontSize: number; buttonWidth: number; buttonGap: number; separator: number[];
+      defeatGradient: { color: string; offset: number }[]; victoryGradient: { color: string; offset: number }[] };
+  };
   /** Keys taken from the reference's own `hotkeys.json`, per action. */
   hotkeys?: { goto?: Record<string, ImportedHotkey>; selectAll?: Record<string, ImportedHotkey> };
   layouts: Record<string, UiLayout>;
   materials: Record<string, UiMaterial>;
   icons: Record<string, Record<string, string>>;
 }
+
+export interface NativeSlices { images: string[]; columns: number[]; rows: number[] }
 
 export interface AudioAssets {
   base: string;

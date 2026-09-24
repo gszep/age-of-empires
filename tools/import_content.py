@@ -51,17 +51,21 @@ def rounded(value: float) -> float:
     return round(value, 6)
 
 
-def read_strings(path: Path) -> dict[int, str]:
+Strings = dict[int | str, str]
+
+
+def read_strings(path: Path) -> Strings:
     """The reference's string table: `<id> "<text>"` per line, `\\n` kept as-is."""
-    strings: dict[int, str] = {}
+    strings: Strings = {}
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        match = re.match(r'^(\d+)\s+"(.*)"\s*$', line)
+        match = re.match(r'^(\d+|IDS_[A-Z0-9_]+)\s+"(.*)"\s*$', line)
         if match:
-            strings[int(match.group(1))] = match.group(2)
+            key = match.group(1)
+            strings[int(key) if key.isdecimal() else key] = match.group(2)
     return strings
 
 
-def text_of(strings: dict[int, str], name_id: int, creation_id: int, help_id: int) -> dict[str, str]:
+def text_of(strings: Strings, name_id: int, creation_id: int, help_id: int) -> dict[str, str]:
     """What the reference calls a thing, and what its tooltip says."""
     text: dict[str, str] = {}
     if name_id in strings:
@@ -406,7 +410,7 @@ def extract_entity(
     spec: dict[str, Any],
     graphics_dir: Path | Graphics,
     hashes: dict[str, str],
-    strings: dict[int, str] | None = None,
+    strings: Strings | None = None,
 ) -> dict[str, Any]:
     unit = civ_units[spec["unitId"]]
     if unit is None:
@@ -1146,7 +1150,7 @@ def effects_of(
 
 def technology_entry(
     dat: DatFile, spec: dict[str, Any], hashes: dict[str, str], attribute_ids: dict[str, int],
-    strings: dict[int, str] | None = None,
+    strings: Strings | None = None,
 ) -> dict[str, Any]:
     """One researchable technology: what it costs, where, and what it changes."""
     tech = dat.techs[spec["techId"]]
@@ -1201,7 +1205,7 @@ def technology_entry(
 
 def civilization_entry(
     dat: DatFile, dat_path: Path, spec: dict[str, Any], hashes: dict[str, str],
-    strings: dict[int, str] | None = None,
+    strings: Strings | None = None,
 ) -> dict[str, Any]:
     """The civilisation this content is imported for, and what its tree lacks.
 
@@ -1279,7 +1283,7 @@ def technologies_from_tree(
     civilization: dict[str, Any],
     hashes: dict[str, str],
     attribute_ids: dict[str, int],
-    strings: dict[int, str] | None = None,
+    strings: Strings | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
     """Every technology the civilisation's tree offers that this game can hold.
 
@@ -1546,7 +1550,7 @@ def terrain_restrictions(
     }
 
 
-def ages_of(dat_path: Path, strings: dict[int, str] | None) -> list[dict[str, Any]]:
+def ages_of(dat_path: Path, strings: Strings | None) -> list[dict[str, Any]]:
     """The base era's ages: name (from the string table) and shield material.
 
     `eras.json` lists each age's `NameId` (4201 "Dark Age" ...) and
@@ -1679,7 +1683,7 @@ def extract(
     attributes = player_attributes(dat.civs[spec["civIndex"]].resources, attribute_ids)
     if not SUPPORTED_PLAYER_ATTRIBUTES.issubset(attributes):
         raise ValueError("Constants.xs: missing supported player attributes")
-    strings: dict[int, str] | None = None
+    strings: Strings | None = None
     if strings_path is not None and strings_path.is_file():
         strings = read_strings(strings_path)
         hashes["strings"] = sha256(strings_path)
@@ -1807,6 +1811,10 @@ def extract(
                 ("confirmDelete", 10213), ("yes", 4003), ("no", 4004),
                 ("confirmDeleteMany", 10214),
                 ("researchComplete", 37157),
+                ("ok", 4001), ("playerDefeated", "IDS_GAME_NOTIFICATION_PANEL_DEFEAT"),
+                ("productionHoused", 3075), ("unitCreated", 37159),
+                ("victoryTitle", 9004), ("defeatTitle", 9005),
+                ("returnToMap", "IDS_RETURN_TO_MAP"), ("leaveMap", "IDS_LEAVE_MAP"), ("close", 10824),
                 # Map setup labels and the three shipped random-map names (#144).
                 ("mapType", 9691), ("mapSeed", 10658), ("startGame", 9472),
                 ("gameSettings", 9682), ("randomSeed", 10107),

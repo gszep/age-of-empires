@@ -8,6 +8,7 @@ import { materialUrl, iconUrl, ownedIconUrl, type PlayerColors, type UiAssets } 
 import { placeCommands } from './command-grid';
 import { widgetBox } from './layout';
 import { installUiColors, placeFeedback } from './feedback';
+import { animateEmbers, buttonText, placeEndScreen } from './native-feedback';
 import { Minimap } from './minimap';
 import type { GameState, PlayerId, Point, ReadonlyGameState } from '../sim/types';
 
@@ -103,6 +104,10 @@ const REFERENCE_WIDTH = 3840;
 /** Teardown is not a player response and must never dispatch a command. */
 export type ConfirmationResult = 'yes' | 'no' | 'aborted';
 
+export interface ProductionItem {
+  producer: number; name: string; icon?: string; fraction: number; blocked: boolean; pending?: boolean; count?: number;
+}
+
 export class Hud {
   root: HTMLElement;
   minimap: Minimap;
@@ -111,6 +116,9 @@ export class Hud {
   private resourceValues: Record<string, HTMLElement> = {};
   private messageBox!: HTMLElement;
   private messageTimers = new Map<HTMLElement, number>();
+  private defeatTimer?: number;
+  private stopEmbers?: () => void;
+  private productionSignature = '';
   private resolveConfirmation?: (result: ConfirmationResult) => void;
   private menuDialog!: HTMLElement;
   private endDialog!: HTMLElement;
@@ -130,6 +138,7 @@ export class Hud {
     parent: HTMLElement,
     private ui: UiAssets | undefined,
     private callbacks: HudCallbacks,
+    private strings: Record<string, string> = {},
   ) {
     this.root = document.createElement('div');
     this.root.id = 'hud';
@@ -158,7 +167,9 @@ export class Hud {
    */
   private installFonts(): void {
     const fonts = this.ui?.fonts;
-    if (!fonts || document.getElementById('aoe2-fonts')) return;
+    if (!fonts) return;
+    this.root.classList.add('reference-fonts');
+    if (document.getElementById('aoe2-fonts')) return;
     const style = document.createElement('style');
     style.id = 'aoe2-fonts';
     const digits = 'U+0030-0039';
@@ -184,6 +195,9 @@ export class Hud {
   destroy(): void {
     this.resolveConfirmation?.('aborted');
     for (const timer of this.messageTimers.values()) window.clearTimeout(timer);
+    window.clearTimeout(this.defeatTimer);
+    this.closePopup();
+    this.hideEnd();
     removeEventListener('resize', this.onResize);
     this.root.remove();
   }
@@ -210,6 +224,7 @@ export class Hud {
         <button class="idle-villager" data-command="idle-villager" title="Select idle villager (.)"></button>
         <div class="age-shield" data-age-shield></div>
         <div class="age-bar"><div class="age-fill"></div><div class="age-text" data-age-text></div></div>
+        <div id="population-flash" hidden></div>
       </div>
       <div id="menu-panel" class="panel">
         <button class="menu-button" data-icon="techtree" data-widget="Techtree" title="Technology tree (not yet available)" disabled></button>
@@ -231,10 +246,19 @@ export class Hud {
       </div>
       <div id="score-panel"></div>
       <div id="game-message"><div class="message-lines" role="log" aria-live="polite" aria-relevant="additions"></div></div>
-      <dialog id="confirm-dialog" aria-labelledby="confirm-message">
+      <div id="global-production" aria-label="Global production queue"></div>
+      <div id="production-warning" hidden role="status"><span class="warning-text"></span></div>
+      <dialog id="confirm-dialog" aria-labelledby="confirm-message" tabindex="-1">
         <p id="confirm-message"></p>
-        <button data-answer="yes">Yes</button><button data-answer="no">No</button>
+        <div class="confirm-actions"><button data-answer="yes">Yes</button><button data-answer="no">No</button></div>
+        <button data-confirm-cancel aria-label="Close">×</button>
       </dialog>
+      <dialog id="popup-dialog" aria-labelledby="popup-message">
+        <p id="popup-message"></p><button data-popup-ok>OK</button>
+      </dialog>
+      <div id="defeat-notification" hidden role="status" aria-live="polite">
+        <span class="defeat-civ"></span><span class="defeat-number"></span><span class="defeat-text"></span>
+      </div>
       <div id="menu-dialog" class="dialog hidden">
         <h2>Menu</h2>
         <button data-menu="resume">Resume</button>
@@ -254,7 +278,15 @@ export class Hud {
         <button data-menu="load-replay">Load replay…</button>
         <input id="replay-file" type="file" accept=".json" style="display:none">
       </div>
-      <div id="end-dialog" class="dialog hidden"><h2 id="end-title"></h2><button data-menu="restart">Play again</button></div>
+      <dialog id="end-dialog" aria-labelledby="end-title" tabindex="-1">
+        <div class="end-frame"></div>
+        <div class="end-content">
+          <div class="end-title-space"><h2 id="end-title"></h2></div>
+          <div class="end-separator"></div>
+          <div class="end-actions"><button data-end="return"></button><button data-end="leave"></button></div>
+        </div>
+        <canvas class="end-embers" aria-hidden="true"></canvas>
+      </dialog>
     `;
 
     // Imported panel art.
@@ -306,6 +338,7 @@ export class Hud {
     const confirmation = this.root.querySelector<HTMLDialogElement>('#confirm-dialog')!;
     confirmation.addEventListener('cancel', event => { event.preventDefault(); this.resolveConfirmation?.('no'); });
     confirmation.addEventListener('click', event => {
+      if ((event.target as HTMLElement).closest('[data-confirm-cancel]')) { this.resolveConfirmation?.('no'); return; }
       const answer = (event.target as HTMLElement).closest<HTMLElement>('[data-answer]')?.dataset.answer;
       if (answer === 'yes' || answer === 'no') { this.callbacks.onSound('button_ui'); this.resolveConfirmation?.(answer); }
     });
@@ -315,6 +348,27 @@ export class Hud {
       if (event.key === 'Enter' && !(event.target instanceof HTMLButtonElement)) {
         event.preventDefault(); this.resolveConfirmation?.('yes');
       }
+    });
+    const popup = this.root.querySelector<HTMLDialogElement>('#popup-dialog')!;
+    popup.addEventListener('cancel', event => { event.preventDefault(); this.closePopup(); });
+    popup.querySelector('button')!.addEventListener('click', () => {
+      this.callbacks.onSound('button_ui'); this.closePopup();
+    });
+    popup.addEventListener('keydown', event => { if (popup.open) event.stopPropagation(); });
+    this.endDialog.addEventListener('cancel', event => { event.preventDefault(); this.hideEnd(); });
+    this.endDialog.addEventListener('keydown', event => {
+      if ((this.endDialog as HTMLDialogElement).open) event.stopPropagation();
+    });
+    this.endDialog.addEventListener('click', event => {
+      const action = (event.target as HTMLElement).closest<HTMLElement>('[data-end]')?.dataset.end;
+      if (!action) return;
+      this.callbacks.onSound('button_ui');
+      this.hideEnd();
+      if (action === 'leave') this.toggleMenu(true);
+    });
+    this.root.querySelector('#global-production')!.addEventListener('click', event => {
+      const id = (event.target as HTMLElement).closest<HTMLElement>('[data-producer]')?.dataset.producer;
+      if (id) this.callbacks.onSelectMember(Number(id));
     });
     const mapForm = this.root.querySelector<HTMLFormElement>('#map-setup')!;
     const seedInput = this.root.querySelector<HTMLInputElement>('#map-seed')!;
@@ -369,7 +423,7 @@ export class Hud {
         this.callbacks.onReplayFile(JSON.parse(await file.text()));
         this.toggleMenu(false);
       } catch {
-        this.showMessage('Not a valid replay file');
+        this.showPopup('Not a valid replay file');
       }
     });
     const minimapCanvas = this.root.querySelector<HTMLCanvasElement>('#minimap-canvas')!;
@@ -493,7 +547,7 @@ export class Hud {
   }
 
   private applyScale(): void {
-    const scale = Math.max(0.24, Math.min(0.62, innerWidth / REFERENCE_WIDTH));
+    const scale = Math.max(0.24, Math.min(innerHeight / 2160, innerWidth / REFERENCE_WIDTH));
     this.root.style.setProperty('--ui-scale', String(scale));
   }
 
@@ -554,12 +608,47 @@ export class Hud {
 
   get confirmationOpen(): boolean { return this.root.querySelector<HTMLDialogElement>('#confirm-dialog')!.open; }
 
+  get modalOpen(): boolean {
+    return this.confirmationOpen || this.root.querySelector<HTMLDialogElement>('#popup-dialog')!.open || this.endOpen;
+  }
+
+  /** Errors that need acknowledgement use the owned generic OK modal. */
+  showPopup(text: string): void {
+    const popup = this.root.querySelector<HTMLDialogElement>('#popup-dialog')!;
+    popup.querySelector('#popup-message')!.textContent = text;
+    popup.querySelector('button')!.textContent = this.strings.ok ?? 'OK';
+    if (!popup.open) popup.showModal();
+    popup.querySelector<HTMLButtonElement>('button')!.focus();
+  }
+
+  private closePopup(): void {
+    const popup = this.root.querySelector<HTMLDialogElement>('#popup-dialog')!;
+    if (popup.open) popup.close();
+    if (popup.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+  }
+
+  showDefeat(player: ScoreRow): void {
+    const panel = this.root.querySelector<HTMLElement>('#defeat-notification')!;
+    const text = panel.querySelector<HTMLElement>('.defeat-text')!;
+    text.textContent = (this.strings.playerDefeated ?? '%s was defeated').replace('%s', () => player.name);
+    text.style.color = player.textColor;
+    const badge = panel.querySelector<HTMLElement>('.defeat-number')!;
+    badge.textContent = String(player.number);
+    badge.style.backgroundColor = player.color;
+    const civ = panel.querySelector<HTMLElement>('.defeat-civ')!;
+    civ.style.backgroundImage = player.civIcon ? this.texture(player.civIcon) : 'none';
+    panel.hidden = false;
+    window.clearTimeout(this.defeatTimer);
+    this.defeatTimer = window.setTimeout(() => { panel.hidden = true; }, 6000);
+  }
+
   confirmDelete(text: string, yes = 'Yes', no = 'No'): Promise<ConfirmationResult> {
     if (this.confirmationOpen) return Promise.resolve('aborted');
     const dialog = this.root.querySelector<HTMLDialogElement>('#confirm-dialog')!;
     dialog.querySelector('#confirm-message')!.textContent = text;
-    dialog.querySelector('[data-answer="yes"]')!.textContent = yes;
-    dialog.querySelector('[data-answer="no"]')!.textContent = no;
+    buttonText(dialog.querySelector<HTMLElement>('[data-answer="yes"]')!, yes);
+    buttonText(dialog.querySelector<HTMLElement>('[data-answer="no"]')!, no);
+    dialog.querySelector('[data-confirm-cancel]')!.setAttribute('aria-label', this.strings.close ?? 'Close');
     return new Promise(resolve => {
       this.resolveConfirmation = result => {
         this.resolveConfirmation = undefined;
@@ -570,7 +659,7 @@ export class Hud {
         resolve(result);
       };
       dialog.showModal();
-      dialog.querySelector<HTMLButtonElement>('[data-answer="yes"]')!.focus();
+      dialog.focus();
     });
   }
 
@@ -830,12 +919,59 @@ export class Hud {
   }
 
   showEnd(victory: boolean): void {
-    this.endDialog.classList.remove('hidden');
-    this.endDialog.querySelector('#end-title')!.textContent = victory ? 'Victory!' : 'Defeat';
+    this.resolveConfirmation?.('aborted');
+    this.closePopup();
+    placeEndScreen(this.root, this.ui, victory);
+    this.endDialog.querySelector('#end-title')!.textContent = victory
+      ? this.strings.victoryTitle ?? 'You are victorious!' : this.strings.defeatTitle ?? 'You have been defeated!';
+    buttonText(this.endDialog.querySelector<HTMLElement>('[data-end="return"]')!, this.strings.returnToMap ?? 'Return to Map');
+    buttonText(this.endDialog.querySelector<HTMLElement>('[data-end="leave"]')!, this.strings.leaveMap ?? 'Leave Map');
+    if (!this.endOpen) (this.endDialog as HTMLDialogElement).showModal();
+    this.endDialog.focus();
+    this.stopEmbers?.();
+    if (this.ui?.nativeFeedback) this.stopEmbers = animateEmbers(this.endDialog.querySelector('canvas')!);
   }
 
+  get endOpen(): boolean { return (this.endDialog as HTMLDialogElement).open; }
+
   hideEnd(): void {
-    this.endDialog.classList.add('hidden');
+    this.stopEmbers?.(); this.stopEmbers = undefined;
+    if (this.endOpen) (this.endDialog as HTMLDialogElement).close();
+    if (this.endDialog.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+  }
+
+  updateProduction(items: ProductionItem[]): void {
+    const blocked = items.some(item => item.blocked);
+    const warning = this.root.querySelector<HTMLElement>('#production-warning')!;
+    warning.hidden = !blocked;
+    warning.querySelector('.warning-text')!.textContent = this.strings.productionHoused ?? 'You need more houses to continue unit production.';
+    this.root.querySelector('[data-value="population"]')!.classList.toggle('production-blocked', blocked);
+    this.root.querySelector<HTMLElement>('#population-flash')!.hidden = !blocked;
+    const signature = JSON.stringify(items);
+    if (signature === this.productionSignature) return;
+    this.productionSignature = signature;
+    const queue = this.root.querySelector<HTMLElement>('#global-production')!;
+    queue.hidden = items.length === 0;
+    queue.replaceChildren();
+    for (const pending of [false, true]) {
+      const row = document.createElement('div'); row.className = 'production-row';
+      for (const item of items.filter(item => !!item.pending === pending)) {
+        const button = document.createElement('button');
+        button.dataset.producer = String(item.producer);
+        button.title = item.name; button.setAttribute('aria-label', item.name);
+        button.className = `production-item${item.blocked ? ' blocked' : ''}${pending ? ' pending' : ''}`;
+        if (item.icon) button.style.backgroundImage = item.icon;
+        else button.textContent = item.name;
+        const progress = document.createElement('span'); progress.className = 'production-progress';
+        progress.style.height = `${Math.max(0, Math.min(1, item.fraction)) * 100}%`;
+        button.append(progress);
+        if (item.count !== undefined) {
+          const count = document.createElement('span'); count.className = 'production-count'; count.textContent = String(item.count); button.append(count);
+        }
+        row.append(button);
+      }
+      queue.append(row);
+    }
   }
 
   /**

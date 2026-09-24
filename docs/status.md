@@ -53,19 +53,28 @@ Start Game rebuilds the board and minimap; Random requests a fresh seed;
 Restart repeats the chosen setup. Solo sessions remember their setup across
 reloads, while shared selection belongs to the host and is sent to the guest.
 
-HUD feedback (#58) now shows attack, population, depleted-farm and named research
-alerts in a bounded, independently expiring notification stack. Delete-confirmed
-entities use an in-page modal with Yes/No/Escape and owned art, viewport and
-localized prompts. `tools/feedback_smoke.mts` exercises real combat/research
-alerts, repeated modal interactions, mixed-selection deletion, read-only HUD
-rebuilds, text-only messages, bounded history and overlapping expiry in imported
-and `OPEN_FALLBACK=1` modes. The imported run also measures notification background
-pixels at full opacity, guarding against losing the panel after its fade.
+HUD feedback (#58) uses a compact, content-height stack for attacks, depleted
+farms, creation and research. Blocked paid production has a separate red lower-
+centre warning and the owned yellow `PopulationFlash`; being at the cap alone
+does not display it. A global two-row queue shows research/training and selects
+its producer on click. The supplied 2560×1440/100% captures exposed the native
+WPFG resources: confirmation now uses the black/gold frame with Yes/No/close,
+and the full victory/defeat screen has owned crests, fonts and Return/Leave
+buttons plus an explicitly approximate animated ember overlay. Return preserves
+the finished board; Leave opens the existing match launcher. The generic OK
+popup acknowledges replay errors. `tools/feedback_smoke.mts` covers both players'
+losses, modal lifetime/abort/dismissal, animation, production warnings, actual file
+uploads, read-only rebuilds, compact layout, 1440p scale and background/alpha pixels
+in imported and `OPEN_FALLBACK=1` modes. Source import tests reconstruct the nine-
+slice images byte-for-byte and assert the consumed XAML metrics and fonts.
 The UI import carries the three owned colour-blind palettes plus `UiColors.txt`
 as CSS variables; `?solo=1&uiPalette=deuteranopia` (also `protanopia`, `tritanopia`)
 selects HUD text colours. This is not a full sprite/minimap colour-blind mode;
-an options-screen selector remains #141. Wonder countdown UI remains tied to
-#110, and objectives/tech-tree surfaces remain #138.
+the remaining palette integration belongs to #141. Wonder UI belongs entirely
+to #110, and objectives/tech-tree surfaces to #138; these are not #58 blockers.
+The supplied captures are indexed locally; remaining font-raster, dimmer, ember
+and timing approximations are in the ledger. The human accepted source-backed
+OK-popup treatment without a runtime capture.
 
 ## Delivered scope
 

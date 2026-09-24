@@ -2295,7 +2295,10 @@
       "GameMsgPanel",
       "notificationpanel",
       "dialogyesnoboxgeneral",
-      "dialogconfirmrestartreplay"
+      "dialogconfirmrestartreplay",
+      "GameNotificationPanel",
+      "popupmessage",
+      "technologyprogresspanel"
     ],
     "iconCategories": {
       "Buildings": "entities",

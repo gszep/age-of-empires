@@ -1,137 +1,126 @@
-# Agent handoff — player rules and interaction/rendering checkpoint
+# Agent handoff — reference-backed HUD feedback (#58)
 
 ## Task and stopping point
 
-The user's final instruction was: **“fix 238 then wrap up — commit, update docs,
-hand off.”** Finish this checkpoint and wait for the next user instruction;
-there is no authorization to start an unattended roster-expansion run.
+The user accepted the result and requested: **“looks good, commit and push.
+update docs and handoff.”** This handoff accompanies the completion commit for
+#58, following the initial feedback checkpoint `de8fb8b`. The agreed #58 scope
+is complete. Wait for the next task; no unattended run is authorized.
 
-Implementation checkpoint: **`f840bb2`**, pushed to `origin/main`; it closes
-**#53, #51, #52, #173 and #238**. This briefing also has a Markdown-only follow-up.
-Use `git log -1`, `git status` and `tools/session_start.sh` for the latest commit,
-remote divergence and gate status. The receiving agent starts with this briefing,
-`docs/status.md`, `docs/ledger.md`, and the live GitHub tracker.
+Use `git log -1`, `git status` and `tools/session_start.sh` for the completion
+commit, divergence and gate status. Read this briefing, `docs/status.md`,
+`docs/ledger.md` and the live tracker. The previous player-rule/rendering
+checkpoint is `f840bb2`; its detailed handoff is preserved at
+`cb82deb:docs/handoff.md`, with enduring scope in `docs/status.md`.
 
 ## Delivered scope
 
-- **#53 — named player attributes:** import the complete named XS/DAT initial
-  table, resource IDs and source hash. `playerAttributeFor` applies completed
-  research to farm capacity and repair costs. Unknown names remain undefined;
-  importing other attributes does not implement their mechanics or live counters.
-- **Civilisation foundation, not a finished second civilisation:** complete
-  per-player rulesets resolve through `src/sim/civilizations.ts`. Gameplay,
-  costs, availability, placement/navigation, HUD and save/restart/replay use the
-  appropriate owner. Gaia/map generation still use the root. The additional
-  manifest catalogue remains empty until real source-backed profiles are ready.
-- **All-civilisation audit and tracker:** 59 non-Gaia definitions, 53 base-era
-  and six Antiquity-era. #122 is the parent of 59 individual issues, labelled
-  `civilisation`. Start the first real matchup with Britons completion **#179**
-  and Franks **#180**, after their shared dependencies. Full plan and audit
-  interpretation: `docs/civilization-coverage.md`.
-- **#173 — composite contours:** retire old layer-mask references every frame
-  and use the same nonempty/loaded-page contract as ordinary contours; remove
-  the never-assigned `atlasKey` gate. Missing, delayed and empty masks cannot
-  revive disposed bindings.
-- **#51 — context cursors:** 18 byte-identical native CUR files with actual
-  header dimensions/hotspots. Hover and right-click share pure command/order
-  classification. Hover does not reserve farms or reset work. Picking and
-  selection read visible entities or last-seen Gaia metadata, not hidden live
-  positions/stocks; vanished remembered Gaia targets fall back to movement.
-- **#52 — drop sites:** derive building `accepts` and task-specific
-  `gather.dropSites` from DAT lists plus JSON worker/target/resource selectors.
-  Raw DAT lists remain provenance. Carried tasks survive source disappearance;
-  authoritative empty lists stay empty. Livestock acceptance is metadata only.
-- **#238 — map-independent ordering:** bound the existing render passes using
-  the monotone mapping already used for ground layers. Sprite bodies/scatter,
-  piece offsets, projectiles, contours and rally flags retain their within-pass
-  order without crossing fog or placement overlays on larger maps. Piece offsets
-  must be applied **before** compression; normal sprite groups keep default order.
-- **#5:** closed at the user's request pending a concrete recurrence. The user
-  will reopen with evidence; this does not declare all pathing reference-perfect.
+- Compact, independently expiring notification stack with owned research and
+  creation strings. Height follows visible lines instead of the template maximum.
+- Separate lower-centre red housing warning for **ready but population-blocked
+  paid production**, plus the actual yellow `PopulationFlash` widget. Full
+  population alone does not trigger the visible warning.
+- Global two-row research/training indicators; click selects the producer.
+- Black/gold deletion confirmation from native WPFG/XAML, including imported
+  frame slices, Times/Trajan fonts, Yes/No and close button. Lifecycle abort is
+  distinct from explicit No and never dispatches a deletion.
+- Full victory/defeat presentation with owned crests, divider, typography and
+  localized Return/Leave controls. Return dismisses without changing the finished
+  match. Leave opens the existing match launcher. Dismissal survives HMR, and
+  ending a match safely aborts a pending deletion prompt.
+- Animated end-screen embers, isolated from simulation RNG and cleaned up on
+  dismissal. A small defeated-player announcement also uses its owned widget.
+- Source-backed generic OK popup for replay-loading failures. Symbolic `IDS_*`
+  localization keys are imported alongside numeric IDs. UI palettes retain the
+  earlier CSS-variable/URL support.
+- HUD scale now reaches the correct 2/3 at 2560×1440 instead of hitting the old
+  0.62 ceiling. HUD rebuilds preserve the reference font class.
 
 ## Verification and evidence
 
-Final full gate **GREEN**, `.local/wrapup-gate.log`: **775 Vitest tests / 60 files**,
-production TypeScript/Vite build, **103 Python/import tests**, and real-browser
-debug smoke. It ran with three Vitest workers on the idle host. All source/test
-edits preceded the run; only Markdown changed afterward. No timeouts were widened.
+Final full gate **GREEN**, `.local/issue58-reference-gate.log`: **775 Vitest tests
+/ 60 files**, TypeScript/Vite build, **107 Python/import tests**, and real-browser
+debug smoke. All source/test edits preceded the run; only Markdown changed
+afterward. No fixture timeout was widened.
 
-Maintained acceptance checks completed for this checkpoint:
+Additional maintained checks, run separately from the four-step gate:
 
-- `tools/composite_outline_smoke.mts`: near and far, with default Galley and
-  `CONTOUR_KIND=villager`; use `CONTOUR_FAR=1` for the far 392×392 fixture.
-  Before #238 the far ship body/contour/occluder orders were **6150 / 5015 / 6205**
-  and only **32** blue contour pixels survived. Afterward the Galley gives **321**
-  blue pixels at both positions; the villager gives **147** at both positions.
-  All **153 / 89** opaque contour samples respectively are covered correctly by
-  the real placement-footprint mesh. Camera round trips preserve identical PNGs;
-  delayed loading, retirement/expiry/reload, empty frames and simulation hashes pass.
-  Logs: `.local/issue238-before-repro.log`, `.local/issue238-{near,far}-{composite,unit}-verified.log`.
-- `tools/tree_fog_smoke.mts`: 620 opaque canopy samples unchanged by reveal,
-  owned shadow alpha mean error 0.0029 across 190 samples, remembered-canopy error
-  below one sRGB byte. `.local/issue238-fog-regression.log`.
-- `tools/outline_residency_smoke.mts`: ordinary contour retirement remains safe.
-  `.local/quickwins-outline-regression.log`.
-- `tools/context_cursor_smoke.mts`, owned and `OPEN_FALLBACK=1`: 15 real
-  hover/right-click outcomes, last-seen resource selection, hover immutability,
-  native requests/hotspots or CSS fallback. `.local/issue51-{owned,fallback}-smoke-final.log`.
-- `tools/civilization_rules_smoke.mts`: real commands/UI through a private
-  synthetic second profile; **not** real Frankish art or bonus acceptance.
-  `.local/civilization-rules-smoke-r2.log`.
-- Full owned regeneration completed in `.local/quickwins-import-r2.log`, reusing
-  all 1,984 sprite atlas entries. #238 changes only rendering; no further import
-  is needed for its ordering helpers. No fixture timeouts were widened.
+```bash
+npx tsx tools/feedback_smoke.mts
+OPEN_FALLBACK=1 npx tsx tools/feedback_smoke.mts
+```
 
-Browser/render measurements use a real private Chrome page with SwiftShader.
-They do not establish physical-GPU FPS or full DE compositor equivalence.
+Both pass. Coverage includes actual research/combat, blocked versus merely full
+population, producer selection, file-chooser error flows, Yes/No/Escape/close,
+mixed deletion and abort, read-only rebuild, message expiry, 1440p native geometry,
+both players losing, changing ember pixels, Return/Leave and starting another seed.
+Import tests reconstruct the source nine-slice images byte-for-byte and verify
+consumed XAML metrics, fonts, localization and population-flash colour units.
+
+Owned assets were regenerated using `npm run import:aoe2`;
+`.local/issue58-native-import.log` records the native-resource pipeline pass.
+The browser probe uses a private Vite server and real Chrome/SwiftShader. The
+performance-soak script follows the new Leave route, exercised by the feedback
+smoke; the long soak and physical-GPU FPS were not remeasured.
+
+## Reference settings and remaining approximations
+
+The human supplied captures at **2560×1440, HUD 100%, tooltip 75%, Normal
+notification duration, Readability Panels on, colour-blind Off, unique player
+and health colours, Safe Delete on**. Chat shows 2000×1125 previews. The original
+PNG bytes are not in the repository; observations/settings are in
+`docs/ui-reference.md` and the local reference index. Current local 1440p renders:
+`.local/issue58-{confirmation,notification,housing,defeat}-owned.png`.
+
+The human accepted the generic OK popup's owned-source layout/art without a
+runtime screenshot; do not request that capture again as a prerequisite.
+Font rasterization/line metrics, dimmer strength, glint omission, notification
+timing, global-queue aggregation and ember emitter parameters remain explicit
+approximations in `docs/ledger.md`. The emitter uses owned shader-derived
+quadratic falloff with chosen distribution/velocity/colours/count. It is not a
+time-identical reconstruction of DE's closed-runtime emitter.
 
 ## What was learned / failed attempts
 
-- Counting any contour pixels was too weak: the far-map bug still left 32.
-  Require proper pass ordering and compare translated near/far results.
-- Animated water/foam confounded contour A/B measurements. The diagnostic hides
-  ground while retaining the actual native ship/unit and TC occluder.
-- Browser-decoded images can bypass a second network event. Reload-delay tests
-  hold the asset-loader boundary; the first-load test holds the actual request.
-- `flag32x32.cur` is **48×48**, hotspot **(9,43)**; convert's hotspot is (15,15).
-  Preserve header metadata, not filename assumptions.
-- Gold/stone task targets can be Gaia-only; player DAT slots may be empty.
-  Resolve their classes from the imported entities. The first drop-site attempt
-  missed these; regression coverage now catches that case.
-- One old exact farmer-metadata assertion needed the new owned drop-site IDs.
-  No gameplay expectations or timeout bounds were weakened to get a green gate.
+- Empty/legacy widget JSON is not the last source: its WPFG/XAML sibling supplied
+  the actual dialog. Reusing replay parchment was wrong; the human capture caught it.
+- Teardown must not mean No: No intentionally deletes unflagged members of a
+  mixed selection. An explicit `aborted` result prevents HMR from deleting units.
+- A negative-z notification background needs a persistent stacking context after
+  opacity reaches one. Pixel checks caught what nine DOM-cell assertions missed.
+- Per-particle canvas filters saturated SwiftShader. Pre-rasterized sprites and
+  two batched blend passes replaced the prototype; its orphan browser processes
+  were terminated and the final tests run on an idle host.
+- After changing viewport size, wait for the HUD resize scale before measuring
+  its box. This was a probe synchronization fix, not a widened timeout.
 
 ## Remaining work — requires a new user task
 
-1. **#178, conversion inheritance:** stored HP/maxHP survives conversion while
-   derived rules currently use the recipient. A public-order synthetic case
-   changed rule HP 80/attack 20 to rule HP 40/attack 4 while stored maxHP stayed 80.
-   Establish reference inheritance before enabling real mixed-civilisation play;
-   do not guess donor/recipient retention or future-upgrade behavior.
-2. **#123/#129:** gated passive/team effects, cost and production-rate consumers,
-   required-count prerequisites and automatic/free research. Some automatic
-   candidates have impossible slots or game-mode gates and must not run by default.
-3. **#179/#180:** real Britons–Franks roster/art/voice/icon and selection work.
-   Imported definitions absent from a civ's tree must not become trainable:
-   Frankish node 8 is Town Watch (`Use Type Tech`), not the Longbowman unit.
-   Extra/replacement TC construction **#177** is needed to exercise the Briton discount.
-4. Existing map/render work remains: #134 cliffs/exact elevation topology,
-   #113/#116 terrain blending, #94 water, #149 compositor, #93 survey regeneration.
-   Older mapping/performance evidence is in `docs/status.md`, `docs/ledger.md`
-   and `docs/reviews/2026-09-23-performance.md`.
+- By explicit user assignment, **#110** owns wonder UI/countdown, **#138** owns
+  technology-tree/objectives, and **#141** owns remaining palette integration and
+  its options selector. These do not block closing #58. #110's “a then b” decision
+  is already answered: do not ask the human to decide it again.
+- **#119**, missing monk contours, was recommended as the next bounded bug; the
+  user chose to finish/review #58 first. Inspect the failing idle/attack outline
+  walks without weakening decoder validation. A decoder change invalidates the
+  atlas cache and entails the full import. No work on #119 was started here.
+- **#113** remains the other high-priority visual bug. Use the live queue rather
+  than treating this list as authorization to begin.
+- Civilisation work retains its existing dependencies: #178 inheritance,
+  #123/#129 effects/prerequisites, #177 extra TCs, then #179/#180. Per-player rules
+  exist, but the real additional-civilisation catalogue is still unpopulated;
+  see `docs/civilization-coverage.md`.
 
 ## Relevant files
 
-- `src/sim/{civilizations,rules,data,game}.ts` — owner rules, attributes, commands,
-  pure context planning, gathering and deposits.
-- `src/view/{render-order,sprites,scatter}.ts` — bounded passes and mask lifetime.
-- `src/view/{cursors,selection}.ts`, `src/main.ts` — native pointers and visible/
-  remembered interaction without simulation mutation.
-- `tools/{import_content,import_ui,audit_civilizations}.py`, `tools/import-spec.json`
-  — source-backed data/cursors and the repeatable coverage inventory.
-- `src/sim/{civilizations,player-attributes,drop-sites}.test.ts`,
-  `src/view/{cursors,render-order,sprites}.test.ts`, `tools/test_import_aoe2.py`
-  — focused outcome/import regressions. The browser scripts above are maintained.
+- `src/view/{hud,feedback,native-feedback}.ts`, `src/view/style.css` — widget/native
+  layout, modal lifecycles, queues and animated presentation.
+- `src/main.ts` — public-command integration and read-only production/outcome view.
+- `tools/{import_feedback,import_ui,import_content}.py`, `tools/import-spec.json`
+  — native resources, widget metadata, numeric and symbolic localization.
+- `tools/feedback_smoke.mts`, `tools/test_import_aoe2.py` — acceptance regressions.
+- `docs/reviews/2026-09-24-issue58.md` — review findings, resolutions and final
+  reference-driven evidence; `docs/ui-reference.md` — source/measurement boundaries.
 
 ## Constraints and operations
 
@@ -140,9 +129,9 @@ They do not establish physical-GPU FPS or full DE compositor equivalence.
   mechanics/values; all approximations remain in the ledger.
 - Preserve the open fallback. Keep Steam credentials, owned/converted assets,
   `.local/` and saved matches out of Git. No disassembly of the game executable.
-- Preserve the managed shared host and Tailscale routes; do not reset/restart
-  deployment as part of a code-only handoff. This checkpoint did not deliberately
-  restart the shared service or update Artemis's separate asset runtime.
+- Preserve the managed shared host and Tailscale routes. At this handoff,
+  `open-empires-shared.service` is active/running, `NRestarts=0`, `ExecMainStatus=0`.
+  This is a local code/import checkpoint, not an Artemis asset-runtime deployment.
 - Play: `https://ysgramor.tail6e864b.ts.net:5173/` (`?solo=1` for solo QA);
   Artemis uses `http://localhost:5174/`. Refresh imported assets only through
   `npm run import:aoe2`, then reload tabs. Verify active runtime paths first.

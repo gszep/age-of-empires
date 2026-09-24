@@ -250,7 +250,7 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 #game-message.owned-notifications { transform: none; text-shadow: none; isolation: isolate; }
 .notification-surround { position: absolute; inset: 0; display: grid; z-index: -1; }
 .notification-surround span { background-size: 100% 100%; }
-.message-lines { height: 100%; overflow: hidden; overflow-wrap: anywhere; }
+.message-lines { overflow: hidden; overflow-wrap: anywhere; }
 #confirm-dialog {
   position: fixed; inset: 0; margin: auto; pointer-events: auto;
   width: calc(1280px * var(--ui-scale)); padding: calc(60px * var(--ui-scale));
@@ -259,13 +259,105 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 }
 #confirm-dialog::backdrop { background: var(--ui-Black50, rgba(0, 0, 0, 0.5)); }
 #confirm-dialog button { font: inherit; padding: 0.5em 2em; cursor: pointer; }
-#confirm-dialog.owned-confirmation { padding: 0; background-size: 100% 100%; }
+#confirm-dialog.owned-confirmation { padding: 0; background-color: transparent; background-size: 100% 100%; }
 #confirm-dialog.owned-confirmation p { margin: 0; display: grid; place-items: center; }
 #confirm-dialog.owned-confirmation button {
   border: 0; padding: 0; background: var(--normal) center / 100% 100%;
 }
 #confirm-dialog.owned-confirmation button:hover { background-image: var(--hover); }
 #confirm-dialog.owned-confirmation button:active { background-image: var(--pressed); }
+
+/* WPFG uses actual XAML font sizes, independently of the widget/SDF text scale. */
+.native-frame { position: absolute; inset: 0; display: grid; pointer-events: none; z-index: -1; }
+.native-frame > span { background-size: 100% 100%; background-repeat: no-repeat; }
+#hud .native-button {
+  height: var(--native-button-height); min-width: 0; margin: 0; padding: 0;
+  border: var(--native-button-border) solid var(--native-border-color);
+  background: var(--native-button-normal) center / 100% 100%;
+  font: bold var(--native-button-font) 'AoE2 button', Georgia, serif;
+  outline: none;
+}
+#hud .native-button:hover, #hud .native-button:focus-visible { background-image: var(--native-button-hover); }
+#hud .native-button:active { background-image: var(--native-button-active); }
+#hud .native-button span { background: var(--native-button-gradient); background-clip: text; color: transparent; filter: drop-shadow(0 1px 1px #000); }
+#confirm-dialog.native-confirmation { background: transparent; isolation: isolate; overflow: visible; font-kerning: none; }
+#confirm-dialog.native-confirmation::backdrop { background: rgba(0, 0, 0, 0.92); }
+#confirm-dialog.native-confirmation #confirm-message {
+  position: static; width: var(--native-message-width); max-width: 100%; margin: auto;
+  font: bold var(--native-message-font)/1.15 'AoE2 body', 'Times New Roman', serif;
+  background: var(--native-message-gradient); background-clip: text; color: transparent;
+}
+.confirm-actions { display: flex; }
+#confirm-dialog [data-confirm-cancel] { position: absolute; right: 0; top: 0; }
+#confirm-dialog.native-confirmation [data-confirm-cancel] { font-size: 0; background-size: 100% 100%; }
+
+#end-dialog {
+  position: fixed; inset: 0; margin: auto; padding: 2em; border: 0;
+  background: #241c10; color: #f3ead2; pointer-events: auto; text-align: center;
+}
+#end-dialog::backdrop { background: rgba(0, 0, 0, 0.92); }
+#end-dialog button { padding: 0.5em; margin: 1em; font: inherit; }
+#end-dialog .end-embers { display: none; }
+#end-dialog.native-end {
+  width: 100vw; height: 100vh; max-width: none; max-height: none; margin: 0; padding: 0;
+  overflow: hidden; background: transparent; isolation: isolate;
+  font-kerning: none;
+}
+.native-end .end-content { position: absolute; left: 0; width: 100%; display: grid; }
+.native-end .end-title-space { grid-row: 2; display: grid; }
+.native-end #end-title {
+  grid-row: 2; margin: 0; font-family: 'AoE2 heading', Georgia, serif; font-weight: normal; line-height: 1.2;
+  background-clip: text; color: transparent;
+}
+.native-end .end-separator { grid-row: 4; justify-self: center; background-size: 100% 100%; }
+.native-end .end-actions { grid-row: 8; display: flex; justify-content: center; }
+#end-dialog.native-end .end-embers { display: block; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* Runtime placement measured from the supplied 2560x1440 / 100% HUD capture. */
+#production-warning {
+  position: absolute; left: calc(50% + 200px * var(--ui-scale)); bottom: calc(374px * var(--ui-scale));
+  transform: translateX(-50%); width: calc(828px * var(--ui-scale)); height: calc(134px * var(--ui-scale));
+  display: flex; justify-content: center; align-items: center; padding-inline: calc(50px * var(--ui-scale));
+  color: var(--ui-Red, red); font: bold calc(34px * var(--ui-scale)) 'AoE2 body', 'Times New Roman', serif;
+  white-space: nowrap; isolation: isolate; text-shadow: 1px 1px 1px #000;
+}
+#production-warning[hidden], #global-production[hidden] { display: none; }
+#population-flash { position: absolute; pointer-events: none; z-index: 1; animation: population-warning 1s steps(2, end) infinite; }
+#population-flash[hidden], #hud.fallback #population-flash { display: none; }
+#hud.fallback .production-blocked { background: yellow; }
+@keyframes population-warning { 50% { opacity: 0; } }
+#global-production { position: absolute; left: 0; top: calc(115px * var(--ui-scale)); --queue-cell: calc(75px * var(--ui-scale)); }
+.production-row { display: flex; overflow: hidden; max-width: inherit; }
+#hud .production-item {
+  position: relative; flex: 0 0 var(--queue-cell); width: var(--queue-cell); height: var(--queue-cell);
+  background-size: 100% 100%; border: 1px solid #9b8b69; overflow: hidden; font-size: calc(24px * var(--ui-scale));
+}
+.production-progress { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0, 255, 0, 0.25); pointer-events: none; }
+.production-item.pending .production-progress { height: 100% !important; background: rgba(255, 255, 0, 0.25); }
+.production-item.blocked .production-progress { height: 100% !important; background: rgba(255, 0, 0, 0.65); }
+.production-count { position: absolute; top: 0; left: 0; color: white; font-size: calc(34px * var(--ui-scale)); font-weight: bold; text-shadow: 1px 1px 1px #000; }
+
+#popup-dialog {
+  position: fixed; inset: 0; margin: auto; pointer-events: auto;
+  width: calc(1280px * var(--ui-scale)); padding: calc(60px * var(--ui-scale));
+  background: #e0c89a; color: #391c1b; border: 0; font: inherit; text-align: center;
+}
+#popup-dialog::backdrop { background: var(--ui-Black50, rgba(0, 0, 0, 0.5)); }
+#popup-dialog button { font: inherit; padding: 0.5em 2em; cursor: pointer; }
+#popup-dialog.owned-popup { padding: 0; background-color: transparent; background-size: 100% 100%; }
+#popup-dialog.owned-popup p { margin: 0; display: grid; place-items: center; overflow: auto; overflow-wrap: anywhere; white-space: pre-wrap; }
+#popup-dialog.owned-popup button { border: 0; padding: 0; background: var(--normal) center / 100% 100%; }
+#popup-dialog.owned-popup button:hover { background-image: var(--hover); --active-font-size: var(--hover-font-size); }
+#popup-dialog.owned-popup button:active { background-image: var(--pressed); --active-font-size: var(--pressed-font-size); }
+#defeat-notification {
+  position: absolute; left: 30%; top: 10%; isolation: isolate;
+  width: calc(520px * var(--ui-scale)); min-height: calc(100px * var(--ui-scale));
+  font-size: calc(40px * var(--text-scale)); pointer-events: none;
+}
+#defeat-notification[hidden] { display: none; }
+.defeat-civ { background-size: contain; background-repeat: no-repeat; background-position: center; }
+.defeat-number { display: inline-grid; place-items: center; color: black; }
+.defeat-text { display: inline-flex; align-items: center; overflow-wrap: anywhere; overflow: hidden; }
 
 .dialog {
   position: absolute; left: 50%; top: 50%;
