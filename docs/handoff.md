@@ -6,8 +6,9 @@ The user's final instruction was: **“fix 238 then wrap up — commit, update d
 hand off.”** Finish this checkpoint and wait for the next user instruction;
 there is no authorization to start an unattended roster-expansion run.
 
-This document accompanies the combined checkpoint based on `b9c9d8a`. Use
-`git log -1`, `git status` and `tools/session_start.sh` for its final commit,
+Implementation checkpoint: **`f840bb2`**, pushed to `origin/main`; it closes
+**#53, #51, #52, #173 and #238**. This briefing also has a Markdown-only follow-up.
+Use `git log -1`, `git status` and `tools/session_start.sh` for the latest commit,
 remote divergence and gate status. The receiving agent starts with this briefing,
 `docs/status.md`, `docs/ledger.md`, and the live GitHub tracker.
 
@@ -137,8 +138,8 @@ They do not establish physical-GPU FPS or full DE compositor equivalence.
 - Run session-start and read the lessons before continuing. Use public commands;
   simulation state belongs to `src/sim`. Inspect owned sources before inventing
   mechanics/values; all approximations remain in the ledger.
-- Preserve the open fallback, Steam credentials, owned/converted assets, `.local/`
-  and saved matches. None belong in Git. No disassembly of the game executable.
+- Preserve the open fallback. Keep Steam credentials, owned/converted assets,
+  `.local/` and saved matches out of Git. No disassembly of the game executable.
 - Preserve the managed shared host and Tailscale routes; do not reset/restart
   deployment as part of a code-only handoff. This checkpoint did not deliberately
   restart the shared service or update Artemis's separate asset runtime.
