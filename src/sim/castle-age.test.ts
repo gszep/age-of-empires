@@ -693,6 +693,9 @@ describe('the Imperial Age', () => {
     if (!early.ok) expect(early.reason).toContain('later age');
 
     state.players[1].age = 2;
+    // Imperial requires the Castle Age and a building-count shadow node.
+    place(state, 'castle');
+    stepGame(state);
     expect(applyCommand(state, { kind: 'research', player: 1, buildingId: tc.id, tech: 'imperial-age' }).ok).toBe(true);
     expect(state.players[1].food).toBe(2000);
     expect(state.players[1].gold).toBe(2200);
@@ -708,10 +711,11 @@ describe('the Imperial Age', () => {
     state.players[1].age = 2;
     state.players[1].food = 3000;
     state.players[1].gold = 3000;
-    // The elite longbowman needs the age and nothing else — no prerequisite
-    // technology stands in front of it, so what it proves is the age gate.
+    // The completed castle supplies its shadow prerequisite; Imperial Age
+    // remains outstanding. Publishing a fixture building needs a sim tick.
     expect(state.rules.technologies['elite-longbowman'].requiresAge).toBe(3);
     const castle = place(state, 'castle');
+    stepGame(state);
     const early = applyCommand(state, {
       kind: 'research', player: 1, buildingId: castle.id, tech: 'elite-longbowman',
     });

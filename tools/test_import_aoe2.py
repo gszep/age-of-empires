@@ -488,9 +488,9 @@ class ContentImportIntegrationTest(unittest.TestCase):
         for key in ("monastery", "siege-workshop", "castle",
                     "knight", "cavalry-archer", "longbowman", "mangonel", "monk"):
             self.assertEqual(ages[key], 2, key)
-        # The ram has no enabling tech of its own: the siege workshop it is
-        # trained at is what puts it in the Castle Age.
-        self.assertEqual(ages["battering-ram"], 0)
+        # Tree node 1258 supplies the Castle gate for its Dark-Age automatic
+        # replacement 35 (tech 712); the displayed workshop is unit 49.
+        self.assertEqual(ages["battering-ram"], 2)
         self.assertEqual(self.result["entities"]["battering-ram"]["train"]["buildingId"], 49)
 
     def test_castle_age_carries_its_price_and_what_it_opens(self):
@@ -772,9 +772,17 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # food), which the game read off the fallback's identical 175 for a
         # month. Every key the game reads rules from, not only the one that
         # bit first.
-        for key in ("playerAttributes", "playerAttributeIds", "civilization", "civilizations", "ages", "playerColors", "terrainRestrictions", "shadows"):
+        for key in ("playerAttributes", "playerAttributeIds", "civilization", "civilizationCatalog", "civilizationBonuses", "ages", "playerColors", "terrainRestrictions", "shadows"):
             self.assertIn(key, published, key)
             self.assertEqual(published[key], self.result[key], key)
+        self.assertEqual(set(published["civilizations"]), set(self.result["civilizations"]))
+        for civ, profile in self.result["civilizations"].items():
+            for key in ("civilization", "technologies", "civilizationBonuses", "playerAttributes", "playerAttributeIds", "terrainRestrictions"):
+                self.assertEqual(published["civilizations"][civ][key], profile[key], f"{civ}/{key}")
+            for key, entity in profile["entities"].items():
+                converted = published["civilizations"][civ]["entities"][key]
+                self.assertIn("atlases", converted, f"{civ}/{key}")
+                self.assertEqual(converted.get("id"), entity.get("id"))
         self.assertEqual(published["shadows"], {"profile": "Default", "strength": 1.0, "color": [0.0, 0.0, 0.0]})
         self.assertIn("terrain/colorcorrection.json", published["source"]["sha256"])
         self.assertEqual(published["source"]["sha256"]["xs/Constants.xs"],

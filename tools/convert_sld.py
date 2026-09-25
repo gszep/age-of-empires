@@ -306,7 +306,8 @@ def atlas_jobs(imported: dict[str, Any]) -> list[dict[str, Any]]:
                           else tuple(layer for layer in MASK_LAYERS if layer != "damage"),
             })
 
-    for key, entity in imported["entities"].items():
+    from civilization_profiles import art_entities
+    for key, entity in art_entities(imported).items():
         add(key, entity["animations"], entity["category"])
         for index, annex in enumerate(entity.get("annexes", [])):
             add(key, annex["animations"], entity["category"], prefix=f"annex{index}-")
@@ -473,8 +474,9 @@ def main() -> None:
             publish_group(group, atlas)
             print(identifier)
 
+    from civilization_profiles import art_entities
     entities: dict[str, Any] = {}
-    for key, entity in imported["entities"].items():
+    for key, entity in art_entities(imported).items():
         entity = dict(entity)
         entity["atlases"] = {
             name: atlas for name, atlas in atlases.get(key, {}).items() if not name.startswith("annex")
@@ -495,16 +497,22 @@ def main() -> None:
     particles = convert_particles(imported.get("particles", {}), args.out)
     source["sha256"] = hashes
 
+    profiles = {}
+    for civ, profile in imported.get("civilizations", {}).items():
+        profiles[civ] = {**profile, "entities": {
+            key: entities[f"civilizations/{civ}/{key}"] for key in profile["entities"]
+        }}
     manifest = {
         "schemaVersion": imported["schemaVersion"],
         "source": source,
-        "entities": entities,
+        "entities": {key: entities[key] for key in imported["entities"]},
         # Technologies have no art of their own, so they pass through
         # untouched -- but they have to pass through. Left out of this dict,
         # `rulesFromManifest` found no key and the game ran on the hand-written
         # fallback rules instead of the DAT's, and matched them closely enough
         # that nothing failed.
         "technologies": imported["technologies"],
+        "civilizationBonuses": imported["civilizationBonuses"],
         "civilization": imported["civilization"],
         "skippedTechnologies": imported["skippedTechnologies"],
         "playerColors": imported["playerColors"],
@@ -515,7 +523,8 @@ def main() -> None:
         # now asserts every rule-bearing key.
         "playerAttributes": imported.get("playerAttributes", {}),
         "playerAttributeIds": imported.get("playerAttributeIds", {}),
-        "civilizations": imported.get("civilizations", {}),
+        "civilizations": profiles,
+        "civilizationCatalog": imported.get("civilizationCatalog", {}),
         "ages": imported.get("ages", []),
         "terrain": terrain,
         # The water presets and their textures (issue: the surface).

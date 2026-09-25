@@ -91,8 +91,6 @@ in `git log` and `docs/status.md`.
 
 Named here so a run does not re-derive the reason; each has an issue.
 
-- **Civilisation bonuses** (#123) — ruled out of the tech-tree work by the
-  human; they are civ-specific effect commands, not tree nodes.
 - **The monk's occlusion contour** (#119) — its outline layers fail the
   decoder's walk invariant; guessing would undo what makes the decoder
   trustworthy.

@@ -198,6 +198,8 @@ export interface UnitRules {
 }
 
 export interface BuildingRules {
+  /** DAT building work rate; research/production advance in work units. */
+  workRate?: number;
   /** DAT minimap_mode: 0 hides the marker (farms); 1 draws an ordinary dot. */
   minimapMode?: number;
   /** The DAT unit id; see `UnitRules.datId`. */
@@ -312,6 +314,10 @@ export interface ResourceNodeRules {
  * `NotAvailable`, which is where these ids come from.
  */
 export interface CivilizationRules {
+  /** False for extracted, unverified profiles. Omitted on legacy/open profiles. */
+  enabled?: boolean;
+  internalName?: string;
+  hudStyle?: string;
   key: string;
   /** The DAT's own name for it, which is not always the modern one. */
   name: string;
@@ -398,6 +404,7 @@ export interface GameRules {
   /** Named DAT initial values; presence does not imply a supported mechanic. */
   playerAttributes: Partial<Record<string, number>>;
   technologies: Record<TechKey, TechRules>;
+  civilizationBonuses?: CivilizationBonuses;
   /**
    * The DAT's passability table: for each restriction row something here
    * obeys, the terrain ids it may stand on. "A land unit may not enter
@@ -534,6 +541,8 @@ export interface TechRules {
    */
   requires?: string[];
   /** What it changes, decoded from the DAT's own effect commands. */
+  requiredTechs?: number[];
+  requiredTechCount?: number;
   effects: TechEffect[];
   /**
    * Attributes the DAT's effect carries that this game does not model, so a
@@ -582,7 +591,7 @@ export type PlayerAttribute = 'farmFoodAmount' | 'unitRepairCost' | 'buildingRep
 export type TechAttribute =
   | 'hitPoints' | 'lineOfSight' | 'speed' | 'armor' | 'attack'
   | 'reloadSeconds' | 'accuracyPercent' | 'range' | 'minRange'
-  | 'workRate' | 'carryCapacity'
+  | 'workRate' | 'carryCapacity' | 'cost' | 'foodCost' | 'woodCost' | 'goldCost' | 'stoneCost'
   /** On a projectile: whether the shot leads a moving target. Ballistics. */
   | 'leadsTarget';
 
@@ -1307,6 +1316,7 @@ export const FALLBACK_RULES: GameRules = {
 };
 
 interface ManifestEntity {
+  workRate?: number;
   accepts?: ResourceKind[];
   acceptsLivestock?: boolean;
   hillMode?: number;
@@ -1382,6 +1392,30 @@ interface ManifestEntity {
   animations?: Record<string, { frameSeconds: number }>;
 }
 
+export interface BonusTechnology {
+  requiredTechs: number[];
+  requiredTechCount: number;
+  /** Public research key, or automatic-<DAT id> for a hidden node. */
+  key: string;
+  automatic: boolean;
+  disabled?: boolean;
+  age?: number;
+  /** Building completion supplies otherwise unsatisfiable shadow techs. */
+  triggeredByBuildings?: string[];
+  /** Free research still needs its completed research building. */
+  researchedAt?: string;
+  effects: TechEffect[];
+  upgrades?: { from: string; to: string }[];
+  unmodelled?: string[];
+}
+
+export interface CivilizationBonuses {
+  /** DAT technology IDs; -1/-2 are the initial tree/team effect nodes. */
+  nodes: Record<string, BonusTechnology>;
+  treeEffectId: number;
+  teamEffectId: number;
+}
+
 interface ManifestTech {
   techId: number;
   name: string;
@@ -1395,15 +1429,25 @@ interface ManifestTech {
   iconId?: number;
   grantsAge?: number;
   requires?: string[];
+  requiredTechs?: number[];
+  requiredTechCount?: number;
   upgrades?: { from: string; to: string }[];
   effects?: TechEffect[];
   unmodelled?: string[];
 }
 
 export interface ContentManifest {
+  civilizationBonuses?: CivilizationBonuses;
   entities: Record<string, ManifestEntity>;
   /** Complete per-civilisation profiles; no implicit inheritance from a rival. */
   civilizations?: Record<string, Omit<ContentManifest, 'civilizations'> & { civilization: CivilizationRules }>;
+  /** Source inventory only. A catalogue entry does not make a profile playable. */
+  civilizationCatalog?: Record<string, CivilizationRules & {
+    datIndex: number; treeFile: string; era: 'base'; extracted: boolean;
+    roster: Record<string, unknown>[]; missingRoster: number[];
+    playerAttributes: Record<string, number>; treeEffectId: number; teamEffectId: number;
+    emblemImage?: string; techTreeImage?: string; uniqueUnitImages: string[];
+  }>;
   technologies?: Record<string, ManifestTech>;
   civilization?: CivilizationRules & { datIndex?: number; treeFile?: string };
   /** All named initial player attributes, including unmodelled mechanics. */
@@ -1545,6 +1589,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     const legacyTownCenter = key === 'town-center' && e[key].build?.sourceId === undefined;
     return {
       datId: e[key].id,
+      workRate: e[key].workRate,
       deathSeconds: e[key].deathSeconds ?? fallback.deathSeconds,
       corpseSeconds: e[key].corpseSeconds ?? fallback.corpseSeconds,
       age: e[key].age ?? fallback.age,
@@ -1628,6 +1673,9 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     civilization: manifest.civilization
       ? {
         key: manifest.civilization.key,
+        enabled: manifest.civilization.enabled,
+        internalName: manifest.civilization.internalName,
+        hudStyle: manifest.civilization.hudStyle,
         name: manifest.civilization.name,
         displayName: manifest.civilization.displayName,
         computerNames: manifest.civilization.computerNames,
@@ -1800,10 +1848,17 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     },
     playerAttributes: { ...manifest.playerAttributes },
     technologies: technologies(manifest, e),
+    civilizationBonuses: manifest.civilizationBonuses,
     terrainRestrictions: manifest.terrainRestrictions
       ? Object.fromEntries(Object.entries(manifest.terrainRestrictions).map(([row, ids]) => [Number(row), ids]))
       : FALLBACK_RULES.terrainRestrictions,
   };
+  for (const [key, entity] of Object.entries(e)) {
+    if (!/^dat-unit-\d+$/.test(key) || entity.category !== 'unit') continue;
+    const producer = entity.train && buildingKindOf.get(entity.train.buildingId);
+    if (!producer) throw new Error(`Imported unit ${key} has no supported producer`);
+    result.units[key as UnitKind] = unit(key, producer);
+  }
   if (manifest.civilizations) {
     result.civilizations = Object.fromEntries(Object.entries(manifest.civilizations).map(([key, profile]) => {
       if (profile.civilization?.key !== key || key === result.civilization.key) {
@@ -1850,6 +1905,8 @@ function technologies(
       iconId: tech.iconId,
       grantsAge: tech.grantsAge,
       requires: tech.requires,
+      requiredTechs: tech.requiredTechs,
+      requiredTechCount: tech.requiredTechCount,
       upgrades: tech.upgrades,
       effects: tech.effects ?? [],
       unmodelled: tech.unmodelled,
@@ -1877,7 +1934,7 @@ const BUILDING_KINDS = new Set<string>([
 
 // Resource nodes dominate surveyed boards and are neither actors nor buildings.
 // Reject that common case before probing general kind tables in hot loops.
-export const isUnit = (kind: EntityKind): kind is UnitKind => kind !== 'resource' && (UNIT_KINDS.has(kind) || kind in NAVAL_RULES);
+export const isUnit = (kind: EntityKind): kind is UnitKind => kind !== 'resource' && (UNIT_KINDS.has(kind) || kind in NAVAL_RULES || /^dat-unit-\d+$/.test(kind));
 export const isBuilding = (kind: EntityKind): kind is BuildingKind => kind !== 'resource' && (BUILDING_KINDS.has(kind) || kind === 'fish-trap');
 const ANIMAL_KINDS = new Set<string>(['sheep', 'deer', 'boar']);
 export const isAnimal = (kind: EntityKind): kind is AnimalKind => ANIMAL_KINDS.has(kind);
@@ -1887,6 +1944,6 @@ export const isAnimal = (kind: EntityKind): kind is AnimalKind => ANIMAL_KINDS.h
  * monk is excluded by having no attack at all rather than by name — it would
  * otherwise walk at the nearest enemy it could never hurt.
  */
-export const isMilitary = (kind: EntityKind): boolean =>
+export const isMilitary = (kind: EntityKind, rules: GameRules = FALLBACK_RULES): boolean =>
   isUnit(kind) && kind !== 'villager' && kind !== 'trade-cart' && !isAnimal(kind)
-  && FALLBACK_RULES.units[kind as UnitKind].attacks.some(attack => attack.amount > 0);
+  && !!rules.units[kind as UnitKind]?.attacks.some(attack => attack.amount > 0);

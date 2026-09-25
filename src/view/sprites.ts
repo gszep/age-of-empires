@@ -175,7 +175,7 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
   group.add(outline.mesh);
   const annexes: Piece[] = [];
   const annexColors: Piece[] = [];
-  const key = entityKey(entity);
+  const key = profileArtKey(assets, entity.owner, entityKey(entity));
   const imported = assets?.entities[key];
   let leap: Piece | undefined;
   if (imported?.atlases['leap']) {
@@ -236,7 +236,16 @@ function buildFallback(view: EntityView, entity: Entity): void {
 export function artKey(
   assets: ContentAssets | undefined, entity: Entity, key: string, salt = 0,
 ): string {
-  return skinnedKey(assets?.skins, entity, entityKey(entity), key, salt);
+  const civ = assets?.civilizationForOwner?.(entity.owner);
+  const families = civ && assets?.civilizationSkins?.[civ];
+  const skin = skinnedKey(families || assets?.skins, entity, entityKey(entity), key, salt);
+  return profileArtKey(assets, entity.owner, skin);
+}
+
+export function profileArtKey(assets: ContentAssets | undefined, owner: number, key: string): string {
+  const civ = assets?.civilizationForOwner?.(owner);
+  const qualified = `civilizations/${civ}/${key}`;
+  return civ && assets?.entities[qualified] ? qualified : key;
 }
 
 export function entityKey(entity: Entity): string {
@@ -752,7 +761,7 @@ export function updateFlagView(
   view: EntityView, assets: ContentAssets | undefined,
   owner: number, position: Point, time: number,
 ): void {
-  const flag = assets?.entities['rally-flag'];
+  const flag = assets?.entities[profileArtKey(assets, owner, 'rally-flag')];
   const atlas = flag?.atlases['idle'];
   const animation = flag?.animations['idle'];
   if (!assets || !atlas || !animation) {
@@ -961,7 +970,7 @@ function updateGarrisonFlags(
     piece.pendingTexture = undefined;
   }
   if (!occupied || entity.dead || entity.buildProgress !== undefined) return;
-  const imported = assets?.entities[entityKey(entity)];
+  const imported = assets?.entities[profileArtKey(assets, entity.owner, entityKey(entity))];
   const flags = ageChain(state, entity, 'idle').map(name => imported?.garrisonFlags?.[name]).find(Boolean) ?? [];
   const count = assets && imported ? flags.length : 1;
   const bodies = view.garrisonFlags ??= [];

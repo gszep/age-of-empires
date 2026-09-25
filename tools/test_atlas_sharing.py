@@ -4,6 +4,7 @@ from pathlib import Path
 import unittest
 
 from convert_sld import atlas_jobs, published, shared_atlas_jobs
+from civilization_profiles import art_entities
 
 
 class AtlasSharingTest(unittest.TestCase):
@@ -47,12 +48,13 @@ class AtlasSharingTest(unittest.TestCase):
     def test_published_groups_use_one_existing_page_set_without_losing_members(self):
         path = Path("public/imported/aoe2/manifest.json")
         manifest = json.loads(path.read_text())
+        entities = art_entities(manifest)
         groups = shared_atlas_jobs(atlas_jobs(manifest), manifest["source"]["sha256"])
         shared = 0
         for group in groups:
             entries = []
             for identifier, job, _image, layer in group:
-                entity = manifest["entities"][job["key"]]
+                entity = entities[job["key"]]
                 atlases = {**entity["atlases"]}
                 for annex in entity.get("annexes", []):
                     atlases.update(annex["atlases"])

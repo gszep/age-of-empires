@@ -125,8 +125,12 @@ state. The per-player rules foundation now resolves complete additional profiles
 for gameplay, placement/navigation, HUD prices/availability, selected-unit stats
 and save/restart/replay. Synthetic mixed-profile regressions and
 `tools/civilization_rules_smoke.mts` verify actual outcomes and real browser clicks.
-The published additional catalogue remains empty: real Franks roster/art, bonus
-activation and selection remain implementation work. Conversion now snapshots
+Britons and Franks now have independent supported-roster profiles, real namespaced
+art/icons/voices and menu selection, with reload/restart persistence. Passive/team
+bonuses, required-count prerequisites, age-dependent costs, building work rates
+and eligible free farm research run from each profile's source-derived graph.
+The separate 53-base-era catalogue is an inventory, not a playability claim.
+Conversion snapshots
 resolved unit-local rules before ownership changes, including passengers, and
 excludes captures from later research/promotions. Public-command regressions
 measure wounds, damage/armour, movement, sight/range, reconversion, unloading,
@@ -134,6 +138,20 @@ JSON continuation and replay; owned Loom cases check retained HP and actual
 damage before/after either player's research. The unit/player inheritance split
 remains inferred: #178 stays open for patch-matched DE evidence, especially
 economic/projectile exceptions and passenger/reconversion behaviour.
+
+The reviewed added combat definitions include Throwing Axeman/Elite, Paladin,
+Hand Cannoneer, Bombard Cannon and Carrack; typed tree absence excludes foreign
+uniques from production while retaining definitions for captures. #179/#180
+remain open for full roster/effect coverage: tower/wall and specialist/relic work
+is separate; Warwolf blast/packed-trebuchet research, search-radius effects and
+other unsupported commands remain tracked gaps. See [bonus contract](civilization-bonuses.md)
+and [profile contract](civ-roster-integration.md).
+
+The integration checkpoint is gate-green: **820 Vitest tests / 64 files**, build,
+**114 import tests**, general browser smoke, plus dedicated enabled-profile and
+TC browser acceptance. Full pipeline repetition is byte-identical for the three
+published manifests. Exact logs and fixture/source caveats are in
+`docs/civilization-coverage.md`.
 
 Shore fish honour the DAT's neighbouring-beach placement requirement (#145).
 The current Britons dock roster is implemented (#97): galley/galleon, fire,
@@ -235,7 +253,8 @@ replacement-count interpretation is recorded as inferred in `ledger.md`.
 `town-center.test.ts` verifies construction, population, training, deposits and
 atomic rejection in open/owned rules; `tools/town_center_smoke.mts` presses the
 replacement/expansion buttons, rejects slopes and finishes a functioning TC in
-the private browser. No civilisation bonus is included in this prerequisite.
+the private browser. Briton Castle-Age TC wood discounts now apply through the
+bonus graph, independently of these construction and replacement limits.
 
 **View** (`src/view`, never mutates state): dimetric projection with AoE2's
 handedness (below); DAT terrain textures with classic land edge blending

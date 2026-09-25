@@ -17,6 +17,9 @@ import { loadMapPreference, saveMapPreference, mapChoices, validMatchSetup, MAX_
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
 import { buildingLimitReached, buildingRulesFor, unitRulesFor, unitRulesForEntity } from './sim/rules';
+import { technologyRequirementsMet } from './sim/technologies';
+import { civilizationRules } from './sim/civilizations';
+import { profileArtKey } from './view/sprites';
 import { gridKey, placeCommands } from './view/command-grid';
 import type { ConfirmationResult, ProductionItem, ResourceStatus, ScoreRow } from './view/hud';
 import { costLabel, displayName as nameFrom, plainHelp } from './view/names';
@@ -87,21 +90,29 @@ if (mapParam !== null && mapType !== mapParam) {
 const seedParam = Number(pageParams.get('seed'));
 const seedFixed = Number.isInteger(seedParam) && seedParam > 0 && seedParam <= MAX_MAP_SEED ? seedParam : undefined;
 const initialSetup: MatchSetup = { map: mapType, seed: seedFixed ?? (mapParam === null ? mapPreference?.seed : undefined) ?? 42 };
+if (mapPreference?.civilizations && [1, 2].every(player => civilizationRules(rules, mapPreference.civilizations![player as 1 | 2]))) {
+  initialSetup.civilizations = mapPreference.civilizations;
+}
 
 const restored = mapParam === null && seedFixed === undefined ? loadSession(rules) : undefined;
 const savedSetup = loadSessionSetup(rules);
 const hostResume = loadSession(rules);
 loading.textContent = 'Connecting to shared match…';
 const shared = await connectSharedMatch(
-  () => hostResume ?? createGame(initialSetup.seed, rules, undefined, initialSetup.map),
+  () => hostResume ?? createGame(initialSetup.seed, rules, initialSetup.civilizations, initialSetup.map),
   notice => { loading.textContent = notice; },
   hostResume ? savedSetup : initialSetup,
 );
 loading.remove();
 const localPlayer: PlayerId = shared?.player ?? 1;
 if (shared) rules = shared.state.rules;
-let game = shared?.state ?? restored ?? createGame(initialSetup.seed, rules, undefined, initialSetup.map);
+let game = shared?.state ?? restored ?? createGame(initialSetup.seed, rules, initialSetup.civilizations, initialSetup.map);
 const playerRules = (owner: Entity['owner'] = localPlayer): GameRules => rulesForPlayer(game, owner);
+const importedEntity = (key: string, owner: number = localPlayer) => {
+  const civ = owner === 1 || owner === 2 ? game.players[owner].civilization : undefined;
+  return assets?.entities[`civilizations/${civ}/${key}`] ?? assets?.entities[key];
+};
+if (assets) assets.civilizationForOwner = owner => owner === 1 || owner === 2 ? game.players[owner].civilization : undefined;
 let activeSetup: MatchSetup = shared?.setup ?? (restored ? savedSetup : undefined) ?? initialSetup;
 let setupKnown = shared ? shared.setup !== undefined : !restored || savedSetup !== undefined;
 const renderPosition = (entity: Entity): Point => shared?.renderPosition(entity) ?? entity.position;
@@ -279,7 +290,7 @@ const SELECTION_COLOR = 0xf5f0dc;
  */
 function selectionMarker(entity: Entity): { shape: 'round' | 'square'; half: { x: number; y: number } } {
   const key = entity.kind === 'palisade-gate' ? view.gateBoxKey(entity) : view.entityKey(entity);
-  const entry = assets?.entities[key]?.selection;
+  const entry = importedEntity(key, entity.owner)?.selection;
   const imported = entity.dead ? entry?.dead ?? entry : entry;
   const shape = imported?.shape ?? (isUnit(entity.kind) ? 'round' : 'square');
   const half = imported && shape === 'square'
@@ -437,6 +448,11 @@ function createHud(): Hud {
 
 function configureMapMenu(target: Hud): void {
   target.configureMapMenu(mapChoices(messages), activeSetup, !shared || localPlayer === 1, messages, setupKnown);
+  const profiles = [rules, ...Object.values(rules.civilizations ?? {}).filter(profile => profile.civilization.enabled !== false)];
+  target.configureCivilizations(profiles.map(profile => ({ id: profile.civilization.key,
+    label: profile.civilization.displayName ?? profile.civilization.name })),
+    { 1: game.players[1].civilization, 2: game.players[2].civilization }, !shared || localPlayer === 1,
+    messages.civilization ?? 'Civilization', playerRules().civilization.internalName, playerRules().civilization.hudStyle);
 }
 
 let hud = createHud();
@@ -497,16 +513,18 @@ async function installDevelopmentDebug(): Promise<void> {
 
 function restart(setup: MatchSetup | undefined = setupKnown ? activeSetup : undefined): boolean {
   if (!validMatchSetup(setup)) return false;
+  if (setup.civilizations && ![1, 2].every(player => civilizationRules(rules, setup.civilizations![player as 1 | 2]))) return false;
   if (shared) {
     if (localPlayer !== 1) { hud.showMessage('Ysgramor starts a new match'); return false; }
-    return shared.send({ type: 'restart', seed: setup.seed, map: setup.map });
+    return shared.send({ type: 'restart', seed: setup.seed, map: setup.map, civilizations: setup.civilizations });
   }
+  const sides = setup.civilizations ?? { 1: game.players[1].civilization, 2: game.players[2].civilization };
+  const next = createGame(setup.seed, rules, sides, setup.map);
   replay = undefined;
   clearSession();
   activeSetup = setup;
   setupKnown = true;
-  game = createGame(setup.seed, rules,
-    { 1: game.players[1].civilization, 2: game.players[2].civilization }, setup.map);
+  game = next;
   saveMapPreference(setup);
   saveSession(game, setup);
   paused = false;
@@ -1114,7 +1132,7 @@ function currentCommands(): CommandButton[] {
           help: helpFor(kind, building.cost),
           slot: building.buildButton,
           enabled: true,
-          icon: hud.iconFor('Buildings', assets?.entities[kind]?.iconId, localPlayer),
+          icon: hud.iconFor('Buildings', importedEntity(kind)?.iconId, localPlayer),
         });
       }
       buttons.push({
@@ -1130,7 +1148,7 @@ function currentCommands(): CommandButton[] {
     const trap = buildingRulesFor(game, localPlayer, 'fish-trap');
     buttons.push({ id: 'build-fish-trap', label: `${createLabel('fish-trap', 'Build')} (${costLabel(trap.cost)})`,
       help: helpFor('fish-trap', trap.cost), slot: trap.buildButton, enabled: true,
-      icon: hud.iconFor('Buildings', assets?.entities['fish-trap']?.iconId, localPlayer) });
+      icon: hud.iconFor('Buildings', importedEntity('fish-trap')?.iconId, localPlayer) });
   }
   // A siege engine that has to be set up before it can shoot.
   const engines = selection.filter(e => isUnit(e.kind)
@@ -1178,7 +1196,7 @@ function currentCommands(): CommandButton[] {
         // (issue #7). Nor the price or the housing: the reference lets the
         // press through and says what is short (issue #70).
         enabled: queuedCount(producer) < TRAINING_QUEUE_LIMIT,
-        icon: hud.iconFor('Units', assets?.entities[kind]?.iconId, localPlayer),
+        icon: hud.iconFor('Units', importedEntity(kind)?.iconId, localPlayer),
       });
     }
   }
@@ -1204,10 +1222,11 @@ function currentCommands(): CommandButton[] {
     const building = selection.find(e => e.kind === tech.researchedAt && e.buildProgress === undefined);
     if (!building) continue;
     if (player1.researched.includes(key)) continue;
-    if (player1.age < tech.requiresAge) continue;
+    if (rules.civilizationBonuses?.nodes[tech.techId]?.disabled) continue;
+    if (tech.requiredTechCount === undefined && player1.age < tech.requiresAge) continue;
     // AoE2 does not show a technology whose predecessor is still outstanding:
     // Iron Casting appears once Forging is done, not beside it.
-    if ((tech.requires ?? []).some(other => !player1.researched.includes(other))) continue;
+    if (!technologyRequirementsMet(game, localPlayer, tech)) continue;
     buttons.push({
       id: `research-${key}`,
       label: `Research ${tech.name} (${costLabel(tech.cost)})`,
@@ -1361,7 +1380,8 @@ function scoreRows(): ScoreRow[] {
     textColor: hud.textColor(playerColorName(player), playerColorHex(assets, player) ?? '#ffffff'),
     // The civilisation's small icon is the material `<Name>Icon`, by the
     // reference's own name for it (`BritonsIcon`).
-    civIcon: assets && rules.civilization.displayName ? `${rules.civilization.displayName}Icon` : undefined,
+    civIcon: assets && (rules.civilization.internalName ?? rules.civilization.displayName)
+      ? `${rules.civilization.internalName ?? rules.civilization.displayName}Icon` : undefined,
     age: game.players[player].age,
     };
   });
@@ -1382,7 +1402,7 @@ function productionItems(): ProductionItem[] {
     if (!entity.training) continue;
     for (const [index, kind] of [entity.training.kind, ...(entity.trainingQueue ?? [])].entries()) {
       const unit = unitRulesFor(game, localPlayer, kind);
-      items.push({ producer: entity.id, name: displayName(kind), icon: hud.iconFor('Units', assets?.entities[kind]?.iconId, localPlayer),
+      items.push({ producer: entity.id, name: displayName(kind), icon: hud.iconFor('Units', importedEntity(kind)?.iconId, localPlayer),
         fraction: index ? 0 : Math.floor(100 * (1 - entity.training.remainingTicks * TICK_SECONDS / unit.trainSeconds)) / 100,
         blocked: index === 0 && entity.training.remainingTicks <= 0 && self.population + unit.popCost > self.populationCap,
         pending: index > 0, count: 1 });
@@ -1392,7 +1412,7 @@ function productionItems(): ProductionItem[] {
 }
 
 function displayName(key: string): string {
-  return nameFrom(key, assets?.entities[key]?.text?.name);
+  return nameFrom(key, importedEntity(key)?.text?.name);
 }
 
 /**
@@ -1402,18 +1422,18 @@ function displayName(key: string): string {
  */
 function nameOf(entity: Entity): string {
   const variant = chooseAnimation(game, entity).key;
-  const text = assets?.entities[variant]?.text?.name ?? assets?.entities[entityKey(entity)]?.text?.name;
+  const text = importedEntity(variant, entity.owner)?.text?.name ?? importedEntity(entityKey(entity), entity.owner)?.text?.name;
   return nameFrom(entityKey(entity), text);
 }
 
 /** The reference's button text ("Create Villager", "Build Mill"), or ours. */
 function createLabel(key: string, verb: 'Build' | 'Train'): string {
-  return assets?.entities[key]?.text?.create ?? `${verb} ${displayName(key)}`;
+  return importedEntity(key)?.text?.create ?? `${verb} ${displayName(key)}`;
 }
 
 /** The reference's tooltip for a build or train button, as plain text. */
 function helpFor(key: string, cost: Cost): string | undefined {
-  const help = assets?.entities[key]?.text?.help;
+  const help = importedEntity(key)?.text?.help;
   return help ? plainHelp(help, cost) : undefined;
 }
 
@@ -1438,7 +1458,7 @@ function selectionInfo(): SelectionInfo | undefined {
       id: member.id,
       name: assets ? nameOf(member) : fallbackName(member),
       icon: hud.iconFor(isUnit(member.kind) ? 'Units' : 'Buildings',
-        assets?.entities[view.entityKey(member)]?.iconId, member.owner),
+        importedEntity(view.entityKey(member), member.owner)?.iconId, member.owner),
       hp: member.hp,
       maxHp: member.maxHp,
     }))
@@ -1473,7 +1493,7 @@ function selectionInfo(): SelectionInfo | undefined {
       fraction,
     };
   }
-  const iconIndex = assets?.entities[view.entityKey(entity)]?.iconId;
+  const iconIndex = importedEntity(view.entityKey(entity), entity.owner)?.iconId;
   const category = isUnit(entity.kind) ? 'Units' : 'Buildings';
   return {
     members,
@@ -1483,7 +1503,7 @@ function selectionInfo(): SelectionInfo | undefined {
       entries: [entity.training.kind, ...(entity.trainingQueue ?? [])].map(kind => ({
         kind,
         name: displayName(kind),
-        icon: hud.iconFor('Units', assets?.entities[kind]?.iconId, entity.owner),
+        icon: hud.iconFor('Units', importedEntity(kind, entity.owner)?.iconId, entity.owner),
       })),
     } : undefined,
     name,
@@ -1610,7 +1630,7 @@ function syncScene(time: number): void {
     const art = projectile.art ?? shooterRules?.unpacked?.projectileArt ?? shooterRules?.projectileArt ?? 'arrow';
     view.updateProjectileView(
       entityView, assets, position, heading, progress, span, projectile.launchHeight,
-      art, time, elevationAt(game, position.x, position.y) * ELEVATION_PIXELS,
+      profileArtKey(assets, projectile.owner, art), time, elevationAt(game, position.x, position.y) * ELEVATION_PIXELS,
     );
   }
 
@@ -1634,7 +1654,9 @@ function syncScene(time: number): void {
   }
   if (cuesStarted) {
     for (const key of game.players[localPlayer].researched.slice(researchedBefore)) {
-      const name = playerRules(localPlayer).technologies[key as TechKey]?.name ?? key;
+      const tech = playerRules(localPlayer).technologies[key as TechKey];
+      if (!tech) continue;
+      const name = tech.name;
       hud.showMessage((messages.researchComplete ?? '--%s Research Complete--').replace('%s', name));
     }
   }
@@ -1963,6 +1985,7 @@ if (import.meta.hot) {
           assetsModule.loadUiAssets(),
           assetsModule.loadAudioAssets(),
         ]);
+        if (assets) assets.civilizationForOwner = owner => owner === 1 || owner === 2 ? game.players[owner].civilization : undefined;
       }
       if (world) {
         view.createGround = world.createGround;

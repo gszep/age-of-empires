@@ -147,6 +147,7 @@ export function pollCues(
   const self = state.players[player];
   if (watcher.started) {
     for (const key of self.researched.slice(watcher.researched)) {
+      if (!rulesForPlayer(state, player).technologies[key as TechKey]) continue;
       cues.push(rulesForPlayer(state, player).technologies[key as TechKey]?.grantsAge !== undefined
         ? 'age_up' : 'tech_researched');
     }

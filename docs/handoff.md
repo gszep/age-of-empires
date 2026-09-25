@@ -1,19 +1,40 @@
-# Agent handoff — reference-backed HUD feedback (#58)
+# Agent handoff — civilisation integration checkpoint
 
 ## Task and stopping point
 
-The user accepted the result and requested: **“looks good, commit and push.
-update docs and handoff.”** This handoff accompanies the completion commit for
-#58, following the initial feedback checkpoint `de8fb8b`. The agreed #58 scope
-is complete. Wait for the next task; no unattended run is authorized.
+The user delegated MAIN integration authority for the bonus and roster worktrees,
+preserving `0458053`, with commit/push authorization under the run ending
+**2026-09-25 18:00 BST**. This checkpoint enables the reviewed Briton/Frank
+gameplay profiles after real browser acceptance. #179/#180 remain incomplete;
+the separate tower/wall and petard/siege-tower/relic worktrees are not included.
 
 Use `git log -1`, `git status` and `tools/session_start.sh` for the completion
-commit, divergence and gate status. Read this briefing, `docs/status.md`,
-`docs/ledger.md` and the live tracker. The previous player-rule/rendering
-checkpoint is `f840bb2`; its detailed handoff is preserved at
-`cb82deb:docs/handoff.md`, with enduring scope in `docs/status.md`.
+commit, divergence and gate status. Read `docs/status.md`, `docs/ledger.md`,
+`docs/civilization-bonuses.md`, `docs/civ-roster-integration.md` and the live
+tracker. The earlier HUD handoff is preserved at `0458053:docs/handoff.md`;
+its follow-up references below remain historical context.
 
-## Delivered scope
+## Current civilisation scope
+
+- Complete independent supported-roster profiles, per-profile bonus graphs and
+  namespaced art/icons/voices; 53 base-era inventory rows, only Britons/Franks enabled.
+- Counted prerequisites and automatic/free research; work-rate-aware production,
+  research and observation countdowns; source-derived cost, gathering, range/sight
+  and cavalry HP effects. Conversion snapshots from #178 remain authoritative.
+- Real menu selection, reload and Restart; completed Longbowman/Throwing Axeman
+  training with foreign unique buttons absent; actual castle/unit atlas identity,
+  names/icons, age-specific building payments and free farm lifecycle.
+- Corrected disabled-child upgrade folding, source tree aliases for ram/gate,
+  and legacy fixtures that omitted now-enforced prerequisites. No timeout widening.
+- Full import repeat is byte-identical for content/UI/audio manifests; 2,122
+  atlases reused. Evidence is in `.local/civ-profiles-verified-repeat.log`,
+  `.local/civ-profiles-browser-verified.log` and
+  `.local/civ-profiles-tc-browser-verified.log`. The checkpoint gate log is
+  `.local/civ-profiles-checkpoint-gate.log`: **GREEN, 820 Vitest tests / 64 files,
+  build, 114 import tests and general browser smoke**. Inspect the latest actual
+  result before continuing; later code edits invalidate this checkpoint.
+
+## Earlier HUD delivered scope (historical)
 
 - Compact, independently expiring notification stack with owned research and
   creation strings. Height follows visible lines instead of the template maximum.
@@ -94,7 +115,7 @@ time-identical reconstruction of DE's closed-runtime emitter.
 - After changing viewport size, wait for the HUD resize scale before measuring
   its box. This was a probe synchronization fix, not a widened timeout.
 
-## Remaining work — requires a new user task
+## Follow-up work
 
 - By explicit user assignment, **#110** owns wonder UI/countdown, **#138** owns
   technology-tree/objectives, and **#141** owns remaining palette integration and
@@ -106,10 +127,11 @@ time-identical reconstruction of DE's closed-runtime emitter.
   atlas cache and entails the full import. No work on #119 was started here.
 - **#113** remains the other high-priority visual bug. Use the live queue rather
   than treating this list as authorization to begin.
-- Civilisation work retains its existing dependencies: #178 inheritance,
-  #123/#129 effects/prerequisites, #177 extra TCs, then #179/#180. Per-player rules
-  exist, but the real additional-civilisation catalogue is still unpopulated;
-  see `docs/civilization-coverage.md`.
+- Civilisation completeness remains #179/#180: missing tower/wall/specialist
+  mechanics, Warwolf and other unsupported effects/resources. #177 construction
+  and the shared bonus/prerequisite/profile infrastructure are implemented.
+  #178 retains explicit reference caveats under the user-approved inferred policy;
+  see `docs/civilization-coverage.md` for the bounded supported-gameplay milestone.
 
 ## Relevant files
 

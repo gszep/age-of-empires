@@ -41,10 +41,9 @@ export class SharedMatch {
     };
   }
 
-  restart(seed: number, map: string): void {
-    const civilizations = { 1: this.state.players[1].civilization, 2: this.state.players[2].civilization };
+  restart(seed: number, map: string, civilizations = { 1: this.state.players[1].civilization, 2: this.state.players[2].civilization }): void {
     this.state = createGame(seed, this.state.rules, civilizations, map);
-    this.setup = { map, seed };
+    this.setup = { map, seed, civilizations };
     this.pending = [];
     this.settings = { ...this.settings, paused: false, generation: this.settings.generation + 1 };
   }

@@ -141,6 +141,9 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | composite ship art | `graphic.deltas` plus `offset_x/_y` and `graphic.layer`; W/X placeholder parents and SLP -1 parents may have no source despite a filename. File-bearing hull/sail children have independent frame clocks; `naval.graphic_layers` resolves them |
 | shared naval upgrades | research 35 has `effect_id = -1`; automatic techs 911 and 246 have no research location and sole prerequisite 35. Resolve their type-3 commands; do not discard the research or offer its child upgrades as separate buttons |
 | building construction / annexes | `unit.building.construction_graphic_id`, `unit.building.annexes` |
+| completed-building prerequisite and production | `unit.building.tech_id`: mill 68 triggers 110, castle 82 triggers 266. Import from each profile; do not infer from names. `unit.bird.work_rate` supplies production/research work |
+| typed-tree aliases | reciprocal construction heads supply building availability (palisade 789 → 792 → 789). The reviewed ram spec maps unit 35 to tree node 1258: common automatic technology 712 replaces 1258 → 35 after Dark Age 104; both Briton/Frank records have 175 HP, speed ~0.6 and workshop 49 / 36 s / button 1. Cuman technology 706 is a distinct later gate; its profile is not enabled here. Explicit alias IDs also provide tree age/prerequisites; heads do not overwrite completed TC age |
+| bonus cost attributes | XS `cResourceCost` 100 (multiply all resources), food/wood/gold/stone 103–106. Tree commands 101 edit tech costs (`a` tech, `b` resource, `c` 0 set / 1 add), 103 edit research time (`a` tech, `c` operation). XS effect IDs and DAT command IDs are separate namespaces |
 | stacked building construction | `unit.building.head_unit` names the construction unit; follow it only when the head's `building.stack_unit_id` points back. TC 109 → 621 → 109: head owns paid 275 wood + 100 stone, `train_locations` builder 118 / button 11 / 150 seconds; completed 109 misleadingly has builder/button −1, 100 seconds and unpaid stone. Building connection 621 enables through tech 187 → required tech 102 (Castle); 109 has no enabling research. Tech 308 is `Shadow TC Foundation`, 722 `Shadow TC -- Age One`; neither defines a replacement-count predicate. XS resource 218 is `FeudalTownCenterLimit` (initial 1 for Britons/Franks), 48 `TownCenterUnavailable` (initial 0). See ledger #177 for the inferred replacement/count interpretation |
 | corpse / rubble / stump | `unit.dead_unit_id` — the unit whose `standing_graphic` is the decay art |
 | carcass food decay | live animal `unit.resource_decay`: Gaia sheep 594 and deer 65 = 0.25 food/s, boar 48 = 0.4. The `dead_unit_id` unit instead has type-12 lifetime storage at decay 1.0, not the food-loss rate |
@@ -191,11 +194,13 @@ and a Markdown coverage matrix under `.local/`; the interpretation and first
 mixed-civilisation acceptance plan are in `docs/civilization-coverage.md`.
 
 The published manifest's `civilization`/`entities`/`technologies` describe the
-root/default profile. `civilizations` is an additional catalogue keyed by each
-profile's `civilization.key`; entries contain complete rule metadata rather than
-inheriting the root player's values. It is currently empty in owned regeneration.
-The runtime and private mixed-profile smoke support it; source-matched Frankish
-roster, art, bonuses and selection must be completed before populating it.
+root/default profile. `civilizations` contains independent complete profiles,
+including converted entities and profile-local bonus graphs. Disabled profiles
+cannot be selected. `civilizationCatalog` inventories 53 base-era trees with
+extraction/enablement flags and missing roster IDs; inventory is not playability.
+`civilization_bonuses` runs after every profile's technology extraction and edits
+costs/times/work rates. See [bonus contract](../docs/civilization-bonuses.md) and
+[roster contract](../docs/civ-roster-integration.md) for source evidence and tests.
 
 `tools/datq.py` reloads the whole DAT on every invocation, which takes tens of
 seconds. Asking it more than two or three questions is slower than writing a

@@ -267,6 +267,12 @@ def extract_ui(
     cursors_dir: Path | None = None,
 ) -> dict[str, Any]:
     ui_spec = spec["ui"]
+    from civilization_profiles import art_entities
+    profiles = [content, *content.get("civilizations", {}).values()]
+    content = {**content, "entities": art_entities(content), "technologies": {
+        f"{index}/{key}": tech for index, profile in enumerate(profiles)
+        for key, tech in profile.get("technologies", {}).items()
+    }}
     style = ui_spec["style"]
     materials, textures = load_material_index(widgetui)
     icons = json.loads((widgetui / "icons.json").read_text())
@@ -352,6 +358,18 @@ def extract_ui(
     # `InGameCivEmblem` icon. Named in the spec, for the civilisation imported.
     for name in ui_spec.get("materials", []):
         used_materials.add(name)
+    for entry in content.get("civilizationCatalog", {}).values():
+        for name in (f"CivEmblem{entry['internalName']}", f"{entry['internalName']}Icon"):
+            used_materials.add(name)
+    for profile in profiles:
+        family = profile.get("civilization", {}).get("hudStyle")
+        if family:
+            for name in list(used_materials):
+                match = CIV_STYLE.match(name)
+                if match:
+                    variant = family + name[match.end():]
+                    if variant in materials:
+                        used_materials.add(variant)
 
     resolved_materials: dict[str, Any] = {}
     missing: list[str] = []

@@ -1,6 +1,6 @@
 import {
   BUILDING_RESTRICTION, GARRISON_CATEGORY, FALLBACK_RULES, LAND_RESTRICTION, TICK_SECONDS, TICKS_PER_SECOND,
-  OPEN_WATER_TERRAINS, groundAllows, isAnimal, isBuilding, isMilitary, isUnit, restrictionOf, rowAdmitsWater,
+  OPEN_WATER_TERRAINS, groundAllows, isAnimal, isBuilding, isUnit, restrictionOf, rowAdmitsWater,
   terrainAllows, NODE_OF_RESOURCE,
 } from './data';
 import type {
@@ -14,6 +14,7 @@ import {
 import { random01, seedFrom } from './random';
 import { buildingLimitReached, buildingRulesFor, combine, inheritConvertedUnit, playerAttributeFor, unitRulesFor, unitRulesForEntity } from './rules';
 import { civilizationRules, rulesForPlayer } from './civilizations';
+import { technologyFor, technologyRequirementsMet } from './technologies';
 import { createVisibility, isEntityVisible, updateVisibility } from './visibility';
 import type {
   AnimalKind, BuildingKind, Command, Entity, GameState, Order, PlayerId, Point, Projectile, ResourceKind,
@@ -165,6 +166,7 @@ export function createGame(
     }
   }
 
+  activateAutomaticTechnologies(state);
   recalculatePopulation(state);
   updateVisibility(state);
   return state;
@@ -242,7 +244,7 @@ const civNameOf = (state: GameState, player: PlayerId): string =>
  */
 export function upgradedAway(state: GameState, player: PlayerId, kind: string): boolean {
   for (const key of state.players[player].researched) {
-    for (const upgrade of rulesForPlayer(state, player).technologies[key]?.upgrades ?? []) {
+    for (const upgrade of technologyFor(rulesForPlayer(state, player), key)?.upgrades ?? []) {
       if (upgrade.from === kind) return true;
     }
   }
@@ -333,7 +335,7 @@ function researchedAttribute(
   let value = base;
   if (owner === 0) return value;
   for (const key of state.players[owner as PlayerId].researched) {
-    for (const effect of rulesForPlayer(state, owner).technologies[key]?.effects ?? []) {
+    for (const effect of technologyFor(rulesForPlayer(state, owner), key)?.effects ?? []) {
       if (effect.attribute !== attribute || effect.unit !== unit) continue;
       value = combine(effect.operation, value, effect.amount);
     }
@@ -705,6 +707,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
   }
 
   if (command.kind === 'train') {
+    if (!Object.hasOwn(rulesForPlayer(state, command.player).units, command.unit)) return rejected(`unit ${command.unit} is not loaded`);
     const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
     if (!building) return rejected(`building ${command.buildingId} is not owned`);
     if (building.buildProgress !== undefined) return rejected('building is under construction');
@@ -836,9 +839,15 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (tech.researchedAt !== building.kind) return rejected(`${building.kind} cannot research ${command.tech}`);
     const player = state.players[command.player];
     if (player.researched.includes(command.tech)) return rejected(`${command.tech} is already researched`);
-    if (player.age < tech.requiresAge) return rejected(`${command.tech} needs a later age`);
-    const missing = (tech.requires ?? []).find(other => !player.researched.includes(other));
-    if (missing) return rejected(`${command.tech} needs ${missing} first`);
+    if (rulesForPlayer(state, command.player).civilizationBonuses?.nodes[tech.techId]?.disabled) {
+      return rejected(`${command.tech} is disabled by the technology tree`);
+    }
+    if (tech.requiredTechCount === undefined && player.age < tech.requiresAge) return rejected(`${command.tech} needs a later age`);
+    if (!technologyRequirementsMet(state, command.player, tech)) {
+      const missing = (tech.requires ?? []).find(other => !player.researched.includes(other));
+      return rejected(`${command.tech} needs ${player.age < tech.requiresAge ? 'a later age'
+        : missing ? `${missing} first` : 'prerequisites first'}`);
+    }
     const paid = spendCost(state, command.player, tech.cost);
     if (!paid.ok) return paid;
     building.researching = {
@@ -2267,7 +2276,7 @@ function releaseAttack(
 function shooterLeadsTarget(state: GameState, shooter: Entity): boolean {
   if (shooter.owner === 0) return false;
   for (const key of state.players[shooter.owner as PlayerId].researched) {
-    for (const effect of rulesForPlayer(state, shooter.owner).technologies[key]?.effects ?? []) {
+    for (const effect of technologyFor(rulesForPlayer(state, shooter.owner), key)?.effects ?? []) {
       if (effect.attribute === 'leadsTarget' && effect.amount >= 1) return true;
     }
   }
@@ -2421,8 +2430,11 @@ function struckBy(state: GameState, projectile: Projectile, at: Point): Entity |
 
 /** Idle military units acquire the nearest living enemy in line of sight. */
 function autoAcquire(state: GameState, entity: Entity): void {
-  if (!isMilitary(entity.kind) || entity.order.kind !== 'idle') return;
-  const los = unitRulesForEntity(state, entity).lineOfSight;
+  if (entity.order.kind !== 'idle' || !isUnit(entity.kind) || entity.kind === 'villager'
+    || entity.kind === 'trade-cart' || isAnimal(entity.kind)) return;
+  const rules = unitRulesForEntity(state, entity);
+  if (!rules.attacks.some(attack => attack.amount > 0)) return;
+  const los = rules.lineOfSight;
   let best: Entity | undefined;
   let bestDistance = Infinity;
   for (const candidate of state.entities) {
@@ -2654,18 +2666,40 @@ function spawnTrainedUnit(state: GameState, building: Entity, kind: UnitKind): v
   }
 }
 
-/**
- * A finished technology moves the player on. An age is a number the rules read
- * for what may be built and trained; anything else is a flat change to a unit
- * kind, which existing units feel too — AoE2's Loom heals the villagers you
- * already have.
- */
+/** Fixed-point activation preserves DAT count gates and completion order. */
+export function activateAutomaticTechnologies(state: GameState): void {
+  for (const owner of [1, 2] as const) {
+    const rules = rulesForPlayer(state, owner);
+    const nodes = rules.civilizationBonuses?.nodes;
+    if (!nodes) continue;
+    const player = state.players[owner];
+    const buildings = new Set(state.entities.filter(e => !e.dead && e.owner === owner
+      && e.buildProgress === undefined && isBuilding(e.kind)).map(e => e.kind));
+    const hasBuilding = (kinds: string[]) => kinds.some(kind => buildings.has(kind as BuildingKind));
+    let changed: boolean;
+    do {
+      changed = false;
+      for (const node of Object.values(nodes)) {
+        if (node.disabled || player.researched.includes(node.key) || !technologyFor(rules, node.key)) continue;
+        const triggered = node.triggeredByBuildings && hasBuilding(node.triggeredByBuildings);
+        const aged = node.age !== undefined && player.age >= node.age;
+        if (!triggered && !aged && (!node.automatic || !technologyRequirementsMet(state, owner, node))) continue;
+        if (node.researchedAt && !hasBuilding([node.researchedAt])) continue;
+        completeResearch(state, owner, node.key);
+        changed = true;
+      }
+    } while (changed);
+  }
+}
+
+/** Apply completed research once, including existing and garrisoned entities. */
 function completeResearch(state: GameState, owner: PlayerId, key: string): void {
-  const tech = rulesForPlayer(state, owner).technologies[key as TechKey];
+  const tech = technologyFor(rulesForPlayer(state, owner), key);
   const player = state.players[owner];
   if (!tech || player.researched.includes(key)) return;
   player.researched.push(key);
-  if (tech.grantsAge !== undefined) player.age = Math.max(player.age, tech.grantsAge);
+  if ('grantsAge' in tech && tech.grantsAge !== undefined) player.age = Math.max(player.age, tech.grantsAge);
+  const promotedIds = new Set<number>();
   // An upgrade replaces what you own: every militia becomes a man-at-arms the
   // moment it lands, keeping the wounds it had rather than being healed by
   // promotion. AoE2 does the same, and it is why the barracks stops offering
@@ -2685,6 +2719,7 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
       entity.maxHp = promoted.hp;
       entity.hp = Math.max(1, promoted.hp - damage);
       entity.radius = promoted.radius;
+      promotedIds.add(entity.id);
     }
   }
 
@@ -2694,7 +2729,8 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
   for (const effect of tech.effects) {
     if (effect.attribute !== 'hitPoints') continue;
     for (const entity of state.entities.flatMap(e => [e, ...(e.garrison ?? [])])) {
-      if (entity.dead || entity.owner !== owner || entity.convertedRules || entity.kind !== effect.unit) continue;
+      if (entity.convertedRules || promotedIds.has(entity.id)
+        || entity.dead || entity.owner !== owner || entity.kind !== effect.unit) continue;
       const raised = combine(effect.operation, entity.maxHp, effect.amount);
       const gained = raised - entity.maxHp;
       entity.maxHp = raised;
@@ -2705,11 +2741,12 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
 
 function updateBuildingResearch(state: GameState, entity: Entity): void {
   if (!entity.researching) return;
-  entity.researching.remainingTicks -= 1;
+  entity.researching.remainingTicks -= buildingRulesFor(state, entity.owner, entity.kind as BuildingKind).workRate ?? 1;
   if (entity.researching.remainingTicks > 0) return;
   const key = entity.researching.tech;
   entity.researching = undefined;
   completeResearch(state, entity.owner as PlayerId, key);
+  activateAutomaticTechnologies(state);
 }
 
 /** How many units a building has spoken for: the one on the anvil and the queue. */
@@ -2724,7 +2761,8 @@ export const TRAINING_QUEUE_LIMIT = 15;
 
 function updateBuildingProduction(state: GameState, entity: Entity): void {
   if (!entity.training) return;
-  entity.training.remainingTicks = Math.max(0, entity.training.remainingTicks - 1);
+  entity.training.remainingTicks = Math.max(0, entity.training.remainingTicks
+    - (buildingRulesFor(state, entity.owner, entity.kind as BuildingKind).workRate ?? 1));
   if (entity.training.remainingTicks > 0) return;
   const kind = entity.training.kind;
   const player = state.players[entity.owner as PlayerId];
@@ -2850,6 +2888,7 @@ function updateAnimals(state: GameState): void {
 
 export function stepGame(state: GameState): void {
   if (state.winner) return;
+  activateAutomaticTechnologies(state);
   state.tick += 1;
   updateAnimals(state);
   const land = terrainLayer(state, LAND_RESTRICTION);

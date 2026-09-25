@@ -35,8 +35,10 @@ uv run --locked python tools/audit_civilizations.py --markdown .local/civilizati
 `civilizations.ts` now resolves each player's complete ruleset by its civilisation
 key. The root remains the default civilisation and shared Gaia/map input.
 Additional `GameRules.civilizations` / manifest `civilizations` entries are complete
-profiles, not patches over the enemy's rules. The importer publishes an empty
-additional catalogue until real roster/art/bonus imports are ready.
+profiles, not patches over the enemy's rules. The importer now extracts Britons
+and Franks with independent bonus graphs and namespaced art/voices/icons. The
+spec enables Franks after supported-gameplay browser acceptance; the 53-entry
+base-era catalogue remains an inventory, not 53 playable civilisations.
 
 Owner-specific consumers now include initial resources/stats, population,
 training/queues/refunds, research/upgrade effects, construction costs/HP/footprints,
@@ -62,15 +64,16 @@ the first attempt checked a button before the HUD refresh, fixed by waiting for
 that element. Full regeneration succeeded in `.local/civilization-rules-import.log`
 with all 1,984 cached sprite atlases reused. No timeouts were widened.
 
-**Conversion reference acceptance remains a blocker before real mixed selection
-(#178).** Conversion now snapshots donor unit-local rules, retains wounds and
+**Conversion uses the documented inferred policy (#178).** It snapshots donor
+unit-local rules, retains wounds and
 excludes captures/passengers from future research and promotions, including after
 reconversion. Synthetic public-command outcomes and owned Loom regressions cover
 the implementation; JSON continuation/replay preserve the snapshot. The boundary
 between frozen unit attributes and live recipient economic/player/projectile
-systems is explicitly inferred in `ledger.md`. Patch-matched runtime evidence,
-including passenger and reconversion exceptions, is still required before
-declaring a real mixed match complete.
+systems is explicitly inferred in `ledger.md`. Passenger, reconversion and
+economic/projectile exception evidence remains open. The user authorized this
+policy for supported mixed gameplay; absence of a runtime capture does not block
+profile enablement indefinitely or turn implementation tests into parity claims.
 
 The #177/#178 integration checkpoint passed **797 Vitest tests / 62 files**, the
 build, **108 owned-import tests**, and general browser smoke
@@ -86,7 +89,47 @@ clicks. An initial added Loom assertion used the wrong remembered melee armour;
 the owned help/effect confirms +1, giving 3 damage from a 4-attack militia.
 No civilisation bonuses or roster expansion are included in this checkpoint.
 
+### Supported Britons/Franks integration verification (2026-09-25)
+
+The subsequent bonus/roster integration gate is **GREEN: 820 Vitest tests / 64
+files, build, 114 Python/import tests and real-browser debug smoke**
+(`.local/civ-profiles-checkpoint-gate.log`, one Vitest worker, unchanged timeouts).
+`npm run import:aoe2` repeated byte-identically for content, UI and audio manifests
+(`.local/civ-profiles-verified-repeat.log`): 2,122 cached atlases and 3,944 shared
+source/layer aliases. Decoder/packer functions were not changed.
+
+The enabled published profiles pass `tools/civilization_profiles_smoke.mts`
+without overrides (`.local/civ-profiles-browser-verified.log`): real menu choices,
+reload and Restart, completed own unique training/absent foreign buttons,
+name/icon/rendered-atlas identity, distinct castle art, Castle/Imperial payments
+and once-only free farm research/new-versus-existing farm food. Advanced scenarios
+are snapshot-staged; subsequent build/research/train input and gameplay clocks
+are real and unmodified. The refreshed TC smoke passes too
+(`.local/civ-profiles-tc-browser-verified.log`).
+
+Integration fixes include disabled naval child filtering, ram/gate tree aliases,
+preserving conversion snapshots during bonuses, and work-rate-aware observation
+countdowns. Earlier gate failures exposed old root-only atlas assertions,
+all-definitions-are-trainable assumptions and omitted scenario prerequisites.
+Those fixtures were corrected explicitly; the AI spending fixture now supplies
+its two required completed Dark-Age buildings rather than widening its clock.
+Large pre-enablement manifest overrides use private HTTP/gzip because CDP's
+100 MiB message limit disconnected interception. The initial namespacing import
+reconverted shared canonical paths; subsequent full imports reused all atlases.
+
 ## Reading the audit output
+
+Current complete-civ blockers remain explicit:
+
+| Civilisation | Remaining coverage beyond the enabled supported profile |
+|---|---|
+| Britons (#179) | Guard Tower/Keep, stone/fortified wall and stone gate; Petard/Siege Tower; Warwolf blast and packed/unpacked trebuchet effect routing; remaining search-radius and shared effect/resource consumers |
+| Franks (#180) | Guard Tower, stone/fortified wall and stone gate; Petard/Siege Tower; Bearded Axe search-radius effect and full paid unique-tech/expanded-roster acceptance; remaining shared effect/resource consumers |
+| Both | Building age-stat replacements (#126), conversion/economic research resources (#128/#178), relic support (#130), and all remaining required roster/effect checks. Tower/wall and specialist/relic mechanics are owned by separate worktrees |
+
+The imported catalogue now accounts for the already represented ram/tree alias,
+palisade construction head and TC foundation. Raw unrepresented IDs are not a
+count of distinct missing mechanics. No full-civ completion is claimed here.
 
 The JSON and per-civilisation Markdown reports stay in `.local/`. They include
 source hashes, effect/attribute counts, missing unit/building IDs, prerequisite
@@ -102,17 +145,16 @@ fidelity certificate.
    `players[p].civilization` alone changes neither of them. Previously `civHas`
    returned true when the player's key differed from the loaded civilisation.
    The foundation above now provides that rule-selection boundary and rejects
-   unloaded keys. Publishing real additional profiles and selecting them remains
-   #122 work.
+    unloaded keys. Britons/Franks publication and selection now use that boundary;
+    additional civilisations remain #122 work.
 2. **Bonuses have a lifecycle.** `civs[i].tech_tree_id` and `.team_bonus_id`
    are effect IDs. Many other bonuses are automatic technologies with
    `tech.civ`, `required_techs` and `required_tech_count`. A positive required
    count with only -1 slots is not an unconditional bonus; scenario/game-mode
    candidates must not all run at match creation.
-3. **Decoder support is not consumer support.** Attribute 13 is decoded as
-   `workRate`, but production buildings do not consume it. Britons' team effect
-   399 multiplies archery-range work rate by 1.1. A generic effect importer
-   would currently claim success without speeding up training.
+3. **Decoder support is not consumer support.** Attribute 13 now advances
+   building production/research work: Briton team effect 399 is verified by
+   earlier completed archers. Unsupported commands remain explicit diagnostics.
 4. **Costs and free research need shared support.** Attribute 100 changes all
    unit/building resource costs; 103–106 address individual costs. Franks'
    tree effect also changes farm technologies' research cost/time. These must
@@ -156,9 +198,9 @@ Franks also require their own unit availability and unique-unit/upgrade art.
 Missing roster IDs are in the detailed report; copying Britons' longbowman
 button into the Frankish castle is not a valid partial implementation.
 Specifically, `FRANKS.json` has no Longbowman unit node: its node ID 8 is **Town
-Watch, Use Type Tech**, not unit 8. The next importer must account for imported
-trainable definitions absent from that civilisation's tree, not only explicit
-`NotAvailable` nodes. Rule definitions needed for captured units are distinct
+Watch, Use Type Tech**, not unit 8. The importer now denies definitions absent
+from a civilisation's typed tree as well as explicit `NotAvailable` nodes.
+Rule definitions needed for captured units are distinct
 from permission to train them.
 
 ## Implementation checklist
@@ -170,18 +212,19 @@ from permission to train them.
 - [x] Resolve rules and technology availability per player throughout simulation,
   command pricing, HUD and visibility; preserve the civilisation in AI observations
   and reject unavailable keys. Verified with synthetic profiles.
-- [ ] Resolve real per-civilisation sprite/voice/icon bindings and conversion
-  inheritance (#178) before enabling the real additional profile.
-- [ ] Import passive/team effects and their activation gates; implement supported
+- [x] Resolve real per-civilisation sprite/voice/icon bindings and preserve
+  conversion snapshots under the documented #178 policy.
+- [x] Import passive/team effects and their activation gates; implement supported
   unit/building costs and building production-rate consumers.
-- [ ] Handle required-count prerequisites and eligible free research without
+- [x] Handle required-count prerequisites and eligible free research without
   treating scenario-only or inactive automatic candidates as unconditional.
-- [ ] Complete the second civilisation's playable roster/art and selection UI.
+- [x] Enable reviewed shared combat/unique-unit roster, profile art and selection UI.
+- [ ] Complete every supported-era roster/effect for #179/#180.
 - [ ] Verify mixed matches, age changes, already-paid queues/refunds, conversions,
   garrisons, JSON save/reload and deterministic replay through public actions.
-- [ ] Verify the actual selection/command UI in a private browser and run the gate.
+- [x] Verify the actual selection/command UI in a private browser and run the gate.
 
 Conversion deserves a separate reference check: changing owner must not silently
 recompute the captured unit using the wrong civilisation's base stats or bonuses.
 The audit inventories data; it does not establish the closed engine's conversion
-inheritance behavior, free-research timing or rounding of discounted integer costs.
+  inheritance behavior, free-research timing or rounding of discounted integer costs.

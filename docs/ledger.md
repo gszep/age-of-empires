@@ -14,6 +14,31 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## Civilisation roster / selection foundation (#122)
+
+- **Owned:** identity, era, HUD family, display/computer names and emblems come
+  from `civilizations.json`/localization. Typed tree nodes, including absence,
+  determine availability. DAT entities, per-civ graphics, flags, icons and voices
+  are extracted independently. `M` is another file-less SLP-2260 composition
+  marker (Frankish garrison graph); child layers supply the art.
+- **Chosen integration policy:** the 53 base-era inventory entries are not 53
+  playable profiles. Extraction and enablement are separate. Reviewed DAT-keyed
+  units use supported combat mechanics, not every unit with a train location.
+- **Chosen UI adaptation:** two native HTML selects extend the existing map
+  menu; the label is owned `IDS_MPS_CIVILIZATION`, not a reproduction of the full
+  native lobby. HUD family/emblem use metadata; other families need review.
+- **Inferred presentation:** captured units retain unit-local stat snapshots
+  while their art/voice lookup follows the recipient profile. The shared supported
+  roster includes foreign unique definitions for capture/upgrade rendering.
+- **Owned alias evidence:** the palisade's completed 789 points to head 792,
+  whose stack points back. Ram technology 712 (common, Dark Age 104 prerequisite)
+  upgrades tree unit 1258 to the imported 35; both Briton/Frank records share
+  name ID 5094, 175 HP, speed ~0.6, workshop 49, 36 seconds and button 1. The
+  reviewed `treeUnitId` spec alias and reciprocal head lookup preserve these
+  permissions under typed absence denial. Cuman tech 706 has different gates
+  and is not enabled by this milestone. Catalogue missing IDs exclude represented
+  aliases/heads, rather than calling each a missing playable unit.
+
 ## Converted-unit inheritance (#178)
 
 - **Owned inspection (2026-09-24):** root resolved with the main checkout's
@@ -203,7 +228,7 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Game-speed multipliers | 1.0 / 1.5 / 1.7 / 2.0 | inferred (Steam, AoEZone threads); the names and the Default are owned strings 20033-20036 | `main.ts` | — |
 | A foundation's line of sight | 0 | chosen against observed behaviour (issue #1); DAT has no construction-time LOS | `visibility.ts` | — |
 | Conversion odds | uniform over the DAT's 5-9 s window | chosen shape; both ends owned | `game.ts` | — |
-| Converted-unit stat inheritance | unit-local rules snapshot before ownership/passenger ownership changes; stored HP/wounds persist; later research/promotions skip captures | **Inferred**, community-backed policy; see the detailed source inspection and remaining economic/projectile/reconversion/passenger reference gaps above. Synthetic public-command outcomes, owned Loom combat/HP cases and JSON/replay checks verify this implementation, not DE parity | `game.ts` `updateConverter`, `rules.ts` `unitRulesForEntity`, `types.ts` | #178 remains open and blocks real mixed-civilisation acceptance |
+| Converted-unit stat inheritance | unit-local rules snapshot before ownership/passenger ownership changes; stored HP/wounds persist; later research/promotions skip captures | **Inferred**, community-backed policy; see the detailed remaining economic/projectile/reconversion/passenger gaps above. Synthetic outcomes, owned Loom combat/HP and JSON/replay verify this implementation, not DE parity. User-approved policy permits the limited supported mixed-profile milestone while those reference questions remain open | `game.ts` `updateConverter`, `rules.ts` `unitRulesForEntity`, `types.ts` | #178 remains open |
 | Blast falloff | none inside `blast_width` | chosen; DAT states no falloff | `game.ts` | — |
 | Scorpion bolt travel and contact | swept circle, one hit per enemy, no friendly damage, full shooter attack on the intended target and projectile attacks on others; travels maximum range +3 | **inferred** engine interpretation of owned hit/vanish mode 1; extra three tiles and friendly immunity corroborated by [community Scorpion article](https://ageofempires.fandom.com/wiki/Scorpion_(Age_of_Empires_II)); radius, speed, primary/collateral attacks and upgrade effects owned | `game.ts` `releaseAttack`, `updateProjectiles` | #127 |
 | Miss scatter, fallback rules only | 1 tile | chosen; imported units use `accuracy_dispersion` | `game.ts` `MISS_TILES` | — |
@@ -235,7 +260,9 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Animal think interval | 5 ticks | chosen | `game.ts` `ANIMAL_INTERVAL` | — |
 | Engagement tolerances | `radius + 1.6`, margins 0.15-0.4, spawn ring +0.2, node pop ≤ 0.12 | chosen | `game.ts` | — |
 | Villager task gathering | hunter 0.41/35, farmer 0.53/10, shepherd 0.33/10, forager 0.31/10, fisher 0.43/10, lumberjack 0.39/10, gold miner 0.38/10, stone miner 0.36/10 (rate/capacity); each variant's technology effects | **owned** DAT `bird.work_rate`/`resource_capacity` on 122/259/592/120/56/123/579/124, already published as `villager-*.gather`; open fallback copies these numbers. Heavy Plow gives farmer +1 capacity; Wheel Barrow's patch-specific class-4 multiplier is **1.2695**, Hand Cart's 1.5. Existing whole-resource collection rounds fractional capacity upward (**inferred**, not reference-measured); switching tasks uses the new target's capacity and banks an overfull load first (**inferred**). A carried load remembers its task if its source disappears; legacy loads lacking both source and task default to forager | `data.ts` `villagerGather`, `game.ts` `rateOn`/`holdOf` | #132 |
-| Technology prerequisites | every listed requirement this game offers | chosen; DAT states `required_tech_count` | `import_content.py` | #129 |
+| Technology prerequisites and automatic bonuses | full nonnegative DAT prerequisite IDs plus `required_tech_count`; foreign/disabled alternatives remain unsatisfied. Completed buildings supply `building.tech_id`. Initial tree/team effects and eligible locationless/free research activate once in completion order | gates, IDs, costs, amounts and triggers **owned**; fixed-point activation order, historical building-trigger persistence and free research requiring its completed research building are **inferred engine semantics**. Positive counts with empty lists remain blocked. Legacy manifests retain their former all-listed path | `import_content.py`, `technologies.ts`, `game.ts`; [contract](civilization-bonuses.md) | #123/#129/#179/#180 |
+| Bonus prices and production | cost multipliers in completion order, then nearest whole resource (half up); production/research advances by building work rate | multipliers **owned**: TC wood ×0.5; castle ×0.85 then ×0.882353; range work ×1.1. Rounding/tick quantization **inferred**: TC wood 138, castle stone 553/488 are implementation outcomes, not DE measurements. Existing HP policy adds max-HP delta preserving absolute damage; converted entities skip bulk HP/upgrades | `rules.ts`, `game.ts` | #123/#178 |
+| Bonus scope and remaining effects | current 1v1 applies each player's own team effect; unsupported commands/attributes retained as `unmodelled`. No allied teams, timed locationless research or general enable/disable-unit effect execution | **owned** commands retained as diagnostics; range/sight, gathering, production, prices and cavalry HP have consumers. Search radius 23, building age-stat replacements, conversion/relic resources and other unsupported effects remain gaps | `civilizationBonuses.nodes`, `import_content.py` | #123/#128/#126/#130/#179/#180 |
 | Unmodelled attributes 23, 130, 48, 49 | recorded per technology, not applied | owned but unmodelled | manifest `unmodelled` | #128 |
 | Named player-attribute coverage | all named DAT initial values imported; research-aware consumers for farm food and unit/building repair costs only. Other resource effects remain unmodelled; initial food/population/score entries are not live counters | names/indices **owned** from the XS Attributes section, values **owned** from the configured civ. Lower-first-letter manifest keys and legacy `FarmFood` → `farmFoodAmount` are schema conventions. No new gameplay constants; repair billing retains existing whole-resource rounding and uses the current researched fraction for each increment | `import_content.py`, `rules.ts` `playerAttributeFor`, `game.ts` | #53 infrastructure; #128, #130, #123, #177 consumers remain separate |
 | Skipped technologies | not researchable, reason each | owned | manifest `skippedTechnologies` | #128, #97 |

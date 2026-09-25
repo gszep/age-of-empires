@@ -228,6 +228,8 @@ export interface FoamAtlases {
 }
 
 export interface ContentAssets {
+  civilizationForOwner?: (owner: number) => string | undefined;
+  civilizationSkins?: Record<string, Map<string, SkinFamily[]>>;
   /** Default colorcorrection.json shadow settings; biome grading is separate. */
   shadows?: { profile: string; strength: number; color: [number, number, number] };
   entities: Record<string, ImportedEntity>;
@@ -376,6 +378,7 @@ function rampTexture(color: PlayerColor, shadeLevels: number[]): THREE.DataTextu
 export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   const manifest = await fetchJson<{
     entities: Record<string, ImportedEntity>;
+    civilizations?: Record<string, { entities: Record<string, ImportedEntity> }>;
     ages?: ImportedAge[];
     terrain?: Record<string, ImportedTerrain>;
     water?: Record<string, WaterPreset>;
@@ -385,6 +388,14 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     particles?: Record<string, ParticleEffect>;
   }>(`${CONTENT_BASE}manifest.json`);
   if (!manifest) return undefined;
+  const rootSkins = skinFamilies(manifest.entities);
+  const civilizationSkins: Record<string, Map<string, SkinFamily[]>> = {};
+  for (const [civ, profile] of Object.entries(manifest.civilizations ?? {})) {
+    civilizationSkins[civ] = skinFamilies(profile.entities);
+    for (const [key, entity] of Object.entries(profile.entities)) {
+      manifest.entities[`civilizations/${civ}/${key}`] = entity;
+    }
+  }
   const textures = new Map<string, THREE.Texture>();
   const spriteResidency = new SpriteResidency(textures);
   const loader = new THREE.TextureLoader();
@@ -548,7 +559,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     }
   }
   return {
-    entities: manifest.entities, skins: skinFamilies(manifest.entities), ages: manifest.ages ?? [],
+    entities: manifest.entities, skins: rootSkins, civilizationSkins, ages: manifest.ages ?? [],
     terrain, water: Object.keys(water).length ? water : undefined,
     shadows: manifest.shadows,
     foam: manifest.foam?.diag?.length ? manifest.foam : undefined,

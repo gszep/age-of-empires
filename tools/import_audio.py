@@ -228,15 +228,18 @@ def consumed_cues(ui_manifest: Path, content: Path | None) -> list[dict[str, Any
     if content is None or not content.is_file():
         return cues
     imported = json.loads(content.read_text())
-    switch = imported.get("audio", {}).get("switch")
-    for key, entity in sorted(imported.get("entities", {}).items()):
-        for name, event_id in sorted(entity.get("sounds", {}).items()):
-            cues.append({
-                "alias": f"{key}-{name}",
-                "event": f"{entity.get('internalName', key)} {name}",
-                "id": event_id,
-                "switch": switch,
-            })
+    profiles = [("", imported), *((f"civilizations/{key}/", profile)
+                for key, profile in sorted(imported.get("civilizations", {}).items()))]
+    for prefix, profile in profiles:
+        switch = profile.get("audio", {}).get("switch")
+        for key, entity in sorted(profile.get("entities", {}).items()):
+            for name, event_id in sorted(entity.get("sounds", {}).items()):
+                cues.append({
+                    "alias": f"{prefix}{key}-{name}",
+                    "event": f"{entity.get('internalName', key)} {name}",
+                    "id": event_id,
+                    "switch": switch,
+                })
     return cues
 
 
@@ -271,6 +274,7 @@ def import_audio(
                 wem = temp / f"{media_id}.wem"
                 suffix = "" if len(matches) == 1 else f"-{index}"
                 target = out / f"{alias}{suffix}.wav"
+                target.parent.mkdir(parents=True, exist_ok=True)
                 wem.write_bytes(media)
                 subprocess.run(
                     [executable, "-i", "-o", str(target), str(wem)],
@@ -279,7 +283,7 @@ def import_audio(
                 with wave.open(str(target), "rb") as decoded:
                     duration = decoded.getnframes() / decoded.getframerate()
                 files.append({
-                    "file": target.name,
+                    "file": target.relative_to(out).as_posix(),
                     "mediaId": media_id,
                     "bankId": int(bank.name),
                     "seconds": round(duration, 6),

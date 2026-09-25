@@ -7,6 +7,7 @@
 import type { BuildingRules, TechEffect, UnitRules } from './data';
 import { isUnit } from './data';
 import { rulesForPlayer } from './civilizations';
+import { technologyFor } from './technologies';
 import type { BuildingKind, DeepReadonly, Entity, GameState, PlayerId, ReadonlyGameState, UnitKind } from './types';
 
 /** Shared by the build menu, placement preview and public build command. */
@@ -39,7 +40,7 @@ export function playerAttributeFor(
   let value = (attributes && Object.hasOwn(attributes, name) ? attributes[name] : undefined) ?? legacy;
   if (value === undefined || owner === 0) return value;
   for (const key of state.players[owner as PlayerId].researched) {
-    for (const effect of rules.technologies[key]?.effects ?? []) {
+    for (const effect of technologyFor(rules, key)?.effects ?? []) {
       if (effect.resource === name) value = combine(effect.operation, value, effect.amount);
     }
   }
@@ -75,7 +76,7 @@ export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: Uni
   if (!researched.length) return base;
   let rules = base;
   for (const key of researched) {
-    for (const effect of source.technologies[key]?.effects ?? []) {
+    for (const effect of technologyFor(source, key)?.effects ?? []) {
       if (base.piercing && effect.unit === base.piercing.unit && effect.attribute === 'attack') {
         const attacks = (rules.piercing ?? base.piercing).attacks.map(a => ({ ...a }));
         const entry = attacks.find(a => a.class === effect.armorClass);
@@ -95,6 +96,7 @@ export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: Uni
       applyEffect(rules, effect);
     }
   }
+  if (rules.cost !== base.cost) roundCost(rules);
   return rules;
 }
 
@@ -105,6 +107,7 @@ export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: Uni
  * what makes a bonus against a class it never fought before take effect.
  */
 function applyEffect(rules: UnitRules, effect: TechEffect): void {
+  if (applyCostEffect(rules, effect)) return;
   const armorClass = effect.armorClass ?? 0;
   switch (effect.attribute) {
     case 'hitPoints': rules.hp = combine(effect.operation, rules.hp, effect.amount); break;
@@ -155,7 +158,7 @@ export function buildingRulesFor(
   if (!researched.length) return base;
   let rules = base;
   for (const key of researched) {
-    for (const effect of source.technologies[key]?.effects ?? []) {
+    for (const effect of technologyFor(source, key)?.effects ?? []) {
       if (effect.unit !== kind) continue;
       if (rules === base) {
         rules = {
@@ -167,12 +170,34 @@ export function buildingRulesFor(
       applyBuildingEffect(rules, effect);
     }
   }
+  if (rules.cost !== base.cost) roundCost(rules);
   return rules;
 }
 
+function roundCost(rules: Pick<UnitRules, 'cost'>): void {
+  for (const resource of ['food', 'wood', 'gold', 'stone'] as const) {
+    rules.cost[resource] = Math.max(0, Math.round(rules.cost[resource]));
+  }
+}
+
+function applyCostEffect(rules: Pick<UnitRules, 'cost'>, effect: TechEffect): boolean {
+  if (effect.attribute === 'cost' || effect.attribute?.endsWith('Cost')) {
+    rules.cost = { ...rules.cost };
+    for (const resource of ['food', 'wood', 'gold', 'stone'] as const) {
+      if (effect.attribute === 'cost' || effect.attribute === `${resource}Cost`) {
+        rules.cost[resource] = combine(effect.operation, rules.cost[resource], effect.amount);
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
 function applyBuildingEffect(rules: BuildingRules, effect: TechEffect): void {
+  if (applyCostEffect(rules, effect)) return;
   const armorClass = effect.armorClass ?? 0;
   switch (effect.attribute) {
+    case 'workRate': rules.workRate = combine(effect.operation, rules.workRate ?? 1, effect.amount); break;
     case 'hitPoints': rules.hp = combine(effect.operation, rules.hp, effect.amount); break;
     case 'lineOfSight':
       rules.lineOfSight = combine(effect.operation, rules.lineOfSight, effect.amount); break;

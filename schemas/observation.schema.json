@@ -74,6 +74,7 @@
             "type": "integer"
           },
           "kind": {
+            "anyOf": [{ "type": "string", "pattern": "^dat-unit-[0-9]+$" }, {
             "enum": [
               "villager",
               "militia",
@@ -137,6 +138,7 @@
               "fish-trap",
               "resource"
             ]
+            }]
           },
           "owner": {
             "enum": [
@@ -230,6 +232,7 @@
           "hasGarrison": { "type": "boolean" },
           "townBell": { "type": "boolean" },
           "kind": {
+            "anyOf": [{ "type": "string", "pattern": "^dat-unit-[0-9]+$" }, {
             "enum": [
               "villager",
               "militia",
@@ -293,6 +296,7 @@
               "fish-trap",
               "resource"
             ]
+            }]
           },
           "owner": {
             "enum": [
@@ -410,6 +414,7 @@
             "type": "object",
             "properties": {
               "kind": {
+                "anyOf": [{ "type": "string", "pattern": "^dat-unit-[0-9]+$" }, {
                 "enum": [
                   "villager",
                   "militia",
@@ -447,6 +452,7 @@
                   "trebuchet",
                   "monk"
                 ]
+                }]
               },
               "remainingSeconds": {
                 "type": "number",

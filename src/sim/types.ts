@@ -8,6 +8,7 @@ export type NavalUnitKind = 'galley' | 'war-galley' | 'galleon' | 'hulk' | 'war-
   | 'demolition-raft' | 'demolition-ship' | 'heavy-demolition-ship'
   | 'cannon-galleon' | 'transport-ship' | 'trade-cog';
 export type UnitKind =
+  | `dat-unit-${number}`
   | 'villager' | 'militia' | 'man-at-arms' | 'long-swordsman'
   | 'two-handed-swordsman' | 'champion'
   | 'spearman' | 'pikeman' | 'halberdier'

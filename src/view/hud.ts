@@ -96,7 +96,7 @@ export interface HudCallbacks {
   onMenu(action: 'resume' | 'restart' | 'pause'): void;
   onReplayFile(record: unknown): void;
   onSound(alias: string): void;
-  onStartMatch(setup: { map: string; seed: number }): boolean;
+  onStartMatch(setup: import('../match-setup').MatchSetup): boolean;
 }
 
 const REFERENCE_WIDTH = 3840;
@@ -109,6 +109,7 @@ export interface ProductionItem {
 }
 
 export class Hud {
+  private civilizationName = 'Britons';
   root: HTMLElement;
   minimap: Minimap;
   private commandGrid!: HTMLElement;
@@ -383,7 +384,10 @@ export class Hud {
       const map = this.root.querySelector<HTMLSelectElement>('#map-choice')!.value;
       const seed = seedInput.value === '' ? ((Date.now() >>> 0) || 1) : seedInput.valueAsNumber;
       this.callbacks.onSound('button_ui');
-      if (this.callbacks.onStartMatch({ map, seed })) this.toggleMenu(false);
+      const first = this.root.querySelector<HTMLSelectElement>('#civilization-1');
+      const second = this.root.querySelector<HTMLSelectElement>('#civilization-2');
+      const civilizations = first && second ? { 1: first.value, 2: second.value } : undefined;
+      if (this.callbacks.onStartMatch({ map, seed, civilizations })) this.toggleMenu(false);
     });
 
     this.root.addEventListener('pointerdown', event => event.stopPropagation());
@@ -543,7 +547,7 @@ export class Hud {
     // material the engine picks per civilisation (`CivEmblemBritons`).
     place('#civ-emblem', widgetBox(this.ui?.layouts.commandpanel, 'BackgroundRight', 'CivEmblem'), true);
     const emblem = this.root.querySelector<HTMLElement>('#civ-emblem');
-    if (emblem) emblem.style.backgroundImage = this.texture('CivEmblemBritons');
+    if (emblem) emblem.style.backgroundImage = this.texture(`CivEmblem${this.civilizationName}`);
   }
 
   private applyScale(): void {
@@ -574,6 +578,34 @@ export class Hud {
     const note = this.root.querySelector<HTMLElement>('#map-host-note')!;
     note.hidden = enabled && setupKnown;
     note.textContent = enabled ? 'Choose a map and seed to start a new game.' : 'Ysgramor starts shared matches.';
+  }
+
+  configureCivilizations(choices: { id: string; label: string }[], selected: { 1: string; 2: string },
+    enabled: boolean, label: string, internalName?: string, hudStyle = 'CivWest'): void {
+    if (internalName) this.civilizationName = internalName;
+    const form = this.root.querySelector<HTMLFormElement>('#map-setup')!;
+    for (const player of [1, 2] as const) {
+      let select = form.querySelector<HTMLSelectElement>(`#civilization-${player}`);
+      if (!select) {
+        const caption = document.createElement('label');
+        caption.htmlFor = `civilization-${player}`;
+        caption.textContent = `${label} ${player}`;
+        select = document.createElement('select');
+        select.id = caption.htmlFor;
+        form.append(caption, select);
+      }
+      select.replaceChildren(...choices.map(choice => new Option(choice.label, choice.id)));
+      select.value = selected[player];
+      select.disabled = !enabled;
+    }
+    const emblem = this.root.querySelector<HTMLElement>('#civ-emblem');
+    if (emblem && internalName) emblem.style.backgroundImage = this.texture(`CivEmblem${internalName}`);
+    const panels: Record<string, string> = { 'topbar-strip': 'Topbar', 'bottombar-strip': 'Bottombar',
+      'resource-panel': 'ResourcePanel', 'menu-panel': 'MenuPanel', 'command-panel': 'CommandPanelExtended',
+      'selection-panel': 'SingleSelectionPanel', 'map-panel': 'MapPanel' };
+    for (const [id, suffix] of Object.entries(panels)) {
+      this.root.querySelector<HTMLElement>(`#${id}`)!.style.backgroundImage = this.texture(hudStyle + suffix);
+    }
   }
 
   toggleMenu(open?: boolean): void {

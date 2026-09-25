@@ -8,7 +8,7 @@ import type { Entity, GameState, ReadonlyGameState } from './types';
 export function civilizationRules(rules: GameRules, key: string): GameRules | undefined {
   if (key === rules.civilization.key) return rules;
   const entry = Object.hasOwn(rules.civilizations ?? {}, key) ? rules.civilizations?.[key] : undefined;
-  return entry?.civilization.key === key ? entry : undefined;
+  return entry?.civilization.key === key && entry.civilization.enabled !== false ? entry : undefined;
 }
 
 export function rulesForPlayer(state: GameState, owner: Entity['owner']): GameRules;

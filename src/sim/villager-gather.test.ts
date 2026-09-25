@@ -21,7 +21,8 @@ function fixture(rules: GameRules, task: VillagerGatherTask) {
   // Measure collection/capacity independently of spoilage. #85 adds a second
   // sink to animal food, exercised with real rates in herd-food.test.ts and
   // the browser smoke; it must not masquerade as extra gathering here.
-  const state = createGame(132, { ...rules, units: { ...rules.units,
+  // Task baselines; passive civ rates are measured in civilization-bonuses.test.ts.
+  const state = createGame(132, { ...rules, civilizationBonuses: undefined, units: { ...rules.units,
     deer: { ...rules.units.deer, foodDecayPerSecond: 0 },
     sheep: { ...rules.units.sheep, foodDecayPerSecond: 0 },
   } });

@@ -123,7 +123,7 @@ export function sharedMatchPlugin(root: string, checkpointPath = resolve(root, '
                 broadcast({ type: 'settings', settings: match.settings });
               } else if (message.type === 'restart' && player === 1) {
                 if (!validMatchSetup(message)) { error('Invalid map or seed'); return; }
-                match.restart(message.seed, message.map);
+                match.restart(message.seed, message.map, message.civilizations);
                 broadcast(match.snapshot());
                 save();
               }

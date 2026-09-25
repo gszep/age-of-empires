@@ -1783,7 +1783,8 @@ describe('the archery range', () => {
     if (importedRules) {
       const upgraded = createGame(23, importedRules);
       const here = (Object.keys(upgraded.rules.units) as (keyof typeof upgraded.rules.units)[])
-        .filter(kind => upgraded.rules.units[kind].trainedAt === 'archery-range');
+        .filter(kind => upgraded.rules.units[kind].trainedAt === 'archery-range'
+          && !upgraded.rules.civilization.unavailable.units.includes(upgraded.rules.units[kind].datId!));
       expect(here).toEqual(expect.arrayContaining(['crossbowman', 'arbalester', 'elite-skirmisher']));
       for (const kind of here) {
         const gated = notYetUpgradedInto(upgraded, 1, kind);
@@ -2369,7 +2370,9 @@ describe('civilisations', () => {
       expect(missing.technologies, `${key} is not in the Britons' tree`).not.toContain(tech.techId);
     }
     for (const [kind, rules] of Object.entries(importedRules.units)) {
-      if (rules.datId === undefined) continue;
+      // Additional definitions include foreign uniques for captures; their
+      // production denial is measured by civilization-profile.test.ts.
+      if (rules.datId === undefined || kind.startsWith('dat-unit-')) continue;
       expect(missing.units, `${kind} is not in the Britons' tree`).not.toContain(rules.datId);
     }
     for (const [kind, rules] of Object.entries(importedRules.buildings)) {
@@ -2777,6 +2780,15 @@ describe('the built-in strategy', () => {
     // and a batch measures that; this asks whether it spends it.
     const state = createGame(1, importedRules ?? FALLBACK_RULES);
     state.players[1].food = 600;
+    // Isolate spending the age fund from buying its two distinct Dark-Age
+    // building prerequisites. This fixture does not widen the scenario clock.
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    for (const [i, kind] of (['mill', 'barracks'] as const).entries()) {
+      const b = state.rules.buildings[kind];
+      state.entities.push({ id: state.nextId++, kind, owner: 1,
+        position: { x: tc.position.x + 8, y: tc.position.y + i * 6 },
+        hp: b.hp, maxHp: b.hp, radius: b.radius, activity: 'idle', order: { kind: 'idle' } });
+    }
     await play(state, 3 * 60);
     expect(state.players[1].researched, 'never left the Dark Age').toContain('feudal-age');
     expect(state.players[1].age).toBeGreaterThanOrEqual(1);
@@ -2876,6 +2888,9 @@ describe('unit upgrades', () => {
       hp: from.hp, maxHp: from.hp, radius: from.radius, activity: 'idle', order: { kind: 'idle' },
     };
     state.entities.push(standing);
+    // Activate the staged scenario's age/producer bookkeeping: hidden
+    // prerequisites are now real gates, not discarded by the importer.
+    stepGame(state);
     expect(applyCommand(state, { kind: 'research', player: 1, buildingId: building.id, tech: key }).ok,
       `${key} refused`).toBe(true);
     for (let i = 0; i < 6000 && !state.players[1].researched.includes(key); i++) stepGame(state);

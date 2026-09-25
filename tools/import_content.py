@@ -1012,6 +1012,11 @@ ATTRIBUTE_NAMES = {
     12: "range",
     13: "workRate",
     14: "carryCapacity",
+    100: "cost",
+    103: "foodCost",
+    104: "woodCost",
+    105: "goldCost",
+    106: "stoneCost",
     # How close is too close. A watch tower and a castle each have a tile of
     # it, and Murder Holes is one `set` of this to zero.
     20: "minRange",
@@ -1080,6 +1085,7 @@ def slug(name: str) -> str:
 
 def effects_of(
     dat: DatFile, tech_id: int, entities: dict[str, Any], attribute_ids: dict[str, int],
+    *, effect_id: int | None = None,
 ) -> tuple[list[dict[str, Any]], list[str], list[str]]:
     """Decode one technology's effect commands against the entities we have.
 
@@ -1093,7 +1099,7 @@ def effects_of(
     was actually asking for, so "none of its effects reach anything imported"
     can say which effects and what they wanted.
     """
-    tech = dat.techs[tech_id]
+    effect_id = dat.techs[tech_id].effect_id if effect_id is None else effect_id
     by_id: dict[int, list[str]] = {}
     by_class: dict[int, list[str]] = {}
     for key, entity in entities.items():
@@ -1110,7 +1116,7 @@ def effects_of(
     resource_names = {index: name for name, index in attribute_ids.items()}
     unmodelled: set[str] = set()
     unreached: set[str] = set()
-    for command in (dat.effects[tech.effect_id].effect_commands if tech.effect_id >= 0 else []):
+    for command in (dat.effects[effect_id].effect_commands if effect_id >= 0 else []):
         if command.type == 1:
             # A player attribute: `a` names the resource, `b` chooses write or
             # add, `d` is the amount. `c` is a bookkeeping slot this does not
@@ -1130,7 +1136,8 @@ def effects_of(
             continue
         operation = OPERATION_NAMES.get(command.type)
         if operation is None:
-            continue  # enable, upgrade-unit and the rest are not attribute changes
+            unreached.add(f"effect type {command.type}: a={command.a}, b={command.b}, c={command.c}, d={command.d}")
+            continue  # handled separately where supported; never silently effective
         target = int(command.a)
         targets = by_id.get(target, []) if target >= 0 else by_class.get(int(command.b), [])
         attribute_id = int(command.c)
@@ -1143,6 +1150,9 @@ def effects_of(
             unreached.add(f"attribute {attribute_id} on {where}")
             continue
         attribute = ATTRIBUTE_NAMES.get(attribute_id)
+        if attribute == "cost" and operation != "multiply":
+            unreached.add(f"attribute {attribute_id} {operation}: only cost multiplication is modelled")
+            continue
         if attribute is None:
             unmodelled.add(f"attribute {attribute_id}")
             unreached.add(f"attribute {attribute_id} on {targets[0]}, which is not modelled")
@@ -1175,6 +1185,8 @@ def technology_entry(
     location = next(l for l in tech.research_locations if l.location_id >= 0)
     entry: dict[str, Any] = {
         "techId": spec["techId"],
+        "requiredTechs": [int(r) for r in tech.required_techs if r >= 0],
+        "requiredTechCount": int(tech.required_tech_count),
         "name": effect.name if effect else tech.name,
         "cost": {RESOURCE_NAMES[c.type]: int(c.amount) for c in tech.resource_costs
                  if c.flag and c.type in RESOURCE_NAMES},
@@ -1254,6 +1266,17 @@ def civilization_entry(
             unavailable[bucket].append(node_id)
     for name in unavailable:
         unavailable[name].sort()
+    # Absence is not permission: foreign uniques often have no node at all.
+    present = {bucket: {int(n["Node ID"]) for n in nodes if buckets.get(n["Use Type"]) == bucket}
+               for bucket in buckets.values()}
+    from civilization_profiles import tree_unit_id
+    for entity in spec["entities"]:
+        bucket = {"unit": "units", "building": "buildings"}.get(entity.get("category"))
+        if bucket and entity.get("civ") != "gaia" and not entity.get("skinOf"):
+            tree_id = tree_unit_id(dat, spec["civIndex"], entity)
+            if tree_id not in present[bucket] or tree_id in unavailable[bucket]:
+                unavailable[bucket].append(entity["unitId"])
+    unavailable = {key: sorted(set(values)) for key, values in unavailable.items()}
     entry: dict[str, Any] = {
         "key": civ_spec["key"],
         "datIndex": spec["civIndex"],
@@ -1268,15 +1291,17 @@ def civilization_entry(
     # (10271 "Britons") and the offset of its computer-name table: the string
     # at the offset is the count, and the names follow (4401 "Henry V" ...).
     civ_list = dat_path.parent / "civilizations.json"
-    if strings and civ_list.is_file():
+    if civ_list.is_file():
         hashes["civilizations.json"] = sha256(civ_list)
         for civ in json.loads(civ_list.read_text())["civilization_list"]:
             if civ.get("tech_tree_name") != civ_spec["treeFile"].removesuffix(".json"):
                 continue
-            if civ.get("name_string_id") in strings:
+            entry["internalName"] = civ["internal_name"]
+            entry["hudStyle"] = civ["hud_style"]
+            if strings and civ.get("name_string_id") in strings:
                 entry["displayName"] = strings[civ["name_string_id"]]
             offset = civ.get("computer_name_string_table_offset")
-            if offset is not None and offset in strings and strings[offset].isdigit():
+            if strings and offset is not None and offset in strings and strings[offset].isdigit():
                 count = int(strings[offset])
                 entry["computerNames"] = [strings[offset + i] for i in range(1, count + 1) if offset + i in strings]
             break
@@ -1288,6 +1313,87 @@ def tree_nodes(dat_path: Path, spec: dict[str, Any]) -> list[dict[str, Any]]:
     tree_path = dat_path.parent / "CivTechTrees" / spec["civilization"]["treeFile"]
     tree = json.loads(tree_path.read_text())
     return tree["civ_techs_buildings"] + tree["civ_techs_units"]
+
+
+def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
+    """Resolve only source-addressed bonuses and their complete prerequisite graph.
+
+    IDs remain DAT IDs, including foreign/unsatisfied alternatives. Tree/team
+    effects are not tech IDs: reserved negative nodes make them initial effects.
+    No civilisation name, bonus value or farm-tech list is special-cased.
+    """
+    civ = dat.civs[civ_index]
+    tree = dat.effects[civ.tech_tree_id].effect_commands
+    disabled = {int(c.d) for c in tree if c.type == 102}
+    by_id = {t["techId"]: key for key, t in technologies.items()}
+    buildings = {e["id"]: key for key, e in entities.items()
+                 if e.get("category") == "building" and "skinOf" not in e}
+    triggers = {}
+    for uid, key in buildings.items():
+        unit = civ.units[uid]
+        if unit.building and unit.building.tech_id >= 0:
+            triggers.setdefault(unit.building.tech_id, []).append(key)
+        entities[key]["workRate"] = rounded(unit.bird.work_rate)
+    # Tree research cost/time commands: c=0 sets, c=1 adds. Unknown forms stay
+    # in the provenance report instead of silently enabling free research.
+    handled = {f"effect type {c.type}: a={c.a}, b={c.b}, c={c.c}, d={c.d}" for c in tree if c.type == 102}
+    for c in tree:
+        key = by_id.get(int(c.a))
+        if key is None or c.type not in (101, 103) or c.c not in (0, 1):
+            continue
+        tech = technologies[key]
+        if c.type == 101 and int(c.b) in RESOURCE_NAMES:
+            resource = RESOURCE_NAMES[int(c.b)]
+            value = tech["cost"].get(resource, 0)
+            tech["cost"][resource] = rounded(c.d if c.c == 0 else value + c.d)
+        elif c.type == 103:
+            tech["researchSeconds"] = rounded(c.d if c.c == 0 else tech["researchSeconds"] + c.d)
+        else:
+            continue
+        handled.add(f"effect type {c.type}: a={c.a}, b={c.b}, c={c.c}, d={c.d}")
+    ids = set(by_id) | set(triggers) | {
+        i for i, t in enumerate(dat.techs) if t.civ == civ_index
+        and not any(l.location_id >= 0 for l in t.research_locations)
+    }
+    pending = list(ids)
+    while pending:
+        for r in dat.techs[pending.pop()].required_techs:
+            if r >= 0 and r not in ids:
+                ids.add(r)
+                pending.append(r)
+    nodes = {}
+    for tid in sorted(ids):
+        tech = dat.techs[tid]
+        public = technologies.get(by_id.get(tid))
+        automatic = not any(l.location_id >= 0 or l.research_time > 0 for l in tech.research_locations)
+        free = public is not None and public["researchSeconds"] == 0 and not any(public["cost"].values())
+        effects, unmodelled, unreached = effects_of(dat, tid, entities, attribute_ids)
+        node = {
+            "key": by_id.get(tid, f"automatic-{tid}"),
+            "requiredTechs": [int(r) for r in tech.required_techs if r >= 0],
+            "requiredTechCount": int(tech.required_tech_count),
+            "automatic": automatic or free,
+            "effects": [] if public else effects,
+        }
+        if tid in disabled or tech.civ not in (-1, civ_index):
+            node["disabled"] = True
+        if tid in AGE_TECHS:
+            node["age"] = AGE_TECHS.index(tid)
+        if tid in triggers:
+            node["triggeredByBuildings"] = sorted(triggers[tid])
+        if free:
+            node["researchedAt"] = buildings[public["researchedAt"]]
+        if unmodelled or unreached:
+            node["unmodelled"] = sorted(set(unmodelled + unreached))
+        nodes[str(tid)] = node
+    for tid, eid in [(-1, civ.tech_tree_id), (-2, civ.team_bonus_id)]:
+        effects, unmodelled, unreached = effects_of(dat, 0, entities, attribute_ids, effect_id=eid)
+        if tid == -1:
+            unreached = [r for r in unreached if r not in handled]
+        nodes[str(tid)] = {"key": f"automatic-{tid}", "automatic": True,
+                           "requiredTechs": [], "requiredTechCount": 0, "effects": effects,
+                           "unmodelled": sorted(set(unmodelled + unreached))}
+    return {"treeEffectId": civ.tech_tree_id, "teamEffectId": civ.team_bonus_id, "nodes": nodes}
 
 
 def technologies_from_tree(
@@ -1321,7 +1427,9 @@ def technologies_from_tree(
     keep: dict[str, Any] = {}
     skipped: list[dict[str, str]] = []
     nodes = tree_nodes(dat_path, spec)
-    research_ids = {int(n["Node ID"]) for n in nodes if n["Node Type"] == "Research"}
+    disabled_techs = {int(c.d) for c in dat.effects[dat.civs[spec["civIndex"]].tech_tree_id].effect_commands
+                      if c.type == 102}
+    research_ids = {int(n["Node ID"]) for n in nodes if n.get("Node Type") == "Research"}
     for node in nodes:
         # A `UnitUpgrade` node is a technology too -- it just replaces one unit
         # with another rather than adding to it, and the tree names the
@@ -1329,8 +1437,8 @@ def technologies_from_tree(
         # civilisation's unique unit takes the same shape: the Elite Longbowman
         # is a `UniqueUnit` node carrying a `Trigger Tech ID`, where the plain
         # Longbowman is a `UniqueUnit` with none because it simply exists.
-        upgrade = node["Node Type"] in ("UnitUpgrade", "UniqueUnit") and node.get("Trigger Tech ID")
-        if node["Node Type"] != "Research" and not upgrade:
+        upgrade = node.get("Node Type") in ("UnitUpgrade", "UniqueUnit") and node.get("Trigger Tech ID")
+        if node.get("Node Type") != "Research" and not upgrade:
             continue
         name = node["Name"]
         tech_id = int(node["Trigger Tech ID"]) if upgrade else int(node["Node ID"])
@@ -1361,9 +1469,11 @@ def technologies_from_tree(
         commands = list(dat.effects[tech.effect_id].effect_commands) if tech.effect_id >= 0 else []
         # Heavy Warships (35) has no effect itself: automatic technologies
         # 911 and 246, whose sole prerequisite is 35, upgrade its ships.
-        for child in dat.techs:
+        for child_id, child in enumerate(dat.techs):
             if child.effect_id >= 0 and child.civ in (-1, spec["civIndex"]) \
+                    and child_id not in disabled_techs \
                     and not any(l.location_id >= 0 for l in child.research_locations) \
+                    and child.required_tech_count == 1 \
                     and {int(r) for r in child.required_techs if r >= 0} == {tech_id}:
                 commands.extend(dat.effects[child.effect_id].effect_commands)
         becomes = [
@@ -1679,6 +1789,7 @@ def extract(
     source: dict[str, Any],
     strings_path: Path | None = None,
     uhd_dir: Path | None = None,
+    _dat: DatFile | None = None,
 ) -> dict[str, Any]:
     """Everything the game reads off the owned data, as `content.json`.
 
@@ -1688,8 +1799,11 @@ def extract(
     """
     if spec.get("naval"):
         from naval import specs
-        spec = {**spec, "entities": [*spec["entities"], *specs()]}
-    dat = DatFile.parse(dat_path)
+        keys = {e["key"] for e in spec["entities"]}
+        spec = {**spec, "entities": [*spec["entities"], *(e for e in specs() if e["key"] not in keys)]}
+    dat = _dat if _dat is not None else DatFile.parse(dat_path)
+    from civilization_profiles import shared_combat_specs
+    spec = {**spec, "entities": [*spec["entities"], *shared_combat_specs(dat, spec)]}
     graphics = Graphics.of(graphics_dir, uhd_dir)
     hashes: dict[str, str] = {"dat": sha256(dat_path)}
     constants_path = dat_path.parent.parent / "xs/Constants.xs"
@@ -1710,6 +1824,8 @@ def extract(
         )
     for effect_spec in spec.get("effects", []):
         entities[effect_spec["key"]] = effect_entry(dat, graphics, effect_spec, hashes)
+    if "fish-trap" in entities:
+        entities["fish-trap"]["foodAmount"] = rounded(dat.civs[spec["civIndex"]].resources[88])
     import_drop_sites(dat_path, dat.civs[spec["civIndex"]].units, entities, hashes)
     # The particle definitions the buildings' fires name, from the directory
     # beside the DAT's.
@@ -1727,19 +1843,22 @@ def extract(
     technologies, skipped_technologies = technologies_from_tree(
         dat, dat_path, spec, entities, civilization, hashes, attribute_ids, strings
     )
+    bonuses = civilization_bonuses(dat, spec["civIndex"], entities, technologies, attribute_ids)
     by_tech_id = {value["techId"]: key for key, value in technologies.items()}
     by_unit_id = {value["id"]: value for value in entities.values() if value.get("category") in ("unit", "building")}
-    from naval import NAVAL_UNITS
-    naval_ids = {*NAVAL_UNITS.values(), 199}
+    # Explicit replacements inherit their tree node's age/requirements.
+    # Construction heads do not: early TC replacement has a separate count gate.
+    by_unit_id.update({row["treeUnitId"]: entities[row["key"]] for row in spec["entities"] if "treeUnitId" in row})
     for node in tree_nodes(dat_path, spec):
-        if node.get("Use Type") not in ("Unit", "Building") or int(node["Node ID"]) not in naval_ids:
+        if node.get("Use Type") not in ("Unit", "Building"):
             continue
         entity = by_unit_id.get(int(node["Node ID"]))
         if entity is None:
             continue
         entity["age"] = int(node["Age ID"]) - 1
-        if node["Node Type"] == "Unit":
-            requires = [by_tech_id[i] for i in node.get("Prerequisite IDs", []) if i in by_tech_id]
+        if node.get("Node Type") in ("Unit", "UniqueUnit"):
+            # Tree JSON pads prerequisite slots with zero; DAT tech slots use -1.
+            requires = [by_tech_id.get(i, f"dat-tech-{i}") for i in node.get("Prerequisite IDs", []) if i > 0]
             if requires:
                 entity["requires"] = requires
     palette_path = palettes_dir / "original.pal"
@@ -1777,7 +1896,7 @@ def extract(
         key: terrain_entry(dat, slot["terrainId"], palette)
         for key, slot in spec.get("terrain", {}).items()
     }
-    return {
+    result = {
         "terrain": terrain,
         "water": water_presets(dat_path, hashes),
         "shadows": shadow_profile(dat_path, hashes),
@@ -1800,15 +1919,14 @@ def extract(
         "ages": ages_of(dat_path, strings),
         "audio": spec.get("audio", {}),
         "civilization": civilization,
-        # Complete additional player profiles. The catalogue contract is in
-        # place; source-verified roster/art/bonus imports must populate it before
-        # another civilisation is offered (#122/#123).
+        # Independent profiles are populated below, including profile-local bonuses.
         "civilizations": {},
         # Complete named initial table, including attributes whose mechanics
         # are not yet modelled. IDs and source hash keep each value traceable.
         "playerAttributes": attributes,
         "playerAttributeIds": attribute_ids,
         "technologies": technologies,
+        "civilizationBonuses": bonuses,
         "particles": particles,
         # The reference's own words for a refused order (issue #70): the
         # strings file's 3001-3005, shown when a button is pressed that the
@@ -1832,6 +1950,7 @@ def extract(
                 ("returnToMap", "IDS_RETURN_TO_MAP"), ("leaveMap", "IDS_LEAVE_MAP"), ("close", 10824),
                 # Map setup labels and the three shipped random-map names (#144).
                 ("mapType", 9691), ("mapSeed", 10658), ("startGame", 9472),
+                ("civilization", "IDS_MPS_CIVILIZATION"),
                 ("gameSettings", 9682), ("randomSeed", 10107),
                 ("mapArabia", 10875), ("mapBlackForest", 10878), ("mapIslands", 10885),
             )
@@ -1851,6 +1970,20 @@ def extract(
         },
         "entities": entities,
     }
+    if "profileCivilizations" in spec:
+        from civilization_profiles import catalogue, profile_spec
+        rows = catalogue(dat, dat_path, spec, hashes, strings, attribute_ids)
+        result["civilizationCatalog"] = rows
+        for key in spec["profileCivilizations"]:
+            if key == civilization["key"]:
+                continue
+            profile = extract(dat_path, graphics_dir, palettes_dir, profile_spec(spec, rows[key]),
+                              source, strings_path, uhd_dir, _dat=dat)
+            profile["civilization"]["enabled"] = rows[key]["enabled"]
+            result["civilizations"][key] = profile
+            result["particles"].update(profile["particles"])
+            hashes.update(profile["source"]["sha256"])
+    return result
 
 
 def main() -> None:
@@ -1866,15 +1999,23 @@ def main() -> None:
     parser.add_argument("--strings", type=Path,
                         default=content / "resources/en/strings/key-value/key-value-strings-utf8.txt")
     parser.add_argument("--spec", type=Path, default=Path(__file__).with_name("import-spec.json"))
+    parser.add_argument("--profiles", nargs="+", help="additional base-era profile keys, or 'base' for all; does not enable them")
     parser.add_argument("--source", type=Path, default=Path(__file__).with_name("aoe2-source.json"))
     parser.add_argument("--out", type=Path, default=Path(".local/aoe2de/content.json"))
     args = parser.parse_args()
-
+    spec = json.loads(args.spec.read_text())
+    if args.profiles is not None:
+        requested = set(args.profiles)
+        if "base" in requested:
+            requested.remove("base")
+            definitions = json.loads((args.dat.parent / "civilizations.json").read_text())["civilization_list"]
+            requested.update(row["tech_tree_name"].lower() for row in definitions[1:] if row.get("era") == "base")
+        spec["profileCivilizations"] = sorted(requested)
     result = extract(
         args.dat,
         args.graphics,
         args.palettes,
-        json.loads(args.spec.read_text()),
+        spec,
         json.loads(args.source.read_text()),
         args.strings,
         uhd_dir=args.uhd_graphics,

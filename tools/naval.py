@@ -35,7 +35,7 @@ def graphic_layers(dat, graphic_id, x=0, y=0, seen=()):
     if graphic is None:
         return []
     layers = []
-    if graphic.file_name not in (None, "", "None", "W", "X") and not (graphic.slp < 0 and graphic.deltas):
+    if graphic.file_name not in (None, "", "None", "W", "X", "M") and not (graphic.slp < 0 and graphic.deltas):
         layers.append((graphic_id, x, y))
     for delta in graphic.deltas or []:
         layers.extend(graphic_layers(dat, delta.graphic_id, x + delta.offset_x,

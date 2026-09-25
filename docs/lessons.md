@@ -243,6 +243,10 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 - **A probe that stages state asserts the page resumed it**, and imports the
   snapshot version from the loader rather than copying it. A silently
   declined snapshot photographs an ordinary opening.
+- **Serve large fixture manifests over private HTTP, not CDP interception.**
+  The two-profile atlas manifest exceeded Chrome's 100 MiB DevTools message
+  buffer after base64 encoding; the only surfaced error was “frame got detached”.
+  A private Vite middleware serving gzip retained the full fixture and fixed it.
 - **A timeout under a CPU-bound job is contention before it is a
   regression**; and a green run can exit 1 when the worker's RPC starves
   (`src/test-setup.ts` yields a macrotask after each test for that).

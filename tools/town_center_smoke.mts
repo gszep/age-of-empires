@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
 import puppeteer from 'puppeteer';
 import { createServer } from 'vite';
-import { createGame, placementLegal } from '../src/sim/game.ts';
+import { activateAutomaticTechnologies, createGame, placementLegal } from '../src/sim/game.ts';
+import { buildingRulesFor } from '../src/sim/rules.ts';
 import { FALLBACK_RULES, rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 
@@ -19,8 +21,17 @@ if (manifest && process.env.TC_CONTENT) {
   Object.assign(manifest.entities['town-center'], { build: fresh.build, cost: fresh.cost });
 }
 const rules = manifest ? rulesFromManifest(manifest) : FALLBACK_RULES;
+const override = manifest && process.env.TC_CONTENT ? gzipSync(JSON.stringify(manifest)) : undefined;
 const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
-  name: 'town-center-preview-probe', enforce: 'pre', transform(code, id) {
+  name: 'town-center-preview-probe', enforce: 'pre',
+  configureServer(server) {
+    if (!override) return;
+    server.middlewares.use((req, res, next) => {
+      if (req.url?.split('?')[0] !== '/imported/aoe2/manifest.json') return next();
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' });
+      res.end(override);
+    });
+  }, transform(code, id) {
     if (!id.endsWith('/src/main.ts')) return;
     const anchor = 'renderer.setAnimationLoop(now => {';
     assert(code.includes(anchor));
@@ -47,6 +58,8 @@ try {
     state.entities = state.entities.filter(e => e.owner !== 0);
     state.terrain.fill(0); state.elevation.fill(0);
     state.players[1].age = age;
+    activateAutomaticTechnologies(state);
+    const paidWood = buildingRulesFor(state, 1, 'town-center').cost.wood;
     state.players[1].wood = state.players[1].stone = 2000;
     const home = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
     const worker = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
@@ -58,14 +71,6 @@ try {
     await page.setViewport({ width: 1280, height: 800 });
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(String(error)));
-    if (manifest) {
-      await page.setRequestInterception(true);
-      page.on('request', request => {
-        if (new URL(request.url()).pathname === '/imported/aoe2/manifest.json') {
-          void request.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(manifest) });
-        } else void request.continue();
-      });
-    }
     await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),
       { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });
     await page.goto('http://127.0.0.1:5247/?solo=1', { waitUntil: 'domcontentloaded' });
@@ -112,7 +117,7 @@ try {
     const placed = await query({ type: 'snapshot' });
     const site = placed.entities.find((e: any) => e.kind === 'town-center' && e.owner === 1 && e.buildProgress !== undefined);
     assert(site, `age ${age}: button and map click placed a foundation`);
-    assert.equal(placed.players[1].wood, 1725);
+    assert.equal(placed.players[1].wood, 2000 - paidWood);
     assert.equal(placed.players[1].stone, 1900);
     const cap = placed.players[1].populationCap;
     if (age === 0) {

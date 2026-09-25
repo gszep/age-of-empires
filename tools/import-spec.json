@@ -1,6 +1,16 @@
 {
   "schemaVersion": 3,
   "civIndex": 1,
+  "profileCivilizations": ["franks"],
+  "enabledCivilizations": ["franks"],
+  "combatRoster": [
+    { "unitId": 5 },
+    { "unitId": 36 },
+    { "unitId": 281 },
+    { "unitId": 531 },
+    { "unitId": 569 },
+    { "unitId": 2628, "composite": true, "decay": false }
+  ],
   "civilization": {
     "key": "britons",
     "treeFile": "BRITONS.json"
@@ -2045,6 +2055,7 @@
         "train"
       ],
       "unitId": 35,
+      "treeUnitId": 1258,
       "category": "unit",
       "animations": {
         "idle": {

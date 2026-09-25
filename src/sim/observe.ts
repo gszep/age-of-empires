@@ -1,11 +1,12 @@
 import { TICK_SECONDS } from './data';
 import { isEntityVisible } from './visibility';
 import { isAnimal, isUnit } from './data';
-import type { Entity, GameState, PlayerId } from './types';
+import type { BuildingKind, Entity, GameState, PlayerId } from './types';
+import { buildingRulesFor } from './rules';
 import type { ObservedEntity, PlayerObservation, RememberedEntityObservation } from '../protocol/types';
 import { PROTOCOL_VERSION } from '../protocol/types';
 
-function observeEntity(entity: Entity, player: PlayerId): ObservedEntity {
+function observeEntity(state: GameState, entity: Entity, player: PlayerId): ObservedEntity {
   const observed: ObservedEntity = {
     id: entity.id,
     kind: entity.kind,
@@ -34,10 +35,14 @@ function observeEntity(entity: Entity, player: PlayerId): ObservedEntity {
       observed.carrying = load;
     }
     if (entity.garrison?.length) observed.garrisoned = entity.garrison.length;
+    // Production clocks hold remaining work. Agents need game-time seconds,
+    // including the owner's active production/research speed modifiers.
+    const workRate = entity.training || entity.researching
+      ? buildingRulesFor(state, entity.owner, entity.kind as BuildingKind).workRate ?? 1 : 1;
     if (entity.training) {
       observed.training = {
         kind: entity.training.kind,
-        remainingSeconds: Math.round(entity.training.remainingTicks * TICK_SECONDS * 100) / 100,
+        remainingSeconds: Math.round(entity.training.remainingTicks / workRate * TICK_SECONDS * 100) / 100,
       };
     }
     // What it is researching, on the same terms. A strategy that cannot see
@@ -46,7 +51,7 @@ function observeEntity(entity: Entity, player: PlayerId): ObservedEntity {
     if (entity.researching) {
       observed.researching = {
         tech: entity.researching.tech,
-        remainingSeconds: Math.round(entity.researching.remainingTicks * TICK_SECONDS * 100) / 100,
+        remainingSeconds: Math.round(entity.researching.remainingTicks / workRate * TICK_SECONDS * 100) / 100,
       };
     }
   }
@@ -63,7 +68,7 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
     if ((entity.dead && !(isAnimal(entity.kind) && (entity.amount ?? 0) > 0))
       || !isEntityVisible(state, player, entity)) continue;
     visibleIds.add(entity.id);
-    entities.push(observeEntity(entity, player));
+    entities.push(observeEntity(state, entity, player));
   }
   const memory: RememberedEntityObservation[] = Object.values(visibility.memory)
     .filter(remembered => !visibleIds.has(remembered.id))
