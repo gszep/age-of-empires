@@ -85,7 +85,7 @@ describe('the grown map', () => {
       }
       // Gold's widest band is 35 per axis; grouping can spill a couple of
       // tiles past the box the seed tile was drawn from.
-      const start = { x: 30, y: 60 };
+      const start = state.entities.find(e => e.kind === 'town-center' && e.owner === 1)!.position;
       for (const e of state.entities) {
         if (e.kind !== 'resource' || e.resourceKind !== 'gold') continue;
         if (e.position.x > state.width / 2) continue; // player 1's half
@@ -104,7 +104,8 @@ describe('the grown map', () => {
       const state = createGame(seed, FALLBACK_RULES);
       for (const e of state.entities) {
         if (e.kind !== 'resource' || e.resourceKind !== 'food' || e.position.x > 60) continue;
-        furthest = Math.max(furthest, Math.hypot(e.position.x - 30.5, e.position.y - 60.5));
+        const start = state.entities.find(e => e.kind === 'town-center' && e.owner === 1)!.position;
+        furthest = Math.max(furthest, Math.hypot(e.position.x - start.x, e.position.y - start.y));
       }
     }
     expect(furthest).toBeGreaterThan(13.5);
@@ -293,7 +294,10 @@ describe('black forest', () => {
     const state = createGame(7, FALLBACK_RULES, undefined, 'black-forest');
     const trees = state.entities.filter(
       e => e.kind === 'resource' && e.resourceKind === 'wood').length;
-    expect(trees).toBeGreaterThan(8000);
+    // The source allocates 44% to clearings; cleaning and the road consume
+    // slightly more. The old >8000 asserted the undersized clearing bug.
+    expect(trees / (state.width * state.height)).toBeGreaterThan(0.5);
+    expect(trees / (state.width * state.height)).toBeLessThan(0.56);
     const [home, enemy] = towncenters(state);
     const grid = buildNavGrid(state);
     expect(reachable(grid, home, enemy)).toBe(true);

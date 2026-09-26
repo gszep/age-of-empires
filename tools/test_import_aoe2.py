@@ -55,6 +55,12 @@ def _dat():
 
 
 class CivilizationAuditTest(unittest.TestCase):
+    @unittest.skipUnless((ROOT / 'depot_813784/resources/_common/drs/gamedata_x2/Arabia.rms').exists(), 'owned RMS unavailable')
+    def test_relic_reference_matches_owned_tiny_standard_branches(self):
+        from relic_reference import extract as relic_reference
+        checked_in = Path(__file__).parent.parent / 'src/sim/refdata/relic-placement.json'
+        self.assertEqual(relic_reference(ROOT), json.loads(checked_in.read_text()))
+
     def test_prerequisite_choices_and_disabled_slots_are_distinct(self):
         choice = prerequisites(SimpleNamespace(required_techs=(1, 2, 3, -1), required_tech_count=2))
         self.assertEqual(choice, {"ids": [1, 2, 3], "count": 2, "choice": True, "unsatisfiedSlots": False})

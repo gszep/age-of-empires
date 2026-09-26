@@ -34,12 +34,19 @@ describe.skipIf(!owned)('owned Siphons outcomes', () => {
     const entry = Object.entries(s.rules.technologies).find(([, t]) => t.techId === 909);
     expect(entry, 'Siphons must be offered by the published Briton profile').toBeDefined();
     const [key, tech] = entry!;
-    const ship = unit('fire-ship', 1, 40, 40);
-    const target = unit('galley', 2, 43, 40), nearby = unit('galley', 2, 43, 40.8);
-    const relic = addRelic(s, { x: 43, y: 40.5 });
     expect(applyCommand(s, { kind: 'research', player: 1, buildingId: university.id, tech: key })).toEqual({ ok: true });
     run(s, tech.researchSeconds * 20 + 1);
     expect(s.players[1].researched).toContain(key);
+    // Stage the combat after research, so the ships do not spend the entire
+    // research interval fighting and separating before the measured shot.
+    const ship = unit('fire-ship', 1, 40, 40);
+    // A shore target leaves the neighbouring ship strictly inside splash.
+    // Two radius0.5 galleys separate to exactly1 tile, the splash boundary;
+    // floating-point tie direction must not decide this damage assertion.
+    s.terrain = s.terrain.slice(); s.terrain[40 * s.width + 43] = 0;
+    const target = unit('villager', 2, 43.5, 40.5), nearby = unit('galley', 2, 43.5, 41.4);
+    const relic = addRelic(s, { x: 43, y: 40.5 });
+    run(s, 1);
     expect(applyCommand(s, { kind: 'order', player: 1, entityIds: [ship.id], target: target.position, targetId: target.id }).ok).toBe(true);
     for (let i = 0; i < 100 && !s.projectiles.some(p => p.art === 'fire-charge'); i++) stepGame(s);
     expect(s.projectiles.filter(p => p.art === 'fire-charge')).toHaveLength(1);

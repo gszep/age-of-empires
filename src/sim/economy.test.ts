@@ -2503,15 +2503,14 @@ describe('the technology tree', () => {
   it.skipIf(!importedRules)('town watch makes a building see further (issue #29)', () => {
     // Measured at the outcome -- the tile the player can see -- not at the
     // rules table, because #26 proved a lookup can be right while nothing
-    // reads it. On seed 51 the town center stands at (30,60) with 8 tiles of
-    // sight and its villagers to the east; tile (20,60) is ~9.5 tiles west,
-    // beyond base sight, inside the +4 Town Watch grants, and away from
-    // anything that wanders.
+    // reads it. Probe 9.5 tiles west of the actual home, beyond its base8
+    // sight and inside Town Watch's +4, away from the eastern starting units.
     const state = createGame(51, importedRules!);
     state.players[1].age = state.rules.technologies['town-watch'].requiresAge;
     const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const west = { x: Math.floor(tc.position.x) - 10, y: Math.floor(tc.position.y) };
     stepGame(state);
-    expect(isTileVisible(state, 1, 20, 60)).toBe(false);
+    expect(isTileVisible(state, 1, west.x, west.y)).toBe(false);
     Object.assign(state.players[1], { food: 9000, wood: 9000, gold: 9000, stone: 9000 });
     expect(applyCommand(state, {
       kind: 'research', player: 1, buildingId: tc.id, tech: 'town-watch',
@@ -2521,7 +2520,7 @@ describe('the technology tree', () => {
     }
     expect(state.players[1].researched).toContain('town-watch');
     stepGame(state);
-    expect(isTileVisible(state, 1, 20, 60)).toBe(true);
+    expect(isTileVisible(state, 1, west.x, west.y)).toBe(true);
   });
 
   it.skipIf(!importedRules)('replays identically across town watch', () => {
@@ -2798,7 +2797,10 @@ describe('the built-in strategy', () => {
     // An age nothing uses is a number. Reaching the Feudal Age and then
     // fielding Dark Age militia for the rest of the match is most of it wasted.
     const state = createGame(1, importedRules ?? FALLBACK_RULES);
-    Object.assign(state.players[1], { food: 900, wood: 900, gold: 400 });
+    // Age spending is tested above. Start this acceptance at the unlock:
+    // corrected RMS start spacing changes the time spent buying early camps
+    // (seed1 had no range by6min, recorded in #124), not the unlock behavior.
+    Object.assign(state.players[1], { food: 900, wood: 900, gold: 400, age: 1 });
     // The range needs a barracks, in AoE2 and here: its tree node links to
     // one. Stand it up rather than waiting out the economy that buys it.
     const barracksRules = state.rules.buildings.barracks;

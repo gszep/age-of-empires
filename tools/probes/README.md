@@ -14,6 +14,12 @@ These scripts live directly under `tools/` and start private Vite/browser
 fixtures. Run `npx tsx tools/<name>.mts`; they supplement the gate's general
 browser smoke and are maintained regression tools.
 
+- **`relic_placement_smoke.mts`** — generated Islands seed 130, untouched terrain,
+  resources and relic positions, staged Castle-age monk/monastery/transport.
+  Real right-click pickup of a home relic and the fifth relic on resource land20;
+  public outward/return transport, deposits and 60 gold/minute. Shares the journey
+  with `relic-journey.test.ts`, which also checks JSON continuation throughout.
+
 - **`civilization_rules_smoke.mts`** — private synthetic second profile through
   the real owned-manifest loader: resumed mixed sides, owner-specific command
   prices, forbidden unit/research filtering, actual training HP, and real house

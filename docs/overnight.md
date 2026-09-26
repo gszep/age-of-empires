@@ -94,5 +94,5 @@ Named here so a run does not re-derive the reason; each has an issue.
 - **The monk's occlusion contour** (#119) — its outline layers fail the
   decoder's walk invariant; guessing would undo what makes the decoder
   trustworthy.
-- **Relics** (#130) and **the wonder's victory** (#110) — mechanics the
-  human has not asked for; a relic today would be invisible scenery.
+- **The wonder's victory** (#110) — decision pending. Relics now have art,
+  collection/deposit/income and map placement; their remaining calibration is #130.

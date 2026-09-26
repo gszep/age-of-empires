@@ -96,8 +96,28 @@ published-asset browser verified all five research buttons, payments, live Spies
 price/reveal and original charge impact feedback (729 changed sRGB pixels), in
 `.local/britons-final-research-browser.log`; the full import completed in
 `.local/britons-final-import.log`. Coverage is in `civilization-coverage.md`;
-source/engine inferences remain in `ledger.md`. Other-map relic placement and
-Regicide/Treason remain outside this Briton random-map acceptance.
+source/engine inferences remain in `ledger.md`. Regicide/Treason remains outside
+this Briton random-map acceptance.
+
+The shared relic-placement follow-up consumes a numeric source contract in
+`src/sim/refdata/relic-placement.json`, checked against the owned RMS by
+`tools/relic_reference.py`: Arabia five (one central, two/player), Black Forest
+four (two/player), Islands five (two/player plus land20). It corrects BF's
+44%-of-map clearing quota, Arabia's 32–34% start radius, and generates the two
+tiny Islands resource islets with their gold/stone groups. Land IDs persist;
+constraints are never relaxed to meet counts. Authored maps explicitly use an
+authored five-relic policy. Fifty seeds per RMS map pass count/distance/metric,
+forest/edge/land-zone/path and islet-connectivity/separation checks; all six maps
+pass deterministic initialization and JSON continuation. Cliffs remain absent,
+and exact native RNG, actor rasterization and land-growth parity remain inferred.
+`tools/relic_placement_smoke.mts` completed the generated Islands seed 130 home
+collection and transport of the fifth relic through two real relic right-clicks,
+public boarding/unloading, deposits and 60 gold/minute at tick 5500. The matching
+Node journey checks JSON replay parity throughout. Salmon and neritic fish remain
+#95; relic reference-calibration boundaries remain #130.
+Final follow-up gate: **929 Vitest tests / 72 files, build, 125 owned-import
+tests and real-browser debug smoke**, all GREEN in
+`.local/relic-placement-gate-r3.log`. One worker, unchanged test timeouts.
 
 **Simulation** (`src/sim`, authoritative, fixed 20 Hz tick, deterministic):
 integer resources with gathering, drop-off and depletion; building placement,
@@ -440,7 +460,7 @@ straight to the canvas. Nor the ground's scatter and layer (#55).
 
 Other civilisations (#122) and their bonuses (#123); selectable formations;
 campaigns; public multiplayer;
-diplomacy; relics (#130); stone walls; a genetic-algorithm framework;
+diplomacy; a genetic-algorithm framework;
 separate mobile gameplay. Skipped technologies are recorded individually, each
 with its reason in the manifest's `skippedTechnologies` (#128). The open
 fallback stops at the Castle Age (#125).

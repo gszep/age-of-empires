@@ -1,12 +1,49 @@
-# Handoff — verified Briton gameplay
+# Handoff — shared relic placement
 
 ## Completed task
 
-The user's latest assignment was **“work on finishing the britons.”** Briton
-playable/random-map acceptance is recorded in closed issue **#179**, with the
-shared limitations below. Do not resume the earlier all-civilisation run or
-enable more profiles without a new assignment. Britons and Franks remain the
-only enabled owned profiles; Franks' completion issue is separate.
+The continuing shared-limit assignment is **source-backed relic placement**, with
+exclusive serial main-tree authority and explicit commit/push authorization.
+No agents were spawned. Briton playable/random-map acceptance remains recorded
+in closed issue **#179**; do not resume the all-civilisation run. Britons and
+Franks remain the only enabled owned profiles.
+
+## Relic placement follow-up
+
+- Numeric RMS reference data is in `src/sim/refdata/relic-placement.json`.
+  `tools/relic_reference.py` deterministically extracts the narrow tiny/two-player/
+  standard-mode branches; an owned import test compares every field. Both content
+  modes consume this checked-in contract; no manifest key or asset import changed.
+- Arabia: one central + two/player. Replaced the arbitrary central x-strip with
+  an explicit neutral actor-area approximation and source distances/flags. Starts
+  now use the source 32–34% radius; old 60-tile separation made the central 32-tile
+  box exclusion infeasible inside the source neutral area.
+- Black Forest: two/player at 24-tile distance/spacing. Fixed 44% clearing area
+  (3168/player at 120×120), rather than relaxing relic distances.
+- Islands: two/player with 18–26 box distance and 8 spacing, plus the fifth on
+  land 20. Tiny has **two**, not four, resource islets: lands 20/23, zones 56/57,
+  1% each, gold 2×3 and stone 2. Named land IDs survive generation and JSON saves.
+- Windsor/Senlac/painted-proof: explicitly authored five-accessible-relic policy.
+- Fifty seeds per RMS map pass placement/path/zone/forest/edge constraints and
+  islet connectivity/avoidance. Six maps pass deterministic creation/JSON
+  continuation. The full Islands journey checks JSON replay parity throughout.
+- `npx tsx tools/relic_placement_smoke.mts` passed with published owned assets:
+  generated Islands seed 130, staged monk/monastery/transport, untouched geography
+  and relics, two real right-click pickups, home deposit, outward transport,
+  fifth-relic return/deposit and 60 gold/minute, ending tick 5500.
+- Exact native actor rasterization, start variance 6 jitter, RNG and land-phase
+  order are not claimed. The mirrored generator reserves islets before homes;
+  omitted islet base_size 3 remains inferred. Cliffs are absent (#134), not
+  inferred from elevation. All details are in `docs/ledger.md`; #130 retains
+  reference-calibration boundaries, #95 retains salmon/neritic fish.
+- Gate regression evidence: the changed map exposed a fixed Town Watch tile,
+  a synthetic beach-only rule applied before generating its arena, and a splash
+  fixture at an exact floating-point boundary. Fixtures now test their intended
+  preconditions. No simulation mechanics outside placement changed. The AI's
+  seed-1 Dark-Age-to-range pacing gap is recorded on #124: Feudal by tick 4800,
+  280 wood at tick 7200, but camp/house construction still preempts the range.
+  Its unlock test now starts in Feudal; age research is tested separately.
+  No test clock was widened.
 
 Pushed implementation checkpoints:
 
@@ -23,7 +60,14 @@ is in `docs/reviews/2026-09-24-issue58.md` and `0458053:docs/handoff.md`.
 
 ## Verification
 
-**Final gate GREEN:** `.local/britons-final-gate-r1.log`: **906 Vitest tests /
+**Relic-placement gate GREEN:** `.local/relic-placement-gate-r3.log`, exit 0:
+**929 Vitest tests / 72 files**, production build, **125 owned-import tests**,
+real-browser debug smoke. One worker; no widened test clocks. The private
+relic journey passed separately with owned art. The second gate attempt was
+stopped before an additional zero-seed normalization regression check; the
+third gate covers that final tree. No source edits followed its start.
+
+**Previous Briton gate GREEN:** `.local/britons-final-gate-r1.log`: **906 Vitest tests /
 70 files**, production build, **124 owned-import tests**, real-browser debug
 smoke. One Vitest worker; no test timeout widened. Source/test changes preceded
 the run; subsequent documentation-only edits do not invalidate it.
@@ -53,8 +97,8 @@ Warwolf and targets inside, rather than exactly on, the splash boundary.
 
 ## Explicit limitations
 
-- **Relics:** Arabia places five through a documented RMS-zone approximation.
-  Other-map placement remains #130/#95. No relic/wonder victory was added;
+- **Relics:** map placement and collection/transport are covered above; native
+  generator calibration remains #130. No relic/wonder victory was added;
   wonder presentation/countdown belongs to #110.
 - **Market/tribute:** fees are DAT-backed; price bases, movement, bounds and
   rounding are documented engine inferences. The compact tribute page is not

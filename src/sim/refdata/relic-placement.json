@@ -1,0 +1,20 @@
+{
+  "neutral": { "landId": 420, "radiusFraction": 0.2, "actorRadius": 3 },
+  "arabia": {
+    "startRadius": { "min": 32, "max": 34, "variance": 6 },
+    "central": { "count": 1, "minStart": 32, "spacing": 24, "forest": 1, "cliff": 1, "edge": 4, "zoneDistance": 1, "actorRadius": 2, "spacerRadius": 26 },
+    "player": { "count": 2, "minStart": 32, "spacing": 24, "forest": 1, "cliff": 2, "edgeScaled": 8, "zoneDistance": 4, "circular": true, "requirePath": true, "closest": true }
+  },
+  "black-forest": {
+    "player": { "count": 2, "minStart": 24, "spacing": 24, "forest": 1, "cliff": 2, "edge": 2, "zoneDistance": 4, "circular": true, "excludeNeutral": true, "closest": true },
+    "land": { "percent": 44, "baseSize": 14, "clumping": 2, "clearance": 6 }
+  },
+  "islands": {
+    "player": { "count": 2, "minStart": 18, "maxStart": 26, "spacing": 8, "forest": 2, "cliff": 3, "circular": false, "closest": false },
+    "extra": { "count": 1, "landId": 20 },
+    "islets": [
+      { "landId": 20, "zone": 56, "percent": 1, "border": 30, "fuzziness": 10, "clearance": 7, "resource": "gold", "groups": 2, "count": 3, "spread": 2 },
+      { "landId": 23, "zone": 57, "percent": 1, "border": 30, "fuzziness": 10, "clearance": 7, "resource": "stone", "groups": 1, "count": 2, "spread": 2 }
+    ]
+  }
+}

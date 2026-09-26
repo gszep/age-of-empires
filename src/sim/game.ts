@@ -20,7 +20,8 @@ import { applyMarketCommand } from './market';
 import { beginProjectileImpact, fireChargeOf, rechargeFireCharge, releaseFireCharge } from './fire-charge';
 import { relicOrder, transferRelic, releaseRelics, updateRelicIncome } from './relics';
 import { conversionWindow, rechargeFaith, spendConversionFaith } from './monastery';
-import { placeArabiaRelics } from './relic-placement';
+import { placeMapRelics } from './relic-placement';
+import relicReference from './refdata/relic-placement.json';
 import { createVisibility, isEntityVisible, updateVisibility } from './visibility';
 import type {
   AnimalKind, BuildingKind, Command, Entity, GameState, Order, PlayerId, Point, Projectile, ResourceKind,
@@ -111,6 +112,11 @@ export function createGame(
   const width = descriptor.baked?.width ?? MAP_TILES;
   const height = descriptor.baked?.height ?? MAP_TILES;
   const start = startFor(width, height);
+  if (map === 'arabia') {
+    const radius = relicReference.arabia.startRadius;
+    const rng = { seed: seedFrom((seed || 1) ^ 0x57a47) };
+    start.x = Math.round(width * (0.5 - (radius.min + Math.floor(random01(rng) * (radius.max - radius.min + 1))) / 100));
+  }
   const state: GameState = {
     rules, seed: seedFrom(seed || 1), matchSeed: seedFrom(seed || 1), tick: 0, nextId: 1, width, height,
     entities: [], projectiles: [], terrain: [], elevation: [],
@@ -152,7 +158,7 @@ export function createGame(
       addEntity(state, landmark.kind, 0, { x: landmark.x, y: landmark.y }, rules.units[landmark.kind]);
     }
   }
-  const { terrain, elevation } = generateMap(
+  const { terrain, elevation, landIds } = generateMap(
     {
       rng: state, width: state.width, height: state.height,
       nodes: rules.nodes,
@@ -165,8 +171,9 @@ export function createGame(
     descriptor, [start, mirror(start)], mirror,
   );
   state.terrain = terrain;
+  state.landIds = landIds;
   state.elevation = elevation;
-  if (map === 'arabia') placeArabiaRelics(state);
+  placeMapRelics(state, map, landIds);
   for (const home of state.entities) {
     if (home.kind === 'town-center' && home.owner !== 0) {
       levelStartingFootprint(state, home.position, buildingFootprint(state, home.kind, 'x', home.owner));

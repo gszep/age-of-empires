@@ -10,6 +10,14 @@ public/imported/ browser-ready local atlases/manifests
 
 No Steam credentials, Steam configuration, DAT files, SLD files, or converted Microsoft assets belong in this repository.
 
+`uv run --locked python tools/relic_reference.py` extracts the tiny two-player
+standard-mode relic policy from the owned RMS and includes. The checked-in
+numeric contract is `src/sim/refdata/relic-placement.json`; the owned import
+suite compares it to the extractor result. Open and owned profiles consume the
+same source values. It does not regenerate/publish an asset manifest or implement
+a general RMS interpreter. Generator adapters and authored-map policy are
+explicitly separated from source values in `docs/ledger.md`.
+
 See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matched SteamCMD downloads and source paths on macOS, Linux, and Windows/WSL2. `tools/depot.py` resolves the depot root — `AOE2DE_DEPOT_ROOT` first, then the usual SteamCMD/Steam download locations — for both `npm run import:aoe2` and the integration tests.
 
 ## Pipeline

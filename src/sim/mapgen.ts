@@ -22,6 +22,7 @@ import type { NodeKind } from './data';
 import paintedProof from './maps/painted-proof.json';
 import senlac from './maps/senlac.json';
 import windsor from './maps/windsor.json';
+import relicReference from './refdata/relic-placement.json';
 import { FALLBACK_RULES, OPEN_WATER_TERRAINS } from './data';
 import { random01, seedFrom } from './random';
 import type { AnimalKind, BuildingKind, Point, UnitKind } from './types';
@@ -218,7 +219,7 @@ export interface MapDescriptor {
    * `left/right/top/bottom_border`, a percentage of the map the land keeps
    * from every edge. */
   land?: {
-    tiles: number; baseSize: number; clearance: number; clumping?: number; border?: number;
+    percent: number; baseSize: number; clearance: number; clumping?: number; border?: number;
     /** `border_fuzziness`: how softly the land meets its limits, as the
      * width in tiles over which a tile's chance of being taken fades from
      * all to none. A hard limit cuts a coast dead straight. */
@@ -237,6 +238,7 @@ export interface MapDescriptor {
    * two terrains are what it leaves.
    */
   waterMasking?: { rim: number };
+  resourceIslets?: typeof relicReference.islands.islets;
   /**
    * DE's fish (`GeneratingObjects.inc`, `GNR_STANDARDFISH`, which Islands
    * defines): `MELKARYBA`, the shore fish (69), as many as fit along
@@ -351,10 +353,10 @@ export const BLACK_FOREST: MapDescriptor = {
     { ground: 'forest', levels: [{ chance: 100, rise: 5, tiles: 1024, clumps: 32 }] },
   ],
   // The owned script's own numbers: `create_player_lands` at land_percent 44
-  // shared across both players (~1580 tiles each on this board), a circular
+  // shared across both players (3168 tiles each on a 120-square board), a circular
   // base of 14, clumping_factor 2 -- a round core with a soft ragged fringe --
   // and 6 tiles of avoidance to the other land's zone.
-  land: { tiles: 1580, baseSize: 14, clearance: 6, clumping: 2 },
+  land: relicReference['black-forest'].land,
   road: { width: 3 },
   opening: ARABIA.opening,
 };
@@ -370,12 +372,13 @@ export const BLACK_FOREST: MapDescriptor = {
  * `MED_WATER` (23) beyond; woods (`WOODIES`) at
  * `spacing_to_other_terrain_types 3` from anything else, so they stand
  * back from the coast; the opening from the same include. The script's
- * resource islets (`land_id 20-23`, 1% each) are not dealt.
+ * tiny-map resource islets are lands20/23 at1% each, carrying bonus resources.
  */
 export const ISLANDS: MapDescriptor = {
   base: 'water',
   biomes: ARABIA_BIOMES,
-  land: { tiles: 2520, baseSize: 15, clearance: 11, clumping: 22, border: 7, fuzziness: 11 },
+  land: { percent: 35, baseSize: 15, clearance: 11, clumping: 22, border: 7, fuzziness: 11 },
+  resourceIslets: relicReference.islands.islets,
   woodShoreSpacing: 3,
   waterMasking: { rim: 5 },
   fish: { shore: { spacing: 6 }, deep: [{ tiles: 6, spacing: 4, nearLand: 4 }, { tiles: 170, spacing: 8, nearLand: 4 }] },
@@ -705,7 +708,7 @@ function paintBiome(
 export function generateMap(
   ctx: MapgenContext, descriptor: MapDescriptor, starts: Point[],
   mirror: (p: Point) => Point,
-): { terrain: number[]; elevation: number[] } {
+): { terrain: number[]; elevation: number[]; landIds: number[] } {
   // One biome per match, rolled before anything is laid so the base ground is
   // already the biome's own. A baked survey board names no biomes: its ground
   // is the geography.
@@ -723,6 +726,7 @@ export function generateMap(
   const terrain = new Array<number>(ctx.width * ctx.height).fill(
     descriptor.base === 'water' ? TERRAIN_WATER : biome?.base ?? TERRAIN_GRASS);
   const elevation = new Array<number>(ctx.width * ctx.height).fill(0);
+  const landIds = new Array<number>(ctx.width * ctx.height).fill(0);
   const start = starts[0];
   const reserved = new Uint8Array(ctx.width * ctx.height);
   const freeBoth = (x: number, y: number): boolean => {
@@ -779,6 +783,55 @@ export function generateMap(
   // On a water base, the island: 1 where the player's land is, for both
   // halves once mirrored. Everything else stays sea.
   const island = new Uint8Array(ctx.width * ctx.height);
+  // Reserve the tiny-map resource lands before growing the mirrored homes.
+  // This joint allocation is an inferred adapter for our mirrored generator:
+  // growing homes first fills the central channel, leaving no room for the
+  // RMS's seven-tile other-zone avoidance. No placement distance is weakened.
+  const isletCtx = { ...ctx, rng: { seed: seedFrom(ctx.rng.seed ^ 0x151e7) } };
+  const isletAvoid = new Uint8Array(ctx.width * ctx.height);
+  for (const spec of descriptor.resourceIslets ?? []) {
+    const border = Math.ceil(Math.min(ctx.width, ctx.height) * spec.border / 100);
+    const room = (x: number, y: number) => Math.min(x - border + 1, y - border + 1,
+      ctx.width - border - x, ctx.height - border - y);
+    const order = candidateOrderBox(isletCtx, border, border, ctx.width - border - 1, ctx.height - border - 1);
+    const candidates = order.filter(i => !isletAvoid[i]);
+    const separation = (i: number) => Math.min(...starts.map(p =>
+      Math.hypot(i % ctx.width + 0.5 - p.x, Math.floor(i / ctx.width) + 0.5 - p.y)));
+    candidates.sort((a, b) => separation(b) - separation(a));
+    const seed = candidates.find(i => room(i % ctx.width, Math.floor(i / ctx.width)) >= 4
+      && [-3, 0, 3].every(dy => [-3, 0, 3].every(dx => !isletAvoid[i + dy * ctx.width + dx])));
+    if (seed === undefined) throw new Error(`no room for resource land ${spec.landId}`);
+    const cx = seed % ctx.width, cy = Math.floor(seed / ctx.width);
+    const land = new Uint8Array(terrain.length);
+    // RMS omits base_size here; three is the inferred engine default.
+    const seeds: { x: number; y: number }[] = [];
+    for (let y = cy - 3; y <= cy + 3; y++) for (let x = cx - 3; x <= cx + 3; x++) {
+      land[y * ctx.width + x] = 1;
+      if (x === cx - 3) seeds.push({ x: x - 1, y });
+      if (x === cx + 3) seeds.push({ x: x + 1, y });
+      if (y === cy - 3) seeds.push({ x, y: y - 1 });
+      if (y === cy + 3) seeds.push({ x, y: y + 1 });
+    }
+    const accept = (x: number, y: number) => room(x, y) > 0 && !isletAvoid[y * ctx.width + x]
+      && (room(x, y) >= spec.fuzziness || randInt(isletCtx.rng, spec.fuzziness) < room(x, y));
+    growClumps(isletCtx, land, seeds, Math.max(0, Math.round(terrain.length * spec.percent / 100) - 49), accept);
+    cleanMask(land, ctx.width, ctx.height, (x, y) => room(x, y) > 0 && !isletAvoid[y * ctx.width + x]);
+    for (let i = 0; i < land.length; i++) {
+      if (!land[i]) continue;
+      landIds[i] = spec.landId;
+      island[i] = 1;
+      terrain[i] = biome?.base ?? TERRAIN_GRASS;
+      const x = i % ctx.width, y = Math.floor(i / ctx.width);
+      for (let dy = -spec.clearance; dy <= spec.clearance; dy++) for (let dx = -spec.clearance; dx <= spec.clearance; dx++) {
+        if (x + dx < 0 || y + dy < 0 || x + dx >= ctx.width || y + dy >= ctx.height) continue;
+        const n = (y + dy) * ctx.width + x + dx;
+        isletAvoid[n] = 1;
+        // Both mirrored home lands must respect an unmirrored resource land.
+        const other = mirror(tileCentre(x + dx, y + dy));
+        isletAvoid[Math.floor(other.y) * ctx.width + Math.floor(other.x)] = 1;
+      }
+    }
+  }
 
   if (!descriptor.baked && descriptor.base !== 'grass' && descriptor.land) {
     // The clearing, or the island: one land grown from the player's origin,
@@ -795,6 +848,7 @@ export function generateMap(
     const inside = (x: number, y: number): number => Math.min(
       halfWidth - margin - x, x - border + 1, y - border + 1, ctx.height - border - y);
     const inLand = (x: number, y: number): boolean => {
+      if (isletAvoid[y * ctx.width + x]) return false;
       const room = inside(x, y);
       if (room <= 0) return false;
       if (room > fuzz) return true;
@@ -820,9 +874,9 @@ export function generateMap(
         }
       }
     }
-    growClumps(ctx, land, ring, Math.max(0, descriptor.land.tiles - stamped),
+    growClumps(ctx, land, ring, Math.max(0, Math.round(ctx.width * ctx.height * descriptor.land.percent / 100 / starts.length) - stamped),
       inLand, descriptor.land.clumping ?? 20);
-    cleanMask(land, ctx.width, ctx.height);
+    cleanMask(land, ctx.width, ctx.height, (x, y) => !isletAvoid[y * ctx.width + x]);
     // The fuzz can leave a tile of land on its own out at sea, which the
     // beach sweep would turn into a sandbar; a land tile with no land beside
     // it is not land.
@@ -834,6 +888,13 @@ export function generateMap(
           || (y > 0 && land[tile - ctx.width]) || (y < ctx.height - 1 && land[tile + ctx.width]);
         if (!beside) land[tile] = 0;
       }
+    }
+    // Keep IDs aligned with the final land mask, after isolated-tile removal.
+    for (let y = 0; y < ctx.height; y++) for (let x = 0; x < halfWidth; x++) {
+      if (!land[y * ctx.width + x]) continue;
+      landIds[y * ctx.width + x] = 1;
+      const other = mirror(tileCentre(x, y));
+      landIds[Math.floor(other.y) * ctx.width + Math.floor(other.x)] = 2;
     }
     if (descriptor.base === 'forest') {
       for (let y = 0; y < ctx.height; y++) {
@@ -868,7 +929,7 @@ export function generateMap(
           }
         }
       }
-      for (let tile = 0; tile < island.length; tile++) if (!island[tile]) reserved[tile] = 1;
+      for (let tile = 0; tile < island.length; tile++) if (landIds[tile] !== 1 && landIds[tile] !== 2) reserved[tile] = 1;
     }
   }
   // Where a wood may stand: on land, and on an island back from the coast
@@ -1012,6 +1073,19 @@ export function generateMap(
     mask[tile] = 0;
     reserved[tile] = 1;
   }
+  // Removing trees for a pond's beach can open a diagonal squeeze. Close
+  // its dry corner, never plant on the beach itself.
+  for (let y = 0; y < ctx.height - 1; y++) for (let x = 0; x < halfWidth - 1; x++) {
+    const a = y * ctx.width + x, b = a + 1, c = a + ctx.width, d = c + 1;
+    const open = mask[a] && mask[d] && !mask[b] && !mask[c] ? [b, c]
+      : mask[b] && mask[c] && !mask[a] && !mask[d] ? [a, d] : [];
+    for (const tile of open) {
+      const nx = tile % ctx.width, ny = Math.floor(tile / ctx.width);
+      if (!freeBoth(nx, ny) || !onDryLand(nx, ny)) continue;
+      mask[tile] = 1;
+      break;
+    }
+  }
 
   // Each mask tile is planted here and again at its mirror, so a tile that is
   // *itself* the mirror of another mask tile would take two trees on one
@@ -1089,6 +1163,33 @@ export function generateMap(
     }
   }
 
+  // Bonus resources belong to their source land IDs, never the nearest home.
+  for (const spec of descriptor.resourceIslets ?? []) {
+    const free = (x: number, y: number) => landIds[y * ctx.width + x] === spec.landId
+      && terrain[y * ctx.width + x] !== TERRAIN_BEACH && ctx.free(tileCentre(x, y));
+    let groups = spec.groups;
+    for (const tile of candidateOrderBox(isletCtx, 0, 0, ctx.width - 1, ctx.height - 1)) {
+      if (!groups) break;
+      const x = tile % ctx.width, y = Math.floor(tile / ctx.width);
+      if (!free(x, y)) continue;
+      // The existing group primitive mirrors; an islet is a single named land.
+      const group: Point[] = [];
+      const queue = [{ x, y }], seen = new Set<number>();
+      for (let at = 0; at < queue.length && group.length < spec.count; at++) {
+        const p = queue[at], i = p.y * ctx.width + p.x;
+        if (seen.has(i)) continue;
+        seen.add(i);
+        if (Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) > spec.spread || !free(p.x, p.y)) continue;
+        group.push(tileCentre(p.x, p.y));
+        for (const [dx, dy] of STEPS) queue.push({ x: p.x + dx, y: p.y + dy });
+      }
+      if (group.length !== spec.count) continue;
+      for (const p of group) ctx.place(spec.resource as NodeKind, p);
+      groups--;
+    }
+    if (groups) throw new Error(`resource groups do not fit land ${spec.landId}`);
+  }
+
   // The fish, last of all and from their own stream, so a board dealt before
   // there were fish keeps every sheep where it was. The scanning half is
   // walked in the stream's order, each accepted tile clears its spacing, and
@@ -1115,6 +1216,8 @@ export function generateMap(
         const y = Math.floor(tile / ctx.width);
         const here = tileCentre(x, y);
         const other = mirror(here);
+        const otherTile = Math.floor(other.y) * ctx.width + Math.floor(other.x);
+        if (!OPEN_WATER.has(terrain[otherTile]) || !ok(otherTile)) continue;
         if (!sideAllows(x, y) || !sideAllows(Math.floor(other.x), Math.floor(other.y))) continue;
         if (!ctx.free(here) || !ctx.free(other)) continue;
         ctx.place(kind, here);
@@ -1136,7 +1239,7 @@ export function generateMap(
     }
   }
 
-  return { terrain, elevation };
+  return { terrain, elevation, landIds };
 }
 
 /** Cost-grown hill footprints, then inward terraces with at most one level

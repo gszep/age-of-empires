@@ -262,6 +262,8 @@ export interface GameState {
   projectiles: Projectile[];
   /** Per-tile DAT terrain id, row-major width x height. Fixed at generation. */
   terrain: number[];
+  /** Generator land IDs retained for source-bound object placement and diagnostics. */
+  landIds?: number[];
   /** Surveyed height levels on the same grid; generated maps are level zero. */
   elevation: number[];
   players: Record<PlayerId, PlayerState>;

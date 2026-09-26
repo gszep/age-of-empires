@@ -208,10 +208,12 @@ describe('per-player civilisation rules', () => {
 
   it('isolates terrain-layer caches and placement modes even when restriction IDs agree', () => {
     const rules = catalog();
+    // Apply the synthetic beach-only restriction after creating the arena;
+    // it deliberately cannot walk Arabia's biomes or place its source relics.
+    const state = arena(rules);
     rules.civilizations!['fixture-other'].terrainRestrictions[7] = [0, 2];
     rules.terrainRestrictions[7] = [0];
     rules.civilizations!['fixture-other'].buildings.house.hillMode = 2;
-    const state = arena(rules);
     state.terrain.fill(2);
     expect(isBlocked(buildNavGrid(state, undefined, 1, 7), 60, 60)).toBe(true);
     expect(isBlocked(buildNavGrid(state, undefined, 2, 7), 60, 60)).toBe(false);
