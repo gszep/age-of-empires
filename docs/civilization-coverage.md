@@ -156,17 +156,18 @@ reconverted shared canonical paths; subsequent full imports reused all atlases.
 
 ## Reading the audit output
 
-Current complete-civ blockers remain explicit:
+Current scoped acceptance and remaining shared work:
 
 | Civilisation | Remaining coverage beyond the enabled supported profile |
 |---|---|
-| Britons (#179) | Guard Tower/Keep, stone/fortified wall and stone gate; Petard/Siege Tower; Warwolf blast and packed/unpacked trebuchet effect routing; remaining search-radius and shared effect/resource consumers |
-| Franks (#180) | Guard Tower, stone/fortified wall and stone gate; Petard/Siege Tower; Bearded Axe search-radius effect and full paid unique-tech/expanded-roster acceptance; remaining shared effect/resource consumers |
-| Both | Building age-stat replacements (#126), conversion/economic research resources (#128/#178), relic support (#130), and all remaining required roster/effect checks. Tower/wall and specialist/relic mechanics are owned by separate worktrees |
+| Britons (#179) | Reviewed random-map gameplay scope accepted in db2c9c0/605f7f7 with full gates and actual browser outcomes; the shared limitations below remain explicit |
+| Franks (#180) | Generic fortifications/specialists are integrated, but full Frank-specific paid unique-tech/expanded-profile acceptance remains a separate task; no completion claim from the Briton pass |
+| Shared engine | Other-map relic placement (#130/#95), full diplomacy UI (#138), Regicide/Treason, charge/market runtime calibration and remaining conversion-policy parity questions (#178). Implemented mechanics and unresolved engine interpretations are distinguished in the ledger |
 
 The imported catalogue now accounts for the already represented ram/tree alias,
 palisade construction head and TC foundation. Raw unrepresented IDs are not a
-count of distinct missing mechanics. No full-civ completion is claimed here.
+count of distinct missing mechanics. Audit inventories alone do not establish
+completion; the Briton scope is accepted through the outcome evidence above.
 
 The JSON and per-civilisation Markdown reports stay in `.local/`. They include
 source hashes, effect/attribute counts, missing unit/building IDs, prerequisite
