@@ -64,11 +64,23 @@ resources/_common/xs/xs.txt
 resources/_common/ai/*.per
 Docs/All/TC Random Map Scripting Guide.doc
 Docs/All/* CP Strategy Builder.doc
+Docs/en/AoK Manual.pdf
+Docs/en/TC Manual.pdf
+Docs/en/TC Tech Tree.pdf
 ```
 
 These files and [official AoE modding documentation](https://support.ageofempires.com/hc/en-us/sections/8633386298644-Creating-Mods) expose object attributes, tasks, AI facts/actions, map commands, and some derived engine values. Official update notes are important because scripting functions increasingly expose calculated values such as attack delay.
 
 The scripts reveal policy and available observations/actions, not the hidden implementation of pathfinding or collision.
+
+The shipped English PDFs are readable using `uv run --locked python
+tools/pdf_text.py "<owned PDF>" > .local/manual.json` (#60). Physical page
+numbers and source SHA-256 accompany extracted text. These are legacy AoK/TC
+manuals bundled with DE, not patch-current numeric tables. AoK printed p33
+(PDF36) states conversion-time attribute retention/no upgrades; pp46–47
+(PDF49–50) establish shared market prices updated after each transaction;
+p13 (PDF16) establishes repeatable temporary Treason. Exact current exceptions,
+price constants and reveal timers remain in the [bounded audit](shared-reference-audit.md).
 
 ### 4. Older independent engine implementations
 

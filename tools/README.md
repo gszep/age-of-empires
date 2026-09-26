@@ -10,6 +10,13 @@ public/imported/ browser-ready local atlases/manifests
 
 No Steam credentials, Steam configuration, DAT files, SLD files, or converted Microsoft assets belong in this repository.
 
+`uv run --locked python tools/pdf_text.py "<owned PDF>" > .local/manual.json`
+extracts prose with physical page numbers and SHA-256 using locked pypdf (#60).
+`test_pdf_text.py` verifies compressed original text/blank pages and the owned
+AoK conversion/market/Treason passages. Decorative glyphs/table layout may need
+visual inspection; these shipped legacy manuals do not supersede current DAT
+numbers. See `docs/shared-reference-audit.md` for the bounded findings.
+
 `uv run --locked python tools/relic_reference.py` extracts the tiny two-player
 standard-mode relic policy from the owned RMS and includes. The checked-in
 numeric contract is `src/sim/refdata/relic-placement.json`; the owned import
@@ -152,6 +159,7 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | drop-site acceptance | `resources/_common/dat/dropsites.json`: intersect `building_id`, `worker_object_group`/`worker_object_list`, target `object_group`/`attribute_type` with each gather variant's DAT `bird.drop_sites` and same-action gather tasks. Targets such as gold 66 and stone 102 are Gaia-only; use the already extracted entity's `class`, not the player's possibly empty unit slot. `gather.dropSites` is the resolved imported-building subset; raw `dropSites` remains provenance. Building `accepts` is the supported resource union, including authoritative empty lists. XS Meat 15/Berries 16/Fish 17 normalize to food. `acceptsLivestock` is metadata; target-state flags are not simulated (#52) |
 | carried resources | `unit.resource_storages`, `unit.resource_capacity` |
 | Siphons charge chain | `unit.creatable.max_charge/recharge_rate/charge_event/charge_type/charge_target/charge_projectile_unit`: Fire Ships529/532/1103 start0/.04/0/0/64/2629; effect915 sets max1/type6. Projectile2629 `dead_fish.tracking_unit`677→graphic3823 `particle_effect_name=flamethrower_flame`; `dying_graphic`12726→`impact_grenade`. Its `projectile.smart_mode`1, `projectile_arc`.45 and `vanish_mode`2 are provenance, with bounded interpretation in the ledger |
+| Siphons unresolved task/flags | same ships' `bird.tasks` action133 has `work_value_1/_2`2/8, `work_range`~1.2, `work_flag_2`2001. XS names ChargeAttack but supplies no parameter/mask semantics.2629 `type_50.friendly_fire_damage`1, `projectile.hit_mode`0/`vanish_mode`2/`area_effect_specials`0, dead-unit−1 and no lifetime resource are evidence, not a general implemented charge contract |
 | naval capacity, volleys and fish traps | `unit.garrison_capacity` (transport 545: 20), `unit.creatable.total_projectiles` (Hulk 2626: 3); trap food is `dat.civs[n].resources[88]` (700), not trap 199's 15-food storage; fishing-ship tasks name trap gather/build factors in `work_value_1` |
 | composite ship art | `graphic.deltas` plus `offset_x/_y` and `graphic.layer`; W/X placeholder parents and SLP -1 parents may have no source despite a filename. File-bearing hull/sail children have independent frame clocks; `naval.graphic_layers` resolves them |
 | shared naval upgrades | research 35 has `effect_id = -1`; automatic techs 911 and 246 have no research location and sole prerequisite 35. Resolve their type-3 commands; do not discard the research or offer its child upgrades as separate buttons |

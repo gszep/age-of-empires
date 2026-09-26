@@ -12,6 +12,7 @@ The project should not build commodity infrastructure from scratch, but it also 
 | Concern | Choice | Reason |
 |---|---|---|
 | AoE DAT import | `genieutils-py` 0.1.2 as an external Python tool | Successfully parsed our patch-matched `VER 8.9` DAT, avoids writing a binary parser; LGPL remains isolated from the MIT runtime |
+| Owned manual text | `pypdf` 6.10.2 (BSD-3-Clause), locked offline Python tool | `pdf_text.py` preserves physical page numbers/source hash; compressed original fixture and owned manual passages verify extraction. No browser/runtime dependency or asset publication; legacy tables are not current DAT replacements (#60) |
 | AoE SLD conversion | own `tools/sld_layers.py`, written from the public format documentation | The pinned openage decoder corrupted the heap on mask layers and crashed on the stable; the replacement was verified byte-identical over all imported frames before the swap, and removes the last GPL tool from the import path |
 | Rendering | Three.js `WebGPURenderer` with WebGL 2 fallback | Already proven in the browser; supports the desired WebGPU path and keeps rendering separate. r180 sprite builder keys include texture lifetime to avoid cloning a disposed sampler template (#172); `sampler_residency_smoke.mts` reproduces the failure and guards future upgrades |
 | Schemas | JSON Schema plus Ajv when generated content is introduced | Standard, language-neutral contracts for Python importer, TypeScript runtime, agents, and future SDKs |

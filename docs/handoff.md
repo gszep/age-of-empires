@@ -1,12 +1,25 @@
-# Handoff — two-player diplomacy and Regicide/Treason
+# Handoff — verified shared-reference audit
 
 ## Assignment and checkpoints
 
-Serial exclusive-main implementation; no subagents. User authorized work and
+Serial main-tree implementation. User authorized work and
 commit/push, **not exact engine inferences**. Relics are in 508a2f2; diplomacy is
 pushed as **ec26a02**. This checkpoint delivers Regicide with the green receipt below.
-Market/charge/conversion audit beyond direct dependencies remains with the
-coordinator; no all-civilisation expansion or unrelated #138 surfaces were taken.
+Market/charge/conversion/Treason source follow-up is now recorded in
+[shared-reference-audit.md](shared-reference-audit.md). It unblocks owned PDF
+reading and corroborates core conversion/shared-price policy; exact remaining
+runtime questions stay explicit. No all-civilisation expansion was taken.
+
+**Audit follow-up verified (2026-09-27):** locked pypdf/extractor, two PDF tests
+and evidence corrections; no simulation/import-pipeline change. After the user
+confirmed Cyberpunk was finished, process inspection confirmed it was absent.
+Full one-worker gate **GREEN**, exit0: **960 tests /73 files**, build,
+**130 Python/owned-content tests**, real-browser debug smoke. Receipt:
+`.local/shared-reference-audit-gate.log`. No timeouts were widened. Only Markdown
+changed after gate start. The latest gameplay checkpoint remains **444e91b**;
+this handoff accompanies the separately verified audit/tooling checkpoint.
+New #241 tracks live protocol skew/state-preserving deployment; #242 tracks
+Siphons field semantics. The managed service and its state were left untouched.
 
 ## Acceptance checklist
 

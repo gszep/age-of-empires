@@ -11,8 +11,10 @@ does not repeat it.
 
 On the installed Ysgramor service, use **http://localhost:5173/?solo=1**
 for the human's current solo QA, or the same path through
-**https://ysgramor.tail6e864b.ts.net:5173/**. Removing `solo=1` joins the shared
-match. Artemis joins through its own **http://localhost:5174/** gateway.
+**https://ysgramor.tail6e864b.ts.net:5173/**. Shared joining is currently blocked
+by the audited live-host protocol1/frontend protocol2 skew; preserve the host
+until migration is verified ([evidence](shared-reference-audit.md)). Artemis's
+gateway remains **http://localhost:5174/**.
 
 Both managed household services were active with zero automatic restarts at
 the 2026-09-23 performance handoff. Verification uses private servers rather

@@ -81,8 +81,11 @@ different browser cannot recover another browser's session storage.
 
 `npm run dev` remains standalone for development, replays and private probes;
 use `npm run dev -- --port 5175` while the shared service occupies port 5173.
-After editing simulation/host code, restart the shared service as well as
-reloading browsers. Bump `SHARED_VERSION` when checkpoint compatibility changes.
+After editing simulation/host code, deploy matching host and browser versions
+only after verifying checkpoint compatibility. Recovery requires the saved
+version **and rules hash** to match; otherwise retain the old runtime/rules
+and prove a migration privately first. Bump `SHARED_VERSION` when checkpoint
+compatibility changes.
 Regicide uses **shared protocol2**; version1 clients/checkpoints are deliberately
 not silently reinterpreted. The implementation acceptance used private hosts;
 it does not itself replace a live managed match or archive its checkpoint.
@@ -91,6 +94,13 @@ startup with status 78 (`CONFIG`), as does malformed checkpoint JSON. The
 service does not retry that permanent failure. Restore the matching game
 rules/version to resume it, or explicitly move the checkpoint aside to start
 a new match. The diagnostic prints the exact saved path.
+
+**2026-09-26 audit:** live config returns protocol1 while its mutable Vite root
+serves protocol2 frontend modules. Reload therefore fails the client's version
+check. No default checkpoint was present during passive inspection, so recovery
+of any in-memory match is not established. No v1→v2 migration exists; matching-
+version recovery tests do not prove one. The managed service was left running.
+See [deployment evidence and required preservation work](shared-reference-audit.md#deployment-and-deferred-dependencies).
 
 **Standing permission (human, 2026-09-21):** when neither Artemis nor Ysgramor
 has accessed the shared match for at least one hour, an agent may terminate
