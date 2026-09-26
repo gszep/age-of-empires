@@ -7,6 +7,7 @@ import type {
   AttackValue, BuildingRules, Cost, GameRules, NodeKind, TechEffect, TechKey, UnitRules, VillagerGatherTask,
 } from './data';
 import { MAPS, generateMap } from './mapgen';
+import { isWallLineKind } from './buildings';
 import { elevationAt, elevationAllowsPlacement, elevationDamageMultiplier, levelStartingFootprint } from './elevation';
 import {
   buildNavGrid, distance, entityGrid, findPath, halfExtent, isBlocked, separateUnits, terrainLayer, tileOf, type NavGrid,
@@ -15,6 +16,9 @@ import { random01, seedFrom } from './random';
 import { buildingLimitReached, buildingRulesFor, combine, inheritConvertedUnit, playerAttributeFor, unitRulesFor, unitRulesForEntity } from './rules';
 import { civilizationRules, rulesForPlayer } from './civilizations';
 import { technologyFor, technologyRequirementsMet } from './technologies';
+import { relicOrder, transferRelic, releaseRelics, updateRelicIncome } from './relics';
+import { conversionWindow, rechargeFaith, spendConversionFaith } from './monastery';
+import { placeArabiaRelics } from './relic-placement';
 import { createVisibility, isEntityVisible, updateVisibility } from './visibility';
 import type {
   AnimalKind, BuildingKind, Command, Entity, GameState, Order, PlayerId, Point, Projectile, ResourceKind,
@@ -160,6 +164,7 @@ export function createGame(
   );
   state.terrain = terrain;
   state.elevation = elevation;
+  if (map === 'arabia') placeArabiaRelics(state);
   for (const home of state.entities) {
     if (home.kind === 'town-center' && home.owner !== 0) {
       levelStartingFootprint(state, home.position, buildingFootprint(state, home.kind, 'x', home.owner));
@@ -534,10 +539,15 @@ function isHuntable(state: GameState, entity: Entity): boolean {
  * In particular, checking a hover must not reserve farms or reset work progress.
  */
 export function resolveUnitOrder(state: GameState, entity: Entity, target: Point, targetEntity?: Entity): Order {
+  const relic = relicOrder(state, entity, targetEntity);
+  if (relic) return relic;
   const unitRules = isUnit(entity.kind) ? unitRulesForEntity(state, entity) : undefined;
   // A unit with no attack is never given one by a right-click: a monk sent at
   // a boar would otherwise stand over it forever, swinging nothing.
   const armed = !unitRules || combatOf(state, entity).attacks.some(attack => attack.amount > 0);
+  if (targetEntity && canCrossWall(state, entity, targetEntity)) {
+    return { kind: 'cross-wall', targetId: targetEntity.id };
+  }
   if ((entity.kind === 'trade-cart' || entity.kind === 'trade-cog') && targetEntity && isTradePartner(state, entity, targetEntity)) {
     return { kind: 'trade', targetId: targetEntity.id };
   } else if (((entity.kind === 'villager' && targetEntity?.kind === 'farm')
@@ -550,7 +560,7 @@ export function resolveUnitOrder(state: GameState, entity: Entity, target: Point
   } else if (targetEntity && isGatherable(state, targetEntity, entity)) {
     return { kind: 'gather', targetId: targetEntity.id };
   } else if (
-    unitRules?.heal && targetEntity && targetEntity.id !== entity.id
+    unitRules?.heal && !entity.relics?.length && targetEntity && targetEntity.id !== entity.id
     && targetEntity.owner === entity.owner && isUnit(targetEntity.kind)
     && targetEntity.hp < targetEntity.maxHp
   ) {
@@ -558,7 +568,7 @@ export function resolveUnitOrder(state: GameState, entity: Entity, target: Point
   } else if (
     // Conversion reaches somebody else's soldiers only. Buildings need
     // Redemption, which is not researchable here.
-    unitRules?.convert && targetEntity && isUnit(targetEntity.kind)
+    unitRules?.convert && !entity.relics?.length && targetEntity && isUnit(targetEntity.kind)
     && targetEntity.owner !== 0 && targetEntity.owner !== entity.owner
   ) {
     return { kind: 'convert', targetId: targetEntity.id };
@@ -611,7 +621,7 @@ export function trainableUnitsAt(state: GameState, player: PlayerId, building: B
     const unit = rules.units[kind];
     return unit.trainedAt === building && (unit.age ?? 0) <= state.players[player].age
       && (unit.requires ?? []).every(key => state.players[player].researched.includes(key))
-      && !isAnimal(kind) && civHas(state, player, 'units', unit.datId)
+      && !isAnimal(kind) && civHas(state, player, 'units', unit.treeUnitId ?? unit.datId)
       && !upgradedAway(state, player, kind) && !notYetUpgradedInto(state, player, kind);
   });
 }
@@ -719,7 +729,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (notYetUpgradedInto(state, command.player, command.unit)) {
       return rejected(`${command.unit} needs its upgrade researched`);
     }
-    if (!civHas(state, command.player, 'units', unitRules.datId)) {
+    if (!civHas(state, command.player, 'units', unitRules.treeUnitId ?? unitRules.datId)) {
       return rejected(`the ${civNameOf(state, command.player)} do not have ${command.unit}`);
     }
     if (unitRules.trainedAt !== building.kind) return rejected(`${building.kind} cannot train ${command.unit}`);
@@ -733,9 +743,10 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (!paid.ok) return paid;
     // Paid for when it is asked for, as in AoE2, and refunded if cancelled.
     if (building.training) {
+      building.trainingQueueCosts = [...(building.trainingQueueCosts ?? (building.trainingQueue ?? []).map(() => undefined)), { ...unitRules.cost }];
       building.trainingQueue = [...(building.trainingQueue ?? []), command.unit];
     } else {
-      building.training = { kind: command.unit, remainingTicks: Math.round(unitRules.trainSeconds * TICKS_PER_SECOND) };
+      building.training = { kind: command.unit, remainingTicks: Math.round(unitRules.trainSeconds * TICKS_PER_SECOND), paidCost: { ...unitRules.cost } };
     }
     return { ok: true };
   }
@@ -766,18 +777,22 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (!queuedCount(building)) return rejected('nothing is being trained');
     if (!Number.isInteger(index) || index < 0 || index >= queuedCount(building)) return rejected('invalid training queue index');
     let refund: UnitKind | undefined;
+    let paidCost: Cost | undefined;
     if (index > 0 || !building.training) {
       const waitingIndex = index - (building.training ? 1 : 0);
       refund = queue[waitingIndex];
+      paidCost = building.trainingQueueCosts?.[waitingIndex];
+      building.trainingQueueCosts = building.trainingQueueCosts?.filter((_, i) => i !== waitingIndex);
       building.trainingQueue = queue.filter((_, i) => i !== waitingIndex);
       if (!building.trainingQueue.length) building.trainingQueue = undefined;
     } else if (building.training) {
       refund = building.training.kind;
+      paidCost = building.training.paidCost;
       building.training = undefined;
       startNextTraining(state, building);
     }
     if (!refund) return rejected('nothing is being trained');
-    const cost = unitRulesFor(state, command.player, refund).cost;
+    const cost = paidCost ?? unitRulesFor(state, command.player, refund).cost;
     const player = state.players[command.player];
     player.food += cost.food; player.wood += cost.wood;
     player.gold += cost.gold; player.stone += cost.stone;
@@ -815,6 +830,10 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
   if (command.kind === 'ungarrison') {
     const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
     if (!building) return rejected(`building ${command.buildingId} is not owned`);
+    if (building.relics?.length) {
+      releaseRelics(state, building, isBuilding(building.kind) ? spawnPoint(state, building, 0.5) : building.position);
+      if (!building.garrison?.length) return { ok: true };
+    }
     if (!building.garrison?.length) return rejected('nobody is garrisoned');
     if (isUnit(building.kind) && unitRulesForEntity(state, building).transportCapacity && command.target) {
       if (!Number.isFinite(command.target.x) || !Number.isFinite(command.target.y)) return rejected('target is not a point');
@@ -898,9 +917,16 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
 
   // Read through research: the Castle Age gives a watch tower a fifth more
   // hit points, and one placed after it should be built to the new number.
+  if (!isBuilding(command.building) || !rulesForPlayer(state, command.player).buildings[command.building]) {
+    return rejected(`unknown building ${command.building}`);
+  }
+  if (upgradedAway(state, command.player, command.building)
+    || notYetUpgradedInto(state, command.player, command.building)) {
+    return rejected(`${command.building} is not the current building upgrade`);
+  }
   const rules = buildingRulesFor(state, command.player, command.building);
   if (!rules.buildable) return rejected(`${command.building} cannot be built`);
-  if (!civHas(state, command.player, 'buildings', rules.datId)) {
+  if (!civHas(state, command.player, 'buildings', rules.availabilityId ?? rules.datId)) {
     return rejected(`the ${civNameOf(state, command.player)} do not have ${command.building}`);
   }
   if ((rules.age ?? 0) > state.players[command.player].age) {
@@ -1015,6 +1041,7 @@ function moveTowardOnGround(state: GameState, entity: Entity, target: Point, spe
 }
 
 function moveAlong(state: GameState, grid: NavGrid, entity: Entity, destination: Point, speed: number, directRange = 0): boolean {
+  speed += infantryCrewCount(state, entity) * (unitRulesForEntity(state, entity).infantryCrew?.speed ?? 0);
   // Final approach straight at an interaction target whose footprint blocks
   // the grid; the caller's range check stops movement at its edge.
   if (directRange > 0 && distance(entity.position, destination) <= directRange) {
@@ -1089,7 +1116,9 @@ function combatOf(state: GameState, entity: Entity): {
       };
   }
   return {
-    attacks: rules.attacks,
+    attacks: rules.infantryCrew ? rules.attacks.map(attack => attack.class === 11
+      ? { ...attack, amount: attack.amount + infantryCrewCount(state, entity) * rules.infantryCrew!.buildingAttack }
+      : attack) : rules.attacks,
     range: rules.range ?? 0,
     minRange: rules.minRange ?? 0,
     reloadSeconds: rules.attackReloadSeconds,
@@ -1410,6 +1439,8 @@ function kill(state: GameState, entity: Entity): void {
   // Whoever was sheltering inside comes out as it falls, as the reference's
   // do from a razed town center or castle.
   if (entity.dead) return;
+  if (entity.relics?.length) releaseRelics(state, entity,
+    isBuilding(entity.kind) ? spawnPoint(state, entity, 0.5) : entity.position);
   if (entity.bellReturn) entity.bellReturn = undefined;
   if (entity.kind === 'town-center' && entity.townBell) releaseTownBell(state, entity);
   const transport = isUnit(entity.kind) && unitRulesForEntity(state, entity).transportCapacity;
@@ -1422,11 +1453,13 @@ function kill(state: GameState, entity: Entity): void {
   // Whatever was waiting behind it dies with the building; AoE2 does not
   // refund a queue that is razed, and neither does this.
   entity.trainingQueue = undefined;
+  entity.trainingQueueCosts = undefined;
   // The DAT states how long a body lies there, on the corpse unit itself.
   // Never shorter than the death graphic, or the thing vanishes mid-fall.
   entity.decayTicks = corpseLifetimeTicks(state, entity);
   clearPath(entity);
-  if (isUnit(entity.kind) && unitRulesForEntity(state, entity).selfDestruct && entity.hp <= 0) {
+  if (isUnit(entity.kind) && unitRulesForEntity(state, entity).selfDestruct
+    && !unitRulesForEntity(state, entity).detonateOnAttackOnly && entity.hp <= 0) {
     const combat = unitRulesForEntity(state, entity);
     applyBlast(state, entity.position, combat.blastRadius ?? 0, combat.blastAttackLevel ?? 2,
       combat.attacks, entity.id, entity.owner as PlayerId);
@@ -1704,10 +1737,9 @@ function touching(a: Entity, b: Entity): boolean {
     && Math.abs(a.position.y - b.position.y) <= halfA.y + halfB.y + 0.01;
 }
 
-/** A palisade and the gate in it are one dragged line; anything else is not. */
-const PALISADE = new Set<string>(['palisade-wall', 'palisade-gate']);
+/** Wall materials and their gates share automatic construction continuation. */
 const sameRun = (a: Entity['kind'], b: Entity['kind']): boolean =>
-  a === b || (PALISADE.has(a) && PALISADE.has(b));
+  a === b || (isWallLineKind(a) && isWallLineKind(b));
 
 function updateBuilder(state: GameState, grid: NavGrid, entity: Entity, builderCounts: Map<number, number>): void {
   if (entity.order.kind !== 'build') return;
@@ -1760,7 +1792,11 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
     clearPath(entity);
     return;
   }
-  if (!inAttackRange(state, entity, target)) {
+  // A small contact blast must cover the ordered target before it is spent.
+  // The ordinary melee tolerance can exceed the petard's owned blast radius.
+  const targetInBlast = !rules.detonateOnAttackOnly
+    || distance(entity.position, target.position) <= target.radius + (rules.blastRadius ?? 0);
+  if (!inAttackRange(state, entity, target) || !targetInBlast) {
     // A swing in progress is kept, not thrown away. It is only spent while the
     // attacker is actually in reach, so nothing lands early -- but a target
     // drifting a few tenths of a tile no longer costs the whole windup. It
@@ -1801,7 +1837,15 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
   entity.attackWindup -= 1;
   if (entity.attackWindup <= 0) {
     const combat = combatOf(state, entity);
-    if (rules.selfDestruct) { entity.hp = 0; kill(state, entity); return; }
+    if (rules.selfDestruct) {
+      entity.hp = 0;
+      kill(state, entity);
+      if (rules.detonateOnAttackOnly) {
+        applyBlast(state, entity.position, rules.blastRadius ?? 0, rules.blastAttackLevel ?? 2,
+          combat.attacks, entity.id, entity.owner);
+      }
+      return;
+    }
     for (let shot = 0; shot < (rules.projectilesPerAttack ?? 1); shot++) {
       releaseAttack(state, entity, target, combat.attacks, profile.projectileSpeed, profile.launchHeight, combat);
     }
@@ -1916,6 +1960,58 @@ function garrisonCategory(state: GameState, unit: Entity): number {
   return datClass === undefined ? 0 : GARRISON_CATEGORY[datClass] ?? 0;
 }
 
+/** Cargo remains live on converted carriers; never bake crew into a snapshot. */
+function infantryCrewCount(state: GameState, carrier: Entity): number {
+  return carrier.garrison?.filter(unit => !unit.dead && unitRulesForEntity(state, unit).datClass === 6).length ?? 0;
+}
+
+function canCrossWall(state: GameState, carrier: Entity, wall: Entity): boolean {
+  const task = isUnit(carrier.kind) && unitRulesForEntity(state, carrier).unloadOverWall;
+  return !!task && !wall.dead && wall.buildProgress === undefined && wall.owner !== 0
+    && wall.owner !== carrier.owner && !!carrier.garrison?.length && isBuilding(wall.kind)
+    && buildingRulesFor(state, wall.owner, wall.kind).datClass === task.targetClass;
+}
+
+/** Task 14 unloads passengers, never moves the carrier through the wall.
+ * The one-footprint cardinal landing algorithm is inferred (ledger specialists).
+ * No free landing means cargo stays aboard; a second wall cannot be jumped. */
+function updateWallUnloader(state: GameState, grid: NavGrid, carrier: Entity): void {
+  if (carrier.order.kind !== 'cross-wall') return;
+  const id = carrier.order.targetId;
+  const wall = state.entities.find(entity => entity.id === id);
+  if (!wall || !canCrossWall(state, carrier, wall)) { becomeIdle(carrier); return; }
+  const half = halfExtent(wall);
+  const dx = carrier.position.x - wall.position.x, dy = carrier.position.y - wall.position.y;
+  const axis = Math.abs(dx) / half.x >= Math.abs(dy) / half.y ? 'x' : 'y';
+  const side = (axis === 'x' ? dx : dy) < 0 ? -1 : 1;
+  const approach = { ...wall.position, [axis]: wall.position[axis] + side * (half[axis] + carrier.radius + 0.1) };
+  if (distance(carrier.position, approach) > 0.2) {
+    carrier.activity = 'moving';
+    moveAlong(state, grid, carrier, approach, unitRulesForEntity(state, carrier).speed);
+    return;
+  }
+  carrier.activity = 'attacking';
+  clearPath(carrier);
+  const released: Entity[] = [];
+  for (const unit of carrier.garrison ?? []) {
+    const otherAxis = axis === 'x' ? 'y' : 'x';
+    for (const offset of [0, -0.5, 0.5]) {
+      const landing = { ...wall.position,
+        [axis]: wall.position[axis] - side * (half[axis] + unit.radius + 0.1),
+        [otherAxis]: wall.position[otherAxis] + offset * half[otherAxis] };
+      if (!spawnFree(state, landing, unit.radius, restrictionOf(rulesForPlayer(state, unit.owner), unit), unit.owner)
+        || released.some(other => distance(other.position, landing) < other.radius + unit.radius)) continue;
+      unit.position = landing;
+      becomeIdle(unit);
+      state.entities.push(unit);
+      released.push(unit);
+      break;
+    }
+  }
+  carrier.garrison = carrier.garrison?.filter(unit => !released.includes(unit));
+  if (!carrier.garrison?.length) { carrier.garrison = undefined; becomeIdle(carrier); }
+}
+
 /**
  * Whether this unit may shelter in that building (issue #75): its own side's,
  * finished, with a garrison the DAT gives a capacity and a type mask that
@@ -1928,7 +2024,9 @@ export function canGarrison(state: GameState, unit: Entity, building: Entity): b
     const carrier = unitRulesForEntity(state, building);
     if (carrier.infantryCapacity) {
       const category = unitRulesForEntity(state, unit).datClass;
-      return (category === 4 || category === 6) && (building.garrison?.length ?? 0) < carrier.infantryCapacity;
+      const admitted = carrier.passengerTypes === undefined ? category === 4 || category === 6
+        : !!(carrier.passengerTypes & garrisonCategory(state, unit));
+      return admitted && (building.garrison?.length ?? 0) < carrier.infantryCapacity;
     }
     const capacity = carrier.transportCapacity;
     const rules = rulesForPlayer(state, unit.owner);
@@ -2114,13 +2212,14 @@ export function ungarrisonAll(state: GameState, building: Entity): Entity[] {
 function updateConverter(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'convert') return;
   const rules = unitRulesForEntity(state, entity);
-  const convert = rules.convert;
   const target = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
-  if (!convert || !target || target.owner === 0 || target.owner === entity.owner) {
+  if (!rules.convert || entity.relics?.length || !target || target.owner === 0 || target.owner === entity.owner) {
     entity.convertTicks = undefined;
     becomeIdle(entity);
     return;
   }
+  const convert = conversionWindow(state, entity, target);
+  if ((entity.faith ?? 100) < 100) { entity.activity = 'idle'; entity.convertTicks = undefined; return; }
   if (!inRange(entity, target, convert.range)) {
     // Breaking off loses the work: a monk cannot bank half a conversion,
     // which is what makes running out of a monk's reach an escape.
@@ -2136,6 +2235,7 @@ function updateConverter(state: GameState, grid: NavGrid, entity: Entity): void 
   if (seconds < convert.minSeconds) return;
   const ticksLeft = Math.max(1, Math.round((convert.maxSeconds - seconds) / TICK_SECONDS) + 1);
   if (random01(state) >= 1 / ticksLeft) return;
+  spendConversionFaith(state, entity, target);
   inheritConvertedUnit(state, target, entity.owner as PlayerId);
   becomeIdle(target);
   clearPath(target);
@@ -2153,6 +2253,7 @@ function applyDamage(
   state: GameState, target: Entity, attacks: AttackValue[], attackerId: number,
   origin: Point,
 ): void {
+  if (target.kind === 'relic') return;
   target.hp -= computeDamage(attacks, armorsOf(state, target)) * elevationDamageMultiplier(
     elevationAt(state, origin.x, origin.y), elevationAt(state, target.position.x, target.position.y),
   );
@@ -2206,7 +2307,8 @@ function velocityOf(state: GameState, entity: Entity): Point {
   const dy = next.y - entity.position.y;
   const gap = Math.hypot(dx, dy);
   if (gap < 1e-6) return { x: 0, y: 0 };
-  const speed = isUnit(entity.kind) ? unitRulesForEntity(state, entity).speed : 0;
+  const unit = isUnit(entity.kind) ? unitRulesForEntity(state, entity) : undefined;
+  const speed = unit ? unit.speed + infantryCrewCount(state, entity) * (unit.infantryCrew?.speed ?? 0) : 0;
   return { x: dx / gap * speed, y: dy / gap * speed };
 }
 
@@ -2434,7 +2536,7 @@ function autoAcquire(state: GameState, entity: Entity): void {
     || entity.kind === 'trade-cart' || isAnimal(entity.kind)) return;
   const rules = unitRulesForEntity(state, entity);
   if (!rules.attacks.some(attack => attack.amount > 0)) return;
-  const los = rules.lineOfSight;
+  const los = Math.min(rules.lineOfSight, rules.searchRadius ?? rules.lineOfSight);
   let best: Entity | undefined;
   let bestDistance = Infinity;
   for (const candidate of state.entities) {
@@ -2504,7 +2606,7 @@ function updateTower(state: GameState, entity: Entity): void {
   }
   entity.attackWindup -= 1;
   if (entity.attackWindup <= 0) {
-    const volley = rulesForPlayer(state, entity.owner).buildings[entity.kind as BuildingKind].garrison?.volley;
+    const volley = buildingRulesFor(state, entity.owner, entity.kind as BuildingKind).garrison?.volley;
     // The building's own arrow first, where it has one...
     if (!volley || volley.ownProjectile) {
       releaseAttack(state, entity, target, attack.attacks, attack.projectileSpeed, attack.launchHeight,
@@ -2530,6 +2632,7 @@ function updateTower(state: GameState, entity: Entity): void {
 }
 
 function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCounts: Map<number, number>): void {
+  rechargeFaith(state, entity);
   // A siege engine being set up or packed away does nothing else while it is:
   // the DAT gives the pair a work rate and this spends it (issue #28).
   if (entity.packingTicks !== undefined) {
@@ -2553,6 +2656,25 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
     assignOrder(state, entity, next.target, target);
   }
   switch (entity.order.kind) {
+    case 'relic': {
+      const target = state.entities.find(e => e.id === (entity.order as { targetId: number }).targetId);
+      if (!target || !relicOrder(state, entity, target)) { becomeIdle(entity); return; }
+      const reach = target.kind === 'monastery' ? 1 : 0;
+      if (inRange(entity, target, reach)) {
+        transferRelic(state, entity, target);
+        becomeIdle(entity);
+        clearPath(entity);
+        if (entity.relics?.length && !entity.orderQueue?.length) {
+          const home = state.entities.filter(e => e.kind === 'monastery' && relicOrder(state, entity, e))
+            .sort((a, b) => distance(entity.position, a.position) - distance(entity.position, b.position) || a.id - b.id)[0];
+          if (home) entity.order = { kind: 'relic', targetId: home.id };
+        }
+      } else {
+        entity.activity = 'moving';
+        moveAlong(state, grid, entity, target.position, unitRulesForEntity(state, entity).speed, interactionRange(target) + reach);
+      }
+      return;
+    }
     case 'unload': {
       entity.activity = 'moving';
       if (moveAlong(state, grid, entity, entity.order.target, unitRulesForEntity(state, entity).speed)) {
@@ -2574,6 +2696,7 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
     case 'heal': return updateHealer(state, grid, entity);
     case 'repair': return updateRepairer(state, grid, entity);
     case 'garrison': return updateGarrisoner(state, grid, entity);
+    case 'cross-wall': return updateWallUnloader(state, grid, entity);
     case 'convert': return updateConverter(state, grid, entity);
     default:
       entity.activity = 'idle';
@@ -2705,7 +2828,8 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
   // promotion. AoE2 does the same, and it is why the barracks stops offering
   // the militia at all afterwards (see `upgradedAway`).
   for (const upgrade of tech.upgrades ?? []) {
-    const to = rulesForPlayer(state, owner).units[upgrade.to as UnitKind];
+    const to = rulesForPlayer(state, owner).units[upgrade.to as UnitKind]
+      ?? rulesForPlayer(state, owner).buildings[upgrade.to as BuildingKind];
     if (!to) continue;
     for (const entity of state.entities.flatMap(e => [e, ...(e.garrison ?? [])])) {
       if (entity.dead || entity.owner !== owner || entity.convertedRules) continue;
@@ -2714,13 +2838,26 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
         kind === upgrade.from ? upgrade.to as UnitKind : kind);
       if (entity.kind !== upgrade.from) continue;
       const damage = entity.maxHp - entity.hp;
-      const promoted = unitRulesFor(state, owner, upgrade.to as UnitKind);
-      entity.kind = upgrade.to as UnitKind;
+      const promoted = isBuilding(upgrade.to as Entity['kind'])
+        ? buildingRulesFor(state, owner, upgrade.to as BuildingKind)
+        : unitRulesFor(state, owner, upgrade.to as UnitKind);
+      entity.kind = upgrade.to as Entity['kind'];
+      entity.hp = entity.buildProgress === undefined ? Math.max(1, promoted.hp - damage)
+        : Math.max(1, entity.hp + (promoted.hp - entity.maxHp) * entity.buildProgress);
       entity.maxHp = promoted.hp;
-      entity.hp = Math.max(1, promoted.hp - damage);
       entity.radius = promoted.radius;
       promotedIds.add(entity.id);
     }
+  }
+
+  // Synchronize age/paid building baselines once, including this research's
+  // effects. Foundation HP gains only its constructed fraction of the delta.
+  for (const entity of state.entities) {
+    if (entity.dead || entity.owner !== owner || !isBuilding(entity.kind)) continue;
+    const hp = buildingRulesFor(state, owner, entity.kind).hp;
+    const gained = hp - entity.maxHp;
+    entity.hp = Math.max(1, Math.min(hp, entity.hp + gained * (entity.buildProgress ?? 1)));
+    entity.maxHp = hp;
   }
 
   // Hit points reach what is already standing, as AoE2's Loom heals the
@@ -2729,7 +2866,7 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
   for (const effect of tech.effects) {
     if (effect.attribute !== 'hitPoints') continue;
     for (const entity of state.entities.flatMap(e => [e, ...(e.garrison ?? [])])) {
-      if (entity.convertedRules || promotedIds.has(entity.id)
+      if (entity.convertedRules || promotedIds.has(entity.id) || isBuilding(entity.kind)
         || entity.dead || entity.owner !== owner || entity.kind !== effect.unit) continue;
       const raised = combine(effect.operation, entity.maxHp, effect.amount);
       const gained = raised - entity.maxHp;
@@ -2785,7 +2922,9 @@ function startNextTraining(state: GameState, entity: Entity): void {
     entity.training = {
       kind: next,
       remainingTicks: Math.round(unitRulesFor(state, entity.owner, next).trainSeconds * TICKS_PER_SECOND),
+      paidCost: entity.trainingQueueCosts?.[0],
     };
+    entity.trainingQueueCosts = queue.length > 1 ? entity.trainingQueueCosts?.slice(1) : undefined;
   }
 }
 
@@ -2793,7 +2932,7 @@ function startNextTraining(state: GameState, entity: Entity): void {
 function trainsAnything(state: GameState, kind: Entity['kind'], player: PlayerId): boolean {
   if (!isBuilding(kind)) return false;
   return Object.values(rulesForPlayer(state, player).units)
-    .some(rules => rules.trainedAt === kind && civHas(state, player, 'units', rules.datId));
+    .some(rules => rules.trainedAt === kind && civHas(state, player, 'units', rules.treeUnitId ?? rules.datId));
 }
 
 function isDefeated(state: GameState, player: PlayerId): boolean {
@@ -2941,6 +3080,7 @@ export function stepGame(state: GameState): void {
     } else if (isBuilding(entity.kind) && entity.buildProgress === undefined) {
       updateBuildingProduction(state, entity);
       updateBuildingResearch(state, entity);
+      if (entity.kind === 'monastery') updateRelicIncome(state, entity);
       updateGarrison(state, entity);
       updateTower(state, entity);
     }

@@ -32,6 +32,34 @@ uv run --locked python tools/audit_civilizations.py --markdown .local/civilizati
 
 ## Per-player rules foundation
 
+### Briton completion pass (2026-09-26)
+
+The reviewed Briton roster now has no missing unit/building tree IDs in the
+published catalogue. This is roster coverage, not proof that every technology
+or shared game mode is complete.
+
+- Stone/fortified walls and gates, Guard Tower/Keep, building age stats and
+  Arrowslits descendants are integrated, including existing foundations and
+  occupied buildings. Public wall dragging and paid upgrades have browser probes.
+- Petards, Siege Towers and live ram crews are integrated with original art,
+  petard explosion feedback and public wall-crossing/unload orders. Constants
+  and geometry without runtime evidence remain explicit in the ledger.
+- Relic pickup/carry/drop/deposit/income/loss, carried art and Drop Relic UI are
+  integrated. Arabia places five reachable relics through a documented zone
+  approximation; other map placement remains #130/#95 work.
+- Devotion, Faith, Theocracy, Herbal Medicine, Block Printing and Illumination
+  have gameplay consumers, including spent/recharging faith and garrison healing.
+- Warwolf reaches the deployed trebuchet's actual projectile, and Siege Engineers
+  reaches its damage/range without applying both form commands twice. Shipwright
+  changes production time; Caravan changes trader work as well as speed.
+  Paid training receipts preserve refunds across research and JSON snapshots.
+
+Remaining research closure includes **Siphons, Spies/Treason and the market/
+tribute actions needed by Guilds, Coinage and Banking**. They are not certified
+by the empty `missingRoster` array. #179 remains open until those outcomes and
+the remaining acceptance evidence are reconciled. Latest gate evidence belongs
+in the checkpoint handoff, not in an unverified completion claim.
+
 `civilizations.ts` now resolves each player's complete ruleset by its civilisation
 key. The root remains the default civilisation and shared Gaia/map input.
 Additional `GameRules.civilizations` / manifest `civilizations` entries are complete

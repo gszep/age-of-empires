@@ -70,13 +70,13 @@ function gameDebug(): Plugin {
 
 export default defineConfig({
   plugins: [gameCompression(), gameDebug()],
-  // Worktrees under .claude/ carry a full copy of the suite; collecting them
+  // Worktrees under .claude/ or .local/ carry a full copy of the suite; collecting them
   // doubles every run and reports stale branches as if they were this tree.
   // A whole simulated match runs in a few seconds here, but the 5s default
   // leaves no room for a machine that is also rendering one in a browser; the
   // suite has flaked on wall time alone rather than on anything it measured.
   test: {
-    exclude: [...configDefaults.exclude, '.claude/**'],
+    exclude: [...configDefaults.exclude, '.claude/**', '.local/**'],
     testTimeout: 30_000,
     setupFiles: ['./src/test-setup.ts'],
     // The sim-heavy files each block their worker with seconds of pure CPU;

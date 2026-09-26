@@ -21,10 +21,13 @@ function observeEntity(state: GameState, entity: Entity, player: PlayerId): Obse
   if (entity.amount !== undefined) observed.amount = Math.floor(entity.amount);
   if (entity.buildProgress !== undefined) observed.buildProgress = Math.round(entity.buildProgress * 1000) / 1000;
   if (entity.garrison?.length) observed.hasGarrison = true;
+  if (isUnit(entity.kind) && entity.relics?.length) observed.carryingRelic = true;
   if (entity.owner === player) {
     // Orders, activities, carried loads, and production stay hidden from opponents.
     observed.activity = entity.activity;
     observed.order = entity.order.kind;
+    if (entity.relics?.length) observed.relics = entity.relics.length;
+    if (entity.faith !== undefined) observed.faith = Math.floor(entity.faith);
     if (entity.kind === 'town-center') observed.townBell = !!entity.townBell;
     if (entity.order.kind === 'build') observed.buildTargetId = entity.order.targetId;
     if (entity.order.kind === 'gather') observed.gatherTargetId = entity.order.targetId;

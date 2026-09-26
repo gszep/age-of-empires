@@ -72,6 +72,7 @@ export interface ImportedEntity {
   /** File-bearing garrison graphic deltas, indexed by the carrier's age art. */
   garrisonFlags?: Record<string, { animation: string; x: number; y: number }[]>;
   particleEffect?: string;
+  deathEffect?: string;
   annexes?: { unitId: number; misplacement: [number, number]; animations: Record<string, AnimationInfo>; atlases: Record<string, Atlas> }[];
   /**
    * A building's fires (issue #73): per standing animation (the age's own

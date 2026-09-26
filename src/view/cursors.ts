@@ -37,6 +37,8 @@ export function contextCursor(
     case 'heal': return 'heal';
     case 'convert': return 'convert';
     case 'trade': return 'action';
+    case 'relic': return targetEntity?.kind === 'monastery' ? 'garrison' : 'action';
+    case 'cross-wall': return 'unboard';
     case 'garrison': return targetEntity && isUnit(targetEntity.kind)
       && rulesForPlayer(game, targetEntity.owner).units[targetEntity.kind].transportCapacity ? 'board' : 'garrison';
     case 'gather': {

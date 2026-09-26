@@ -1,12 +1,13 @@
-# Agent handoff — civilisation integration checkpoint
+# Agent handoff — Briton playable checkpoint
 
 ## Task and stopping point
 
-The user delegated MAIN integration authority for the bonus and roster worktrees,
-preserving `0458053`, with commit/push authorization under the run ending
-**2026-09-25 18:00 BST**. This checkpoint enables the reviewed Briton/Frank
-gameplay profiles after real browser acceptance. #179/#180 remain incomplete;
-the separate tower/wall and petard/siege-tower/relic worktrees are not included.
+The user authorized direct MAIN integration, checkpoint commits and pushes, and
+then closure of the five remaining Briton research mechanics. Scope is Britons,
+not additional civilisations. Fortifications, specialists, relics/monastery,
+Warwolf/deployed trebuchet effects, Shipwright, Caravan, garrison firepower and
+original-price training refunds are integrated. #179 stays open pending Siphons,
+random-map Spies, Guilds, Coinage and Banking outcomes and final verification.
 
 Use `git log -1`, `git status` and `tools/session_start.sh` for the completion
 commit, divergence and gate status. Read `docs/status.md`, `docs/ledger.md`,
@@ -26,13 +27,18 @@ its follow-up references below remain historical context.
   names/icons, age-specific building payments and free farm lifecycle.
 - Corrected disabled-child upgrade folding, source tree aliases for ram/gate,
   and legacy fixtures that omitted now-enforced prerequisites. No timeout widening.
-- Full import repeat is byte-identical for content/UI/audio manifests; 2,122
-  atlases reused. Evidence is in `.local/civ-profiles-verified-repeat.log`,
-  `.local/civ-profiles-browser-verified.log` and
-  `.local/civ-profiles-tc-browser-verified.log`. The checkpoint gate log is
-  `.local/civ-profiles-checkpoint-gate.log`: **GREEN, 820 Vitest tests / 64 files,
-  build, 114 import tests and general browser smoke**. Inspect the latest actual
-  result before continuing; later code edits invalidate this checkpoint.
+- Published assets have been regenerated through the full pipeline. The existing
+  tower/wall and specialist browser probes passed; published monastery/Warwolf
+  clicks and impact checks passed in `.local/britons-monastery-browser-diagnostic.log`.
+- Current checkpoint gate: **GREEN**, `.local/britons-playable-gate-r5.log`:
+  **898 tests / 68 files**, build, **123 import tests**, real-browser debug smoke.
+  R4 passed the tests/imports, then exposed a startup race in
+  the general smoke: canvas presence preceded debug-listener installation.
+  The smoke now waits for listener readiness within its unchanged startup limit;
+  its focused rerun passed. No clocks were widened. R3's three stale import
+  assertions now verify explicit zero blast fields and implemented monk effects.
+- The earlier profile/import determinism checkpoint is preserved in `4ba51db`
+  and its `.local/civ-profiles-*` evidence. It is not the latest gate result.
 
 ## Earlier HUD delivered scope (historical)
 
@@ -127,9 +133,9 @@ time-identical reconstruction of DE's closed-runtime emitter.
   atlas cache and entails the full import. No work on #119 was started here.
 - **#113** remains the other high-priority visual bug. Use the live queue rather
   than treating this list as authorization to begin.
-- Civilisation completeness remains #179/#180: missing tower/wall/specialist
-  mechanics, Warwolf and other unsupported effects/resources. #177 construction
-  and the shared bonus/prerequisite/profile infrastructure are implemented.
+- Briton completeness remains #179: Siphons, Spies and market/tribute research
+  actions are the next bounded work. Do not expand the civilisation catalogue.
+  #177 construction and the shared bonus/prerequisite/profile infrastructure are implemented.
   #178 retains explicit reference caveats under the user-approved inferred policy;
   see `docs/civilization-coverage.md` for the bounded supported-gameplay milestone.
 

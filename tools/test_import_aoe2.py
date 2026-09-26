@@ -73,10 +73,10 @@ class CivilizationAuditTest(unittest.TestCase):
         self.assertEqual(classify_command(gather, units, {1}, {}), "target-outside-roster")
 
     def test_a_named_resource_and_an_enabled_unit_do_not_imply_runtime_support(self):
-        resources = {36: "farmFoodAmount", 191: "relicRate"}
+        resources = {36: "farmFoodAmount", 194: "crenellations"}
         self.assertEqual(classify_command(SimpleNamespace(type=1, a=36, b=1), [], set(), resources),
                          "decoded-player-effect")
-        self.assertEqual(classify_command(SimpleNamespace(type=1, a=191, b=1), [], set(), resources),
+        self.assertEqual(classify_command(SimpleNamespace(type=1, a=194, b=1), [], set(), resources),
                          "unmodelled-player-attribute")
         self.assertEqual(classify_command(SimpleNamespace(type=2), [], set(), resources),
                          "enable-disable-needs-runtime")
@@ -520,7 +520,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(entities["monk"]["combat"]["attacks"], [])
         # The mangonel's stone lands with a blast; an archer's arrow does not.
         self.assertEqual(entities["mangonel"]["combat"]["blastRadius"], 1.0)
-        self.assertNotIn("blastRadius", entities["archer"]["combat"])
+        self.assertEqual(entities["archer"]["combat"]["blastRadius"], 0)
 
     def test_skirmisher_is_identified_by_its_art_not_its_name(self):
         # The DAT calls unit 7 "XBOWM" and unit 24 "CARCH": AoK names that never
@@ -831,8 +831,9 @@ class ContentImportIntegrationTest(unittest.TestCase):
         technologies = self.result["technologies"]
         for tech in technologies.values():
             for step in tech.get("upgrades", []):
-                self.assertEqual(entities[step["from"]]["train"]["button"],
-                                 entities[step["to"]]["train"]["button"], step)
+                role = "build" if entities[step["from"]]["category"] == "building" else "train"
+                self.assertEqual(entities[step["from"]][role]["button"],
+                                 entities[step["to"]][role]["button"], step)
         self.assertEqual(entities["militia"]["train"]["button"], 1)
         self.assertEqual(entities["spearman"]["train"]["button"], 2)
         self.assertEqual(technologies["loom"]["button"], 6)
@@ -1082,21 +1083,19 @@ class ContentImportIntegrationTest(unittest.TestCase):
 
     def test_delete_asks_where_the_dat_flags_it(self):
         # Issue #47: `hero_mode` bit 32 is the safe-delete confirmation, and
-        # it is on five buildings -- not on "buildings". A house goes on the
+        # it is on specific buildings and their upgrades. A house goes on the
         # keypress as in the reference.
         entities = self.result["entities"]
-        flagged = sorted(key for key, entity in entities.items() if entity.get("confirmDelete"))
-        self.assertEqual(flagged, ["castle", "monastery", "town-center", "watch-tower", "wonder"])
         dat = _dat()
         civ = dat.civs[SPEC["civIndex"]]
-        for entry in SPEC["entities"]:
-            if entry.get("civ") == "gaia":
+        for key, entity in entities.items():
+            if entity.get("category") not in ("unit", "building") or "id" not in entity:
                 continue
-            unit = civ.units[entry["unitId"]]
+            unit = civ.units[entity["id"]]
             if unit is None or unit.creatable is None:
                 continue
             self.assertEqual(bool(unit.creatable.hero_mode & 32),
-                             bool(entities[entry["key"]].get("confirmDelete")), entry["key"])
+                             bool(entity.get("confirmDelete")), key)
 
     def test_a_miss_lands_the_dat_dispersion_away(self):
         # Issue #45: the DAT states how far a shot that fails its accuracy
@@ -1148,7 +1147,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
         entities = self.result["entities"]
         self.assertEqual(entities["mangonel"]["combat"]["blastAttackLevel"], 2)
         self.assertEqual(entities["onager"]["combat"]["blastAttackLevel"], 1)
-        self.assertNotIn("blastAttackLevel", entities["archer"]["combat"])
+        self.assertEqual(entities["archer"]["combat"]["blastAttackLevel"], 3)
         for key in ("militia", "villager", "knight", "monk", "sheep", "mangonel"):
             self.assertEqual(entities[key]["blastDefenseLevel"], 3, key)
         for key in ("town-center", "house", "barracks", "palisade-wall", "watch-tower", "castle"):
@@ -1740,8 +1739,12 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertNotIn("set", ids)  # later effect enum, not a player attribute
         self.assertEqual(self.result["source"]["sha256"]["xs/Constants.xs"], sha256(constants))
         # Merely importing the baseline must not expose ineffective research.
-        for key in ("coinage", "banking", "guilds", "faith", "devotion", "theocracy"):
+        for key in ("coinage", "banking", "guilds"):
             self.assertNotIn(key, self.result["technologies"])
+        for key, resources in (("faith", {"convertResistMinAdj", "convertResistMaxAdj"}),
+                               ("devotion", {"convertResistMinAdj", "convertResistMaxAdj"}),
+                               ("theocracy", {"theocracy"})):
+            self.assertEqual({e.get("resource") for e in self.result["technologies"][key]["effects"]}, resources)
         self.assertTrue(any("tradeVigRate" in tech["reason"]
                             for tech in self.result["skippedTechnologies"]))
 

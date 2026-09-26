@@ -78,6 +78,21 @@ OK-popup treatment without a runtime capture.
 
 ## Delivered scope
 
+The 2026-09-26 Briton playable checkpoint passed the full gate:
+**898 Vitest tests / 68 files, build, 123 owned-import tests and browser smoke**
+(`.local/britons-playable-gate-r5.log`). Dedicated published-art monastery/Warwolf
+click/impact evidence is `.local/britons-monastery-browser-diagnostic.log`.
+The five remaining research actions below still block final #179 acceptance.
+
+The Briton completion pass adds stone/fortified walls and gates, Guard Tower/Keep,
+age-correct building durability, Petards, Siege Towers and ram crew bonuses. It
+also adds the relic lifecycle and carried art, six Briton monastery research
+consumers, deployed Warwolf/Siege Engineers effects, Shipwright production timing
+and original-price production refunds. The detailed coverage and remaining
+research gaps are in `civilization-coverage.md`; source/engine inferences remain
+in `ledger.md`. These are completion steps for #179, not a claim that all
+Briton research or all map-specific relic distributions are finished.
+
 **Simulation** (`src/sim`, authoritative, fixed 20 Hz tick, deterministic):
 integer resources with gathering, drop-off and depletion; building placement,
 construction, repair (#74), garrison (#75), destruction with each age's

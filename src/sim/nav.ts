@@ -124,8 +124,9 @@ export function entityGrid(
     // not it is finished — the DAT gives it no collision height and no
     // obstruction class (issue #40).
     if (building?.passable) continue;
-    if (forOwner !== undefined && entity.owner === forOwner && entity.buildProgress === undefined
-      && building?.passableForOwner) {
+    const open = forOwner !== undefined && entity.owner === forOwner && entity.buildProgress === undefined
+      && building?.passableForOwner;
+    if (open && building.gateOpening === undefined) {
       continue;
     }
     const half = halfExtent(entity);
@@ -134,7 +135,11 @@ export function entityGrid(
     const minY = Math.max(0, Math.floor(entity.position.y - half.y + 1e-6));
     const maxY = Math.min(grid.height - 1, Math.ceil(entity.position.y + half.y - 1e-6) - 1);
     for (let y = minY; y <= maxY; y++) {
-      for (let x = minX; x <= maxX; x++) grid.blocked[index(grid, x, y)] = 1;
+      for (let x = minX; x <= maxX; x++) {
+        const along = half.x > half.y ? x + 0.5 - entity.position.x : y + 0.5 - entity.position.y;
+        if (open && Math.abs(along) < building.gateOpening!) continue;
+        grid.blocked[index(grid, x, y)] = 1;
+      }
     }
   }
   return grid;

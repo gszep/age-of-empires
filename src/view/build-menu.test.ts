@@ -60,10 +60,16 @@ describe('the villager build menu', () => {
     // A kind added without a page would land silently on the economic one;
     // this is what says so.
     for (const rules of [FALLBACK_RULES, ...(importedRules ? [importedRules] : [])]) {
-      const economic = buildMenu(rules, 3, 'economic');
-      const military = buildMenu(rules, 3, 'military');
-      expect([...economic, ...military].sort()).toEqual(buildable(rules).sort());
-      expect(economic.filter(k => military.includes(k))).toEqual([]);
+      const seen = new Set<BuildingKind>();
+      for (const researched of [[], ['guard-tower'], ['guard-tower', 'keep', 'fortified-wall']]) {
+        const economic = buildMenu(rules, 3, 'economic', researched);
+        const military = buildMenu(rules, 3, 'military', researched);
+        for (const kind of [...economic, ...military]) seen.add(kind);
+        expect(economic.filter(k => military.includes(k))).toEqual([]);
+        const slots = military.map(k => rules.buildings[k].buildButton).filter(n => n !== undefined);
+        expect(new Set(slots).size).toBe(slots.length);
+      }
+      expect([...seen].sort()).toEqual(buildable(rules).sort());
     }
   });
 
@@ -84,8 +90,7 @@ describe('the villager build menu', () => {
   });
 
   it('keeps walls and their gates with the defences', () => {
-    // Neither is picked from a slot -- a wall is dragged and the DAT gives the
-    // gate no build button at all -- but both belong on the military page.
+    // Construction heads provide gate slots; both belong with the defences.
     expect(MILITARY_BUILDINGS.has('palisade-wall')).toBe(true);
     expect(MILITARY_BUILDINGS.has('palisade-gate')).toBe(true);
   });

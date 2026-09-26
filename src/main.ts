@@ -10,6 +10,7 @@ import { isTileVisible } from './sim/visibility';
 import { checksumState } from './sim/checksum';
 import type { MatchRecord } from './protocol/types';
 import type { BuildingKind, Entity, GameState, PlayerId, Point, UnitKind } from './sim/types';
+import { isGateKind, isWallKind } from './sim/buildings';
 import { buildMenu, type BuildPage } from './view/build-menu';
 import { contextTargets, sameKindOnScreen } from './view/selection';
 import { clearSession, loadSession, loadSessionSetup, saveSession } from './dev-session';
@@ -289,7 +290,7 @@ const SELECTION_COLOR = 0xf5f0dc;
  * what was a ring around an animal becomes a flat box over what is left of it.
  */
 function selectionMarker(entity: Entity): { shape: 'round' | 'square'; half: { x: number; y: number } } {
-  const key = entity.kind === 'palisade-gate' ? view.gateBoxKey(entity) : view.entityKey(entity);
+  const key = isGateKind(entity.kind) ? view.gateBoxKey(entity) : view.entityKey(entity);
   const entry = importedEntity(key, entity.owner)?.selection;
   const imported = entity.dead ? entry?.dead ?? entry : entry;
   const shape = imported?.shape ?? (isUnit(entity.kind) ? 'round' : 'square');
@@ -610,7 +611,7 @@ function runUiCommand(id: string, shift = false): void {
       hud.showMessage(messages.unloadWhere ?? 'Click where you want the transport to unload.');
       return;
     }
-    for (const building of selection.filter(e => e.garrison?.length)) {
+    for (const building of selection.filter(e => e.garrison?.length || e.relics?.length)) {
       const result = applyCommand(game, { kind: 'ungarrison', player: localPlayer, buildingId: building.id });
       if (!result.ok) reject(result.reason);
     }
@@ -737,7 +738,7 @@ renderer.domElement.addEventListener('contextmenu', event => event.preventDefaul
 const DOUBLE_CLICK_MS = 350;
 let lastClick: { id: number; at: number } | undefined;
 /** A building placed one tile at a time along a dragged line, as AoE2 walls are. */
-const isWall = (kind: BuildingKind): boolean => kind === 'palisade-wall';
+const isWall = isWallKind;
 let wallStart: Point | undefined;
 
 /**
@@ -750,10 +751,11 @@ let gateOrientation: 'x' | 'y' = 'x';
 function orientationOf(kind: BuildingKind, at: Point): 'x' | 'y' {
   if (!playerRules().buildings[kind].footprint) return 'x';
   const joins = (dx: number, dy: number) => game.entities.some(e => !e.dead && e.owner === localPlayer
-    && e.kind === 'palisade-wall'
+    && isWallKind(e.kind)
     && Math.abs(e.position.x - (at.x + dx)) < 0.6 && Math.abs(e.position.y - (at.y + dy)) < 0.6);
-  if (joins(-1.5, 0) || joins(1.5, 0)) return 'x';
-  if (joins(0, -1.5) || joins(0, 1.5)) return 'y';
+  const reach = Math.max(...Object.values(playerRules().buildings[kind].footprint!)) + 0.5;
+  if (joins(-reach, 0) || joins(reach, 0)) return 'x';
+  if (joins(0, -reach) || joins(0, reach)) return 'y';
   return gateOrientation;
 }
 
@@ -1122,9 +1124,9 @@ function currentCommands(): CommandButton[] {
         slot: GRID_SLOT.repair, enabled: true,
       });
     } else {
-      for (const kind of buildMenu(rules, player.age, buildPage)) {
+      for (const kind of buildMenu(rules, player.age, buildPage, player.researched)) {
         const building = buildingRulesFor(game, localPlayer, kind);
-        if (!civHas(game, localPlayer, 'buildings', building.datId)) continue;
+        if (!civHas(game, localPlayer, 'buildings', building.availabilityId ?? building.datId)) continue;
         if (buildingLimitReached(game, localPlayer, kind)) continue;
         buttons.push({
           id: `build-${kind}`,
@@ -1167,9 +1169,10 @@ function currentCommands(): CommandButton[] {
   }
   // A building with somebody inside offers the reference's "Ungarrison All
   // Units" (`buttons.json`: action 78, cell 9, icon 2) (issue #75).
-  if (selection.some(e => e.garrison?.length)) {
+  if (selection.some(e => e.garrison?.length || e.relics?.length)) {
     buttons.push({
-      id: 'ungarrison', label: selection.some(e => e.kind === 'transport-ship') ? messages.unload ?? 'Unload' : 'Ungarrison all units', icon: hud.actionIcon(ACTION_ICON.ungarrison),
+      id: 'ungarrison', label: selection.some(e => e.kind === 'monk' && e.relics?.length) ? 'Drop Relic'
+        : selection.some(e => e.kind === 'transport-ship') ? messages.unload ?? 'Unload' : 'Ungarrison all units', icon: hud.actionIcon(ACTION_ICON.ungarrison),
       slot: selection.some(e => e.kind === 'transport-ship') ? 1 : GRID_SLOT.ungarrison, enabled: true,
     });
   }
@@ -1472,6 +1475,8 @@ function selectionInfo(): SelectionInfo | undefined {
     details.push(`${entity.garrison.length}${capacity ? `/${capacity}` : ''} garrisoned`);
   }
   if (entity.carrying) details.push(`Carrying ${entity.carrying.amount} ${entity.carrying.kind}`);
+  if (entity.owner === localPlayer && entity.relics?.length) details.push(`Relics: ${entity.relics.length}`);
+  if (entity.owner === localPlayer && entity.kind === 'monk') details.push(`Faith: ${Math.floor(entity.faith ?? 100)}%`);
   let progress: SelectionInfo['progress'];
   if (entity.buildProgress !== undefined) {
     progress = { label: 'Building', fraction: entity.buildProgress };

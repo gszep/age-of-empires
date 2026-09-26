@@ -3,6 +3,7 @@ import { materialColor, materialOpacity, texture as textureNode, vec2 } from 'th
 import { skinnedKey } from './skins';
 import { atlasPage, spriteTexture, type ContentAssets, type Atlas, type AnimationInfo, type ImportedEntity } from './assets';
 import { isAnimal, isBuilding, isUnit } from '../sim/data';
+import { isGateKind, isWallKind, isWallLineKind } from '../sim/buildings';
 import { rulesForPlayer } from '../sim/civilizations';
 import { corpseAgeSeconds, swingSeconds } from '../sim/game';
 import { createTerrainPatch, elevationAt, ELEVATION_PIXELS, elevatedWorldToIso, FOG_EXPLORED } from './world';
@@ -317,6 +318,21 @@ export const WALL_JOINT = 2;
 export const WALL_POST = 4;
 
 export function wallShape(state: ReadonlyGameState, entity: Entity): number {
+  if (entity.kind === 'stone-wall' || entity.kind === 'fortified-wall') {
+    // Owned frames: x, y, post, screen-horizontal/vertical diagonal. Unlike
+    // palisades, 4 is not a post (tools/probes/building_wall_art.py).
+    const axes = new Set<number>();
+    for (const [dx, dy, frame] of [[1, 0, 0], [0, 1, 1], [1, -1, 3], [1, 1, 4]]) {
+      for (const sign of [-1, 1]) {
+        const at = { x: entity.position.x + dx * sign, y: entity.position.y + dy * sign };
+        if (state.entities.some(other => !other.dead && other.id !== entity.id && other.owner === entity.owner
+          && isWallLineKind(other.kind)
+          && Math.abs(other.position.x - at.x) < (other.footprint?.x ?? other.radius)
+          && Math.abs(other.position.y - at.y) < (other.footprint?.y ?? other.radius))) axes.add(frame);
+      }
+    }
+    return axes.size === 1 ? [...axes][0] : WALL_JOINT;
+  }
   let alongX = false;
   let alongY = false;
   for (const offset of [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]) {
@@ -324,7 +340,7 @@ export function wallShape(state: ReadonlyGameState, entity: Entity): number {
     // than sitting on one, so what is asked is whether it reaches this tile.
     const at = { x: entity.position.x + offset.x, y: entity.position.y + offset.y };
     const joined = state.entities.some(other => !other.dead && other.owner === entity.owner
-      && (other.kind === 'palisade-wall' || other.kind === 'palisade-gate')
+      && isWallLineKind(other.kind)
       && Math.abs(other.position.x - at.x) < (other.footprint?.x ?? other.radius)
       && Math.abs(other.position.y - at.y) < (other.footprint?.y ?? other.radius));
     if (!joined) continue;
@@ -348,7 +364,7 @@ export function wallShape(state: ReadonlyGameState, entity: Entity): number {
 
 /** The unit whose obstruction box matches this gate: for the selection marker. */
 export const gateBoxKey = (entity: Entity): string =>
-  (entity.footprint?.y ?? 0) > (entity.footprint?.x ?? 0) ? 'palisade-gate-y' : 'palisade-gate';
+  (entity.footprint?.y ?? 0) > (entity.footprint?.x ?? 0) ? `${entity.kind}-y` : entity.kind;
 
 /** The unit whose art lies along this gate's run on screen: the same one. */
 export const gateArtKey = gateBoxKey;
@@ -426,6 +442,9 @@ function isVariantArt(entity: Entity, animation: AnimationInfo): boolean {
 /** Choose the imported sprite source (entity variant) and animation name. */
 export function chooseAnimation(state: ReadonlyGameState, entity: Entity): { key: string; name: string } {
   const kind = entity.kind;
+  if (kind === 'monk' && entity.relics?.length && !entity.dead) {
+    return { key: 'monk-relic', name: entity.activity === 'moving' ? 'walk' : 'idle' };
+  }
   if (kind === 'resource') {
     const felled = entity.dead || treeIsFelled(state, entity);
     return { key: entityKey(entity), name: felled ? 'death' : 'idle' };
@@ -433,10 +452,10 @@ export function chooseAnimation(state: ReadonlyGameState, entity: Entity): { key
   if (isBuilding(kind)) {
     // A gate is two units in the DAT, one per axis, each with a closed leaf and
     // an open one; which of the four to draw is the footprint and who is near.
-    const key = kind === 'palisade-gate' ? gateArtKey(entity) : kind;
+    const key = isGateKind(kind) ? gateArtKey(entity) : kind;
     if (entity.dead) return { key, name: ageIdle(state, entity, 'death') };
     if (entity.buildProgress !== undefined) return { key, name: 'construction' };
-    if (kind === 'palisade-gate' && gateIsOpen(state, entity)) return { key, name: 'open' };
+    if (isGateKind(kind) && gateIsOpen(state, entity)) return { key, name: 'open' };
     return { key, name: ageIdle(state, entity) };
   }
   if (kind !== 'villager') {
@@ -1077,6 +1096,21 @@ export function updateEntityView(
   } else {
     view.diedAt = undefined;
   }
+  const deathEffect = entity.dead && imported?.deathEffect ? assets.particles?.[imported.deathEffect] : undefined;
+  if (deathEffect) {
+    const elapsed = deathElapsed ?? 0;
+    const duration = deathEffect.cycleSeconds[1];
+    const frame = Math.min(deathEffect.atlas.framesInFile - 1,
+      Math.floor(elapsed / duration * deathEffect.atlas.framesInFile));
+    view.frameIndex = frame;
+    view.animationState = `${choice.key}/death-effect/${imported!.deathEffect}`;
+    applyFrame(view.body, assets, deathEffect.atlas, frame, entity.position, 0xffffff);
+    view.body.mesh.position.y += elevationAt(state, entity.position.x, entity.position.y) * ELEVATION_PIXELS;
+    view.body.mesh.renderOrder = spriteLayerOrder(depth, 9);
+    if (elapsed >= duration) view.body.mesh.visible = false;
+    for (const piece of [view.shadow, view.color, view.outline]) piece.mesh.visible = false;
+    return;
+  }
   // An attack plays once per swing, on the simulation's own clock: the frame
   // is where the swing is, so the stone leaves the arm at the DAT's frame,
   // and once the art has played out the unit stands until the next swing
@@ -1138,7 +1172,7 @@ export function updateEntityView(
     : choice.name.startsWith('decay') ? Math.max(0, deathElapsed - dyingSeconds) : deathElapsed;
 
   let frameIndex: number;
-  if (entity.kind === 'palisade-wall' && choice.name === 'idle') {
+  if (isWallKind(entity.kind) && choice.name === 'idle') {
     frameIndex = Math.min(atlas.framesInFile - 1, wallShape(state, entity));
   } else if (choice.name === 'construction') {
     // Ahead of the variation rule: a foundation's frames are the stages of

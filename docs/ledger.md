@@ -39,6 +39,61 @@ off the reference; **measured** — fitted to a reference screenshot;
   and is not enabled by this milestone. Catalogue missing IDs exclude represented
   aliases/heads, rather than calling each a missing playable unit.
 
+## Petard, siege tower and ram crews (#131/#161/#179/#180)
+
+- **Owned:** petard 440 trains at castle 82: HP 50, speed .8, 65 food/20 gold,
+  25 seconds; attacks 26:100, 11:500, 4:25, 20:60, 22:900; blast .5, level 2.
+  Tower 1105: capacity 10, speed .96, HP 175, 100 wood/120 gold, 36 seconds at
+  workshop 49, no attacks. Task 14 targets class 27; XS calls it
+  `cTaskTypeUnloadOverWall`, help 26445/3123 describes crossing enemy walls.
+  Both civs, tasks and ram identity aliases were inspected.
+- **Inferred crew constants:** living class-6 infantry adds .05 tiles/s to a
+  ram/tower and 10 class-11 attack to a ram. Villagers add neither. Tower
+  archers/monks can ride without speed. DAT/tasks/XS/help establish the mechanic,
+  not these constants. Passenger mask 11 is inferred from the foot/mounted
+  prohibition. Contributions stay live, never in conversion snapshots; #161's
+  patch-matched numeric calibration remains open.
+- **Inferred petard semantics:** one blast on attack contact, none on interception/
+  deletion. Reuses demolition owner immunity, full damage within radius, armour/
+  elevation and centre-to-target-radius resolution. This is not established by
+  the DAT's numbers (including `friendly_fire_damage = 1`).
+- **Chosen landing geometry:** completed enemy wall of the task class, nearest
+  cardinal face, tower outside; passengers just beyond one footprint at offsets
+  0/±half of its half-extent and .1 clearance. Blocked cargo retries; double walls
+  cannot be jumped. Diagonal/gate crossing, cadence and ordinary egress/destruction
+  retain explicit approximations.
+- **Owned feedback:** death 5461 → delta 12217 → `impact_petard.json` uses
+  `impact_explosions.png` frames 90..174, 85 frames, 1.5 s, scale .6, replacing
+  the parent's misleading idle filename on the saved corpse clock. Tower slots/
+  flags are its own. Native sound cues remain #114. See the specialist contract.
+
+## Briton deployed research and paid production
+
+- **Owned, 2026-09-26:** DAT technology 461/effect 540 adds blast width .5
+  and sets accuracy 100 on deployed trebuchet 42, whose baseline blast is zero.
+  Technology 377 addresses both packed class 51 and deployed class 54 separately;
+  applying both to one attack would double Siege Engineers. The rule resolver
+  retains the deployed target identity, armour, sight and search values separately.
+  XS constants name blast/search attributes 22/23 and garrison firepower 130.
+- **Owned:** Shipwright 373/effect 371 multiplies ship training time by .65
+  and wood cost by .8; the localized description's “50% faster” is not used to
+  replace the DAT multiplier. Caravan 48/effect 482 multiplies both speed and
+  work by 1.2. Work now reaches trader income, and ship training reads the
+  researched duration. Existing paid entries retain their original price in
+  snapshots and refunds.
+- **Inferred:** active paid production keeps its purchased clock; waiting
+  production takes the effective duration when it begins. Legacy saves without
+  price receipts refund their current rule cost because the original payment
+  cannot be reconstructed. Search radius is limited by the unit's sight for
+  autonomous acquisition. Existing blast geometry/damage interpretation remains
+  the shared approximation; Warwolf does not introduce a second damage model.
+- **Evidence:** `briton-research.test.ts` measures splash damage and projectile
+  JSON continuation, actual Siege Engineers shot/range, Shipwright completion
+  and cancellation after discounts/JSON. `test_briton_research.py` connects the
+  consumed values to DAT effects. The published-manifest monastery browser probe
+  also clicks Warwolf and verifies damage to a neighbouring unit. Its targets
+  are inside the splash boundary, rather than on a floating-point boundary.
+
 ## Converted-unit inheritance (#178)
 
 - **Owned inspection (2026-09-24):** root resolved with the main checkout's
@@ -245,9 +300,13 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | AI Feudal infrastructure reserve | reserve the next archery range's 175 wood, then blacksmith's 150, against extra camps/farms and archer training; housing, first drop sites and first farm remain available; release once both buildings exist | **chosen** strategy fixing #86's repeated small-purchase starvation, reusing existing building prices. Owned `Promisory/buildings.per` 11217–11239 explicitly targets and builds a blacksmith after a lumber camp; our reserve and exceptions are not an import of its goal system. Fresh imported seeds 1/7 now finish blacksmiths; seed 42 finishes a range and wins before its smith. Further building/unit policy remains #124 | `ai.ts`, `ai-military-buildings.test.ts` | #86 |
 | Repair targets beyond the class table (a farm) | repairs at the building rate | chosen | `game.ts` | — |
 | `garrison_heal_rate` unit | hit points a second | inferred | `game.ts` | — |
+| Briton relics | Gaia285 pickup → carrier286 → monastery104, persisted identity, gold income and drop/death release | **Owned** monk125 task132 (target285, result286, range0), carrier task136 (target104, result125, range1), Gaia285 HP30/radius0.5, resource191=30, original relic/carry art. Per-minute interpretation, integer banking with persisted fraction, nearest non-full owned monastery, unchanged monk collider/stat snapshot, damage immunity and deterministic release point are **inferred** integration. Reuses public ungarrison; Drop Relic wording is owned40106/41106, icon/cell reuse and count/faith text are **chosen** UI. Transport sinking retains existing passenger-loss policy. No relic victory (#110) | `relics.ts`, `game.ts`, `sprites.ts`, `main.ts` | #130 |
+| Briton monastery research consumers | Devotion/Faith delay enemy conversion, Theocracy spares other participants' faith, Illumination accelerates recharge, Block Printing extends actual conversion range, Herbal Medicine increases actual garrison healing | **Owned** effects46/45 add1/4 to178/179;494 sets193;219 multiplies class18 attribute10 by1.875;220 adds3 range;41 multiplies class3/52 attribute108 by6. Monk reload1.6 as faith points/sec over100, additive seconds and participant charge policy are **inferred** engine semantics atop the existing uniform conversion window. `convertedRules` remains locked; player resources remain live. No new conversion permissions, chance or healing modifiers | `monastery.ts`, `rules.ts`, `import_content.py`; owned offered-tech assertions + outcome tests | #128 |
+| Briton relic placement slice | Tiny Arabia: one central + two/player, independently seeded after the existing opening | Counts, distance32/spacing24 from **owned** modern Arabia BALANCED `includes/relics.inc`; box distances, approximate central strip/player zones, cardinal reachability and obstacle clearance are **chosen**. Exact actor areas/cliff/forest constraints are not reproduced. Other maps remain without relic placement in this bounded change; no Black Forest relaxation or invented Islands islet | `relic-placement.ts` | #130/#95 |
+| Unsupported relic thresholds | Non-stockpile technology costs disable automatic nodes; legacy automatic699–702 return no technology/effects | **Owned** resource7 costs on699–702 are count prerequisites lost by old extraction. **Chosen fail-closed guard**, not implementation of Lithuanian bonuses or resource counters | `technologies.ts`, `import_content.py` | #130 |
 | Garrison firepower and volley resolution | positive firepower multiplies ranged DPS; a negative value adds its magnitude as flat DPS (villager −2.5 → 2.5 DPS); sum contributions, divide by the researched building's pierce DPS, floor and cap; an absent primary projectile consumes neither the nominal base arrow nor its maximum slot | signed field **owned**; sign meaning **community-documented** in [UGC attribute 130](https://ugc.aoe2.rocks/general/attributes/attributes/#130-garrison-firepower). Ranged-DPS basis, flooring and absent-primary slot interpretation **inferred** engine integration, tested through actual released volleys. Replaces the old fixed-one-arrow treatment; not claimed as a patch-matched runtime measurement | `game.ts` `volleyArrows` | #137 |
 | Town bell recall and return | nearest eligible owned villagers first, stable ID ties, up to free TC capacity minus incoming garrison reservations; remember interrupted order/queue, bank carried loads on entry, restore work on bell release; newer orders cancel the remembered task; newly trained villagers shelter while the bell rings | toggle/return behavior **owned** help 41111, button actions 163/165 at cell 14 with icons 49/61; cue aliases `townbell_start/stop` **owned**. Global nearest-worker selection with no radius cutoff, reservation policy, preserving manually sheltered units and new-villager handling **chosen/inferred**; exact DE bell search radius/overflow routing is not stated by inspected files | `game.ts`, `main.ts`, observation v5 | #137 |
-| Production and ram shelter | self-rally holds newly trained units; type-0 production buildings do not accept returning outside units; overflow emerges outside. Rams carry infantry/villagers, reject archers/cavalry, unload to passable land and release on destruction when an exit is available | self-rally training **owned** help 4944; capacity/type/healing **owned** (production 10/type 0, ram units 35/422 capacity 6). Ram passenger class filter, overflow and deterministic egress policy **inferred/chosen**. Ram crew speed/attack bonuses are not implemented (#161) | `data.ts`, `game.ts` | #137 |
+| Production and ram shelter | self-rally holds trainees; type-0 producers refuse returning units; overflow emerges outside. Rams carry infantry/villagers, reject archers/cavalry, unload to passable land and release on destruction where possible | self-rally **owned** help 4944; production capacity 10/type 0, ram 35/422 capacity 6 **owned**. Filtering/egress **inferred/chosen**; live crew constants and their remaining calibration caveat are recorded above | `data.ts`, `game.ts` | #137/#161 |
 | Garrison categories by DAT class | editor table | chosen | `game.ts` `GARRISON_CATEGORY` | — |
 | Shift-click queue count | 5 | inferred (the reference's count); `hotkeys.json` binds nothing | `main.ts` | — |
 | Shift-click route: an unshifted order or Stop clears the route | rule | inferred | `game.ts` | — |
@@ -264,9 +323,11 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Bonus prices and production | cost multipliers in completion order, then nearest whole resource (half up); production/research advances by building work rate | multipliers **owned**: TC wood ×0.5; castle ×0.85 then ×0.882353; range work ×1.1. Rounding/tick quantization **inferred**: TC wood 138, castle stone 553/488 are implementation outcomes, not DE measurements. Existing HP policy adds max-HP delta preserving absolute damage; converted entities skip bulk HP/upgrades | `rules.ts`, `game.ts` | #123/#178 |
 | Bonus scope and remaining effects | current 1v1 applies each player's own team effect; unsupported commands/attributes retained as `unmodelled`. No allied teams, timed locationless research or general enable/disable-unit effect execution | **owned** commands retained as diagnostics; range/sight, gathering, production, prices and cavalry HP have consumers. Search radius 23, building age-stat replacements, conversion/relic resources and other unsupported effects remain gaps | `civilizationBonuses.nodes`, `import_content.py` | #123/#128/#126/#130/#179/#180 |
 | Unmodelled attributes 23, 130, 48, 49 | recorded per technology, not applied | owned but unmodelled | manifest `unmodelled` | #128 |
-| Named player-attribute coverage | all named DAT initial values imported; research-aware consumers for farm food and unit/building repair costs only. Other resource effects remain unmodelled; initial food/population/score entries are not live counters | names/indices **owned** from the XS Attributes section, values **owned** from the configured civ. Lower-first-letter manifest keys and legacy `FarmFood` → `farmFoodAmount` are schema conventions. No new gameplay constants; repair billing retains existing whole-resource rounding and uses the current researched fraction for each increment | `import_content.py`, `rules.ts` `playerAttributeFor`, `game.ts` | #53 infrastructure; #128, #130, #123, #177 consumers remain separate |
+| Named player-attribute coverage | all named DAT initial values imported; research-aware consumers for farm food, repair, relic gold, conversion resistance windows and Theocracy. Other resource effects remain unmodelled; initial food/population/score entries are not live counters | names/indices **owned** from XS, values **owned** from configured civ. Lower-first-letter keys and legacy `FarmFood` → `farmFoodAmount` remain schema conventions | `import_content.py`, `rules.ts`, `monastery.ts`, `relics.ts` | #53/#128/#130 |
 | Skipped technologies | not researchable, reason each | owned | manifest `skippedTechnologies` | #128, #97 |
-| Age variants' hit points | not applied | owned, not applied | — | #126 |
+| Building age and paid upgrades | stable age variants select HP/armour/LOS; paid tower/wall/gate upgrades replace kind, retaining damage and scaling foundation gains by built fraction | baselines, IDs, costs/gates/armour **owned**; absolute damage retention, fractional foundation scaling and shared gate HP **inferred**. Generic sole-age rows 71/72 normalize into baselines with `includedTechs` preventing graph reapplication; source float precision retained | `tools/buildings.py`, `rules.ts`, `game.ts`; building contract | #126/#179/#180 |
+| Stone/fortified gate topology and art | four-tile construction, two-tile owner doorway, solid posts, two axes preserved by upgrade; previews supply closed/open parts/flags, heads supply construction, rubble/collapse includes posts | geometry, links and graphics **owned**; shared HP, owner passage and proximity-open display **inferred**. Diagonal placement/native timing remain #133 | `import_content.py`, `nav.ts`, `sprites.ts` | #126 roster slice |
+| Stone/fortified wall frames | x=0, y=1, post/junction=2, horizontal/vertical screen diagonals=3/4 | **Measured** by composing owned x2 frames at hotspots divided by scale (`tools/probes/building_wall_art.py`). Neighbour-footprint junction selection **inferred**; palisades keep their separate mapping | `sprites.ts` `wallShape` | #126 roster slice |
 | Mirror-symmetric board | exact mirror | chosen divergence; the paired batch rests on it | `mapgen.ts` | — |
 | Black Forest seed 7 | one far-gold pair dropped | chosen compromise | `mapgen.ts` | — |
 | Straggler clearance, neutral wood counts | scaled from the script | chosen | `mapgen.ts` | — |

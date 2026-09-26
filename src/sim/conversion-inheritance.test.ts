@@ -87,6 +87,23 @@ function convert(state: GameState, monk: Entity, target: Entity): void {
 }
 
 describe('converted unit inheritance (#178)', () => {
+  it('keeps both siege forms when a deployed engine is captured and packed again', () => {
+    const rules = catalog();
+    rules.civilizations!.donor.units.trebuchet.unpacked!.armors = [{ class: 3, amount: 150 }];
+    const state = arena(rules);
+    const target = spawn(state, 'trebuchet', 2);
+    target.unpacked = true;
+    const monk = spawn(state, 'monk', 1, 59.5, 50.5);
+    convert(state, monk, target);
+    command(state, { kind: 'pack', player: 1, entityIds: [target.id], unpacked: false });
+    until(state, () => !target.unpacked);
+    const attacker = spawn(state, 'longbowman', 2, 63.5, 50.5);
+    command(state, { kind: 'order', player: 2, entityIds: [attacker.id], target: target.position, targetId: target.id });
+    const hp = target.hp;
+    until(state, () => target.hp < hp);
+    expect(hp - target.hp).toBe(12); // 20 pierce minus packed armour 8, not deployed 150
+  });
+
   it.skipIf(!imported).each([false, true])('owned Loom preserves captured wounds and excludes later research (donor Loom: %s)', donorLoom => {
     const state = createGame(178, imported!);
     state.entities = state.entities.filter(e => e.kind === 'town-center');

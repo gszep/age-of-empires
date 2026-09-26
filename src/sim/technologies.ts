@@ -4,6 +4,8 @@ import type { GameState, PlayerId } from './types';
 
 /** Hidden nodes share the same ordered research history and effect consumers. */
 export function technologyFor(rules: GameRules, key: string) {
+  // Legacy imports lost these live relic-count prerequisites. Fail closed.
+  if (/^automatic-(699|700|701|702)$/.test(key)) return undefined;
   return rules.technologies[key] ?? (key.startsWith('automatic-')
     ? rules.civilizationBonuses?.nodes[key.slice('automatic-'.length)] : undefined);
 }

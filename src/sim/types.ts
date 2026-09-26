@@ -1,4 +1,4 @@
-import type { GameRules, NodeKind, UnitRules, VillagerGatherTask } from './data';
+import type { Cost, GameRules, NodeKind, UnitRules, VillagerGatherTask } from './data';
 import type { PlayerVisibility } from './visibility';
 
 export type PlayerId = 1 | 2;
@@ -17,7 +17,7 @@ export type UnitKind =
   | 'knight' | 'cavalier' | 'cavalry-archer' | 'heavy-cavalry-archer'
   | 'longbowman' | 'elite-longbowman'
   | 'battering-ram' | 'capped-ram' | 'mangonel' | 'onager' | 'scorpion' | 'heavy-scorpion' | 'monk'
-  | 'trebuchet'
+  | 'trebuchet' | 'petard' | 'siege-tower'
   | AnimalKind | NavalUnitKind;
 /** Gaia's food on the hoof: herded, or hunted where it stands. */
 export type AnimalKind = 'sheep' | 'deer' | 'boar';
@@ -27,8 +27,9 @@ export type BuildingKind =
   | 'outpost' | 'watch-tower'
   | 'archery-range' | 'blacksmith' | 'market' | 'stable'
   | 'monastery' | 'siege-workshop' | 'castle' | 'university' | 'wonder' | 'dock'
-  | 'palisade-wall' | 'palisade-gate' | 'fish-trap';
-export type EntityKind = UnitKind | BuildingKind | 'resource';
+  | 'palisade-wall' | 'palisade-gate' | 'fish-trap'
+  | 'stone-wall' | 'fortified-wall' | 'stone-gate' | 'fortified-gate' | 'guard-tower' | 'keep';
+export type EntityKind = UnitKind | BuildingKind | 'resource' | 'relic';
 export type Activity =
   | 'idle' | 'moving' | 'gathering' | 'carrying' | 'building' | 'attacking' | 'dying'
   /** A monk's two works: mending its own side, and preaching at somebody else's. */
@@ -39,6 +40,7 @@ export type Activity =
 export interface Point { x: number; y: number }
 
 export type Order =
+  | { kind: 'relic'; targetId: number }
   | { kind: 'idle' }
   | { kind: 'move'; target: Point }
   | { kind: 'gather'; targetId: number }
@@ -54,6 +56,7 @@ export type Order =
   | { kind: 'repair'; targetId: number }
   /** A unit walking into its own side's building to shelter there. */
   | { kind: 'garrison'; targetId: number }
+  | { kind: 'cross-wall'; targetId: number }
   | { kind: 'unload'; target: Point };
 
 export interface Entity {
@@ -64,6 +67,11 @@ export interface Entity {
    * subsequent research. Player-level resources/tree permissions still follow
    * owner. Plain data so saves and replays preserve the same inheritance. */
   convertedRules?: UnitRules;
+  /** Intact off-map relics: one on a monk, up to capacity in a monastery. */
+  relics?: Entity[];
+  relicGoldProgress?: number;
+  /** 0..100 conversion faith; absent means full, including legacy saves. */
+  faith?: number;
   position: Point;
   hp: number;
   maxHp: number;
@@ -127,13 +135,15 @@ export interface Entity {
    * a gate is two tiles by one, and which way round is its orientation. */
   footprint?: { x: number; y: number };
   buildProgress?: number; // 0..1; undefined once complete
-  training?: { kind: UnitKind; remainingTicks: number };
+  training?: { kind: UnitKind; remainingTicks: number; paidCost?: Cost };
   /**
    * Units waiting behind the one being trained, in the order they were asked
    * for. Each was paid for when it was queued, as in AoE2, and is refunded if
    * it is cancelled.
    */
   trainingQueue?: UnitKind[];
+  /** Original paid prices, aligned with the waiting queue; legacy entries may be absent. */
+  trainingQueueCosts?: (Cost | undefined)[];
   researching?: { tech: string; remainingTicks: number };
   rally?: { target: Point; targetId?: number };
   attackCooldown?: number; // ticks until a new swing may start

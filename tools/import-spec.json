@@ -17,6 +17,7 @@
   },
   "gaiaIndex": 0,
   "naval": true,
+  "buildingRoster": true,
   "playerColors": [
     "blue",
     "red",
@@ -57,6 +58,22 @@
     }
   ],
   "entities": [
+    {
+      "key": "petard", "unitId": 440, "category": "unit",
+      "sounds": ["select", "train"],
+      "animations": {
+        "idle": {"slot": "standing"}, "walk": {"slot": "walking"},
+        "attack": {"slot": "attack"}, "death": {"slot": "dying"}
+      }
+    },
+    {
+      "key": "siege-tower", "unitId": 1105, "category": "unit",
+      "sounds": ["select", "train"],
+      "animations": {
+        "idle": {"slot": "standing"}, "walk": {"slot": "walking"},
+        "attack": {"slot": "attack"}, "death": {"slot": "dying"}, "decay": {"slot": "dead"}
+      }
+    },
     {
       "key": "militia",
       "sounds": [
@@ -2227,6 +2244,23 @@
         "decay": {
           "slot": "dead"
         }
+      }
+    },
+    {
+      "key": "relic",
+      "unitId": 285,
+      "civ": "gaia",
+      "category": "resource",
+      "animations": { "idle": { "slot": "standing" } }
+    },
+    {
+      "key": "monk-relic",
+      "unitId": 286,
+      "category": "relic-carrier",
+      "animations": {
+        "idle": { "slot": "standing" },
+        "walk": { "slot": "walking" },
+        "death": { "slot": "dying" }
       }
     },
     {

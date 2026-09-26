@@ -282,15 +282,26 @@ describe('siege', () => {
 describe('what Delete asks about', () => {
   /**
    * The DAT's `hero_mode` bit 32 (issue #47): set on the town center, watch
-   * tower, monastery, castle and wonder, and on nothing else. The rule is
-   * asserted on both rule sets so the open fallback cannot drift from it.
+   * tower, monastery, castle and wonder, including the paid tower tiers.
+   * Compare imported flags to metadata and preserve the fallback upgrade family.
    */
   const asks = ['town-center', 'watch-tower', 'monastery', 'castle', 'wonder'];
   for (const [label, rules] of [['fallback', FALLBACK_RULES], ['imported', importedRules]] as const) {
-    it.skipIf(!rules)(`is exactly five buildings in the ${label} rules`, () => {
+    it.skipIf(!rules)(`preserves source confirmation flags and tower upgrades in ${label} rules`, () => {
       const flagged = Object.entries(rules!.buildings)
         .filter(([, b]) => b.confirmDelete).map(([kind]) => kind).sort();
-      expect(flagged).toEqual([...asks].sort());
+      const expected = new Set(asks);
+      for (const tech of Object.values(rules!.technologies)) {
+        for (const upgrade of tech.upgrades ?? []) {
+          if (expected.has(upgrade.from) && upgrade.to in rules!.buildings) expected.add(upgrade.to);
+        }
+      }
+      if (label === 'imported') {
+        const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as ContentManifest;
+        expect(flagged).toEqual(Object.entries(manifest.entities)
+          .filter(([key, e]) => key in rules!.buildings && e.confirmDelete).map(([key]) => key).sort());
+      }
+      expect(flagged).toEqual([...expected].sort());
     });
   }
 });

@@ -210,6 +210,8 @@ def resolve_graphic_id(unit: Any, animation: dict[str, Any], civ_units: Any, dat
         slot = animation["slot"]
         if slot == "standing":
             return unit.standing_graphic[0]
+        if slot == "gate-open":
+            return civ_units[unit.building.transform_unit].standing_graphic[0]
         if slot == "base":
             return base_graphic(dat, unit, unit.standing_graphic[0])
         if slot == "dead":
@@ -419,6 +421,8 @@ def extract_entity(
 
     entity: dict[str, Any] = {
         "id": unit.id,
+        **({"availabilityId": spec["availabilityId"]} if "availabilityId" in spec else {}),
+        **({"treeUnitId": spec["treeUnitId"]} if "treeUnitId" in spec else {}),
         "internalName": unit.name,
         "category": category,
         "hitPoints": unit.hit_points,
@@ -515,7 +519,9 @@ def extract_entity(
         # building's train row. TC 109 -> head 621 -> stack 109: the latter
         # owns the paid stone, 150-second construction and villager button.
         construction = unit
-        if category == "building" and unit.building.head_unit > 0:
+        if spec.get("constructionId"):
+            construction = civ_units[spec["constructionId"]]
+        elif category == "building" and unit.building.head_unit > 0:
             head = civ_units[unit.building.head_unit]
             if head.building and head.building.stack_unit_id == unit.id:
                 construction = head
@@ -527,6 +533,9 @@ def extract_entity(
         train = construction.creatable.train_locations[0]
         if category == "building":
             entity["build"] = {"builderId": train.unit_id, "seconds": train.train_time}
+            if spec.get("gate"):
+                entity["gate"] = True
+                entity["collision"] = [rounded(construction.collision_size_x), rounded(construction.collision_size_y)]
             if construction is not unit:
                 entity["build"]["sourceId"] = construction.id
             if unit.id == 109 and construction is not unit:
@@ -595,9 +604,8 @@ def extract_entity(
         if combat.graphic_displacement:
             entity["combat"]["launchOffset"] = [rounded(v) for v in combat.graphic_displacement]
         # A mangonel's stone hurts what it lands beside, not only what it hit.
-        if combat.blast_width and combat.blast_width > 0:
-            entity["combat"]["blastRadius"] = rounded(combat.blast_width)
-            entity["combat"]["blastAttackLevel"] = int(combat.blast_attack_level)
+        entity["combat"]["blastRadius"] = rounded(combat.blast_width)
+        entity["combat"]["blastAttackLevel"] = int(combat.blast_attack_level)
 
     # Garrison (issue #75). A building says how many it holds
     # (`garrison_capacity`), who may enter (`building.garrison_type`, a flag
@@ -637,6 +645,14 @@ def extract_entity(
         entity["garrisonFirepower"] = rounded(unit.type_50.garrison_firepower)
     if category == "unit" and unit.class_ == 13 and unit.garrison_capacity > 0:
         entity["infantryCapacity"] = int(unit.garrison_capacity)
+        # Help establishes the mechanic, not these inferred engine constants.
+        if unit.id in (35, 1258, 422, 548):
+            entity["infantryCrew"] = {"speed": 0.05, "buildingAttack": 10}
+        wall_task = next((task for task in unit.bird.tasks if task.action_type == 14), None)
+        if unit.id == 1105 and wall_task is not None:
+            entity["unloadOverWall"] = {"targetClass": wall_task.class_id}
+            entity["passengerTypes"] = 11
+            entity["infantryCrew"] = {"speed": 0.05, "buildingAttack": 0}
 
     if category == "projectile" and unit.projectile is not None:
         # `projectile_arc` is a fraction of the shot's distance. Its sign varies
@@ -749,6 +765,8 @@ def extract_entity(
                 entity["popSupport"] = int(s.amount)
 
     entity["age"] = available_age(dat, unit.id)
+    if spec.get("gate"):
+        entity["age"] = available_age(dat, spec["constructionId"])
 
     # The DAT names a unit's voices by Wwise id directly, so the audio import
     # resolves them without a name to hash.
@@ -780,8 +798,26 @@ def extract_entity(
         from naval import graphic_layers
         entity["animationLayers"] = {}
         for name, animation in spec["animations"].items():
-            graphic_id = resolve_graphic_id(unit, animation, civ_units, dat)
-            layers = graphic_layers(dat, graphic_id)
+            graphic_id = resolve_graphic_id(civ_units[animation["unitId"]] if "unitId" in animation else unit,
+                                           animation, civ_units, dat)
+            layers = [(graphic_id, 0, 0)] if spec.get("gate") and name not in ("idle", "open") else graphic_layers(dat, graphic_id)
+            if spec.get("gate") and name in ("idle", "open"):
+                # The preview owns the complete gate, including posts/flags.
+                preview = civ_units[spec["constructionId"]]
+                layers = [(graphic_id if g == unit.standing_graphic[0] else g, x, y)
+                          for g, x, y in graphic_layers(dat, preview.standing_graphic[0])]
+            if spec.get("gate") and name in ("death", "decay"):
+                # Replace doorway/posts at owned offsets; flags do not survive.
+                replacements = {unit.standing_graphic[0]: graphic_id}
+                for annex in unit.building.annexes:
+                    if annex.unit_id <= 0:
+                        continue
+                    part = civ_units[annex.unit_id]
+                    base = graphic_layers(dat, part.standing_graphic[0])[0][0]
+                    replacements[base] = resolve_graphic_id(part, animation, civ_units, dat)
+                preview = civ_units[spec["constructionId"]]
+                layers = [(replacements[g], x, y)
+                          for g, x, y in graphic_layers(dat, preview.standing_graphic[0]) if g in replacements]
             layers.sort(key=lambda layer: dat.graphics[layer[0]].layer)
             if not layers:
                 continue
@@ -805,6 +841,15 @@ def extract_entity(
         entity["projectilesPerAttack"] = max(1, int(unit.creatable.total_projectiles))
     if spec["key"].startswith(("demolition-", "heavy-demolition-")):
         entity["selfDestruct"] = True
+    if unit.id == 440:
+        entity["selfDestruct"] = True
+        entity["detonateOnAttackOnly"] = True
+        effects = [dat.graphics[delta.graphic_id].particle_effect_name
+                   for delta in dat.graphics[unit.dying_graphic].deltas
+                   if delta.graphic_id >= 0 and dat.graphics[delta.graphic_id].particle_effect_name]
+        if len(effects) != 1:
+            raise ValueError("petard death must resolve one owned particle effect")
+        entity["deathEffect"] = effects[0]
     if spec["key"] == "trade-cog":
         entity["trade"] = {"ratePerSecond": rounded(unit.bird.work_rate), "capacity": unit.resource_capacity, "buildingId": 45}
     if spec["key"] == "naval-fire":
@@ -819,8 +864,7 @@ def extract_entity(
     # house falls as a Feudal house (issue #61). A collapse is a hundred-frame
     # sheet, so an age whose art is the previous age's (the Imperial house is
     # the Castle one) is left to the renderer's age chain rather than decoded
-    # twice. The hit points the variants also carry are a simulation change
-    # and are not read here; see docs/backlog.md.
+    # twice. Stats use the same IDs, including unchanged-art Imperial variants.
     def garrison_flags(carrier, age_key):
         from naval import graphic_layers
         if carrier.creatable is None or carrier.garrison_capacity <= 0:
@@ -849,7 +893,14 @@ def extract_entity(
         composed = spec["animations"].get("idle", {}).get("slot") == "base"
         for age, variant_id in age_variants(dat, unit.id).items():
             variant = civ_units[variant_id]
-            if variant is None or variant.standing_graphic[0] < 0:
+            if variant is None:
+                continue
+            entity.setdefault("ageStats", {})[age] = {
+                "id": variant_id, "hp": variant.hit_points,
+                "lineOfSight": rounded(variant.line_of_sight),
+                "armors": [{"class": a.class_, "amount": a.amount} for a in variant.type_50.armours],
+            }
+            if variant.standing_graphic[0] < 0:
                 continue
             standing = variant.standing_graphic[0]
             garrison_flags(variant, f"idle-{age}")
@@ -1012,11 +1063,16 @@ ATTRIBUTE_NAMES = {
     12: "range",
     13: "workRate",
     14: "carryCapacity",
+    22: "blastRadius",
+    23: "searchRadius",
+    101: "trainSeconds",
+    130: "garrisonFirepower",
     100: "cost",
     103: "foodCost",
     104: "woodCost",
     105: "goldCost",
     106: "stoneCost",
+    108: "garrisonHealRate",
     # How close is too close. A watch tower and a castle each have a tile of
     # it, and Murder Holes is one `set` of this to zero.
     20: "minRange",
@@ -1033,7 +1089,8 @@ OPERATION_NAMES = {0: "set", 4: "add", 5: "multiply"}
 
 # Importing a starting value does not implement the mechanic. Only these
 # attributes have simulation consumers for research effects (issue #53).
-SUPPORTED_PLAYER_ATTRIBUTES = {"farmFoodAmount", "unitRepairCost", "buildingRepairCost"}
+SUPPORTED_PLAYER_ATTRIBUTES = {"farmFoodAmount", "unitRepairCost", "buildingRepairCost",
+    "relicRate", "convertResistMinAdj", "convertResistMaxAdj", "theocracy"}
 # `b` on a type 1 command: 0 writes the value, 1 adds to it.
 RESOURCE_OPERATIONS = {0: "set", 1: "add"}
 
@@ -1111,6 +1168,11 @@ def effects_of(
             by_id.setdefault(entity["id"], []).append(key)
         if "class" in entity:
             by_class.setdefault(entity["class"], []).append(key)
+        arrow = entity.get("garrison", {}).get("volley", {}).get("arrowUnitId")
+        if arrow is not None:
+            alias = f"dat-projectile-{arrow}"
+            if alias not in by_id.setdefault(arrow, []):
+                by_id[arrow].append(alias)
 
     effects: list[dict[str, Any]] = []
     resource_names = {index: name for name, index in attribute_ids.items()}
@@ -1355,19 +1417,42 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
         i for i, t in enumerate(dat.techs) if t.civ == civ_index
         and not any(l.location_id >= 0 for l in t.research_locations)
     }
-    pending = list(ids)
-    while pending:
-        for r in dat.techs[pending.pop()].required_techs:
-            if r >= 0 and r not in ids:
-                ids.add(r)
-                pending.append(r)
+    def include_prerequisites():
+        pending = list(ids)
+        while pending:
+            for r in dat.techs[pending.pop()].required_techs:
+                if r >= 0 and r not in ids:
+                    ids.add(r)
+                    pending.append(r)
+    include_prerequisites()
+    # Relevant generic automatic descendants are not necessarily prerequisites
+    # of a public button. Arrowslits' 610/611 rows depend on paid tower upgrades
+    # plus 608; retain their full count gates and foreign alternatives.
+    decoded = {}
+    descendants = {}
+    for tid, tech in enumerate(dat.techs):
+        if tech.civ != -1 or tid in ids or tech.effect_id < 0 \
+                or any(l.location_id >= 0 or l.research_time > 0 for l in tech.research_locations):
+            continue
+        required = {r for r in tech.required_techs if r >= 0}
+        if not required:
+            continue
+        decoded[tid] = effects_of(dat, tid, entities, attribute_ids)
+        if decoded[tid][0]:
+            descendants[tid] = required
+    while True:
+        added = {tid for tid, required in descendants.items() if tid not in ids and required & ids}
+        if not added:
+            break
+        ids.update(added)
+        include_prerequisites()
     nodes = {}
     for tid in sorted(ids):
         tech = dat.techs[tid]
         public = technologies.get(by_id.get(tid))
         automatic = not any(l.location_id >= 0 or l.research_time > 0 for l in tech.research_locations)
         free = public is not None and public["researchSeconds"] == 0 and not any(public["cost"].values())
-        effects, unmodelled, unreached = effects_of(dat, tid, entities, attribute_ids)
+        effects, unmodelled, unreached = decoded[tid] if tid in decoded else effects_of(dat, tid, entities, attribute_ids)
         node = {
             "key": by_id.get(tid, f"automatic-{tid}"),
             "requiredTechs": [int(r) for r in tech.required_techs if r >= 0],
@@ -1377,6 +1462,8 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
         }
         if tid in disabled or tech.civ not in (-1, civ_index):
             node["disabled"] = True
+        if any(c.flag and c.type >= 0 and c.type not in RESOURCE_NAMES for c in tech.resource_costs):
+            node["disabled"] = True  # live counter gates are outside this Briton implementation
         if tid in AGE_TECHS:
             node["age"] = AGE_TECHS.index(tid)
         if tid in triggers:
@@ -1422,7 +1509,8 @@ def technologies_from_tree(
     units = {
         entity["id"]: key
         for key, entity in entities.items()
-        if entity.get("category") in ("unit", "animal") and "id" in entity and "skinOf" not in entity
+        if entity.get("category") in ("unit", "animal", "building") and "id" in entity
+        and "skinOf" not in entity and not key.endswith("-y")
     }
     keep: dict[str, Any] = {}
     skipped: list[dict[str, str]] = []
@@ -1801,6 +1889,10 @@ def extract(
         from naval import specs
         keys = {e["key"] for e in spec["entities"]}
         spec = {**spec, "entities": [*spec["entities"], *(e for e in specs() if e["key"] not in keys)]}
+    if spec.get("buildingRoster"):
+        from buildings import building_specs
+        keys = {e["key"] for e in spec["entities"]}
+        spec = {**spec, "entities": [*spec["entities"], *(e for e in building_specs() if e["key"] not in keys)]}
     dat = _dat if _dat is not None else DatFile.parse(dat_path)
     from civilization_profiles import shared_combat_specs
     spec = {**spec, "entities": [*spec["entities"], *shared_combat_specs(dat, spec)]}
@@ -1824,6 +1916,8 @@ def extract(
         )
     for effect_spec in spec.get("effects", []):
         entities[effect_spec["key"]] = effect_entry(dat, graphics, effect_spec, hashes)
+    from buildings import age_stat_baselines
+    age_stat_baselines(dat, spec["civIndex"], entities, age_variants)
     if "fish-trap" in entities:
         entities["fish-trap"]["foodAmount"] = rounded(dat.civs[spec["civIndex"]].resources[88])
     import_drop_sites(dat_path, dat.civs[spec["civIndex"]].units, entities, hashes)
@@ -1837,9 +1931,19 @@ def extract(
         for flame in stage["flames"]
     }
     flame_names.update(e["particleEffect"] for e in entities.values() if "particleEffect" in e)
+    flame_names.update(e["deathEffect"] for e in entities.values() if "deathEffect" in e)
     particles = particle_effects(dat_path.parent.parent / "particles", flame_names, hashes)
+    for entity in entities.values():
+        if "deathEffect" in entity:
+            entity["deathSeconds"] = max(entity.get("deathSeconds", 0),
+                                         max(particles[entity["deathEffect"]]["cycleSeconds"]))
     skin_chances(dat_path, entities, hashes)
     civilization = civilization_entry(dat, dat_path, spec, hashes, strings)
+    building_nodes = {int(n["Node ID"]) for n in tree_nodes(dat_path, spec) if n.get("Use Type") == "Building"}
+    for entity in entities.values():
+        head = entity.get("build", {}).get("sourceId")
+        if entity.get("category") == "building" and entity["id"] not in building_nodes and head in building_nodes:
+            entity.setdefault("availabilityId", head)
     technologies, skipped_technologies = technologies_from_tree(
         dat, dat_path, spec, entities, civilization, hashes, attribute_ids, strings
     )

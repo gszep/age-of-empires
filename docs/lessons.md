@@ -258,6 +258,12 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 
 ## Before starting, waiting on, or restarting a job
 
+- **Uncommitted worktrees must survive a reboot.** The civilisation run's
+  `/tmp/opencode` patches disappeared; only the already integrated main-tree
+  work survived. Keep implementation worktrees/patches in persistent ignored
+  storage and exclude that directory from test discovery (`.local/**`), which
+  otherwise runs stale sibling suites twice.
+
 - **Start with a handle, wait on the handle** (`AGENTS.md`). A `&` job dies
   with the shell the harness times out; a job meant to outlive its command is
   started with `setsid` writing an exit file and waited on from a separate

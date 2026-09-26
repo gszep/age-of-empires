@@ -109,6 +109,7 @@
               "onager",
               "scorpion",
               "heavy-scorpion",
+              "petard", "siege-tower",
               "trebuchet",
               "monk",
               "sheep",
@@ -135,8 +136,9 @@
               "wonder",
               "palisade-wall",
               "palisade-gate",
+              "stone-wall", "fortified-wall", "stone-gate", "fortified-gate", "guard-tower", "keep",
               "fish-trap",
-              "resource"
+              "resource", "relic"
             ]
             }]
           },
@@ -267,6 +269,7 @@
               "onager",
               "scorpion",
               "heavy-scorpion",
+              "petard", "siege-tower",
               "trebuchet",
               "monk",
               "sheep",
@@ -293,8 +296,9 @@
               "wonder",
               "palisade-wall",
               "palisade-gate",
+              "stone-wall", "fortified-wall", "stone-gate", "fortified-gate", "guard-tower", "keep",
               "fish-trap",
-              "resource"
+              "resource", "relic"
             ]
             }]
           },
@@ -370,7 +374,7 @@
               "heal",
               "convert",
               "repair",
-              "garrison", "unload"
+              "garrison", "unload", "cross-wall", "relic"
             ]
           },
           "garrisoned": {
@@ -378,6 +382,9 @@
             "minimum": 0,
             "$comment": "Units sheltering inside this building of yours; they are not in the entity list while they are."
           },
+          "carryingRelic": { "type": "boolean" },
+          "relics": { "type": "integer", "minimum": 0 },
+          "faith": { "type": "number", "minimum": 0, "maximum": 100 },
           "carrying": {
             "type": "object",
             "properties": {
@@ -449,6 +456,7 @@
                   "onager",
                   "scorpion",
                   "heavy-scorpion",
+                  "petard", "siege-tower",
                   "trebuchet",
                   "monk"
                 ]

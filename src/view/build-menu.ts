@@ -17,11 +17,11 @@
  * | 4 | lumber camp | siege workshop |
  * | 6 | farm | outpost |
  * | 7 | blacksmith | palisade wall |
- * | 8 | market | — |
+ * | 8 | market | stone / fortified wall |
  * | 9 | monastery | watch tower |
  * | 10 | university | — |
- * | 11 | town center | — |
- * | 12 | wonder | — |
+ * | 11 | town center | stone / fortified gate |
+ * | 12 | wonder | palisade gate |
  * | 13 | — | castle |
  *
  * That is the reference for the layout, and it is also a check: the split that
@@ -43,10 +43,9 @@ export type BuildPage = 'economic' | 'military';
 export const MILITARY_BUILDINGS: ReadonlySet<string> = new Set<string>([
   'barracks', 'archery-range', 'stable', 'siege-workshop',
   'outpost', 'watch-tower', 'castle',
-  // Walls and their gates are placed by dragging rather than from a slot --
-  // the DAT gives the gate no build button at all -- but they belong with the
-  // defences, which is where AoE2 puts them.
+  // Gate slots come from construction heads, not the finished doorway units.
   'palisade-wall', 'palisade-gate',
+  'stone-wall', 'fortified-wall', 'stone-gate', 'fortified-gate', 'guard-tower', 'keep',
 ]);
 
 export const pageOf = (kind: string): BuildPage =>
@@ -54,12 +53,16 @@ export const pageOf = (kind: string): BuildPage =>
 
 /**
  * The buildings on one page, in the DAT's own order. Anything the DAT gives no
- * build button -- a gate, which is dragged rather than picked -- sorts after
+ * build button in an older manifest sorts after
  * what does, by name, so the slots that are stated stay where they are stated.
  */
-export function buildMenu(rules: GameRules, age: number, page: BuildPage): BuildingKind[] {
+export function buildMenu(rules: GameRules, age: number, page: BuildPage, researched: readonly string[] = []): BuildingKind[] {
+  const upgrades = Object.entries(rules.technologies).flatMap(([key, tech]) =>
+    (tech.upgrades ?? []).map(step => ({ ...step, done: researched.includes(key) })));
   return (Object.keys(rules.buildings) as BuildingKind[])
     .filter(kind => rules.buildings[kind].buildable
+      && !upgrades.some(u => u.from === kind && u.done)
+      && (!upgrades.some(u => u.to === kind) || upgrades.some(u => u.to === kind && u.done))
       && (rules.buildings[kind].builderKind ?? 'villager') === 'villager'
       && (rules.buildings[kind].age ?? 0) <= age
       && pageOf(kind) === page)

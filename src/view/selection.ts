@@ -25,7 +25,7 @@ export function* contextTargets(state: ReadonlyGameState, player: PlayerId, reve
   if (reveal) return;
   for (const memory of Object.values(visibility.memory)) {
     if (memory.owner !== 0 || live.has(memory.id) || visible(memory)) continue;
-    const rule = memory.kind === 'resource'
+    const rule = memory.kind === 'relic' ? { radius: 0.5 } : memory.kind === 'resource'
       ? state.rules.nodes[memory.node ?? NODE_OF_RESOURCE[memory.resource ?? 'food']]
       : isBuilding(memory.kind) ? state.rules.buildings[memory.kind] : state.rules.units[memory.kind as UnitKind];
     yield { remembered: true, entity: {

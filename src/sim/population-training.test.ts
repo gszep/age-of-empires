@@ -47,7 +47,7 @@ describe('population-blocked production (#143)', () => {
     const paid = state.players[1].food;
     run(state, duration * 3);
     expect(state.players[1].population).toBe(state.players[1].populationCap);
-    expect(tc.training).toEqual({ kind: 'villager', remainingTicks: 0 });
+    expect(tc.training).toMatchObject({ kind: 'villager', remainingTicks: 0 });
     expect(tc.trainingQueue).toEqual(['villager']);
     const blockedPopulation = state.players[1].population;
     const house = buildHouse(state);
@@ -56,7 +56,7 @@ describe('population-blocked production (#143)', () => {
     expect(house.buildProgress).toBeUndefined();
     stepGame(state); stepGame(replay);
     expect(state.players[1].population).toBe(blockedPopulation + 1);
-    expect(tc.training).toEqual({ kind: 'villager', remainingTicks: duration });
+    expect(tc.training).toMatchObject({ kind: 'villager', remainingTicks: duration });
     expect(tc.trainingQueue).toBeUndefined();
     run(state, duration); run(replay, duration);
     expect(state.players[1].population).toBe(blockedPopulation + 2);

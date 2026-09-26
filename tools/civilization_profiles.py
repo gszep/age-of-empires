@@ -5,6 +5,8 @@ import json
 
 def tree_unit_id(dat, civ_index, entity):
     """A reviewed replacement's tree ID, or a reciprocal construction head."""
+    if "availabilityId" in entity:
+        return entity["availabilityId"]
     if "treeUnitId" in entity:
         return entity["treeUnitId"]
     uid = entity["unitId"]

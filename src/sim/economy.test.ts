@@ -2865,7 +2865,8 @@ describe('unit upgrades', () => {
   // the fifteen took 22 s against a 30 s timeout and failed under load.
   const upgradeLines = importedRules
     ? Object.entries(importedRules.technologies)
-      .flatMap(([key, tech]) => (tech.upgrades ?? []).map(step => ({ key, tech, step })))
+      .flatMap(([key, tech]) => (tech.upgrades ?? []).filter(step => step.from in importedRules.units)
+        .map(step => ({ key, tech, step })))
     : [];
   it.skipIf(!importedRules)('carries at least the fifteen upgrade lines, the castle line included', () => {
     expect(upgradeLines.length).toBeGreaterThanOrEqual(15);

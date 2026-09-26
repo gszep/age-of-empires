@@ -26,6 +26,9 @@ export interface ObservedEntity {
   /** Own gatherers only, including those walking to or banking from the node. */
   gatherTargetId?: number;
   carrying?: { kind: ResourceKind; amount: number; node?: NodeKind };
+  carryingRelic?: boolean;
+  relics?: number;
+  faith?: number;
   training?: { kind: UnitKind; remainingSeconds: number };
   /** What it is researching; own buildings only, like `training`. */
   researching?: { tech: string; remainingSeconds: number };

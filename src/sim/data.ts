@@ -1,4 +1,5 @@
 import type { AnimalKind, BuildingKind, Entity, EntityKind, ResourceKind, UnitKind, NavalUnitKind } from './types';
+import { BUILDING_ROSTER, BUILDING_TECHS } from './buildings';
 
 export const TICK_SECONDS = 0.05;
 export const TICKS_PER_SECOND = 20;
@@ -15,6 +16,8 @@ export interface UnitRules {
    * fallback, where the question cannot be asked.
    */
   datId?: number;
+  /** Source tree identity; effects retain the actual DAT identity (35/1258). */
+  treeUnitId?: number;
   hp: number;
   radius: number;
   speed: number; // tiles per second
@@ -36,6 +39,7 @@ export interface UnitRules {
   attackReleaseSeconds: number;
   /** Tiles a ranged unit may strike from; melee units leave this unset. */
   range?: number;
+  searchRadius?: number;
   /**
    * Its cell in the trainer's command grid, 1-15, from the DAT's
    * `train_locations[*].button_id`. An upgrade line shares its cell: the
@@ -96,6 +100,10 @@ export interface UnitRules {
    * all; unpacked it cannot move.
    */
   unpacked?: {
+    unit?: string;
+    lineOfSight?: number;
+    searchRadius?: number;
+    armors?: AttackValue[];
     attacks: AttackValue[];
     range: number;
     minRange: number;
@@ -156,7 +164,13 @@ export interface UnitRules {
   transportCapacity?: number;
   /** Land siege carriers: the DAT's capacity, separate from naval transports. */
   infantryCapacity?: number;
+  passengerTypes?: number;
+  /** Inferred engine crew constants; derived live from cargo, never snapshotted. */
+  infantryCrew?: { speed: number; buildingAttack: number };
+  /** DAT task 14 target class; landing geometry is inferred. */
+  unloadOverWall?: { targetClass: number };
   selfDestruct?: boolean;
+  detonateOnAttackOnly?: boolean;
   projectilesPerAttack?: number;
   requires?: string[];
   /**
@@ -198,6 +212,13 @@ export interface UnitRules {
 }
 
 export interface BuildingRules {
+  datClass?: number;
+  availabilityId?: number;
+  /** Age-replacement stats under a stable building identity. */
+  ageStats?: Record<string, { id: number; hp: number; lineOfSight: number; armors: AttackValue[];
+    includedTechs?: number[] }>;
+  /** Half length of the traversable doorway; end posts remain solid. */
+  gateOpening?: number;
   /** DAT building work rate; research/production advance in work units. */
   workRate?: number;
   /** DAT minimap_mode: 0 hides the marker (farms); 1 draws an ordinary dot. */
@@ -363,6 +384,7 @@ export interface GarrisonRules {
     ownProjectile: boolean;
     arrowSpeed?: number;
     arrowAttacks?: AttackValue[];
+    arrowUnitId?: number;
     arrowArt?: string;
   };
 }
@@ -490,6 +512,7 @@ export const NODE_OF_RESOURCE: Record<ResourceKind, NodeKind> = {
  * memory of the map, which no DAT field states.
  */
 export function lingersInFog(rules: GameRules, entity: Entity): boolean {
+  if (entity.kind === 'relic') return true;
   if (isBuilding(entity.kind)) return true;
   if (entity.kind === 'resource') {
     return entity.resourceKind !== undefined
@@ -586,11 +609,14 @@ export interface TechEffect {
  * resource 36 in the DAT, where civ 1 starts it at 175 -- the number the open
  * fallback had hand-written before anybody looked.
  */
-export type PlayerAttribute = 'farmFoodAmount' | 'unitRepairCost' | 'buildingRepairCost';
+export type PlayerAttribute = 'farmFoodAmount' | 'unitRepairCost' | 'buildingRepairCost'
+  | 'relicRate' | 'convertResistMinAdj' | 'convertResistMaxAdj' | 'theocracy';
 
 export type TechAttribute =
   | 'hitPoints' | 'lineOfSight' | 'speed' | 'armor' | 'attack'
   | 'reloadSeconds' | 'accuracyPercent' | 'range' | 'minRange'
+  | 'garrisonHealRate'
+  | 'blastRadius' | 'searchRadius' | 'trainSeconds' | 'garrisonFirepower'
   | 'workRate' | 'carryCapacity' | 'cost' | 'foodCost' | 'woodCost' | 'goldCost' | 'stoneCost'
   /** On a projectile: whether the shot leads a moving target. Ballistics. */
   | 'leadsTarget';
@@ -887,6 +913,7 @@ export const FALLBACK_RULES: GameRules = {
     },
     'capped-ram': {
       infantryCapacity: 6,
+      infantryCrew: { speed: 0.05, buildingAttack: 10 },
       age: 3,
       hp: 200, radius: 0.45, speed: 0.6, lineOfSight: 3.0,
       cost: cost(0, 160, 75, 0), trainSeconds: 36,
@@ -971,6 +998,7 @@ export const FALLBACK_RULES: GameRules = {
     // ram's 150 against buildings and its -3 pierce armour are both the DAT's.
     'battering-ram': {
       infantryCapacity: 6,
+      infantryCrew: { speed: 0.05, buildingAttack: 10 },
       age: 2,
       hp: 175, radius: 0.45, speed: 0.6, lineOfSight: 3, cost: cost(0, 160, 75), trainSeconds: 36,
       trainedAt: 'siege-workshop', popCost: 1, trainButton: 1,
@@ -988,6 +1016,25 @@ export const FALLBACK_RULES: GameRules = {
       attackReloadSeconds: 3.6, attackReleaseSeconds: 0.6, range: 7, minRange: 2,
       projectileSpeed: 6, projectileArt: 'scorpion-bolt', launchHeight: 0.5,
       piercing: { radius: 0.1, attacks: [{ class: 3, amount: 5 }, { class: 11, amount: 1 }], unit: 'scorpion-bolt' },
+    },
+    petard: {
+      hp: 50, radius: 0.2, speed: 0.8, lineOfSight: 4, datClass: 35,
+      cost: { food: 65, wood: 0, gold: 20, stone: 0 }, trainSeconds: 25,
+      trainedAt: 'castle', trainButton: 3, popCost: 1, age: 2,
+      attacks: [{ class: 26, amount: 100 }, { class: 11, amount: 500 }, { class: 4, amount: 25 },
+        { class: 20, amount: 60 }, { class: 22, amount: 900 }],
+      armors: [{ class: 4, amount: 0 }, { class: 3, amount: 2 }, { class: 31, amount: 0 }],
+      attackReloadSeconds: 0, attackReleaseSeconds: 0, selfDestruct: true,
+      detonateOnAttackOnly: true, blastRadius: 0.5, blastAttackLevel: 2, deathSeconds: 0.5, corpseSeconds: 0,
+    },
+    'siege-tower': {
+      hp: 175, radius: 0.45, speed: 0.96, lineOfSight: 8, datClass: 13,
+      terrainRestriction: 20, cost: { food: 0, wood: 100, gold: 120, stone: 0 },
+      trainSeconds: 36, trainedAt: 'siege-workshop', trainButton: 14, popCost: 1, age: 2,
+      attacks: [], armors: [{ class: 4, amount: -2 }, { class: 3, amount: 100 },
+        { class: 17, amount: 0 }, { class: 20, amount: 0 }, { class: 31, amount: 0 }],
+      attackReloadSeconds: 0, attackReleaseSeconds: 0, infantryCapacity: 10, passengerTypes: 11,
+      infantryCrew: { speed: 0.05, buildingAttack: 0 }, unloadOverWall: { targetClass: 27 },
     },
     'heavy-scorpion': {
       hp: 60, radius: 0.5, speed: 0.65, lineOfSight: 9,
@@ -1025,6 +1072,7 @@ export const FALLBACK_RULES: GameRules = {
     },
   },
   buildings: {
+    ...BUILDING_ROSTER,
     'fish-trap': { hp: 250, radius: 0.5, lineOfSight: 1, terrainRestriction: 13, hillMode: 0,
       cost: cost(0, 100), buildSeconds: 40 / (0.24 * 3.57), popSupport: 0, buildable: true,
       builderKind: 'fishing-ship', buildButton: 1, age: 1, accepts: [], fishTrapAmount: 700,
@@ -1146,6 +1194,7 @@ export const FALLBACK_RULES: GameRules = {
       buildButton: 8,
     },
     'palisade-wall': {
+      datClass: 27,
       hillMode: 0,
       terrainRestriction: 10,
       hp: 150, radius: 0.5, lineOfSight: 2, cost: cost(0, 3), buildSeconds: 7,
@@ -1285,6 +1334,7 @@ export const FALLBACK_RULES: GameRules = {
     6: FALLBACK_WATER_TERRAINS, 13: FALLBACK_WATER_TERRAINS, 19: [1, 23],
   },
   technologies: {
+    ...BUILDING_TECHS,
     warships: { techId: 34, name: 'Medium Warships', button: 12, cost: cost(0, 150, 100), researchSeconds: 50,
       researchedAt: 'dock', requiresAge: 2, effects: [], upgrades: [
         { from: 'galley', to: 'war-galley' }, { from: 'fire-galley', to: 'fire-ship' }, { from: 'hulk', to: 'war-hulk' }] },
@@ -1316,6 +1366,9 @@ export const FALLBACK_RULES: GameRules = {
 };
 
 interface ManifestEntity {
+  availabilityId?: number;
+  ageStats?: BuildingRules['ageStats'];
+  gate?: boolean;
   workRate?: number;
   accepts?: ResourceKind[];
   acceptsLivestock?: boolean;
@@ -1370,7 +1423,12 @@ interface ManifestEntity {
   searchRadius?: number;
   transportCapacity?: number;
   infantryCapacity?: number;
+  passengerTypes?: number;
+  infantryCrew?: UnitRules['infantryCrew'];
+  treeUnitId?: number;
+  unloadOverWall?: UnitRules['unloadOverWall'];
   selfDestruct?: boolean;
+  detonateOnAttackOnly?: boolean;
   projectilesPerAttack?: number;
   foodAmount?: number;
   foodDecayPerSecond?: number;
@@ -1522,6 +1580,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       piercing: piercing(key) ?? fallback?.piercing,
       launchHeight: e[key].combat?.launchOffset?.[2] ?? fallback?.launchHeight,
       blastRadius: e[key].combat?.blastRadius ?? fallback?.blastRadius,
+      searchRadius: e[key].searchRadius ?? fallback?.searchRadius,
       blastAttackLevel: e[key].combat?.blastAttackLevel === undefined ? fallback?.blastAttackLevel : e[key].combat!.blastAttackLevel! & 3,
       blastDefenseLevel: e[key].blastDefenseLevel ?? fallback?.blastDefenseLevel,
       heal: e[key].heal ?? fallback?.heal,
@@ -1537,9 +1596,14 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       deathSeconds: e[key].deathSeconds ?? fallback?.deathSeconds,
       corpseSeconds: e[key].corpseSeconds ?? fallback?.corpseSeconds,
       datId: e[key].id,
+      treeUnitId: e[key].treeUnitId,
       transportCapacity: e[key].transportCapacity ?? fallback?.transportCapacity,
       infantryCapacity: e[key].infantryCapacity ?? fallback?.infantryCapacity,
+      passengerTypes: e[key].passengerTypes ?? fallback?.passengerTypes,
+      infantryCrew: e[key].infantryCrew ?? fallback?.infantryCrew,
+      unloadOverWall: e[key].unloadOverWall ?? fallback?.unloadOverWall,
       selfDestruct: e[key].selfDestruct ?? fallback?.selfDestruct,
+      detonateOnAttackOnly: e[key].detonateOnAttackOnly ?? fallback?.detonateOnAttackOnly,
       projectilesPerAttack: e[key].projectilesPerAttack ?? fallback?.projectilesPerAttack,
       requires: e[key].requires,
       tradeRatePerSecond: e[key].trade?.ratePerSecond ?? fallback?.tradeRatePerSecond,
@@ -1590,6 +1654,9 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     return {
       datId: e[key].id,
       workRate: e[key].workRate,
+      availabilityId: e[key].availabilityId,
+      ageStats: e[key].ageStats,
+      gateOpening: e[key].gate ? 1 : fallback.gateOpening,
       deathSeconds: e[key].deathSeconds ?? fallback.deathSeconds,
       corpseSeconds: e[key].corpseSeconds ?? fallback.corpseSeconds,
       age: e[key].age ?? fallback.age,
@@ -1617,6 +1684,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       passableForOwner: fallback.passableForOwner,
       passable: e[key].passable ?? fallback.passable,
       blastDefenseLevel: e[key].blastDefenseLevel ?? fallback.blastDefenseLevel,
+      datClass: e[key].class ?? fallback.datClass,
       confirmDelete: e[key].confirmDelete ?? fallback.confirmDelete,
       garrison: e[key].garrison
         ? {
@@ -1629,6 +1697,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
             ownProjectile: e[key].combat?.projectileUnitId !== undefined,
             arrowSpeed: e[key].garrison.volley.arrowSpeed ?? fallback.garrison?.volley?.arrowSpeed,
             arrowAttacks: e[key].garrison.volley.arrowAttacks ?? fallback.garrison?.volley?.arrowAttacks,
+            arrowUnitId: e[key].garrison.volley.arrowUnitId,
             arrowArt: e[key].garrison.volley.arrowUnitId === undefined
               ? undefined : projectileArtById.get(e[key].garrison.volley.arrowUnitId),
           },
@@ -1733,6 +1802,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       'cavalry-archer': unit('cavalry-archer', 'archery-range'),
       longbowman: unit('longbowman', 'castle'),
       'battering-ram': unit('battering-ram', 'siege-workshop'),
+      petard: unit('petard', 'castle'),
+      'siege-tower': unit('siege-tower', 'siege-workshop'),
       mangonel: unit('mangonel', 'siege-workshop'),
       scorpion: unit('scorpion', 'siege-workshop'),
       'heavy-scorpion': unit('heavy-scorpion', 'siege-workshop'),
@@ -1744,6 +1815,11 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
         attacks: [],
         unpacked: {
           ...FALLBACK_RULES.units.trebuchet.unpacked!,
+          unit: 'trebuchet-unpacked',
+          lineOfSight: e['trebuchet-unpacked']?.lineOfSight,
+          searchRadius: e['trebuchet-unpacked']?.searchRadius,
+          armors: e['trebuchet-unpacked']?.combat?.armors
+            ? attackValues(e['trebuchet-unpacked'].combat.armors) : undefined,
           attacks: attackValues(e['trebuchet-unpacked']?.combat?.attacks).length
             ? attackValues(e['trebuchet-unpacked']?.combat?.attacks)
             : FALLBACK_RULES.units.trebuchet.unpacked!.attacks,
@@ -1785,6 +1861,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       },
     },
     buildings: {
+      ...Object.fromEntries(Object.keys(BUILDING_ROSTER).map(key => [key, building(key, !!e[key])])) as typeof BUILDING_ROSTER,
       'town-center': building('town-center', true),
       barracks: building('barracks', true),
       house: building('house', true),
@@ -1922,7 +1999,7 @@ const UNIT_KINDS = new Set<string>([
   'scout-cavalry', 'light-cavalry', 'trade-cart', 'fishing-ship',
   'knight', 'cavalier', 'cavalry-archer', 'heavy-cavalry-archer',
   'longbowman', 'elite-longbowman',
-  'battering-ram', 'capped-ram', 'mangonel', 'onager', 'scorpion', 'heavy-scorpion', 'monk', 'trebuchet',
+  'battering-ram', 'capped-ram', 'mangonel', 'onager', 'scorpion', 'heavy-scorpion', 'monk', 'trebuchet', 'petard', 'siege-tower',
   'sheep', 'deer', 'boar',
 ]);
 const BUILDING_KINDS = new Set<string>([
@@ -1930,6 +2007,7 @@ const BUILDING_KINDS = new Set<string>([
   'outpost', 'watch-tower', 'archery-range', 'blacksmith', 'market', 'stable',
   'monastery', 'siege-workshop', 'castle', 'university', 'wonder', 'dock',
   'palisade-wall', 'palisade-gate',
+  ...Object.keys(BUILDING_ROSTER),
 ]);
 
 // Resource nodes dominate surveyed boards and are neither actors nor buildings.

@@ -64,8 +64,10 @@ try {
   const pageErrors = [];
   page.on('pageerror', error => { pageErrors.push(error.message); console.log(`page error: ${error.message}`); });
   await page.goto(BASE, { waitUntil: 'networkidle2', timeout: 60_000 });
-  await page.waitForFunction(() => document.querySelector('canvas.battlefield') !== null, { timeout: 60_000 });
-  await sleep(3000);
+  // The canvas is inserted before owned content finishes loading and before
+  // the debug listener is installed. Wait for readiness, not a three-second race.
+  await page.waitForFunction(() => document.querySelector('canvas.battlefield') !== null
+    && typeof window.__empiresDebug === 'function', { timeout: 60_000 });
 
   const query = async payload => {
     const response = await fetch(`${BASE}/__debug`, { method: 'POST', body: JSON.stringify(payload) });

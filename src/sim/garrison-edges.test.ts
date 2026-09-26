@@ -213,7 +213,9 @@ describe.each(modes)('%s garrison edges (#137)', (_mode, rules) => {
     tc.garrison = workers;
     expect(volleyArrows(state, tc)).toBe(3);
     state.players[1].researched.push('fletching');
-    expect(volleyArrows(state, tc)).toBe(rules.origin === 'imported' ? 2 : 3);
+    // Fletching changes villager firepower (attribute 130) as well as the
+    // building's damage. Ignoring the former used to drop this volley to two.
+    expect(volleyArrows(state, tc)).toBe(3);
   });
 
   it.each([false, true])('releases the computed garrison volley into actual combat (Fletching: %s)', researched => {
@@ -224,8 +226,7 @@ describe.each(modes)('%s garrison edges (#137)', (_mode, rules) => {
     const target = put('militia', 4, 0);
     target.owner = 2; target.hp = 1000; target.maxHp = 1000;
     until(state, () => state.projectiles.some(p => p.shooterId === tc.id));
-    expect(state.projectiles.filter(p => p.shooterId === tc.id)).toHaveLength(
-      researched && rules.origin === 'imported' ? 2 : 3);
+    expect(state.projectiles.filter(p => p.shooterId === tc.id)).toHaveLength(3);
     until(state, () => target.hp < 1000);
   });
 });

@@ -102,6 +102,7 @@
             "onager",
             "scorpion",
             "heavy-scorpion",
+            "petard", "siege-tower",
             "trebuchet",
             "monk"
           ]
@@ -186,7 +187,8 @@
             "university",
             "wonder",
             "palisade-wall",
-            "palisade-gate", "fish-trap"
+            "palisade-gate", "fish-trap",
+            "stone-wall", "fortified-wall", "stone-gate", "fortified-gate", "guard-tower", "keep"
           ]
         },
         "target": {

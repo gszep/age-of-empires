@@ -65,6 +65,32 @@ describe('naval composite sprites (#97)', () => {
   });
 });
 
+describe('specialist death feedback', () => {
+  it('replaces the petard body with its death particle on the saved simulation clock', () => {
+    const assets = fakeAssets();
+    const frames = [{ x: 0, y: 0, w: 4, h: 4, cx: 2, cy: 2 }, { x: 4, y: 0, w: 8, h: 4, cx: 4, cy: 2 }];
+    const atlas: Atlas = { image: 'explosion', size: [12, 4], framesInFile: 2, frames };
+    assets.textures.set('explosion', new THREE.DataTexture(new Uint8Array(12 * 4 * 4), 12, 4));
+    assets.entities.petard = { category: 'unit', deathEffect: 'impact_petard',
+      animations: { idle: { frames: 1, directions: 1, frameSeconds: 0, mirroringMode: 0 } },
+      atlases: { idle: atlas } };
+    assets.particles = { impact_petard: { atlas, loop: false, cycleSeconds: [1.5, 1.5], fadeInSeconds: 0, fadeOutSeconds: 0 } };
+    const state = createGame(440);
+    state.rules = structuredClone(state.rules);
+    state.rules.units.petard.deathSeconds = 1.5;
+    const entity: Entity = { id: state.nextId++, kind: 'petard', owner: 1, position: { x: 20, y: 20 },
+      hp: 0, maxHp: 50, radius: 0.2, order: { kind: 'idle' }, activity: 'dying', dead: true, decayTicks: 15 };
+    const view = createEntityView(assets, entity);
+    updateEntityView(view, assets, state, entity, 999);
+    expect(view.body.mesh.visible).toBe(true);
+    expect(view.body.mesh.scale.x).toBe(8);
+    expect(view.color.mesh.visible).toBe(false);
+    entity.decayTicks = 0;
+    updateEntityView(view, assets, state, entity, 1000);
+    expect(view.body.mesh.visible).toBe(false);
+  });
+});
+
 describe('tree chopping stages', () => {
   it('stands until the first wood is taken', () => {
     const state = createGame();

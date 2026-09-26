@@ -53,7 +53,12 @@ export function playerAttributeFor(
 export function unitRulesForEntity(state: GameState, entity: Entity): UnitRules;
 export function unitRulesForEntity(state: ReadonlyGameState, entity: DeepReadonly<Entity>): DeepReadonly<UnitRules>;
 export function unitRulesForEntity(state: ReadonlyGameState, entity: DeepReadonly<Entity>): DeepReadonly<UnitRules> {
-  return entity.convertedRules ?? unitRulesFor(state as GameState, entity.owner, entity.kind as UnitKind);
+  const rules = entity.convertedRules ?? unitRulesFor(state as GameState, entity.owner, entity.kind as UnitKind);
+  return entity.unpacked && rules.unpacked ? { ...rules,
+    lineOfSight: rules.unpacked.lineOfSight ?? rules.lineOfSight,
+    searchRadius: rules.unpacked.searchRadius ?? rules.searchRadius,
+    armors: rules.unpacked.armors ?? rules.armors,
+  } : rules;
 }
 
 /** Capture before changing ownership, including passengers. A second conversion
@@ -61,7 +66,8 @@ export function unitRulesForEntity(state: ReadonlyGameState, entity: DeepReadonl
  * locked-unit / live-player split is inferred; see ledger #178. */
 export function inheritConvertedUnit(state: GameState, entity: Entity, owner: PlayerId): void {
   if (isUnit(entity.kind) && !entity.convertedRules) {
-    entity.convertedRules = structuredClone(unitRulesForEntity(state, entity));
+    // Snapshot both forms, not the active form's temporary armour/sight view.
+    entity.convertedRules = structuredClone(unitRulesFor(state, entity.owner, entity.kind));
   }
   for (const passenger of entity.garrison ?? []) inheritConvertedUnit(state, passenger, owner);
   entity.owner = owner;
@@ -77,6 +83,20 @@ export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: Uni
   let rules = base;
   for (const key of researched) {
     for (const effect of technologyFor(source, key)?.effects ?? []) {
+      if (rules.unpacked?.unit && effect.unit === rules.unpacked.unit) {
+        const deployed: UnitRules = { ...rules, ...rules.unpacked,
+          armors: (rules.unpacked.armors ?? rules.armors).map(a => ({ ...a })),
+          attacks: rules.unpacked.attacks.map(a => ({ ...a })),
+        };
+        applyEffect(deployed, effect);
+        rules = { ...rules, unpacked: { ...rules.unpacked,
+          attacks: deployed.attacks, armors: deployed.armors, range: deployed.range!,
+          minRange: deployed.minRange!, attackReloadSeconds: deployed.attackReloadSeconds,
+          lineOfSight: deployed.lineOfSight, searchRadius: deployed.searchRadius,
+          accuracyPercent: deployed.accuracyPercent, blastRadius: deployed.blastRadius,
+        } };
+        continue;
+      }
       if (base.piercing && effect.unit === base.piercing.unit && effect.attribute === 'attack') {
         const attacks = (rules.piercing ?? base.piercing).attacks.map(a => ({ ...a }));
         const entry = attacks.find(a => a.class === effect.armorClass);
@@ -114,6 +134,18 @@ function applyEffect(rules: UnitRules, effect: TechEffect): void {
     case 'lineOfSight':
       rules.lineOfSight = combine(effect.operation, rules.lineOfSight, effect.amount); break;
     case 'speed': rules.speed = combine(effect.operation, rules.speed, effect.amount); break;
+    case 'trainSeconds': rules.trainSeconds = combine(effect.operation, rules.trainSeconds, effect.amount); break;
+    case 'blastRadius': rules.blastRadius = combine(effect.operation, rules.blastRadius ?? 0, effect.amount); break;
+    case 'searchRadius': rules.searchRadius = combine(effect.operation, rules.searchRadius ?? rules.lineOfSight, effect.amount); break;
+    case 'garrisonFirepower': rules.garrisonFirepower = combine(effect.operation, rules.garrisonFirepower ?? 0, effect.amount); break;
+    case 'workRate':
+      if (rules.tradeRatePerSecond !== undefined) rules.tradeRatePerSecond = combine(effect.operation, rules.tradeRatePerSecond, effect.amount);
+      if (rules.gather) rules.gather = { ...rules.gather, ratePerSecond: combine(effect.operation, rules.gather.ratePerSecond, effect.amount) };
+      break;
+    case 'carryCapacity':
+      if (rules.gather) rules.gather = { ...rules.gather, capacity: combine(effect.operation, rules.gather.capacity, effect.amount) };
+      break;
+    case 'minRange': rules.minRange = combine(effect.operation, rules.minRange ?? 0, effect.amount); break;
     case 'reloadSeconds':
       rules.attackReloadSeconds =
         combine(effect.operation, rules.attackReloadSeconds, effect.amount); break;
@@ -121,6 +153,7 @@ function applyEffect(rules: UnitRules, effect: TechEffect): void {
       rules.accuracyPercent = combine(effect.operation, rules.accuracyPercent ?? 100, effect.amount);
       break;
     case 'range':
+      if (rules.convert) rules.convert = { ...rules.convert, range: combine(effect.operation, rules.convert.range, effect.amount) };
       if (rules.range !== undefined) {
         rules.range = combine(effect.operation, rules.range, effect.amount);
       }
@@ -152,17 +185,33 @@ export function buildingRulesFor(
   state: GameState, owner: Entity['owner'], kind: BuildingKind,
 ): BuildingRules {
   const source = rulesForPlayer(state, owner);
-  const base = source.buildings[kind];
+  const original = source.buildings[kind];
+  const age = owner === 0 ? 0 : state.players[owner as PlayerId].age;
+  const variant = ['imperial', 'castle', 'feudal'].find((name, index) =>
+    age >= 3 - index && original.ageStats?.[name]);
+  const base = variant ? { ...original, ...original.ageStats![variant], datId: original.datId } : original;
   if (owner === 0) return base;
   const researched = state.players[owner as PlayerId].researched;
   if (!researched.length) return base;
   let rules = base;
   for (const key of researched) {
+    const techId = source.technologies[key]?.techId ?? (key.startsWith('automatic-') ? Number(key.slice(10)) : undefined);
+    if (variant && techId !== undefined && original.ageStats![variant].includedTechs?.includes(techId)) continue;
     for (const effect of technologyFor(source, key)?.effects ?? []) {
+      const volley = rules.garrison?.volley;
+      if (volley?.arrowUnitId !== undefined && effect.unit === `dat-projectile-${volley.arrowUnitId}`
+        && effect.attribute === 'attack') {
+        const attacks = (volley.arrowAttacks ?? []).map(a => ({ ...a }));
+        const entry = attacks.find(a => a.class === effect.armorClass);
+        if (entry) entry.amount = combine(effect.operation, entry.amount, effect.amount);
+        else attacks.push({ class: effect.armorClass ?? 0, amount: combine(effect.operation, 0, effect.amount) });
+        rules = { ...rules, garrison: { ...rules.garrison!, volley: { ...volley, arrowAttacks: attacks } } };
+        continue;
+      }
       if (effect.unit !== kind) continue;
-      if (rules === base) {
+      if (rules.armors === base.armors) {
         rules = {
-          ...base,
+          ...rules,
           armors: base.armors.map(a => ({ ...a })),
           ...(base.attack ? { attack: { ...base.attack, attacks: base.attack.attacks.map(a => ({ ...a })) } } : {}),
         };
@@ -197,6 +246,9 @@ function applyBuildingEffect(rules: BuildingRules, effect: TechEffect): void {
   if (applyCostEffect(rules, effect)) return;
   const armorClass = effect.armorClass ?? 0;
   switch (effect.attribute) {
+    case 'garrisonHealRate':
+      if (rules.garrison) rules.garrison = { ...rules.garrison, healRate: combine(effect.operation, rules.garrison.healRate, effect.amount) };
+      break;
     case 'workRate': rules.workRate = combine(effect.operation, rules.workRate ?? 1, effect.amount); break;
     case 'hitPoints': rules.hp = combine(effect.operation, rules.hp, effect.amount); break;
     case 'lineOfSight':
