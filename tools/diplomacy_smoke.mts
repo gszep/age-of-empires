@@ -87,11 +87,16 @@ try {
       const r = e.getBoundingClientRect();
       return r.width > 0 && r.height > 0 && document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest('button') === e;
     }, {}, tech);
-    const at = await page.$eval(`[data-command="research-${tech}"]`, e => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    // Query and measure in one browser turn: $eval's retained element handle
+    // can detach while the command grid is replaced between CDP calls.
+    const at = await page.evaluate(key => {
+      const e = document.querySelector(`[data-command="research-${key}"]`)!;
+      const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    }, tech);
     await page.mouse.click(at.x, at.y);
     const clicked = await snapshot();
     assert.equal(clicked.entities.find((e: any) => e.id === market.id)?.researching?.tech, tech,
-      `research click must be accepted before advancing time: ${JSON.stringify(await page.evaluate(p => document.elementFromPoint(p.x, p.y)?.outerHTML, at))}`);
+      `research click must be accepted before advancing time: ${JSON.stringify(await page.evaluate(p => document.elementFromPoint(p.x, p.y)?.tagName, at))}`);
     await step(Math.ceil(rules.technologies[tech].researchSeconds * 20) + 1);
     await open();
     assert((await page.$eval('[data-tribute-heading]', e => e.textContent!)).includes(`${fee}%`));

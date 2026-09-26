@@ -22,10 +22,11 @@ import { relicOrder, transferRelic, releaseRelics, updateRelicIncome } from './r
 import { conversionWindow, rechargeFaith, spendConversionFaith } from './monastery';
 import { placeMapRelics } from './relic-placement';
 import relicReference from './refdata/relic-placement.json';
+import { applyTreason, livingKings, matchOver, placeRegicideStart } from './regicide';
 import { createVisibility, isEntityVisible, updateVisibility } from './visibility';
 import type {
   AnimalKind, BuildingKind, Command, Entity, GameState, Order, PlayerId, Point, Projectile, ResourceKind,
-  UnitKind, ReadonlyGameState, DeepReadonly,
+  UnitKind, ReadonlyGameState, DeepReadonly, GameMode,
 } from './types';
 
 
@@ -98,8 +99,9 @@ function freeSpot(state: GameState, at: Point): boolean {
 export function createGame(
   seed = 42, rules: GameRules = FALLBACK_RULES,
   civilizations: Record<PlayerId, string> = { 1: rules.civilization.key, 2: rules.civilization.key },
-  map = 'arabia',
+  map = 'arabia', mode: GameMode = 'random-map',
 ): GameState {
+  if (mode !== 'random-map' && mode !== 'regicide') throw new Error(`unknown game mode ${mode}`);
   // A civilisation label is not a ruleset; both players must resolve before
   // generating the map or spending any resources.
   for (const player of [1, 2] as const) {
@@ -118,6 +120,7 @@ export function createGame(
     start.x = Math.round(width * (0.5 - (radius.min + Math.floor(random01(rng) * (radius.max - radius.min + 1))) / 100));
   }
   const state: GameState = {
+    ...(mode === 'regicide' ? { mode } : {}),
     rules, seed: seedFrom(seed || 1), matchSeed: seedFrom(seed || 1), tick: 0, nextId: 1, width, height,
     entities: [], projectiles: [], terrain: [], elevation: [],
     players: {
@@ -140,6 +143,7 @@ export function createGame(
     const at = (point: Point) => player === 1 ? point : mirror(point);
     addEntity(state, 'town-center', player, at(start), rules.buildings['town-center']);
     for (const dy of [-1, 0, 1]) {
+      if (mode === 'regicide' && map !== 'islands') continue;
       addEntity(state, 'villager', player, at({ x: start.x + 2.8, y: start.y + dy }), rules.units.villager);
     }
     // `create_object SCOUT`, one per player at 7-9 tiles. On a board this size
@@ -162,6 +166,17 @@ export function createGame(
     {
       rng: state, width: state.width, height: state.height,
       nodes: rules.nodes,
+      beforeObjects: mode === 'regicide' ? layers => {
+        Object.assign(state, layers);
+        placeRegicideStart(state, map, {
+          free: at => freeSpot(state, at),
+          castleLegal: (at, owner) => placementLegal(state, 'castle', at, 'x', owner).ok
+            && state.entities.every(e => !isUnit(e.kind) || !footprintsOverlap(at,
+              buildingFootprint(state, 'castle', 'x', owner), e.position, halfExtent(e))),
+          add: (kind, owner, at) => addEntity(state, kind, owner, at,
+            kind === 'castle' ? buildingRulesFor(state, owner, kind) : unitRulesFor(state, owner, kind)),
+        });
+      } : undefined,
       free: at => freeSpot(state, at),
       place: (kind, at) => {
         if (kind === 'sheep' || kind === 'deer' || kind === 'boar') addAnimal(state, kind, at);
@@ -189,16 +204,20 @@ export function createGame(
 export const gameTimeSeconds = (state: GameState): number => state.tick * TICK_SECONDS;
 
 function recalculatePopulation(state: GameState): void {
+  const population: Record<PlayerId, number> = { 1: 0, 2: 0 };
+  const count = (entities: Entity[]) => {
+    for (const e of entities) {
+      if (e.dead) continue;
+      if (e.owner !== 0 && isUnit(e.kind)) population[e.owner] += unitRulesForEntity(state, e).popCost;
+      // Nested passengers remain people, including an immune King whose
+      // owner differs from its captured carrier's owner.
+      if (e.garrison?.length) count(e.garrison);
+    }
+  };
+  count(state.entities);
   for (const player of [1, 2] as PlayerId[]) {
     const rules = rulesForPlayer(state, player);
-    state.players[player].population = state.entities
-      .filter(e => !e.dead && e.owner === player && isUnit(e.kind))
-      .reduce((sum, e) => sum + unitRulesForEntity(state, e).popCost, 0)
-      // A unit inside a building is out of the list and still a person.
-      + state.entities
-        .filter(e => !e.dead && e.owner === player && e.garrison?.length)
-        .reduce((sum, e) => sum + e.garrison!.reduce(
-          (inner, unit) => inner + unitRulesForEntity(state, unit).popCost, 0), 0);
+    state.players[player].population = population[player];
     state.players[player].populationCap = rules.startingPopulationCap + state.entities
       .filter(e => !e.dead && e.owner === player && isBuilding(e.kind) && e.buildProgress === undefined)
       .reduce((sum, e) => sum + rules.buildings[e.kind as BuildingKind].popSupport, 0);
@@ -578,6 +597,7 @@ export function resolveUnitOrder(state: GameState, entity: Entity, target: Point
     // Conversion reaches somebody else's soldiers only. Buildings need
     // Redemption, which is not researchable here.
     unitRules?.convert && !entity.relics?.length && targetEntity && isUnit(targetEntity.kind)
+    && !unitRulesForEntity(state, targetEntity).conversionImmune
     && targetEntity.owner !== 0 && targetEntity.owner !== entity.owner
   ) {
     return { kind: 'convert', targetId: targetEntity.id };
@@ -628,7 +648,7 @@ export function trainableUnitsAt(state: GameState, player: PlayerId, building: B
   const rules = rulesForPlayer(state, player);
   return (Object.keys(rules.units) as UnitKind[]).filter(kind => {
     const unit = rules.units[kind];
-    return unit.trainedAt === building && (unit.age ?? 0) <= state.players[player].age
+    return unit.trainable !== false && unit.trainedAt === building && (unit.age ?? 0) <= state.players[player].age
       && (unit.requires ?? []).every(key => state.players[player].researched.includes(key))
       && !isAnimal(kind) && civHas(state, player, 'units', unit.treeUnitId ?? unit.datId)
       && !upgradedAway(state, player, kind) && !notYetUpgradedInto(state, player, kind);
@@ -659,9 +679,10 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
   if (!civilizationRules(state.rules, state.players[command.player]?.civilization)) {
     return rejected(`civilisation is not loaded for player ${command.player}`);
   }
-  if (state.winner) return rejected('match is over');
+  if (matchOver(state)) return rejected('match is over');
   if (command.player !== 1 && command.player !== 2) return rejected('unknown player');
   if (command.kind === 'exchange' || command.kind === 'tribute' || command.kind === 'tribute-batch') return applyMarketCommand(state, command);
+  if (command.kind === 'treason') return applyTreason(state, command);
 
   if (command.kind === 'order' || command.kind === 'stop') {
     // A carcass is a thing orders may name: the gatherer loop has always been
@@ -733,6 +754,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (building.buildProgress !== undefined) return rejected('building is under construction');
     if (queuedCount(building) >= TRAINING_QUEUE_LIMIT) return rejected('training queue is full');
     const unitRules = unitRulesFor(state, command.player, command.unit);
+    if (unitRules.trainable === false) return rejected(`${command.unit} cannot be trained`);
     if (upgradedAway(state, command.player, command.unit)) {
       return rejected(`${command.unit} has been upgraded`);
     }
@@ -860,7 +882,9 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (!building) return rejected(`building ${command.buildingId} is not owned`);
     if (building.buildProgress !== undefined) return rejected('building is under construction');
     if (building.researching) return rejected('building is already researching');
-    const tech = rulesForPlayer(state, command.player).technologies[command.tech as TechKey];
+    const technologies = rulesForPlayer(state, command.player).technologies;
+    const tech = Object.hasOwn(technologies, command.tech) ? technologies[command.tech as TechKey] : undefined;
+    if (state.mode === 'regicide' && tech?.effects.some(e => e.resource === 'spies')) return rejected('Spies is unavailable in Regicide; use Treason');
     if (!tech) return rejected(`unknown technology ${command.tech}`);
     if (!civHas(state, command.player, 'technologies', tech.techId)) {
       return rejected(`the ${civNameOf(state, command.player)} do not have ${command.tech}`);
@@ -2225,7 +2249,8 @@ function updateConverter(state: GameState, grid: NavGrid, entity: Entity): void 
   if (entity.order.kind !== 'convert') return;
   const rules = unitRulesForEntity(state, entity);
   const target = state.entities.find(e => !e.dead && e.id === (entity.order as { targetId: number }).targetId);
-  if (!rules.convert || entity.relics?.length || !target || target.owner === 0 || target.owner === entity.owner) {
+  if (!rules.convert || entity.relics?.length || !target || target.owner === 0 || target.owner === entity.owner
+    || (isUnit(target.kind) && unitRulesForEntity(state, target).conversionImmune)) {
     entity.convertTicks = undefined;
     becomeIdle(entity);
     return;
@@ -3046,7 +3071,7 @@ function updateAnimals(state: GameState): void {
 }
 
 export function stepGame(state: GameState): void {
-  if (state.winner) return;
+  if (matchOver(state)) return;
   activateAutomaticTechnologies(state);
   state.tick += 1;
   updateAnimals(state);
@@ -3193,9 +3218,13 @@ export function stepGame(state: GameState): void {
   // own kill the moment the blow lands, so a town center razed in a fight never
   // reaches that flag. One match ran the full half hour with the loser's town
   // center rubble and nothing left to decide it.
-  const p1Out = isDefeated(state, 1);
-  const p2Out = isDefeated(state, 2);
+  const kings = state.mode === 'regicide' ? livingKings(state) : undefined;
+  const p1Out = kings ? !kings.some(k => k.owner === 1) : isDefeated(state, 1);
+  const p2Out = kings ? !kings.some(k => k.owner === 2) : isDefeated(state, 2);
   if (p1Out && !p2Out) state.winner = 2;
   else if (p2Out && !p1Out) state.winner = 1;
-  else if (p1Out && p2Out) state.winner = 2; // simultaneous: attacker's tick order favors 2 deterministically
+  else if (p1Out && p2Out) {
+    if (state.mode === 'regicide') state.draw = true;
+    else state.winner = 2; // legacy conquest tie policy
+  }
 }

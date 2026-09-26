@@ -1,7 +1,8 @@
 import type { Command, GameState } from '../sim/types';
 import type { MatchSetup } from '../match-setup';
 
-export const SHARED_VERSION = 1;
+/** v2: mode-specific starts/victory and repeatable Treason; old clients must not simulate these as random map. */
+export const SHARED_VERSION = 2;
 export const SHARED_SPEEDS = [1, 1.5, 1.7, 2, 5, 10];
 export interface MatchSettings { paused: boolean; speed: number; generation: number }
 export type HostMessage =

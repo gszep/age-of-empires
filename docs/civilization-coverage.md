@@ -45,8 +45,9 @@ or shared game mode is complete.
   petard explosion feedback and public wall-crossing/unload orders. Constants
   and geometry without runtime evidence remain explicit in the ledger.
 - Relic pickup/carry/drop/deposit/income/loss, carried art and Drop Relic UI are
-  integrated. Arabia places five reachable relics through a documented zone
-  approximation; other map placement remains #130/#95 work.
+  integrated. Shared follow-up508a2f2 adds source-backed placement on Arabia,
+  Black Forest and Islands plus an explicit authored-map policy; #130/#95 retain
+  native placement calibration and fish gaps, not absent other-map relics.
 - Devotion, Faith, Theocracy, Herbal Medicine, Block Printing and Illumination
   have gameplay consumers, including spent/recharging faith and garrison healing.
 - Warwolf reaches the deployed trebuchet's actual projectile, and Siege Engineers
@@ -65,9 +66,15 @@ isolation and JSON continuation. This is gameplay evidence, not an inference fro
 the empty `missingRoster` array. Final gate **GREEN**: 906 tests / 70 files,
 build, 124 owned-import tests and general browser smoke
 (`.local/britons-final-gate-r1.log`), with no timeout widening.
-Regicide/Treason, a full diplomacy UI, other-map relic placement and exact
-closed-engine charge/market calibration remain explicit shared-scope limitations;
-the approved bounded interpretations are in the ledger.
+Shared follow-ups add the locked two-player diplomacy/tribute dialog (ec26a02)
+and Regicide/Treason. Unlocked diplomacy/cooperative victories are not offered;
+native Regicide calibration remains #240. Charge/market runtime calibration,
+relic map-generation parity and conversion questions remain explicit. The ledger
+labels bounded implementation choices as inferred, not user-approved policy.
+The shared Regicide checkpoint passed **960 tests /73 files**, build,
+**128 owned-content tests** and general browser smoke
+(`.local/regicide-gate-r3.log`), plus dedicated solo and two-client browser
+acceptance. These mode results do not imply completion of further civilisations.
 
 `civilizations.ts` now resolves each player's complete ruleset by its civilisation
 key. The root remains the default civilisation and shared Gaia/map input.
@@ -108,9 +115,9 @@ reconversion. Synthetic public-command outcomes and owned Loom regressions cover
 the implementation; JSON continuation/replay preserve the snapshot. The boundary
 between frozen unit attributes and live recipient economic/player/projectile
 systems is explicitly inferred in `ledger.md`. Passenger, reconversion and
-economic/projectile exception evidence remains open. The user authorized this
-policy for supported mixed gameplay; absence of a runtime capture does not block
-profile enablement indefinitely or turn implementation tests into parity claims.
+economic/projectile exception evidence remains open. The user authorized the
+implementation work, not this exact inheritance policy. Tests verify the chosen
+implementation and do not establish patch-matched DE parity.
 
 The #177/#178 integration checkpoint passed **797 Vitest tests / 62 files**, the
 build, **108 owned-import tests**, and general browser smoke
@@ -162,7 +169,7 @@ Current scoped acceptance and remaining shared work:
 |---|---|
 | Britons (#179) | Reviewed random-map gameplay scope accepted in db2c9c0/605f7f7 with full gates and actual browser outcomes; the shared limitations below remain explicit |
 | Franks (#180) | Generic fortifications/specialists are integrated, but full Frank-specific paid unique-tech/expanded-profile acceptance remains a separate task; no completion claim from the Briton pass |
-| Shared engine | Other-map relic placement (#130/#95), full diplomacy UI (#138), Regicide/Treason, charge/market runtime calibration and remaining conversion-policy parity questions (#178). Implemented mechanics and unresolved engine interpretations are distinguished in the ledger |
+| Shared engine | Native relic-generation calibration/fish gaps (#130/#95), unlocked diplomacy/cooperative victories beyond the current locked two-player dialog (#138), Regicide timing/preset/task calibration (#240), charge/market runtime calibration and conversion-policy parity (#178). Relic placement and playable Regicide/Treason are implemented; the ledger distinguishes mechanics from unresolved engine interpretations |
 
 The imported catalogue now accounts for the already represented ram/tree alias,
 palisade construction head and TC foundation. Raw unrepresented IDs are not a

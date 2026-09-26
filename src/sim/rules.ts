@@ -65,6 +65,8 @@ export function unitRulesForEntity(state: ReadonlyGameState, entity: DeepReadonl
  * keeps the first snapshot, not either player's intervening upgrades. The
  * locked-unit / live-player split is inferred; see ledger #178. */
 export function inheritConvertedUnit(state: GameState, entity: Entity, owner: PlayerId): void {
+  // A King's owned hero-mode immunity survives capture of its carrier too.
+  if (isUnit(entity.kind) && unitRulesForEntity(state, entity).conversionImmune) return;
   if (isUnit(entity.kind) && !entity.convertedRules) {
     // Snapshot both forms, not the active form's temporary armour/sight view.
     entity.convertedRules = structuredClone(unitRulesFor(state, entity.owner, entity.kind));

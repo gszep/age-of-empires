@@ -284,6 +284,8 @@ export function installDebug(context: DebugContext): void {
         connection: context.connection?.(),
         seconds: round(gameTimeSeconds(game)),
         winner: game.winner,
+        mode: game.mode ?? 'random-map',
+        draw: game.draw ?? false,
         players: Object.fromEntries(Object.entries(game.players).map(([id, player]) => [id, {
           food: player.food, wood: player.wood, gold: player.gold, stone: player.stone,
           population: player.population, populationCap: player.populationCap,

@@ -16,6 +16,9 @@ export interface FireChargeRules {
 }
 
 export interface UnitRules {
+  trainable?: boolean;
+  conversionImmune?: boolean;
+  confirmDelete?: boolean;
   fireCharge?: FireChargeRules;
   /**
    * The DAT unit id, when this came from imported content. It is what a
@@ -399,6 +402,7 @@ export interface GarrisonRules {
 
 /** Which garrison category a DAT unit class falls in: the editor's table. */
 export const GARRISON_CATEGORY: Record<number, number> = {
+  59: 1,                      // King: civilian garrison category (engine adapter)
   4: 1,                       // villagers
   0: 2, 6: 2,                 // foot archers and infantry
   12: 4, 36: 4, 47: 4,        // cavalry, cavalry archers, scouts
@@ -1027,6 +1031,13 @@ export const FALLBACK_RULES: GameRules = {
       projectileSpeed: 6, projectileArt: 'scorpion-bolt', launchHeight: 0.5,
       piercing: { radius: 0.1, attacks: [{ class: 3, amount: 5 }, { class: 11, amount: 1 }], unit: 'scorpion-bolt' },
     },
+    king: {
+      datId: 434, datClass: 59, hp: 75, radius: 0.3, speed: 1.32, lineOfSight: 6,
+      terrainRestriction: 7, cost: cost(50), trainSeconds: 30, trainedAt: 'castle', trainable: false,
+      conversionImmune: true, confirmDelete: true, popCost: 1, attacks: [],
+      armors: [{ class: 4, amount: 0 }, { class: 3, amount: 0 }, { class: 31, amount: 0 }, { class: 36, amount: 0 }],
+      attackReloadSeconds: 0, attackReleaseSeconds: 0, deathSeconds: 1, corpseSeconds: 300,
+    },
     petard: {
       hp: 50, radius: 0.2, speed: 0.8, lineOfSight: 4, datClass: 35,
       cost: { food: 65, wood: 0, gold: 20, stone: 0 }, trainSeconds: 25,
@@ -1431,6 +1442,7 @@ interface ManifestEntity {
   minimapColor?: [number, number, number];
   /** The DAT's `hero_mode` bit 32: Delete asks first. */
   confirmDelete?: boolean;
+  conversionImmune?: boolean;
   heal?: { hitPointsPerSecond: number; range: number };
   repair?: { hitPointsPerSecond: number; classFactors: Record<string, number> };
   garrison?: {
@@ -1575,6 +1587,9 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     const fallback = FALLBACK_RULES.units[key as UnitKind];
     if (!e[key]) return { ...fallback, trainedAt };
     return {
+      trainable: key === 'king' ? false : fallback?.trainable,
+      conversionImmune: e[key].conversionImmune ?? fallback?.conversionImmune,
+      confirmDelete: e[key].confirmDelete ?? fallback?.confirmDelete,
       hp: e[key].hitPoints,
       fireCharge: e[key].fireCharge,
       radius: e[key].collision[0],
@@ -1822,6 +1837,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       'cavalry-archer': unit('cavalry-archer', 'archery-range'),
       longbowman: unit('longbowman', 'castle'),
       'battering-ram': unit('battering-ram', 'siege-workshop'),
+      king: unit('king', 'castle'),
       petard: unit('petard', 'castle'),
       'siege-tower': unit('siege-tower', 'siege-workshop'),
       mangonel: unit('mangonel', 'siege-workshop'),
@@ -2019,7 +2035,7 @@ const UNIT_KINDS = new Set<string>([
   'scout-cavalry', 'light-cavalry', 'trade-cart', 'fishing-ship',
   'knight', 'cavalier', 'cavalry-archer', 'heavy-cavalry-archer',
   'longbowman', 'elite-longbowman',
-  'battering-ram', 'capped-ram', 'mangonel', 'onager', 'scorpion', 'heavy-scorpion', 'monk', 'trebuchet', 'petard', 'siege-tower',
+  'battering-ram', 'capped-ram', 'mangonel', 'onager', 'scorpion', 'heavy-scorpion', 'monk', 'trebuchet', 'petard', 'siege-tower', 'king',
   'sheep', 'deer', 'boar',
 ]);
 const BUILDING_KINDS = new Set<string>([
@@ -2043,5 +2059,5 @@ export const isAnimal = (kind: EntityKind): kind is AnimalKind => ANIMAL_KINDS.h
  * otherwise walk at the nearest enemy it could never hurt.
  */
 export const isMilitary = (kind: EntityKind, rules: GameRules = FALLBACK_RULES): boolean =>
-  isUnit(kind) && kind !== 'villager' && kind !== 'trade-cart' && !isAnimal(kind)
+  isUnit(kind) && kind !== 'villager' && kind !== 'trade-cart' && kind !== 'king' && !isAnimal(kind)
   && !!rules.units[kind as UnitKind]?.attacks.some(attack => attack.amount > 0);

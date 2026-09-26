@@ -64,9 +64,9 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   camp, `H` town centers, `W` wonder, `D` dock. The letters are the reference's own,
   imported from its `hotkeys.json` rather than chosen here.
 - `Delete` destroys what you have selected, of your own. The town center, a
-  watch tower, the monastery, the castle and the wonder ask first; everything
+  watch tower, the monastery, the castle, the wonder and the King ask first; everything
   else — a house, a barracks, a soldier — goes on the keypress. The list is
-  the reference's own, a flag the DAT sets on exactly those five.
+  the reference's own, from the DAT's confirmation flag.
 - Every command has a fixed cell in the fifteen-cell grid — the one the
   reference's own data gives it — and a line keeps its cell: the militia and
   the champion are both the barracks' first, Forging and Blast Furnace the
@@ -84,6 +84,22 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   Changing a field alone leaves the current match running. The chosen map and
   seed are remembered; **Restart** repeats them. In shared play, Ysgramor
   controls these settings and Artemis sees the selected values.
+- **Regicide Mode** in Game Settings starts each side with ten villagers,
+  a King and a Castle. Losing the King ends the match, including loss aboard a
+  sinking transport; simultaneous King loss is a draw. Mode persists through
+  reload/restart and recordings. `?mode=regicide` selects it directly;
+  `?mode=random-map` selects the ordinary mode. Kings can shelter in owned
+  buildings/transports and cannot attack, be trained or be converted.
+- In Regicide, select a Castle and use **Treason**: **400 gold per use** for a
+  temporary flashing X at enemy King positions, including inside carriers.
+  It is repeatable and reveals no ordinary unit/building sight. The current
+  ten-second lifetime and marker cadence are explicit calibration choices (#240).
+  Ordinary random-map **Spies** remains the permanent researched ability.
+- **Diplomacy** opens the two-player tribute dialog. Click100, Shift-click500,
+  Ctrl-click all affordable stock including the fee; right-click subtracts.
+  **OK** pays the whole draft atomically; Clear/Cancel discard it. Coinage and
+  Banking reduce fees. Current opposing teams are locked; relation controls
+  and Allied Victory are read-only. Replay viewing cannot pay tribute.
 - `?seed=` still works for direct links (`?seed=3` has a pond in a wood around
   tile 11,62). The first visit defaults to Arabia, seed 42; later visits use
   the last chosen setup unless the URL overrides it.

@@ -1,6 +1,8 @@
 import { applyCommand, createGame, gameTimeSeconds, stepGame } from '../sim/game';
 import { FALLBACK_RULES, TICK_SECONDS, type GameRules } from '../sim/data';
 import { checksumState } from '../sim/checksum';
+import { matchOver } from '../sim/regicide';
+import { validRecordedMode } from '../match-setup';
 import { describeObservation, observe } from '../sim/observe';
 import type { Command, PlayerId } from '../sim/types';
 import type { MatchConfig, MatchRecord, MatchResult, RejectedCommand, StrategyInputMessage } from '../protocol/types';
@@ -18,9 +20,11 @@ export async function runMatch(
   strategies: Record<PlayerId, Strategy>,
   rules: GameRules = FALLBACK_RULES,
 ): Promise<{ result: MatchResult; record: MatchRecord }> {
+  if (config.version !== 1 && config.version !== 2) throw new Error('unknown match format');
+  if (config.version === 1 && config.mode !== undefined) throw new Error('game mode requires match format v2');
   const maxTime = config.maxTimeSeconds ?? 1800;
   const decideInterval = config.decideIntervalSeconds ?? 0.5;
-  const state = createGame(config.seed, rules, config.civilizations, config.map ?? 'arabia');
+  const state = createGame(config.seed, rules, config.civilizations, config.map ?? 'arabia', config.mode);
   const rejectedCommands: RejectedCommand[] = [];
   const pendingRejections: Record<PlayerId, RejectedCommand[]> = { 1: [], 2: [] };
   const recordedCommands: MatchRecord['commands'] = [];
@@ -28,7 +32,7 @@ export async function runMatch(
 
   const stepsPerDecision = Math.max(1, Math.round(decideInterval / TICK_SECONDS));
   try {
-    while (!state.winner && gameTimeSeconds(state) < maxTime - 1e-9) {
+    while (!matchOver(state) && gameTimeSeconds(state) < maxTime - 1e-9) {
       if (state.tick % stepsPerDecision === 0) {
         for (const player of [1, 2] as PlayerId[]) {
           const observation = observe(state, player);
@@ -53,7 +57,7 @@ export async function runMatch(
         }
       }
       stepGame(state);
-      if (state.tick % CHECKSUM_INTERVAL_TICKS === 0 || state.winner) {
+      if (state.tick % CHECKSUM_INTERVAL_TICKS === 0 || matchOver(state)) {
         checksums.push({ tick: state.tick, hash: checksumState(state) });
       }
       // Await only ever reaches the microtask queue, so a long match is one
@@ -67,7 +71,8 @@ export async function runMatch(
   }
 
   const result: MatchResult = {
-    version: 1,
+    version: 2,
+    mode: config.mode ?? 'random-map',
     seed: config.seed,
     timeSeconds: Math.round(gameTimeSeconds(state) * 100) / 100,
     players: {
@@ -77,12 +82,14 @@ export async function runMatch(
     rejectedCommands,
   };
   if (state.winner) result.winner = state.winner;
+  if (state.draw) result.draw = true;
   const record: MatchRecord = {
-    version: 1,
+    version: 2,
     seed: config.seed,
     rulesOrigin: rules.origin,
     civilizations: { 1: state.players[1].civilization, 2: state.players[2].civilization },
     ...(config.map && config.map !== 'arabia' ? { map: config.map } : {}),
+    mode: config.mode ?? 'random-map',
     decideIntervalSeconds: decideInterval,
     maxTimeSeconds: maxTime,
     commands: recordedCommands,
@@ -106,12 +113,14 @@ export function replayRecord(
   rules: GameRules = FALLBACK_RULES,
   onTick?: (state: ReturnType<typeof createGame>) => void,
 ): ReplayOutcome {
-  const state = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia');
+  if (!validRecordedMode(record.version, record.mode)) return { ok: false, checked: 0, expected: 'valid record version/mode', actual: `${record.version}/${record.mode}` };
+  const state = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode);
   const commands = [...record.commands];
   const checksums = new Map(record.checksums.map(entry => [entry.tick, entry.hash]));
   const lastTick = record.checksums.at(-1)?.tick ?? 0;
   let checked = 0;
   while (state.tick < lastTick) {
+    if (matchOver(state)) return { ok: false, mismatchTick: state.tick, expected: 'more ticks', actual: 'match ended', checked };
     while (commands.length && commands[0].tick === state.tick) {
       applyCommand(state, commands.shift()!.command);
     }

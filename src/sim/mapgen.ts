@@ -427,6 +427,7 @@ export const MAPS: Record<string, MapDescriptor> = {
 /** What the generator needs from the game: its RNG stream, whether a tile
  * can take a one-tile footprint, and somewhere to put what it places. */
 export interface MapgenContext {
+  beforeObjects?(layers: { terrain: number[]; elevation: number[]; landIds: number[] }): void;
   nodes?: typeof FALLBACK_RULES.nodes;
   rng: { seed: number };
   width: number;
@@ -1146,6 +1147,7 @@ export function generateMap(
   }
 
   // The opening objects, one candidate scan per line.
+  ctx.beforeObjects?.({ terrain, elevation, landIds });
   for (const spec of descriptor.opening) {
     let order = candidateOrder(ctx, start, spec.far);
     let groupsLeft = spec.groups ?? 1;

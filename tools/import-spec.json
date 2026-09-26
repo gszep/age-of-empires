@@ -59,6 +59,14 @@
   ],
   "entities": [
     {
+      "key": "king", "unitId": 434, "category": "unit",
+      "sounds": ["select", "train"],
+      "animations": {
+        "idle": {"slot": "standing"}, "walk": {"slot": "walking"},
+        "death": {"slot": "dying"}, "decay": {"slot": "dead"}
+      }
+    },
+    {
       "key": "petard", "unitId": 440, "category": "unit",
       "sounds": ["select", "train"],
       "animations": {

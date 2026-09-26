@@ -275,6 +275,8 @@ export class Hud {
           <h3 data-map-label="gameSettings">Game Settings</h3>
           <label for="map-choice" data-map-label="mapType">Map Type</label>
           <select id="map-choice" name="map"></select>
+          <label for="regicide-mode" data-map-label="regicideMode">Regicide Mode</label>
+          <input id="regicide-mode" name="regicide" type="checkbox">
           <label for="map-seed" data-map-label="mapSeed">Seed</label>
           <div class="seed-row">
             <input id="map-seed" name="seed" type="number" min="1" max="4294967295" step="1" inputmode="numeric" placeholder="Random">
@@ -394,7 +396,8 @@ export class Hud {
       const first = this.root.querySelector<HTMLSelectElement>('#civilization-1');
       const second = this.root.querySelector<HTMLSelectElement>('#civilization-2');
       const civilizations = first && second ? { 1: first.value, 2: second.value } : undefined;
-      if (this.callbacks.onStartMatch({ map, seed, civilizations })) this.toggleMenu(false);
+      const mode = this.root.querySelector<HTMLInputElement>('#regicide-mode')!.checked ? 'regicide' : 'random-map';
+      if (this.callbacks.onStartMatch({ map, seed, civilizations, mode })) this.toggleMenu(false);
     });
 
     this.root.addEventListener('pointerdown', event => event.stopPropagation());
@@ -563,12 +566,14 @@ export class Hud {
   }
 
   configureMapMenu(
-    choices: { id: string; label: string }[], setup: { map: string; seed: number },
+    choices: { id: string; label: string }[], setup: import('../match-setup').MatchSetup,
     enabled: boolean, strings: Record<string, string>, setupKnown = true,
   ): void {
     const select = this.root.querySelector<HTMLSelectElement>('#map-choice')!;
     select.replaceChildren(...choices.map(choice => new Option(choice.label, choice.id)));
     select.value = setup.map;
+    const mode = this.root.querySelector<HTMLInputElement>('#regicide-mode')!;
+    mode.checked = setup.mode === 'regicide'; mode.title = strings.regicideHelp ?? 'If you lose your King, you are defeated.';
     const seed = this.root.querySelector<HTMLInputElement>('#map-seed')!;
     seed.value = setupKnown ? String(setup.seed) : '';
     seed.placeholder = strings.randomSeed ?? 'Random';

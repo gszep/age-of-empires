@@ -14,6 +14,19 @@ These scripts live directly under `tools/` and start private Vite/browser
 fixtures. Run `npx tsx tools/<name>.mts`; they supplement the gate's general
 browser smoke and are maintained regression tools.
 
+- **`regicide_smoke.mts`** — real mode checkbox/Start Game, King sprite/colour/
+  voice request, reload/restart and return to random map; two actual400-gold
+  Treason clicks, pixel-verified minimap X blink/expiry at a hidden garrisoned
+  King, no fog/research leakage, real shelter/occupied-Castle flag and royal
+  Delete confirmation/defeat. Loads a v2 headless record through file input and
+  verifies its checksum using the browser's real replay clock. Simultaneous
+  public King deletions verify the draw popup without a false victory/defeat.
+- **`regicide_shared_smoke.mts`** — two actual owned-content v2 browser clients
+  on a private authoritative host: guest mode control is read-only, a real
+  Treason click pays once and both synchronization hashes agree, mode switches
+  reach both clients, and reconnect/checkpoint preserve Regicide. The managed
+  host and its live checkpoint are untouched.
+
 - **`diplomacy_smoke.mts`** — enabled native diplomacy menu, locked two-player
   relations, original tribute icon states, draft/Clear/Cancel, Shift/right-click/
   CTRL-all, real Coinage/Banking research and fee deductions, market destruction,

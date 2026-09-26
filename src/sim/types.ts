@@ -2,6 +2,7 @@ import type { Cost, GameRules, NodeKind, UnitRules, VillagerGatherTask } from '.
 import type { PlayerVisibility } from './visibility';
 
 export type PlayerId = 1 | 2;
+export type GameMode = 'random-map' | 'regicide';
 export type ResourceKind = 'food' | 'wood' | 'gold' | 'stone';
 export type NavalUnitKind = 'galley' | 'war-galley' | 'galleon' | 'hulk' | 'war-hulk'
   | 'fire-galley' | 'fire-ship' | 'fast-fire-ship'
@@ -17,7 +18,7 @@ export type UnitKind =
   | 'knight' | 'cavalier' | 'cavalry-archer' | 'heavy-cavalry-archer'
   | 'longbowman' | 'elite-longbowman'
   | 'battering-ram' | 'capped-ram' | 'mangonel' | 'onager' | 'scorpion' | 'heavy-scorpion' | 'monk'
-  | 'trebuchet' | 'petard' | 'siege-tower'
+  | 'trebuchet' | 'petard' | 'siege-tower' | 'king'
   | AnimalKind | NavalUnitKind;
 /** Gaia's food on the hoof: herded, or hunted where it stands. */
 export type AnimalKind = 'sheep' | 'deer' | 'boar';
@@ -243,6 +244,11 @@ export interface Projectile {
 }
 
 export interface GameState {
+  /** Absent in legacy saves/records means random map. */
+  mode?: GameMode;
+  /** Ended without a winner, e.g. both Regicide kings lost in one tick. */
+  draw?: boolean;
+  treasonUntil?: Partial<Record<PlayerId, number>>;
   /** Shared commodity base prices, independent of each player's researched fee. */
   marketPrices?: Record<'wood' | 'food' | 'stone', number>;
   rules: GameRules;
@@ -286,6 +292,7 @@ export type DeepReadonly<T> =
 export type ReadonlyGameState = DeepReadonly<GameState>;
 
 export type Command =
+  | { kind: 'treason'; player: PlayerId; castleId: number }
   | { kind: 'exchange'; player: PlayerId; marketId: number; resource: 'wood' | 'food' | 'stone'; side: 'buy' | 'sell'; amount: 100 | 500 }
   | { kind: 'tribute'; player: PlayerId; recipient: PlayerId; resource: ResourceKind; amount: number }
   | { kind: 'tribute-batch'; player: PlayerId; recipient: PlayerId; amounts: Partial<Record<ResourceKind, number | 'all'>> }

@@ -515,6 +515,8 @@ def extract_entity(
         # division, not "buildings ask" (issue #47).
         if unit.creatable.hero_mode & HERO_CONFIRM_DELETE:
             entity["confirmDelete"] = True
+        if unit.creatable.hero_mode & 2:
+            entity["conversionImmune"] = True
         # Stacked buildings expose a construction head, not the finished
         # building's train row. TC 109 -> head 621 -> stack 109: the latter
         # owns the paid stone, 150-second construction and villager button.
@@ -2093,6 +2095,9 @@ def extract(
                 ("mapType", 9691), ("mapSeed", 10658), ("startGame", 9472),
                 ("civilization", "IDS_MPS_CIVILIZATION"),
                 ("gameSettings", 9682), ("randomSeed", 10107),
+                ("regicideMode", 13078), ("regicideHelp", 13081), ("regicideObjective", 9846),
+                ("treason", 40112), ("treasonHelp", 41112),
+                ("gameOver", 9006),
                 ("mapArabia", 10875), ("mapBlackForest", 10878), ("mapIslands", 10885),
             )
             if strings is not None and string_id in strings

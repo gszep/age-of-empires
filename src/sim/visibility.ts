@@ -86,7 +86,7 @@ export function updateVisibility(state: GameState): void {
   for (const player of [1, 2] as PlayerId[]) {
     const visibility = state.visibility[player];
     visibility.visible.fill(0);
-    const spies = (playerAttributeFor(state, player, 'spies') ?? 0) > 0;
+    const spies = state.mode !== 'regicide' && (playerAttributeFor(state, player, 'spies') ?? 0) > 0;
     for (const entity of state.entities) {
       const spying = spies && entity.owner !== 0 && entity.owner !== player;
       if (entity.dead || (entity.owner !== player && !spying)) continue;

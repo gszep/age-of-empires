@@ -14,7 +14,8 @@ import { isGateKind, isWallKind } from './sim/buildings';
 import { buildMenu, type BuildPage } from './view/build-menu';
 import { contextTargets, sameKindOnScreen } from './view/selection';
 import { clearSession, loadSession, loadSessionSetup, saveSession } from './dev-session';
-import { loadMapPreference, saveMapPreference, mapChoices, validMatchSetup, MAX_MAP_SEED, type MatchSetup } from './match-setup';
+import { loadMapPreference, saveMapPreference, mapChoices, validMatchSetup, validRecordedMode, MAX_MAP_SEED, type MatchSetup } from './match-setup';
+import { matchOver, TREASON_GOLD } from './sim/regicide';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
 import { buildingLimitReached, buildingRulesFor, unitRulesFor, unitRulesForEntity } from './sim/rules';
@@ -93,23 +94,24 @@ if (mapParam !== null && mapType !== mapParam) {
 const seedParam = Number(pageParams.get('seed'));
 const seedFixed = Number.isInteger(seedParam) && seedParam > 0 && seedParam <= MAX_MAP_SEED ? seedParam : undefined;
 const initialSetup: MatchSetup = { map: mapType, seed: seedFixed ?? (mapParam === null ? mapPreference?.seed : undefined) ?? 42 };
+if (pageParams.get('mode') === 'regicide' || (!pageParams.has('mode') && mapPreference?.mode === 'regicide')) initialSetup.mode = 'regicide';
 if (mapPreference?.civilizations && [1, 2].every(player => civilizationRules(rules, mapPreference.civilizations![player as 1 | 2]))) {
   initialSetup.civilizations = mapPreference.civilizations;
 }
 
-const restored = mapParam === null && seedFixed === undefined ? loadSession(rules) : undefined;
+const restored = mapParam === null && seedFixed === undefined && !pageParams.has('mode') ? loadSession(rules) : undefined;
 const savedSetup = loadSessionSetup(rules);
 const hostResume = loadSession(rules);
 loading.textContent = 'Connecting to shared match…';
 const shared = await connectSharedMatch(
-  () => hostResume ?? createGame(initialSetup.seed, rules, initialSetup.civilizations, initialSetup.map),
+  () => hostResume ?? createGame(initialSetup.seed, rules, initialSetup.civilizations, initialSetup.map, initialSetup.mode),
   notice => { loading.textContent = notice; },
   hostResume ? savedSetup : initialSetup,
 );
 loading.remove();
 const localPlayer: PlayerId = shared?.player ?? 1;
 if (shared) rules = shared.state.rules;
-let game = shared?.state ?? restored ?? createGame(initialSetup.seed, rules, initialSetup.civilizations, initialSetup.map);
+let game = shared?.state ?? restored ?? createGame(initialSetup.seed, rules, initialSetup.civilizations, initialSetup.map, initialSetup.mode);
 const playerRules = (owner: Entity['owner'] = localPlayer): GameRules => rulesForPlayer(game, owner);
 const importedEntity = (key: string, owner: number = localPlayer) => {
   const civ = owner === 1 || owner === 2 ? game.players[owner].civilization : undefined;
@@ -201,7 +203,8 @@ let replay: ReplayState | undefined;
 function startReplay(raw: unknown): void {
   if (shared) { hud.showPopup('Open a standalone game to watch a replay'); return; }
   const record = raw as MatchRecord;
-  if (!record || record.version !== 1 || !Array.isArray(record.commands) || !Array.isArray(record.checksums)) {
+  if (!record || !validRecordedMode(record.version, record.mode) || !Array.isArray(record.commands) || !Array.isArray(record.checksums)
+    || !validMatchSetup({ map: record.map ?? 'arabia', seed: record.seed, mode: record.mode })) {
     hud.showPopup('Not a valid replay file');
     return;
   }
@@ -214,8 +217,8 @@ function startReplay(raw: unknown): void {
   clearSession();
   // A record from before civilisations were written down replays as whatever
   // the content is for, which is what it was played as.
-  game = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia');
-  activeSetup = { map: record.map ?? 'arabia', seed: record.seed };
+  game = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode);
+  activeSetup = { map: record.map ?? 'arabia', seed: record.seed, mode: record.mode, civilizations: record.civilizations };
   setupKnown = true;
   cameraCenter = homeCamera(game);
   selectedIds = [];
@@ -405,7 +408,7 @@ function createHud(): Hud {
   const created = new view.Hud(app, uiAssets, {
     onCommand: (id, shift) => runUiCommand(id, shift),
     onTribute: amounts => {
-      if (replay || game.winner) return { ok: false, reason: 'read-only' };
+      if (replay || matchOver(game)) return { ok: false, reason: 'read-only' };
       return applyCommand(game, { kind: 'tribute-batch', player: localPlayer,
         recipient: localPlayer === 1 ? 2 : 1, amounts });
     },
@@ -443,7 +446,7 @@ function createHud(): Hud {
       // The menu now owns setup. Keep solo/player flags, and let ordinary
       // reloads resume the saved match instead of re-dealing an old URL map.
       const url = new URL(location.href);
-      url.searchParams.delete('map'); url.searchParams.delete('seed');
+      url.searchParams.delete('map'); url.searchParams.delete('seed'); url.searchParams.delete('mode');
       history.replaceState(null, '', url);
       return true;
     },
@@ -455,7 +458,7 @@ function createHud(): Hud {
 }
 
 function configureMapMenu(target: Hud): void {
-  target.configureMapMenu(mapChoices(messages), activeSetup, !shared || localPlayer === 1, messages, setupKnown);
+  target.configureMapMenu(mapChoices(messages), { ...activeSetup, mode: game.mode ?? 'random-map' }, !shared || localPlayer === 1, messages, setupKnown);
   const profiles = [rules, ...Object.values(rules.civilizations ?? {}).filter(profile => profile.civilization.enabled !== false)];
   target.configureCivilizations(profiles.map(profile => ({ id: profile.civilization.key,
     label: profile.civilization.displayName ?? profile.civilization.name })),
@@ -479,7 +482,8 @@ if (shared) {
     game = state;
     rules = state.rules;
     if (shared.setup) {
-      const different = !setupKnown || activeSetup.map !== shared.setup.map || activeSetup.seed !== shared.setup.seed;
+      const different = !setupKnown || activeSetup.map !== shared.setup.map || activeSetup.seed !== shared.setup.seed
+        || (activeSetup.mode ?? 'random-map') !== (shared.setup.mode ?? 'random-map');
       activeSetup = shared.setup;
       setupKnown = true;
       saveMapPreference(activeSetup);
@@ -524,10 +528,10 @@ function restart(setup: MatchSetup | undefined = setupKnown ? activeSetup : unde
   if (setup.civilizations && ![1, 2].every(player => civilizationRules(rules, setup.civilizations![player as 1 | 2]))) return false;
   if (shared) {
     if (localPlayer !== 1) { hud.showMessage('Ysgramor starts a new match'); return false; }
-    return shared.send({ type: 'restart', seed: setup.seed, map: setup.map, civilizations: setup.civilizations });
+    return shared.send({ type: 'restart', seed: setup.seed, map: setup.map, civilizations: setup.civilizations, mode: setup.mode });
   }
   const sides = setup.civilizations ?? { 1: game.players[1].civilization, 2: game.players[2].civilization };
-  const next = createGame(setup.seed, rules, sides, setup.map);
+  const next = createGame(setup.seed, rules, sides, setup.map, setup.mode);
   replay = undefined;
   clearSession();
   activeSetup = setup;
@@ -574,7 +578,7 @@ function selectIdleVillager(): void {
 const BATCH_TRAIN_COUNT = 5;
 
 function diplomacyModel(): DiplomacyModel {
-  return { player: localPlayer, readOnly: !!replay || !!game.winner,
+  return { player: localPlayer, readOnly: !!replay || matchOver(game),
     hasMarket: hasMarket(game, localPlayer), fee: tributeFee(game, localPlayer, 100),
     maximum: Object.fromEntries((['wood', 'food', 'gold', 'stone'] as const).map(r => [r, maximumTribute(game, localPlayer, r)])) as DiplomacyModel['maximum'],
     players: ([1, 2] as const).map(id => ({ id, name: `Player ${id}`,
@@ -587,6 +591,11 @@ function runUiCommand(id: string, shift = false): void {
     return;
   }
   if (replay) return;
+  if (id === 'treason') {
+    const castle = ownSelected().find(e => e.kind === 'castle' && e.buildProgress === undefined);
+    if (castle) { const result = applyCommand(game, { kind: 'treason', player: localPlayer, castleId: castle.id }); if (!result.ok) reject(result.reason); }
+    return;
+  }
   if (id.startsWith('exchange-')) {
     const [, side, resource] = id.split('-');
     const market = ownSelected().find(e => e.kind === 'market' && e.buildProgress === undefined);
@@ -1019,7 +1028,8 @@ addEventListener('keydown', event => {
     // castle and wonder and on nothing else, so a house or a barracks goes on
     // the keypress as a soldier does (issue #47).
     const asked = mine.filter(e =>
-      isBuilding(e.kind) && playerRules(e.owner).buildings[e.kind as BuildingKind].confirmDelete);
+      isBuilding(e.kind) ? playerRules(e.owner).buildings[e.kind as BuildingKind].confirmDelete
+        : isUnit(e.kind) && unitRulesForEntity(game, e).confirmDelete);
     const match = game;
     const player = localPlayer;
     const remove = (result: ConfirmationResult): void => {
@@ -1261,8 +1271,16 @@ function currentCommands(): CommandButton[] {
       label: (messages.payTribute ?? 'Pay Tribute (cost %d%%)').replace('%d', String(tributeFee(game, localPlayer, 100))).replace('%%', '%') });
   }
   // Technologies the selected building researches, in the DAT's own order.
+  if (game.mode === 'regicide' && selection.some(e => e.kind === 'castle' && e.buildProgress === undefined)) {
+    const source = Object.values(rules.technologies).find(t => t.techId === 408);
+    buttons.push({ id: 'treason', slot: source?.button ?? 14, enabled: true,
+      label: plainHelp(messages.treason ?? `Research Treason (${TREASON_GOLD} gold)`),
+      help: messages.treasonHelp ? plainHelp(messages.treasonHelp) : 'Temporarily reveal enemy Kings on the minimap.',
+      icon: hud.iconFor('Techs', source?.iconId, localPlayer) });
+  }
   const player1 = game.players[localPlayer];
   for (const [key, tech] of Object.entries(rules.technologies) as [TechKey, typeof rules.technologies[TechKey]][]) {
+    if (game.mode === 'regicide' && tech.effects.some(e => e.resource === 'spies')) continue;
     if (!civHas(game, localPlayer, 'technologies', tech.techId)) continue;
     const building = selection.find(e => e.kind === tech.researchedAt && e.buildProgress === undefined);
     if (!building) continue;
@@ -1889,7 +1907,7 @@ renderer.setAnimationLoop(now => {
     hud.showMessage(`Advancing to the ${AGE_NAMES[shownAge]}`);
   }
 
-  if (!shared && !paused && !game.winner) {
+  if (!shared && !paused && !matchOver(game)) {
     // `elapsed` is already capped at 0.1s, so a frame runs at most the fastest
     // setting's multiplier over `TICK_SECONDS` ticks: a machine that cannot
     // keep up falls behind real time rather than spiralling.
@@ -1950,13 +1968,19 @@ renderer.setAnimationLoop(now => {
       w: innerWidth / zoom / TILE_W * 1.2,
       h: innerHeight / zoom / TILE_H * 0.9,
     }, assets, revealMap);
+    if (game.draw && !ended) {
+      ended = true;
+      hud.diplomacy.close();
+      hud.showPopup(`${(messages.gameOver ?? 'Game over.').split('.')[0]}.\nDraw: both Kings were lost in the same tick.`);
+    }
     if (game.winner && !ended) {
       ended = true;
+      hud.diplomacy.close();
       const defeated = scoreRows().find(row => row.number !== game.winner)!;
       hud.showDefeat(defeated);
       hud.showEnd(game.winner === localPlayer);
     }
-    if (!game.winner) ended = false;
+    if (!matchOver(game)) ended = false;
   }
 
   assets?.spriteResidency?.sweep();

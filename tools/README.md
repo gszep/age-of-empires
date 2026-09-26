@@ -18,6 +18,12 @@ same source values. It does not regenerate/publish an asset manifest or implemen
 a general RMS interpreter. Generator adapters and authored-map policy are
 explicitly separated from source values in `docs/ledger.md`.
 
+`uv run --locked python tools/regicide_reference.py` similarly extracts standard
+Regicide starting-actor constraints and the400-gold Treason price into the
+contract checked against `src/sim/refdata/regicide.json`. Black Forest's
+`REGICIDE_BACKWARD` override is retained. Exact Treason timing is not in this
+owned-value contract; it remains a labelled runtime inference (#240).
+
 See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matched SteamCMD downloads and source paths on macOS, Linux, and Windows/WSL2. `tools/depot.py` resolves the depot root — `AOE2DE_DEPOT_ROOT` first, then the usual SteamCMD/Steam download locations — for both `npm run import:aoe2` and the integration tests.
 
 ## Pipeline

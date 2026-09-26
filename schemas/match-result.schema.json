@@ -4,8 +4,10 @@
   "title": "MatchResult",
   "type": "object",
   "properties": {
+    "mode": { "enum": ["random-map", "regicide"] },
+    "draw": { "type": "boolean" },
     "version": {
-      "const": 1
+      "enum": [1, 2]
     },
     "seed": {
       "type": "integer"

@@ -5,6 +5,7 @@ import type { BuildingKind, Entity, GameState, PlayerId } from './types';
 import { buildingRulesFor } from './rules';
 import { researchCostFor } from './technologies';
 import { COMMODITIES, hasMarket, marketQuote, tributeFee } from './market';
+import { TREASON_GOLD, treasonMarkers } from './regicide';
 import { rulesForPlayer } from './civilizations';
 import { fireChargeOf } from './fire-charge';
 import type { ObservedEntity, PlayerObservation, RememberedEntityObservation } from '../protocol/types';
@@ -94,6 +95,7 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
   }
   const observation: PlayerObservation = {
     version: PROTOCOL_VERSION,
+    mode: state.mode ?? 'random-map',
     time: Math.round(state.tick * TICK_SECONDS * 100) / 100,
     player,
     mapWidth: state.width,
@@ -113,8 +115,14 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
     explored,
   };
   if (state.winner) observation.winner = state.winner;
+  if (state.draw) observation.draw = true;
+  if (state.mode === 'regicide') observation.treason = {
+    goldCost: TREASON_GOLD, available: state.entities.some(e => e.owner === player && e.kind === 'castle' && !e.dead && e.buildProgress === undefined),
+    untilTick: state.treasonUntil?.[player] ?? 0,
+    kings: treasonMarkers(state, player).map(k => ({ owner: k.owner, x: k.position.x, y: k.position.y })),
+  };
   observation.researchCosts = Object.fromEntries(Object.entries(rulesForPlayer(state, player).technologies)
-    .filter(([key, tech]) => !self.researched.includes(key) && tech.requiresAge <= self.age && tech.effects.some(e => e.resource === 'spies')
+    .filter(([key, tech]) => state.mode !== 'regicide' && !self.researched.includes(key) && tech.requiresAge <= self.age && tech.effects.some(e => e.resource === 'spies')
       && state.entities.some(e => e.owner === player && !e.dead && e.kind === tech.researchedAt && e.buildProgress === undefined))
     .map(([key]) => [key, researchCostFor(state, player, key)]));
   if (hasMarket(state, player)) observation.market = {
@@ -145,6 +153,7 @@ export function describeObservation(observation: PlayerObservation): string {
   const parts = [
     `t=${observation.time.toFixed(1)}`,
     `p${observation.player}`,
+    `mode=${observation.mode}`,
     `food=${observation.food} wood=${observation.wood} gold=${observation.gold} stone=${observation.stone} pop=${observation.population}/${observation.populationCap}`,
     `age=${observation.age}${observation.researched.length ? ` researched=${observation.researched.join(',')}` : ''}`,
     `own: ${countByKind(mine) || 'none'}${idle ? ` (${idle} idle)` : ''}`,
@@ -153,5 +162,7 @@ export function describeObservation(observation: PlayerObservation): string {
     `resource nodes: ${nodes.filter(e => e.resource === 'food').length} food, ${nodes.filter(e => e.resource === 'wood').length} wood, ${nodes.filter(e => e.resource === 'gold').length} gold, ${nodes.filter(e => e.resource === 'stone').length} stone`,
   ];
   if (observation.winner) parts.push(observation.winner === observation.player ? 'result: victory' : 'result: defeat');
+  if (observation.draw) parts.push('result: draw');
+  if (observation.treason?.kings.length) parts.push(`enemy kings: ${observation.treason.kings.map(k => `p${k.owner}@${k.x},${k.y}`).join('; ')}`);
   return parts.join(' | ');
 }

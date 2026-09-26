@@ -5,6 +5,11 @@
   "oneOf": [
     {
       "type": "object", "additionalProperties": false,
+      "properties": { "kind": { "const": "treason" }, "player": { "enum": [1, 2] }, "castleId": { "type": "integer" } },
+      "required": ["kind", "player", "castleId"]
+    },
+    {
+      "type": "object", "additionalProperties": false,
       "properties": {
         "kind": { "const": "tribute-batch" }, "player": { "enum": [1, 2] }, "recipient": { "enum": [1, 2] },
         "amounts": {
@@ -130,7 +135,7 @@
             "onager",
             "scorpion",
             "heavy-scorpion",
-            "petard", "siege-tower",
+            "petard", "siege-tower", "king",
             "trebuchet",
             "monk"
           ]

@@ -78,6 +78,33 @@ OK-popup treatment without a runtime capture.
 
 ## Delivered scope
 
+Regicide is now a real two-player mode in setup, saves, shared restarts,
+headless runs and recordings. Each side starts with ten villagers, King434 and
+a Castle; numeric placement data is in `refdata/regicide.json`, checked against
+owned RMS by `tools/regicide_reference.py`. Arabia uses centre-facing Castles,
+Black Forest its explicit backward override, and Islands its classic box bands.
+Original King art/icon/voice and occupied-building flags are published for both
+enabled profiles. Kings are unarmed, untrainable and conversion-immune; survival
+is tracked recursively through carriers. Actual combat/sinking loss ends the
+match, and simultaneous royal loss is an explicit draw.
+
+Treason is an immediate, repeatable400-gold Castle command with a temporary
+King-position channel, flashing minimap X and no permanent research/fog leakage.
+Its ten-second lifetime, marker cadence and availability interpretation remain
+explicit inferences (#240), alongside starting-resource preset and extra King
+task semantics. Fifty seeds per RMS map pass starts/constraints; private owned
+browser checks cover actual setup/reload/restart, King voice/art, paid Treason
+blink/expiry pixels, shelter flag, Delete defeat and verified v2 replay. A second
+private two-browser host verifies guest read-only setup, real Treason payment,
+equal client synchronization hashes, mode switches and reconnect.
+New observations are v7; records/results and shared protocol are v2; dev saves
+are v3 with mode-less v2 save compatibility. Legacy v1 recordings mean random
+map and cannot smuggle in a Regicide mode. The live managed host was not replaced.
+Final Regicide gate **GREEN** in `.local/regicide-gate-r3.log`: **960 tests /
+73 files, build,128 owned-content tests and real-browser debug smoke**, exit0.
+One worker; no test timeout widening. Full import receipt:
+`.local/regicide-import-r1.log`.
+
 The diplomacy follow-up enables the native menu button for the current fixed,
 opposing two-player teams. It replaces the compact market tribute page with an
 owned-WPFG-derived dialog: player/civilisation/stance rows, four resource buttons,
@@ -111,8 +138,8 @@ published-asset browser verified all five research buttons, payments, live Spies
 price/reveal and original charge impact feedback (729 changed sRGB pixels), in
 `.local/britons-final-research-browser.log`; the full import completed in
 `.local/britons-final-import.log`. Coverage is in `civilization-coverage.md`;
-source/engine inferences remain in `ledger.md`. Regicide/Treason remains outside
-this Briton random-map acceptance.
+source/engine inferences remain in `ledger.md`. The later Regicide checkpoint is
+separate from this historical Briton random-map acceptance.
 
 The shared relic-placement follow-up consumes a numeric source contract in
 `src/sim/refdata/relic-placement.json`, checked against the owned RMS by

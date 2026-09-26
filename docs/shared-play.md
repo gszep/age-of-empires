@@ -62,11 +62,13 @@ Player 1 is Ysgramor; player 2 is Artemis. The AI controls player 2 until a
 human first joins that seat. It stays disabled thereafter, including across
 reconnections and host restarts. A player disconnecting pauses the match;
 F3 resumes after reconnecting. Pause and speed are shared. Only player 1 can
-restart the match. **F10 → Game Settings → Start Game** selects a map and
-seed; Random clears the seed field for a fresh board. The guest's controls
+restart the match. **F10 → Game Settings → Start Game** selects a map,
+seed and Regicide mode; Random clears the seed field for a fresh board. The guest's controls
 are read-only. URL map/seed parameters do not replace a running shared match.
-Launch metadata travels in snapshots and checkpoints, outside simulation state
-and replay hashes. Old saves without this metadata remain loadable.
+Launch metadata travels in snapshots and checkpoints. Unlike map/seed launch
+metadata, game mode also belongs to authoritative state and replay hashes.
+Mode-less legacy data means random map; inconsistent mode metadata is rejected.
+Old saves without launch metadata remain readable under their matching rules/version.
 Their menu offers Start Game to choose a known setup; Restart becomes available
 once the map and original seed are recorded, rather than guessing them.
 
@@ -81,6 +83,9 @@ different browser cannot recover another browser's session storage.
 use `npm run dev -- --port 5175` while the shared service occupies port 5173.
 After editing simulation/host code, restart the shared service as well as
 reloading browsers. Bump `SHARED_VERSION` when checkpoint compatibility changes.
+Regicide uses **shared protocol2**; version1 clients/checkpoints are deliberately
+not silently reinterpreted. The implementation acceptance used private hosts;
+it does not itself replace a live managed match or archive its checkpoint.
 A checkpoint with a different version or rules hash is preserved and fails
 startup with status 78 (`CONFIG`), as does malformed checkpoint JSON. The
 service does not retry that permanent failure. Restore the matching game

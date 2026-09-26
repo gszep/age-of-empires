@@ -2,7 +2,7 @@ import { applyCommand, createGame, stepGame } from '../sim/game';
 import { exampleAiCommands } from '../sim/ai';
 import { observe } from '../sim/observe';
 import { synchronizationHash } from './checksum';
-import type { Command, GameState, PlayerId } from '../sim/types';
+import type { Command, GameMode, GameState, PlayerId } from '../sim/types';
 import type { HostMessage, MatchSettings } from './protocol';
 import type { MatchSetup } from '../match-setup';
 
@@ -41,9 +41,10 @@ export class SharedMatch {
     };
   }
 
-  restart(seed: number, map: string, civilizations = { 1: this.state.players[1].civilization, 2: this.state.players[2].civilization }): void {
-    this.state = createGame(seed, this.state.rules, civilizations, map);
-    this.setup = { map, seed, civilizations };
+  restart(seed: number, map: string, civilizations = { 1: this.state.players[1].civilization, 2: this.state.players[2].civilization },
+    mode: GameMode = this.state.mode ?? 'random-map'): void {
+    this.state = createGame(seed, this.state.rules, civilizations, map, mode);
+    this.setup = { map, seed, civilizations, ...(mode === 'regicide' ? { mode } : {}) };
     this.pending = [];
     this.settings = { ...this.settings, paused: false, generation: this.settings.generation + 1 };
   }

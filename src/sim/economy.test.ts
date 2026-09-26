@@ -2370,9 +2370,10 @@ describe('civilisations', () => {
       expect(missing.technologies, `${key} is not in the Britons' tree`).not.toContain(tech.techId);
     }
     for (const [kind, rules] of Object.entries(importedRules.units)) {
-      // Additional definitions include foreign uniques for captures; their
-      // production denial is measured by civilization-profile.test.ts.
-      if (rules.datId === undefined || kind.startsWith('dat-unit-')) continue;
+      // Definitions also include foreign captures and spawn-only Kings.
+      // Their public production denial is covered by profile/Regicide tests;
+      // only units actually offered for training belong to this invariant.
+      if (rules.datId === undefined || rules.trainable === false || kind.startsWith('dat-unit-')) continue;
       expect(missing.units, `${kind} is not in the Britons' tree`).not.toContain(rules.datId);
     }
     for (const [kind, rules] of Object.entries(importedRules.buildings)) {

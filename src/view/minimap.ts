@@ -3,6 +3,7 @@ import { isBuilding, NODE_OF_RESOURCE, type NodeKind } from '../sim/data';
 import { rulesForPlayer } from '../sim/civilizations';
 import type { ContentAssets, ImportedTerrain } from './assets';
 import { playerColorHex } from './sprites';
+import { treasonMarkers } from '../sim/regicide';
 
 /**
  * Resource dots without owned content. With it, the DAT's own
@@ -240,6 +241,16 @@ export class Minimap {
         remembered.x, remembered.y, color,
         remembered.kind === 'resource' ? resourceDotSize : 3,
       );
+    }
+
+    // Camera viewport diamond.
+    // Localization41112 specifies flashing X markers, not a fog reveal.
+    // Size and half-second cadence are explicit view inferences.
+    if (Math.floor(state.tick / 10) % 2 === 0) for (const king of treasonMarkers(state, this.player)) {
+      const p = this.toCanvas(state, king.position.x, king.position.y);
+      ctx.strokeStyle = ownerColor(king.owner); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(p.x - 5, p.y - 5); ctx.lineTo(p.x + 5, p.y + 5);
+      ctx.moveTo(p.x + 5, p.y - 5); ctx.lineTo(p.x - 5, p.y + 5); ctx.stroke();
     }
 
     // Camera viewport diamond.

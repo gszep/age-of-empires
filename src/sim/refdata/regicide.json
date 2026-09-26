@@ -1,0 +1,12 @@
+{
+  "modern": {
+    "villagers": 10,
+    "villagerDistance": 5,
+    "villager": { "forest": 1, "zone": 1, "cliff": 1, "edge": 2 },
+    "king": { "forest": 1, "zone": 2, "cliff": 1, "edge": 4 },
+    "castle": { "unitId": 82, "maximumDistance": 13, "forest": 3, "zone": 4, "cliff": 3, "edge": 4 }
+  },
+  "blackForestBackward": true,
+  "islands": { "extraVillagers": 7, "villagerDistance": 6, "kingMinimum": 6, "kingMaximum": 8, "castleDistance": 10 },
+  "treasonGold": 400
+}

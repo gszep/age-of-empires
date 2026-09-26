@@ -88,3 +88,12 @@ fog, sprite bodies, projectiles, contours, rally flags and placement overlays ke
 their relative passes regardless of map extent. Body piece offsets are applied
 before bounding, preserving their existing depth order. This is a view-only
 implementation policy, not a substitute for the reference compositor (#149).
+
+Game mode (`random-map` / `regicide`) is authoritative match input. Regicide
+starting actors, King survival through nested carriers, repeatable Treason and
+draw outcomes live in `src/sim/regicide.ts`/`game.ts`; minimap markers consume a
+read-only King-position channel, never mutate fog. Observation v7 exposes mode,
+draw and temporary positions. New records/results are v2 with mode; legacy v1
+recordings are accepted only without a mode field and mean random map. Shared
+protocol2 rejects old simulation clients; dev snapshot3 admits mode-less v2
+snapshots as legacy random maps. A mode is not inferred from a map filename.

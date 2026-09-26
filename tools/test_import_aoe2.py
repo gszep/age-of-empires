@@ -1078,6 +1078,11 @@ class ContentImportIntegrationTest(unittest.TestCase):
                 self.assertNotIn("text", entity, key)
                 continue
             self.assertIn("name", entity["text"], key)
+            # Spawn-only units such as King434 have no creation/help text in
+            # the owned strings. Do not invent a train tooltip for a unit with
+            # no DAT training location; task variants still keep their help.
+            if entity.get("category") == "unit" and "train" not in entity:
+                continue
             if entity.get("category") in ("unit", "unit-variant", "building") and not key.startswith("palisade-gate"):
                 self.assertEqual(sorted(entity["text"]), ["create", "help", "name"], key)
         technologies = self.result["technologies"]

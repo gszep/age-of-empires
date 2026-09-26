@@ -22,6 +22,51 @@ function fixture() {
 }
 afterEach(() => { for (const path of directories.splice(0)) rmSync(path, { recursive: true, force: true }); });
 
+it('carries Regicide/Treason over the real wire, rejects old clients and bad modes, and restores mode after restart/checkpoint', async () => {
+  const { directory, checkpoint } = fixture();
+  const { rules: ignored, ...state } = createGame(130, FALLBACK_RULES, undefined, 'arabia', 'regicide');
+  state.players[1].gold = 900;
+  const castle = state.entities.find(e => e.owner === 1 && e.kind === 'castle')!;
+  writeFileSync(checkpoint, JSON.stringify({ version: SHARED_VERSION,
+    rulesHash: createHash('sha256').update(JSON.stringify(FALLBACK_RULES)).digest('hex'), state,
+    settings: { paused: true, speed: 1, generation: 0 }, humanTwo: true, setup: { map: 'arabia', seed: 130, mode: 'regicide' } }));
+  for (const restored of [false, true]) {
+    const server = await createServer({ root: directory, configFile: false, logLevel: 'silent',
+      server: { host: '127.0.0.1', port: 0 }, plugins: [sharedMatchPlugin(directory, checkpoint)] });
+    await server.listen();
+    const address = server.httpServer!.address();
+    if (!address || typeof address === 'string') throw new Error('missing address');
+    const socket = new WebSocket(`ws://127.0.0.1:${address.port}/__match/socket?player=1`);
+    const packets = new EventEmitter();
+    socket.on('message', bytes => { const p = JSON.parse(bytes.toString()); packets.emit(p.type, p); });
+    await once(socket, 'open');
+    const request = async (message: object, response: string) => {
+      const next = once(packets, response, { signal: AbortSignal.timeout(10000) });
+      socket.send(JSON.stringify(message)); return (await next)[0];
+    };
+    try {
+      const joined = await request({ type: 'join', version: SHARED_VERSION }, 'snapshot');
+      expect(joined.state.mode).toBe('regicide'); expect(joined.setup.mode).toBe('regicide');
+      if (restored) { expect(joined.setup.map).toBe('islands'); expect(joined.setup.seed).toBe(131); continue; }
+      socket.send(JSON.stringify({ type: 'command', command: { kind: 'treason', player: 1, castleId: castle.id } }));
+      const tick = await request({ type: 'settings', paused: false }, 'tick');
+      expect(tick.commands).toContainEqual({ kind: 'treason', player: 1, castleId: castle.id });
+      await request({ type: 'settings', paused: true }, 'settings');
+      const paid = await request({ type: 'resync' }, 'snapshot');
+      expect(paid.state.players[1].gold).toBe(500); expect(paid.state.treasonUntil['1']).toBeGreaterThan(paid.state.tick);
+      expect((await request({ type: 'restart', map: 'islands', seed: 131, mode: 'king-hunt' }, 'error')).reason).toContain('Invalid');
+      const reset = await request({ type: 'restart', map: 'islands', seed: 131, mode: 'regicide' }, 'snapshot');
+      expect(reset.state.mode).toBe('regicide'); expect(reset.state.treasonUntil).toBeUndefined();
+      expect(reset.state.entities.filter((e: any) => e.kind === 'king')).toHaveLength(2);
+      const legacy = new WebSocket(`ws://127.0.0.1:${address.port}/__match/socket?player=2`);
+      await once(legacy, 'open');
+      const refused = once(legacy, 'message'); const closed = once(legacy, 'close');
+      legacy.send(JSON.stringify({ type: 'join', version: 1 }));
+      expect(JSON.parse(String((await refused)[0])).reason).toContain('version mismatch'); await closed;
+    } finally { socket.close(); await once(socket, 'close'); await server.close(); }
+  }
+});
+
 function host(checkpoint: string, port = 0) {
   return spawnSync(process.execPath, ['node_modules/tsx/dist/cli.mjs', 'tools/shared-host.mts'], {
     env: { ...process.env, MATCH_CHECKPOINT: checkpoint, MATCH_PORT: String(port) },

@@ -1,10 +1,10 @@
 import type { Activity, Command, EntityKind, Order, PlayerId, ResourceKind, UnitKind } from '../sim/types';
 import type { NodeKind } from '../sim/data';
 
-/** v6 adds market/tribute quotes, dynamic research prices and charge state. */
-export const PROTOCOL_VERSION = 6;
-/** Commands, match configuration and recordings retain their v1 formats. */
-export const MATCH_FORMAT_VERSION = 1;
+/** v7 adds game mode, explicit draws and the temporary King-position channel. */
+export const PROTOCOL_VERSION = 7;
+/** v2 records carry an explicit mode; legacy v1 records mean random map. */
+export const MATCH_FORMAT_VERSION = 2;
 
 export interface ObservedEntity {
   id: number;
@@ -42,6 +42,9 @@ export interface ObservedEntity {
 }
 
 export interface PlayerObservation {
+  mode: import('../sim/types').GameMode;
+  draw?: boolean;
+  treason?: { goldCost: number; available: boolean; untilTick: number; kings: { owner: PlayerId; x: number; y: number }[] };
   version: typeof PROTOCOL_VERSION;
   time: number;
   player: PlayerId;
@@ -81,7 +84,7 @@ export interface RejectedCommand {
 }
 
 export interface MatchConfig {
-  version: typeof MATCH_FORMAT_VERSION;
+  version: 1 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   maxTimeSeconds?: number;
   decideIntervalSeconds?: number;
@@ -94,6 +97,7 @@ export interface MatchConfig {
   /** Which map type generates the board. Absent means `arabia`, so a match
    * recorded before map types existed replays as it was played. */
   map?: string;
+  mode?: import('../sim/types').GameMode;
 }
 
 export interface PlayerSummary {
@@ -110,7 +114,9 @@ export interface PlayerSummary {
 }
 
 export interface MatchResult {
-  version: typeof MATCH_FORMAT_VERSION;
+  mode?: import('../sim/types').GameMode;
+  draw?: boolean;
+  version: 1 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   timeSeconds: number;
   winner?: PlayerId;
@@ -137,7 +143,8 @@ export interface RememberedEntityObservation {
 
 /** Everything needed to reproduce a match tick-for-tick. */
 export interface MatchRecord {
-  version: typeof MATCH_FORMAT_VERSION;
+  mode?: import('../sim/types').GameMode;
+  version: 1 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   rulesOrigin: 'fallback' | 'imported';
   /**

@@ -4,7 +4,7 @@ import { isAnimal, isUnit } from '../sim/data';
 import type { Command, Entity, GameState, PlayerId, Point, Projectile } from '../sim/types';
 import { SHARED_VERSION, type HostMessage, type MatchSettings } from './protocol';
 import { TickPlayback } from './playback';
-import { validMatchSetup, type MatchSetup } from '../match-setup';
+import { validGameMode, validMatchSetup, type MatchSetup } from '../match-setup';
 
 export class SharedClient {
   state!: GameState;
@@ -120,9 +120,14 @@ export class SharedClient {
         socket.onmessage = event => {
           const message = JSON.parse(event.data) as HostMessage;
           if (message.type === 'snapshot') {
+            if (!validGameMode(message.state.mode)) { this.onNotice?.('Invalid game mode in snapshot'); socket.close(); return; }
+            if (validMatchSetup(message.setup) && (message.setup.mode ?? 'random-map') !== (message.state.mode ?? 'random-map')) {
+              this.onNotice?.('Inconsistent game mode metadata'); socket.close(); return;
+            }
             const changedMap = !this.state || !this.settings || this.settings.generation !== message.settings.generation
               || this.state.width !== message.state.width || this.state.height !== message.state.height
               || this.state.matchSeed !== message.state.matchSeed
+              || (this.state.mode ?? 'random-map') !== (message.state.mode ?? 'random-map')
               || this.state.terrain.some((tile, index) => tile !== message.state.terrain[index])
               || this.state.elevation.some((level, index) => level !== message.state.elevation[index]);
             this.clearPlayback();

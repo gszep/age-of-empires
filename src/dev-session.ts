@@ -14,7 +14,7 @@
  */
 import type { GameRules } from './sim/data';
 import type { GameState } from './sim/types';
-import { validMatchSetup, type MatchSetup } from './match-setup';
+import { validGameMode, validMatchSetup, type MatchSetup } from './match-setup';
 import { seedFrom } from './sim/random';
 import { civilizationRules } from './sim/civilizations';
 
@@ -28,7 +28,7 @@ const KEY = 'open-empires-lab:dev-session';
  * nothing. `tools/probes/snapshot.ts` had been doing exactly that since this
  * went to 2.
  */
-export const SNAPSHOT_VERSION = 2;
+export const SNAPSHOT_VERSION = 3;
 const VERSION = SNAPSHOT_VERSION;
 
 interface Snapshot {
@@ -37,6 +37,8 @@ interface Snapshot {
   state: Omit<GameState, 'rules'>;
   setup?: MatchSetup;
 }
+const compatibleSnapshot = (snapshot: Snapshot): boolean => snapshot.version === VERSION
+  || (snapshot.version === 2 && snapshot.state.mode === undefined);
 
 export function saveSession(state: GameState, setup?: MatchSetup): void {
   if (!import.meta.env.DEV) return;
@@ -58,7 +60,8 @@ export function loadSession(rules: GameRules): GameState | undefined {
     const snapshot = JSON.parse(raw) as Snapshot;
     // Rules are not restored: a re-import must take effect, and a snapshot
     // taken under different content would resume against mismatched entities.
-    if (snapshot.version !== VERSION || snapshot.rulesOrigin !== rules.origin) return undefined;
+    if (!compatibleSnapshot(snapshot) || snapshot.rulesOrigin !== rules.origin) return undefined;
+    if (!validGameMode(snapshot.state.mode)) return undefined;
     if (![1, 2].every(player => civilizationRules(rules, snapshot.state.players[player as 1 | 2]?.civilization))) return undefined;
     return { ...snapshot.state, rules };
   } catch {
@@ -77,8 +80,9 @@ export function clearSession(): void {
 export function loadSessionSetup(rules: GameRules): MatchSetup | undefined {
   try {
     const saved: Snapshot = JSON.parse(sessionStorage.getItem(KEY) ?? 'null');
-    if (saved?.version === VERSION && saved.rulesOrigin === rules.origin && validMatchSetup(saved.setup)
-      && seedFrom(saved.setup.seed) === saved.state.matchSeed) return saved.setup;
+    if (saved && compatibleSnapshot(saved) && saved.rulesOrigin === rules.origin && validMatchSetup(saved.setup)
+      && seedFrom(saved.setup.seed) === saved.state.matchSeed
+      && (saved.setup.mode ?? 'random-map') === (saved.state.mode ?? 'random-map')) return saved.setup;
   } catch { /* old or unavailable session */ }
   return;
 }
