@@ -78,6 +78,21 @@ OK-popup treatment without a runtime capture.
 
 ## Delivered scope
 
+The diplomacy follow-up enables the native menu button for the current fixed,
+opposing two-player teams. It replaces the compact market tribute page with an
+owned-WPFG-derived dialog: player/civilisation/stance rows, four resource buttons,
+100/Shift500/CTRL-all, Clear/OK/Cancel, and read-only replay. Confirmation sends
+one atomic public command; fees and all-stockpile amounts are resolved against
+current research/resources and a live completed market. Both owned and open
+fallback browser checks cover actual clicks, cancellation, decrement, fee changes
+after Coinage/Banking, market destruction and replay. Relation/Allied Victory
+controls remain visibly locked; no unlocked-alliance behavior is offered.
+`tools/diplomacy_smoke.mts` is the maintained acceptance; full pipeline receipt is
+`.local/diplomacy-import-r2.log`. Unrelated #138 surfaces remain open.
+Checkpoint gate **GREEN** in `.local/diplomacy-gate-r1.log`: **931 tests /72 files,
+build,126 owned-content tests and real-browser debug smoke**. One worker;
+no test timeouts widened.
+
 The 2026-09-26 Briton playable checkpoint passed the full gate:
 **898 Vitest tests / 68 files, build, 123 owned-import tests and browser smoke**
 (`.local/britons-playable-gate-r5.log`). Dedicated published-art monastery/Warwolf
@@ -460,7 +475,7 @@ straight to the canvas. Nor the ground's scatter and layer (#55).
 
 Other civilisations (#122) and their bonuses (#123); selectable formations;
 campaigns; public multiplayer;
-diplomacy; a genetic-algorithm framework;
+unlocked diplomatic relations/cooperative victories; a genetic-algorithm framework;
 separate mobile gameplay. Skipped technologies are recorded individually, each
 with its reason in the manifest's `skippedTechnologies` (#128). The open
 fallback stops at the Castle Age (#125).

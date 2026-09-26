@@ -14,6 +14,11 @@ These scripts live directly under `tools/` and start private Vite/browser
 fixtures. Run `npx tsx tools/<name>.mts`; they supplement the gate's general
 browser smoke and are maintained regression tools.
 
+- **`diplomacy_smoke.mts`** — enabled native diplomacy menu, locked two-player
+  relations, original tribute icon states, draft/Clear/Cancel, Shift/right-click/
+  CTRL-all, real Coinage/Banking research and fee deductions, market destruction,
+  and read-only replay through file input. Also run with `OPEN_FALLBACK=1`.
+
 - **`relic_placement_smoke.mts`** — generated Islands seed 130, untouched terrain,
   resources and relic positions, staged Castle-age monk/monastery/transport.
   Real right-click pickup of a home relic and the fifth relic on resource land20;

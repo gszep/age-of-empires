@@ -81,9 +81,11 @@ try {
   await click('exchange-sell-wood'); assert.equal((await snapshot()).players[1].gold - guildGold, 85);
   for (const [tech, fee] of [[undefined, 30], [23, 20], [17, 0]] as const) {
     if (tech) await research(tech, market);
-    await click('market-tribute'); const before = await snapshot(); await click('tribute-stone'); s = await snapshot();
+    await click('market-tribute'); const before = await snapshot();
+    await page.click('#diplomacy-dialog [data-player="2"] [data-tribute-resource="stone"]');
+    await page.click('[data-diplomacy-confirm]'); s = await snapshot();
     assert.equal(before.players[1].stone - s.players[1].stone, 100 + fee);
-    assert.equal(s.players[2].stone - before.players[2].stone, 100); await click('market-back');
+    assert.equal(s.players[2].stone - before.players[2].stone, 100);
   }
   await select(castle); const spies = keyFor(408);
   await page.waitForFunction(key => document.querySelector<HTMLButtonElement>(`[data-command="research-${key}"]`)?.title.includes('400 gold'), {}, spies);

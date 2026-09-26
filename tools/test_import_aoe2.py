@@ -2162,6 +2162,22 @@ class UiImportIntegrationTest(unittest.TestCase):
         self.assertEqual(button["StateMaterials"]["StateHover"]["Font"]["PointSize"], 45)
         self.assertEqual(button["StateMaterials"]["StateNormal"]["Font"]["PointSize"], 38)
 
+    def test_diplomacy_reads_native_columns_and_original_tribute_button_states(self):
+        data = self.result['nativeFeedback']['diplomacy']
+        self.assertEqual(data['width'], 2800)
+        self.assertEqual(data['columns'], ['100', '*', '400', '200', '200', '200', '200', '150', '150', '150', '150'])
+        self.assertEqual(data['rowHeight'], 940 / 9)
+        self.assertEqual(data['tributeSize'], [121, 84])
+        self.assertEqual(data['closeSize'], [85, 87])
+        self.assertEqual(data['fonts'], {'title': 80, 'name': 52, 'civilization': 30, 'stance': 40})
+        self.assertEqual(len(data['icons']), 16)
+        for path in data['icons'].values():
+            owned = SOUNDS.parent.parent / 'wpfg' / path.removeprefix('wpfg/')
+            self.assertEqual((Path(self.directory.name) / path).read_bytes(), owned.read_bytes())
+        self.assertIn('diplomacy', self.result['layouts'])
+        self.assertIn('wpfg/dialog/dialogdiplomacy.xaml', self.result['source']['sha256'])
+        self.assertIn('wpfg/SystemResourcesDiplomacyItem.xaml', self.result['source']['sha256'])
+
     def test_native_dialogs_read_xaml_fonts_and_keep_the_owned_nine_slice_pixels(self):
         native = self.result["nativeFeedback"]
         self.assertEqual(native["confirm"]["messageWidth"], 1100)

@@ -296,6 +296,8 @@ export interface UiAssets {
   colorPalettes?: Record<string, NonNullable<UiAssets['colors']>>;
   colorTags?: Record<string, number[]>;
   nativeFeedback?: {
+    diplomacy?: { width: number; columns: string[]; rowHeight: number; tributeSize: number[]; closeSize: number[];
+      buttonWidth: number; icons: Record<string, string>; fonts: Record<string, number> };
     images: Record<string, string>;
     fonts: Record<string, string>;
     button: { height: number; fontSize: number; border: number; borderColor: string; gradient: { color: string; offset: number }[] };

@@ -46,6 +46,15 @@ def extract_feedback(wpfg: Path, out: Path, hashes: dict) -> dict:
     text = xml("SystemResourcesTextBlock.xaml")
     fonts_doc = xml("SystemResourcesFont.xaml")
     yesno = xml("dialog/dialogyesnoboxgeneral.xaml")
+    diplomacy = xml("dialog/dialogdiplomacy.xaml")
+    diplomacy_item = xml("SystemResourcesDiplomacyItem.xaml")
+    diplomacy_canvas = next(e for e in diplomacy.iter(P + "Canvas") if e.find(P + "Canvas.Effect") is not None)
+    diplomacy_rows = next(e for e in diplomacy.iter(P + "Grid") if e.get("Margin") == "20")
+    diplomacy_main_rows = next(e for e in diplomacy.iter(P + "Grid.RowDefinitions"))
+    tribute_icons = {key: copy(keyed(diplomacy_item, key).get("ImageSource"))
+                     for resource in ("Wood", "Food", "Gold", "Stone")
+                     for state in ("Normal", "Disabled", "Active", "Hover")
+                     for key in (f"{resource}{state}Icon",)}
     end = xml("dialog/dialogendgame.xaml")
     button = keyed(xml("systemresourcesbuttonlarge.xaml"), "ButtonLarge")
     frame = keyed(xml("SystemResourcesPaphos.xaml"), "DialogBackgroundRect")
@@ -86,6 +95,19 @@ def extract_feedback(wpfg: Path, out: Path, hashes: dict) -> dict:
     xml("screenwindow.xaml")
     return {
         "images": images,
+        "diplomacy": {
+            "width": float(diplomacy_canvas.get("Width")),
+            "columns": [e.get("Width") for e in next(diplomacy_item.iter(P + "Grid.ColumnDefinitions"))],
+            "rowHeight": float(list(diplomacy_main_rows)[3].get("Height")) / len(diplomacy_rows.find(P + "Grid.RowDefinitions")),
+            "tributeSize": [float(named(diplomacy_item, "ButtonWood").get(k)) for k in ("Width", "Height")],
+            "closeSize": [float(named(diplomacy, "ButtonClose").get(k)) for k in ("Width", "Height")],
+            "buttonWidth": float(named(diplomacy, "ButtonConfirm").get("Width")),
+            "fonts": {"title": float(setters(keyed(text, 'TextBlockHeading'))['FontSize']),
+                      "name": float(setters(keyed(text, 'TextBlockGreyMed'))['FontSize']),
+                      "civilization": float(named(diplomacy_item, 'PlayerCiv').get('FontSize')),
+                      "stance": float(named(diplomacy_item, 'TheirStance').get('FontSize'))},
+            "icons": tribute_icons,
+        },
         "fonts": {name: copy(f"fonts/{file}") for name, file in {
             "body": "timesbd.ttf", "heading": "TrajanPro-Regular.ttf", "button": "TrajanPro-Bold.ttf",
         }.items()},

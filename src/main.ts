@@ -19,7 +19,8 @@ import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets'
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
 import { buildingLimitReached, buildingRulesFor, unitRulesFor, unitRulesForEntity } from './sim/rules';
 import { researchCostFor, technologyRequirementsMet } from './sim/technologies';
-import { COMMODITIES, marketQuote, tributeFee, type Commodity } from './sim/market';
+import { COMMODITIES, hasMarket, marketQuote, maximumTribute, tributeFee, type Commodity } from './sim/market';
+import type { DiplomacyModel } from './view/diplomacy';
 import { civilizationRules } from './sim/civilizations';
 import { profileArtKey } from './view/sprites';
 import { gridKey, placeCommands } from './view/command-grid';
@@ -403,6 +404,11 @@ function reject(reason: string): void {
 function createHud(): Hud {
   const created = new view.Hud(app, uiAssets, {
     onCommand: (id, shift) => runUiCommand(id, shift),
+    onTribute: amounts => {
+      if (replay || game.winner) return { ok: false, reason: 'read-only' };
+      return applyCommand(game, { kind: 'tribute-batch', player: localPlayer,
+        recipient: localPlayer === 1 ? 2 : 1, amounts });
+    },
     onMinimapNavigate: canvasPoint => {
       const world = hud.minimap.fromCanvas(game, canvasPoint.x, canvasPoint.y);
       cameraCenter = elevatedWorldToIso(game, world.x, world.y);
@@ -567,13 +573,20 @@ function selectIdleVillager(): void {
 /** How many a Shift-click on a train button asks for, as the reference does. */
 const BATCH_TRAIN_COUNT = 5;
 
-let tributeMarketId: number | undefined;
+function diplomacyModel(): DiplomacyModel {
+  return { player: localPlayer, readOnly: !!replay || !!game.winner,
+    hasMarket: hasMarket(game, localPlayer), fee: tributeFee(game, localPlayer, 100),
+    maximum: Object.fromEntries((['wood', 'food', 'gold', 'stone'] as const).map(r => [r, maximumTribute(game, localPlayer, r)])) as DiplomacyModel['maximum'],
+    players: ([1, 2] as const).map(id => ({ id, name: `Player ${id}`,
+      civilization: playerRules(id).civilization.displayName ?? playerRules(id).civilization.name,
+      color: playerColorHex(assets, id) ?? (id === 1 ? '#3b64ff' : '#ff3b3b') })) };
+}
 function runUiCommand(id: string, shift = false): void {
-  if (id === 'market-tribute') {
-    tributeMarketId = ownSelected().find(e => e.kind === 'market' && e.buildProgress === undefined)?.id;
+  if (id === 'market-tribute' || id === 'diplomacy') {
+    hud.diplomacy.show(diplomacyModel());
     return;
   }
-  if (id === 'market-back') { tributeMarketId = undefined; return; }
+  if (replay) return;
   if (id.startsWith('exchange-')) {
     const [, side, resource] = id.split('-');
     const market = ownSelected().find(e => e.kind === 'market' && e.buildProgress === undefined);
@@ -582,12 +595,6 @@ function runUiCommand(id: string, shift = false): void {
         side: side as 'buy' | 'sell', resource: resource as Commodity, amount: shift ? 500 : 100 });
       if (!result.ok) reject(result.reason);
     }
-    return;
-  }
-  if (id.startsWith('tribute-')) {
-    const result = applyCommand(game, { kind: 'tribute', player: localPlayer,
-      recipient: localPlayer === 1 ? 2 : 1, resource: id.slice(8) as ResourceKind, amount: shift ? 500 : 100 });
-    if (!result.ok) reject(result.reason);
     return;
   }
   const rules = playerRules();
@@ -1117,16 +1124,6 @@ function currentCommands(): CommandButton[] {
   const player = game.players[localPlayer];
   const buttons: CommandButton[] = [];
   const selectedMarket = selection.find(e => e.kind === 'market' && e.buildProgress === undefined);
-  if (tributeMarketId !== selectedMarket?.id) tributeMarketId = undefined;
-  if (tributeMarketId !== undefined) {
-    const recipient = localPlayer === 1 ? 2 : 1;
-    return [...(['wood', 'food', 'gold', 'stone'] as const).map((resource, i) => {
-      const suffix = resource[0].toUpperCase() + resource.slice(1);
-      return { id: `tribute-${resource}`, slot: i + 1, hotkey: gridKey(i + 1), enabled: true,
-        label: `${messages.tribute ?? 'Tribute'} 100 ${resource} → Player ${recipient} (+${tributeFee(game, localPlayer, 100)} fee)`,
-        help: messages[`tribute${suffix}Help`] };
-    }), { id: 'market-back', slot: 15, hotkey: 'escape', enabled: true, label: 'Back' }];
-  }
   if (buildMode) {
     return [{
       id: 'cancel', label: 'Cancel placement', hotkey: 'escape', enabled: true, active: true,
@@ -1944,6 +1941,7 @@ renderer.setAnimationLoop(now => {
   if (hudClock > 0.15) {
     hudClock = 0;
     hud.updateResources(game, localPlayer, resourceStatus());
+    if (hud.diplomacy.open) hud.diplomacy.update(diplomacyModel());
     hud.updateProduction(productionItems());
     hud.updateScore(scoreRows());
     hud.setCommands(currentCommands());

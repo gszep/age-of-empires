@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES } from './data';
 import { applyCommand, createGame, stepGame } from './game';
-import { marketQuote } from './market';
+import { marketQuote, maximumTribute } from './market';
 import { researchCostFor } from './technologies';
 import { updateVisibility, isEntityVisible } from './visibility';
 import { observe } from './observe';
@@ -32,6 +32,45 @@ const exchange = (id: number, side: 'buy' | 'sell', amount: 100 | 500 = 100): Co
   ({ kind: 'exchange', player: 1, marketId: id, resource: 'wood', side, amount });
 
 describe('public market transactions', () => {
+  it('confirms a four-resource tribute atomically and resolves CTRL-all against current stock and fees', () => {
+    const { s } = fixture();
+    s.players[1].wood = 131; s.players[1].food = 650; s.players[1].gold = 1; s.players[1].stone = 130;
+    expect(maximumTribute(s, 1, 'wood')).toBe(100);
+    const cmd: Command = { kind: 'tribute-batch', player: 1, recipient: 2,
+      amounts: { wood: 'all', food: 500, gold: 1, stone: 100 } };
+    expect(validateCommand(JSON.parse(JSON.stringify(cmd)))).toBe(true);
+    const before = checksumState(s);
+    expect(applyCommand(s, cmd)).toEqual({ ok: false, reason: 'not enough gold' });
+    expect(checksumState(s)).toBe(before);
+    // A deposit after the displayed quote is included by CTRL-all at execution.
+    s.players[1].wood += 129; s.players[1].gold = 2;
+    const copy = JSON.parse(JSON.stringify(s)) as GameState;
+    for (const state of [s, copy]) expect(applyCommand(state, JSON.parse(JSON.stringify(cmd)))).toEqual({ ok: true });
+    expect(s.players[1]).toMatchObject({ wood: 0, food: 0, gold: 0, stone: 0 });
+    expect(s.players[2]).toMatchObject({ wood: 10200, food: 10500, gold: 10001, stone: 10100 });
+    expect(checksumState(copy)).toBe(checksumState(s));
+  });
+
+  it('uses completed Coinage/Banking for all-resource transfers and rejects malformed or marketless batches without paying', () => {
+    const { s, market } = fixture();
+    for (const [tech, stock, gift] of [[undefined, 130, 100], ['coinage', 120, 100], ['banking', 123, 123]] as const) {
+      if (tech) research(s, market.id, tech);
+      s.players[1].stone = stock;
+      const before = s.players[2].stone;
+      expect(applyCommand(s, { kind: 'tribute-batch', player: 1, recipient: 2, amounts: { stone: 'all' } }).ok).toBe(true);
+      expect(s.players[1].stone).toBe(0); expect(s.players[2].stone - before).toBe(gift);
+    }
+    for (const amounts of [{}, { food: -1 }, { food: 1.5 }, { wood: 1, water: 1 }, { wood: 'ALL' }, null, []]) {
+      const command = { kind: 'tribute-batch', player: 1, recipient: 2, amounts };
+      expect(validateCommand(command)).toBe(false);
+      const before = checksumState(s);
+      expect(applyCommand(s, command as Command).ok).toBe(false); expect(checksumState(s)).toBe(before);
+    }
+    market.dead = true;
+    const before = checksumState(s);
+    expect(applyCommand(s, { kind: 'tribute-batch', player: 1, recipient: 2, amounts: { wood: 'all' } }).ok).toBe(false);
+    expect(checksumState(s)).toBe(before);
+  });
   it('buys/sells actual stock at shared moving prices, with owner-specific Guilds fees', () => {
     const { s, market } = fixture();
     expect(validateCommand(exchange(market.id, 'buy'))).toBe(true);

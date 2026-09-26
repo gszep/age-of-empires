@@ -27,7 +27,20 @@ export function tributeFee(state: GameState, owner: PlayerId, amount: number): n
   return Math.ceil(amount * (playerAttributeFor(state, owner, 'tributeInefficency') ?? 0.3) - 1e-9);
 }
 
-export function applyMarketCommand(state: GameState, command: Extract<Command, { kind: 'exchange' | 'tribute' }>): CommandResult {
+/** CTRL-all includes the fee in the budget. Resolve again at command execution,
+ * not against a potentially stale dialog/shared snapshot. Integer fee rounding
+ * leaves at most the indivisible remainder in the sender's stockpile. */
+export function maximumTribute(state: GameState, owner: PlayerId, resource: ResourceKind): number {
+  let low = 0, high = Math.floor(state.players[owner][resource]);
+  while (low < high) {
+    const mid = low + Math.ceil((high - low) / 2);
+    if (mid + tributeFee(state, owner, mid) <= state.players[owner][resource]) low = mid;
+    else high = mid - 1;
+  }
+  return low;
+}
+
+export function applyMarketCommand(state: GameState, command: Extract<Command, { kind: 'exchange' | 'tribute' | 'tribute-batch' }>): CommandResult {
   const no = (reason: string): CommandResult => ({ ok: false, reason });
   const player = state.players[command.player];
   if (command.kind === 'exchange') {
@@ -44,15 +57,29 @@ export function applyMarketCommand(state: GameState, command: Extract<Command, {
     state.marketPrices = quote.prices;
     return { ok: true };
   }
-  if (![1, 2].includes(command.recipient) || command.recipient === command.player
-    || !['wood', 'food', 'gold', 'stone'].includes(command.resource)
-    || !Number.isSafeInteger(command.amount) || command.amount <= 0) return no('invalid tribute');
+  if (![1, 2].includes(command.recipient) || command.recipient === command.player) return no('invalid tribute');
   if (!hasMarket(state, command.player)) return no('tribute needs a completed market');
-  const total = command.amount + tributeFee(state, command.player, command.amount);
   const recipient = state.players[command.recipient];
-  if (!Number.isSafeInteger(total) || !Number.isSafeInteger(recipient[command.resource] + command.amount)) return no('invalid tribute amount');
-  if (player[command.resource] < total) return no(`not enough ${command.resource}`);
-  player[command.resource] -= total;
-  recipient[command.resource] += command.amount;
+  const amounts = command.kind === 'tribute' ? { [command.resource]: command.amount } : command.amounts;
+  if (!amounts || typeof amounts !== 'object' || Array.isArray(amounts)) return no('invalid tribute');
+  const entries = Object.entries(amounts);
+  if (!entries.length || entries.length > 4) return no('invalid tribute');
+  const transfers: { resource: ResourceKind; amount: number; total: number }[] = [];
+  for (const [key, value] of entries) {
+    if (!['wood', 'food', 'gold', 'stone'].includes(key)) return no('invalid tribute');
+    const resource = key as ResourceKind;
+    const amount = value === 'all' && command.kind === 'tribute-batch' ? maximumTribute(state, command.player, resource) : value;
+    if (typeof amount !== 'number' || !Number.isSafeInteger(amount) || amount <= 0) return no('invalid tribute amount');
+    const total = amount + tributeFee(state, command.player, amount);
+    if (!Number.isSafeInteger(total) || !Number.isSafeInteger(recipient[resource] + amount)) return no('invalid tribute amount');
+    if (player[resource] < total) return no(`not enough ${resource}`);
+    transfers.push({ resource, amount, total });
+  }
+  // Confirm is one atomic payment. A stale/invalid fourth resource cannot
+  // spend the first three, and all resources use the current research fee.
+  for (const { resource, amount, total } of transfers) {
+    player[resource] -= total;
+    recipient[resource] += amount;
+  }
   return { ok: true };
 }

@@ -269,6 +269,29 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 
 /* WPFG uses actual XAML font sizes, independently of the widget/SDF text scale. */
 .native-frame { position: absolute; inset: 0; display: grid; pointer-events: none; z-index: -1; }
+#diplomacy-dialog { --diplomacy-columns: 35px minmax(0, 1fr) 130px repeat(4, 65px) repeat(4, 50px); --diplomacy-row: 42px; --tribute-width: 42px; --tribute-height: 30px;
+  width: 940px; max-width: 96vw; max-height: 92vh; padding: 0; border: none; background: #171714; color: #e0ddd3; isolation: isolate; pointer-events: auto; }
+#diplomacy-dialog:has(.native-frame) { background: transparent; }
+#diplomacy-dialog::backdrop { background: rgba(0, 0, 0, .92); }
+.diplomacy-content { padding: calc(70px * var(--ui-scale)) calc(20px * var(--ui-scale)) calc(60px * var(--ui-scale)); }
+#diplomacy-title { margin: 0 0 calc(50px * var(--ui-scale)); text-align: center; font: var(--diplomacy-title-font, 24px) 'AoE2 heading', Georgia, serif; }
+[data-diplomacy-close] { position: absolute; top: 0; right: 0; }
+.diplomacy-row { display: grid; grid-template-columns: var(--diplomacy-columns); align-items: center; min-height: var(--diplomacy-row); gap: 0; font: bold var(--diplomacy-stance-font, 14px) 'AoE2 body', Georgia, serif; }
+.diplomacy-row [data-diplomacy-cell="name"] { font-size: var(--diplomacy-name-font, 16px); }
+.diplomacy-row [data-diplomacy-cell="civilization"] { font-size: var(--diplomacy-civilization-font, 13px); }
+.diplomacy-row > * { min-width: 0; text-align: center; }
+.diplomacy-row [data-diplomacy-cell="name"], .diplomacy-row [data-diplomacy-cell="civilization"] { text-align: left; overflow-wrap: anywhere; }
+.diplomacy-row:nth-child(even) { background: #50505010; }
+.diplomacy-row input { width: calc(42px * var(--ui-scale)); height: calc(42px * var(--ui-scale)); }
+#hud .tribute-button { width: var(--tribute-width); height: var(--tribute-height); min-width: 0; padding: 0; margin: 0; border: 0; color: white;
+  background: var(--tribute-normal, #3d392c) center / 100% 100% no-repeat; font: inherit; text-shadow: 1px 1px #000; }
+#hud .tribute-button:hover { background-image: var(--tribute-hover); }
+#hud .tribute-button:active { background-image: var(--tribute-active); }
+#hud .tribute-button:disabled { background-image: var(--tribute-disabled); opacity: .55; }
+.diplomacy-actions { display: flex; justify-content: space-around; gap: calc(20px * var(--ui-scale)); margin-top: calc(50px * var(--ui-scale)); }
+.diplomacy-actions button { width: 30%; }
+.diplomacy-lock, .diplomacy-victory, [data-diplomacy-market], [data-diplomacy-error] { display: block; text-align: center; margin: calc(20px * var(--ui-scale)) 0; }
+[data-diplomacy-error] { color: #efb7a2; }
 .native-frame > span { background-size: 100% 100%; background-repeat: no-repeat; }
 #hud .native-button {
   height: var(--native-button-height); min-width: 0; margin: 0; padding: 0;

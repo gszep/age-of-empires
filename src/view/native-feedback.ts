@@ -7,7 +7,7 @@ const color = (s: string): string => s.length === 9 ? `#${s.slice(3)}${s.slice(1
 const gradient = (stops: { color: string; offset: number }[]): string =>
   `linear-gradient(to top, ${stops.map(s => `${color(s.color)} ${s.offset * 100}%`).join(', ')})`;
 
-function slices(target: HTMLElement, definition: NativeSlices, ui: UiAssets, inverted = false): void {
+export function slices(target: HTMLElement, definition: NativeSlices, ui: UiAssets, inverted = false): void {
   target.replaceChildren();
   target.classList.add('native-frame');
   target.style.gridTemplateColumns = inverted

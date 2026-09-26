@@ -10,6 +10,7 @@ import { widgetBox } from './layout';
 import { installUiColors, placeFeedback } from './feedback';
 import { animateEmbers, buttonText, placeEndScreen } from './native-feedback';
 import { Minimap } from './minimap';
+import { DiplomacyDialog, type TributeDraft } from './diplomacy';
 import type { GameState, PlayerId, Point, ReadonlyGameState } from '../sim/types';
 
 /**
@@ -86,6 +87,7 @@ export interface SelectionInfo {
 export interface HudCallbacks {
   /** A grid button was pressed; `shift` is the reference's batch modifier. */
   onCommand(id: string, shift?: boolean): void;
+  onTribute?(draft: TributeDraft): { ok: boolean; reason?: string };
   /** A portrait in the group grid was clicked: select that one entity. */
   onSelectMember(id: number): void;
   onCancelTraining(buildingId: number, index: number): void;
@@ -112,6 +114,7 @@ export class Hud {
   private civilizationName = 'Britons';
   root: HTMLElement;
   minimap: Minimap;
+  diplomacy: DiplomacyDialog;
   private commandGrid!: HTMLElement;
   private selectionPanel!: HTMLElement;
   private resourceValues: Record<string, HTMLElement> = {};
@@ -149,6 +152,9 @@ export class Hud {
     this.build();
     installUiColors(this.root, ui, new URLSearchParams(location.search).get('uiPalette') ?? 'default');
     placeFeedback(this.root, ui);
+    this.diplomacy = new DiplomacyDialog(this.root, ui, strings,
+      draft => this.callbacks.onTribute?.(draft) ?? { ok: false, reason: 'read-only' },
+      () => this.callbacks.onSound('button_ui'));
     const canvas = this.root.querySelector<HTMLCanvasElement>('#minimap-canvas')!;
     this.minimap = new Minimap(canvas);
     this.applyScale();
@@ -194,6 +200,7 @@ export class Hud {
 
   /** Detach every DOM node and listener this HUD owns (hot reload rebuilds it). */
   destroy(): void {
+    this.diplomacy.close();
     this.resolveConfirmation?.('aborted');
     for (const timer of this.messageTimers.values()) window.clearTimeout(timer);
     window.clearTimeout(this.defeatTimer);
@@ -231,7 +238,7 @@ export class Hud {
         <button class="menu-button" data-icon="techtree" data-widget="Techtree" title="Technology tree (not yet available)" disabled></button>
         <button class="menu-button" data-icon="objectives" data-widget="Objectives" title="Objectives (not yet available)" disabled></button>
         <button class="menu-button" data-icon="chat" data-widget="Chat" title="Chat (not yet available)" disabled></button>
-        <button class="menu-button" data-icon="diplomacy" data-widget="Diplomacy" title="Diplomacy (not yet available)" disabled></button>
+        <button class="menu-button" data-command="diplomacy" data-icon="diplomacy" data-widget="Diplomacy" title="Diplomacy"></button>
         <button data-menu="pause" class="menu-button" data-icon="settings" data-widget="Settings" title="Pause (F3)"></button>
         <button data-menu="open" class="menu-button" data-icon="menu" data-widget="Menu" title="Menu (F10)"></button>
       </div>
@@ -641,7 +648,7 @@ export class Hud {
   get confirmationOpen(): boolean { return this.root.querySelector<HTMLDialogElement>('#confirm-dialog')!.open; }
 
   get modalOpen(): boolean {
-    return this.confirmationOpen || this.root.querySelector<HTMLDialogElement>('#popup-dialog')!.open || this.endOpen;
+    return this.diplomacy.open || this.confirmationOpen || this.root.querySelector<HTMLDialogElement>('#popup-dialog')!.open || this.endOpen;
   }
 
   /** Errors that need acknowledgement use the owned generic OK modal. */

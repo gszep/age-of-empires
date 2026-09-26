@@ -288,6 +288,7 @@ export type ReadonlyGameState = DeepReadonly<GameState>;
 export type Command =
   | { kind: 'exchange'; player: PlayerId; marketId: number; resource: 'wood' | 'food' | 'stone'; side: 'buy' | 'sell'; amount: 100 | 500 }
   | { kind: 'tribute'; player: PlayerId; recipient: PlayerId; resource: ResourceKind; amount: number }
+  | { kind: 'tribute-batch'; player: PlayerId; recipient: PlayerId; amounts: Partial<Record<ResourceKind, number | 'all'>> }
   | { kind: 'order'; player: PlayerId; entityIds: number[]; target: Point; targetId?: number;
       /** Fall in behind what the unit is already doing instead of replacing
        * it: the reference's shift-click, which is how a player lays a route

@@ -661,7 +661,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
   }
   if (state.winner) return rejected('match is over');
   if (command.player !== 1 && command.player !== 2) return rejected('unknown player');
-  if (command.kind === 'exchange' || command.kind === 'tribute') return applyMarketCommand(state, command);
+  if (command.kind === 'exchange' || command.kind === 'tribute' || command.kind === 'tribute-batch') return applyMarketCommand(state, command);
 
   if (command.kind === 'order' || command.kind === 'stop') {
     // A carcass is a thing orders may name: the gatherer loop has always been

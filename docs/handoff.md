@@ -1,139 +1,69 @@
-# Handoff — shared relic placement
+# Handoff — shared limitations, serial checkpoints
 
-## Completed task
+## Active assignment
 
-The continuing shared-limit assignment is **source-backed relic placement**, with
-exclusive serial main-tree authority and explicit commit/push authorization.
-No agents were spawned. Briton playable/random-map acceptance remains recorded
-in closed issue **#179**; do not resume the all-civilisation run. Britons and
-Franks remain the only enabled owned profiles.
+Continue from relic checkpoint **508a2f2** with exclusive serial main authority:
+two-player diplomacy interface, then Regicide/Treason. No subagents. Commit/push
+authorization is explicit; each checkpoint requires a green gate. Market/charge/
+conversion auditing beyond direct dependencies belongs to the coordinator.
 
-## Relic placement follow-up
+## Diplomacy checkpoint
 
-- Numeric RMS reference data is in `src/sim/refdata/relic-placement.json`.
-  `tools/relic_reference.py` deterministically extracts the narrow tiny/two-player/
-  standard-mode branches; an owned import test compares every field. Both content
-  modes consume this checked-in contract; no manifest key or asset import changed.
-- Arabia: one central + two/player. Replaced the arbitrary central x-strip with
-  an explicit neutral actor-area approximation and source distances/flags. Starts
-  now use the source 32–34% radius; old 60-tile separation made the central 32-tile
-  box exclusion infeasible inside the source neutral area.
-- Black Forest: two/player at 24-tile distance/spacing. Fixed 44% clearing area
-  (3168/player at 120×120), rather than relaxing relic distances.
-- Islands: two/player with 18–26 box distance and 8 spacing, plus the fifth on
-  land 20. Tiny has **two**, not four, resource islets: lands 20/23, zones 56/57,
-  1% each, gold 2×3 and stone 2. Named land IDs survive generation and JSON saves.
-- Windsor/Senlac/painted-proof: explicitly authored five-accessible-relic policy.
-- Fifty seeds per RMS map pass placement/path/zone/forest/edge constraints and
-  islet connectivity/avoidance. Six maps pass deterministic creation/JSON
-  continuation. The full Islands journey checks JSON replay parity throughout.
-- `npx tsx tools/relic_placement_smoke.mts` passed with published owned assets:
-  generated Islands seed 130, staged monk/monastery/transport, untouched geography
-  and relics, two real right-click pickups, home deposit, outward transport,
-  fifth-relic return/deposit and 60 gold/minute, ending tick 5500.
-- Exact native actor rasterization, start variance 6 jitter, RNG and land-phase
-  order are not claimed. The mirrored generator reserves islets before homes;
-  omitted islet base_size 3 remains inferred. Cliffs are absent (#134), not
-  inferred from elevation. All details are in `docs/ledger.md`; #130 retains
-  reference-calibration boundaries, #95 retains salmon/neritic fish.
-- Gate regression evidence: the changed map exposed a fixed Town Watch tile,
-  a synthetic beach-only rule applied before generating its arena, and a splash
-  fixture at an exact floating-point boundary. Fixtures now test their intended
-  preconditions. No simulation mechanics outside placement changed. The AI's
-  seed-1 Dark-Age-to-range pacing gap is recorded on #124: Feudal by tick 4800,
-  280 wood at tick 7200, but camp/house construction still preempts the range.
-  Its unlock test now starts in Feudal; age research is tested separately.
-  No test clock was widened.
+- Native Diplomacy button opens the actual two-player dialog, also reachable
+  from the market. Imported WPFG columns, row sizes, fonts, tribute icon states
+  and existing native frame/buttons replace the compact tribute command page.
+- Existing matches are locked opposing teams. Ally/Neutral/Enemy controls and
+  Allied Victory are shown disabled; Lock Teams is checked. No unlocked relation
+  changes, shared vision or cooperative victory is offered.
+- Draft100/Shift500/CTRL-all, right-click subtraction, Clear, Cancel/Escape and
+  OK. One public `tribute-batch` atomically validates all resources before paying.
+  CTRL-all resolves using execution-time stock and fees, including the sender
+  fee in the budget. Missing/destroyed markets and malformed/stale commands fail
+  without partial payment. Old single-resource commands remain accepted.
+- Modal input containment, focus return, view teardown and read-only replay are
+  covered. The dialog changes no simulation state until its public command.
+- Source reads: `widgetui/diplomacy.json`, `dialog/dialogdiplomacy.xaml`,
+  `SystemResourcesDiplomacyItem.xaml`, sibling fonts/buttons and English
+  strings30350–30356/9851–9865/99857–99859/30630. Inferences are in the ledger.
+- Full pipeline: `.local/diplomacy-import-r2.log`, exit0; atlas cache reused.
+  `tools/diplomacy_smoke.mts` passes owned and `OPEN_FALLBACK=1` runs, including
+  actual research/payment clicks and replay file input. Focused market tests and
+  owned UI extraction contract pass. Full gate **GREEN**, exit0:
+  `.local/diplomacy-gate-r1.log` — **931 tests /72 files**, build,
+  **126 owned-content tests**, real-browser debug smoke. One worker; no widened
+  test clocks. No source changes followed the gate start.
+- Corrected the ledger claim that the user approved the exact conversion
+  inheritance inference: authorization covered work, not that agent decision.
 
-Pushed implementation checkpoints:
+## Next: Regicide/Treason
 
-- `db2c9c0`: fortifications, building age stats, Petards/Siege Towers, ram crews,
-  relic/monastery gameplay, Warwolf/deployed siege effects, Shipwright/Caravan,
-  garrison firepower and original-price production refunds.
-- `605f7f7`: Siphons, random-map Spies, Guilds, Coinage and Banking, including
-  source art, public commands, UI and observation v6.
-- `41811c7`: acceptance evidence and tracker/documentation reconciliation.
+Not implemented by the diplomacy checkpoint. Add real setup/persistence/restart/
+shared/headless/replay mode, King434 with original content, king-loss outcomes
+including nested garrison/transport and simultaneous losses, repeatable400-gold
+Treason with temporary flashing minimap X rather than permanent Spies reveal.
+Do not claim an exact reveal duration if sources only say “a few seconds.”
 
-The prior bonus/profile checkpoint is `4ba51db`; converted-rule snapshots and
-additional/replacement town centres are in `0458053`. Historical HUD evidence
-is in `docs/reviews/2026-09-24-issue58.md` and `0458053:docs/handoff.md`.
+Reads already made:
+- Modern `includes/regicide.inc`: King nearest villager distance5, castle within
+  circular13 toward centre, zone4/forest3/cliff3/edge4. Normal villagers.inc
+  Regicide branch creates10 villagers (not the ordinary couples-therapy2+1).
+- Islands `GeneratingObjects.inc`2606–2673: King6–8 box band,7 additional
+  villagers at6, GNR_REGICIDECLASSIC castle at10 box distance.
+- Localization28408/41112/41114: Treason400 per use, temporarily reveals enemy
+  Kings to team as flashing minimap X; no exact duration stated there.
+- `Constants.xs`: startingVillagers84, startingFood/Wood/Stone/Gold91–94;
+  Spies183, temporaryMapReveal209. Inspect actual values/config before inventing
+  extra starting resources. King DAT and graphics still need the planned read.
 
-## Verification
+## Prior verified work and operations
 
-**Relic-placement gate GREEN:** `.local/relic-placement-gate-r3.log`, exit 0:
-**929 Vitest tests / 72 files**, production build, **125 owned-import tests**,
-real-browser debug smoke. One worker; no widened test clocks. The private
-relic journey passed separately with owned art. The second gate attempt was
-stopped before an additional zero-seed normalization regression check; the
-third gate covers that final tree. No source edits followed its start.
-
-**Previous Briton gate GREEN:** `.local/britons-final-gate-r1.log`: **906 Vitest tests /
-70 files**, production build, **124 owned-import tests**, real-browser debug
-smoke. One Vitest worker; no test timeout widened. Source/test changes preceded
-the run; subsequent documentation-only edits do not invalidate it.
-
-The full import passed in `.local/britons-final-import.log`; no decoder changes
-or partial manifest publication. Dedicated browser evidence:
-
-- `tools/briton_final_smoke.mts`: actual clicks on all five final research
-  buttons, buy/sell payments, tribute fees 30% → 20% → 0%, dynamic Spies
-  pricing/reveal, and Siphons flight/impact. The original grenade A/B check
-  changed **729 sRGB pixels**. Log: `.local/britons-final-research-browser.log`.
-- `tools/monastery_smoke.mts`: published relic/carry art, real Drop Relic,
-  deposit/income, Devotion and Warwolf buttons, public unpack/attack, actual
-  splash damage. Log: `.local/britons-monastery-browser-diagnostic.log`.
-- Maintained earlier acceptance: `tools/buildings_smoke.mts`,
-  `tools/specialists_smoke.mts`, `tools/civilization_profiles_smoke.mts` and
-  `tools/town_center_smoke.mts`. Advanced scenarios are snapshot-staged;
-  subsequent commands and rule clocks exercise the real simulation.
-
-The intermediate `db2c9c0` gate passed 898 tests, build, 123 import tests and
-browser smoke (`.local/britons-playable-gate-r5.log`). Earlier failures exposed
-stale inventory/volley assertions, terrain-cache initialization, sibling-worktree
-test discovery and browser-listener readiness. Their fixes preserve actual
-source invariants; the sheep simulation test required one worker to avoid its
-unchanged 30-second timeout. Browser staging also needed sufficient wood for
-Warwolf and targets inside, rather than exactly on, the splash boundary.
-
-## Explicit limitations
-
-- **Relics:** map placement and collection/transport are covered above; native
-  generator calibration remains #130. No relic/wonder victory was added;
-  wonder presentation/countdown belongs to #110.
-- **Market/tribute:** fees are DAT-backed; price bases, movement, bounds and
-  rounding are documented engine inferences. The compact tribute page is not
-  the full diplomacy dialog (#138); CTRL-all tribute is not implemented.
-- **Spies:** random-map reveal/pricing is implemented. Regicide/Treason is not
-  an implemented game mode.
-- **Siphons:** mode-6 charge behavior uses owned values and original projectile/
-  impact art. Initial charge, recharge/attack cadence and vanish interpretation
-  remain explicit inferences, not measured closed-engine parity.
-- **Conversion:** #178 retains its unit-local snapshot policy and reference
-  caveats. Captured deployed trebuchets retain both forms when repacked.
-- General render/audio/native-interface gaps retain their existing issues.
-
-`docs/ledger.md` is the source/inference record, and
-`docs/civilization-coverage.md` carries the profile/acceptance boundaries.
-
-## Files and operations
-
-- Core: `src/sim/{rules,technologies,buildings,relics,monastery,relic-placement,
-  market,fire-charge,game}.ts`; public UI in `src/main.ts`.
-- Import: `tools/{import_content,buildings,naval,civilization_profiles}.py`,
-  `tools/import-spec.json`; all regeneration through `npm run import:aoe2`.
-- Production receipts, relic ownership/income, faith and charge are serialized
-  simulation state. Observation v6 includes market/research quotes; match/replay
-  formats remain v1.
-- Temporary implementation worktrees belong in persistent ignored storage,
-  not `/tmp`: the original unintegrated patches were lost after restart.
-  `.local/**` is excluded from Vitest discovery. The reconstructed monastery
-  worktree remains in `.local/briton-monastery`; it is not an active worker.
-- No import, gate or private browser/probe jobs remained at handoff. The managed
-  shared service stayed active with zero restarts (wrapper 631, node 1201).
-  It was not redeployed; preserve it and existing Tailscale routes.
-- Solo QA: **http://localhost:5173/?solo=1** or
-  **https://ysgramor.tail6e864b.ts.net:5173/?solo=1**. Reload existing tabs for
-  the new imported manifest. This is not an Artemis asset-runtime deployment.
-
-Start subsequent work with `tools/session_start.sh`, `docs/lessons.md` and the
-live tracker. Keep owned assets, credentials, `.local/` and saves out of Git.
+- Relics508a2f2:5 Arabia/4 Black Forest/5 Islands; owned RMS numeric refdata;
+  prerequisite land/start corrections;50 seeds/map; generated Islands collection
+  and transport browser journey. Gate929 tests/72 files, build,125 import tests,
+  browser smoke. #130 retains native placement calibration; #95 retains fish gaps.
+- Britons/Franks remain the only enabled profiles. #179 records prior Briton
+  acceptance; #178 retains conversion inference boundaries. No all-civ expansion.
+- Preserve managed shared service and Tailscale routes. Private probes use their
+  own Vite ports, explicit root/config. Solo QA: localhost:5173/?solo=1.
+- Owned assets, `.local/`, saves and credentials stay out of Git. Full import
+  regeneration only through `npm run import:aoe2`; one-worker full gate on idle host.

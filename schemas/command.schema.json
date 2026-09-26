@@ -5,6 +5,20 @@
   "oneOf": [
     {
       "type": "object", "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "tribute-batch" }, "player": { "enum": [1, 2] }, "recipient": { "enum": [1, 2] },
+        "amounts": {
+          "type": "object", "minProperties": 1, "additionalProperties": false,
+          "properties": {
+            "wood": { "$ref": "#/definitions/tributeAmount" }, "food": { "$ref": "#/definitions/tributeAmount" },
+            "gold": { "$ref": "#/definitions/tributeAmount" }, "stone": { "$ref": "#/definitions/tributeAmount" }
+          }
+        }
+      },
+      "required": ["kind", "player", "recipient", "amounts"]
+    },
+    {
+      "type": "object", "additionalProperties": false,
       "properties": { "kind": { "const": "exchange" }, "player": { "enum": [1, 2] },
         "marketId": { "type": "integer" }, "resource": { "enum": ["wood", "food", "stone"] },
         "side": { "enum": ["buy", "sell"] }, "amount": { "enum": [100, 500] } },
@@ -428,6 +442,7 @@
     }
   ],
   "definitions": {
+    "tributeAmount": { "oneOf": [{ "const": "all" }, { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }] },
     "point": {
       "type": "object",
       "properties": {
