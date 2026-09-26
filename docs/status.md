@@ -82,16 +82,22 @@ The 2026-09-26 Briton playable checkpoint passed the full gate:
 **898 Vitest tests / 68 files, build, 123 owned-import tests and browser smoke**
 (`.local/britons-playable-gate-r5.log`). Dedicated published-art monastery/Warwolf
 click/impact evidence is `.local/britons-monastery-browser-diagnostic.log`.
-The five remaining research actions below still block final #179 acceptance.
+The final research-action pass also passed its full gate: **906 Vitest tests /
+70 files, build, 124 owned-import tests and browser smoke**, recorded in
+`.local/britons-final-gate-r1.log`. Single worker; no timeout widening.
 
 The Briton completion pass adds stone/fortified walls and gates, Guard Tower/Keep,
 age-correct building durability, Petards, Siege Towers and ram crew bonuses. It
 also adds the relic lifecycle and carried art, six Briton monastery research
 consumers, deployed Warwolf/Siege Engineers effects, Shipwright production timing
-and original-price production refunds. The detailed coverage and remaining
-research gaps are in `civilization-coverage.md`; source/engine inferences remain
-in `ledger.md`. These are completion steps for #179, not a claim that all
-Briton research or all map-specific relic distributions are finished.
+and original-price production refunds. The final pass adds Siphons, random-map
+Spies and real market/tribute actions for Guilds, Coinage and Banking. The private
+published-asset browser verified all five research buttons, payments, live Spies
+price/reveal and original charge impact feedback (729 changed sRGB pixels), in
+`.local/britons-final-research-browser.log`; the full import completed in
+`.local/britons-final-import.log`. Coverage is in `civilization-coverage.md`;
+source/engine inferences remain in `ledger.md`. Other-map relic placement and
+Regicide/Treason remain outside this Briton random-map acceptance.
 
 **Simulation** (`src/sim`, authoritative, fixed 20 Hz tick, deterministic):
 integer resources with gathering, drop-off and depletion; building placement,

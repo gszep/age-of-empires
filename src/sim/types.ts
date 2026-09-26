@@ -72,6 +72,8 @@ export interface Entity {
   relicGoldProgress?: number;
   /** 0..100 conversion faith; absent means full, including legacy saves. */
   faith?: number;
+  /** Fire Ship charge reservoir; absent means the current maximum. */
+  charge?: number;
   position: Point;
   hp: number;
   maxHp: number;
@@ -204,6 +206,9 @@ export interface PlayerState {
  * dies first simply takes the arrow into empty ground.
  */
 export interface Projectile {
+  impactEffect?: string;
+  impactSeconds?: number;
+  impact?: { effect: string; remainingTicks: number; totalTicks: number };
   /** Persist shot art and pass-through damage even when the shooter dies or upgrades. */
   art?: string;
   piercing?: { radius: number; attacks: { class: number; amount: number }[]; hitIds: number[] };
@@ -238,6 +243,8 @@ export interface Projectile {
 }
 
 export interface GameState {
+  /** Shared commodity base prices, independent of each player's researched fee. */
+  marketPrices?: Record<'wood' | 'food' | 'stone', number>;
   rules: GameRules;
   seed: number;
   /**
@@ -277,6 +284,8 @@ export type DeepReadonly<T> =
 export type ReadonlyGameState = DeepReadonly<GameState>;
 
 export type Command =
+  | { kind: 'exchange'; player: PlayerId; marketId: number; resource: 'wood' | 'food' | 'stone'; side: 'buy' | 'sell'; amount: 100 | 500 }
+  | { kind: 'tribute'; player: PlayerId; recipient: PlayerId; resource: ResourceKind; amount: number }
   | { kind: 'order'; player: PlayerId; entityIds: number[]; target: Point; targetId?: number;
       /** Fall in behind what the unit is already doing instead of replacing
        * it: the reference's shift-click, which is how a player lays a route

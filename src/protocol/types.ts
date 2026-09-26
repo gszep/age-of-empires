@@ -1,8 +1,8 @@
 import type { Activity, Command, EntityKind, Order, PlayerId, ResourceKind, UnitKind } from '../sim/types';
 import type { NodeKind } from '../sim/data';
 
-/** v5 adds the town-bell command/state and the publicly visible garrison flag. */
-export const PROTOCOL_VERSION = 5;
+/** v6 adds market/tribute quotes, dynamic research prices and charge state. */
+export const PROTOCOL_VERSION = 6;
 /** Commands, match configuration and recordings retain their v1 formats. */
 export const MATCH_FORMAT_VERSION = 1;
 
@@ -29,6 +29,7 @@ export interface ObservedEntity {
   carryingRelic?: boolean;
   relics?: number;
   faith?: number;
+  charge?: { current: number; maximum: number };
   training?: { kind: UnitKind; remainingSeconds: number };
   /** What it is researching; own buildings only, like `training`. */
   researching?: { tech: string; remainingSeconds: number };
@@ -62,6 +63,9 @@ export interface PlayerObservation {
   autoReseedFarms?: boolean;
   /** Technology keys this player has finished researching. */
   researched: string[];
+  /** Current public prices; Spies' quote deliberately reveals its villager-based price. */
+  researchCosts?: Record<string, { food: number; wood: number; gold: number; stone: number }>;
+  market?: { buy: Record<'wood' | 'food' | 'stone', number>; sell: Record<'wood' | 'food' | 'stone', number>; tributeFee: number };
   entities: ObservedEntity[];
   /** Last-seen snapshots of entities not currently visible. */
   memory: RememberedEntityObservation[];

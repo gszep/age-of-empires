@@ -4,6 +4,20 @@
   "title": "Command",
   "oneOf": [
     {
+      "type": "object", "additionalProperties": false,
+      "properties": { "kind": { "const": "exchange" }, "player": { "enum": [1, 2] },
+        "marketId": { "type": "integer" }, "resource": { "enum": ["wood", "food", "stone"] },
+        "side": { "enum": ["buy", "sell"] }, "amount": { "enum": [100, 500] } },
+      "required": ["kind", "player", "marketId", "resource", "side", "amount"]
+    },
+    {
+      "type": "object", "additionalProperties": false,
+      "properties": { "kind": { "const": "tribute" }, "player": { "enum": [1, 2] },
+        "recipient": { "enum": [1, 2] }, "resource": { "enum": ["wood", "food", "gold", "stone"] },
+        "amount": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 } },
+      "required": ["kind", "player", "recipient", "resource", "amount"]
+    },
+    {
       "type": "object",
       "properties": {
         "kind": { "const": "town-bell" },

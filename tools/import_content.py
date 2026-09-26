@@ -856,6 +856,21 @@ def extract_entity(
         # Projectile 676 is file-less (SLP 4193); use the owned flame flipbook.
         # The binding/one-puff representation is inferred, recorded in the ledger.
         entity["particleEffect"] = "flamethrower_flame"
+    if unit.id == 2629:
+        tracking = civ_units[unit.dead_fish.tracking_unit]
+        entity["particleEffect"] = dat.graphics[tracking.standing_graphic[0]].particle_effect_name
+        entity["impactEffect"] = dat.graphics[unit.dying_graphic].particle_effect_name
+    if unit.id in (529, 532, 1103):
+        charge = unit.creatable
+        shot = civ_units[charge.charge_projectile_unit]
+        entity["fireCharge"] = {
+            "maximum": rounded(charge.max_charge), "type": charge.charge_type,
+            "rechargePerSecond": rounded(charge.recharge_rate), "event": charge.charge_event, "target": charge.charge_target,
+            "projectile": {"id": shot.id, "speed": rounded(shot.speed),
+                "attacks": [{"class": a.class_, "amount": a.amount} for a in shot.type_50.attacks],
+                "radius": rounded(shot.type_50.blast_width), "level": shot.type_50.blast_attack_level,
+                "impactEffect": dat.graphics[shot.dying_graphic].particle_effect_name},
+        }
 
     # Ageing up replaces the building with the next age's unit, so the art for
     # each age is that unit's standing graphic (issue #13) -- and its own
@@ -1073,6 +1088,8 @@ ATTRIBUTE_NAMES = {
     105: "goldCost",
     106: "stoneCost",
     108: "garrisonHealRate",
+    59: "maxCharge",
+    62: "chargeType",
     # How close is too close. A watch tower and a castle each have a tile of
     # it, and Murder Holes is one `set` of this to zero.
     20: "minRange",
@@ -1090,7 +1107,8 @@ OPERATION_NAMES = {0: "set", 4: "add", 5: "multiply"}
 # Importing a starting value does not implement the mechanic. Only these
 # attributes have simulation consumers for research effects (issue #53).
 SUPPORTED_PLAYER_ATTRIBUTES = {"farmFoodAmount", "unitRepairCost", "buildingRepairCost",
-    "relicRate", "convertResistMinAdj", "convertResistMaxAdj", "theocracy"}
+    "relicRate", "convertResistMinAdj", "convertResistMaxAdj", "theocracy",
+    "spies", "tradeVigRate", "tributeInefficency"}
 # `b` on a type 1 command: 0 writes the value, 1 adds to it.
 RESOURCE_OPERATIONS = {0: "set", 1: "add"}
 
@@ -1221,6 +1239,9 @@ def effects_of(
             continue
         amount = float(command.d)
         for key in targets:
+            if attribute in ("maxCharge", "chargeType") and not entities.get(key, {}).get("fireCharge"):
+                unreached.add(f"attribute {attribute_id} on {key}: unsupported charge mode")
+                continue
             effect: dict[str, Any] = {
                 "unit": key, "attribute": attribute, "operation": operation,
             }
@@ -1932,8 +1953,12 @@ def extract(
     }
     flame_names.update(e["particleEffect"] for e in entities.values() if "particleEffect" in e)
     flame_names.update(e["deathEffect"] for e in entities.values() if "deathEffect" in e)
+    flame_names.update(e["impactEffect"] for e in entities.values() if "impactEffect" in e)
     particles = particle_effects(dat_path.parent.parent / "particles", flame_names, hashes)
     for entity in entities.values():
+        if "fireCharge" in entity:
+            projectile = entity["fireCharge"]["projectile"]
+            projectile["impactSeconds"] = max(particles[projectile["impactEffect"]]["cycleSeconds"])
         if "deathEffect" in entity:
             entity["deathSeconds"] = max(entity.get("deathSeconds", 0),
                                          max(particles[entity["deathEffect"]]["cycleSeconds"]))
@@ -2042,6 +2067,13 @@ def extract(
                 ("notEnoughFood", 3001), ("notEnoughWood", 3002), ("notEnoughStone", 3003),
                 ("notEnoughGold", 3004), ("needMoreHouses", 3005),
                 ("unload", 4107), ("unloadWhere", 3053),
+                ("sellFood", 13251), ("sellWood", 13252), ("sellStone", 13253),
+                ("buyFood", 13254), ("buyWood", 13255), ("buyStone", 13256),
+                ("sellWoodHelp", 41072), ("sellFoodHelp", 41073), ("sellStoneHelp", 41074),
+                ("buyWoodHelp", 41076), ("buyFoodHelp", 41077), ("buyStoneHelp", 41078),
+                ("payTribute", 9856), ("tribute", 11555),
+                ("tributeWoodHelp", 30353), ("tributeFoodHelp", 30354),
+                ("tributeGoldHelp", 30355), ("tributeStoneHelp", 30356),
                 ("townBell", 40111), ("townBellHelp", 41111),
                 ("backToWork", 40015), ("backToWorkHelp", 41015),
                 ("creating", 4310), ("stopCreating", 42105),

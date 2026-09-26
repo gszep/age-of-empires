@@ -294,6 +294,8 @@ export function installDebug(context: DebugContext): void {
         projectileViews: game.projectiles.slice(0, 200).map(p => ({
           id: p.id, shooterId: p.shooterId, art: p.art,
           rendered: !!context.views.get(`p${p.id}`)?.body?.mesh?.visible,
+          animation: context.views.get(`p${p.id}`)?.animationState,
+          frame: context.views.get(`p${p.id}`)?.frameIndex,
         })),
         selected: context.selectedIds(),
         // Which entity's marker is blinking as the last order's target: the

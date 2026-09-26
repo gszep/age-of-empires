@@ -8,7 +8,15 @@ export interface Cost { food: number; wood: number; gold: number; stone: number 
 
 export interface AttackValue { class: number; amount: number }
 
+/** Only the owned Fire Ship/Siphons charge mode is implemented. */
+export interface FireChargeRules {
+  maximum: number; type: number; rechargePerSecond: number; event: number; target: number;
+  projectile: { id: number; speed: number; attacks: AttackValue[]; radius: number; level: number;
+    impactEffect: string; impactSeconds: number };
+}
+
 export interface UnitRules {
+  fireCharge?: FireChargeRules;
   /**
    * The DAT unit id, when this came from imported content. It is what a
    * civilisation's tech tree names its nodes by, so it is what decides
@@ -610,12 +618,14 @@ export interface TechEffect {
  * fallback had hand-written before anybody looked.
  */
 export type PlayerAttribute = 'farmFoodAmount' | 'unitRepairCost' | 'buildingRepairCost'
-  | 'relicRate' | 'convertResistMinAdj' | 'convertResistMaxAdj' | 'theocracy';
+  | 'relicRate' | 'convertResistMinAdj' | 'convertResistMaxAdj' | 'theocracy'
+  | 'spies' | 'tradeVigRate' | 'tributeInefficency';
 
 export type TechAttribute =
   | 'hitPoints' | 'lineOfSight' | 'speed' | 'armor' | 'attack'
   | 'reloadSeconds' | 'accuracyPercent' | 'range' | 'minRange'
   | 'garrisonHealRate'
+  | 'maxCharge' | 'chargeType'
   | 'blastRadius' | 'searchRadius' | 'trainSeconds' | 'garrisonFirepower'
   | 'workRate' | 'carryCapacity' | 'cost' | 'foodCost' | 'woodCost' | 'goldCost' | 'stoneCost'
   /** On a projectile: whether the shot leads a moving target. Ballistics. */
@@ -1324,7 +1334,7 @@ export const FALLBACK_RULES: GameRules = {
     stonemason: { ratePerSecond: 0.36, capacity: 10, dropSites: ['town-center', 'mining-camp'] },
   },
   repairCostFraction: { building: 0.5, unit: 0.5 },
-  playerAttributes: {},
+  playerAttributes: { spies: 0, tradeVigRate: 0.3, tributeInefficency: 0.3 },
   terrainRestrictions: {
     3: [1, 2, 4, 22, 23, 35, 59], 15: [1, 2, 4, 22, 23, 35, 59], 30: [1, 2, 4, 22, 23, 35, 59],
     1: FALLBACK_LAND_TERRAINS, 4: FALLBACK_LAND_TERRAINS, 7: FALLBACK_SHORE_TERRAINS,
@@ -1334,6 +1344,14 @@ export const FALLBACK_RULES: GameRules = {
     6: FALLBACK_WATER_TERRAINS, 13: FALLBACK_WATER_TERRAINS, 19: [1, 23],
   },
   technologies: {
+    guilds: { techId: 15, name: 'Guilds', button: 4, cost: cost(300, 0, 200), researchSeconds: 50,
+      researchedAt: 'market', requiresAge: 3, effects: [{ resource: 'tradeVigRate', operation: 'set', amount: 0.15 }] },
+    coinage: { techId: 23, name: 'Coinage', button: 3, cost: cost(200, 0, 100), researchSeconds: 70,
+      researchedAt: 'market', requiresAge: 2, effects: [{ resource: 'tributeInefficency', operation: 'set', amount: 0.2 }] },
+    banking: { techId: 17, name: 'Banking', button: 3, cost: cost(300, 0, 200), researchSeconds: 70,
+      researchedAt: 'market', requiresAge: 3, requires: ['coinage'], effects: [{ resource: 'tributeInefficency', operation: 'set', amount: 0 }] },
+    spies: { techId: 408, name: 'Spies', button: 14, cost: cost(0, 0, 200), researchSeconds: 1,
+      researchedAt: 'castle', requiresAge: 3, effects: [{ resource: 'spies', operation: 'set', amount: 1 }] },
     ...BUILDING_TECHS,
     warships: { techId: 34, name: 'Medium Warships', button: 12, cost: cost(0, 150, 100), researchSeconds: 50,
       researchedAt: 'dock', requiresAge: 2, effects: [], upgrades: [
@@ -1366,6 +1384,7 @@ export const FALLBACK_RULES: GameRules = {
 };
 
 interface ManifestEntity {
+  fireCharge?: FireChargeRules;
   availabilityId?: number;
   ageStats?: BuildingRules['ageStats'];
   gate?: boolean;
@@ -1557,6 +1576,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     if (!e[key]) return { ...fallback, trainedAt };
     return {
       hp: e[key].hitPoints,
+      fireCharge: e[key].fireCharge,
       radius: e[key].collision[0],
       speed: e[key].speedTilesPerSecond ?? 0.8,
       lineOfSight: e[key].lineOfSight,

@@ -6,8 +6,9 @@ The user authorized direct MAIN integration, checkpoint commits and pushes, and
 then closure of the five remaining Briton research mechanics. Scope is Britons,
 not additional civilisations. Fortifications, specialists, relics/monastery,
 Warwolf/deployed trebuchet effects, Shipwright, Caravan, garrison firepower and
-original-price training refunds are integrated. #179 stays open pending Siphons,
-random-map Spies, Guilds, Coinage and Banking outcomes and final verification.
+original-price training refunds are committed/pushed as `db2c9c0`. Siphons,
+random-map Spies, Guilds, Coinage and Banking now have gameplay consumers,
+actual UI/browser evidence and a green final checkpoint gate.
 
 Use `git log -1`, `git status` and `tools/session_start.sh` for the completion
 commit, divergence and gate status. Read `docs/status.md`, `docs/ledger.md`,
@@ -39,6 +40,15 @@ its follow-up references below remain historical context.
   assertions now verify explicit zero blast fields and implemented monk effects.
 - The earlier profile/import determinism checkpoint is preserved in `4ba51db`
   and its `.local/civ-profiles-*` evidence. It is not the latest gate result.
+- Final-five evidence: `.local/britons-final-import.log` (full pipeline),
+  `.local/britons-final-research-browser.log` (all five actual research buttons,
+  buy/sell/tribute, live Spies price/reveal and 729 sRGB impact pixels), 149 focused
+  TypeScript tests and four focused owned-source tests. Observation is now v6;
+  match/replay formats remain v1. Final gate log: `.local/britons-final-gate-r1.log`.
+  **GREEN: 906 Vitest tests / 70 files, build, 124 owned-import tests and general
+  browser smoke**, one worker and no widened clocks. This completes the requested
+  Briton random-map research scope under the source/inference boundaries in the
+  ledger; it is not an all-civilisation or closed-engine parity claim.
 
 ## Earlier HUD delivered scope (historical)
 
@@ -133,8 +143,10 @@ time-identical reconstruction of DE's closed-runtime emitter.
   atlas cache and entails the full import. No work on #119 was started here.
 - **#113** remains the other high-priority visual bug. Use the live queue rather
   than treating this list as authorization to begin.
-- Briton completeness remains #179: Siphons, Spies and market/tribute research
-  actions are the next bounded work. Do not expand the civilisation catalogue.
+- The requested Briton #179 gameplay scope is verified. Shared limitations remain
+  other-map relic placement (#130/#95), exact charge/market calibration, the full
+  diplomacy surface (#138), Regicide/Treason and the existing conversion-policy
+  parity questions (#178). Do not expand the civilisation catalogue implicitly.
   #177 construction and the shared bonus/prerequisite/profile infrastructure are implemented.
   #178 retains explicit reference caveats under the user-approved inferred policy;
   see `docs/civilization-coverage.md` for the bounded supported-gameplay milestone.

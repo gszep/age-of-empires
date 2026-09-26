@@ -130,6 +130,12 @@ function applyEffect(rules: UnitRules, effect: TechEffect): void {
   if (applyCostEffect(rules, effect)) return;
   const armorClass = effect.armorClass ?? 0;
   switch (effect.attribute) {
+    case 'maxCharge':
+      if (rules.fireCharge) rules.fireCharge = { ...rules.fireCharge, maximum: combine(effect.operation, rules.fireCharge.maximum, effect.amount) };
+      break;
+    case 'chargeType':
+      if (rules.fireCharge) rules.fireCharge = { ...rules.fireCharge, type: combine(effect.operation, rules.fireCharge.type, effect.amount) };
+      break;
     case 'hitPoints': rules.hp = combine(effect.operation, rules.hp, effect.amount); break;
     case 'lineOfSight':
       rules.lineOfSight = combine(effect.operation, rules.lineOfSight, effect.amount); break;

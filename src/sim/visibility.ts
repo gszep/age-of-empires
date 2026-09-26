@@ -4,7 +4,7 @@
  * entities. Observations and the viewer read only this state.
  */
 import { isBuilding, isUnit, lingersInFog } from './data';
-import { buildingRulesFor, unitRulesForEntity } from './rules';
+import { buildingRulesFor, playerAttributeFor, unitRulesForEntity } from './rules';
 import { rulesForPlayer } from './civilizations';
 import type { BuildingKind, Entity, GameState, PlayerId } from './types';
 
@@ -86,8 +86,14 @@ export function updateVisibility(state: GameState): void {
   for (const player of [1, 2] as PlayerId[]) {
     const visibility = state.visibility[player];
     visibility.visible.fill(0);
+    const spies = (playerAttributeFor(state, player, 'spies') ?? 0) > 0;
     for (const entity of state.entities) {
-      if (entity.dead || entity.owner !== player) continue;
+      const spying = spies && entity.owner !== 0 && entity.owner !== player;
+      if (entity.dead || (entity.owner !== player && !spying)) continue;
+      if (spying) {
+        const at = tileIndex(state, Math.floor(entity.position.x), Math.floor(entity.position.y));
+        visibility.visible[at] = 1; visibility.explored[at] = 1;
+      }
       const los = lineOfSightOf(state, entity);
       const losSquared = los * los;
       const cx = entity.position.x;

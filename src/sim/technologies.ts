@@ -1,6 +1,15 @@
-import type { GameRules, TechRules } from './data';
+import type { Cost, GameRules, TechRules } from './data';
 import { rulesForPlayer } from './civilizations';
-import type { GameState, PlayerId } from './types';
+import type { Entity, GameState, PlayerId } from './types';
+
+/** Random-map Spies: paid at acceptance, including villagers inside carriers. */
+export function researchCostFor(state: GameState, owner: PlayerId, key: string): Cost {
+  const tech = rulesForPlayer(state, owner).technologies[key];
+  if (!tech.effects.some(e => e.resource === 'spies')) return tech.cost;
+  const count = (entities: Entity[]): number => entities.reduce((n, e) => e.dead ? n : n
+    + (e.owner !== 0 && e.owner !== owner && e.kind === 'villager' ? 1 : 0) + count(e.garrison ?? []), 0);
+  return { ...tech.cost, gold: tech.cost.gold * count(state.entities) };
+}
 
 /** Hidden nodes share the same ordered research history and effect consumers. */
 export function technologyFor(rules: GameRules, key: string) {

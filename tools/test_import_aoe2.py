@@ -153,7 +153,7 @@ extern const int cAttributeSet = 0;
     def test_type_one_effects_use_source_ids_but_only_enable_modelled_mechanics(self):
         # Synthetic IDs prove the decoder uses the source map, not the old
         # 36/270/271 allow-list. Unimplemented attributes remain diagnostic.
-        ids = {"farmFoodAmount": 8, "unitRepairCost": 9, "buildingRepairCost": 10, "tradeVigRate": 11}
+        ids = {"farmFoodAmount": 8, "unitRepairCost": 9, "buildingRepairCost": 10, "militaryConversionChance": 11}
         commands = [SimpleNamespace(type=1, a=a, b=b, d=d) for a, b, d in (
             (8, 1, 75), (9, 0, 0), (10, 1, -0.25), (11, 0, 0.1), (999, 0, 1), (9, 2, 1),
         )]
@@ -165,7 +165,7 @@ extern const int cAttributeSet = 0;
             {"resource": "unitRepairCost", "operation": "set", "amount": 0},
             {"resource": "buildingRepairCost", "operation": "add", "amount": -0.25},
         ])
-        self.assertIn("resource 11 (tradeVigRate) at the player level: not modelled", unreached)
+        self.assertIn("resource 11 (militaryConversionChance) at the player level: not modelled", unreached)
         self.assertIn("resource 999 at the player level: not modelled", unreached)
         self.assertIn("resource 9 (unitRepairCost) at the player level: unsupported operation 2", unreached)
 
@@ -1739,14 +1739,13 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertNotIn("set", ids)  # later effect enum, not a player attribute
         self.assertEqual(self.result["source"]["sha256"]["xs/Constants.xs"], sha256(constants))
         # Merely importing the baseline must not expose ineffective research.
-        for key in ("coinage", "banking", "guilds"):
-            self.assertNotIn(key, self.result["technologies"])
+        for key, resource in (("coinage", "tributeInefficency"), ("banking", "tributeInefficency"), ("guilds", "tradeVigRate")):
+            self.assertEqual({e.get("resource") for e in self.result["technologies"][key]["effects"]}, {resource})
         for key, resources in (("faith", {"convertResistMinAdj", "convertResistMaxAdj"}),
                                ("devotion", {"convertResistMinAdj", "convertResistMaxAdj"}),
                                ("theocracy", {"theocracy"})):
             self.assertEqual({e.get("resource") for e in self.result["technologies"][key]["effects"]}, resources)
-        self.assertTrue(any("tradeVigRate" in tech["reason"]
-                            for tech in self.result["skippedTechnologies"]))
+        self.assertNotIn("Guilds", [tech["name"] for tech in self.result["skippedTechnologies"]])
 
     def test_drop_sites_publish_building_acceptance_and_each_worker_variant(self):
         entities = self.result["entities"]

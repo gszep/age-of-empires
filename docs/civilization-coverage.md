@@ -54,11 +54,20 @@ or shared game mode is complete.
   changes production time; Caravan changes trader work as well as speed.
   Paid training receipts preserve refunds across research and JSON snapshots.
 
-Remaining research closure includes **Siphons, Spies/Treason and the market/
-tribute actions needed by Guilds, Coinage and Banking**. They are not certified
-by the empty `missingRoster` array. #179 remains open until those outcomes and
-the remaining acceptance evidence are reconciled. Latest gate evidence belongs
-in the checkpoint handoff, not in an unverified completion claim.
+The final five research consumers are now implemented: **Siphons**, random-map
+**Spies**, **Guilds**, **Coinage** and **Banking**. Public buy/sell/tribute actions
+validate atomically; Spies prices at acceptance and shares enemy sight; Siphons
+adds a source-backed bounded charge projectile with original impact feedback.
+Private published-asset browser clicks cover all five, including a live Spies
+price change, actual resource transfers and 729 changed sRGB impact pixels
+(`.local/britons-final-research-browser.log`). Focused outcomes cover owner
+isolation and JSON continuation. This is gameplay evidence, not an inference from
+the empty `missingRoster` array. Final gate **GREEN**: 906 tests / 70 files,
+build, 124 owned-import tests and general browser smoke
+(`.local/britons-final-gate-r1.log`), with no timeout widening.
+Regicide/Treason, a full diplomacy UI, other-map relic placement and exact
+closed-engine charge/market calibration remain explicit shared-scope limitations;
+the approved bounded interpretations are in the ledger.
 
 `civilizations.ts` now resolves each player's complete ruleset by its civilisation
 key. The root remains the default civilisation and shared Gaia/map input.

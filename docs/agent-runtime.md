@@ -30,7 +30,7 @@ The simulation owns state transitions. The agent gateway owns the stable public 
 
 The canonical observation is structured and versioned. Screenshots are optional presentation evidence, never the primary input.
 
-The current **observation version is 5** (`PROTOCOL_VERSION`). Version 2 added
+The current **observation version is 6** (`PROTOCOL_VERSION`). Version 2 added
 `buildTargetId` for the player's own units with a build order, including while
 walking to the foundation. Enemy and remembered entities never expose that
 assignment. Strategies can therefore distinguish an abandoned house from one
@@ -43,6 +43,13 @@ and remaining food. Version 5 adds the `town-bell` command
 public `hasGarrison` flag on visible entities and last-seen memory. Opponents
 can see the flag but cannot read the passenger count, identities or bell state.
 Match-config, result and recording formats remain version 1 (`MATCH_FORMAT_VERSION`).
+Version 6 adds own market buy/sell quotes and tribute fee, available Spies
+`researchCosts`, and own Fire Ship `charge` state. Its new commands are
+`exchange {player, marketId, resource: wood|food|stone, side: buy|sell, amount: 100|500}`
+and `tribute {player, recipient, resource, amount}`. Both validate and refuse
+atomically. Market base prices are shared authoritative state; fees follow the
+acting player's completed research. Spies' publicly quoted price intentionally
+reveals its enemy-villager-based cost, while enemy orders/queues remain private.
 `buildProgress` being present means a foundation is unfinished, even when its
 rounded display value is 1.
 

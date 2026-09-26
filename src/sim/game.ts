@@ -15,7 +15,9 @@ import {
 import { random01, seedFrom } from './random';
 import { buildingLimitReached, buildingRulesFor, combine, inheritConvertedUnit, playerAttributeFor, unitRulesFor, unitRulesForEntity } from './rules';
 import { civilizationRules, rulesForPlayer } from './civilizations';
-import { technologyFor, technologyRequirementsMet } from './technologies';
+import { researchCostFor, technologyFor, technologyRequirementsMet } from './technologies';
+import { applyMarketCommand } from './market';
+import { beginProjectileImpact, fireChargeOf, rechargeFireCharge, releaseFireCharge } from './fire-charge';
 import { relicOrder, transferRelic, releaseRelics, updateRelicIncome } from './relics';
 import { conversionWindow, rechargeFaith, spendConversionFaith } from './monastery';
 import { placeArabiaRelics } from './relic-placement';
@@ -652,6 +654,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
   }
   if (state.winner) return rejected('match is over');
   if (command.player !== 1 && command.player !== 2) return rejected('unknown player');
+  if (command.kind === 'exchange' || command.kind === 'tribute') return applyMarketCommand(state, command);
 
   if (command.kind === 'order' || command.kind === 'stop') {
     // A carcass is a thing orders may name: the gatherer loop has always been
@@ -867,7 +870,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       return rejected(`${command.tech} needs ${player.age < tech.requiresAge ? 'a later age'
         : missing ? `${missing} first` : 'prerequisites first'}`);
     }
-    const paid = spendCost(state, command.player, tech.cost);
+    const paid = spendCost(state, command.player, researchCostFor(state, command.player, command.tech));
     if (!paid.ok) return paid;
     building.researching = {
       tech: command.tech,
@@ -1849,6 +1852,8 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
     for (let shot = 0; shot < (rules.projectilesPerAttack ?? 1); shot++) {
       releaseAttack(state, entity, target, combat.attacks, profile.projectileSpeed, profile.launchHeight, combat);
     }
+    const charge = fireChargeOf(state, entity);
+    if (charge) releaseFireCharge(state, entity, target, leadPoint(state, entity, target, charge.projectile.speed));
     entity.attackWindup = undefined;
     entity.attackCooldown = Math.max(1, Math.round(combat.reloadSeconds * TICKS_PER_SECOND) - Math.max(1, Math.round(releaseSeconds * TICKS_PER_SECOND)));
   }
@@ -2401,7 +2406,7 @@ function applyBlast(
   directHitId: number, excludeOwner?: Entity['owner'], origin: Point = at,
 ): void {
   for (const other of [...state.entities]) {
-    if (other.dead || other.id === directHitId) continue;
+    if (other.dead || other.kind === 'relic' || other.id === directHitId) continue;
     if (excludeOwner !== undefined && other.owner === excludeOwner) continue;
     if (blastDefenseLevelOf(state, other) < attackLevel) continue;
     if (distance(other.position, at) - other.radius > radius) continue;
@@ -2459,6 +2464,11 @@ function pointToSegment(point: Point, a: Point, b: Point): number {
 function updateProjectiles(state: GameState): void {
   const remaining: typeof state.projectiles = [];
   for (const projectile of state.projectiles) {
+    if (projectile.impact) {
+      projectile.impact.remainingTicks -= 1;
+      if (projectile.impact.remainingTicks > 0) remaining.push(projectile);
+      continue;
+    }
     const step = projectile.speed * TICK_SECONDS;
     const dx = projectile.aim.x - projectile.position.x;
     const dy = projectile.aim.y - projectile.position.y;
@@ -2495,6 +2505,7 @@ function updateProjectiles(state: GameState): void {
         applyBlast(state, at, projectile.blastRadius, projectile.blastAttackLevel ?? 0,
           projectile.attacks, intended.id, undefined, projectile.origin);
       }
+      if (beginProjectileImpact(projectile, at)) remaining.push(projectile);
       continue;
     }
     if (!landing) {
@@ -2509,6 +2520,7 @@ function updateProjectiles(state: GameState): void {
       applyBlast(state, at, projectile.blastRadius, projectile.blastAttackLevel ?? 0,
         projectile.attacks, struck?.id ?? -1, undefined, projectile.origin);
     }
+    if (beginProjectileImpact(projectile, at)) remaining.push(projectile);
   }
   state.projectiles = remaining;
 }
@@ -2632,6 +2644,7 @@ function updateTower(state: GameState, entity: Entity): void {
 }
 
 function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCounts: Map<number, number>): void {
+  rechargeFireCharge(state, entity);
   rechargeFaith(state, entity);
   // A siege engine being set up or packed away does nothing else while it is:
   // the DAT gives the pair a work rate and this spends it (issue #28).

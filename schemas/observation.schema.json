@@ -3,9 +3,22 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "PlayerObservation",
   "type": "object",
+  "definitions": { "commodityPrices": {
+    "type": "object", "additionalProperties": false,
+    "properties": { "wood": { "type": "integer", "minimum": 0 }, "food": { "type": "integer", "minimum": 0 },
+      "stone": { "type": "integer", "minimum": 0 } }, "required": ["wood", "food", "stone"]
+  } },
   "properties": {
+    "researchCosts": { "type": "object", "additionalProperties": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "food": { "type": "integer", "minimum": 0 }, "wood": { "type": "integer", "minimum": 0 },
+        "gold": { "type": "integer", "minimum": 0 }, "stone": { "type": "integer", "minimum": 0 } },
+      "required": ["food", "wood", "gold", "stone"] } },
+    "market": { "type": "object", "additionalProperties": false,
+      "properties": { "buy": { "$ref": "#/definitions/commodityPrices" }, "sell": { "$ref": "#/definitions/commodityPrices" },
+        "tributeFee": { "type": "integer", "minimum": 0 } }, "required": ["buy", "sell", "tributeFee"] },
     "version": {
-      "const": 5
+      "const": 6
     },
     "time": {
       "type": "number",
@@ -385,6 +398,9 @@
           "carryingRelic": { "type": "boolean" },
           "relics": { "type": "integer", "minimum": 0 },
           "faith": { "type": "number", "minimum": 0, "maximum": 100 },
+          "charge": { "type": "object", "additionalProperties": false,
+            "properties": { "current": { "type": "number", "minimum": 0 }, "maximum": { "type": "number", "minimum": 0 } },
+            "required": ["current", "maximum"] },
           "carrying": {
             "type": "object",
             "properties": {

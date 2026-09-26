@@ -9,7 +9,7 @@ import { MAPS } from './sim/mapgen';
 import { isTileVisible } from './sim/visibility';
 import { checksumState } from './sim/checksum';
 import type { MatchRecord } from './protocol/types';
-import type { BuildingKind, Entity, GameState, PlayerId, Point, UnitKind } from './sim/types';
+import type { BuildingKind, Entity, GameState, PlayerId, Point, ResourceKind, UnitKind } from './sim/types';
 import { isGateKind, isWallKind } from './sim/buildings';
 import { buildMenu, type BuildPage } from './view/build-menu';
 import { contextTargets, sameKindOnScreen } from './view/selection';
@@ -18,7 +18,8 @@ import { loadMapPreference, saveMapPreference, mapChoices, validMatchSetup, MAX_
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
 import { buildingLimitReached, buildingRulesFor, unitRulesFor, unitRulesForEntity } from './sim/rules';
-import { technologyRequirementsMet } from './sim/technologies';
+import { researchCostFor, technologyRequirementsMet } from './sim/technologies';
+import { COMMODITIES, marketQuote, tributeFee, type Commodity } from './sim/market';
 import { civilizationRules } from './sim/civilizations';
 import { profileArtKey } from './view/sprites';
 import { gridKey, placeCommands } from './view/command-grid';
@@ -566,7 +567,29 @@ function selectIdleVillager(): void {
 /** How many a Shift-click on a train button asks for, as the reference does. */
 const BATCH_TRAIN_COUNT = 5;
 
+let tributeMarketId: number | undefined;
 function runUiCommand(id: string, shift = false): void {
+  if (id === 'market-tribute') {
+    tributeMarketId = ownSelected().find(e => e.kind === 'market' && e.buildProgress === undefined)?.id;
+    return;
+  }
+  if (id === 'market-back') { tributeMarketId = undefined; return; }
+  if (id.startsWith('exchange-')) {
+    const [, side, resource] = id.split('-');
+    const market = ownSelected().find(e => e.kind === 'market' && e.buildProgress === undefined);
+    if (market) {
+      const result = applyCommand(game, { kind: 'exchange', player: localPlayer, marketId: market.id,
+        side: side as 'buy' | 'sell', resource: resource as Commodity, amount: shift ? 500 : 100 });
+      if (!result.ok) reject(result.reason);
+    }
+    return;
+  }
+  if (id.startsWith('tribute-')) {
+    const result = applyCommand(game, { kind: 'tribute', player: localPlayer,
+      recipient: localPlayer === 1 ? 2 : 1, resource: id.slice(8) as ResourceKind, amount: shift ? 500 : 100 });
+    if (!result.ok) reject(result.reason);
+    return;
+  }
   const rules = playerRules();
   if (replay) return;
   const selection = ownSelected();
@@ -1093,6 +1116,17 @@ function currentCommands(): CommandButton[] {
   const selection = ownSelected();
   const player = game.players[localPlayer];
   const buttons: CommandButton[] = [];
+  const selectedMarket = selection.find(e => e.kind === 'market' && e.buildProgress === undefined);
+  if (tributeMarketId !== selectedMarket?.id) tributeMarketId = undefined;
+  if (tributeMarketId !== undefined) {
+    const recipient = localPlayer === 1 ? 2 : 1;
+    return [...(['wood', 'food', 'gold', 'stone'] as const).map((resource, i) => {
+      const suffix = resource[0].toUpperCase() + resource.slice(1);
+      return { id: `tribute-${resource}`, slot: i + 1, hotkey: gridKey(i + 1), enabled: true,
+        label: `${messages.tribute ?? 'Tribute'} 100 ${resource} → Player ${recipient} (+${tributeFee(game, localPlayer, 100)} fee)`,
+        help: messages[`tribute${suffix}Help`] };
+    }), { id: 'market-back', slot: 15, hotkey: 'escape', enabled: true, label: 'Back' }];
+  }
   if (buildMode) {
     return [{
       id: 'cancel', label: 'Cancel placement', hotkey: 'escape', enabled: true, active: true,
@@ -1218,6 +1252,17 @@ function currentCommands(): CommandButton[] {
       enabled: true,
     });
   }
+  if (selectedMarket) {
+    for (const [i, resource] of COMMODITIES.entries()) for (const side of ['sell', 'buy'] as const) {
+      const gold = marketQuote(game, localPlayer, resource, side).gold;
+      const name = `${side}${resource[0].toUpperCase()}${resource.slice(1)}`;
+      buttons.push({ id: `exchange-${side}-${resource}`, slot: (side === 'sell' ? 7 : 12) + i,
+        enabled: true, label: `${messages[name] ?? `${side} ${resource}`} (100: ${gold} gold)`,
+        help: messages[`${name}Help`] ? plainHelp(messages[`${name}Help`].replace('%d', String(gold))) : undefined });
+    }
+    buttons.push({ id: 'market-tribute', slot: 5, enabled: true,
+      label: (messages.payTribute ?? 'Pay Tribute (cost %d%%)').replace('%d', String(tributeFee(game, localPlayer, 100))).replace('%%', '%') });
+  }
   // Technologies the selected building researches, in the DAT's own order.
   const player1 = game.players[localPlayer];
   for (const [key, tech] of Object.entries(rules.technologies) as [TechKey, typeof rules.technologies[TechKey]][]) {
@@ -1230,10 +1275,11 @@ function currentCommands(): CommandButton[] {
     // AoE2 does not show a technology whose predecessor is still outstanding:
     // Iron Casting appears once Forging is done, not beside it.
     if (!technologyRequirementsMet(game, localPlayer, tech)) continue;
+    const researchCost = researchCostFor(game, localPlayer, key);
     buttons.push({
       id: `research-${key}`,
-      label: `Research ${tech.name} (${costLabel(tech.cost)})`,
-      help: tech.help ? plainHelp(tech.help, tech.cost) : undefined,
+      label: `Research ${tech.name} (${costLabel(researchCost)})`,
+      help: tech.help ? plainHelp(tech.help, researchCost) : undefined,
       slot: tech.button,
       enabled: !building.researching,
       icon: hud.iconFor('Techs', tech.iconId, localPlayer),
@@ -1477,6 +1523,10 @@ function selectionInfo(): SelectionInfo | undefined {
   if (entity.carrying) details.push(`Carrying ${entity.carrying.amount} ${entity.carrying.kind}`);
   if (entity.owner === localPlayer && entity.relics?.length) details.push(`Relics: ${entity.relics.length}`);
   if (entity.owner === localPlayer && entity.kind === 'monk') details.push(`Faith: ${Math.floor(entity.faith ?? 100)}%`);
+  if (entity.owner === localPlayer && isUnit(entity.kind)) {
+    const charge = unitRulesForEntity(game, entity).fireCharge;
+    if (charge && charge.type === 6 && charge.maximum > 0) details.push(`Charge: ${Math.floor(100 * (entity.charge ?? charge.maximum) / charge.maximum)}%`);
+  }
   let progress: SelectionInfo['progress'];
   if (entity.buildProgress !== undefined) {
     progress = { label: 'Building', fraction: entity.buildProgress };
@@ -1618,7 +1668,8 @@ function syncScene(time: number): void {
       ? Math.hypot(targetPosition.x - position.x, targetPosition.y - position.y)
       : 0;
     const span = flown + left;
-    const progress = span > 1e-6 ? flown / span : 0;
+    const progress = projectile.impact ? 1 - projectile.impact.remainingTicks / projectile.impact.totalTicks
+      : span > 1e-6 ? flown / span : 0;
     let entityView = views.get(key);
     if (!entityView) {
       entityView = view.createProjectileView();
@@ -1636,6 +1687,7 @@ function syncScene(time: number): void {
     view.updateProjectileView(
       entityView, assets, position, heading, progress, span, projectile.launchHeight,
       profileArtKey(assets, projectile.owner, art), time, elevationAt(game, position.x, position.y) * ELEVATION_PIXELS,
+      projectile.impact?.effect,
     );
   }
 

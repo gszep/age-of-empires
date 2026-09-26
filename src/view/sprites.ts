@@ -844,14 +844,21 @@ export function updateProjectileView(
   /** Wall-clock seconds, for art whose frames are a timed tumble. */
   timeSeconds = 0,
   groundHeightPixels = 0,
+  impactEffect?: string,
 ): void {
   const arrow = assets?.entities[projectileKey] ?? assets?.entities['arrow'];
-  const flame = arrow?.particleEffect ? assets?.particles?.[arrow.particleEffect] : undefined;
+  const flame = impactEffect ? assets?.particles?.[impactEffect]
+    : arrow?.particleEffect ? assets?.particles?.[arrow.particleEffect] : undefined;
   if (assets && flame) {
     const frame = Math.min(flame.atlas.framesInFile - 1, Math.floor(progress * flame.atlas.framesInFile));
     applyFrame(view.body, assets, flame.atlas, frame, position, 0xffffff);
-    view.body.mesh.position.y += groundHeightPixels + launchHeight * HEIGHT_PIXELS;
+    const height = !impactEffect && projectileKey.endsWith('fire-charge')
+      ? launchHeight * (1 - progress) + 4 * Math.abs(arrow?.projectile?.arc ?? 0) * span * progress * (1 - progress)
+      : launchHeight;
+    view.body.mesh.position.y += groundHeightPixels + height * HEIGHT_PIXELS;
     view.body.mesh.renderOrder = projectileLayerOrder(isoDepth(position.x, position.y));
+    view.animationState = `${projectileKey}/${impactEffect ? 'impact' : 'flight'}/${impactEffect ?? arrow?.particleEffect}`;
+    view.frameIndex = frame;
     return;
   }
   const atlas = arrow?.atlases['idle'];

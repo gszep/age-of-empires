@@ -21,7 +21,7 @@ def specs():
                    "animations": {"idle": {"slot": "standing"}, "construction": {"slot": "construction"},
                                   "decay": {"slot": "dead"}}})
     for key, unit in {"galley-arrow": 512, "war-galley-arrow": 372, "galleon-arrow": 373,
-                      "naval-fire": 676, "naval-cannonball": 374, "hulk-bolt": 2636}.items():
+                      "naval-fire": 676, "fire-charge": 2629, "naval-cannonball": 374, "hulk-bolt": 2636}.items():
         result.append({"key": key, "unitId": unit, "category": "projectile", "composite": True,
                        "animations": {"idle": {"slot": "standing"}}})
     return result

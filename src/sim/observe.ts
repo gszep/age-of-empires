@@ -3,6 +3,10 @@ import { isEntityVisible } from './visibility';
 import { isAnimal, isUnit } from './data';
 import type { BuildingKind, Entity, GameState, PlayerId } from './types';
 import { buildingRulesFor } from './rules';
+import { researchCostFor } from './technologies';
+import { COMMODITIES, hasMarket, marketQuote, tributeFee } from './market';
+import { rulesForPlayer } from './civilizations';
+import { fireChargeOf } from './fire-charge';
 import type { ObservedEntity, PlayerObservation, RememberedEntityObservation } from '../protocol/types';
 import { PROTOCOL_VERSION } from '../protocol/types';
 
@@ -28,6 +32,10 @@ function observeEntity(state: GameState, entity: Entity, player: PlayerId): Obse
     observed.order = entity.order.kind;
     if (entity.relics?.length) observed.relics = entity.relics.length;
     if (entity.faith !== undefined) observed.faith = Math.floor(entity.faith);
+    if (isUnit(entity.kind)) {
+      const charge = fireChargeOf(state, entity);
+      if (charge) observed.charge = { current: Math.round((entity.charge ?? charge.maximum) * 1000) / 1000, maximum: charge.maximum };
+    }
     if (entity.kind === 'town-center') observed.townBell = !!entity.townBell;
     if (entity.order.kind === 'build') observed.buildTargetId = entity.order.targetId;
     if (entity.order.kind === 'gather') observed.gatherTargetId = entity.order.targetId;
@@ -105,6 +113,15 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
     explored,
   };
   if (state.winner) observation.winner = state.winner;
+  observation.researchCosts = Object.fromEntries(Object.entries(rulesForPlayer(state, player).technologies)
+    .filter(([key, tech]) => !self.researched.includes(key) && tech.requiresAge <= self.age && tech.effects.some(e => e.resource === 'spies')
+      && state.entities.some(e => e.owner === player && !e.dead && e.kind === tech.researchedAt && e.buildProgress === undefined))
+    .map(([key]) => [key, researchCostFor(state, player, key)]));
+  if (hasMarket(state, player)) observation.market = {
+    buy: Object.fromEntries(COMMODITIES.map(r => [r, marketQuote(state, player, r, 'buy').gold])) as Record<'wood' | 'food' | 'stone', number>,
+    sell: Object.fromEntries(COMMODITIES.map(r => [r, marketQuote(state, player, r, 'sell').gold])) as Record<'wood' | 'food' | 'stone', number>,
+    tributeFee: tributeFee(state, player, 100),
+  };
   return observation;
 }
 
