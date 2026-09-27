@@ -285,6 +285,15 @@ def extract_ui(
         "icons.json": sha256(widgetui / "icons.json"),
         "sounds.json": sha256(sounds_path),
     }
+    buttons_path = sounds_path.with_name('buttons.json')
+    hashes['buttons.json'] = sha256(buttons_path)
+    command_buttons = {
+        str(entry['button_action_id']): {
+            'name': entry['name'], 'slot': entry['sequence_id'] + 1,
+            'iconId': entry['icon_id'], 'helpId': entry.get('help_string_id'),
+            'moreHelpId': entry.get('more_help_string_id'),
+        } for entry in json.loads(buttons_path.read_text())['command_button_list']
+    }
 
     used_materials: set[str] = set()
     # Cues the game plays for itself rather than for a widget click: alerts and
@@ -448,6 +457,7 @@ def extract_ui(
 
     return {
         "schemaVersion": spec["schemaVersion"],
+        "commandButtons": command_buttons,
         "style": style,
         "fonts": fonts,
         "colors": colors,

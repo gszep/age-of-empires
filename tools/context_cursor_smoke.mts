@@ -86,7 +86,7 @@ try {
     [worker, sheep, 'gather_meat', 'gather'], [worker, site, 'build', 'build'],
     [worker, damaged, 'repair', 'repair'], [monk, wounded, 'heal', 'heal'],
     [monk, enemy, 'convert', 'convert'], [soldier, enemy, 'attack', 'attack'],
-    [worker, tc, 'garrison', 'garrison'], [tc, mill, 'flag', 'rally'],
+    [worker, tc, 'garrison', 'garrison'], [tc, mill, 'default', 'rally'],
     [worker, hidden, 'default', 'move'],
   ] as const;
   for (const [actor, target, cursor, order] of cases) {
@@ -117,6 +117,51 @@ try {
       else assert.equal(updated.order.targetId, undefined, 'hidden target is not exposed by the cursor or command');
     }
   }
+  // #239: an actual TC selection stays ordinary until Set Gather Point is
+  // explicitly pressed. The button uses native sequence4 => grid cell5/T.
+  await query({ type: 'look', entity: tc.id });
+  let tcDrawn = (await query({ type: 'entities', id: tc.id })).entities[0];
+  await page.mouse.click(tcDrawn.screen.x, tcDrawn.screen.y);
+  assert.deepEqual((await query({ type: 'sim' })).selected, [tc.id]);
+  const expectCursor = async (name: string) => page.waitForFunction(({ name, fallback }) => {
+    const css = getComputedStyle(document.querySelector('canvas.battlefield')!).cursor;
+    return fallback ? css === 'default' : css.includes(`/${name}32x32.cur`);
+  }, { timeout: 10000 }, { name, fallback });
+  const clickGather = async () => {
+    await page.waitForSelector('[data-command="set-gather-point"]');
+    const button = await page.$eval('[data-command="set-gather-point"]', e => {
+      const r = e.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2,
+        cell: [...e.parentElement!.children].indexOf(e) + 1, title: (e as HTMLElement).title };
+    });
+    assert.equal(button.cell, 5); assert(button.title.includes('(T)'));
+    await page.mouse.click(button.x, button.y);
+  };
+  await expectCursor('default');
+  await clickGather();
+  await page.mouse.move(tcDrawn.screen.x + 120, tcDrawn.screen.y);
+  await expectCursor('flag');
+  const beforeCancel = (await query({ type: 'sim' })).synchronizationHash;
+  await page.keyboard.press('Escape'); await expectCursor('default');
+  assert.equal((await query({ type: 'sim' })).synchronizationHash, beforeCancel);
+  await clickGather();
+  await query({ type: 'look', entity: mill.id });
+  const millDrawn = (await query({ type: 'entities', id: mill.id })).entities[0];
+  await page.mouse.move(millDrawn.screen.x, millDrawn.screen.y); await expectCursor('flag');
+  await page.mouse.click(millDrawn.screen.x, millDrawn.screen.y);
+  assert.equal((await query({ type: 'snapshot' })).entities.find((e: any) => e.id === tc.id).rally.targetId, mill.id);
+  await expectCursor('default');
+  assert.deepEqual((await query({ type: 'sim' })).selected, [tc.id], 'placement does not select the target');
+  await page.keyboard.press('t'); await expectCursor('flag');
+  const beforeRightCancel = (await query({ type: 'sim' })).synchronizationHash;
+  await page.mouse.click(millDrawn.screen.x, millDrawn.screen.y, { button: 'right' });
+  await expectCursor('default');
+  assert.equal((await query({ type: 'sim' })).synchronizationHash, beforeRightCancel);
+  await page.keyboard.press('t'); await expectCursor('flag');
+  await query({ type: 'select', ids: [worker.id] });
+  await page.mouse.move(millDrawn.screen.x + 150, millDrawn.screen.y + 20);
+  await expectCursor('default');
+  console.log('GATHER POINT GREEN: TC click stays ordinary; native button/T arms left-click placement; Escape/right-click/selection cancel');
   // A last-seen resource is selected at its remembered location and reports
   // remembered stock, not hidden live position/depletion data.
   await query({ type: 'select', ids: [worker.id] });

@@ -43,11 +43,15 @@ headless record and checks its periodic hashes.
 Context cursors (#51) use 18 owned native CUR files and their embedded hotspots.
 Hover and actual right-clicks share pure dispatch/order classification, including
 gathering, hunting, construction, repair, healing, conversion, transport boarding,
-garrison and rally points. Hover never reserves farms or resets worker progress.
+garrison. Producer selection keeps the ordinary pointer (#239); the owned
+Set Gather Point button/T explicitly arms the flag cursor for left-click rally
+placement. Escape/right-click/selection change cancels it. Right-click rally
+remains a shortcut without arming the flag. Hover never reserves farms or resets worker progress.
 Unseen Gaia is no longer pickable by live coordinates: remembered objects use
 last-seen position/status in cursors and selection info. The open fallback uses
 ordinary CSS cursors. `cursors.test.ts` and `tools/context_cursor_smoke.mts`
-verify read-only hover, command outcomes, fog memory, native requests and hotspots;
+verify read-only hover, command outcomes, explicit gather-point placement and
+cancellation, fog memory, native requests and hotspots;
 the browser script also runs with `OPEN_FALLBACK=1`.
 
 `F10 → Game Settings` chooses the map and seed without editing a URL (#144).

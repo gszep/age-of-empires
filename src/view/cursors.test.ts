@@ -104,10 +104,12 @@ describe('owned context cursor classification', () => {
     const state = createGame(53);
     const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
     const enemy = add(state, 'militia', 2);
-    expect(contextCursor(state, 1, [tc], { x: 50, y: 50 })).toBe('flag');
+    expect(contextCursor(state, 1, [tc], { x: 50, y: 50 })).toBe('default');
+    expect(contextCursor(state, 1, [tc], { x: 50, y: 50 }, undefined, { rally: true })).toBe('flag');
     expect(planContextCommand(state, 1, [tc], { x: 50, y: 50 })?.kind).toBe('rally');
     // A shooting producer targets enemies; it does not plant a rally flag there.
-    expect(contextCursor(state, 1, [tc], enemy.position, enemy)).toBe(FALLBACK_RULES.buildings['town-center'].attack ? 'attack' : 'flag');
+    expect(contextCursor(state, 1, [tc], enemy.position, enemy)).toBe(FALLBACK_RULES.buildings['town-center'].attack ? 'attack' : 'default');
+    expect(contextCursor(state, 1, [tc], enemy.position, enemy, { rally: true })).toBe('flag');
     expect(contextCursor(state, 1, [], enemy.position, enemy)).toBe('default');
     expect(contextCursor(state, 1, [enemy], enemy.position, enemy)).toBe('default');
     expect(contextCursor(state, 1, [tc], enemy.position, enemy, { replay: true, build: true })).toBe('default');

@@ -8,22 +8,24 @@ export type ContextCursor = 'default' | 'attack' | 'hunt' | 'chop' | 'mine_gold'
   | 'gather' | 'gather_meat' | 'fish' | 'build' | 'repair' | 'heal' | 'convert'
   | 'garrison' | 'board' | 'unboard' | 'flag' | 'action' | 'not-allowed';
 
-/** Predict exactly the current context command; never mutate/reserve its target.
+/** Unit target cursors follow the context command without reserving its target.
+ * A producer's right-click rally shortcut does not arm the flag targeting mode.
  * Mixed selections use the first unit, matching the command dispatcher order.
  */
 export function contextCursor(
   state: ReadonlyGameState, player: PlayerId, selection: readonly DeepReadonly<Entity>[], point: Point,
-  target?: DeepReadonly<Entity>, mode: { build?: boolean; repair?: boolean; unload?: boolean; replay?: boolean } = {},
+  target?: DeepReadonly<Entity>, mode: { build?: boolean; repair?: boolean; unload?: boolean; rally?: boolean; replay?: boolean } = {},
 ): ContextCursor {
   if (mode.replay) return 'default';
   if (mode.build) return 'build';
   if (mode.unload) return 'unboard';
+  if (mode.rally) return 'flag';
   // The sim classification helpers below are pure; the view only reads them.
   const game = state as GameState, selected = selection as Entity[], entity = target as Entity | undefined;
   if (mode.repair) return entity && selected.some(e => isRepairable(game, e, entity)) ? 'repair' : 'not-allowed';
   const command = planContextCommand(game, player, selected, point, entity);
   if (!command) return 'default';
-  if (command.kind === 'rally') return 'flag';
+  if (command.kind === 'rally') return 'default';
   if (command.kind !== 'order') return 'default';
   const first = selected.find(e => command.entityIds.includes(e.id));
   if (!first) return 'default';

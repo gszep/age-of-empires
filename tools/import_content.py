@@ -2113,6 +2113,7 @@ def extract(
                 ("tributeNeedsMarket", 9863), ("lockTeams", 13523), ("lockTeamsHelp", 30630),
                 ("allyHelp", 30350), ("neutralHelp", 30351), ("enemyHelp", 30352), ("cancel", 4006),
                 ("townBell", 40111), ("townBellHelp", 41111),
+                ("setGatherPoint", 4144), ("setGatherPointHelp", 4944),
                 ("backToWork", 40015), ("backToWorkHelp", 41015),
                 ("creating", 4310), ("stopCreating", 42105),
                 ("confirmDelete", 10213), ("yes", 4003), ("no", 4004),

@@ -142,6 +142,8 @@ let buildMode: BuildingKind | undefined;
 /** The villager's Repair button is down: the next click names what to mend. */
 let repairMode = false;
 let unloadShips: number[] = [];
+let gatherPointBuildings: number[] = [];
+let gatherPointSelection = '';
 let paused = false;
 /**
  * Debug: draw the whole board as if seen. Strictly a view-side override --
@@ -571,6 +573,7 @@ function resetMatchView(): void {
   worldSounds = new WorldSounds();
   audioPlayer.reset();
   musicPlayer.reset();
+  gatherPointBuildings = [];
   rebuildPresentation();
 }
 
@@ -621,6 +624,12 @@ function runUiCommand(id: string, shift = false): void {
   const rules = playerRules();
   if (replay) return;
   const selection = ownSelected();
+  if (id === 'set-gather-point') {
+    gatherPointBuildings = selection.filter(e => isBuilding(e.kind) && e.buildProgress === undefined
+      && trainableAt(e.kind as BuildingKind).length > 0).map(e => e.id);
+    gatherPointSelection = selectedIds.join(',');
+    return;
+  }
   if (id.startsWith('build-')) {
     const kind = id.slice('build-'.length) as BuildingKind;
     // The reference lets the press through and says what is short rather
@@ -716,7 +725,7 @@ function runUiCommand(id: string, shift = false): void {
   if (id === 'page-economic') { buildPage = 'economic'; return; }
   if (id === 'page-military') { buildPage = 'military'; return; }
   if (id === 'page-back') { buildPage = undefined; return; }
-  if (id === 'cancel') { buildMode = undefined; repairMode = false; unloadShips = []; }
+  if (id === 'cancel') { buildMode = undefined; repairMode = false; unloadShips = []; gatherPointBuildings = []; }
   if (id === 'repair') { repairMode = true; return; }
 }
 
@@ -829,6 +838,23 @@ function placeBuilding(kind: BuildingKind, targets: Point[]): void {
 
 renderer.domElement.addEventListener('pointerdown', event => {
   const point = screenToWorld(event.clientX, event.clientY);
+  if (gatherPointBuildings.length && !replay) {
+    const ids = gatherPointBuildings;
+    gatherPointBuildings = [];
+    if (event.button === 0) {
+      const target = pickEntity(point);
+      let accepted = false;
+      for (const buildingId of ids) {
+        if (!ownSelected().some(e => e.id === buildingId)) continue;
+        const result = applyCommand(game, { kind: 'rally', player: localPlayer, buildingId,
+          target: point, ...(target ? { targetId: target.id } : {}) });
+        if (!result.ok) reject(result.reason);
+        else accepted = true;
+      }
+      if (accepted) playSound('gatherpoint_set');
+    }
+    return;
+  }
   if (event.button === 0) {
     if (unloadShips.length && !replay) {
       for (const id of unloadShips) {
@@ -955,14 +981,17 @@ function contextOrder(point: Point, _clientX: number, _clientY: number, queue = 
 }
 
 function updateContextCursor(): void {
-  const stamp = `${pointerOnCanvas}/${game.tick}/${selectedIds.join(',')}/${buildMode}/${repairMode}/${unloadShips.length}/${!!replay}/${cursorPoint.x}/${cursorPoint.y}/${cameraCenter.x}/${cameraCenter.y}/${zoom}`;
+  if (gatherPointSelection !== selectedIds.join(',')
+    || gatherPointBuildings.some(id => !ownSelected().some(e => e.id === id && e.buildProgress === undefined))) gatherPointBuildings = [];
+  const stamp = `${pointerOnCanvas}/${game.tick}/${selectedIds.join(',')}/${buildMode}/${repairMode}/${unloadShips.length}/${gatherPointBuildings.join(',')}/${!!replay}/${cursorPoint.x}/${cursorPoint.y}/${cameraCenter.x}/${cameraCenter.y}/${zoom}`;
   if (game === cursorGame && stamp === cursorStamp) return;
   cursorGame = game; cursorStamp = stamp;
   const point = screenToWorld(cursorPoint.x, cursorPoint.y);
   const selection = pointerOnCanvas ? ownSelected() : [];
   const target = pointerOnCanvas && selection.length ? pickEntity(point) : undefined;
   const name = pointerOnCanvas ? contextCursor(game, localPlayer, selection, point, target,
-    { build: !!buildMode, repair: repairMode, unload: !!unloadShips.length, replay: !!replay }) : 'default';
+    { build: !!buildMode, repair: repairMode, unload: !!unloadShips.length,
+      rally: !!gatherPointBuildings.length, replay: !!replay }) : 'default';
   const css = cursorCss(uiAssets, name);
   if (renderer.domElement.style.cursor !== css) renderer.domElement.style.cursor = css;
 }
@@ -1003,6 +1032,7 @@ addEventListener('keydown', event => {
   }
   if (key.startsWith('Arrow')) { heldKeys.add(key); event.preventDefault(); return; }
   if (key === 'Escape') {
+    if (gatherPointBuildings.length) { gatherPointBuildings = []; event.preventDefault(); return; }
     if (unloadShips.length) { unloadShips = []; event.preventDefault(); return; }
     if (buildMode) { buildMode = undefined; wallStart = undefined; }
     else if (repairMode) repairMode = false;
@@ -1154,6 +1184,10 @@ function currentCommands(): CommandButton[] {
   const player = game.players[localPlayer];
   const buttons: CommandButton[] = [];
   const selectedMarket = selection.find(e => e.kind === 'market' && e.buildProgress === undefined);
+  if (gatherPointBuildings.length) {
+    return [{ id: 'cancel', label: messages.cancel ?? 'Cancel', hotkey: 'escape', enabled: true,
+      active: true, icon: hud.actionIcon(ACTION_ICON.cancel), slot: GRID_SLOT.cancel }];
+  }
   if (buildMode) {
     return [{
       id: 'cancel', label: 'Cancel placement', hotkey: 'escape', enabled: true, active: true,
@@ -1249,6 +1283,10 @@ function currentCommands(): CommandButton[] {
   const producer = selection.find(e => isBuilding(e.kind) && e.buildProgress === undefined
     && trainableAt(e.kind as BuildingKind).length > 0);
   if (producer) {
+    const gather = uiAssets?.commandButtons?.['51'];
+    buttons.push({ id: 'set-gather-point', label: messages.setGatherPoint ?? gather?.name ?? 'Set Gather Point',
+      help: messages.setGatherPointHelp ? plainHelp(messages.setGatherPointHelp) : undefined,
+      slot: gather?.slot ?? 5, icon: hud.actionIcon(gather?.iconId ?? 45), enabled: true });
     for (const kind of trainableAt(producer.kind as BuildingKind)) {
       const unitRules = unitRulesFor(game, localPlayer, kind);
       buttons.push({

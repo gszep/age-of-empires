@@ -39,6 +39,10 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 - Left-click selects; drag-select chooses multiple units; shift-click adds to
   the selection and double-click takes every unit of that kind on screen.
 - Right-click ground/resources/enemies issues context-sensitive move, gather, or attack orders; right-click with a production building selected sets its rally point.
+- Selecting a production building keeps the ordinary cursor. **Set Gather Point
+  (T)** explicitly arms the flag cursor for a left-click destination; Escape or
+  right-click cancels that mode. The right-click rally shortcut still works
+  without entering the mode.
 - **Shift + right-click** falls in behind what a unit is already doing rather
   than replacing it, so you can lay a route or a run of jobs in one go. What is
   queued is the click, not the order it became: a waypoint onto a tree somebody

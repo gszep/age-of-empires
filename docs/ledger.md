@@ -64,6 +64,18 @@ off the reference; **measured** — fitted to a reference screenshot;
   Browser WAV playback preserves decoded PCM; Wwise bus DSP and music-mode
   selection remain outside this consumer (mixing #243, options #141).
 
+## Explicit gather-point targeting (#239)
+
+- **Human correction:** selecting a production building does not itself turn
+  the pointer into the flag cursor. Only the Set Gather Point action arms it.
+- **Owned:** buttons.json action51, icon45, zero-based sequence4 → cell5;
+  hotkeys.json definitive T independently confirms the grid cell. Localization
+ 4144/4944 supplies the label/help. The UI import retains native command-button
+  metadata rather than baking the new button's source values into imported mode.
+- **Integration policy:** left-click issues public rally commands for the armed
+  owned producers and returns to normal; Escape/right-click/selection change
+  cancels without changing a rally. Ordinary right-click rally remains available.
+
 ## Civilisation roster / selection foundation (#122)
 
 - **Owned:** identity, era, HUD family, display/computer names and emblems come
