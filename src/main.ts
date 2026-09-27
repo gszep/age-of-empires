@@ -32,6 +32,9 @@ import { artKey, chooseAnimation, createEntityView, refreshEntityTextures, dimFo
 import { createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline, elevatedWorldToIso, elevationAt, ELEVATION_PIXELS } from './view/world';
 import { createScatter, fillScatter } from './view/scatter';
 import { createCueWatcher, pollCues } from './view/cues';
+import { ConstructionCues } from './view/construction-cues';
+import { AudioPlayer } from './view/audio';
+import { WorldSounds, type SoundPose } from './view/world-sounds';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 
 /**
@@ -336,29 +339,29 @@ let ghostFootprint: THREE.Mesh | undefined;
 let ghostView: EntityView | undefined;
 let pointerWorld: Point = { x: 16, y: 9 };
 
-let soundSequence = 0;
+const audioPlayer = new AudioPlayer(() => audioAssets);
+addEventListener('pointerdown', () => audioPlayer.unlock(), { capture: true });
+addEventListener('keydown', () => audioPlayer.unlock(), { capture: true });
+addEventListener('pagehide', () => audioPlayer.stop());
+document.addEventListener('visibilitychange', () => { if (document.hidden) audioPlayer.stop(); });
 function playSound(alias: string): void {
-  const files = audioAssets?.audio[alias]?.files;
-  if (!files?.length) return;
-  const source = files[soundSequence++ % files.length];
-  const element = new Audio(`${audioAssets!.base}${source.file}`);
-  void element.play().catch(() => { /* browser gesture/autoplay policy */ });
+  audioPlayer.play(alias);
 }
 
-/**
- * A unit's own voice, from the DAT's Wwise ids. AoE2 answers both a selection
- * and an order with the same voice set, and the DAT carries one voice set for
- * the unit, so this plays for both.
- */
-function playUnitSound(unit: Entity, cue: 'select' | 'train'): void {
+/** Selection and order voices have separate DAT event IDs. */
+function playUnitSound(unit: Entity, cue: 'select' | 'train' | 'move' | 'attack' | 'construction'): void {
   // Her own voice: the skin that draws a villager speaks for her too.
-  playSound(`${artKey(assets, unit, unit.kind, game.matchSeed ?? 0)}-${cue}`);
+  const variant = cue === 'train' ? unit.kind : chooseAnimation(game, unit).key;
+  const alias = `${artKey(assets, unit, variant, game.matchSeed ?? 0)}-${cue}`;
+  const base = `${artKey(assets, unit, unit.kind, game.matchSeed ?? 0)}-${cue}`;
+  audioPlayer.play(audioAssets?.audio[alias] ? alias : base, cue === 'construction' ? 'ui' : 'voice');
 }
 
 /** One voice for a selection or an order, from the first owned unit in it. */
-function acknowledge(): void {
-  const unit = ownSelected().find(e => isUnit(e.kind));
-  if (unit) playUnitSound(unit, 'select');
+function acknowledge(cue: 'select' | 'move' | 'attack' = 'select'): void {
+  const selected = ownSelected();
+  const unit = selected.find(e => isUnit(e.kind)) ?? (cue === 'select' ? selected[0] : undefined);
+  if (unit) playUnitSound(unit, cue);
 }
 
 /** A stand-in entity so the preview reuses the normal building rendering. */
@@ -559,6 +562,9 @@ function resetMatchView(): void {
   shownAge = game.players[localPlayer].age;
   knownOwnUnits = new Set();
   cueWatcher = createCueWatcher();
+  constructionCues = new ConstructionCues();
+  worldSounds = new WorldSounds();
+  audioPlayer.reset();
   rebuildPresentation();
 }
 
@@ -802,14 +808,17 @@ function placeBuilding(kind: BuildingKind, targets: Point[]): void {
   const builders = ownSelected().filter(e => e.kind === (playerRules().buildings[kind].builderKind ?? 'villager')).map(e => e.id);
   if (!builders.length) { reject('Select a villager first'); return; }
   let failure: string | undefined;
+  let accepted = false;
   for (const target of targets) {
     const result = applyCommand(game, {
       kind: 'build', player: localPlayer, builderIds: builders, building: kind, target,
       orientation: orientationOf(kind, target),
     });
     if (!result.ok) failure ??= result.reason;
+    else accepted = true;
   }
   if (failure) reject(failure);
+  if (accepted) acknowledge('attack');
 }
 
 renderer.domElement.addEventListener('pointerdown', event => {
@@ -931,7 +940,10 @@ function contextOrder(point: Point, _clientX: number, _clientY: number, queue = 
     return;
   }
   const hostile = target !== undefined && isHostile(target);
-  if (selection.some(e => isUnit(e.kind))) acknowledge();
+  if (selection.some(e => isUnit(e.kind))) acknowledge(
+    hostile || (target && (target.kind === 'resource' || target.kind === 'farm'
+      || target.buildProgress !== undefined || selection.some(e => isRepairable(game, e, target))))
+      ? 'attack' : 'move');
   else hud.showMessage(hostile ? 'Target set' : 'Target cleared');
   if (hostile) orderFlash = { entityId: target!.id, startedAt: gameTimeSeconds(game) };
 }
@@ -954,6 +966,8 @@ function updateContextCursor(): void {
  * always visible, so a new id is one that finished training.
  */
 let cueWatcher = createCueWatcher();
+let constructionCues = new ConstructionCues();
+let worldSounds = new WorldSounds();
 let knownOwnUnits = new Set<number>();
 let lastAnnouncedNextId = game.nextId;
 function announceTrained(): void {
@@ -1596,6 +1610,7 @@ function entityVisible(entity: Entity): boolean {
 
 function syncScene(time: number): void {
   const wanted = new Set<string>();
+  const soundPoses = new Map<number, SoundPose>();
   for (const entity of game.entities) {
     if (!entityVisible(entity)) continue;
     if (!revealMap && entity.owner === 0 && !isTileVisible(game, localPlayer, entity.position.x, entity.position.y)) {
@@ -1617,7 +1632,21 @@ function syncScene(time: number): void {
       scene.add(entityView.group);
     }
     view.updateEntityView(entityView, assets, game, renderEntity(entity), time);
+    if (entityView.soundPose && isOnScreen(renderPosition(entity))
+      && isTileVisible(game, localPlayer, entity.position.x, entity.position.y)) {
+      soundPoses.set(entity.id, entityView.soundPose);
+    }
   }
+  for (const cue of worldSounds.poll(soundPoses)) {
+    const prefix = soundPoses.get(cue.id)!.key.match(/^civilizations\/[^/]+\//)?.[0] ?? '';
+    audioPlayer.play(`${prefix}events/${cue.event}`, 'world', 0.6);
+  }
+  const center = isoToWorld(cameraCenter.x, cameraCenter.y);
+  const terrainId = game.terrain[Math.floor(center.y) * game.width + Math.floor(center.x)];
+  const ambientEvent = Object.values(assets?.terrain ?? {}).find(slot => slot.terrainId === terrainId)?.soundEvent;
+  audioPlayer.ambient(!paused && !document.hidden && ambientEvent
+    && isTileVisible(game, localPlayer, center.x, center.y) ? `terrain/${ambientEvent}` : undefined,
+  performance.now() / 1000);
   // Remembered entities render as whole, dimmed static snapshots. Ground fog
   // sits beneath bodies, so it cannot cut through their crowns and roofs.
   // A revealed board draws the real entities, so the snapshots stand down.
@@ -1714,6 +1743,10 @@ function syncScene(time: number): void {
   }
 
   announceTrained();
+  for (const id of constructionCues.poll(game, localPlayer)) {
+    const building = game.entities.find(entity => entity.id === id);
+    if (building) playUnitSound(building, 'construction');
+  }
   // Alerts and feedback, read out of what the view can already see. The
   // simulation never raises them: it does not know about sound.
   const researchedBefore = cueWatcher.researched;

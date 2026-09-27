@@ -34,6 +34,7 @@ export function spriteTexture(assets: ContentAssets, image: string): THREE.Textu
 }
 export type AnimationInfo = {
   frames: number; directions: number; frameSeconds: number; mirroringMode: number;
+  soundEvents?: { frame: number; direction?: number; event: number }[];
   /** Drawn through one of the engine's alpha palettes: a fish's underwater
    * school at `n_alpha_underwater.palx`'s 86/255. Absent, opaque. */
   alpha?: number;
@@ -124,6 +125,7 @@ export interface PlayerColors {
 export interface ImportedTerrain {
   /** The DAT slot this is, so the ground can be bucketed by what the map says. */
   terrainId: number;
+  soundEvent?: number;
   /** Which of two meeting terrains is painted over the other, and which
    * family of blend masks the edge is drawn with. Both the DAT's own. */
   blendPriority: number;

@@ -297,6 +297,7 @@ def consumed_cues(ui_manifest: Path, content: Path | None) -> list[dict[str, Any
                 for key, profile in sorted(imported.get("civilizations", {}).items()))]
     for prefix, profile in profiles:
         switch = profile.get("audio", {}).get("switch")
+        events: set[int] = set()
         for key, entity in sorted(profile.get("entities", {}).items()):
             for name, event_id in sorted(entity.get("sounds", {}).items()):
                 cues.append({
@@ -305,6 +306,13 @@ def consumed_cues(ui_manifest: Path, content: Path | None) -> list[dict[str, Any
                     "id": event_id,
                     "switch": switch,
                 })
+            for animation in entity.get("animations", {}).values():
+                events.update(item["event"] for item in animation.get("soundEvents", []))
+        for event in sorted(events):
+            cues.append({"alias": f"{prefix}events/{event}", "event": f"graphic {event}",
+                         "id": event, "switch": switch})
+    for event in sorted({slot.get("soundEvent", 0) for slot in imported.get("terrain", {}).values()} - {0}):
+        cues.append({"alias": f"terrain/{event}", "event": f"terrain {event}", "id": event, "switch": None})
     return cues
 
 

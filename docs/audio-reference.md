@@ -34,14 +34,20 @@ out of memory until a consumed cue needs it.
 - Town centre109 `building.wwise_construction_sound_id` is1357475385, the same
   event as its selection sound, resolving media448598844. The previous claim
   that no owned construction cue exists was based only on `sounds.json`.
-  The field names the sound; its exact completion timing still needs a consumer.
+  The completion consumer now watches an owned foundation become a building;
+  this exact timing interpretation remains inferred (#243).
 - Terrain0's `wwise_sound_id`3923190460, shore1/2's1923763734,
   forest5/10's811708576, desert14's151185016 and deep-water22's1597834659
-  resolve to ambient media. Container mixing, timing and spatial rules need
-  separate implementation; a flat media list does not specify a soundscape.
+  resolve to ambient media. Playback now uses a bounded visible-camera-centre
+  pool. Container mixing, timing and spatial rules remain #243; a flat media
+  list does not specify the reference soundscape.
 - Attack graphics can have `wwise_sound_id`0 while `angle_sounds_used`1 and
   nonempty `angle_sounds`: read frame/direction sound entries before declaring
-  an attack silent.
+  an attack silent. Militia attack1096 has event542552093 at frame12 in every
+  direction; builder work1598 has1893274449 at frame12. Archer627 has two
+  events at frames15/21. These now follow the renderer's attack/work clock,
+  including skipped frames and per-swing resets. Death-wide cues play only
+  when the visible live entity transitions; snapshots establish a baseline.
 - Bank1638387902 contains119 music tracks (HIRC11),121 music segments (10),
   nine music random/sequence containers (13), one music switch container (12),
   plus events/actions. Music is present in owned metadata. `sounds.json` names
@@ -58,3 +64,11 @@ The owned integration test decodes an event whose complete stream is in
 across reversed pack order. Existing UI and civilisation-voice tests still run.
 This establishes extraction and decoding, not acoustic equivalence to Wwise's
 mixer, random weights, effects or interactive-music transitions.
+
+`tools/audio_smoke.mts` adds real-browser playback evidence for #114: actual
+selection/move/attack gestures, a paid house build button/placement, weapon and
+hammer frame cues and completion. It waits for HTMLMediaElement `playing`, then
+decodes played owned WAVs in Chrome and measures nonzero PCM. Looking away
+silences combat and unseen terrain; watcher tests cover reveal/reconnect,
+direction changes, paused frames and bounded missed intervals. This does not
+claim a microphone comparison against a running DE mixer.

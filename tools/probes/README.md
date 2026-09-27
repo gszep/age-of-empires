@@ -14,6 +14,12 @@ These scripts live directly under `tools/` and start private Vite/browser
 fixtures. Run `npx tsx tools/<name>.mts`; they supplement the gate's general
 browser smoke and are maintained regression tools.
 
+- **`audio_smoke.mts`** — #114's real select/move/attack and paid house-build
+  gestures; observes native media playing, owned weapon/hammer frame events,
+  completion and terrain ambience. Chrome decodes played WAVs and measures
+  non-silent PCM; looking away suppresses offscreen combat and unseen terrain.
+  Mixer/reference calibration is separately tracked as #243.
+
 - **`regicide_smoke.mts`** — real mode checkbox/Start Game, King sprite/colour/
   voice request, reload/restart and return to random map; two actual400-gold
   Treason clicks, pixel-verified minimap X blink/expiry at a hidden garrisoned

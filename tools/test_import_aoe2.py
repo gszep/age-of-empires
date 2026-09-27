@@ -2064,6 +2064,33 @@ class AudioImportIntegrationTest(unittest.TestCase):
         for key in ("villager", "militia", "spearman", "archer", "skirmisher",
                     "scout-cavalry", "trade-cart"):
             self.assertIn(f"{key}-select", aliases)
+        self.assertIn('militia-move', aliases)
+        self.assertIn('militia-attack', aliases)
+        self.assertIn('town-center-construction', aliases)
+        self.assertIn('events/542552093', aliases)
+        self.assertIn('terrain/3923190460', aliases)
+
+    def test_world_audio_metadata_reaches_the_published_manifest(self):
+        content = extracted_content()
+        dat = _dat()
+        militia = content['entities']['militia']
+        unit = dat.civs[1].units[militia['id']]
+        self.assertEqual(militia['sounds']['move'], unit.bird.wwise_move_sound_id)
+        self.assertEqual(militia['sounds']['attack'], unit.bird.wwise_attack_sound_id)
+        events = militia['animations']['attack']['soundEvents']
+        graphic = dat.graphics[unit.type_50.attack_graphic]
+        self.assertEqual(events[0], {'frame': graphic.angle_sounds[0].frame_num,
+                                    'direction': 0, 'event': graphic.angle_sounds[0].wwise_sound_id & 0xffffffff})
+        self.assertEqual(content['entities']['town-center']['sounds']['construction'],
+                         dat.civs[1].units[109].building.wwise_construction_sound_id)
+        published = json.loads(Path('public/imported/aoe2/manifest.json').read_text())
+        for key in ('militia', 'villager-builder', 'town-center'):
+            self.assertEqual(published['entities'][key]['sounds'], content['entities'][key]['sounds'])
+            for name, animation in content['entities'][key]['animations'].items():
+                self.assertEqual(published['entities'][key]['animations'][name]['soundEvents'], animation['soundEvents'])
+        for key, terrain in content['terrain'].items():
+            self.assertEqual(terrain['soundEvent'], dat.terrain_block.terrains[terrain['terrainId']].wwise_sound_id)
+            self.assertEqual(published['terrain'][key]['soundEvent'], terrain['soundEvent'])
 
     def test_vgmstream_regenerates_byte_identical_browser_audio(self):
         with tempfile.TemporaryDirectory() as directory:

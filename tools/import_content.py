@@ -256,6 +256,21 @@ def resolve_graphic_id(unit: Any, animation: dict[str, Any], civ_units: Any, dat
     return getattr(task, f"{animation['graphic']}_graphic_id")
 
 
+def graphic_sound_events(graphic: Any) -> list[dict[str, int]]:
+    """DAT animation-wide and per-direction frame events, retaining raw frames."""
+    events = []
+    if graphic.wwise_sound_id:
+        events.append({"frame": 0, "event": graphic.wwise_sound_id & 0xFFFFFFFF})
+    if graphic.angle_sounds_used:
+        for direction, row in enumerate(graphic.angle_sounds):
+            for suffix in ("", "_2", "_3"):
+                frame = getattr(row, f"frame_num{suffix}")
+                event = getattr(row, f"wwise_sound_id{suffix}")
+                if frame >= 0 and event:
+                    events.append({"frame": frame, "direction": direction, "event": event & 0xFFFFFFFF})
+    return events
+
+
 def animation_entry(
     dat: DatFile, graphics_dir: Path | Graphics, graphic_id: int, hashes: dict[str, str]
 ) -> dict[str, Any]:
@@ -280,6 +295,7 @@ def animation_entry(
         "directions": graphic.angle_count,
         "frameSeconds": rounded(graphic.frame_duration),
         "mirroringMode": graphic.mirroring_mode,
+        "soundEvents": graphic_sound_events(graphic),
     }
 
 
@@ -777,6 +793,17 @@ def extract_entity(
         for name, field in (("select", "selection"), ("train", "train"))
         if name in spec.get("sounds", []) and getattr(unit, f"wwise_{field}_sound_id")
     }
+    if category in ("unit", "unit-variant", "animal", "building"):
+        if unit.wwise_selection_sound_id:
+            sounds["select"] = unit.wwise_selection_sound_id
+        if unit.bird is not None:
+            for name in ("move", "attack"):
+                event = getattr(unit.bird, f"wwise_{name}_sound_id")
+                if event:
+                    sounds[name] = event
+        if category == "building" and unit.building is not None:
+            if unit.building.wwise_construction_sound_id:
+                sounds["construction"] = unit.building.wwise_construction_sound_id
     if sounds:
         entity["sounds"] = sounds
 
@@ -802,6 +829,7 @@ def extract_entity(
         for name, animation in spec["animations"].items():
             graphic_id = resolve_graphic_id(civ_units[animation["unitId"]] if "unitId" in animation else unit,
                                            animation, civ_units, dat)
+            parent_sound_events = graphic_sound_events(dat.graphics[graphic_id]) if graphic_id >= 0 else []
             layers = [(graphic_id, 0, 0)] if spec.get("gate") and name not in ("idle", "open") else graphic_layers(dat, graphic_id)
             if spec.get("gate") and name in ("idle", "open"):
                 # The preview owns the complete gate, including posts/flags.
@@ -830,6 +858,8 @@ def extract_entity(
                 if "(Underwater)" in dat.graphics[graphic_id].name:
                     entity["animations"][key]["alphaPalette"] = "n_alpha_underwater.palx"
                 entity["animationLayers"][name].append({"animation": key, "x": x, "y": y})
+            if parent_sound_events:
+                entity["animations"][name]["soundEvents"] = parent_sound_events
 
     if spec["key"] == "fish-trap":
         entity["foodAmount"] = rounded(dat.civs[1].resources[88])
@@ -1663,6 +1693,7 @@ def terrain_entry(
     minimap = shades[1] if shades else list(terrain.colors)
     return {
         "terrainId": terrain_id,
+        "soundEvent": terrain.wwise_sound_id & 0xFFFFFFFF,
         "name": terrain.name,
         "texture": terrain.name_2,
         # Tiles covered by one repeat of the texture, so the view can lay it out

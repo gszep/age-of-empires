@@ -26,6 +26,29 @@ off the reference; **measured** — fitted to a reference screenshot;
   HIRC10–13 is now inventoried but remains outside this effects-only resolver.
   Decoded WAV identity is verified; reference mixer equivalence is not claimed.
 
+## World audio playback (#114, calibration #243)
+
+- **Owned:** separate selection, move and attack-acknowledgement event IDs,
+  task/female variants, building construction IDs, terrain ambient IDs, and
+  graphic-wide/per-direction `angle_sounds` frame events. Parent sound events
+  survive file-less composite ship graphics. No simulation state is written.
+- **Inferred timing:** a building's construction cue plays when an observed
+  owned foundation becomes complete. Graphic-wide cues start at frame0; raw
+  DAT frame numbers are interpreted on the existing zero-based sprite clock.
+  These timings need reference-audio alignment, not just source-field tests.
+- **Chosen playback:** cosmetic per-alias round robin; one acknowledgement
+  voice; at most24 simultaneous HTMLAudio elements; UI/voice gain1, world0.6,
+  ambience0.18. Sounds load lazily after a gesture and release on end/error,
+  restart or hidden tab. World sounds are audible only on screen and in actual
+  visibility (debug reveal does not bypass it). A missed interval emits at most
+  one occurrence of each event per entity, not a fast-forward sound backlog.
+- **Chosen ambient integration:** one pool from the visible camera-centre
+  terrain; change/leave/pause stops it, end permits another clip with a minimum
+  two seconds between starts. It is not Wwise's layered/weighted loop graph.
+  There is no continuous distance attenuation, panning or imported bus DSP yet.
+  First sight/reconnect sets a silent baseline; existing corpses do not cry
+  again. #243 owns mixing, ambient timing and spatial/reference calibration.
+
 ## Civilisation roster / selection foundation (#122)
 
 - **Owned:** identity, era, HUD family, display/computer names and emblems come

@@ -151,7 +151,7 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | selection marker shape and size | `unit.obstruction_type` (5 = round unit outline, others square/footprint), `unit.outline_size_x/_y` (half-extents in tiles, can exceed the collision box) |
 | movement speed, walk graphic | `unit.speed`; `unit.dead_fish.walking_graphic` |
 | order acknowledgements and construction audio | `unit.bird.wwise_move_sound_id` / `.wwise_attack_sound_id`; `unit.building.wwise_construction_sound_id`. Signed event IDs normalize to uint32. Construction TC109 shares its selection event1357475385. These are separate from weapon animation sounds |
-| graphic and ambient audio | `graphic.wwise_sound_id`, `.angle_sounds_used`, `.angle_sounds`; terrain `.wwise_sound_id`. A zero graphic-wide ID does not mean the frame/direction sound entries are empty |
+| graphic and ambient audio | `graphic.wwise_sound_id`, `.angle_sounds_used`, `.angle_sounds[*].frame_num/.wwise_sound_id` and `_2`/`_3` suffix pairs; terrain `.wwise_sound_id`. A zero graphic-wide ID does not mean the frame/direction sound entries are empty. Published as `animations.*.soundEvents` and terrain `soundEvent`; composite parents retain sound metadata even without their own file |
 | idle / death graphics | `unit.standing_graphic`, `unit.dying_graphic` |
 | cost and train time/location | `unit.creatable.resource_costs`; `unit.creatable.train_locations[0].unit_id/.train_time` |
 | combat (attacks, armor, range, projectile) | `unit.type_50.*` — `.attacks`, `.attack_graphic`, `.projectile_unit_id`, `.graphic_displacement` (launch offset, z = height) |

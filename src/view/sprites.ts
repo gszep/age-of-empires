@@ -2,7 +2,8 @@ import * as THREE from 'three/webgpu';
 import { materialColor, materialOpacity, texture as textureNode, vec2 } from 'three/tsl';
 import { skinnedKey } from './skins';
 import { atlasPage, spriteTexture, type ContentAssets, type Atlas, type AnimationInfo, type ImportedEntity } from './assets';
-import { isAnimal, isBuilding, isUnit } from '../sim/data';
+import { isAnimal, isBuilding, isUnit, TICK_SECONDS } from '../sim/data';
+import type { SoundPose } from './world-sounds';
 import { isGateKind, isWallKind, isWallLineKind } from '../sim/buildings';
 import { rulesForPlayer } from '../sim/civilizations';
 import { corpseAgeSeconds, swingSeconds } from '../sim/game';
@@ -81,6 +82,7 @@ export interface EntityView {
   fallback: boolean;
   animationState?: string;
   animationStartedAt?: number;
+  soundPose?: SoundPose;
   /** The frame of that animation actually drawn this tick. Reported through
    * the debug protocol, so which variant a sprite chose — a wall's joint, a
    * carcass's stage of rot — is a field to read rather than a picture to
@@ -1049,6 +1051,7 @@ export function updateEntityView(
   hasGarrison = !!entity.garrison?.length,
 ): void {
   const depth = isoDepth(entity.position.x, entity.position.y);
+  view.soundPose = undefined;
   // A new animation may have no contour. Do not leave the previous animation
   // eligible for updateOcclusion to revive after its texture expires.
   for (const piece of [view.outline, ...(view.layerOutlines ?? [])]) {
@@ -1106,6 +1109,12 @@ export function updateEntityView(
   const deathEffect = entity.dead && imported?.deathEffect ? assets.particles?.[imported.deathEffect] : undefined;
   if (deathEffect) {
     const elapsed = deathElapsed ?? 0;
+    const deathAnimation = imported?.animations[choice.name];
+    if (deathAnimation) view.soundPose = {
+      key: `${choice.key}/death-effect`, direction: directionIndex(view.facing, deathAnimation.directions),
+      frame: Math.min(deathAnimation.frames - 1,
+        Math.floor(elapsed / (deathAnimation.frameSeconds || 0.1))), animation: deathAnimation,
+    };
     const duration = deathEffect.cycleSeconds[1];
     const frame = Math.min(deathEffect.atlas.framesInFile - 1,
       Math.floor(elapsed / duration * deathEffect.atlas.framesInFile));
@@ -1177,6 +1186,14 @@ export function updateEntityView(
   }
   const elapsed = deathElapsed === undefined ? time - (view.animationStartedAt ?? time)
     : choice.name.startsWith('decay') ? Math.max(0, deathElapsed - dyingSeconds) : deathElapsed;
+
+  const soundFrame = animation.frameSeconds > 0
+    ? Math.floor((swing ?? elapsed) / animation.frameSeconds) : 0;
+  view.soundPose = {
+    key: `${stateKey}/${swing !== undefined ? Math.round((time - swing) / TICK_SECONDS) : view.animationStartedAt}`,
+    frame: entity.dead || swing !== undefined ? Math.min(soundFrame, animation.frames - 1) : soundFrame,
+    direction: directionIndex(view.facing, animation.directions), animation,
+  };
 
   let frameIndex: number;
   if (isWallKind(entity.kind) && choice.name === 'idle') {
