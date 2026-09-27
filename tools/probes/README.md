@@ -19,6 +19,8 @@ browser smoke and are maintained regression tools.
   completion and terrain ambience. Chrome decodes played WAVs and measures
   non-silent PCM; looking away suppresses offscreen combat and unseen terrain.
   Mixer/reference calibration is separately tracked as #243.
+  #248 adds actual four-layer ambient fade playback and a real militia-training
+  completion whose horn and500ms-delayed voice are both observed playing.
 - **`music_smoke.mts`** — #115's27 real owned soundtrack tracks, native seek/end
   transitions and wrap, one live source, gesture unlock, pause/resume,
   hidden/foreground, restart and absent-audio fallback. `MUSIC_SOAK=1` also

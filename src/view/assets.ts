@@ -332,7 +332,19 @@ export interface NativeSlices { images: string[]; columns: number[]; rows: numbe
 export interface AudioAssets {
   music?: { playlist: string[] };
   base: string;
-  audio: Record<string, { event: string; files: { file: string; mediaId: number; seconds: number }[] }>;
+  audio: Record<string, { event: string; files: { file: string; mediaId: number; seconds: number }[]; layers?: AudioLayer[] }>;
+}
+
+export interface AudioLayer {
+  actionId: number;
+  fileIndices: number[];
+  delaySeconds: number;
+  delayRange: [number, number];
+  fadeSeconds: number;
+  fadeRange: [number, number];
+  probability: number;
+  probabilityRange: [number, number];
+  curve: number;
 }
 
 const CONTENT_BASE = '/imported/aoe2/';

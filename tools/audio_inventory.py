@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 from depot import depot_root
-from import_audio import Stream, music_catalogue, read_audio_packs, resolve_event_id
+from import_audio import Stream, music_catalogue, read_audio_packs, resolve_event_id, resolve_event_layers
 from wwise_pck import read_index
 
 
@@ -22,7 +22,7 @@ def inventory(packs: list[Path], events: list[int], switch: str, music: bool = F
     banks = read_audio_packs(packs)
     result = {
         'packs': sources,
-        'banks': [{'id': int(bank.name), 'pack': bank.pack,
+        'banks': [{'id': int(bank.name), 'pack': bank.pack, 'version': bank.version,
                    'localObjectTypes': dict(sorted(Counter(
                        kind for kind, _ in bank.objects.maps[0].values()).items()))}
                   for bank in banks],
@@ -31,6 +31,9 @@ def inventory(packs: list[Path], events: list[int], switch: str, music: bool = F
              'pack': bank.media[media].pack.name if isinstance(bank.media[media], Stream) else bank.pack,
              'storage': 'stream' if isinstance(bank.media[media], Stream) else 'embedded'}
             for bank in banks for media in resolve_event_id(bank, event, switch)] for event in events},
+        'playLayers': {str(event & 0xffffffff): [
+            {'bankId': int(bank.name), **layer} for bank in banks
+            for layer in resolve_event_layers(bank, event, switch)] for event in events},
     }
     if music:
         result['music'] = music_catalogue(banks)

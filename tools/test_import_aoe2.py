@@ -2038,6 +2038,25 @@ class AudioImportIntegrationTest(unittest.TestCase):
             self.assertEqual(files[0]['storage'], 'stream')
             self.assertGreater(files[0]['seconds'], 60)
 
+    def test_owned_play_layers_and_timing_are_published_without_flattening(self):
+        from import_audio import resolve_event_layers
+        bank = next(bank for bank in self.banks if bank.name == '232745270')
+        self.assertEqual(bank.version, 154)
+        train = resolve_event_layers(bank, 1091801433, 'Britons')
+        self.assertEqual(len(train), 2)
+        self.assertEqual(train[0]['media'], [603334752])
+        self.assertEqual([layer['delaySeconds'] for layer in train], [0, 0.5])
+        attack = resolve_event_layers(bank, 542552093, 'Britons')
+        self.assertEqual([layer['delaySeconds'] for layer in attack], [0, 0.1])
+        ambient = resolve_event_layers(bank, 3923190460)
+        self.assertEqual(len(ambient), 4)
+        self.assertTrue(all(layer['fadeSeconds'] == 3 and layer['curve'] == 4 for layer in ambient))
+        published = json.loads(Path('public/imported/aoe2/audio/manifest.json').read_text())
+        cue = published['audio']['militia-train']
+        self.assertEqual([layer['delaySeconds'] for layer in cue['layers']], [0, 0.5])
+        self.assertEqual([[cue['files'][index]['mediaId'] for index in layer['fileIndices']]
+                          for layer in cue['layers']], [layer['media'] for layer in train])
+
     def test_widget_event_resolves_through_hirc_to_owned_media(self):
         matches = [
             (int(bank.name), media_id)

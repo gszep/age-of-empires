@@ -392,6 +392,10 @@ records their source fields. `tools/audio_smoke.mts` exercises actual select,
 move, attack and house-placement gestures, observes browser media playing,
 measures non-silent decoded PCM and rejects hidden/offscreen audio leakage.
 Exact Wwise mixing, spatial balance and ambient scheduling remain #243.
+The Play-action boundary now preserves separate layers, owned delays/ranges,
+probability and linear fades (#248): a training horn and delayed voice both play,
+and terrain actions retain their own fades. Pending layers reserve source-budget
+slots and are cancelled with their group on replacement/reset/hidden-tab cleanup.
 In-game music (#115) resolves the owned `Ingame_Music` dialogue tree and plays
 27 complete numbered tracks (111 minutes) with one lazy native audio element,
 pause/foreground resume and restart cleanup. Three missing full streams are

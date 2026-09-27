@@ -348,7 +348,7 @@ let ghostFootprint: THREE.Mesh | undefined;
 let ghostView: EntityView | undefined;
 let pointerWorld: Point = { x: 16, y: 9 };
 
-const audioPlayer = new AudioPlayer(() => audioAssets);
+const audioPlayer = new AudioPlayer(() => audioAssets, () => game.matchSeed ?? 0);
 const musicPlayer = new MusicPlayer(() => audioAssets);
 audioPlayer.setVolume(preferences.sound / 100);
 musicPlayer.setVolume(preferences.music / 100);

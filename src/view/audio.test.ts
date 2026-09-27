@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AudioPlayer } from './audio';
-import type { AudioAssets } from './assets';
+import type { AudioAssets, AudioLayer } from './assets';
 
 class FakeAudio {
   static instances: FakeAudio[] = [];
@@ -23,9 +23,59 @@ beforeEach(() => {
   vi.stubGlobal('Audio', FakeAudio);
   vi.stubGlobal('document', { hidden: false });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+const layer = (file: number, extra: Partial<AudioLayer> = {}): AudioLayer => ({ actionId: file + 1, fileIndices: [file],
+  delaySeconds: 0, delayRange: [0, 0], fadeSeconds: 0, fadeRange: [0, 0], probability: 100, probabilityRange: [0, 0], curve: 4, ...extra });
+const layered = (layers: AudioLayer[]): AudioAssets => ({ ...assets, audio: { ...assets.audio,
+  layered: { event: 'layered', files: assets.audio.cue.files, layers } } });
 
 describe('bounded browser sound player', () => {
+  it('plays each action layer at its owned delay rather than choosing between layers', async () => {
+    vi.useFakeTimers();
+    const player = new AudioPlayer(() => layered([layer(0), layer(1, { delaySeconds: 0.5 })]));
+    player.unlock(); player.play('layered', 'voice');
+    const [horn, voice] = FakeAudio.instances;
+    expect(horn.play).toHaveBeenCalledOnce(); expect(voice.play).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(499); expect(voice.play).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1); expect(voice.play).toHaveBeenCalledOnce();
+    expect(horn.pause).not.toHaveBeenCalled();
+    player.stop(); expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('cancels pending layers when a newer acknowledgement or reset supersedes them', async () => {
+    vi.useFakeTimers();
+    const player = new AudioPlayer(() => layered([layer(0), layer(1, { delaySeconds: 0.5 })]));
+    player.unlock(); player.play('layered', 'voice');
+    const delayed = FakeAudio.instances[1];
+    player.play('other', 'voice');
+    await vi.advanceTimersByTimeAsync(1000); expect(delayed.play).not.toHaveBeenCalled();
+    expect(delayed.removeAttribute).toHaveBeenCalledWith('src');
+    player.reset(); expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('ramps an owned linear fade and applies volume changes without jumping to full gain', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => Number(setTimeout(() => callback(performance.now()), 16)));
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => clearTimeout(id));
+    const player = new AudioPlayer(() => layered([layer(0, { fadeSeconds: 3 })]));
+    player.unlock(); player.play('layered', 'ambient', 0.6);
+    await Promise.resolve(); expect(FakeAudio.instances[0].volume).toBe(0);
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(FakeAudio.instances[0].volume).toBeCloseTo(0.3, 2);
+    player.setVolume(0.5); expect(FakeAudio.instances[0].volume).toBeCloseTo(0.15, 2);
+    await vi.advanceTimersByTimeAsync(1600); expect(FakeAudio.instances[0].volume).toBe(0.3);
+    player.stop(); expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('honours action probability without touching the simulation random stream', () => {
+    const simulation = { seed: 123, matchSeed: 42 };
+    const before = { ...simulation };
+    const player = new AudioPlayer(() => layered([layer(0, { probability: 0 }), layer(1)]), () => simulation.matchSeed);
+    player.unlock(); player.play('layered');
+    expect(FakeAudio.instances.map(e => e.src)).toEqual(['/audio/two.wav']);
+    expect(simulation).toEqual(before);
+  });
   it('applies sound volume to playing cues and avoids loading new cues while muted', () => {
     const player = new AudioPlayer(() => assets); player.unlock(); player.play('cue', 'world', 0.6);
     player.setVolume(0.5); expect(FakeAudio.instances[0].volume).toBe(0.3);

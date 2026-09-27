@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from import_audio import Bank, Stream, dialogue_leaves, music_catalogue, read_audio_packs, read_bank, resolve_event_id, wwise_id
+from import_audio import Bank, Stream, dialogue_leaves, music_catalogue, play_parameters, read_audio_packs, read_bank, resolve_event_id, resolve_event_layers, wwise_id
 from wwise_pck import PackedFile
 
 
@@ -46,6 +46,32 @@ def pack(path, banks=(), streams=()):
 
 
 class AudioPackTest(unittest.TestCase):
+    def test_play_action_layers_keep_their_own_media_and_delay(self):
+        def play(target, properties=None, ranges=None):
+            properties, ranges = properties or {}, ranges or {}
+            result = struct.pack('<BBIB', 3, 4, target, 0)
+            for values, width in ((properties, 1), (ranges, 2)):
+                result += bytes([len(values), *values])
+                for key, value in values.items():
+                    numbers = [value] if width == 1 else value
+                    result += struct.pack('<' + ('f' if key == 60 else 'i') * width, *numbers)
+            return result + struct.pack('<BII', 4, 1, 0)
+        objects = {1: (4, b'\x02' + struct.pack('<II', 2, 3)),
+                   2: (3, play(4)), 3: (3, play(5, {58: 500, 59: 3000, 60: 50}, {58: [-100, 100]})),
+                   4: (2, b'\0' * 5 + struct.pack('<I', 11)), 5: (2, b'\0' * 5 + struct.pack('<I', 12))}
+        source = Bank('1', objects, {11: b'horn', 12: b'voice'}, version=154)
+        layers = resolve_event_layers(source, 1)
+        self.assertEqual([layer['media'] for layer in layers], [[11], [12]])
+        self.assertEqual(layers[1]['delaySeconds'], 0.5)
+        self.assertEqual(layers[1]['delayRange'], [-0.1, 0.1])
+        self.assertEqual(layers[1]['fadeSeconds'], 3)
+        self.assertEqual(layers[1]['probability'], 50)
+        self.assertEqual(resolve_event_id(source, 1), [11, 12])
+        with self.assertRaisesRegex(ValueError, 'suffix'):
+            play_parameters(play(4) + b'\0')
+        with self.assertRaisesRegex(ValueError, 'unsupported.*property'):
+            play_parameters(play(4, {57: 1}))
+
     def test_music_dialogue_orders_named_states_and_excludes_missing_stream_prefixes(self):
         event = wwise_id('Ingame_Music')
         leaves = [(wwise_id('MUSIC02'), 200), (wwise_id('MUSIC01'), 100), (wwise_id('MUSIC03'), 300)]

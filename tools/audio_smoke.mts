@@ -25,7 +25,10 @@ const soldier = { ...worker, id: state.nextId++, kind: 'militia' as const,
 const target = { ...home, id: state.nextId++, kind: 'house' as const, owner: 2 as const,
   radius: 1, footprint: { x: 1, y: 1 }, hp: 1000, maxHp: 1000,
   position: { x: home.position.x + 9, y: home.position.y + 3 } };
-state.entities.push(soldier, target);
+const barracks = { ...home, id: state.nextId++, kind: 'barracks' as const, footprint: undefined,
+  radius: rules.buildings.barracks.radius, hp: rules.buildings.barracks.hp, maxHp: rules.buildings.barracks.hp,
+  position: { x: home.position.x + 12, y: home.position.y - 7 } };
+state.entities.push(soldier, target, barracks);
 stepGame(state);
 const { rules: omitted, ...saved } = state;
 const server = await createServer({ root, configFile: `${root}vite.config.ts`, logLevel: 'error',
@@ -39,6 +42,8 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, l
       return code.replace('if (!shared && !paused && !matchOver(game))', 'if (false && !shared && !paused && !matchOver(game))')
         .replace(anchor, `Object.assign(globalThis, {
           __audioStep: (n: number) => { for (let i=0;i<n;i++) { stepGame(game); syncScene(gameTimeSeconds(game)); } },
+          __audioLive: () => [...(audioPlayer as any).active.keys()].map((e: HTMLAudioElement) => ({src:e.src,volume:e.volume,time:e.currentTime,
+            paused:e.paused,ready:e.readyState,fade:(audioPlayer as any).fades.get(e)})),
           __audioPoint: (p: Point) => { const q=elevatedWorldToIso(game,p.x,p.y); return {
             x:(q.x-cameraCenter.x)*zoom+innerWidth/2, y:-(q.y-cameraCenter.y)*zoom+innerHeight/2 }; }
         });\n${anchor}`);
@@ -55,13 +60,14 @@ try {
   const errors: string[] = []; page.on('pageerror', e => errors.push(String(e)));
   await page.evaluateOnNewDocument(snapshot => {
     sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot));
-    const plays: { url: string; playing: boolean; error?: string }[] = [];
+    const plays: { url: string; playing: boolean; error?: string; called: number; started?: number; initialVolume: number }[] = [];
     Object.assign(window, { __audioPlays: plays });
     const original = HTMLMediaElement.prototype.play;
     HTMLMediaElement.prototype.play = function () {
-      const record = { url: this.src, playing: false, error: undefined as string | undefined };
+      const record = { url: this.src, playing: false, error: undefined as string | undefined,
+        called: performance.now(), started: undefined as number | undefined, initialVolume: this.volume };
       plays.push(record);
-      this.addEventListener('playing', () => { record.playing = true; }, { once: true });
+      this.addEventListener('playing', () => { record.playing = true; record.started = performance.now(); }, { once: true });
       return original.call(this).catch(error => { record.error = String(error); throw error; });
     };
   }, { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved, setup: { map: 'arabia', seed: 114 } });
@@ -71,7 +77,8 @@ try {
   const step = (n: number) => page.evaluate(n => (window as any).__audioStep(n), n);
   const point = (p: { x: number; y: number }): Promise<{ x: number; y: number }> =>
     page.evaluate(p => (window as any).__audioPoint(p), p);
-  const sounds = () => page.evaluate(() => (window as any).__audioPlays as { url: string; playing: boolean; error?: string }[]);
+  const sounds = () => page.evaluate(() => (window as any).__audioPlays as { url: string; playing: boolean; error?: string;
+    called: number; started?: number; initialVolume: number }[]);
   const clickButton = async (selector: string) => {
     await page.waitForFunction(selector => {
       const button = document.querySelector<HTMLButtonElement>(selector);
@@ -100,6 +107,19 @@ try {
   assert.deepEqual((await query({ type: 'sim' })).selected, [soldier.id]);
   await heard('militia-select');
   await heard('terrain/3923190460');
+  await page.waitForFunction(() => (window as any).__audioPlays.filter((p: any) => p.playing && p.url.includes('/terrain/3923190460-')).length >= 4);
+  const ambient = (await sounds()).filter(p => p.url.includes('/terrain/3923190460-')).slice(0, 4);
+  assert(ambient.every(p => p.initialVolume === 0), 'all four ambient Play actions begin their owned fade at zero');
+  const windFile = audio.audio['terrain/3923190460'].files.find((file: any) => file.mediaId === 11894005).file;
+  await page.waitForFunction(file => (window as any).__audioLive().some((e: any) => e.src.endsWith(file) && e.volume >= 0.179),
+    { timeout: 10000, polling: 50 }, windFile);
+  const fadedWind = await page.evaluate(file => (window as any).__audioLive().find((e: any) => e.src.endsWith(file)), windFile);
+  const windPlay = (await sounds()).find(p => p.url.endsWith(windFile) && p.playing)!;
+  const fadeWallMs = await page.evaluate(() => performance.now()) - windPlay.started!;
+  // HTML currentTime includes the output device's buffering latency. The
+  // action envelope uses the monotonic playback-start clock, as the player does.
+  assert(fadeWallMs >= 2950 && fadeWallMs < 6000,
+    `owned3s fade on playback-start clock: ${JSON.stringify({fadeWallMs,fadedWind})}`);
   let since = (await sounds()).length;
   let p = await point({ x: soldier.position.x - 1, y: soldier.position.y });
   await page.mouse.click(p.x, p.y, { button: 'right' });
@@ -134,6 +154,24 @@ try {
   await heard('house-construction', since);
   await heard('events/1893274449', since);
   console.log('AUDIO BUILD GREEN: real house placement, hammer frame sound and one completion sound');
+
+  // #248: a real training completion must play the horn AND its delayed voice.
+  await query({ type: 'look', entity: barracks.id }); await query({ type: 'select', ids: [barracks.id] });
+  await clickButton('[data-command="train-militia"]');
+  const training = (await query({ type: 'snapshot' })).entities.find((e: any) => e.id === barracks.id).training;
+  assert(training);
+  since = (await sounds()).length;
+  await step(Math.ceil(training.remainingTicks));
+  const cue = audio.audio['militia-train'];
+  assert.equal(cue.layers.length, 2);
+  const layerFiles: string[][] = cue.layers.map((layer: any) => layer.fileIndices.map((i: number) => cue.files[i].file));
+  await page.waitForFunction(({ layerFiles, since }) => layerFiles.every(files => (window as any).__audioPlays.slice(since)
+    .some((p: any) => p.playing && files.some(file => p.url.endsWith(`/${file}`)))), { timeout: 30000 }, { layerFiles, since });
+  const recorded = (await sounds()).slice(since);
+  const starts = layerFiles.map(files => recorded.find(p => p.playing && files.some(file => p.url.endsWith(`/${file}`)))!);
+  const gap = starts[1].called - starts[0].called;
+  assert(gap >= 450 && gap < 1500, `owned500ms voice delay observed as ${gap}ms`);
+  console.log(`AUDIO LAYERS GREEN: four fading ambient actions and real training horn + voice (${gap.toFixed(1)}ms delay)`);
 
   // Decode played files in Chrome and measure actual non-silent PCM, alongside
   // the real HTMLMediaElement playing events above.

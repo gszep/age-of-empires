@@ -20,9 +20,10 @@ off the reference; **measured** — fitted to a reference screenshot;
   entries. Complete PCK streams replace matching embedded prefixes. Repeated
   pack inputs resolve cross-bank references with bank-local ID precedence;
   ambiguous global IDs are excluded from fallback. See `docs/audio-reference.md`.
-- **Existing inferred resolver boundary:** random/sequence container children
+- **Remaining inferred resolver boundary:** random/sequence container children
   are found by matching packed IDs, not a complete versioned Wwise node parser.
-  Flat media lists do not reproduce weights, mix layers, delays or DSP. Music
+  Per-action media pools do not reproduce container weights, continuous loops
+  or bus DSP. Play-action layers/delays/fades/probability are preserved (#248). Music
   HIRC10–13 is inventoried; gameplay music uses its separate HIRC15 decision
   tree rather than this effects-only resolver.
   Decoded WAV identity is verified; reference mixer equivalence is not claimed.
@@ -37,15 +38,19 @@ off the reference; **measured** — fitted to a reference screenshot;
   owned foundation becomes complete. Graphic-wide cues start at frame0; raw
   DAT frame numbers are interpreted on the existing zero-based sprite clock.
   These timings need reference-audio alignment, not just source-field tests.
-- **Chosen playback:** cosmetic per-alias round robin; one acknowledgement
-  voice; at most24 simultaneous HTMLAudio elements; UI/voice gain1, world0.6,
-  ambience0.18. Sounds load lazily after a gesture and release on end/error,
-  restart or hidden tab. World sounds are audible only on screen and in actual
-  visibility (debug reveal does not bypass it). A missed interval emits at most
+- **Chosen playback:** cosmetic per-action round robin; one acknowledgement
+  group; at most24 simultaneous/scheduled HTMLAudio elements; UI/voice gain1, world0.6,
+  ambience0.18. Owned v154 Play-action delay/fade/probability and delay ranges
+  are consumed (#248); chance/range draws are a separate match-seeded cosmetic
+  stream. Sounds load lazily after a gesture and release on end/error,
+  restart or hidden tab. World sounds are raised only from on-screen, actually
+  visible frames (debug reveal does not bypass it). Already-triggered layers
+  may finish after the camera moves. A missed interval emits at most
   one occurrence of each event per entity, not a fast-forward sound backlog.
-- **Chosen ambient integration:** one pool from the visible camera-centre
-  terrain; change/leave/pause stops it, end permits another clip with a minimum
-  two seconds between starts. It is not Wwise's layered/weighted loop graph.
+- **Chosen ambient integration:** one layered event from the visible camera-centre
+  terrain; change/leave/pause stops it, all layers ending permits another invocation
+  with a minimum two seconds between starts. Continuous nested loop/weight
+  semantics are not Wwise's full graph.
   There is no continuous distance attenuation, panning or imported bus DSP yet.
   First sight/reconnect sets a silent baseline; existing corpses do not cry
   again. #243 owns mixing, ambient timing and spatial/reference calibration.

@@ -44,6 +44,7 @@ class Bank:
     objects: Mapping[int, tuple[int, bytes]]
     media: Mapping[int, bytes | Stream]
     pack: str = ""
+    version: int = 0
 
 
 def wwise_id(name: str) -> int:
@@ -109,7 +110,8 @@ def read_bank(name: str, data: bytes) -> Bank:
         if data_offset + size > len(payload):
             raise ValueError(f"{name}: truncated embedded media {media_id}")
         media[media_id] = payload[data_offset:data_offset + size]
-    return Bank(name, objects, media)
+    version = unpack_from('<I', chunks[b'BKHD'])[0] if b'BKHD' in chunks else 0
+    return Bank(name, objects, media, version=version)
 
 
 def read_banks(pack: Path) -> list[Bank]:
@@ -140,7 +142,7 @@ def read_audio_packs(packs: Sequence[Path]) -> list[Bank]:
                 streams[entry.id] = stream
             for entry in index["banks"]:
                 bank = read_bank(str(entry.id), extract(handle, entry))
-                banks.append(Bank(bank.name, bank.objects, bank.media, pack.name))
+                banks.append(Bank(bank.name, bank.objects, bank.media, pack.name, bank.version))
                 for object_id, value in bank.objects.items():
                     if object_id in shared_objects and shared_objects[object_id] != value:
                         ambiguous.add(object_id)
@@ -155,7 +157,7 @@ def read_audio_packs(packs: Sequence[Path]) -> list[Bank]:
     # Sharing them would resolve each cue once for every loaded bank.
     shared_objects = {key: value for key, value in shared_objects.items() if value[0] != 4}
     return [Bank(bank.name, ChainMap(bank.objects, shared_objects),
-                 ChainMap(streams, bank.media, shared_media), bank.pack) for bank in banks]
+                 ChainMap(streams, bank.media, shared_media), bank.pack, bank.version) for bank in banks]
 
 
 def _object_references(payload: bytes, objects: Mapping[int, tuple[int, bytes]]) -> list[int]:
@@ -276,6 +278,77 @@ def resolve_event_id(bank: Bank, event_id: int, switch: str | None = None) -> li
         # Scope byte, action-type byte, then the target HIRC object ID.
         descend(unpack_from("<I", action[1], 2)[0], set())
     return media_ids
+
+
+def play_parameters(payload: bytes) -> dict[str, Any]:
+    """Pinned v154 Play action property bundles; exact walk, no mixer emulation.
+
+    Owned bytes corroborate the v154 property IDs:58 DelayTime (ms),59
+    TransitionTime (ms),60 Probability (%). Ranged values are offsets. The
+    remaining nine bytes are interpolation curve, bank ID and reserved word.
+    """
+    if len(payload) < 18 or payload[1] != 4:
+        raise ValueError('malformed v154 Play action')
+    cursor = 7
+    values: dict[int, int | float] = {}
+    ranges: dict[int, list[int | float]] = {}
+    for destination, width in ((values, 1), (ranges, 2)):
+        if cursor >= len(payload):
+            raise ValueError('truncated Play property count')
+        count = payload[cursor]
+        keys = payload[cursor + 1:cursor + 1 + count]
+        cursor += 1 + count
+        if len(keys) != count or cursor + count * width * 4 > len(payload):
+            raise ValueError('truncated Play property bundle')
+        for key in keys:
+            if key not in (58, 59, 60) or key in destination:
+                raise ValueError(f'unsupported or repeated Play property {key}')
+            fmt = '<' + ('f' if key == 60 else 'i') * width
+            numbers = list(unpack_from(fmt, payload, cursor)); cursor += 4 * width
+            destination[key] = numbers[0] if width == 1 else numbers
+    if cursor + 9 != len(payload):
+        raise ValueError('malformed Play action suffix')
+    curve = payload[cursor]
+    if curve != 4:
+        raise ValueError(f'unsupported Play interpolation curve {curve}')
+    delay = values.get(58, 0)
+    fade = values.get(59, 0)
+    probability = values.get(60, 100)
+    if delay < 0 or fade < 0 or not 0 <= probability <= 100:
+        raise ValueError('invalid Play timing/probability')
+    for low, high in ranges.values():
+        if low > high:
+            raise ValueError('inverted Play randomizer range')
+    return {
+        'delaySeconds': delay / 1000, 'delayRange': [value / 1000 for value in ranges.get(58, [0, 0])],
+        'fadeSeconds': fade / 1000, 'fadeRange': [value / 1000 for value in ranges.get(59, [0, 0])],
+        'probability': probability, 'probabilityRange': ranges.get(60, [0, 0]), 'curve': curve,
+    }
+
+
+def resolve_event_layers(bank: Bank, event_id: int, switch: str | None = None) -> list[dict[str, Any]]:
+    event_id &= 0xffffffff
+    event = bank.objects.get(event_id)
+    if not event or event[0] != 4:
+        return []
+    if bank.version != 154:
+        raise ValueError(f'{bank.name}: unsupported Play-action bank version {bank.version}')
+    payload = event[1]
+    if not payload or len(payload) != 1 + payload[0] * 4:
+        raise ValueError('malformed event action list')
+    layers = []
+    for index in range(payload[0]):
+        action_id = unpack_from('<I', payload, 1 + index * 4)[0]
+        action = bank.objects.get(action_id)
+        if not action or action[0] != 3 or len(action[1]) < 6 or action[1][1] != 4:
+            continue
+        # Reuse the existing scoped effects resolver for this one root only.
+        one = Bank(bank.name, ChainMap({event_id: (4, bytes([1]) + action_id.to_bytes(4, 'little'))}, bank.objects),
+                   bank.media, bank.pack, bank.version)
+        media = resolve_event_id(one, event_id, switch)
+        if media:
+            layers.append({'actionId': action_id, 'media': media, **play_parameters(action[1])})
+    return layers
 
 
 def dialogue_leaves(payload: bytes) -> dict[int, int]:
@@ -412,12 +485,15 @@ def import_audio(
         temp = Path(temporary)
         for cue in cues:
             alias, event_name = cue["alias"], cue["event"]
-            matches = [(bank, cue['mediaId']) for bank in banks if int(bank.name) == cue['bankId']] if 'mediaId' in cue else [
-                (bank, media_id) for bank in banks
-                for media_id in resolve_event_id(bank, cue["id"], cue["switch"])
-            ]
+            layers = [] if 'mediaId' in cue else [(bank, layer) for bank in banks
+                for layer in resolve_event_layers(bank, cue['id'], cue['switch'])]
+            matches = [(bank, cue['mediaId']) for bank in banks if int(bank.name) == cue['bankId']] if 'mediaId' in cue else []
+            for bank, layer in layers:
+                for media_id in layer['media']:
+                    if not any(b.name == bank.name and mid == media_id for b, mid in matches):
+                        matches.append((bank, media_id))
             if not matches:
-                raise ValueError(f"Wwise event {event_name!r} did not resolve to embedded media")
+                raise ValueError(f"Wwise event {event_name!r} did not resolve to complete media")
             files = []
             for index, (bank, media_id) in enumerate(matches):
                 source = bank.media[media_id]
@@ -444,6 +520,12 @@ def import_audio(
                 })
                 source_hashes[str(media_id)] = sha256(media)
             imported[alias] = {"event": event_name, "files": files}
+            if layers:
+                indices = {(bank.name, media_id): index for index, (bank, media_id) in enumerate(matches)}
+                imported[alias]['layers'] = [
+                    {**{key: value for key, value in layer.items() if key != 'media'},
+                     'fileIndices': [indices[(bank.name, media_id)] for media_id in layer['media']]}
+                    for bank, layer in layers]
 
     version_result = subprocess.run([executable, "-V"], capture_output=True, text=True)
     try:
@@ -454,6 +536,7 @@ def import_audio(
         "audio": imported,
         "source": {
             "packs": sorted({pack.name for pack in packs}),
+            "bankVersions": {bank.name: bank.version for bank in banks},
             "mediaSha256": source_hashes,
             "decoder": {"name": "vgmstream-cli", "version": decoder_version},
         },

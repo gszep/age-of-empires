@@ -127,3 +127,50 @@ retaining one live soundtrack source. The first probe attempt hit CDP's default
 RPC lifetime before a song finished; the maintained probe now receives short
 per-track binding notifications instead of holding one two-hour RPC. Game and
 fixture timing limits were not widened to hide a playback failure.
+
+## Play-action layering and timing (#248)
+
+All five owned banks declare BKHD version154. Of150 distinct consumed events,
+119 have one playable action,23 have two, four have three and four have four:
+193 Play actions in total. Flattening them into one variation pool discarded
+simultaneous/offset layers. Reproduce their independent roots and parameters:
+
+```sh
+uv run --locked python tools/audio_inventory.py --event 1091801433 --event 542552093 --event 3923190460
+```
+
+- Militia training1091801433: immediate horn603334752, plus a separate voice
+  pool delayed500ms. They are not alternative variants of the same sound.
+- Militia attack542552093: two separate pools, the second delayed100ms.
+- Grass3923190460: four independent pools, each with3000ms fade-in.
+- The consumed Play actions use only properties58 (DelayTime, integer ms),
+  59 (TransitionTime, integer ms) and60 (Probability, float percent). Four
+  actions also carry signed delay-randomizer offsets. All193 use curve4,
+  linear. The two property bundles and nine-byte suffix are walked exactly;
+  unsupported versions/properties/curves fail explicitly.
+
+Property semantics are corroborated by the Wwise editor observations in
+[wwiser's notes](https://github.com/bnnm/wwiser/blob/master/doc/EDITOR.md#eventsactionsetc)
+and the factual v154 enum mapping in
+[`wdefs.py`71654ed](https://github.com/bnnm/wwiser/blob/71654ed1a2c4642894bd7e7ed79eba66986fb770/wwiser/parser/wdefs.py).
+The repository's parser walks the owned bytes independently; no external parser
+implementation is incorporated.
+
+The manifest retains file indices per action plus delay/range, fade/range and
+probability. The browser chooses one variation per action, schedules each layer,
+and applies the linear fade after playback starts. Delayed layers count toward
+the24-source cap. New acknowledgements, reset and hidden-tab cleanup cancel
+pending playback/fades too. Cosmetic probability/range sampling derives from
+the match seed without consuming simulation randomness.
+
+Container random weights, continuous-loop graphs, bus DSP and spatial balance
+remain #243. In particular, the ambient event is still a bounded repeated
+invocation rather than Wwise's continuously running nested containers.
+
+The browser acceptance observes all four grass layers starting at zero gain and
+the long wind layer reaching its configured gain after the3-second envelope.
+A real militia train-button completion plays both pools with a measured500.8ms
+delay between Play calls. Fade measurement uses the monotonic playback-start
+clock: Chrome's media playhead lagged it by about230ms in one probe, so comparing
+those two clocks directly was an invalid assertion. Unit tests cover the linear
+ramp, cancellation, probability and independent simulation randomness.

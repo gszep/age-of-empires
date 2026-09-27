@@ -113,6 +113,10 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
     streams are reported in `music.unavailable`, never replaced by DIDX prefixes.
     The27 available tracks add about1.28GB of WAV, streamed one at a time by the
     browser. Direct test imports omit music unless explicitly requested.
+    Consumed v154 Play actions retain separate media pools and their original
+    delay/ranges, transition/fade time and probability (#248); `audio_inventory.py
+    --event <id>` reports those layers. Container weights/loops and bus DSP remain
+    a separate fidelity boundary, documented in `docs/audio-reference.md`.
 
 `npm run test:import` runs the integration suite (`test_import_aoe2.py`) against
 the owned fixture, including determinism checks.
