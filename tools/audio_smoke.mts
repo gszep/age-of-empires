@@ -72,6 +72,17 @@ try {
   const point = (p: { x: number; y: number }): Promise<{ x: number; y: number }> =>
     page.evaluate(p => (window as any).__audioPoint(p), p);
   const sounds = () => page.evaluate(() => (window as any).__audioPlays as { url: string; playing: boolean; error?: string }[]);
+  const clickButton = async (selector: string) => {
+    await page.waitForFunction(selector => {
+      const button = document.querySelector<HTMLButtonElement>(selector);
+      return button && !button.disabled && button.getBoundingClientRect().width > 0;
+    }, {}, selector);
+    const p = await page.evaluate(selector => {
+      const r = document.querySelector(selector)!.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    }, selector);
+    await page.mouse.click(p.x, p.y);
+  };
   const heard = async (alias: string, since = 0) => {
     const files = Object.entries(audio.audio).filter(([key]) => key === alias || key.endsWith(`/${alias}`))
       .flatMap(([, value]: [string, any]) => value.files.map((file: any) => file.file));
@@ -106,10 +117,8 @@ try {
   drawn = (await query({ type: 'entities', id: worker.id })).entities[0];
   await page.mouse.click(drawn.screen.x, drawn.screen.y);
   assert.deepEqual((await query({ type: 'sim' })).selected, [worker.id]);
-  await page.waitForSelector('[data-command="page-economic"]');
-  await page.click('[data-command="page-economic"]');
-  await page.waitForSelector('[data-command="build-house"]');
-  await page.click('[data-command="build-house"]');
+  await clickButton('[data-command="page-economic"]');
+  await clickButton('[data-command="build-house"]');
   p = await point({ x: worker.position.x + 1, y: worker.position.y - 3 });
   await page.mouse.click(p.x, p.y);
   let snapshot = await query({ type: 'snapshot' });

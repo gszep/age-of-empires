@@ -34,6 +34,7 @@ import { createScatter, fillScatter } from './view/scatter';
 import { createCueWatcher, pollCues } from './view/cues';
 import { ConstructionCues } from './view/construction-cues';
 import { AudioPlayer } from './view/audio';
+import { MusicPlayer } from './view/music';
 import { WorldSounds, type SoundPose } from './view/world-sounds';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 
@@ -340,10 +341,14 @@ let ghostView: EntityView | undefined;
 let pointerWorld: Point = { x: 16, y: 9 };
 
 const audioPlayer = new AudioPlayer(() => audioAssets);
-addEventListener('pointerdown', () => audioPlayer.unlock(), { capture: true });
-addEventListener('keydown', () => audioPlayer.unlock(), { capture: true });
-addEventListener('pagehide', () => audioPlayer.stop());
-document.addEventListener('visibilitychange', () => { if (document.hidden) audioPlayer.stop(); });
+const musicPlayer = new MusicPlayer(() => audioAssets);
+const unlockAudio = (): void => { audioPlayer.unlock(); musicPlayer.unlock(); };
+addEventListener('pointerdown', unlockAudio, { capture: true });
+addEventListener('keydown', unlockAudio, { capture: true });
+addEventListener('pagehide', () => { audioPlayer.stop(); musicPlayer.reset(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { audioPlayer.stop(); musicPlayer.update(false); }
+});
 function playSound(alias: string): void {
   audioPlayer.play(alias);
 }
@@ -565,6 +570,7 @@ function resetMatchView(): void {
   constructionCues = new ConstructionCues();
   worldSounds = new WorldSounds();
   audioPlayer.reset();
+  musicPlayer.reset();
   rebuildPresentation();
 }
 
@@ -1609,6 +1615,7 @@ function entityVisible(entity: Entity): boolean {
 }
 
 function syncScene(time: number): void {
+  musicPlayer.update(!paused && !matchOver(game) && !document.hidden);
   const wanted = new Set<string>();
   const soundPoses = new Map<number, SoundPose>();
   for (const entity of game.entities) {

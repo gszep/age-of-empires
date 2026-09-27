@@ -4,7 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from import_audio import Stream, read_audio_packs, read_bank, resolve_event_id
+from import_audio import Bank, Stream, dialogue_leaves, music_catalogue, read_audio_packs, read_bank, resolve_event_id, wwise_id
+from wwise_pck import PackedFile
 
 
 def chunk(tag, payload):
@@ -45,6 +46,31 @@ def pack(path, banks=(), streams=()):
 
 
 class AudioPackTest(unittest.TestCase):
+    def test_music_dialogue_orders_named_states_and_excludes_missing_stream_prefixes(self):
+        event = wwise_id('Ingame_Music')
+        leaves = [(wwise_id('MUSIC02'), 200), (wwise_id('MUSIC01'), 100), (wwise_id('MUSIC03'), 300)]
+        tree = struct.pack('<IHHHH', 0, 1, len(leaves), 50, 100)
+        tree += b''.join(struct.pack('<IIHH', key, sound, 50, 100) for key, sound in leaves)
+        payload = b'\x64' + struct.pack('<II', 1, event) + b'\0' + struct.pack('<I', len(tree)) + b'\0' + tree + b'\0\0'
+        self.assertEqual(dialogue_leaves(payload), dict(leaves))
+        objects = {event: (15, payload)}
+        for sound in (100, 200, 300):
+            objects[sound] = (2, struct.pack('<IBI', 0x140001, 1, sound + 1))
+        media = {101: Stream(Path('Base.pck'), PackedFile(101, 0, 10, 0)),
+                 201: Stream(Path('Base.1.pck'), PackedFile(201, 0, 10, 0)), 301: b'prefix'}
+        catalogue = music_catalogue([Bank('1', objects, media)])
+        self.assertEqual([row['name'] for row in catalogue['tracks']], ['MUSIC01', 'MUSIC02'])
+        self.assertEqual(catalogue['unavailable'][0]['name'], 'MUSIC03')
+        self.assertIn('prefetch', catalogue['unavailable'][0]['reason'])
+        with self.assertRaisesRegex(ValueError, 'malformed'):
+            dialogue_leaves(payload[:-1])
+
+    def test_missing_stream_is_never_mistaken_for_its_embedded_prefix(self):
+        objects = {1: (4, b'\x01' + struct.pack('<I', 2)),
+                   2: (3, b'\x03\x04' + struct.pack('<I', 3)),
+                   3: (2, struct.pack('<IBI', 0x140001, 1, 4))}
+        self.assertEqual(resolve_event_id(Bank('1', objects, {4: b'prefix'}), 1), [])
+
     def test_cross_bank_play_reaches_full_stream_in_second_pack(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

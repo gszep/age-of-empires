@@ -23,7 +23,8 @@ off the reference; **measured** — fitted to a reference screenshot;
 - **Existing inferred resolver boundary:** random/sequence container children
   are found by matching packed IDs, not a complete versioned Wwise node parser.
   Flat media lists do not reproduce weights, mix layers, delays or DSP. Music
-  HIRC10–13 is now inventoried but remains outside this effects-only resolver.
+  HIRC10–13 is inventoried; gameplay music uses its separate HIRC15 decision
+  tree rather than this effects-only resolver.
   Decoded WAV identity is verified; reference mixer equivalence is not claimed.
 
 ## World audio playback (#114, calibration #243)
@@ -48,6 +49,20 @@ off the reference; **measured** — fitted to a reference screenshot;
   There is no continuous distance attenuation, panning or imported bus DSP yet.
   First sight/reconnect sets a silent baseline; existing corpses do not cry
   again. #243 owns mixing, ambient timing and spatial/reference calibration.
+
+## In-game soundtrack (#115)
+
+- **Owned:** `Ingame_Music` HIRC15 and its MUSIC01–30 state hashes, source
+  objects and complete media.27 streams are available across the shared packs;
+  three have only prefetches and are explicitly excluded/tracked as #244.
+  Source resolution fails closed on unexpected dialogue-tree layouts.
+- **Chosen/inferred playlist:** ascending numbered states, repeat after the
+  last available track, no civilisation intro/theme or chapter transitions.
+  The localization's Classic description motivates that scope, but exact
+  ordering is not asserted from the engine. Default gain0.35, pause with the
+  match/hidden tab, restart at track one; one native media element at a time.
+  Browser WAV playback preserves decoded PCM; Wwise bus DSP and music-mode
+  selection remain outside this consumer (mixing #243, options #141).
 
 ## Civilisation roster / selection foundation (#122)
 

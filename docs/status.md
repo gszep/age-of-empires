@@ -366,8 +366,14 @@ owned decode/determinism tests cover that boundary; `docs/audio-reference.md`
 records their source fields. `tools/audio_smoke.mts` exercises actual select,
 move, attack and house-placement gestures, observes browser media playing,
 measures non-silent decoded PCM and rejects hidden/offscreen audio leakage.
-Exact Wwise mixing, spatial balance and ambient scheduling remain #243; music
-playback remains #115.
+Exact Wwise mixing, spatial balance and ambient scheduling remain #243.
+In-game music (#115) resolves the owned `Ingame_Music` dialogue tree and plays
+27 complete numbered tracks (111 minutes) with one lazy native audio element,
+pause/foreground resume and restart cleanup. Three missing full streams are
+explicitly excluded (#244). `tools/music_smoke.mts` exercises all27 tracks,
+native end/wrap events and missing-audio fallback; the optional natural-cycle
+mode passed all27 natural endings and wrap on2026-09-27. Exact DE theme/chapter/playlist modes
+remain outside the numbered-playlist consumer.
 
 Minimap buildings use compact, equal-sized live and fog-memory markers (#84),
 with farms hidden according to the DAT's `minimap_mode`.

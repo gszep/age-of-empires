@@ -2020,6 +2020,24 @@ class AudioImportIntegrationTest(unittest.TestCase):
             self.assertEqual((root / 'first' / cue['file']).read_bytes(),
                              (root / 'second' / cue['file']).read_bytes())
 
+    def test_owned_ingame_music_tree_publishes_complete_numbered_tracks(self):
+        from import_audio import music_catalogue
+        catalogue = music_catalogue(self.banks)
+        self.assertEqual(catalogue['event'], 'Ingame_Music')
+        names = [row['name'] for row in catalogue['tracks']]
+        self.assertEqual(names, sorted(names))
+        self.assertIn('MUSIC01', names)
+        self.assertEqual([row['name'] for row in catalogue['unavailable']], ['MUSIC17', 'MUSIC27', 'MUSIC30'])
+        published = json.loads(Path('public/imported/aoe2/audio/manifest.json').read_text())
+        self.assertEqual(published['music']['tracks'], catalogue['tracks'])
+        self.assertEqual(published['music']['unavailable'], catalogue['unavailable'])
+        self.assertEqual(published['music']['playlist'], [f'music/{name}' for name in names])
+        for alias in published['music']['playlist']:
+            files = published['audio'][alias]['files']
+            self.assertEqual(len(files), 1)
+            self.assertEqual(files[0]['storage'], 'stream')
+            self.assertGreater(files[0]['seconds'], 60)
+
     def test_widget_event_resolves_through_hirc_to_owned_media(self):
         matches = [
             (int(bank.name), media_id)

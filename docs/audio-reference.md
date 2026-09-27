@@ -50,10 +50,9 @@ out of memory until a consumed cue needs it.
   when the visible live entity transitions; snapshots establish a baseline.
 - Bank1638387902 contains119 music tracks (HIRC11),121 music segments (10),
   nine music random/sequence containers (13), one music switch container (12),
-  plus events/actions. Music is present in owned metadata. `sounds.json` names
-  no gameplay music event; resolve the music graph for #115 rather than
-  selecting arbitrary streams. Music object traversal is not implemented by
-  the effects-only resolver yet.
+  plus events/actions. These include frontend/lobby/history music, and must
+  not all be treated as the in-game playlist. See the named gameplay dialogue
+  tree below (#115).
 
 ### Verification boundary
 
@@ -72,3 +71,59 @@ decodes played owned WAVs in Chrome and measures nonzero PCM. Looking away
 silences combat and unseen terrain; watcher tests cover reveal/reconnect,
 direction changes, paused frames and bounded missed intervals. This does not
 claim a microphone comparison against a running DE mixer.
+
+## Gameplay music (#115)
+
+```sh
+uv run --locked python tools/audio_inventory.py --music
+```
+
+The bank's HIRC15 `Ingame_Music` hashes to2613926250. Its one-argument dialogue
+tree has31 leaf states: `MUSIC01` through `MUSIC30`, plus one non-media plug-in
+control. Each numbered state maps to a sound object, which names a streamed
+medium. The parser verifies the depth, argument, exact tree byte count, root
+child span, leaf weights/probabilities and trailing empty property bundles.
+The two-digit names are corroborated by their hashes in all30 leaves; the
+numeric ordering is the local playlist policy, not a claim to implement the
+closed engine's dynamic/chapter choices.
+
+This is distinct from `Play_Music_Switch`1228139402 → music switch24633563.
+Its state labels include `frontend`, `lobby`, `credits`, `history`, `win` and
+`lose`; the long19-segment container270503669 belongs to `lobby`. Extracting
+that attractive-looking container as gameplay music would have been wrong.
+`sounds.json` does not name gameplay music. `widgetui/history.json` names
+history stingers; `screenoptions.json` defines Soundtrack Playlist/Music Volume.
+Localization98846 describes Standard, Classic, Reverse, Dynamic, Immersive and
+Shuffle; Classic is the soundtrack without the civilisation theme. The current
+consumer plays the available numbered soundtrack without themes.
+
+### Missing complete streams (#244)
+
+| State | Sound object | Media ID | Embedded prefix bytes |
+| --- | ---: | ---: | ---: |
+| MUSIC17 |174633414|730136042|25016|
+| MUSIC27 |585835830|438278983|25206|
+| MUSIC30 |662278358|1057400168|26922|
+
+All three sources declare stream type1, but neither installed shared pack's
+stream index contains their media IDs. Both external-stream tables are empty.
+The optional English813787 depot is not installed; the installed root contains
+813781/813782/813783/813784/1039811. The decoder can accept these prefixes as
+millisecond-long audio, so successful decoding alone is insufficient. The
+importer excludes them in explicit `music.unavailable` records and never
+substitutes unrelated music. #244 tracks source recovery/availability.
+
+The remaining27 complete tracks decode to6676.378775 seconds and1281865912
+bytes of deterministic WAV (about1.28GB). Only the current track is loaded in
+the browser; native ended events advance and wrap the playlist. Gesture unlock,
+pause/resume and hidden/foreground preserve the current playhead; restart
+releases it. Media failures are bounded, and absent owned audio stays silent.
+`tools/music_smoke.mts` loads/plays every actual track and uses native seeking
+and ended events to traverse the playlist, checking one live source, expected
+durations and lifecycle controls. `MUSIC_SOAK=1` additionally waits for one
+natural full playlist; it freezes scene redraws during that audio-only interval.
+The 2026-09-27 run passed all27 natural endings and wrapped at13:10BST,
+retaining one live soundtrack source. The first probe attempt hit CDP's default
+RPC lifetime before a song finished; the maintained probe now receives short
+per-track binding notifications instead of holding one two-hour RPC. Game and
+fixture timing limits were not widened to hide a playback failure.

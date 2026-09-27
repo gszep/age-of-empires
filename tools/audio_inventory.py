@@ -8,11 +8,11 @@ import json
 from pathlib import Path
 
 from depot import depot_root
-from import_audio import Stream, read_audio_packs, resolve_event_id
+from import_audio import Stream, music_catalogue, read_audio_packs, resolve_event_id
 from wwise_pck import read_index
 
 
-def inventory(packs: list[Path], events: list[int], switch: str) -> dict:
+def inventory(packs: list[Path], events: list[int], switch: str, music: bool = False) -> dict:
     sources = []
     for pack in sorted(packs):
         with pack.open('rb') as handle:
@@ -20,7 +20,7 @@ def inventory(packs: list[Path], events: list[int], switch: str) -> dict:
         sources.append({'pack': pack.name, 'bytes': pack.stat().st_size,
                         'banks': len(index['banks']), 'streams': len(index['streams'])})
     banks = read_audio_packs(packs)
-    return {
+    result = {
         'packs': sources,
         'banks': [{'id': int(bank.name), 'pack': bank.pack,
                    'localObjectTypes': dict(sorted(Counter(
@@ -32,6 +32,9 @@ def inventory(packs: list[Path], events: list[int], switch: str) -> dict:
              'storage': 'stream' if isinstance(bank.media[media], Stream) else 'embedded'}
             for bank in banks for media in resolve_event_id(bank, event, switch)] for event in events},
     }
+    if music:
+        result['music'] = music_catalogue(banks)
+    return result
 
 
 if __name__ == '__main__':
@@ -39,7 +42,8 @@ if __name__ == '__main__':
     parser.add_argument('--pack', type=Path, action='append')
     parser.add_argument('--event', type=int, action='append', default=[])
     parser.add_argument('--switch', default='Britons')
+    parser.add_argument('--music', action='store_true')
     args = parser.parse_args()
     packs = args.pack or [depot_root() / 'depot_813783/wwise' / name
                           for name in ('Base.pck', 'Base.1.pck')]
-    print(json.dumps(inventory(packs, args.event, args.switch), indent=2, sort_keys=True))
+    print(json.dumps(inventory(packs, args.event, args.switch, args.music), indent=2, sort_keys=True))

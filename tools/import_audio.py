@@ -252,6 +252,8 @@ def resolve_event_id(bank: Bank, event_id: int, switch: str | None = None) -> li
         object_type, object_payload = item
         if object_type == 2 and len(object_payload) >= 9:
             media_id = unpack_from("<I", object_payload, 5)[0]
+            if object_payload[4] in (1, 2) and not isinstance(bank.media.get(media_id), Stream):
+                return  # a streamed source's DIDX prefix is not a playable file
             if media_id in bank.media and media_id not in media_ids:
                 media_ids.append(media_id)
             return
@@ -274,6 +276,75 @@ def resolve_event_id(bank: Bank, event_id: int, switch: str | None = None) -> li
         # Scope byte, action-type byte, then the target HIRC object ID.
         descend(unpack_from("<I", action[1], 2)[0], set())
     return media_ids
+
+
+def dialogue_leaves(payload: bytes) -> dict[int, int]:
+    """The pinned one-argument HIRC15 decision tree, with an exact node walk.
+
+    Probability byte; depth u32; argument ID u32/type u8; tree byte size u32;
+    mode u8; 12-byte nodes (key, child span or audio ID, weight, probability).
+    The two trailing empty property-bundle counts are retained as a guard.
+    This deliberately rejects other Wwise versions/depths instead of guessing.
+    """
+    if len(payload) < 29 or payload[0] != 100 or unpack_from('<I', payload, 1)[0] != 1:
+        raise ValueError('unsupported music dialogue depth/probability')
+    size = unpack_from('<I', payload, 10)[0]
+    if payload[9] != 0 or payload[14] != 0 or size % 12 or len(payload) != 15 + size + 2 or payload[-2:] != b'\0\0':
+        raise ValueError('malformed music dialogue tree')
+    root, first, count, weight, probability = unpack_from('<I4H', payload, 15)
+    if root != 0 or first != 1 or (count + 1) * 12 != size or (weight, probability) != (50, 100):
+        raise ValueError('unsupported music dialogue root')
+    leaves = {}
+    for index in range(count):
+        key, target, weight, probability = unpack_from('<IIHH', payload, 27 + index * 12)
+        if key in leaves or (weight, probability) != (50, 100):
+            raise ValueError('ambiguous music dialogue leaf')
+        leaves[key] = target
+    return leaves
+
+
+def music_catalogue(banks: Sequence[Bank]) -> dict[str, Any]:
+    """Resolve the owned Ingame_Music/MUSIC01.. tree, not a lobby playlist."""
+    event_id = wwise_id('Ingame_Music')
+    matches = []
+    for bank in banks:
+        local = bank.objects.maps[0] if isinstance(bank.objects, ChainMap) else bank.objects
+        if local.get(event_id, (None,))[0] == 15:
+            matches.append(bank)
+    if len(matches) != 1:
+        raise ValueError('expected one owned Ingame_Music dialogue event')
+    bank = matches[0]
+    payload = bank.objects[event_id][1]
+    if unpack_from('<I', payload, 5)[0] != event_id:
+        raise ValueError('unexpected Ingame_Music argument')
+    leaves = dialogue_leaves(payload)
+    named = {wwise_id(f'MUSIC{index:02}'): (index, f'MUSIC{index:02}') for index in range(1, 100)}
+    tracks, unavailable, controls = [], [], []
+    for state_id, sound_id in leaves.items():
+        sound = bank.objects.get(sound_id)
+        if sound is None or sound[0] != 2 or len(sound[1]) < 9:
+            raise ValueError(f'music state {state_id}: missing sound object')
+        plugin = unpack_from('<I', sound[1])[0]
+        if state_id not in named:
+            if plugin != 0x80001:
+                raise ValueError(f'unrecognized media-bearing music state {state_id}')
+            controls.append({'stateId': state_id, 'soundId': sound_id, 'pluginId': plugin})
+            continue
+        index, name = named[state_id]
+        media_id = unpack_from('<I', sound[1], 5)[0]
+        track = {'index': index, 'name': name, 'stateId': state_id,
+                 'soundId': sound_id, 'mediaId': media_id, 'bankId': int(bank.name)}
+        if sound[1][4] in (1, 2) and not isinstance(bank.media.get(media_id), Stream):
+            unavailable.append({**track, 'reason': 'stream absent; DIDX prefetch is incomplete'})
+        elif media_id not in bank.media:
+            unavailable.append({**track, 'reason': 'media absent'})
+        else:
+            tracks.append(track)
+    if not tracks:
+        raise ValueError('no complete owned in-game music tracks')
+    return {'event': 'Ingame_Music', 'eventId': event_id,
+            'tracks': sorted(tracks, key=lambda row: row['index']),
+            'unavailable': sorted(unavailable, key=lambda row: row['index']), 'controls': controls}
 
 
 def sha256(data: bytes) -> str:
@@ -318,7 +389,7 @@ def consumed_cues(ui_manifest: Path, content: Path | None) -> list[dict[str, Any
 
 def import_audio(
     pack: Path | Sequence[Path], ui_manifest: Path, out: Path, decoder: str = "vgmstream-cli",
-    content: Path | None = None,
+    content: Path | None = None, music: bool = False,
 ) -> dict[str, Any]:
     executable = shutil.which(decoder)
     if not executable:
@@ -326,6 +397,11 @@ def import_audio(
     cues = consumed_cues(ui_manifest, content)
     packs = [pack] if isinstance(pack, Path) else list(pack)
     banks = read_audio_packs(packs)
+    catalogue = music_catalogue(banks) if music else None
+    if catalogue:
+        for track in catalogue['tracks']:
+            cues.append({'alias': f"music/{track['name']}", 'event': track['name'],
+                         'bankId': track['bankId'], 'mediaId': track['mediaId']})
     out.mkdir(parents=True, exist_ok=True)
     for old in out.glob("*.wav"):
         old.unlink()
@@ -336,7 +412,7 @@ def import_audio(
         temp = Path(temporary)
         for cue in cues:
             alias, event_name = cue["alias"], cue["event"]
-            matches = [
+            matches = [(bank, cue['mediaId']) for bank in banks if int(bank.name) == cue['bankId']] if 'mediaId' in cue else [
                 (bank, media_id) for bank in banks
                 for media_id in resolve_event_id(bank, cue["id"], cue["switch"])
             ]
@@ -382,6 +458,8 @@ def import_audio(
             "decoder": {"name": "vgmstream-cli", "version": decoder_version},
         },
     }
+    if catalogue:
+        manifest['music'] = {**catalogue, 'playlist': [f"music/{track['name']}" for track in catalogue['tracks']]}
     (out / "manifest.json").write_text(json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n")
     return manifest
 
@@ -393,8 +471,9 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=Path("public/imported/aoe2/audio"))
     parser.add_argument("--decoder", default="vgmstream-cli")
     parser.add_argument("--content", type=Path, default=Path(".local/aoe2de/content.json"))
+    parser.add_argument("--music", action="store_true", help="include complete available in-game music streams")
     args = parser.parse_args()
-    import_audio(args.pack, args.ui_manifest, args.out, args.decoder, args.content)
+    import_audio(args.pack, args.ui_manifest, args.out, args.decoder, args.content, args.music)
     print(args.out / "manifest.json")
 
 

@@ -108,6 +108,11 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
     The full pipeline requires both `Base.pck` and `Base.1.pck` when the shared
     audio depot is present. `audio_inventory.py` audits banks/streams and numeric
     `--event` IDs without publishing assets; see `docs/audio-reference.md`.
+    `--music` audits the `Ingame_Music` dialogue tree too. The full pipeline
+    passes `import_audio.py --music` to decode complete numbered tracks; missing
+    streams are reported in `music.unavailable`, never replaced by DIDX prefixes.
+    The27 available tracks add about1.28GB of WAV, streamed one at a time by the
+    browser. Direct test imports omit music unless explicitly requested.
 
 `npm run test:import` runs the integration suite (`test_import_aoe2.py`) against
 the owned fixture, including determinism checks.

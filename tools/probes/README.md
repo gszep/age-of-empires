@@ -19,6 +19,11 @@ browser smoke and are maintained regression tools.
   completion and terrain ambience. Chrome decodes played WAVs and measures
   non-silent PCM; looking away suppresses offscreen combat and unseen terrain.
   Mixer/reference calibration is separately tracked as #243.
+- **`music_smoke.mts`** — #115's27 real owned soundtrack tracks, native seek/end
+  transitions and wrap, one live source, gesture unlock, pause/resume,
+  hidden/foreground, restart and absent-audio fallback. `MUSIC_SOAK=1` also
+  waits for a natural complete111-minute playlist with scene redraws frozen;
+  the real audio player and native end callbacks continue throughout.
 
 - **`regicide_smoke.mts`** — real mode checkbox/Start Game, King sprite/colour/
   voice request, reload/restart and return to random map; two actual400-gold

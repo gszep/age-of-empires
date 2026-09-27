@@ -320,6 +320,7 @@ export interface UiAssets {
 export interface NativeSlices { images: string[]; columns: number[]; rows: number[] }
 
 export interface AudioAssets {
+  music?: { playlist: string[] };
   base: string;
   audio: Record<string, { event: string; files: { file: string; mediaId: number; seconds: number }[] }>;
 }
