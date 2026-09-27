@@ -31,6 +31,11 @@ browser smoke and are maintained regression tools.
   Also runs with `OPEN_FALLBACK=1`. `map_menu_smoke.mts` additionally verifies
   that saved local speed never overwrites shared authority on join/reload,
   while an explicit options Apply reaches both private clients.
+- **`ai_fishing_smoke.mts`** — #91's actual player2 example AI from an untouched
+  Islands seed2 opening, using normal speed keys and the normal simulation/AI
+  loop. A read-only observer records paid dock completion, ship creation and
+  real fish deposits; only afterwards does F4 reveal the dock/ship for rendering
+  and selection checks. Also runs with `OPEN_FALLBACK=1`.
 
 - **`regicide_smoke.mts`** — real mode checkbox/Start Game, King sprite/colour/
   voice request, reload/restart and return to random map; two actual400-gold

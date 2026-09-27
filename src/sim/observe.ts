@@ -10,6 +10,7 @@ import { rulesForPlayer } from './civilizations';
 import { fireChargeOf } from './fire-charge';
 import type { ObservedEntity, PlayerObservation, RememberedEntityObservation } from '../protocol/types';
 import { PROTOCOL_VERSION } from '../protocol/types';
+import { observedTerrain } from '../protocol/terrain';
 
 function observeEntity(state: GameState, entity: Entity, player: PlayerId): ObservedEntity {
   const observed: ObservedEntity = {
@@ -113,6 +114,7 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
     entities,
     memory,
     explored,
+    terrain: observedTerrain(state, player),
   };
   if (state.winner) observation.winner = state.winner;
   if (state.draw) observation.draw = true;

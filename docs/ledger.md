@@ -100,6 +100,26 @@ off the reference; **measured** — fitted to a reference screenshot;
   use their existing original.pal blocks; the separately inspected256-entry
   colour-blind sprite LUTs require their actual shader addressing (#246).
 
+## Example fishing policy and explored-map input (#91)
+
+- **Owned policy evidence:** Promisory watercontrol uses a14-tile deep-fish
+  allowance and25-tile dock-centred search; units/buildings have conditional
+  fishing goals and4/8/12-boat limits. Dock150 wood/radius1.5/row6/hill3 and
+  ship75 wood/40s/row13 are the current DAT baseline. See the bounded eight-file
+  reading in `docs/ai-fishing.md`; the scripts themselves are not copied.
+- **Chosen adapter:** a fixed four-boat cap, baseline price reservations,
+  housing/wood-economy precedence, restaffing paid dock foundations, rotating
+  eight nearby coast candidates every three game seconds, coarse obstacle
+  spacing and known-land/water component checks. One idle boat explores known
+  water frontiers; current gather/bank orders are not repeatedly replaced.
+  This is example-strategy policy, not DE's full buildability/search runtime.
+- **Protocol choice:** observation v8 carries run-length encoded explored
+  terrain/elevation as `[length,id,height]`, with−1 for unknown. Static ground
+  is public once explored; no hidden tile or neighbour changes the output.
+  The strategy never receives privileged GameState or queries placementLegal.
+  Command acceptance remains authoritative. Simulation/record/shared-wire
+  formats are unchanged by this observation/strategy addition.
+
 ## Civilisation roster / selection foundation (#122)
 
 - **Owned:** identity, era, HUD family, display/computer names and emblems come
@@ -455,7 +475,7 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Black Forest clearing quota | 44% of actual map area shared across players, not a fixed1580/player | **Owned** `Black_Forest.rms` 288–296: land_percent44, circular base14, clumping2, avoidance6. At120×120 this is3168/player before cleaning. Existing mirrored growth/road adapter remains inferred. The old half-size quota made source24-tile relic constraints infeasible | `mapgen.ts`, `refdata/relic-placement.json` | #130 |
 | The AI never orders a villager onto a boar | rule | chosen (deliberate) | `ai.ts` | — |
 | AI tuning constants | `ARMY_BEFORE_AGE`, `FARM_SPOTS`, camp costs… | chosen; strategy, not fidelity | `ai.ts` | #124 |
-| The wonder wins nothing | rule | decision pending | `game.ts` | #110 |
+| The wonder wins nothing | current staged placeholder | human approved cosmetic first, then a reference countdown after settings; settings now exist, but exact map-size defaults/query-clock conversion remain unverified after the DAT task120/manual/strings/AI read recorded on #110 | `game.ts` | #110 |
 | The 2026-08-28 genie-rms read | algorithm understanding only; code written fresh | GPL source read, recorded under #112 | `mapgen.ts` | #142 |
 
 ## View

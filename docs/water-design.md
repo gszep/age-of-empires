@@ -161,5 +161,7 @@ ice remain outside this design note; map-script work is tracked separately.
 
 ## What is next
 
-The next naval strategy gap is #91: the example AI still does not build a dock
-or manage a fishing economy. The playable naval units are covered by #97.
+The example AI now builds docks and manages a bounded fishing economy (#91),
+using only explored terrain and canonical observations; see `docs/ai-fishing.md`.
+Naval attack/transport strategy remains broader AI work (#124). The playable
+naval units are covered by #97.

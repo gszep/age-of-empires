@@ -96,6 +96,15 @@ OK-popup treatment without a runtime capture.
 
 ## Delivered scope
 
+The example AI now builds and completes a dock, trains a bounded fishing fleet,
+works connected known schools and banks food (#91). Observation v8 supplies
+compact explored terrain/elevation runs with no hidden-neighbour leakage.
+Natural owned Islands openings at seeds2/3/7 and a real player2 browser opening
+all reach fish deposits with zero naval refusals; fallback does too. The dock,
+ship rendering and selection are exercised by `tools/ai_fishing_smoke.mts`.
+Source policy readings and the bounded strategy choices are in `docs/ai-fishing.md`;
+naval combat/transport and broader DE AI policy remain #124/#59.
+
 Regicide is now a real two-player mode in setup, saves, shared restarts,
 headless runs and recordings. Each side starts with ten villagers, King434 and
 a Castle; numeric placement data is in `refdata/regicide.json`, checked against
@@ -115,7 +124,7 @@ browser checks cover actual setup/reload/restart, King voice/art, paid Treason
 blink/expiry pixels, shelter flag, Delete defeat and verified v2 replay. A second
 private two-browser host verifies guest read-only setup, real Treason payment,
 equal client synchronization hashes, mode switches and reconnect.
-New observations are v7; records/results and shared protocol are v2; dev saves
+New observations are v8; records/results and shared protocol are v2; dev saves
 are v3 with mode-less v2 save compatibility. Legacy v1 recordings mean random
 map and cannot smuggle in a Regicide mode. The live managed host was not replaced.
 Final Regicide gate **GREEN** in `.local/regicide-gate-r3.log`: **960 tests /

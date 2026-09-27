@@ -2,6 +2,7 @@ import type { BuildingKind, Command, EntityKind, ResourceKind } from './types';
 import { isBuilding } from './data';
 import { distance } from './nav';
 import type { PlayerObservation } from '../protocol/types';
+import { DOCK_WOOD, FISHING_SHIP_WOOD, fishingWater, fishingDockSite, fishingOrders, fishingProducer, plannedWood } from './ai-fishing';
 
 interface Spotted {
   id: number; kind: string; owner: number; x: number; y: number; hp: number;
@@ -195,6 +196,7 @@ export interface ExampleAiOptions {
   /** Q2's control: `false` plays the strategy as it was before the
    * blacksmith, so the two can be run against each other and measured. */
   blacksmith?: boolean;
+  fishing?: boolean;
 }
 
 export function exampleAiCommands(
@@ -214,18 +216,20 @@ export function exampleAiCommands(
     e => e.kind === 'militia' || e.kind === 'man-at-arms' || e.kind === 'archer');
   const militia = army;
   const tc = mine.find(e => e.kind === 'town-center');
+  const water = options.fishing === false ? undefined : fishingWater(observation);
+  const dock = mine.find(e => e.kind === 'dock');
   const barracks = mine.find(e => e.kind === 'barracks');
   const direction = tc && tc.x < observation.mapWidth / 2 ? 1 : -1;
   const place = (offset: { x: number; y: number }) =>
     tc ? { x: tc.x + direction * offset.x, y: tc.y + offset.y } : offset;
 
-  // A foundation is already paid for. Recover unstaffed houses before buying
+  // A foundation is already paid for. Recover unstaffed houses/docks before buying
   // another building or assigning gatherers; a builder walking there counts
   // just as much as one hammering. Presence of buildProgress means unfinished,
   // even if its rounded public value has reached 1 (#146).
   const constructionWorkers = new Set<number>();
   const staffed = new Set(villagers.filter(e => e.order === 'build').map(e => e.buildTargetId));
-  for (const house of mine.filter(e => e.kind === 'house' && e.buildProgress !== undefined)
+  for (const house of mine.filter(e => (e.kind === 'house' || e.kind === 'dock') && e.buildProgress !== undefined)
     .sort((a, b) => a.id - b.id)) {
     if (staffed.has(house.id)) continue;
     const worker = villagers.filter(e => !constructionWorkers.has(e.id) && (e.order === 'idle' || e.order === 'gather'))
@@ -252,9 +256,8 @@ export function exampleAiCommands(
     const wanted = ASSIGNMENT[index % ASSIGNMENT.length];
     // Farms are food sources too once complete, so they keep villagers fed
     // after the berries run out.
-    // Fish are left alone: this strategy builds no dock, and a fish two
-    // tiles off the bank is food a villager cannot reach, which would be
-    // re-assigned to it every tick it went idle (docs/backlog.md).
+    // Fishing ships get their own water-component orders below; villagers
+    // must not be repeatedly sent at fish they cannot reach from land.
     const node = known
       .filter(e => e.resource === wanted && (e.amount ?? 1) > 0
         && e.node !== 'fish' && e.node !== 'shore-fish'
@@ -474,6 +477,7 @@ export function exampleAiCommands(
   const militaryWoodReserve = observation.age >= 1 && barracks
     ? !range ? 175 : options.blacksmith !== false && !smith ? 150 : 0
     : 0;
+  const dockReserve = water && !dock && woodIsHandy ? DOCK_WOOD : 0;
   for (const camp of CAMPS) {
     if (observation.wood < CAMP_COST_WOOD || !idleBuilder || !tc) continue;
     if (camp.resource !== 'wood' && !woodIsHandy) continue;
@@ -484,7 +488,7 @@ export function exampleAiCommands(
     // nineteen (also measured).
     if (camp.resource === 'gold' && !barracks) continue;
     const built = mine.filter(e => e.kind === camp.building);
-    if (built.length && observation.wood < CAMP_COST_WOOD + militaryWoodReserve) continue;
+    if (built.length && observation.wood < CAMP_COST_WOOD + Math.max(militaryWoodReserve, dockReserve)) continue;
     if (built.length >= CAMPS_PER_RESOURCE) continue;
     // One of each until the barracks is up. Three camps and a mill is four
     // hundred wood, and a player who keeps buying them never saves the
@@ -509,6 +513,14 @@ export function exampleAiCommands(
       build(camp.building, target);
       break;
     }
+  }
+
+  // A paid foundation and its worker precede any later farm/military order.
+  // The owned policy likewise protects housing/wood economy before fishing.
+  if (water && !dock && !builderTasked && idleBuilder && woodIsHandy
+    && observation.wood >= DOCK_WOOD + militaryWoodReserve) {
+    const target = fishingDockSite(water, idleBuilder, tc ?? idleBuilder);
+    if (target) build('dock', target);
   }
 
   // Not until the wood is banked somewhere near the trees. The starting wood
@@ -551,6 +563,7 @@ export function exampleAiCommands(
   // the question is what is near home -- and from the Feudal Age a player
   // farms whatever else it has, which is what pays for the Castle Age.
   const foodNearby = known.some(e => e.resource === 'food' && (e.amount ?? 0) > 0
+    && e.node !== 'fish' && e.node !== 'shore-fish'
     && (e.kind === 'resource' || HERD.includes(e.kind))
     && tc && distance(e, tc) <= FOOD_WALK);
   const farms = mine.filter(e => e.kind === 'farm');
@@ -571,7 +584,7 @@ export function exampleAiCommands(
   const mayFarm = barracks !== undefined || farms.length < 1;
   if ((!foodNearby || (observation.age >= 1 && foodShort)) && mayFarm && idleBuilder
       && !farmsUnderway && farms.length < FARM_SPOTS.length
-      && observation.wood >= 60 + (farms.length ? militaryWoodReserve : 0)) {
+      && observation.wood >= 60 + (farms.length ? Math.max(militaryWoodReserve, dockReserve) : 0)) {
     const spot = clearSpot(FARM_SPOTS, 1.5);
     if (spot) build('farm', spot);
   }
@@ -718,6 +731,15 @@ export function exampleAiCommands(
         target,
         targetId: enemyTc && observation.entities.some(e => e.id === enemyTc.id) ? enemyTc.id : undefined,
       });
+    }
+  }
+  if (water) {
+    commands.push(...fishingOrders(water));
+    const producer = fishingProducer(water);
+    const plannedPopulation = commands.filter(command => command.kind === 'train').length;
+    if (producer && headroom > plannedPopulation
+      && observation.wood - plannedWood(commands) >= FISHING_SHIP_WOOD + militaryWoodReserve) {
+      commands.push({ kind: 'train', player, buildingId: producer.id, unit: 'fishing-ship' });
     }
   }
   return commands;

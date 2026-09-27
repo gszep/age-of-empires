@@ -1,8 +1,8 @@
 import type { Activity, Command, EntityKind, Order, PlayerId, ResourceKind, UnitKind } from '../sim/types';
 import type { NodeKind } from '../sim/data';
 
-/** v7 adds game mode, explicit draws and the temporary King-position channel. */
-export const PROTOCOL_VERSION = 7;
+/** v8 adds compact explored terrain/elevation, enabling fog-safe coastal planning. */
+export const PROTOCOL_VERSION = 8;
 /** v2 records carry an explicit mode; legacy v1 records mean random map. */
 export const MATCH_FORMAT_VERSION = 2;
 
@@ -41,7 +41,12 @@ export interface ObservedEntity {
   townBell?: boolean;
 }
 
+export type TerrainRun = [length: number, terrain: number, elevation: number];
+
 export interface PlayerObservation {
+  /** Per-row [run length, terrain ID, elevation] tuples; -1 means unexplored.
+   * Emitted by observe; optional for older handcrafted strategy fixtures. */
+  terrain?: TerrainRun[][];
   mode: import('../sim/types').GameMode;
   draw?: boolean;
   treason?: { goldCost: number; available: boolean; untilTick: number; kings: { owner: PlayerId; x: number; y: number }[] };

@@ -74,6 +74,12 @@ One canonical schema produces several encodings:
 
 The text representation is derived from structured state, so it cannot become a second source of truth.
 
+Current JSON observation **v8** includes compact `terrain` rows of
+`[runLength, terrainId, elevation]`, with−1 for unexplored values. The canonical
+observer always emits it; `src/protocol/terrain.ts` decodes and validates row
+coverage for in-process strategies. This is static explored ground, not hidden
+map truth. The fishing adapter and its evidence are in `docs/ai-fishing.md`.
+
 ## Universal strategy contract
 
 A strategy is a stateful program implementing the conceptual contract:

@@ -9,6 +9,10 @@
       "stone": { "type": "integer", "minimum": 0 } }, "required": ["wood", "food", "stone"]
   } },
   "properties": {
+    "terrain": { "type": "array", "items": { "type": "array", "items": {
+      "type": "array", "minItems": 3, "maxItems": 3, "additionalItems": false,
+      "items": [{ "type": "integer", "minimum": 1 }, { "type": "integer", "minimum": -1 }, { "type": "number" }]
+    } } },
     "mode": { "enum": ["random-map", "regicide"] },
     "draw": { "type": "boolean" },
     "treason": { "type": "object", "additionalProperties": false,
@@ -27,7 +31,7 @@
       "properties": { "buy": { "$ref": "#/definitions/commodityPrices" }, "sell": { "$ref": "#/definitions/commodityPrices" },
         "tributeFee": { "type": "integer", "minimum": 0 } }, "required": ["buy", "sell", "tributeFee"] },
     "version": {
-      "const": 7
+      "const": 8
     },
     "time": {
       "type": "number",
