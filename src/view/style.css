@@ -269,6 +269,23 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 
 /* WPFG uses actual XAML font sizes, independently of the widget/SDF text scale. */
 .native-frame { position: absolute; inset: 0; display: grid; pointer-events: none; z-index: -1; }
+#options-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; width: 620px; max-width: 94vw; max-height: 92vh; padding: 24px; border: 1px solid #776345;
+  background: #211f19 center / 100% 100% no-repeat; color: #e0ddd3; pointer-events: auto; }
+#options-dialog::backdrop { background: rgba(0, 0, 0, .92); }
+#options-dialog form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 20px; }
+#options-title { grid-column: 1 / -1; text-align: center; margin: 0 0 12px; }
+#options-dialog select { min-width: 0; width: 100%; font: inherit; color: inherit; background: #292720; padding: 6px; }
+.option-volume { display: flex; gap: 10px; align-items: center; }
+.option-volume input { min-width: 0; width: 100%; accent-color: var(--native-border-color, #bda45c); }
+.option-volume output { min-width: 3ch; text-align: right; font-variant-numeric: tabular-nums; }
+.options-actions { grid-column: 1 / -1; display: flex; gap: 12px; margin-top: 12px; }
+.options-actions button { flex: 1; min-width: 0; padding: 8px; font: inherit; }
+#options-dialog.native-options { width: calc(var(--options-width) * 1px * var(--ui-scale));
+  min-height: min(80vh, calc(var(--options-height) * 1px * var(--ui-scale)));
+  padding: calc(80px * var(--ui-scale)); border: none; background: transparent; isolation: isolate;
+  font: bold max(13px, calc(var(--options-font) * 1px * var(--ui-scale))) 'AoE2 body', Georgia, serif; }
+#options-dialog.native-options #options-title { font: max(20px, calc(var(--options-heading) * 1px * var(--ui-scale))) 'AoE2 heading', Georgia, serif; }
+#options-dialog.native-options form { gap: calc(60px * var(--ui-scale)); }
 #diplomacy-dialog { --diplomacy-columns: 35px minmax(0, 1fr) 130px repeat(4, 65px) repeat(4, 50px); --diplomacy-row: 42px; --tribute-width: 42px; --tribute-height: 30px;
   width: 940px; max-width: 96vw; max-height: 92vh; padding: 0; border: none; background: #171714; color: #e0ddd3; isolation: isolate; pointer-events: auto; }
 #diplomacy-dialog:has(.native-frame) { background: transparent; }

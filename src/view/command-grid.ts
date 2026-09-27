@@ -10,8 +10,8 @@
  * thing beside it disappears. A button with no stated cell takes the first
  * free one.
  *
- * The hotkey is the cell's own letter, the reference's grid layout: the top
- * row Q W E R T, the middle A S D F G, the bottom Z X C V B.
+ * The default grid fallback uses Q W E R T / A S D F G / Z X C V B. Native
+ * profile bindings are resolved separately, without moving the DAT cells.
  */
 export const GRID_CELLS = 15;
 export const GRID_KEYS = ['q', 'w', 'e', 'r', 't', 'a', 's', 'd', 'f', 'g', 'z', 'x', 'c', 'v', 'b'] as const;

@@ -58,7 +58,7 @@ def read_strings(path: Path) -> Strings:
     """The reference's string table: `<id> "<text>"` per line, `\\n` kept as-is."""
     strings: Strings = {}
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        match = re.match(r'^(\d+|IDS_[A-Z0-9_]+)\s+"(.*)"\s*$', line)
+        match = re.match(r'^(\d+|[A-Z][A-Z0-9_]+)\s+"(.*)"\s*$', line)
         if match:
             key = match.group(1)
             strings[int(key) if key.isdecimal() else key] = match.group(2)
@@ -440,6 +440,7 @@ def extract_entity(
         **({"availabilityId": spec["availabilityId"]} if "availabilityId" in spec else {}),
         **({"treeUnitId": spec["treeUnitId"]} if "treeUnitId" in spec else {}),
         "internalName": unit.name,
+        "hotkeyTextId": unit.language_dll_hotkey_text - 139000,
         "category": category,
         "hitPoints": unit.hit_points,
         "lineOfSight": rounded(unit.line_of_sight),
@@ -1317,6 +1318,7 @@ def technology_entry(
     # Furnace all sit at the blacksmith's slot 1, the three ages at 11.
     if location.button_id > 0:
         entry["button"] = location.button_id
+    entry["hotkeyTextId"] = tech.language_dll_description + 10000
     if strings:
         text = text_of(strings, tech.language_dll_name, tech.language_dll_description, tech.language_dll_help)
         if "create" in text:
@@ -2114,6 +2116,17 @@ def extract(
                 ("allyHelp", 30350), ("neutralHelp", 30351), ("enemyHelp", 30352), ("cancel", 4006),
                 ("townBell", 40111), ("townBellHelp", 41111),
                 ("setGatherPoint", 4144), ("setGatherPointHelp", 4944),
+                ("options", 8800), ("apply", 4011), ("optionsOk", 4001), ("optionsCancel", 4002),
+                ("optionsGame", 4058), ("optionsInterface", 4060), ("optionsAudio", 4062), ("optionsHotkeys", 8801),
+                ("musicVolume", 8837), ("musicVolumeHelp", 98837), ("soundVolume", 8840), ("soundVolumeHelp", 98840),
+                ("gameSpeed", "IDS_OPTIONS_GAMESPEED"), ("gameSpeedHelp", "IDS_OPTIONS_GAMESPEED_HELP"),
+                ("hotkeyProfile", "IDS_HOTKEYS_SELECTED_PROFILE"),
+                ("hotkeysDefinitive", "IDS_HOTKEYS_DEFINITIVE"), ("hotkeysClassic", "IDS_HOTKEYS_CLASSIC"),
+                ("hotkeysHd", "IDS_HOTKEYS_HD"), ("hotkeysLeft", "IDS_HOTKEYS_LEFT_HAND"),
+                ("colorBlindMode", 8807), ("paletteDefault", "OPTIONS_PLAYER_COLOURS_OFF"),
+                ("paletteDeuteranopia", "OPTIONS_PLAYER_COLOURS_DEUTERANOPIA"),
+                ("paletteProtanopia", "OPTIONS_PLAYER_COLOURS_PROTANOPIA"),
+                ("paletteTritanopia", "OPTIONS_PLAYER_COLOURS_TRITANOPIA"),
                 ("backToWork", 40015), ("backToWorkHelp", 41015),
                 ("creating", 4310), ("stopCreating", 42105),
                 ("confirmDelete", 10213), ("yes", 4003), ("no", 4004),

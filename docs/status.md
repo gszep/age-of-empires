@@ -78,10 +78,17 @@ losses, modal lifetime/abort/dismissal, animation, production warnings, actual f
 uploads, read-only rebuilds, compact layout, 1440p scale and background/alpha pixels
 in imported and `OPEN_FALLBACK=1` modes. Source import tests reconstruct the nine-
 slice images byte-for-byte and assert the consumed XAML metrics and fonts.
-The UI import carries the three owned colour-blind palettes plus `UiColors.txt`
-as CSS variables; `?solo=1&uiPalette=deuteranopia` (also `protanopia`, `tritanopia`)
-selects HUD text colours. This is not a full sprite/minimap colour-blind mode;
-the remaining palette integration belongs to #141. Wonder UI belongs entirely
+The Options screen (#141), reached through the settings gear or menu, persists
+speed, music/sound volume, four owned hotkey profiles and the three owned interface
+colour-blind palettes. Command keys resolve through native string/action IDs;
+explicitly unbound research keys remain unbound. Score/diplomacy colours,
+selection health and live/remembered minimap colours use the selected owned roles.
+`?uiPalette=` remains a preview override; world sprite/portrait LUTs are #246.
+The bounded panel uses original WPFG nine-slice art, fonts and button styles.
+`options_smoke.mts` checks real controls, actual training keys in all four profiles,
+native colours/minimap pixels, volume changes, storage/reload and Cancel in owned
+and fallback modes. `map_menu_smoke.mts` verifies shared speed authority across
+join/reload and explicit Apply on a private two-client host. Wonder UI belongs entirely
 to #110, and objectives/tech-tree surfaces to #138; these are not #58 blockers.
 The supplied captures are indexed locally; remaining font-raster, dimmer, ember
 and timing approximations are in the ledger. The human accepted source-backed

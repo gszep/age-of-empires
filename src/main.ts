@@ -35,6 +35,8 @@ import { createCueWatcher, pollCues } from './view/cues';
 import { ConstructionCues } from './view/construction-cues';
 import { AudioPlayer } from './view/audio';
 import { MusicPlayer } from './view/music';
+import { loadPreferences, normalizePreferences, savePreferences, type Preferences } from './view/preferences';
+import { commandHotkey, hotkeyLabel, matchesHotkey } from './view/hotkeys';
 import { WorldSounds, type SoundPose } from './view/world-sounds';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
 
@@ -69,6 +71,12 @@ await renderer.init();
 let [assets, uiAssets, audioAssets] = await Promise.all([
   loadContentAssets(), loadUiAssets(), loadAudioAssets(),
 ]);
+let preferences = loadPreferences();
+const requestedPalette = new URLSearchParams(location.search).get('uiPalette');
+if (requestedPalette) preferences = normalizePreferences({ ...preferences, palette: requestedPalette });
+if (!uiAssets?.hotkeyProfiles?.[preferences.hotkeys]) preferences.hotkeys = 'definitive';
+if (preferences.palette !== 'default' && !uiAssets?.colorPalettes?.[preferences.palette]) preferences.palette = 'default';
+const selectedHotkeys = () => uiAssets?.hotkeyProfiles?.[preferences.hotkeys];
 let rules: GameRules = FALLBACK_RULES;
 /** The reference's own words for a refused order, from its strings file (issue #70). */
 let messages: Record<string, string> = {};
@@ -190,9 +198,7 @@ const GAME_SPEEDS: { label: string; multiplier: number }[] = [
   { label: 'Fast-forward 5x', multiplier: 5 },
   { label: 'Fast-forward 10x', multiplier: 10 },
 ];
-/** "Set Speed to Default" is the reference's own name for the second setting. */
-const DEFAULT_SPEED = 1;
-let speedIndex = DEFAULT_SPEED;
+let speedIndex = preferences.speed;
 const gameSpeed = (): number => GAME_SPEEDS[speedIndex].multiplier;
 let aiClock = 0;
 
@@ -344,6 +350,8 @@ let pointerWorld: Point = { x: 16, y: 9 };
 
 const audioPlayer = new AudioPlayer(() => audioAssets);
 const musicPlayer = new MusicPlayer(() => audioAssets);
+audioPlayer.setVolume(preferences.sound / 100);
+musicPlayer.setVolume(preferences.music / 100);
 const unlockAudio = (): void => { audioPlayer.unlock(); musicPlayer.unlock(); };
 addEventListener('pointerdown', unlockAudio, { capture: true });
 addEventListener('keydown', unlockAudio, { capture: true });
@@ -416,6 +424,10 @@ function reject(reason: string): void {
 
 function createHud(): Hud {
   const created = new view.Hud(app, uiAssets, {
+    onOptions: () => hud.options.show({ preferences: { ...preferences, speed: speedIndex },
+      speeds: GAME_SPEEDS.map(speed => speed.label), profiles: Object.keys(uiAssets?.hotkeyProfiles ?? { definitive: {} }),
+      palettes: ['default', ...Object.keys(uiAssets?.colorPalettes ?? {})] }),
+    onPreferences: applyPreferences,
     onCommand: (id, shift) => runUiCommand(id, shift),
     onTribute: amounts => {
       if (replay || matchOver(game)) return { ok: false, reason: 'read-only' };
@@ -462,6 +474,7 @@ function createHud(): Hud {
     },
   }, messages);
   created.playerColors = assets?.playerColors;
+  created.setPalette(preferences.palette);
   created.minimap.player = localPlayer;
   configureMapMenu(created);
   return created;
@@ -477,6 +490,27 @@ function configureMapMenu(target: Hud): void {
 }
 
 let hud = createHud();
+
+function setPreferredSpeed(speed: number): void {
+  preferences = { ...preferences, speed };
+  savePreferences(preferences);
+  if (shared) shared.send({ type: 'settings', speed });
+  else speedIndex = speed;
+}
+
+function applyPreferences(value: Preferences): void {
+  const next = normalizePreferences(value);
+  if (next.speed !== speedIndex) setPreferredSpeed(next.speed);
+  preferences = next;
+  savePreferences(preferences);
+  audioPlayer.setVolume(preferences.sound / 100);
+  musicPlayer.setVolume(preferences.music / 100);
+  musicPlayer.update(preferences.music > 0 && !paused && !matchOver(game) && !document.hidden);
+  hud.setPalette(preferences.palette);
+  hud.setCommands(currentCommands());
+  hud.setSelection(selectionInfo());
+  hud.updateScore(scoreRows());
+}
 
 function setPaused(value: boolean): void {
   if (shared) shared.send({ type: 'settings', paused: value });
@@ -598,7 +632,7 @@ function diplomacyModel(): DiplomacyModel {
     maximum: Object.fromEntries((['wood', 'food', 'gold', 'stone'] as const).map(r => [r, maximumTribute(game, localPlayer, r)])) as DiplomacyModel['maximum'],
     players: ([1, 2] as const).map(id => ({ id, name: `Player ${id}`,
       civilization: playerRules(id).civilization.displayName ?? playerRules(id).civilization.name,
-      color: playerColorHex(assets, id) ?? (id === 1 ? '#3b64ff' : '#ff3b3b') })) };
+      color: hud.uiColor(playerColorName(id), 'Icons', playerColorHex(assets, id) ?? (id === 1 ? '#3b64ff' : '#ff3b3b'))! })) };
 }
 function runUiCommand(id: string, shift = false): void {
   if (id === 'market-tribute' || id === 'diplomacy') {
@@ -1055,8 +1089,7 @@ addEventListener('keydown', event => {
     const next = Math.max(0, Math.min(GAME_SPEEDS.length - 1, speedIndex + (faster ? 1 : -1)));
     const setting = GAME_SPEEDS[next];
     if (next !== speedIndex) {
-      if (shared) shared.send({ type: 'settings', speed: next });
-      else speedIndex = next;
+      setPreferredSpeed(next);
       hud.showMessage(`Game speed: ${setting.label}`);
     } else {
       hud.showMessage(faster
@@ -1101,19 +1134,15 @@ addEventListener('keydown', event => {
     event.preventDefault();
     return;
   }
-  if (key === '.') { selectIdleVillager(); return; }
+  if (matchesHotkey(event, selectedHotkeys()?.names.NEXT_IDLE_VILLAGER ?? { key: '.' })) { selectIdleVillager(); return; }
   // Ctrl+<key> walks the buildings of a kind one at a time; Ctrl+Shift+<key>
   // takes the lot. Both the letters and the modifiers come from the
   // reference's own `hotkeys.json` through the UI import, so "Ctrl+Shift+B is
   // your barracks" is true of the reference rather than of whoever typed it.
-  if (event.ctrlKey || event.metaKey) {
-    const bindings = uiAssets?.hotkeys;
-    const wanted = event.shiftKey ? bindings?.selectAll : bindings?.goto;
-    const pressed = key.toUpperCase();
-    const kind = Object.entries(wanted ?? {}).find(([, binding]) =>
-      binding.key.toUpperCase() === pressed
-      && !!binding.control === (event.ctrlKey || event.metaKey)
-      && !!binding.shift === event.shiftKey)?.[0];
+  {
+    const bindings = selectedHotkeys() ?? uiAssets?.hotkeys;
+    const kind = Object.entries(event.shiftKey ? bindings?.selectAll ?? {} : bindings?.goto ?? {})
+      .find(([, binding]) => matchesHotkey(event, binding))?.[0];
     if (kind) {
       const mine = game.entities.filter(e =>
         e.owner === localPlayer && e.kind === kind && !e.dead && e.buildProgress === undefined);
@@ -1134,7 +1163,7 @@ addEventListener('keydown', event => {
       return;
     }
   }
-  if (key === 'h' || key === 'H') {
+  if (!selectedHotkeys() && (key === 'h' || key === 'H')) {
     const tc = game.entities.find(e => e.owner === localPlayer && e.kind === 'town-center' && !e.dead);
     if (tc) {
       selectedIds = [tc.id];
@@ -1143,8 +1172,8 @@ addEventListener('keydown', event => {
     return;
   }
   const commands = currentCommands();
-  const match = commands.find(c => c.hotkey === key.toLowerCase() && c.enabled);
-  if (match) runUiCommand(match.id, event.shiftKey);
+  const match = commands.find(c => c.enabled && matchesHotkey(event, c.binding ?? (c.hotkey ? { key: c.hotkey } : undefined), c.id.startsWith('train-')));
+  if (match) { event.preventDefault(); runUiCommand(match.id, event.shiftKey); }
 });
 addEventListener('keyup', event => heldKeys.delete(event.key));
 // A keyup that never arrives is a camera that never stops: alt-tabbing or
@@ -1272,7 +1301,8 @@ function currentCommands(): CommandButton[] {
         : selection.some(e => e.kind === 'transport-ship') ? messages.unload ?? 'Unload'
           : buildingGarrison ? native?.name ?? 'Ungarrison All Units' : 'Ungarrison all units',
       icon: hud.actionIcon(buildingGarrison ? native?.iconId ?? ACTION_ICON.ungarrison : ACTION_ICON.ungarrison),
-      slot: selection.some(e => e.kind === 'transport-ship') ? 1
+      slot: selection.some(e => e.kind === 'transport-ship' || e.kind === 'monk') ? 1
+        : selection.some(e => e.kind === 'battering-ram' || e.kind === 'capped-ram') ? 5
         : buildingGarrison ? native?.slot ?? 10 : GRID_SLOT.ungarrison, enabled: true,
     });
   }
@@ -1378,12 +1408,24 @@ function currentCommands(): CommandButton[] {
       enabled: true,
     });
   }
-  // Settle every button into its cell and give it that cell's letter, so the
-  // key on the button is the key that presses it. A stated cell holds against
-  // whatever else is on the panel; the rest take the first free ones.
-  return placeCommands(buttons).flatMap((button, index) => button
-    ? [{ ...button, slot: index + 1, hotkey: button.hotkey ?? gridKey(index + 1) }]
-    : []);
+  // Keep native/DAT cells while resolving the active profile's binding.
+  // Only unmapped Definitive extension commands fall back to grid letters;
+  // an explicitly unbound native entry never borrows another profile's key.
+  return placeCommands(buttons).flatMap((button, index) => {
+    if (!button) return [];
+    const actions: Record<string, number> = { 'page-economic': 116, 'page-military': 115, repair: 31,
+      stop: 5, pack: 110, unpack: 111, 'set-gather-point': 51, 'town-bell': 163,
+      ungarrison: selection.some(e => e.kind === 'monk') ? 159
+        : selection.some(e => e.kind === 'transport-ship') ? 7
+          : selection.some(e => e.kind === 'battering-ram' || e.kind === 'capped-ram') ? 172 : 78 };
+    const profile = selectedHotkeys();
+    let binding = commandHotkey(profile, game.players[localPlayer].civilization, button.id,
+      button.hotkey ?? (preferences.hotkeys === 'definitive' ? gridKey(index + 1) : undefined), actions[button.id]);
+    const named = button.id.startsWith('exchange-') ? `MARKET_${button.id.slice(9).replaceAll('-', '_').toUpperCase()}`
+      : button.id === 'treason' ? 'CASTLE_TREASON' : undefined;
+    if (profile && named && Object.hasOwn(profile.names, named)) binding = profile.names[named] ?? undefined;
+    return [{ ...button, slot: index + 1, binding, hotkey: binding ? hotkeyLabel(binding) : undefined }];
+  });
 }
 
 /**
@@ -1504,7 +1546,7 @@ function scoreRows(): ScoreRow[] {
     return {
     number: player,
     name: shared ? (player === 1 ? 'Ysgramor' : 'Artemis') : player === 1 ? 'Player 1' : computer,
-    color: playerColorHex(assets, player) ?? (player === 1 ? '#3b64ff' : '#ff3b3b'),
+    color: hud.uiColor(playerColorName(player), 'Icons', playerColorHex(assets, player) ?? (player === 1 ? '#3b64ff' : '#ff3b3b'))!,
     textColor: hud.textColor(playerColorName(player), playerColorHex(assets, player) ?? '#ffffff'),
     // The civilisation's small icon is the material `<Name>Icon`, by the
     // reference's own name for it (`BritonsIcon`).
@@ -1589,6 +1631,8 @@ function selectionInfo(): SelectionInfo | undefined {
         importedEntity(view.entityKey(member), member.owner)?.iconId, member.owner),
       hp: member.hp,
       maxHp: member.maxHp,
+      hpColor: preferences.palette !== 'default' && (member.owner === 1 || member.owner === 2)
+        ? hud.uiColor(playerColorName(member.owner), 'HealthBar') : undefined,
     }))
     : undefined;
   if (entity.kind === 'town-center' && entity.owner === localPlayer) details.push(AGE_NAMES[game.players[localPlayer].age]);
@@ -1641,6 +1685,8 @@ function selectionInfo(): SelectionInfo | undefined {
       })),
     } : undefined,
     name,
+    hpColor: preferences.palette !== 'default' && (entity.owner === 1 || entity.owner === 2)
+      ? hud.uiColor(playerColorName(entity.owner), 'HealthBar') : undefined,
     stats: selectionStats(entity),
     icon: entity.kind !== 'resource' ? hud.iconFor(category, iconIndex, entity.owner) : undefined,
     // A carcass shows no health: the DAT's corpse unit has none, and what a
@@ -1659,7 +1705,7 @@ function entityVisible(entity: Entity): boolean {
 }
 
 function syncScene(time: number): void {
-  musicPlayer.update(!paused && !matchOver(game) && !document.hidden);
+  musicPlayer.update(preferences.music > 0 && !paused && !matchOver(game) && !document.hidden);
   const wanted = new Set<string>();
   const soundPoses = new Map<number, SoundPose>();
   for (const entity of game.entities) {

@@ -24,6 +24,13 @@ browser smoke and are maintained regression tools.
   hidden/foreground, restart and absent-audio fallback. `MUSIC_SOAK=1` also
   waits for a natural complete111-minute playlist with scene redraws frozen;
   the real audio player and native end callbacks continue throughout.
+- **`options_smoke.mts`** — #141's real settings/menu controls, four owned
+  training-key profiles, explicit unbound keys, left-handed navigation, exact
+  owned score/diplomacy/health colours and minimap pixels, volume changes,
+  preference/speed-key persistence, bounded centered geometry and Cancel.
+  Also runs with `OPEN_FALLBACK=1`. `map_menu_smoke.mts` additionally verifies
+  that saved local speed never overwrites shared authority on join/reload,
+  while an explicit options Apply reaches both private clients.
 
 - **`regicide_smoke.mts`** — real mode checkbox/Start Game, King sprite/colour/
   voice request, reload/restart and return to random map; two actual400-gold

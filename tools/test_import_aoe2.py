@@ -2151,6 +2151,23 @@ class UiImportIntegrationTest(unittest.TestCase):
         self.assertEqual(extracted_content()['strings']['setGatherPoint'], 'Set Gather Point')
         self.assertIn('new units', extracted_content()['strings']['setGatherPointHelp'])
 
+    def test_options_profiles_and_panel_come_from_owned_metadata(self):
+        profiles = self.result['hotkeyProfiles']
+        self.assertEqual(set(profiles), {'classic', 'definitive', 'high definition', 'left handed'})
+        for profile, key in [('classic', 'C'), ('definitive', 'Q'), ('high definition', 'A'), ('left handed', 'Y')]:
+            self.assertEqual(profiles[profile]['commands']['train-villager']['key'], key)
+        self.assertIsNone(profiles['classic']['commands']['research-loom'])
+        self.assertEqual(profiles['definitive']['commands']['research-loom']['key'], 'A')
+        self.assertEqual(profiles['classic']['commands']['build-house']['key'], 'E')
+        self.assertEqual(profiles['left handed']['names']['GOTO_TOWN_CENTER']['key'], 'G')
+        self.assertEqual(profiles['left handed']['names']['NEXT_IDLE_VILLAGER']['key'], 'V')
+        self.assertEqual(profiles['definitive']['actions']['172']['key'], 'T')
+        options = self.result['nativeFeedback']['options']
+        self.assertEqual((options['panelWidth'], options['panelHeight']), (1810, 1500))
+        self.assertEqual(len(options['frame']['images']), 9)
+        self.assertEqual(extracted_content()['strings']['paletteDeuteranopia'], 'Deuteranopia')
+        self.assertEqual(extracted_content()['strings']['hotkeysClassic'], 'Classic Hotkeys')
+
     def test_context_cursors_preserve_owned_bytes_dimensions_hotspots_and_publication(self):
         cursors = self.result["cursors"]
         self.assertEqual(set(cursors), set(SPEC["ui"]["cursors"]))

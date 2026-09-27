@@ -231,6 +231,48 @@ def extract_hotkeys(hotkeys_path: Path, wanted: dict[str, Any]) -> dict[str, Any
     }
 
 
+def extract_hotkey_profiles(path: Path, wanted: dict, content: dict) -> dict:
+    """Preserve explicit unbound entries; do not borrow a different profile's key."""
+    data = json.loads(path.read_text())
+    groups = [*data.get('shared_hotkey_group_list', []), *data['hotkey_group_list']]
+    bindings = [binding for group in groups for binding in group.get('hotkey_list', []) or []]
+    layouts = list(dict.fromkeys(default['name'] for binding in bindings for default in binding.get('defaults_list', [])))
+    profiles = {}
+    for layout in layouts:
+        names, strings, actions = {}, {}, {}
+        for binding in bindings:
+            if 'data_name' not in binding:
+                continue
+            chosen = next((d for d in binding.get('defaults_list', []) if d['name'] == layout), None)
+            key = None
+            if chosen and chosen.get('key'):
+                key = {'key': chosen['key'].removeprefix('VK_')}
+                for modifier in ('control', 'shift', 'alt'):
+                    if chosen.get(modifier) or (modifier == 'alt' and chosen.get('alternate')):
+                        key[modifier] = True
+            names[binding['data_name']] = key
+            for identifier in binding.get('string_index_list', []):
+                strings[identifier] = key
+            for identifier in binding.get('button_action_list', []):
+                actions[str(identifier)] = key
+        commands = {}
+        for prefix, profile in [('', content), *((f'civilizations/{key}/', profile)
+                for key, profile in sorted(content.get('civilizations', {}).items()))]:
+            for key, entity in profile['entities'].items():
+                identifier = entity.get('hotkeyTextId')
+                if identifier in strings:
+                    verb = 'build' if entity['category'] == 'building' else 'train'
+                    commands[f'{prefix}{verb}-{key}'] = strings[identifier]
+            for key, technology in profile.get('technologies', {}).items():
+                identifier = technology.get('hotkeyTextId')
+                if identifier in strings:
+                    commands[f'{prefix}research-{key}'] = strings[identifier]
+        profiles[layout] = {**{action: {name: names.get(data_name) for name, data_name in mapping.items()}
+                              for action, mapping in wanted.items()},
+                            'commands': commands, 'names': names, 'actions': actions}
+    return profiles
+
+
 def import_cursors(directory: Path, names: list[str], out_root: Path, hashes: dict[str, str]) -> dict[str, Any]:
     """Copy native CUR bytes and read their actual dimensions/hotspot.
 
@@ -269,6 +311,7 @@ def extract_ui(
     ui_spec = spec["ui"]
     from civilization_profiles import art_entities
     profiles = [content, *content.get("civilizations", {}).values()]
+    hotkey_profiles = extract_hotkey_profiles(hotkeys_path, ui_spec.get('hotkeys', {}), content) if hotkeys_path else {}
     content = {**content, "entities": art_entities(content), "technologies": {
         f"{index}/{key}": tech for index, profile in enumerate(profiles)
         for key, tech in profile.get("technologies", {}).items()
@@ -458,6 +501,7 @@ def extract_ui(
     return {
         "schemaVersion": spec["schemaVersion"],
         "commandButtons": command_buttons,
+        "hotkeyProfiles": hotkey_profiles,
         "style": style,
         "fonts": fonts,
         "colors": colors,

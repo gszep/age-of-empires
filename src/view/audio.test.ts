@@ -26,6 +26,13 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('bounded browser sound player', () => {
+  it('applies sound volume to playing cues and avoids loading new cues while muted', () => {
+    const player = new AudioPlayer(() => assets); player.unlock(); player.play('cue', 'world', 0.6);
+    player.setVolume(0.5); expect(FakeAudio.instances[0].volume).toBe(0.3);
+    player.setVolume(0); expect(FakeAudio.instances[0].volume).toBe(0);
+    player.play('other', 'voice'); expect(FakeAudio.instances).toHaveLength(1);
+    player.setVolume(1); expect(FakeAudio.instances[0].volume).toBe(0.6);
+  });
   it('waits for a gesture, cancels the previous voice and releases completed media', () => {
     const player = new AudioPlayer(() => assets);
     player.play('cue', 'voice');

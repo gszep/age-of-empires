@@ -286,10 +286,18 @@ export interface UiLayout {
 }
 /** A key the reference binds, as `hotkeys.json` gives it. */
 export interface ImportedHotkey { key: string; control?: boolean; shift?: boolean; alt?: boolean }
+export interface HotkeyProfile {
+  goto?: Record<string, ImportedHotkey>;
+  selectAll?: Record<string, ImportedHotkey>;
+  commands: Record<string, ImportedHotkey | null>;
+  names: Record<string, ImportedHotkey | null>;
+  actions: Record<string, ImportedHotkey | null>;
+}
 
 export interface UiAssets {
   base: string;
   commandButtons?: Record<string, { name: string; slot: number; iconId: number; helpId?: number; moreHelpId?: number }>;
+  hotkeyProfiles?: Record<string, HotkeyProfile>;
   /** Native owned CUR files; dimensions and hotspots come from the CUR header. */
   cursors?: Record<string, { image: string; size: [number, number]; hotspot: [number, number] }>;
   /** The reference's faces, copied as they ship: file name -> path under `base`. */
@@ -299,6 +307,7 @@ export interface UiAssets {
   colorPalettes?: Record<string, NonNullable<UiAssets['colors']>>;
   colorTags?: Record<string, number[]>;
   nativeFeedback?: {
+    options?: { panelWidth: number; panelHeight: number; fontSize: number; headingSize: number; frame?: NativeSlices };
     diplomacy?: { width: number; columns: string[]; rowHeight: number; tributeSize: number[]; closeSize: number[];
       buttonWidth: number; icons: Record<string, string>; fonts: Record<string, number> };
     images: Record<string, string>;

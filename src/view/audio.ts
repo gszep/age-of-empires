@@ -9,6 +9,8 @@ export class AudioPlayer {
   private sequence = new Map<string, number>();
   private active = new Map<HTMLAudioElement, AudioChannel>();
   private unlocked = false;
+  private volume = 1;
+  private baseVolumes = new WeakMap<HTMLAudioElement, number>();
   private ambientAlias?: string;
   private ambientDue = 0;
 
@@ -16,10 +18,15 @@ export class AudioPlayer {
 
   unlock(): void { this.unlocked = true; }
 
+  setVolume(volume: number): void {
+    this.volume = Math.max(0, Math.min(1, volume));
+    for (const element of this.active.keys()) element.volume = (this.baseVolumes.get(element) ?? 1) * this.volume;
+  }
+
   play(alias: string, channel: AudioChannel = 'ui', volume = 1): void {
     const assets = this.assets();
     const files = assets?.audio[alias]?.files;
-    if (!this.unlocked || !files?.length || document.hidden) return;
+    if (!this.unlocked || !files?.length || document.hidden || this.volume === 0) return;
     if (channel === 'voice') this.stop('voice');
     if (this.active.size >= 24) {
       if (channel === 'world' || channel === 'ambient') return;
@@ -31,7 +38,9 @@ export class AudioPlayer {
     this.sequence.set(alias, sequence + 1);
     const source = files[sequence % files.length];
     const element = new Audio(`${assets!.base}${source.file}`);
-    element.volume = Math.max(0, Math.min(1, volume));
+    const base = Math.max(0, Math.min(1, volume));
+    this.baseVolumes.set(element, base);
+    element.volume = base * this.volume;
     this.active.set(element, channel);
     element.onended = element.onerror = () => this.release(element);
     void element.play().catch(() => this.release(element));

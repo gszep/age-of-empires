@@ -77,6 +77,7 @@ export function minimapResourceDotSize(width: number, height: number): number {
 }
 
 export class Minimap {
+  playerColor?: (owner: number) => string | undefined;
   private context: CanvasRenderingContext2D;
   /** Flares dropped on the map: where, and when they were lit (ms). */
   private flares: { x: number; y: number; at: number }[] = [];
@@ -180,7 +181,7 @@ export class Minimap {
   ): void {
     const ctx = this.context;
     const ownerColor = (owner: number): string =>
-      playerColorHex(assets, owner) ?? '#ffffff';
+      this.playerColor?.(owner) ?? playerColorHex(assets, owner) ?? '#ffffff';
     const visibility = state.visibility[this.player];
     const resourceDotSize = minimapResourceDotSize(state.width, state.height);
     const forest = this.terrainColors(assets).get(10); // owned Forest terrain slot

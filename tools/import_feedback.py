@@ -48,6 +48,13 @@ def extract_feedback(wpfg: Path, out: Path, hashes: dict) -> dict:
     yesno = xml("dialog/dialogyesnoboxgeneral.xaml")
     diplomacy = xml("dialog/dialogdiplomacy.xaml")
     diplomacy_item = xml("SystemResourcesDiplomacyItem.xaml")
+    options_audio = xml('tab/taboptionsaudio.xaml')
+    options_game = xml('tab/taboptionsgame.xaml')
+    xml('tab/taboptionsinterface.xaml')
+    xml('tab/taboptionshotkeys.xaml')
+    xml('screen/screenoptions.xaml')
+    options_panel = next(e for e in options_audio.iter(P + 'Grid') if e.get('Height') == '1500')
+    options_columns = options_panel.find(P + 'Grid.ColumnDefinitions')
     diplomacy_canvas = next(e for e in diplomacy.iter(P + "Canvas") if e.find(P + "Canvas.Effect") is not None)
     diplomacy_rows = next(e for e in diplomacy.iter(P + "Grid") if e.get("Margin") == "20")
     diplomacy_main_rows = next(e for e in diplomacy.iter(P + "Grid.RowDefinitions"))
@@ -60,7 +67,7 @@ def extract_feedback(wpfg: Path, out: Path, hashes: dict) -> dict:
     frame = keyed(xml("SystemResourcesPaphos.xaml"), "DialogBackgroundRect")
     frame_effect = next(e for e in frame.iter() if e.tag.endswith("}Age2NineSliceShinyEffect"))
     image_names = ["dialog2_9slice", "dialog_defeat", "dialog_victory", "seperator", "seperator_grey",
-                   "button_large_normal", "button_large_hover", "button_large_active", "button_large_disable", "button_close_cross"]
+                   "button_large_normal", "button_large_hover", "button_large_active", "button_large_disable", "button_close_cross", "panel00"]
     images = {name: copy(keyed(images_doc, name).get("ImageSource").lstrip("/")) for name in image_names}
 
     def slices(name, effect):
@@ -95,6 +102,16 @@ def extract_feedback(wpfg: Path, out: Path, hashes: dict) -> dict:
     xml("screenwindow.xaml")
     return {
         "images": images,
+        "options": {
+            'panelWidth': float(list(options_columns)[0].get('Width')),
+            'panelHeight': float(options_panel.get('Height')),
+            'fontSize': float(setters(keyed(text, 'TextBlockGreyMed'))['FontSize']),
+            'headingSize': float(setters(keyed(text, 'TextBlockHeading'))['FontSize']),
+            'frame': slices('panel00', next(e for e in options_audio.iter() if e.tag.endswith('}Age2NineSliceEffect'))),
+            'controls': {name: dict(named(document, name).attrib) for document, names in (
+                (options_audio, ('MusicVolume', 'SoundVolume', 'SoundtrackPlaylist')),
+                (options_game, ('GameSpeedList',))) for name in names},
+        },
         "diplomacy": {
             "width": float(diplomacy_canvas.get("Width")),
             "columns": [e.get("Width") for e in next(diplomacy_item.iter(P + "Grid.ColumnDefinitions"))],

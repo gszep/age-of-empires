@@ -1,4 +1,4 @@
-/** Issue #144: real menu controls on a private host, including its solo override. */
+/** #144/#141: real map/options controls on a private host and its solo override. */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -29,10 +29,16 @@ const until = (page: Page, expression: string) => page.waitForFunction(async tex
   return new Function('s', `return ${text}`)(state);
 }, { timeout: 30_000, polling: 100 }, expression);
 const errors: string[] = [];
-async function open(path: string): Promise<Page> {
+async function open(path: string, preferredSpeed?: number): Promise<Page> {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 800 });
   page.on('pageerror', error => { errors.push(String(error)); console.error(error); });
+  if (preferredSpeed !== undefined) await page.evaluateOnNewDocument(speed => {
+    if (!sessionStorage.getItem('options-shared-fixture')) {
+      localStorage.setItem('open-empires-lab:preferences', JSON.stringify({ speed, music: 0, sound: 0 }));
+      sessionStorage.setItem('options-shared-fixture', '1');
+    }
+  }, preferredSpeed);
   await page.goto(base + path, { waitUntil: 'domcontentloaded', timeout: 120_000 });
   await ready(page);
   return page;
@@ -83,7 +89,9 @@ try {
   const tick = (await query(solo, { type: 'sim' })).tick;
   await solo.reload({ waitUntil: 'domcontentloaded' }); await ready(solo);
   const resumed = await query(solo, { type: 'sim' });
-  assert.deepEqual(resumed.connection.setup, { map: 'islands', seed: 2 });
+  assert.equal(resumed.connection.setup.map, 'islands');
+  assert.equal(resumed.connection.setup.seed, 2);
+  assert.equal(resumed.connection.setup.mode ?? 'random-map', 'random-map');
   assert(resumed.tick >= tick, 'reload resumes rather than re-dealing the chosen board');
   console.log('Solo: six maps, safe text input, seed validation, Islands seed 2 and reload persistence');
 
@@ -104,17 +112,30 @@ try {
   console.log('Solo: large/small map transitions rebuild terrain; Random creates a new seed');
   await solo.close();
 
-  const host = await open('/');
+  const host = await open('/', 5);
+  assert.equal((await query(host, { type: 'sim' })).connection.speed, 1, 'joining does not send a local speed preference');
   await host.keyboard.press('F3'); await until(host, 's.connection.paused');
-  const guest = await open('/?player=2');
+  const guest = await open('/?player=2', 0);
+  assert.equal((await query(guest, { type: 'sim' })).connection.speed, 1);
   await guest.keyboard.press('F10');
   assert(await guest.$eval('#map-choice', e => (e as HTMLSelectElement).disabled));
   assert(await guest.$eval('#map-setup button[type="submit"]', e => (e as HTMLButtonElement).disabled));
+  await guest.click('#menu-dialog [data-options]');
+  await guest.waitForSelector('#options-dialog[open]');
+  await guest.select('#option-speed', '4'); await guest.click('[data-option-action="ok"]');
+  await until(host, 's.connection.speed === 4'); await until(guest, 's.connection.speed === 4');
+  await guest.evaluate(() => localStorage.setItem('open-empires-lab:preferences', JSON.stringify({ speed: 0, music: 0, sound: 0 })));
+  await guest.reload({ waitUntil: 'domcontentloaded' }); await ready(guest);
+  assert.equal((await query(guest, { type: 'sim' })).connection.speed, 4, 'reload preserves authoritative shared speed');
+  assert.equal((await query(host, { type: 'sim' })).connection.speed, 4);
+  console.log('Shared options: local saved speed never overwrites host on join/reload; explicit Apply uses shared settings');
   await choose(host, 'islands', 2);
   await until(guest, "s.connection.setup.map === 'islands' && s.connection.setup.seed === 2");
   await host.keyboard.press('F3'); await until(host, 's.connection.paused'); await until(guest, 's.connection.paused');
   assert.equal((await query(host, { type: 'sim' })).synchronizationHash, (await query(guest, { type: 'sim' })).synchronizationHash);
-  assert.deepEqual(JSON.parse(readFileSync(checkpoint, 'utf8')).setup, { map: 'islands', seed: 2 });
+  const savedSetup = JSON.parse(readFileSync(checkpoint, 'utf8')).setup;
+  assert.equal(savedSetup.map, 'islands'); assert.equal(savedSetup.seed, 2);
+  assert.equal(savedSetup.mode ?? 'random-map', 'random-map');
   console.log('Shared: host menu changes both clients; guest is read-only; setup is checkpointed');
   assert.deepEqual(errors, []);
   console.log('MAP MENU SMOKE GREEN');

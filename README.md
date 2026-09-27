@@ -80,6 +80,15 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   villager's economic and military build pages, `G` is stop, `Esc` is back —
   the reference's own grid layout.
 - `Esc` cancels placement or opens the menu; `F3` pauses; `F10` toggles the menu.
+- The **settings gear** or **F10 → Options** opens persistent game speed,
+  hotkey profile, interface colour palette, music and sound volume controls.
+  **Apply/OK** saves locally; **Cancel** discards unapplied edits. Owned hotkeys
+  offer Definitive, Classic, HD and Left-handed layouts, including the letters
+  shown on command buttons. The control notes here use the default Definitive
+  layout. Interface palettes update score/diplomacy colours, selection health
+  bars and the minimap; battlefield sprite-palette support remains #246.
+  Shared speed changes use the host's settings channel; local preferences never
+  overwrite the running shared speed merely by joining or reloading.
 - `F4` toggles a debug reveal of the whole map. It is strictly a view-side
   override — the simulation's fog, the AI's observation and every checksum are
   untouched, so a revealed match replays identically to a fogged one.
@@ -115,7 +124,8 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   use Environment Agency LIDAR/VOM. Asking explicitly always deals a fresh board.
 - `+` and `-` step the game speed through the original's own four settings —
   Slow, Normal, Fast and Extra Fast — and then two fast-forward steps past them
-  for watching a whole match go by. The game starts at **Normal**, which is the
+  for watching a whole match go by. The first visit starts at **Normal** and
+  subsequent visits remember your selected speed. Normal is the
   setting the reference's own hotkey names call "Default": every duration in the
   data is quoted in game seconds, and Normal runs 1.5 of them a second, so a
   25-second villager arrives in about 17 real seconds. The simulation's tick

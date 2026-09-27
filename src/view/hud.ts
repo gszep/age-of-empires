@@ -4,13 +4,15 @@
  * selection panel bottom-centre, minimap panel bottom-right. Falls back to an
  * open skin when imported assets are absent.
  */
-import { materialUrl, iconUrl, ownedIconUrl, type PlayerColors, type UiAssets } from './assets';
+import { materialUrl, iconUrl, ownedIconUrl, type ImportedHotkey, type PlayerColors, type UiAssets } from './assets';
 import { placeCommands } from './command-grid';
 import { widgetBox } from './layout';
 import { installUiColors, placeFeedback } from './feedback';
 import { animateEmbers, buttonText, placeEndScreen } from './native-feedback';
 import { Minimap } from './minimap';
 import { DiplomacyDialog, type TributeDraft } from './diplomacy';
+import { OptionsDialog } from './options';
+import type { Preferences } from './preferences';
 import type { GameState, PlayerId, Point, ReadonlyGameState } from '../sim/types';
 
 /**
@@ -53,6 +55,7 @@ export interface CommandButton {
   /** The reference's tooltip for it, already plain text, shown under the label. */
   help?: string;
   hotkey?: string;
+  binding?: ImportedHotkey;
   icon?: string; // css background url
   enabled: boolean;
   active?: boolean;
@@ -65,6 +68,7 @@ export interface SelectionInfo {
    * food left on it, and the DAT gives its corpse unit no hit points at all. */
   hp?: number;
   maxHp?: number;
+  hpColor?: string;
   details: string[];
   /**
    * The stat row the reference draws beside the portrait (`ObjectStats`):
@@ -81,10 +85,12 @@ export interface SelectionInfo {
    * group as a grid of portraits rather than the first of them, and each is
    * clickable to single out that unit (issue #6).
    */
-  members?: { id: number; name: string; icon?: string; hp: number; maxHp: number }[];
+  members?: { id: number; name: string; icon?: string; hp: number; maxHp: number; hpColor?: string }[];
 }
 
 export interface HudCallbacks {
+  onOptions?(): void;
+  onPreferences?(preferences: Preferences): void;
   /** A grid button was pressed; `shift` is the reference's batch modifier. */
   onCommand(id: string, shift?: boolean): void;
   onTribute?(draft: TributeDraft): { ok: boolean; reason?: string };
@@ -115,6 +121,8 @@ export class Hud {
   root: HTMLElement;
   minimap: Minimap;
   diplomacy: DiplomacyDialog;
+  options: OptionsDialog;
+  private palette = 'default';
   private commandGrid!: HTMLElement;
   private selectionPanel!: HTMLElement;
   private resourceValues: Record<string, HTMLElement> = {};
@@ -155,8 +163,11 @@ export class Hud {
     this.diplomacy = new DiplomacyDialog(this.root, ui, strings,
       draft => this.callbacks.onTribute?.(draft) ?? { ok: false, reason: 'read-only' },
       () => this.callbacks.onSound('button_ui'));
+    this.options = new OptionsDialog(this.root, ui, strings,
+      preferences => this.callbacks.onPreferences?.(preferences), () => this.callbacks.onSound('button_ui'));
     const canvas = this.root.querySelector<HTMLCanvasElement>('#minimap-canvas')!;
     this.minimap = new Minimap(canvas);
+    this.minimap.playerColor = owner => this.uiColor(this.colorName(owner), 'MiniMap');
     this.applyScale();
     addEventListener('resize', this.onResize);
   }
@@ -198,8 +209,25 @@ export class Hud {
     return rgba ? `var(--ui-${colorName}-Text, rgb(${rgba[0]}, ${rgba[1]}, ${rgba[2]}))` : fallback;
   }
 
+  setPalette(palette: string): void {
+    this.palette = palette;
+    installUiColors(this.root, this.ui, palette);
+  }
+
+  private colorName(owner: number): string | undefined {
+    const name = this.playerColors?.players[String(owner)]?.name;
+    return name === 'teal' ? 'Aqua' : name ? name[0].toUpperCase() + name.slice(1) : undefined;
+  }
+
+  uiColor(name: string | undefined, role: string, fallback?: string): string | undefined {
+    const color = name && (this.ui?.colorPalettes?.[this.palette]?.ColorTables?.[name]?.[role]
+      ?? this.ui?.colors?.ColorTables?.[name]?.[role]);
+    return color ? `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${color[3] / 255})` : fallback;
+  }
+
   /** Detach every DOM node and listener this HUD owns (hot reload rebuilds it). */
   destroy(): void {
+    this.options.close();
     this.diplomacy.close();
     this.resolveConfirmation?.('aborted');
     for (const timer of this.messageTimers.values()) window.clearTimeout(timer);
@@ -239,7 +267,7 @@ export class Hud {
         <button class="menu-button" data-icon="objectives" data-widget="Objectives" title="Objectives (not yet available)" disabled></button>
         <button class="menu-button" data-icon="chat" data-widget="Chat" title="Chat (not yet available)" disabled></button>
         <button class="menu-button" data-command="diplomacy" data-icon="diplomacy" data-widget="Diplomacy" title="Diplomacy"></button>
-        <button data-menu="pause" class="menu-button" data-icon="settings" data-widget="Settings" title="Pause (F3)"></button>
+        <button data-options class="menu-button" data-icon="settings" data-widget="Settings" title="Options"></button>
         <button data-menu="open" class="menu-button" data-icon="menu" data-widget="Menu" title="Menu (F10)"></button>
       </div>
       <div id="bottombar-strip" class="panel"></div>
@@ -271,6 +299,7 @@ export class Hud {
         <h2>Menu</h2>
         <button data-menu="resume">Resume</button>
         <button data-menu="restart">Restart</button>
+        <button data-options>Options</button>
         <form id="map-setup">
           <h3 data-map-label="gameSettings">Game Settings</h3>
           <label for="map-choice" data-map-label="mapType">Map Type</label>
@@ -298,6 +327,13 @@ export class Hud {
         <canvas class="end-embers" aria-hidden="true"></canvas>
       </dialog>
     `;
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-options]')) {
+      button.title = this.strings.options ?? 'Options';
+      if (!button.classList.contains('menu-button')) button.textContent = button.title;
+      button.addEventListener('click', () => {
+        this.callbacks.onSound('button_ui'); this.toggleMenu(false); this.callbacks.onOptions?.();
+      });
+    }
 
     // Imported panel art.
     const style = (selector: string, material: string) => {
@@ -653,7 +689,7 @@ export class Hud {
   get confirmationOpen(): boolean { return this.root.querySelector<HTMLDialogElement>('#confirm-dialog')!.open; }
 
   get modalOpen(): boolean {
-    return this.diplomacy.open || this.confirmationOpen || this.root.querySelector<HTMLDialogElement>('#popup-dialog')!.open || this.endOpen;
+    return this.options.element.open || this.diplomacy.open || this.confirmationOpen || this.root.querySelector<HTMLDialogElement>('#popup-dialog')!.open || this.endOpen;
   }
 
   /** Errors that need acknowledgement use the owned generic OK modal. */
@@ -795,7 +831,7 @@ export class Hud {
               <span class="member-portrait" style="background-image:${member.icon ?? 'none'}"></span>
               <span class="member-hp"><span class="member-hp-fill" style="width:${
                 (Math.max(0, Math.min(1, member.maxHp > 0 ? member.hp / member.maxHp : 0)) * 100).toFixed(1)
-              }%"></span></span>
+              }%;${member.hpColor ? `background:${member.hpColor}` : ''}"></span></span>
             </button>`).join('')}
         </div>
         </div>`;
@@ -815,7 +851,7 @@ export class Hud {
         <div class="object-info">
           <div class="object-name">${info.name}</div>
           ${health ? `
-          <div class="hp-bar"><div class="hp-fill" style="width:${(fraction * 100).toFixed(1)}%"></div></div>
+          <div class="hp-bar"><div class="hp-fill" style="width:${(fraction * 100).toFixed(1)}%;${info.hpColor ? `background:${info.hpColor}` : ''}"></div></div>
           <div class="object-hp">${Math.ceil(info.hp!)} / ${info.maxHp}</div>` : ''}
           ${info.details.map(line => `<div class="object-detail">${line}</div>`).join('')}
           ${info.progress ? `
@@ -833,7 +869,7 @@ export class Hud {
       <div ${at('ObjectName')}"><div class="object-name">${info.name}</div></div>
       <div ${at('ObjectImage')}"><div class="portrait" style="background-image:${info.icon ?? 'none'}"></div></div>
       ${health ? `
-      <div ${at('HPProgress')}"><div class="hp-bar"><div class="hp-fill" style="width:${(fraction * 100).toFixed(1)}%"></div></div></div>
+      <div ${at('HPProgress')}"><div class="hp-bar"><div class="hp-fill" style="width:${(fraction * 100).toFixed(1)}%;${info.hpColor ? `background:${info.hpColor}` : ''}"></div></div></div>
       <div ${at('ObjectHealth')}"><div class="object-hp">${Math.ceil(info.hp!)} / ${info.maxHp}</div></div>` : ''}
       ${info.details.length ? `<div ${at('ObjectOwnerNameCulture')}"><div class="object-detail">${info.details.join(' · ')}</div></div>` : ''}
       ${info.stats?.length ? `<div ${at('ObjectStats')}"><div class="object-stats">${info.stats.map(stat => `

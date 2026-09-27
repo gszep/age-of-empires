@@ -62,7 +62,8 @@ off the reference; **measured** — fitted to a reference screenshot;
   ordering is not asserted from the engine. Default gain0.35, pause with the
   match/hidden tab, restart at track one; one native media element at a time.
   Browser WAV playback preserves decoded PCM; Wwise bus DSP and music-mode
-  selection remain outside this consumer (mixing #243, options #141).
+  selection remain outside this consumer (mixing #243). #141 supplies persisted
+  music/sound volume controls, including silent pause at zero music volume.
 
 ## Explicit gather-point targeting (#239)
 
@@ -75,6 +76,29 @@ off the reference; **measured** — fitted to a reference screenshot;
 - **Integration policy:** left-click issues public rally commands for the armed
   owned producers and returns to normal; Escape/right-click/selection change
   cancels without changing a rally. Ordinary right-click rally remains available.
+
+## Local options and native hotkey profiles (#141)
+
+- **Owned:** WPFG screenoptions and its audio/game/interface/hotkey tabs;
+  original panel00 nine-slice,1810×1500 panel metrics, font sizes and native
+  button resources. Localization supplies the option/profile/palette labels.
+  Both shared and game-specific hotkey-group lists are read; unit hotkey-text
+  IDs minus139000 and technology description IDs plus10000 identify native
+  string bindings. Four native profiles preserve explicit missing bindings.
+- **Chosen UI adapter:** the supported controls share one centered compact
+  panel rather than reproducing all five full-screen tabs. Browser select/range
+  controls and linear0–100 volume scaling are integration choices. Defaults
+  preserve the preceding sound gain1/music gain.35 and Normal speed. Apply/OK
+  persist a validated local preference; Cancel discards the uncommitted draft.
+- **Boundary:** speed stays a pacing preference; shared changes use the public
+  settings channel and joining/reloading never sends local saved speed. Keys
+  and palettes remain view-only. Native ram unloadT/cell5 and relic dropQ/cell1
+  replace the old generic unit-unload cell when the source bindings are known.
+- **Palette scope:** owned UI roles colour score/diplomacy badges, text,
+  non-default selection health bars and live/remembered minimap dots. The field
+  is labelled Interface: Color Blind Mode. World sprites/portrait ramps still
+  use their existing original.pal blocks; the separately inspected256-entry
+  colour-blind sprite LUTs require their actual shader addressing (#246).
 
 ## Civilisation roster / selection foundation (#122)
 
@@ -251,10 +275,10 @@ off the reference; **measured** — fitted to a reference screenshot;
   view callback. One entry per paid slot, active/pending rows, green/yellow/red
   overlay amounts and count typography are **inferred** integration, not a
   complete reconstruction of engine aggregation. No production rules change.
-- **Palette scope:** URL-selected CSS palette applies to player text; imported
-  tags supply lower-HUD healthy bars and modal backdrop. The UI variants do not
-  change sprite ramps, world health bars or minimap colours. #141 owns the
-  future options-screen control. `GameMsgPanel.json` supplies nine empty full-
+- **Palette scope:** #141 now owns the persisted interface selector and its
+  score/diplomacy, selection-health and minimap roles (above); source tags still
+  supply default lower-HUD healthy bars and modal backdrop. World sprite LUTs
+  remain #246. `GameMsgPanel.json` supplies nine empty full-
   screen anchors, not the message typography described in the original issue.
 - **Defeat announcement:** collection origin (1140,110), 520×100 Surround,
   75×75 civilisation icon, 42×42 number badge and label at x=144.5 are **owned**
