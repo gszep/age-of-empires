@@ -14,6 +14,18 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## Audio pack boundary (#57)
+
+- **Owned:** shared PCK bank/stream tables, HIRC objects and DIDX prefetch
+  entries. Complete PCK streams replace matching embedded prefixes. Repeated
+  pack inputs resolve cross-bank references with bank-local ID precedence;
+  ambiguous global IDs are excluded from fallback. See `docs/audio-reference.md`.
+- **Existing inferred resolver boundary:** random/sequence container children
+  are found by matching packed IDs, not a complete versioned Wwise node parser.
+  Flat media lists do not reproduce weights, mix layers, delays or DSP. Music
+  HIRC10–13 is now inventoried but remains outside this effects-only resolver.
+  Decoded WAV identity is verified; reference mixer equivalence is not claimed.
+
 ## Civilisation roster / selection foundation (#122)
 
 - **Owned:** identity, era, HUD family, display/computer names and emblems come

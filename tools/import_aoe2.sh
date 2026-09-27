@@ -20,6 +20,7 @@ GRAPHICS="$DEPOT_ROOT/depot_813784/resources/_common/drs/graphics"
 # The Enhanced Graphics Pack (depot 1039811): optional, preferred when present.
 UHD_GRAPHICS="$DEPOT_ROOT/depot_1039811/resources/_common/drs/graphics"
 AUDIO_PACK="$DEPOT_ROOT/depot_813783/wwise/Base.pck"
+AUDIO_STREAM_PACK="$DEPOT_ROOT/depot_813783/wwise/Base.1.pck"
 
 for required in "$DAT" "$SOUNDS" "$BLENDOMATIC" "$HOTKEYS" "$STRINGS" "$PALETTES" "$WIDGETUI" "$TERRAIN" "$GRAPHICS"; do
   if [ ! -e "$required" ]; then
@@ -47,13 +48,17 @@ uv run --project "$ROOT" --locked python "$ROOT/tools/import_blends.py" \
   --blendomatic "$BLENDOMATIC" --de-blends "$DE_BLENDS"
 
 if [ -f "$AUDIO_PACK" ]; then
+  if [ ! -f "$AUDIO_STREAM_PACK" ]; then
+    echo "Incomplete owned audio depot: missing $AUDIO_STREAM_PACK" >&2
+    exit 2
+  fi
   if ! command -v vgmstream-cli >/dev/null; then
     echo "Owned Wwise audio found, but vgmstream-cli is missing." >&2
     echo "Install vgmstream (macOS: brew install vgmstream), then rerun." >&2
     exit 2
   fi
   uv run --project "$ROOT" --locked python "$ROOT/tools/import_audio.py" \
-    --pack "$AUDIO_PACK" --content "$ROOT/.local/aoe2de/content.json"
+    --pack "$AUDIO_PACK" --pack "$AUDIO_STREAM_PACK" --content "$ROOT/.local/aoe2de/content.json"
 else
   rm -rf "$ROOT/public/imported/aoe2/audio"
   echo "Optional audio depot 813783 not found; continuing without audio." >&2

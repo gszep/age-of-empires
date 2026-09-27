@@ -2,7 +2,7 @@
 """Resolve consumed Wwise events and decode their owned media with vgmstream.
 
 This intentionally implements only the small, evidenced AKPK/BNK boundary the
-slice consumes: event -> Play action -> sound/container -> embedded DIDX media.
+slice consumes: event -> Play action -> sound/container -> DIDX or PCK media.
 The codec remains delegated to the permissively licensed vgmstream CLI.
 """
 
@@ -15,19 +15,35 @@ import shutil
 import subprocess
 import tempfile
 import wave
+from collections import ChainMap
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from struct import unpack_from
 from typing import Any
 
-from wwise_pck import extract, read_index
+from wwise_pck import PackedFile, extract, read_index
+
+
+@dataclass(frozen=True)
+class Stream:
+    pack: Path
+    entry: PackedFile
+
+    def read_bytes(self) -> bytes:
+        with self.pack.open("rb") as handle:
+            data = extract(handle, self.entry)
+        if len(data) != self.entry.size:
+            raise ValueError(f"{self.pack.name}: truncated stream {self.entry.id}")
+        return data
 
 
 @dataclass(frozen=True)
 class Bank:
     name: str
-    objects: dict[int, tuple[int, bytes]]
-    media: dict[int, bytes]
+    objects: Mapping[int, tuple[int, bytes]]
+    media: Mapping[int, bytes | Stream]
+    pack: str = ""
 
 
 def wwise_id(name: str) -> int:
@@ -50,6 +66,8 @@ def _chunks(data: bytes) -> dict[bytes, bytes]:
             raise ValueError(f"truncated Wwise bank chunk {tag!r}")
         chunks[tag] = data[offset + 8:end]
         offset = end
+    if offset != len(data):
+        raise ValueError("trailing bytes after Wwise bank chunks")
     return chunks
 
 
@@ -58,15 +76,23 @@ def read_bank(name: str, data: bytes) -> Bank:
     hirc = chunks.get(b"HIRC")
     didx = chunks.get(b"DIDX")
     payload = chunks.get(b"DATA")
-    if hirc is None or didx is None or payload is None:
-        raise ValueError(f"{name}: bank lacks HIRC/DIDX/DATA")
+    if hirc is None:
+        raise ValueError(f"{name}: bank lacks HIRC")
+    if (didx is None) != (payload is None):
+        raise ValueError(f"{name}: bank has incomplete DIDX/DATA")
 
+    if len(hirc) < 4:
+        raise ValueError(f"{name}: truncated HIRC count")
     count = unpack_from("<I", hirc, 0)[0]
     offset = 4
     objects: dict[int, tuple[int, bytes]] = {}
     for _ in range(count):
+        if offset + 9 > len(hirc):
+            raise ValueError(f"{name}: truncated HIRC object")
         object_type = hirc[offset]
         size = unpack_from("<I", hirc, offset + 1)[0]
+        if size < 4 or offset + 5 + size > len(hirc):
+            raise ValueError(f"{name}: invalid HIRC object size")
         object_id = unpack_from("<I", hirc, offset + 5)[0]
         objects[object_id] = (object_type, hirc[offset + 9:offset + 5 + size])
         offset += 5 + size
@@ -74,26 +100,65 @@ def read_bank(name: str, data: bytes) -> Bank:
         raise ValueError(f"{name}: malformed HIRC object table")
 
     media: dict[int, bytes] = {}
+    didx = didx or b""
+    payload = payload or b""
+    if len(didx) % 12:
+        raise ValueError(f"{name}: malformed DIDX table")
     for offset in range(0, len(didx), 12):
         media_id, data_offset, size = unpack_from("<3I", didx, offset)
+        if data_offset + size > len(payload):
+            raise ValueError(f"{name}: truncated embedded media {media_id}")
         media[media_id] = payload[data_offset:data_offset + size]
     return Bank(name, objects, media)
 
 
 def read_banks(pack: Path) -> list[Bank]:
+    return read_audio_packs([pack])
+
+
+def read_audio_packs(packs: Sequence[Path]) -> list[Bank]:
+    """Join bank graphs and stream indices, retaining bank-local ID precedence.
+
+    DIDX can contain only a stream's prefetch prefix. The full PCK stream wins.
+    Streams stay on disk until consumed. Wwise IDs are not globally unique:
+    Init's buses collide with events, and Play actions can differ by bank ID.
+    Only unambiguous objects are exposed as cross-bank fallbacks; each bank's
+    own objects always win. Do not silently overwrite a conflicting object.
+    """
     banks: list[Bank] = []
-    with pack.open("rb") as handle:
-        for entry in read_index(handle)["banks"]:
-            data = extract(handle, entry)
-            try:
-                banks.append(read_bank(str(entry.id), data))
-            except ValueError:
-                # Init/control banks may legitimately have no embedded media.
-                continue
-    return banks
+    streams: dict[int, Stream] = {}
+    shared_objects: dict[int, tuple[int, bytes]] = {}
+    ambiguous: set[int] = set()
+    shared_media: dict[int, bytes | Stream] = {}
+    for pack in sorted(set(packs)):
+        with pack.open("rb") as handle:
+            index = read_index(handle)
+            for entry in index["streams"]:
+                stream = Stream(pack, entry)
+                if entry.id in streams and streams[entry.id].read_bytes() != stream.read_bytes():
+                    raise ValueError(f"conflicting stream {entry.id} in {pack.name}")
+                streams[entry.id] = stream
+            for entry in index["banks"]:
+                bank = read_bank(str(entry.id), extract(handle, entry))
+                banks.append(Bank(bank.name, bank.objects, bank.media, pack.name))
+                for object_id, value in bank.objects.items():
+                    if object_id in shared_objects and shared_objects[object_id] != value:
+                        ambiguous.add(object_id)
+                    shared_objects[object_id] = value
+                for media_id, data in bank.media.items():
+                    if media_id in shared_media and shared_media[media_id] != data:
+                        raise ValueError(f"conflicting embedded media {media_id}")
+                    shared_media[media_id] = data
+    for object_id in ambiguous:
+        del shared_objects[object_id]
+    # Events are entry points of their owning bank, not cross-bank fallbacks.
+    # Sharing them would resolve each cue once for every loaded bank.
+    shared_objects = {key: value for key, value in shared_objects.items() if value[0] != 4}
+    return [Bank(bank.name, ChainMap(bank.objects, shared_objects),
+                 ChainMap(streams, bank.media, shared_media), bank.pack) for bank in banks]
 
 
-def _object_references(payload: bytes, objects: dict[int, tuple[int, bytes]]) -> list[int]:
+def _object_references(payload: bytes, objects: Mapping[int, tuple[int, bytes]]) -> list[int]:
     # HIRC object lists are packed and not guaranteed to be 4-byte aligned.
     references: list[int] = []
     for offset in range(len(payload) - 3):
@@ -164,7 +229,7 @@ def resolve_event(bank: Bank, event_name: str, switch: str | None = None) -> lis
 
 
 def resolve_event_id(bank: Bank, event_id: int, switch: str | None = None) -> list[int]:
-    """Every embedded medium one event plays.
+    """Every available medium one event plays.
 
     Widget cues arrive as a name to hash; unit voices arrive as the DAT's own
     `wwise_*_sound_id`, which is already the hashed id (as a signed integer).
@@ -204,7 +269,7 @@ def resolve_event_id(bank: Bank, event_id: int, switch: str | None = None) -> li
 
     for action_id in action_ids:
         action = bank.objects.get(action_id)
-        if not action or action[0] != 3 or len(action[1]) < 6:
+        if not action or action[0] != 3 or len(action[1]) < 6 or action[1][1] != 4:
             continue
         # Scope byte, action-type byte, then the target HIRC object ID.
         descend(unpack_from("<I", action[1], 2)[0], set())
@@ -244,14 +309,15 @@ def consumed_cues(ui_manifest: Path, content: Path | None) -> list[dict[str, Any
 
 
 def import_audio(
-    pack: Path, ui_manifest: Path, out: Path, decoder: str = "vgmstream-cli",
+    pack: Path | Sequence[Path], ui_manifest: Path, out: Path, decoder: str = "vgmstream-cli",
     content: Path | None = None,
 ) -> dict[str, Any]:
     executable = shutil.which(decoder)
     if not executable:
         raise FileNotFoundError(f"{decoder} is required (macOS: brew install vgmstream)")
     cues = consumed_cues(ui_manifest, content)
-    banks = read_banks(pack)
+    packs = [pack] if isinstance(pack, Path) else list(pack)
+    banks = read_audio_packs(packs)
     out.mkdir(parents=True, exist_ok=True)
     for old in out.glob("*.wav"):
         old.unlink()
@@ -270,7 +336,8 @@ def import_audio(
                 raise ValueError(f"Wwise event {event_name!r} did not resolve to embedded media")
             files = []
             for index, (bank, media_id) in enumerate(matches):
-                media = bank.media[media_id]
+                source = bank.media[media_id]
+                media = source.read_bytes() if isinstance(source, Stream) else source
                 wem = temp / f"{media_id}.wem"
                 suffix = "" if len(matches) == 1 else f"-{index}"
                 target = out / f"{alias}{suffix}.wav"
@@ -286,6 +353,8 @@ def import_audio(
                     "file": target.relative_to(out).as_posix(),
                     "mediaId": media_id,
                     "bankId": int(bank.name),
+                    "pack": source.pack.name if isinstance(source, Stream) else bank.pack,
+                    "storage": "stream" if isinstance(source, Stream) else "embedded",
                     "seconds": round(duration, 6),
                     "sha256": sha256(target.read_bytes()),
                 })
@@ -300,7 +369,7 @@ def import_audio(
     manifest = {
         "audio": imported,
         "source": {
-            "pack": pack.name,
+            "packs": sorted({pack.name for pack in packs}),
             "mediaSha256": source_hashes,
             "decoder": {"name": "vgmstream-cli", "version": decoder_version},
         },
@@ -311,7 +380,7 @@ def import_audio(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--pack", type=Path, required=True)
+    parser.add_argument("--pack", type=Path, action="append", required=True)
     parser.add_argument("--ui-manifest", type=Path, default=Path("public/imported/aoe2/ui/manifest.json"))
     parser.add_argument("--out", type=Path, default=Path("public/imported/aoe2/audio"))
     parser.add_argument("--decoder", default="vgmstream-cli")

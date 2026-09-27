@@ -44,6 +44,7 @@ app_813780/
 ├── depot_813782/widgetui/
 ├── depot_813783/wwise/Base.pck
 ├── depot_813784/resources/_common/drs/graphics/
+├── depot_813783/wwise/Base.1.pck           # required with shared audio
 ├── depot_813787/wwise/en/Base.pck          # optional localized audio
 └── depot_1039811/                          # optional Enhanced Graphics Pack (about 26 GB)
 ```

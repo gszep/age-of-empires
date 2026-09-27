@@ -359,7 +359,11 @@ bar, menu panel, minimap with four buttons and a flare, score panel — in the
 reference's face and colours (#69), names and tooltips from the strings file
 (#48), portraits in the owner's colour (#77), context refusals in the
 reference's words (#70); unit voices and the feedback cues from the owned
-audio.
+audio. The importer reads both shared packs, including all722 indexed streams,
+and prefers complete streams over short DIDX prefetches (#57). Cross-bank and
+owned decode/determinism tests cover that boundary; `docs/audio-reference.md`
+records the construction, order-voice, terrain and music sources found for the
+remaining playback work.
 
 Minimap buildings use compact, equal-sized live and fog-memory markers (#84),
 with farms hidden according to the DAT's `minimap_mode`.

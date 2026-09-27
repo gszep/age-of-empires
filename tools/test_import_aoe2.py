@@ -14,7 +14,7 @@ from PIL import Image
 from depot import Graphics, depot_root, uhd_graphics_dir
 from import_content import effects_of, extract, import_drop_sites, player_attribute_ids, player_attributes, sha256
 from import_ui import extract_ui
-from import_audio import import_audio, read_banks, resolve_event
+from import_audio import Stream, import_audio, read_audio_packs, read_banks, resolve_event
 from convert_sld import convert, convert_terrain
 from audit_civilizations import audit as audit_civilizations, classify_command, markdown as civilization_report, prerequisites
 
@@ -1992,7 +1992,33 @@ class AtlasPackingTest(unittest.TestCase):
 class AudioImportIntegrationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.banks = read_banks(AUDIO_PACK)
+        cls.packs = [AUDIO_PACK, AUDIO_PACK.with_name('Base.1.pck')]
+        cls.banks = read_audio_packs(cls.packs)
+
+    def test_second_pack_stream_decodes_completely_and_repeatably(self):
+        from import_audio import resolve_event_id
+        # Base.1 has no HIRC banks: its event lives in Base, with only a short
+        # DIDX prefetch. Decode through the public importer, not the index alone.
+        streamed = next((event_id, media_id) for bank in self.banks
+                        for event_id, (kind, _) in bank.objects.items() if kind == 4
+                        for media_id in resolve_event_id(bank, event_id)
+                        if isinstance(bank.media[media_id], Stream)
+                        and bank.media[media_id].pack.name == 'Base.1.pck')
+        event_id, media_id = streamed
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ui, content = root / 'ui.json', root / 'content.json'
+            ui.write_text('{"sounds":{}}')
+            content.write_text(json.dumps({'entities': {'probe': {'sounds': {'stream': event_id}}}}))
+            first = import_audio(self.packs, ui, root / 'first', content=content)
+            second = import_audio(list(reversed(self.packs)), ui, root / 'second', content=content)
+            self.assertEqual(first, second)
+            files = first['audio']['probe-stream']['files']
+            cue = next(file for file in files if file['mediaId'] == media_id)
+            self.assertEqual((cue['pack'], cue['storage']), ('Base.1.pck', 'stream'))
+            self.assertGreater(cue['seconds'], 1)
+            self.assertEqual((root / 'first' / cue['file']).read_bytes(),
+                             (root / 'second' / cue['file']).read_bytes())
 
     def test_widget_event_resolves_through_hirc_to_owned_media(self):
         matches = [

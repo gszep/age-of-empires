@@ -99,11 +99,15 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    while the classic sheets use isometric-diamond UVs. No SLD decoding changes.
 6. When sound depot 813783 and `vgmstream-cli` are available,
    `import_audio.py` follows consumed cues through the owned PCK/BNK HIRC
-   graph, extracts only referenced DIDX media, and writes deterministic
+    graph across repeated `--pack` inputs, prefers complete PCK streams over
+    DIDX prefetch prefixes, and writes deterministic
    browser-playable WAV cues under `public/imported/aoe2/audio/`. Widget cues
    arrive as event names to hash; unit voices arrive as the Wwise ids the DAT
    already holds, narrowed to the imported civilisation's branch of the
-   `Civilization` switch container.
+    `Civilization` switch container.
+    The full pipeline requires both `Base.pck` and `Base.1.pck` when the shared
+    audio depot is present. `audio_inventory.py` audits banks/streams and numeric
+    `--event` IDs without publishing assets; see `docs/audio-reference.md`.
 
 `npm run test:import` runs the integration suite (`test_import_aoe2.py`) against
 the owned fixture, including determinism checks.
@@ -146,6 +150,8 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | building elevation placement | `unit.hill_mode`: Briton town center 109 = 2, house 70/farm 50/walls/towers/gates = 0, barracks 12/mill 68/camps 562/584/dock 45/castle 82 = 3. Thracian barracks = 0, TC = 2. Mode meaning is community-documented UGC attribute 187: 0 unrestricted, 2 flat only, 3 allows one elevation difference (1 unused/no hill corners). DAT owns the per-building choice, not our tile-height range interpretation (#176) |
 | selection marker shape and size | `unit.obstruction_type` (5 = round unit outline, others square/footprint), `unit.outline_size_x/_y` (half-extents in tiles, can exceed the collision box) |
 | movement speed, walk graphic | `unit.speed`; `unit.dead_fish.walking_graphic` |
+| order acknowledgements and construction audio | `unit.bird.wwise_move_sound_id` / `.wwise_attack_sound_id`; `unit.building.wwise_construction_sound_id`. Signed event IDs normalize to uint32. Construction TC109 shares its selection event1357475385. These are separate from weapon animation sounds |
+| graphic and ambient audio | `graphic.wwise_sound_id`, `.angle_sounds_used`, `.angle_sounds`; terrain `.wwise_sound_id`. A zero graphic-wide ID does not mean the frame/direction sound entries are empty |
 | idle / death graphics | `unit.standing_graphic`, `unit.dying_graphic` |
 | cost and train time/location | `unit.creatable.resource_costs`; `unit.creatable.train_locations[0].unit_id/.train_time` |
 | combat (attacks, armor, range, projectile) | `unit.type_50.*` — `.attacks`, `.attack_graphic`, `.projectile_unit_id`, `.graphic_displacement` (launch offset, z = height) |
