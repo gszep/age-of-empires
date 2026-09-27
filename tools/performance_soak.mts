@@ -50,6 +50,9 @@ const soakDistribution = values => {
 Object.assign(globalThis, { __performanceSoak: () => ({
   timings: Object.fromEntries(Object.entries(soakSamples).map(([key, values]) => [key, soakDistribution(values)])),
   gpu: { ...renderer.info.memory }, sprites: assets?.spriteResidency?.stats,
+  audio: { active: audioPlayer.active.size, pending: audioPlayer.pending.size, fades: audioPlayer.fades.size,
+    playing: [...audioPlayer.active.keys()].filter(element => !element.paused).length,
+    music: !!musicPlayer.element, musicTime: musicPlayer.element?.currentTime, musicPaused: musicPlayer.element?.paused },
   bindingFailure: soakBindingFailure,
   spritePolicy: { ...assets?.spriteResidency?.policy },
   heap: performance.memory?.usedJSHeapSize, views: views.size, tick: game.tick,
@@ -59,7 +62,7 @@ Object.assign(globalThis, { __performanceSoak: () => ({
     const texture = piece.mapNode?.value ?? piece.mesh.material.map;
     return texture?.source?.data === null ? [{ key, part, image: piece.textureImage, pending: piece.pendingTexture }] : [];
   })),
-  entities: game.entities.length, winner: game.winner, setup: activeSetup,
+  entities: game.entities.length, winner: game.winner, draw: game.draw, setup: activeSetup,
   ages: [game.players[1].age, game.players[2].age],
   look: game.entities.find(e => e.owner === 1 && !e.dead && e.activity === 'attacking')?.id
     ?? game.entities.find(e => e.owner === 1 && !e.dead && e.activity === 'moving')?.id
@@ -144,25 +147,44 @@ try {
       console.log(JSON.stringify({ event: 'failure-snapshot', file }));
     }
     assert.deepEqual(errors, [], 'no page crashes, script failures or missing owned assets');
+    assert(metrics.audio.active <= 24 && metrics.audio.pending <= metrics.audio.active
+      && metrics.audio.fades <= metrics.audio.active, 'audio layers/timers/fades stay within the active-source budget');
     assert(available > 1.5 * 1024 ** 3, 'stop workload before exhausting the host memory envelope');
-    stalled = metrics.tick === lastTick && !metrics.winner ? stalled + 1 : 0;
+    stalled = metrics.tick === lastTick && !metrics.winner && !metrics.draw ? stalled + 1 : 0;
     assert(stalled < 3, 'simulation must continue advancing');
     lastTick = metrics.tick;
-    if (metrics.winner || metrics.tick >= tickLimit || Date.now() - roundStarted > 30 * 60_000) {
+    if (metrics.winner || metrics.draw || metrics.tick >= tickLimit || Date.now() - roundStarted > 30 * 60_000) {
       console.log(JSON.stringify({ event: 'round-end', at: new Date().toISOString(), round: rounds, tick: metrics.tick, winner: metrics.winner,
-        reason: metrics.winner ? 'victory' : metrics.tick >= tickLimit ? 'tick-limit' : 'wall-limit',
+        reason: metrics.winner ? 'victory' : metrics.draw ? 'draw' : metrics.tick >= tickLimit ? 'tick-limit' : 'wall-limit',
         synchronizationHash: (await query({ type: 'sim' })).synchronizationHash }));
       rounds++;
       if (Date.now() >= until) break;
-      if (metrics.winner) await page.locator('#end-dialog [data-end="leave"]').click();
-      else await page.keyboard.press('F10');
-      await page.select('#map-choice', maps[rounds % maps.length]);
-      await page.locator('#map-seed').fill(String(3 + rounds));
-      await page.locator('#map-setup button[type="submit"]').click();
-      await page.waitForSelector('#menu-dialog.hidden');
-      const setup = (await query({ type: 'sim' })).connection.setup;
-      assert.equal(setup.map, maps[rounds % maps.length]);
-      assert.equal(setup.seed, 3 + rounds);
+      try {
+        // Freeze through the public pause key before opening the form. A live
+        // 10x match can otherwise end while filling it and cover Submit with
+        // the victory dialog. Refresh the outcome after the pause request.
+        if (!(await query({ type: 'sim' })).connection.paused) await page.keyboard.press('F3');
+        const latest = await page.evaluate(() => (window as any).__performanceSoak());
+        if (latest.winner || latest.draw) await page.locator('#end-dialog [data-end="leave"]').click();
+        else if (await page.$eval('#menu-dialog', e => e.classList.contains('hidden'))) await page.keyboard.press('F10');
+        await page.select('#map-choice', maps[rounds % maps.length]);
+        await page.locator('#map-seed').fill(String(3 + rounds));
+        await page.locator('#map-setup button[type="submit"]').click();
+        await page.waitForSelector('#menu-dialog.hidden');
+        const setup = (await query({ type: 'sim' })).connection.setup;
+        assert.equal(setup.map, maps[rounds % maps.length]);
+        assert.equal(setup.seed, 3 + rounds);
+      } catch (error) {
+        const state = await query({ type: 'snapshot' });
+        const { rules, ...saved } = state;
+        const ui = await page.evaluate(() => ({ end: document.querySelector<HTMLDialogElement>('#end-dialog')?.open,
+          menu: document.querySelector('#menu-dialog')?.className,
+          submit: document.querySelector<HTMLButtonElement>('#map-setup button[type="submit"]')?.disabled }));
+        const file = `${root}.local/performance-soak-transition-${process.pid}.json`;
+        writeFileSync(file, JSON.stringify({ version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved, metrics, ui, error: String(error) }) + '\n');
+        console.log(JSON.stringify({ event: 'transition-failure', file, ui, error: String(error) }));
+        throw error;
+      }
       await setSpeed();
       await startRound();
     } else if (metrics.look !== undefined) await query({ type: 'look', entity: metrics.look });

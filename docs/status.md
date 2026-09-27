@@ -37,6 +37,12 @@ npm run dev
   remembered choice, or Arabia/42 on a first visit. F4 reveals the map;
   `+`/`-` step the game speed.
 
+The 2026-09-27 audio-first run also passed a39-minute private five-map endurance
+workload:150 samples,19 completed tick-limit rounds, no recorded browser/asset
+errors, and sampled audio within24 sources. The full natural27-track soundtrack
+cycle passed separately. Receipts, the earlier interrupted run and limits are
+recorded in [handoff.md](handoff.md).
+
 Controls and hotkeys are in `README.md`. `F10 → Load replay…` plays a
 headless record and checks its periodic hashes.
 

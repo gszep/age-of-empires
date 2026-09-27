@@ -1,100 +1,104 @@
-# Handoff — verified shared-reference audit
+# Handoff — audio-first autonomous run, 2026-09-27
 
-## Assignment and checkpoints
+## Assignment and play
 
-Serial main-tree implementation. User authorized work and
-commit/push, **not exact engine inferences**. Relics are in 508a2f2; diplomacy is
-pushed as **ec26a02**. This checkpoint delivers Regicide with the green receipt below.
-Market/charge/conversion/Treason source follow-up is now recorded in
-[shared-reference-audit.md](shared-reference-audit.md). It unblocks owned PDF
-reading and corroborates core conversion/shared-price policy; exact remaining
-runtime questions stay explicit. No all-civilisation expansion was taken.
+User-authorized window: **09:46–20:46 BST**, audio #57 first, then logical
+non-civilisation work, one fully gated and pushed checkpoint at a time.
+Britons/Franks remain the only enabled profiles.
 
-**Audit follow-up verified (2026-09-27):** locked pypdf/extractor, two PDF tests
-and evidence corrections; no simulation/import-pipeline change. After the user
-confirmed Cyberpunk was finished, process inspection confirmed it was absent.
-Full one-worker gate **GREEN**, exit0: **960 tests /73 files**, build,
-**130 Python/owned-content tests**, real-browser debug smoke. Receipt:
-`.local/shared-reference-audit-gate.log`. No timeouts were widened. Only Markdown
-changed after gate start. The latest gameplay checkpoint remains **444e91b**;
-this handoff accompanies the separately verified audit/tooling checkpoint.
-New #241 tracks live protocol skew/state-preserving deployment; #242 tracks
-Siphons field semantics. The managed service and its state were left untouched.
+- Solo desktop: <http://localhost:5173/?solo=1>
+- Tailnet solo QA: <https://ysgramor.tail6e864b.ts.net:5173/?solo=1>
+- Fishing opening: <http://localhost:5173/?solo=1&map=islands&seed=3>
+- Shared deployment remains blocked by **#241**: managed live host protocol1
+  versus current frontend protocol2. Preserve its live state and routes until
+  a state-preserving migration is verified.
 
-## Acceptance checklist
+## Delivered checkpoints
 
-- [x] Two-player Diplomacy opens from the native button and market, using owned
-  WPFG geometry/fonts/icon states. 100/Shift500/CTRL-all, right-click subtraction,
-  Clear/Cancel/OK, atomic payment, current fees/stock and market-loss rejection.
-  Replay is read-only. Existing opposing teams remain locked; relation and Allied
-  Victory controls are disabled. No unlocked/allied gameplay is offered.
-- [x] Regicide setup checkbox and direct `?mode=regicide` selection; mode persists
-  through save/reload/restart, shared snapshots/checkpoints, headless and replay.
-- [x] King434 source stats/flags/art/icon/voice in both enabled profiles.75HP,
-  speed1.32, LOS6, unarmed/untrainable, conversion immunity and Delete confirmation.
-  Public shelter works and displays the original occupied-building flag.
-- [x] Ten villagers and Castle/player. Modern RMS bands plus **Black Forest's
-  REGICIDE_BACKWARD override**, and Islands' separate classic bands. Source
-  contract: `src/sim/refdata/regicide.json` / `tools/regicide_reference.py`.
-- [x] Royal survival scans nested carriers. Combat loss ends the game; razed
-  buildings can release their King, sinking ships lose cargo. Simultaneous
-  losses draw, with explicit state/protocol/result and HUD explanation.
-  Nested population is counted recursively by each passenger's owner, including
-  an immune King aboard a converted enemy carrier.
-- [x] Repeatable400-gold Treason: current King/carrier positions on the minimap,
-  flashing X, no research queue/journal or normal fog reveal. Random-map Spies
-  is mode-isolated. JSON continuation preserves the paid reveal window.
-- [x] 50 seeds per RMS map; all six maps deterministic/JSON-continuable. Real
-  shared-wire tests cover payment, mode restart/checkpoint, invalid modes and
-  old-client rejection. The existing relic transport journey still passes.
-- [x] `tools/regicide_smoke.mts`: real setup/King click/voice, reload/restart,
-  return to RM, paid Treason with blink/expiry pixels at hidden garrisoned King,
-  shelter/flag, royal Delete defeat, actual-file-input v2 replay verification.
-  Simultaneous public King deletions also verify the draw popup without a false
-  winner/defeat frame.
-- [x] `tools/regicide_shared_smoke.mts`: two real clients, guest setup locked,
-  actual Treason click/payment and equal hashes, both mode switches, reconnect.
-- [x] Final Regicide full gate: **960 tests /73 files**, build,
-  **128 owned-content tests**, real-browser debug smoke; exit0 in
-  `.local/regicide-gate-r3.log`. One worker, unchanged test timeouts.
+| Commit | Issue | Delivered and verified |
+| --- | --- | --- |
+| `be0e695` | #57 | Both shared audio packs, cross-bank resolution, complete streams rather than embedded prefixes, lazy reads and inventory tests. |
+| `5810300` | #114 | Distinct order voices, frame-driven combat/work/death sounds, construction completion and visible-terrain ambience; browser playback/PCM checks. |
+| `944a730` | #115 | Owned in-game playlist: 27 complete tracks, 6676.378775 seconds, one live music source; full natural cycle and wrap verified. |
+| `380817c` | #239 | Producer selection retains ordinary cursor; explicit Set Gather Point/T arms flag/left-click placement, with cancellation and right-click shortcut checks. |
+| `3283a6e` | #245 | Native zero-based command sequences: town bell cell15/B, building ungarrison cell10/G; actual key execution verified. |
+| `7eab67b` | #141 | Persisted speed, music/sound volume, four owned hotkey profiles and interface colour-blind palettes; owned UI, reload/cancel, palette pixels and private shared-speed authority checks. |
+| `6ffea73` | #247 | SLD validation before cached atlas publication. Selected sources569/569 pass; x1 counterparts567/569, with two damaged monk files. |
+| `13a7bc5` | #91 | Fog-safe observation-v8 explored terrain/elevation and observation-only AI docks/fishing. Natural owned seeds2/3/7 and owned/fallback browser openings bank fish. |
+| `8b1aad8` | #248 | Wwise Play-action layers, delay/ranges, probability and linear fades. Browser measures training horn/voice separation at500.8ms; delayed/fading sources remain cancellable within24-source budget. |
 
-## Verification receipts
+Each feature checkpoint passed the full gate before push. Last feature gate:
+`.local/audio248-gate.log`, **997 Vitest tests /81 files**, build,
+**149 Python/owned-content tests**, real-browser debug smoke, exit0.
+Source boundaries and inferred integration choices are in
+[audio-reference.md](audio-reference.md), [ai-fishing.md](ai-fishing.md),
+[source-integrity.md](source-integrity.md) and [ledger.md](ledger.md).
 
-- Diplomacy: `.local/diplomacy-gate-r1.log` GREEN, **931 tests /72 files**, build,
-  **126 owned-content tests**, browser smoke. Owned and fallback dedicated browser
-  checks pass. Full pipeline `.local/diplomacy-import-r2.log`, exit0.
-- Regicide full pipeline `.local/regicide-import-r1.log`, exit0. Original King
-  layers were converted; existing atlases reused. Source contracts pass for both
-  profiles. Focused Regicide/session/relic checks pass; private solo and
-  two-client browser evidence above. No test clock widened.
-- Final gate regressions were contract assumptions, now corrected: spawn-only
-  King definitions are not trainable offers, observation pins follow v7, and the
-  King retains only its actually present owned name rather than invented
-  creation/help text. No non-Markdown edit followed the final gate start.
-- A diplomacy probe's retained `$eval` handle could detach between CDP calls,
-  yielding a zero rectangle. Querying/measuring in one browser turn fixes that
-  probe race; it does not change gameplay or widen clocks.
+## Endurance verification and final tooling
 
-## Exact boundaries and operations
+`tools/performance_soak.mts` now reports active/pending/fading/playing audio
+sources and music playhead. Samples assert the24-source cap and that pending
+and fading layers belong to active sources. Public F3 pauses before map setup;
+draws end rounds, and failed transitions save state/UI diagnostics. No fixture
+timeout was widened.
 
-- #240 tracks native calibration:10-second Treason lifetime, half-second blink,
-  X size, live tracking/refresh semantics and Castle/no-age/no-queue availability;
-  inherited starting-resource preset; King garrison-category mapping, immunity
-  inside converted carriers and extra task109/Guard13 semantics. These are agent
-  integration choices, not user-approved facts or measured DE parity.
-- RMS adapter uses seeded scans, integer positions, simplified actor exclusion
-  and existing land IDs. Cliff rules are vacuous without cliff entities (#134).
-  Survey/proof starts are explicitly authored nearest-legal placements.
-- #124 records absent King-specific shelter/escort/Treason strategy decisions;
-  King is not treated as an army unit. #130/#95 retain relic/fish calibration gaps.
-- Observation **v7**, new records/results **v2** with mode. Legacy record **v1**
-  requires no mode and means RM. Shared **v2** rejects v1 clients/checkpoints;
-  incompatible checkpoints remain preserved. Dev save **v3** accepts old v2 only
-  when mode is absent. Mode metadata is checked rather than guessed.
-- Private tests never use the shared debug broadcast or managed checkpoint.
-  The existing managed shared service remains active; it has **not been deployed
-  to protocol2**. New shared clients need a matching host deployment. Preserve
-  its live match/checkpoint and Tailscale routes; follow `docs/shared-play.md`.
-- Britons/Franks remain the only enabled profiles. No owned/converted assets,
-  credentials, `.local/` or saves belong in Git. Only full import pipeline runs
-  publish assets. Gate uses one worker on an idle host.
+- **Successful rerun:** `.local/audio-run-soak-r2.log`, exit0,
+  **19:26:00–20:05:00 BST** (39 minutes), **150 samples**, **19 completed
+  tick-limit rounds**, 20 rounds started, all five maps: Black Forest, Senlac,
+  Islands, Arabia and Windsor. Private WebGL2/SwiftShader browser, both seats
+  driven through public commands, speed index5 (10x), 12000-tick round target,
+  15-second sampling. No recorded page/render/missing-asset errors. Sampled
+  maxima: active24, pending2, fading4, playing24. Minimum available Linux RAM
+  **8,902,656,000 bytes**; maximum sampled JS heap **866,420,396 bytes**.
+- **Earlier partial run:** `.local/audio-run-soak.log`, exit1 after54 samples
+  and three completed Islands/Arabia/Windsor rounds. Next-map Submit timed out.
+  The old harness captured no transition snapshot, so its cause is unproven.
+  Pausing before setup removes a possible live-match/end-dialog race; the rerun
+  verifies19 transitions, not a diagnosis of that earlier failure. This receipt
+  is explicitly not a green whole soak.
+- **Natural soundtrack cycle:** `.local/music115-soak-r2.log`, exit0, all27
+  tracks and wrap over111 minutes. The shorter mixed-map soak does not replace
+  that dedicated playlist verification.
+- **Final tooling gate GREEN:** `.local/audio-final-gate.log`, exit0;
+  **997 Vitest tests /81 files**, build, **149 Python/owned-content tests**,
+  real-browser debug smoke. Only Markdown changed after gate start.
+
+These bounded measurements do not establish native-GPU performance, unbounded
+memory stability, native DE audio mix parity or all victory/draw paths.
+The successful mixed-map rounds ended at tick limits.
+
+## Remaining blockers and next work
+
+1. **#241 — preserve shared match during protocol migration.** Passive audit
+   found no default `.local/shared-match.json` and no established5173 sockets;
+   joining itself can change seats/AI/pristine state. No verified read-only
+   export/migration path exists yet. See [shared-reference-audit.md](shared-reference-audit.md).
+2. **#119 — repair source bytes.** x1 monk idle/attack files become zero-filled
+   at exactly1MiB. Restore patch-matched sources; never relax the decoder's exact
+   walk. Selected x2 sources pass; no owned bytes were modified.
+3. **#113 — water/terrain fidelity.** Existing reference calibration remains.
+4. **#110 — wonder countdown.** Human approval is already recorded; settings
+   now exist. Exact map-size defaults/query-clock conversion remain unverified
+   after the task120/manual/strings/AI read. No guessed countdown was added.
+5. **#243/#244 — remaining audio.** Container weights/continuous loops/bus DSP/
+   spatial calibration remain; MUSIC17/27/30 lack complete owned streams.
+   Optional813787 is absent. Embedded prefixes are excluded from the playlist.
+6. **#246 — battlefield colour-blind palettes.** Interface palettes ship;
+   sprite shader reflection does not establish the transform. SHDR exists but
+   Aon9 does not; the256-entry LUT cannot simply replace the8-shade ramp.
+   Windows blocked the inspection script by execution policy; no bypass tried.
+7. **#59/#124 — broader AI.** A bounded eight-file Promisory policy audit is
+   recorded; fishing is implemented, broader source reading/strategy remains.
+
+Observation is **v8**. Shared wire remains **v2**, recordings/results **v2**,
+dev snapshots **v3**; legacy compatibility boundaries are in the protocol docs.
+Prior diplomacy/Regicide evidence is preserved in `docs/status.md` and their
+feature commits; Regicide calibration remains #240, Siphons semantics #242.
+
+## Operations
+
+At the final20:25 BST check, all private soak/gate browser/server processes had exited.
+Managed `open-empires-shared.service` remained active, MainPID631 / Node1201,
+NRestarts0. Tailscale routes and the managed match were untouched. Final gate
+used three Vitest workers and unchanged test clocks.
+Owned content, converted assets, local logs and snapshots remain ignored.

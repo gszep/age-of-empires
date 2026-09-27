@@ -169,8 +169,12 @@ browser smoke and are maintained regression tools.
   the actual multiplier. `MATCH_TICKS`, `SOAK_MAPS` and `SAMPLE_MS` control the
   workload. JSON lines separate startup/transitions, steady samples, victory or
   tick/wall-limit endings, completion and interruption. Samples include timing
-  distributions, sprite bytes/evictions, GPU allocations, JS heap and Linux
-  available memory. No artificial cache clock or forced GC; stops before host
+  distributions, sprite bytes/evictions, GPU allocations, JS heap, active/pending/
+  fading audio sources, music playhead and Linux available memory. Audio samples
+  enforce the 24-source budget, including delayed and fading layers. Map changes
+  pause through the public F3 key before opening setup; transition failures save
+  a snapshot and UI diagnostics under `.local/performance-soak-transition-*.json`.
+  Draws end rounds alongside victories. No artificial cache clock or forced GC; stops before host
   memory exhaustion. SIGINT/SIGTERM close the private browser/server.
 
 - **`sim_performance.mts`** — record/compare path hashes and raw-JSON state
