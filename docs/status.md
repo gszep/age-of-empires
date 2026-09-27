@@ -479,7 +479,11 @@ without any of it. With the Enhanced Graphics Pack downloaded (depot
 1039811, #150/#151) every sprite is sourced from its `_x2` file at scale 2
 and drawn at half size, where its drawn pixels land within one x1 pixel of
 the base art's; sheets over 8192 px continue on pages. The base depots
-alone still import at x1. Sprite pages load on first use rather than all
+alone import at x1 when their source files are complete. The atlas step now
+checks exact source container walks before cache reuse/publication (#247):569
+selected sources pass; two local base monk files have zero-filled1MiB tails
+and need source repair (#119, `docs/source-integrity.md`). The pixel decoder
+and atlas fingerprint remain unchanged. Sprite pages load on first use rather than all
 at start -- loading the whole pack up front took the machine down (WSL,
 15 GB) -- so a sprite may be absent
 until its page finishes loading. Unused pages now release both GPU

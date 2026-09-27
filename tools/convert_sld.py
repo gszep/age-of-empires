@@ -393,6 +393,12 @@ def main() -> None:
 
     jobs = atlas_jobs(imported)
     graphics = Graphics(args.graphics, args.uhd_graphics)
+    # A cache hit cannot prove the owned input was complete. In particular,
+    # zero-filled source tails can masquerade as empty frames in the main
+    # decoder while only the outline walk reports damage (#119/#247).
+    from sld_integrity import validate_sld
+    for source in sorted({job['source'] for job in jobs}):
+        validate_sld(graphics.path(source))
 
     # Decoding every frame of every animation takes about twenty minutes, and
     # adding one unit re-decodes the other seventy-odd sources for nothing. An

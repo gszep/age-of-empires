@@ -91,8 +91,9 @@ in `git log` and `docs/status.md`.
 
 Named here so a run does not re-derive the reason; each has an issue.
 
-- **The monk's occlusion contour** (#119) — its outline layers fail the
-  decoder's walk invariant; guessing would undo what makes the decoder
-  trustworthy.
+- **The base monk source repair** (#119) — x1 idle/attack files are zero-filled
+  after exactly1MiB, not a special outline format. Restore/revalidate the
+  original source bytes; never weaken the decoder invariant. The selected x2
+  sources pass. `docs/source-integrity.md` records the read-only audit.
 - **The wonder's victory** (#110) — decision pending. Relics now have art,
   collection/deposit/income and map placement; their remaining calibration is #130.

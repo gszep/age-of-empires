@@ -119,6 +119,13 @@ the owned fixture, including determinism checks.
 
 ## Recorded approximations and source gaps
 
+`uv run --locked python tools/sld_integrity.py` audits the selected content's
+SLD containers; `--base` audits x1 counterparts. The full atlas step performs
+the same structural validation before cache reuse/publication. On2026-09-27 it
+passed569 selected sources and found two zero-filled x1 monk tails; see
+`docs/source-integrity.md` (#119/#247). Pixel decoding/cache fingerprints are
+unchanged. Repair missing original bytes rather than relaxing the mask walk.
+
 Every approximation is a row in `docs/ledger.md`. Import-side gaps the
 manifest records itself: `skippedMasks` (the monk's outline layers, #119),
 `skippedTechnologies` (each with its reason), `skippedAtlases`, and in
