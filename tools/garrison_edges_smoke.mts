@@ -67,6 +67,15 @@ try {
     });
     await page.mouse.click(at.x, at.y);
   };
+  const assertButtonKey = async (command: string, cell: number, hotkey: string) => {
+    const selector = `[data-command="${command}"]`;
+    await page.waitForSelector(selector);
+    const actual = await page.$eval(selector, el => ({
+      cell: [...el.parentElement!.children].indexOf(el) + 1,
+      hotkey: el.querySelector('.hotkey')?.textContent,
+    }));
+    assert.deepEqual(actual, { cell, hotkey });
+  };
   const until = (expression: string) => page.waitForFunction(async expression => {
     const s = await (window as any).__empiresDebug({ type: 'snapshot' });
     return new Function('s', `return ${expression}`)(s);
@@ -91,13 +100,15 @@ try {
   assert((await query({ type: 'snapshot' })).entities.some((e: any) => e.id === ram.id && e.kind === 'battering-ram'), 'fixture resumed');
   await select(tc.id);
   await page.waitForSelector('[data-command="town-bell"]');
-  await clickButton('town-bell');
+  await assertButtonKey('town-bell', 15, 'B');
+  await page.keyboard.press('b');
   await until(`s.entities.find(e => e.id === ${tc.id}).townBell === true`);
   for (let i = 0; i < 6; i++) await page.keyboard.press('+');
   await page.keyboard.press('F3');
   await until(`s.entities.find(e => e.id === ${tc.id}).garrison?.length === 3`);
   await page.keyboard.press('F3');
   const tcPixels = await flags(tc.id);
+  await assertButtonKey('town-bell', 15, 'B');
   await clickButton('town-bell');
   const afterBell = await query({ type: 'snapshot' });
   assert(workers.every(w => afterBell.entities.some((e: any) => e.id === w.id && e.order.kind === 'gather' && e.order.targetId === berries.id)));
@@ -115,7 +126,8 @@ try {
   await until(`s.entities.find(e => e.id === ${barracks.id}).garrison?.length === 1`);
   await page.keyboard.press('F3');
   const productionPixels = await flags(barracks.id);
-  await clickButton('ungarrison');
+  await assertButtonKey('ungarrison', 10, 'G');
+  await page.keyboard.press('g');
   await until(`!s.entities.find(e => e.id === ${barracks.id}).garrison?.length`);
   await select(ram.id);
   const carrier = (await query({ type: 'entities', id: ram.id })).entities[0];

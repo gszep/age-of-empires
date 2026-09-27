@@ -1263,21 +1263,27 @@ function currentCommands(): CommandButton[] {
     });
   }
   // A building with somebody inside offers the reference's "Ungarrison All
-  // Units" (`buttons.json`: action 78, cell 9, icon 2) (issue #75).
+  // Units" (`buttons.json`: action78, zero-based sequence9, icon2).
   if (selection.some(e => e.garrison?.length || e.relics?.length)) {
+    const buildingGarrison = selection.some(e => isBuilding(e.kind) && (e.garrison?.length || e.relics?.length));
+    const native = uiAssets?.commandButtons?.['78'];
     buttons.push({
       id: 'ungarrison', label: selection.some(e => e.kind === 'monk' && e.relics?.length) ? 'Drop Relic'
-        : selection.some(e => e.kind === 'transport-ship') ? messages.unload ?? 'Unload' : 'Ungarrison all units', icon: hud.actionIcon(ACTION_ICON.ungarrison),
-      slot: selection.some(e => e.kind === 'transport-ship') ? 1 : GRID_SLOT.ungarrison, enabled: true,
+        : selection.some(e => e.kind === 'transport-ship') ? messages.unload ?? 'Unload'
+          : buildingGarrison ? native?.name ?? 'Ungarrison All Units' : 'Ungarrison all units',
+      icon: hud.actionIcon(buildingGarrison ? native?.iconId ?? ACTION_ICON.ungarrison : ACTION_ICON.ungarrison),
+      slot: selection.some(e => e.kind === 'transport-ship') ? 1
+        : buildingGarrison ? native?.slot ?? 10 : GRID_SLOT.ungarrison, enabled: true,
     });
   }
   const bellCenters = selection.filter(e => e.kind === 'town-center' && e.buildProgress === undefined);
   if (bellCenters.length) {
     const ringing = bellCenters.every(e => e.townBell);
-    buttons.push({ id: 'town-bell', slot: 14, enabled: true,
+    const native = uiAssets?.commandButtons?.[ringing ? '165' : '163'];
+    buttons.push({ id: 'town-bell', slot: native?.slot ?? 15, enabled: true,
       label: ringing ? messages.backToWork ?? 'Back to work' : messages.townBell ?? 'Ring town bell',
       help: ringing ? messages.backToWorkHelp : messages.townBellHelp,
-      icon: hud.actionIcon(ringing ? 61 : 49) });
+      icon: hud.actionIcon(native?.iconId ?? (ringing ? 61 : 49)) });
   }
   // Every completed production building offers the units the rules train there.
   const producer = selection.find(e => isBuilding(e.kind) && e.buildProgress === undefined

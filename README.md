@@ -48,12 +48,12 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   queued is the click, not the order it became: a waypoint onto a tree somebody
   fells meanwhile becomes a walk to where it stood.
 - Select a watch tower and right-click an enemy to make it concentrate fire there; right-click bare ground to release it back to choosing its own targets.
-- Select a town center and use **Ring Town Bell** to shelter the nearest available
+- Select a town center and use **Ring Town Bell (B)** to shelter the nearest available
   villagers up to its free capacity. Use the same button again to send those
   workers back to their previous jobs and queued orders. New player orders
   supersede the recall; manually garrisoned units stay when the bell is released.
 - Right-click a selected production building onto itself to hold newly trained
-  units inside (up to its garrison capacity). **Ungarrison all units** releases
+  units inside (up to its garrison capacity). **Ungarrison All Units (G)** releases
   them. A full building lets subsequent completed units emerge outside.
 - Infantry and villagers can right-click a **Battering Ram** or **Capped Ram**
   to ride inside, up to six passengers. Select the ram and use **Ungarrison all

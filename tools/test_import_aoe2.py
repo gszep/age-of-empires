@@ -2142,11 +2142,12 @@ class UiImportIntegrationTest(unittest.TestCase):
 
     def test_gather_point_uses_native_action_icon_zero_based_sequence_and_strings(self):
         buttons = json.loads(SOUNDS.with_name('buttons.json').read_text())['command_button_list']
-        source = next(row for row in buttons if row['button_action_id'] == 51)
-        gathered = self.result['commandButtons']['51']
-        self.assertEqual(gathered['slot'], source['sequence_id'] + 1)
-        self.assertEqual(gathered['iconId'], source['icon_id'])
-        self.assertEqual(gathered['name'], source['name'])
+        for action in (51, 78, 163, 165):
+            source = next(row for row in buttons if row['button_action_id'] == action)
+            gathered = self.result['commandButtons'][str(action)]
+            self.assertEqual(gathered['slot'], source['sequence_id'] + 1)
+            self.assertEqual(gathered['iconId'], source['icon_id'])
+            self.assertEqual(gathered['name'], source['name'])
         self.assertEqual(extracted_content()['strings']['setGatherPoint'], 'Set Gather Point')
         self.assertIn('new units', extracted_content()['strings']['setGatherPointHelp'])
 

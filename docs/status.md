@@ -54,6 +54,11 @@ verify read-only hover, command outcomes, explicit gather-point placement and
 cancellation, fog memory, native requests and hotspots;
 the browser script also runs with `OPEN_FALLBACK=1`.
 
+Native command sequences are zero-based (#245): town bell/return use cell15/B,
+building ungarrison uses cell10/G, and gather-point targeting uses cell5/T.
+`garrison_edges_smoke.mts` verifies actual B/G actions and displayed cells,
+alongside the existing bell/return, training, ram and occupied-flag pixel checks.
+
 `F10 → Game Settings` chooses the map and seed without editing a URL (#144).
 Start Game rebuilds the board and minimap; Random requests a fresh seed;
 Restart repeats the chosen setup. Solo sessions remember their setup across

@@ -120,6 +120,8 @@ browser smoke and are maintained regression tools.
 - **`garrison_edges_smoke.mts`** — #137's real bell/return buttons, production
   self-rally and training, ram boarding/unload, plus rendered player-colour pixels
   in the imported garrison flag rectangles reported through `entities`.
+  #245 additionally checks native cell15/B for bell and cell10/G for building
+  ungarrison, and exercises those keys through the actual browser input path.
 - **`minimap_markers_smoke.mts`** — actual minimap pixels for live and remembered
   building dots, reveal parity, and the absence of a farm marker.
 - **`minimap_relief_smoke.mts`** — #96's actual sRGB canvas pixels for all three
