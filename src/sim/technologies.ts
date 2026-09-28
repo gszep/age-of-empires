@@ -2,6 +2,20 @@ import type { Cost, GameRules, TechRules } from './data';
 import { rulesForPlayer } from './civilizations';
 import type { Entity, GameState, PlayerId } from './types';
 
+/** Automatic research-time bonuses preserve their own activation gates. */
+export function researchSecondsFor(state: GameState, owner: PlayerId, key: string): number {
+  const rules = rulesForPlayer(state, owner), tech = rules.technologies[key];
+  let seconds = tech.researchSeconds;
+  for (const completed of state.players[owner].researched) {
+    for (const effect of technologyFor(rules, completed)?.effects ?? []) {
+      if (effect.technologyId !== tech.techId || effect.attribute !== 'researchSeconds') continue;
+      seconds = effect.operation === 'set' ? effect.amount : effect.operation === 'add'
+        ? seconds + effect.amount : seconds * effect.amount;
+    }
+  }
+  return Math.max(0, seconds);
+}
+
 /** Random-map Spies: paid at acceptance, including villagers inside carriers. */
 export function researchCostFor(state: GameState, owner: PlayerId, key: string): Cost {
   const tech = rulesForPlayer(state, owner).technologies[key];

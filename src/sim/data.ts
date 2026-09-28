@@ -42,6 +42,9 @@ export interface UnitRules {
   cost: Cost;
   trainSeconds: number;
   trainedAt: BuildingKind;
+  /** Indexed DAT secondary slots; disabled entries survive until research enables them. */
+  trainLocations?: { building?: BuildingKind; seconds: number; button?: number; hotkeyTextId?: number }[];
+  deathExplosion?: DeathExplosion;
   popCost: number;
   attacks: AttackValue[];
   armors: AttackValue[];
@@ -423,6 +426,8 @@ export interface GameRules {
   civilizations?: Record<string, Omit<GameRules, 'civilizations'>>;
   startingResources: Cost;
   startingPopulationCap: number;
+  /** Match population ceiling, separate from housing. Absent in legacy bundles. */
+  populationLimit?: number;
   units: Record<UnitKind, UnitRules>;
   buildings: Record<BuildingKind, BuildingRules>;
   nodes: Record<NodeKind, ResourceNodeRules>;
@@ -604,6 +609,10 @@ export interface TechEffect {
   amount: number;
   /** For `armor` and `attack`, which armour class the amount is against. */
   armorClass?: number;
+  trainingIndex?: number;
+  trainingBuilding?: BuildingKind;
+  technologyId?: number;
+  deathExplosion?: DeathExplosion;
   /**
    * A player attribute rather than a unit's -- the DAT's effect command type
    * 1, which addresses a resource id instead of a unit. The mill's
@@ -621,16 +630,24 @@ export interface TechEffect {
  * resource 36 in the DAT, where civ 1 starts it at 175 -- the number the open
  * fallback had hand-written before anybody looked.
  */
+export interface DeathExplosion {
+  art: string;
+  seconds: number;
+  radius: number;
+  level: number;
+  attacks: AttackValue[];
+}
+
 export type PlayerAttribute = 'farmFoodAmount' | 'unitRepairCost' | 'buildingRepairCost'
   | 'relicRate' | 'convertResistMinAdj' | 'convertResistMaxAdj' | 'theocracy' | 'heresy'
-  | 'spies' | 'tradeVigRate' | 'tributeInefficency';
+  | 'spies' | 'tradeVigRate' | 'tributeInefficency' | 'huntingProductivity' | 'unitLimit';
 
 export type TechAttribute =
   | 'hitPoints' | 'lineOfSight' | 'speed' | 'armor' | 'attack'
   | 'reloadSeconds' | 'accuracyPercent' | 'range' | 'minRange'
   | 'garrisonHealRate'
   | 'maxCharge' | 'chargeType'
-  | 'blastRadius' | 'searchRadius' | 'trainSeconds' | 'garrisonFirepower'
+  | 'blastRadius' | 'searchRadius' | 'trainSeconds' | 'trainLocation' | 'researchSeconds' | 'deathExplosion' | 'garrisonFirepower'
   | 'workRate' | 'carryCapacity' | 'cost' | 'foodCost' | 'woodCost' | 'goldCost' | 'stoneCost'
   /** On a projectile: whether the shot leads a moving target. Ballistics. */
   | 'leadsTarget';
@@ -682,6 +699,7 @@ export const FALLBACK_RULES: GameRules = {
   civilization: OPEN_CIVILIZATION,
   startingResources: cost(200, 200, 100),
   startingPopulationCap: 0,
+  populationLimit: 200,
   units: {
     ...NAVAL_RULES,
     villager: {
@@ -1417,6 +1435,7 @@ interface ManifestEntity {
   cost?: Partial<Record<ResourceKind, number>>;
   populationCost?: number;
   train?: { buildingId: number; seconds: number; button?: number };
+  trainLocations?: { buildingId: number; seconds: number; button?: number; hotkeyTextId?: number }[];
   build?: { builderId: number; seconds: number; button?: number; sourceId?: number; additionalAge?: number };
   combat?: {
     reloadSeconds: number;
@@ -1600,6 +1619,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       trainSeconds: e[key].train?.seconds ?? 25,
       trainButton: e[key].train?.button ?? fallback?.trainButton,
       trainedAt,
+      trainLocations: e[key].trainLocations?.map(row => ({ ...row, building: buildingKindOf.get(row.buildingId) })),
       popCost: e[key].populationCost ?? 1,
       attacks: attackValues(e[key].combat?.attacks),
       armors: attackValues(e[key].combat?.armors),
@@ -1794,6 +1814,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     // reference's Standard start. Decided on issue #109.
     startingResources: cost(200, 200, 100, 200),
     startingPopulationCap: 0,
+    populationLimit: 200,
     units: {
       // A villager hunting is the DAT's hunter unit: its reach and its arrow
       // ride along on the plain villager, used only against animals.

@@ -1,23 +1,24 @@
-# Handoff — consolidated verified checkpoint, 2026-09-28
+# Handoff — civilisation run checkpoint, 2026-09-28
 
 ## Current checkpoint
 
-- Branch `main`. This checkpoint consolidates the verified follow-ups since
-  **`96d71db`** (2026-09-27 audio endurance), at the user's explicit request to
-  commit the accumulated work and update the docs for a context handoff.
-- Latest full gate **GREEN**, `.local/rms56-gate.log`, exit0:
-  **1055 Vitest tests /86 files**, build, **150 Python/owned-content tests**, and
-  real-browser debug smoke. Three workers, unchanged timeouts. Only Markdown
-  changed after gate start.
-- Most recent implementation: **#56**, owned RMS land defaults and source audit.
-  Player lands/resource islets default to8; terrain remains20. Explicit values
-  are preserved. The broader generator remains a documented adapter.
-- Most recent audit: **#54**, now an accurate remaining-consumer inventory.
-  [dat-field-audit.md](dat-field-audit.md) distinguishes implemented, metadata-only
-  and unconsumed fields; five owned integration checks pass. #54 remains open.
-- **Next suggested task: #139, score display.** AoK Manual printed p18/PDF21
-  provides a starting source, indexed in `manual-audit.md`; modern scoring,
-  rounding and special cases still require investigation. It has not been started.
+- Branch `main`. Autonomous run authorised through **2026-09-29T16:57:14Z**;
+  started2026-09-28T20:57:14Z from60d37b4. Order: Franks, Goths, Teutons,
+  Japanese, Chinese, Byzantines, Persians, Saracens, Turks, Vikings, Mongols,
+  Celts; only then non-civilisation issues. Fix inhibiting bugs along the way,
+  verify/gate/commit/push each checkpoint. Scope answers are recorded on#180.
+- Franks completion pushed as**a770809**; #180 closed with evidence. Gothic
+  completion is the current verified checkpoint; **Teutons#182 is next**.
+- Latest full gate **GREEN**, `.local/goths-gate-r2.log`, exit0:
+  **1076 Vitest tests /88 files**,7 inapplicable Gothic stone/tower tests skipped,
+  build, **156 Python/owned-content tests**, real-browser debug smoke. Dedicated
+  published Goth browser acceptance also passes (`.local/goths-browser.log`).
+  Three workers, unchanged timeouts. Only Markdown changed after gate start.
+- Gothic additions include secondary producer slots/hotkeys, gated fast Loom,
+  hunting yield, population ceilings, Dromon and Incendiaries. New reference gaps
+  are#252/#253; [coverage](civilization-coverage.md) and ledger distinguish source
+  values from integration inferences. The first gate's availability regression
+  was fixed and measured, not hidden by increasing a timeout.
 
 ## Play and deployment
 
@@ -104,7 +105,7 @@ remain `.local/music115-soak-r2.log` and `.local/audio-run-soak-r2.log`.
 - Remaining RMS phase/quota/terrain-height fidelity is documented in the #56
   contract audit and tracked with #130/#134; this is not a full native generator.
 
-Britons/Franks remain the only enabled profiles. Owned plant assets were already
-regenerated through the full pipeline in this workspace. Fresh installations
-need `npm run import:aoe2` for that content; gameplay-only follow-ups require no
-additional asset regeneration. Never overwrite the preserved managed match.
+Britons/Franks/Goths are the enabled profiles. Gothic art/UI/audio and rules were
+regenerated through the full pipeline (`.local/goths-enabled-import.log`). Fresh
+installations need `npm run import:aoe2` for that content. Never overwrite the
+preserved managed match.

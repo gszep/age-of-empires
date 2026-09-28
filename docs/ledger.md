@@ -27,6 +27,47 @@ off the reference; **measured** — fitted to a reference screenshot;
   native Heresy cargo/demolition exceptions remain uncalibrated under#178;
   regression tests establish deterministic implementation, not native parity.
 
+## Gothic shared mechanics (#181)
+
+- **Owned:** Anarchy16 selects train-location entry1 with attribute158 and
+  writes barracks12 through attribute42. Huskarl41/555 preserve castle13s/button1
+  and secondary16s/button4/hotkey16748. **Inferred integration:** tree759/761 are
+  represented by the corresponding41/555 secondary slot, based on the actual
+  Anarchy commands and matching nonzero combat/cost/graphics; the extra zero
+  attack entry on41 is not a different playable unit. Slots, queue start times,
+  HUD cells and native hotkey bindings use the selected producer.
+- **Owned:** TC annex619 triggers307, satisfying Gothic automatic343, whose
+  effect sets paid Loom to1 second. **Inferred representation:** completion of
+  a parent triggers its declared annex bookkeeping without separate sim actors.
+- **Owned:** hunting productivity268×1.23, worker rate×.8130081296 and hunter
+  capacity+15. **Inferred integration:** preserve integer carried/banked food,
+  multiply output work by productivity, consume1/productivity source food per
+  carried unit, and clamp only productivity-adjusted terminal residue below1e−9.
+  Ordinary gathering keeps its previous path; decay still consumes raw carcass
+  food. Native fractional/last-unit rounding remains uncalibrated.
+- **Owned:** Imperial technology406/effect418 adds10 to unit-limit resource32,
+  distinct from housing; help63208 describes200→210. **Chosen mode default:** new
+  rules bundles use a fixed200 population ceiling; missing legacy fields retain
+  uncapped behaviour. **Inferred:** cap is min(housing, ceiling+bonus), with no
+  free houses. Configurable setup and native default/bonus calibration are#253.
+  This replaces the previous unlimited housing sum for new rule bundles.
+- **Owned graphics:** Gothic garrison composites include the fileless`E`
+  placeholder (e.g.2416); its file-bearing children remain traversed. No missing
+  real asset is substituted and no atlas decoder rule changes.
+
+## Incendiaries death replacement (#181/#252)
+
+- **Owned:** technology910/effect916 replaces fire-ship death with unit2624:
+  HP−1,10 melee/+5 class60 attack, radius3, blast level2, sink graphic9347 and
+  child12206's`explosion_demo_ships`. Costs200 food/325 gold,50 seconds, requiring
+  Imperial and Siphons. Help528007 explicitly specifies detonation when sunk.
+- **Inferred integration:** apply the source payload immediately through the
+  existing non-owner blast/death lifecycle, including public Delete and Heresy;
+  retain the source death-art identity/duration in serializable entity state.
+  The explosion particle uses the existing single-feedback renderer rather than
+  native simultaneous sinking/explosion/water-splash compositing. Native delay,
+  death-reason/friendly-fire exceptions and exact layering remain#252.
+
 ## Audio pack boundary (#57)
 
 - **Owned:** shared PCK bank/stream tables, HIRC objects and DIDX prefetch

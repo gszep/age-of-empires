@@ -443,6 +443,7 @@ function isVariantArt(entity: Entity, animation: AnimationInfo): boolean {
 
 /** Choose the imported sprite source (entity variant) and animation name. */
 export function chooseAnimation(state: ReadonlyGameState, entity: Entity): { key: string; name: string } {
+  if (entity.dead && entity.deathReplacement) return { key: entity.deathReplacement.art, name: 'death' };
   const kind = entity.kind;
   if (kind === 'monk' && entity.relics?.length && !entity.dead) {
     return { key: 'monk-relic', name: entity.activity === 'moving' ? 'walk' : 'idle' };

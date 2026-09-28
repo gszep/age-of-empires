@@ -19,8 +19,8 @@ import { loadMapPreference, saveMapPreference, mapChoices, validMatchSetup, vali
 import { matchOver, TREASON_GOLD } from './sim/regicide';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
-import { buildingLimitReached, buildingRulesFor, unitRulesFor, unitRulesForEntity } from './sim/rules';
-import { researchCostFor, technologyRequirementsMet } from './sim/technologies';
+import { buildingLimitReached, buildingRulesFor, populationLimitFor, trainingAt, unitRulesFor, unitRulesForEntity } from './sim/rules';
+import { researchCostFor, researchSecondsFor, technologyRequirementsMet } from './sim/technologies';
 import { COMMODITIES, hasMarket, marketQuote, maximumTribute, tributeFee, type Commodity } from './sim/market';
 import type { DiplomacyModel } from './view/diplomacy';
 import { civilizationRules } from './sim/civilizations';
@@ -684,7 +684,7 @@ function runUiCommand(id: string, shift = false): void {
   if (id.startsWith('train-')) {
     const unit = id.slice('train-'.length) as UnitKind;
     const building = selection.find(e => isBuilding(e.kind) && e.buildProgress === undefined
-      && rules.units[unit]?.trainedAt === e.kind);
+      && trainableUnitsAt(game, localPlayer, e.kind as BuildingKind).includes(unit));
     if (!building) return;
     // Shift asks for five, or as many of the five as the queue and the price
     // allow (issue #76): each goes through the same command a
@@ -1330,7 +1330,7 @@ function currentCommands(): CommandButton[] {
         id: `train-${kind}`,
         label: `${createLabel(kind, 'Train')} (${costLabel(unitRules.cost)})`,
         help: helpFor(kind, unitRules.cost),
-        slot: unitRules.trainButton,
+        slot: trainingAt(unitRules, producer.kind)?.button,
         // Not "is it already training" -- that is what the queue is for
         // (issue #7). Nor the price or the housing: the reference lets the
         // press through and says what is short (issue #70).
@@ -1420,7 +1420,10 @@ function currentCommands(): CommandButton[] {
         : selection.some(e => e.kind === 'transport-ship') ? 7
           : selection.some(e => e.kind === 'battering-ram' || e.kind === 'capped-ram') ? 172 : 78 };
     const profile = selectedHotkeys();
-    let binding = commandHotkey(profile, game.players[localPlayer].civilization, button.id,
+    const training = producer && button.id.startsWith('train-')
+      ? trainingAt(unitRulesFor(game, localPlayer, button.id.slice(6) as UnitKind), producer.kind) : undefined;
+    const hotkeyCommand = training?.index ? `${button.id}@${training.index}` : button.id;
+    let binding = commandHotkey(profile, game.players[localPlayer].civilization, hotkeyCommand,
       button.hotkey ?? (preferences.hotkeys === 'definitive' ? gridKey(index + 1) : undefined), actions[button.id]);
     const named = button.id.startsWith('exchange-') ? `MARKET_${button.id.slice(9).replaceAll('-', '_').toUpperCase()}`
       : button.id === 'treason' ? 'CASTLE_TREASON' : undefined;
@@ -1567,14 +1570,16 @@ function productionItems(): ProductionItem[] {
       const tech = playerRules(localPlayer).technologies[entity.researching.tech as TechKey];
       if (tech) items.push({ producer: entity.id, name: tech.name,
         icon: hud.iconFor('Techs', tech.iconId, localPlayer),
-        fraction: Math.floor(100 * (1 - entity.researching.remainingTicks * TICK_SECONDS / tech.researchSeconds)) / 100,
+        fraction: Math.floor(100 * (1 - entity.researching.remainingTicks * TICK_SECONDS
+          / Math.max(TICK_SECONDS, researchSecondsFor(game, localPlayer, entity.researching.tech)))) / 100,
         blocked: false });
     }
     if (!entity.training) continue;
     for (const [index, kind] of [entity.training.kind, ...(entity.trainingQueue ?? [])].entries()) {
       const unit = unitRulesFor(game, localPlayer, kind);
       items.push({ producer: entity.id, name: displayName(kind), icon: hud.iconFor('Units', importedEntity(kind)?.iconId, localPlayer),
-        fraction: index ? 0 : Math.floor(100 * (1 - entity.training.remainingTicks * TICK_SECONDS / unit.trainSeconds)) / 100,
+        fraction: index ? 0 : Math.floor(100 * (1 - entity.training.remainingTicks * TICK_SECONDS
+          / (trainingAt(unit, entity.kind)?.seconds ?? unit.trainSeconds))) / 100,
         blocked: index === 0 && entity.training.remainingTicks <= 0 && self.population + unit.popCost > self.populationCap,
         pending: index > 0, count: 1 });
     }
@@ -1657,17 +1662,20 @@ function selectionInfo(): SelectionInfo | undefined {
     progress = { label: 'Building', fraction: entity.buildProgress };
   } else if (entity.researching) {
     const tech = rules.technologies[entity.researching.tech as TechKey];
-    const total = tech.researchSeconds / TICK_SECONDS;
+    const total = Math.max(1, researchSecondsFor(game, entity.owner as PlayerId, entity.researching.tech) / TICK_SECONDS);
     progress = {
       label: `Researching ${tech.name}`,
       fraction: 1 - entity.researching.remainingTicks / total,
     };
   } else if (entity.training) {
-    const total = rules.units[entity.training.kind].trainSeconds / TICK_SECONDS;
+    const unit = unitRulesFor(game, entity.owner, entity.training.kind);
+    const total = (trainingAt(unit, entity.kind)?.seconds ?? unit.trainSeconds) / TICK_SECONDS;
     const fraction = Math.max(0, Math.min(1, 1 - entity.training.remainingTicks / total));
     progress = {
       label: entity.training.remainingTicks <= 0
-        ? messages.needMoreHouses ?? 'You need to build more houses.'
+        ? game.players[localPlayer].population >= populationLimitFor(game, localPlayer)
+          ? messages.productionHoused ?? 'Population limit reached.'
+          : messages.needMoreHouses ?? 'You need to build more houses.'
         : `${messages.creating ?? 'Creating'} ${Math.floor(fraction * 100)}%`,
       name: displayName(entity.training.kind),
       fraction,

@@ -263,6 +263,9 @@ def extract_hotkey_profiles(path: Path, wanted: dict, content: dict) -> dict:
                 if identifier in strings:
                     verb = 'build' if entity['category'] == 'building' else 'train'
                     commands[f'{prefix}{verb}-{key}'] = strings[identifier]
+                for index, location in enumerate(entity.get('trainLocations', [])):
+                    if index > 0 and location.get('hotkeyTextId') in strings:
+                        commands[f'{prefix}train-{key}@{index}'] = strings[location['hotkeyTextId']]
             for key, technology in profile.get('technologies', {}).items():
                 identifier = technology.get('hotkeyTextId')
                 if identifier in strings:

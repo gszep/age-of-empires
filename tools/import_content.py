@@ -550,6 +550,12 @@ def extract_entity(
         if population:
             entity["populationCost"] = population
         train = construction.creatable.train_locations[0]
+        if category == "unit" and len(construction.creatable.train_locations) > 1:
+            # Keep disabled slots: Anarchy activates the second entry rather
+            # than replacing the castle entry (XS attributes158 then42).
+            entity["trainLocations"] = [{"buildingId": row.unit_id, "seconds": row.train_time,
+                "button": row.button_id, "hotkeyTextId": row.hot_key_id}
+                for row in construction.creatable.train_locations]
         if category == "building":
             entity["build"] = {"builderId": train.unit_id, "seconds": train.train_time}
             if spec.get("gate"):
@@ -883,6 +889,11 @@ def extract_entity(
         if len(effects) != 1:
             raise ValueError("petard death must resolve one owned particle effect")
         entity["deathEffect"] = effects[0]
+    if spec.get("deathParticleGraphic") is not None:
+        gid = spec["deathParticleGraphic"]
+        if gid not in [d.graphic_id for d in dat.graphics[unit.dying_graphic].deltas]:
+            raise ValueError(f"death particle {gid} is not a child of {unit.id}'s death graphic")
+        entity["deathEffect"] = dat.graphics[gid].particle_effect_name
     if spec["key"] == "trade-cog":
         entity["trade"] = {"ratePerSecond": rounded(unit.bird.work_rate), "capacity": unit.resource_capacity, "buildingId": 45}
     if spec["key"] == "naval-fire":
@@ -1141,7 +1152,7 @@ OPERATION_NAMES = {0: "set", 4: "add", 5: "multiply"}
 # attributes have simulation consumers for research effects (issue #53).
 SUPPORTED_PLAYER_ATTRIBUTES = {"farmFoodAmount", "unitRepairCost", "buildingRepairCost",
     "relicRate", "convertResistMinAdj", "convertResistMaxAdj", "theocracy", "heresy",
-    "spies", "tradeVigRate", "tributeInefficency"}
+    "spies", "tradeVigRate", "tributeInefficency", "huntingProductivity", "unitLimit"}
 # `b` on a type 1 command: 0 writes the value, 1 adds to it.
 RESOURCE_OPERATIONS = {0: "set", 1: "add"}
 
@@ -1229,13 +1240,18 @@ def effects_of(
     resource_names = {index: name for name, index in attribute_ids.items()}
     unmodelled: set[str] = set()
     unreached: set[str] = set()
+    training_indices: dict[str, int] = {}
     for command in (dat.effects[effect_id].effect_commands if effect_id >= 0 else []):
-        if command.type == 1:
+        if command.type == 103 and command.c in (0, 1, 2):
+            effects.append({"technologyId": int(command.a), "attribute": "researchSeconds",
+                "operation": {0: "set", 1: "add", 2: "multiply"}[int(command.c)], "amount": rounded(command.d)})
+            continue
+        if command.type in (1, 6):
             # A player attribute: `a` names the resource, `b` chooses write or
             # add, `d` is the amount. `c` is a bookkeeping slot this does not
             # read.
             resource = resource_names.get(int(command.a))
-            resource_operation = RESOURCE_OPERATIONS.get(int(command.b))
+            resource_operation = "multiply" if command.type == 6 else RESOURCE_OPERATIONS.get(int(command.b))
             if resource not in SUPPORTED_PLAYER_ATTRIBUTES or resource_operation is None:
                 name = f" ({resource})" if resource is not None else ""
                 reason = "not modelled" if resource not in SUPPORTED_PLAYER_ATTRIBUTES else f"unsupported operation {int(command.b)}"
@@ -1254,6 +1270,32 @@ def effects_of(
         target = int(command.a)
         targets = by_id.get(target, []) if target >= 0 else by_class.get(int(command.b), [])
         attribute_id = int(command.c)
+        if attribute_id == 57 and operation == "set":
+            spawned = next((key for key in by_id.get(int(command.d), [])
+                if entities[key].get("hitPoints", 0) < 0 and entities[key].get("combat", {}).get("blastRadius", 0) > 0), None)
+            if spawned:
+                payload = entities[spawned]
+                combat = payload["combat"]
+                for key in targets:
+                    effects.append({"unit": key, "attribute": "deathExplosion", "operation": "set", "amount": int(command.d),
+                        "deathExplosion": {"art": spawned, "seconds": payload.get("deathSeconds", 0),
+                            "radius": combat["blastRadius"], "level": combat["blastAttackLevel"] & 3,
+                            "attacks": combat["attacks"]}})
+                continue
+        if attribute_id == 158 and operation == "set":
+            for key in targets:
+                training_indices[key] = int(command.d)
+            continue
+        if attribute_id == 42 and operation == "set":
+            buildings = [key for key in by_id.get(int(command.d), []) if entities[key].get("category") == "building"]
+            for key in targets:
+                index = training_indices.get(key, 0)
+                if len(buildings) == 1 and index < len(entities[key].get("trainLocations", [entities[key].get("train")])):
+                    effects.append({"unit": key, "attribute": "trainLocation", "operation": "set",
+                        "amount": int(command.d), "trainingIndex": index, "trainingBuilding": buildings[0]})
+                else:
+                    unreached.add(f"training location {int(command.d)} entry {index} on {key}")
+            continue
         if not targets:
             # Something this slice of the game does not have. Say which
             # attribute it wanted to change and on what, by the DAT's own
@@ -1450,6 +1492,13 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
         unit = civ.units[uid]
         if unit.building and unit.building.tech_id >= 0:
             triggers.setdefault(unit.building.tech_id, []).append(key)
+        if unit.building:
+            for annex in unit.building.annexes:
+                child = civ.units[annex.unit_id] if annex.unit_id > 0 else None
+                if child and child.building and child.building.tech_id >= 0:
+                    owners = triggers.setdefault(child.building.tech_id, [])
+                    if key not in owners:
+                        owners.append(key)
         entities[key]["workRate"] = rounded(unit.bird.work_rate)
     # Tree research cost/time commands: c=0 sets, c=1 adds. Unknown forms stay
     # in the provenance report instead of silently enabling free research.
@@ -1532,6 +1581,9 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
         effects, unmodelled, unreached = effects_of(dat, 0, entities, attribute_ids, effect_id=eid)
         if tid == -1:
             unreached = [r for r in unreached if r not in handled]
+            # Tree modifiers above are already folded into the profile tables;
+            # automatic-tech modifiers remain ordered runtime effects.
+            effects = [e for e in effects if e.get("technologyId") not in by_id]
         nodes[str(tid)] = {"key": f"automatic-{tid}", "automatic": True,
                            "requiredTechs": [], "requiredTechCount": 0, "effects": effects,
                            "unmodelled": sorted(set(unmodelled + unreached))}

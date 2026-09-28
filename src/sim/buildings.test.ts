@@ -59,7 +59,9 @@ function research(state: GameState, tech: string, building?: Entity) {
 }
 
 describe.each(Object.entries(profiles))('%s building outcomes', (_key, source) => {
-  it('pays for stone defences, upgrades existing and new gates/walls, and exposes only current build buttons', () => {
+  const available = (kind: BuildingKind) => !source.civilization.unavailable.buildings.includes(
+    source.buildings[kind].availabilityId ?? source.buildings[kind].datId ?? -1);
+  it.skipIf(!available('stone-wall') || !source.technologies['fortified-wall'])('pays for stone defences, upgrades existing and new gates/walls, and exposes only current build buttons', () => {
     const state = fixture(source); state.players[1].age = 2;
     const university = build(state, 'university', 30, 30);
     const before = state.players[1].stone;
@@ -86,7 +88,7 @@ describe.each(Object.entries(profiles))('%s building outcomes', (_key, source) =
     expect(validateObservation(JSON.parse(JSON.stringify(observe(state, 1))))).toBe(true);
   });
 
-  it('keeps end posts solid while the owner walks through the gate doorway; enemy must go around', () => {
+  it.skipIf(!available('stone-gate'))('keeps end posts solid while the owner walks through the gate doorway; enemy must go around', () => {
     const state = fixture(source); state.players[1].age = 1;
     const gate = build(state, 'stone-gate', 40, 40.5);
     const own = buildNavGrid(state, undefined, 1), enemy = buildNavGrid(state, undefined, 2);
@@ -102,7 +104,7 @@ describe.each(Object.entries(profiles))('%s building outcomes', (_key, source) =
     expect(isBlocked(buildNavGrid(state, undefined, 1), 39, 40)).toBe(true);
   });
 
-  it('promotes an occupied tower without losing the passenger, then hits harder and builds the new tier', () => {
+  it.skipIf(!source.technologies['guard-tower'])('promotes an occupied tower without losing the passenger, then hits harder and builds the new tier', () => {
     const state = fixture(source); state.players[1].age = 2;
     const university = build(state, 'university', 30, 30), tower = build(state, 'watch-tower');
     const worker = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
@@ -177,7 +179,7 @@ describe.each(Object.entries(profiles))('%s building outcomes', (_key, source) =
     expect(wallShape(state, wall)).toBe(2);
   });
 
-  it('updates an unfinished building proportionally and rejects malformed kinds without payment', () => {
+  it.skipIf(!available('stone-wall') || !source.technologies['fortified-wall'])('updates an unfinished building proportionally and rejects malformed kinds without payment', () => {
     const state = fixture(source); state.players[1].age = 2;
     const university = build(state, 'university', 30, 30), site = build(state, 'stone-wall');
     site.buildProgress = .25; site.hp = site.maxHp * .25 - 5;
@@ -190,7 +192,7 @@ describe.each(Object.entries(profiles))('%s building outcomes', (_key, source) =
     expect(JSON.stringify(state.players[1])).toBe(before);
   });
 
-  it.skipIf(!source.buildings['stone-wall'].ageStats)('applies automatic age HP to existing/new walls only once with the complete research journal', () => {
+  it.skipIf(!available('stone-wall') || !source.buildings['stone-wall'].ageStats)('applies automatic age HP to existing/new walls only once with the complete research journal', () => {
     const state = fixture(source); state.players[1].age = 1;
     const wall = build(state, 'stone-wall'); wall.hp -= 19;
     research(state, 'castle-age');
@@ -201,7 +203,7 @@ describe.each(Object.entries(profiles))('%s building outcomes', (_key, source) =
     expect(buildingRulesFor(state, 1, 'stone-wall').hp).toBe(wall.maxHp);
   });
 
-  it.skipIf(!source.buildings['guard-tower'].garrison?.volley?.arrowUnitId)('upgrades the secondary arrows fired by an occupied guard tower', () => {
+  it.skipIf(!source.technologies['guard-tower'] || !source.buildings['guard-tower'].garrison?.volley?.arrowUnitId)('upgrades the secondary arrows fired by an occupied guard tower', () => {
     const state = fixture(source); state.players[1].age = 2;
     const university = build(state, 'university', 30, 30), tower = build(state, 'watch-tower');
     for (const worker of state.entities.filter(e => e.owner === 1 && e.kind === 'villager').slice(0, 2)) {
@@ -216,7 +218,7 @@ describe.each(Object.entries(profiles))('%s building outcomes', (_key, source) =
     expect(1000 - victim.hp).toBe(14); // 7 primary + 7 secondary, not the old 5
   });
 
-  it.skipIf(!source.civilizationBonuses)('gates Arrowslits descendants on paid tower upgrades and applies their actual volley damage', () => {
+  it.skipIf(!source.technologies.arrowslits || !source.technologies['guard-tower'] || !source.civilizationBonuses)('gates Arrowslits descendants on paid tower upgrades and applies their actual volley damage', () => {
     const state = fixture(source); state.players[1].age = 3;
     const university = build(state, 'university', 30, 30), tower = build(state, 'watch-tower');
     research(state, 'arrowslits', university);

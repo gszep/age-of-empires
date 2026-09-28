@@ -13,10 +13,10 @@ import {
   buildNavGrid, distance, entityGrid, findPath, halfExtent, isBlocked, separateUnits, terrainLayer, tileOf, type NavGrid,
 } from './nav';
 import { random01, seedFrom } from './random';
-import { buildingLimitReached, buildingRulesFor, combine, inheritConvertedUnit, playerAttributeFor, unitRulesFor, unitRulesForEntity } from './rules';
+import { buildingLimitReached, buildingRulesFor, combine, inheritConvertedUnit, playerAttributeFor, populationLimitFor, trainingAt, unitRulesFor, unitRulesForEntity } from './rules';
 import { garrisonCount } from './garrison';
 import { civilizationRules, rulesForPlayer } from './civilizations';
-import { researchCostFor, technologyFor, technologyRequirementsMet } from './technologies';
+import { researchCostFor, researchSecondsFor, technologyFor, technologyRequirementsMet } from './technologies';
 import { applyMarketCommand } from './market';
 import { beginProjectileImpact, fireChargeOf, rechargeFireCharge, releaseFireCharge } from './fire-charge';
 import { relicOrder, transferRelic, releaseRelics, updateRelicIncome } from './relics';
@@ -219,9 +219,10 @@ function recalculatePopulation(state: GameState): void {
   for (const player of [1, 2] as PlayerId[]) {
     const rules = rulesForPlayer(state, player);
     state.players[player].population = population[player];
-    state.players[player].populationCap = rules.startingPopulationCap + state.entities
+    const housing = rules.startingPopulationCap + state.entities
       .filter(e => !e.dead && e.owner === player && isBuilding(e.kind) && e.buildProgress === undefined)
       .reduce((sum, e) => sum + rules.buildings[e.kind as BuildingKind].popSupport, 0);
+    state.players[player].populationCap = Math.min(housing, populationLimitFor(state, player));
   }
 }
 
@@ -654,11 +655,22 @@ function assignOrder(state: GameState, entity: Entity, target: Point, targetEnti
 }
 
 /** The command grid and right-click use the same trainability test. */
+function relocatedTrainingUnits(state: GameState, player: PlayerId): Set<string> {
+  const rules = rulesForPlayer(state, player), changed = new Set<string>();
+  for (const key of state.players[player].researched) for (const effect of technologyFor(rules, key)?.effects ?? []) {
+    if (effect.attribute === 'trainLocation' && effect.unit) changed.add(effect.unit);
+  }
+  return changed;
+}
+
 export function trainableUnitsAt(state: GameState, player: PlayerId, building: BuildingKind): UnitKind[] {
   const rules = rulesForPlayer(state, player);
+  const relocated = relocatedTrainingUnits(state, player);
   return (Object.keys(rules.units) as UnitKind[]).filter(kind => {
-    const unit = rules.units[kind];
-    return unit.trainable !== false && unit.trainedAt === building && (unit.age ?? 0) <= state.players[player].age
+    // Cost/combat effects do not change availability. Resolve the full effect
+    // history only for units whose producer slots actually changed.
+    const unit = relocated.has(kind) ? unitRulesFor(state, player, kind) : rules.units[kind];
+    return unit.trainable !== false && !!trainingAt(unit, building) && (unit.age ?? 0) <= state.players[player].age
       && (unit.requires ?? []).every(key => state.players[player].researched.includes(key))
       && !isAnimal(kind) && civHas(state, player, 'units', unit.treeUnitId ?? unit.datId)
       && !upgradedAway(state, player, kind) && !notYetUpgradedInto(state, player, kind);
@@ -774,7 +786,8 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (!civHas(state, command.player, 'units', unitRules.treeUnitId ?? unitRules.datId)) {
       return rejected(`the ${civNameOf(state, command.player)} do not have ${command.unit}`);
     }
-    if (unitRules.trainedAt !== building.kind) return rejected(`${building.kind} cannot train ${command.unit}`);
+    const location = trainingAt(unitRules, building.kind);
+    if (!location) return rejected(`${building.kind} cannot train ${command.unit}`);
     const player = state.players[command.player];
     if ((unitRules.age ?? 0) > player.age) return rejected(`${command.unit} needs a later age`);
     const missingUnitTech = unitRules.requires?.find(key => !player.researched.includes(key));
@@ -788,7 +801,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       building.trainingQueueCosts = [...(building.trainingQueueCosts ?? (building.trainingQueue ?? []).map(() => undefined)), { ...unitRules.cost }];
       building.trainingQueue = [...(building.trainingQueue ?? []), command.unit];
     } else {
-      building.training = { kind: command.unit, remainingTicks: Math.round(unitRules.trainSeconds * TICKS_PER_SECOND), paidCost: { ...unitRules.cost } };
+      building.training = { kind: command.unit, remainingTicks: Math.round(location.seconds * TICKS_PER_SECOND), paidCost: { ...unitRules.cost } };
     }
     return { ok: true };
   }
@@ -915,7 +928,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (!paid.ok) return paid;
     building.researching = {
       tech: command.tech,
-      remainingTicks: Math.round(tech.researchSeconds * TICKS_PER_SECOND),
+      remainingTicks: Math.round(researchSecondsFor(state, command.player, command.tech) * TICKS_PER_SECOND),
     };
     return { ok: true };
   }
@@ -1466,6 +1479,7 @@ function armorsOf(state: GameState, entity: Entity): AttackValue[] {
 const FALLBACK_CORPSE_SECONDS = 3;
 
 function corpseLifetimeTicks(state: ReadonlyGameState, entity: DeepReadonly<Entity>): number {
+  if (entity.deathReplacement) return Math.max(1, Math.round(entity.deathReplacement.seconds * TICKS_PER_SECOND));
   const rules = isBuilding(entity.kind)
     ? rulesForPlayer(state, entity.owner).buildings[entity.kind]
     : isUnit(entity.kind) ? unitRulesForEntity(state, entity) : undefined;
@@ -1483,6 +1497,8 @@ function kill(state: GameState, entity: Entity): void {
   // Whoever was sheltering inside comes out as it falls, as the reference's
   // do from a razed town center or castle.
   if (entity.dead) return;
+  const explosion = isUnit(entity.kind) && entity.hp <= 0 ? unitRulesForEntity(state, entity).deathExplosion : undefined;
+  if (explosion) entity.deathReplacement = { art: explosion.art, seconds: explosion.seconds };
   if (entity.relics?.length) releaseRelics(state, entity,
     isBuilding(entity.kind) ? spawnPoint(state, entity, 0.5) : entity.position);
   if (entity.bellReturn) entity.bellReturn = undefined;
@@ -1509,6 +1525,8 @@ function kill(state: GameState, entity: Entity): void {
       combat.attacks, entity.id, entity.owner as PlayerId);
   }
   recalculatePopulation(state);
+  if (explosion) applyBlast(state, entity.position, explosion.radius, explosion.level, explosion.attacks,
+    entity.id, entity.owner);
 }
 
 function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
@@ -1642,10 +1660,16 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   // Automatic continuation may have changed tasks since the banking check.
   const activeCapacity = holdOf(state, entity, node);
   if ((entity.carrying?.amount ?? 0) >= activeCapacity) return;
-  entity.gatherProgress = (entity.gatherProgress ?? 0) + rateOn(state, entity, node) * TICK_SECONDS;
+  // Productivity changes output per source food, not the Gaia carcass for
+  // everyone. Goth hunting pairs this with a reciprocal worker-rate effect.
+  const productivity = entity.kind === 'villager' && villagerTaskOn(state, node) === 'hunter'
+    ? Math.max(0, playerAttributeFor(state, entity.owner, 'huntingProductivity') ?? 1) : 1;
+  if (productivity === 0) return;
+  entity.gatherProgress = (entity.gatherProgress ?? 0) + rateOn(state, entity, node) * productivity * TICK_SECONDS;
   while ((entity.gatherProgress ?? 0) >= 1 && (node.amount ?? 0) > 0 && (entity.carrying?.amount ?? 0) < activeCapacity) {
     entity.gatherProgress! -= 1;
-    node.amount! -= 1;
+    node.amount! -= 1 / productivity;
+    if (productivity !== 1 && node.amount! < 1e-9) node.amount = 0;
     // Switching resource types discards the old load, as in AoE2.
     if (!entity.carrying || entity.carrying.kind !== resource) entity.carrying = { kind: resource, amount: 0 };
     entity.carrying.amount += 1;
@@ -2887,6 +2911,7 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
   const player = state.players[owner];
   if (!tech || player.researched.includes(key)) return;
   player.researched.push(key);
+  if (tech.effects.some(effect => effect.resource === 'unitLimit')) recalculatePopulation(state);
   if ('grantsAge' in tech && tech.grantsAge !== undefined) player.age = Math.max(player.age, tech.grantsAge);
   const promotedIds = new Set<number>();
   // An upgrade replaces what you own: every militia becomes a man-at-arms the
@@ -2987,7 +3012,8 @@ function startNextTraining(state: GameState, entity: Entity): void {
     entity.trainingQueue = queue.length > 1 ? queue.slice(1) : undefined;
     entity.training = {
       kind: next,
-      remainingTicks: Math.round(unitRulesFor(state, entity.owner, next).trainSeconds * TICKS_PER_SECOND),
+      remainingTicks: Math.round((trainingAt(unitRulesFor(state, entity.owner, next), entity.kind)?.seconds
+        ?? unitRulesFor(state, entity.owner, next).trainSeconds) * TICKS_PER_SECOND),
       paidCost: entity.trainingQueueCosts?.[0],
     };
     entity.trainingQueueCosts = queue.length > 1 ? entity.trainingQueueCosts?.slice(1) : undefined;
@@ -2997,8 +3023,11 @@ function startNextTraining(state: GameState, entity: Entity): void {
 /** Whether the rules train any unit at this kind of building. */
 function trainsAnything(state: GameState, kind: Entity['kind'], player: PlayerId): boolean {
   if (!isBuilding(kind)) return false;
-  return Object.values(rulesForPlayer(state, player).units)
-    .some(rules => rules.trainedAt === kind && civHas(state, player, 'units', rules.treeUnitId ?? rules.datId));
+  const source = rulesForPlayer(state, player), relocated = relocatedTrainingUnits(state, player);
+  return Object.keys(source.units).some(key => {
+    const rules = relocated.has(key) ? unitRulesFor(state, player, key as UnitKind) : source.units[key as UnitKind];
+    return !!trainingAt(rules, kind) && civHas(state, player, 'units', rules.treeUnitId ?? rules.datId);
+  });
 }
 
 function isDefeated(state: GameState, player: PlayerId): boolean {

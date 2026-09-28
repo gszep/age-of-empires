@@ -81,9 +81,9 @@ acceptance. These mode results do not imply completion of further civilisations.
 `civilizations.ts` now resolves each player's complete ruleset by its civilisation
 key. The root remains the default civilisation and shared Gaia/map input.
 Additional `GameRules.civilizations` / manifest `civilizations` entries are complete
-profiles, not patches over the enemy's rules. The importer now extracts Britons
-and Franks with independent bonus graphs and namespaced art/voices/icons. The
-spec enables Franks after supported-gameplay browser acceptance; the 53-entry
+profiles, not patches over the enemy's rules. The importer now extracts Britons,
+Franks and Goths with independent bonus graphs and namespaced art/voices/icons. The
+spec enables reviewed profiles after supported-gameplay browser acceptance; the 53-entry
 base-era catalogue remains an inventory, not 53 playable civilisations.
 
 Owner-specific consumers now include initial resources/stats, population,
@@ -171,6 +171,7 @@ Current scoped acceptance and remaining shared work:
 |---|---|
 | Britons (#179) | Reviewed random-map gameplay scope accepted in db2c9c0/605f7f7 with full gates and actual browser outcomes; the shared limitations below remain explicit |
 | Franks (#180) | Paid Bearded Axe/Chivalry/elite axeman acceptance and Heresy conversion-death implemented and browser-verified on2026-09-28; full gate GREEN. Shared native conversion/cargo calibration remains#178 |
+| Goths (#181) | Enabled and verified through published-profile browser acceptance and a GREEN full checkpoint gate. Shared population-setting/native Incendiaries calibration remains#253/#252 |
 | Shared engine | Native relic-generation calibration/fish gaps (#130/#95), unlocked diplomacy/cooperative victories beyond the current locked two-player dialog (#138), Regicide timing/preset/task calibration (#240), charge/market runtime calibration and conversion-policy parity (#178). Relic placement and playable Regicide/Treason are implemented; the ledger distinguishes mechanics from unresolved engine interpretations |
 
 The imported catalogue now accounts for the already represented ram/tree alias,
@@ -283,6 +284,51 @@ Rule definitions needed for captured units are distinct
 from permission to train them.
 
 ## Implementation checklist
+
+### Gothic implementation pass (2026-09-28)
+
+The profile adds Huskarl/Elite Huskarl, Hussar and Dromon, independent
+availability/bonuses, architecture, flags, icons, voices and native hotkeys.
+Source tree759/761 are represented by the current41/555 secondary training slot;
+the DAT Anarchy effect now enables barracks production without moving the castle
+button. Both source clocks and cells survive queued production and elite upgrades.
+TC-annex bookkeeping activates the one-second paid Loom modifier. Hunting has
+distinct output productivity, work rate and carrying capacity. Imperial's+10
+unit-limit bonus changes the match ceiling rather than granting houses; see#253
+for chosen default200 and remaining configuration/reference calibration.
+
+Incendiaries was the final wholly skipped available research. It now uses dead
+unit2624's own blast attacks/radius and the owned explosion feedback. The single
+death feedback, non-owner damage and immediate/scuttling behaviour are documented
+inferences under#252. The profile has no missing roster entries or wholly skipped
+available research; that inventory is supplemented by actual outcome checks.
+
+`src/sim/goths.test.ts` verifies13 outcomes: paid Loom, four age discounts/refunds
+and building damage, Anarchy/elite/Perfusion production, a housing-versus-ceiling
+production boundary, hunting consumption/banking, Incendiaries damage/death art,
+Dromon volleys, captured Huskarls, unavailable fortifications and mixed replay.
+The public UI probe `tools/goths_smoke.mts` passes for both pending and published
+enabled profiles (`.local/goths-browser{,-pending}.log`): menu/reload/restart,
+paid research, castle and barracks production including the native secondary
+hotkey, elite artwork and actual Incendiaries damage with the source explosion
+texture bound. Scenarios are staged; gameplay clocks and subsequent input are real.
+
+The first import exposed a previously unhandled fileless`E` garrison-graphic
+placeholder; its child layers now remain traversed. Atlas decoder/packer code
+was not changed. The initial source-alias comparison exposed an extra zero attack
+entry on41; nonzero attacks match. Existing building tests now respect each
+profile's available tech tree: seven inapplicable Gothic stone/tower tests skip,
+and public rejection is verified separately. Briton/Frank cases remain exercised.
+No test or fixture clocks were widened.
+
+Full gate GREEN (`.local/goths-gate-r2.log`):1076 Vitest tests/88 files,7 explicitly
+inapplicable Gothic fortification cases skipped, build,156 owned-import tests,
+and real-browser debug smoke. The first gate exposed an availability-path
+performance regression: resolving all units' combat effects was unnecessary.
+Only changed training-location units now need full resolution. The affected
+isolated AI test measured28.4→13.1s; three seeds through12000 ticks have identical
+whole-state and availability-stream hashes before/after the optimization
+(`.local/goths-training-equivalence.log`). No timeout increase.
 
 - [x] Reproducible all-civilisation coverage inventory with source provenance.
 - [x] Select a contrasting second civilisation from the owned data.

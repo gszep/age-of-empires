@@ -47,7 +47,8 @@ def catalogue(dat, dat_path, spec, hashes, strings, attribute_ids):
         entry["roster"] = [dict(node) for node in tree["civ_techs_buildings"] + tree["civ_techs_units"]]
         imported_ids = {row["unitId"] for row in spec["entities"]}
         imported_ids.update(tree_unit_id(dat, index, row) for row in spec["entities"]
-                            if row.get("civ") != "gaia")
+                             if row.get("civ") != "gaia")
+        imported_ids.update(uid for row in spec["entities"] for uid in row.get("rosterAliases", []))
         entry["missingRoster"] = sorted({int(node["Node ID"]) for node in entry["roster"]
                                         if node["Use Type"] in ("Unit", "Building")
                                         and node["Node Status"] != "NotAvailable"
@@ -103,6 +104,8 @@ def shared_combat_specs(dat, spec):
                                ("death", "dying"), ("decay", "dead"))}})
         if row.get("composite"):
             additions[-1]["composite"] = True
+        if row.get("rosterAliases"):
+            additions[-1]["rosterAliases"] = row["rosterAliases"]
         if row.get("decay") is False:
             additions[-1]["animations"].pop("decay")
         known.add(uid)

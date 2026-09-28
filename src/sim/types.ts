@@ -169,6 +169,8 @@ export interface Entity {
   /** Corpse state: plays the death animation, then despawns. */
   dead?: boolean;
   decayTicks?: number;
+  /** Source-backed replacement death art, fixed at death rather than later research. */
+  deathReplacement?: { art: string; seconds: number };
   /** Fraction of the next whole food unit spoiled on an animal carcass. */
   foodDecayProgress?: number;
   /** Navigation. */

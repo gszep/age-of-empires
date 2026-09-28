@@ -53,6 +53,9 @@ class ProfileImportTest(unittest.TestCase):
         self.assertEqual(cues['villager-select']['switch'], 'Britons')
         self.assertEqual(cues['civilizations/franks/villager-select']['switch'], 'Franks')
         self.assertIn('civilizations/franks/dat-unit-281-select', cues)
+        if 'goths' in self.content['civilizations']:
+            self.assertEqual(cues['civilizations/goths/villager-select']['switch'], 'Goths')
+            self.assertEqual(cues['civilizations/goths/dat-unit-41-select']['switch'], 'Goths')
 
     def test_frankish_heresy_reaches_the_conversion_consumer(self):
         franks = self.content['civilizations']['franks']

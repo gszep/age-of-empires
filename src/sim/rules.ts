@@ -47,6 +47,11 @@ export function playerAttributeFor(
   return value;
 }
 
+export function populationLimitFor(state: GameState, owner: PlayerId): number {
+  return (rulesForPlayer(state, owner).populationLimit ?? Infinity)
+    + (playerAttributeFor(state, owner, 'unitLimit') ?? 0);
+}
+
 /** Existing units may carry a conversion snapshot; creation/availability uses
  * unitRulesFor instead. Never resolve a captured unique unit through its new
  * owner's trainable catalogue. */
@@ -122,6 +127,14 @@ export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: Uni
   return rules;
 }
 
+/** Production slot, not just unit identity: a secondary producer can have a
+ * different clock/button. The legacy primary fields remain authoritative. */
+export function trainingAt(rules: UnitRules, building: Entity['kind']) {
+  if (rules.trainedAt === building) return { index: 0, seconds: rules.trainSeconds, button: rules.trainButton };
+  const index = rules.trainLocations?.findIndex((row, index) => index > 0 && row.building === building) ?? -1;
+  return index > 0 ? { ...rules.trainLocations![index], index } : undefined;
+}
+
 /**
  * One technology effect against one thing's rules. Armour and attack are
  * per-class lists rather than single numbers -- Forging is "+1 against melee",
@@ -132,6 +145,14 @@ function applyEffect(rules: UnitRules, effect: TechEffect): void {
   if (applyCostEffect(rules, effect)) return;
   const armorClass = effect.armorClass ?? 0;
   switch (effect.attribute) {
+    case 'deathExplosion': rules.deathExplosion = effect.deathExplosion; break;
+    case 'trainLocation': {
+      const index = effect.trainingIndex ?? 0;
+      if (index === 0 && effect.trainingBuilding) rules.trainedAt = effect.trainingBuilding;
+      if (rules.trainLocations?.[index]) rules.trainLocations = rules.trainLocations.map((row, i) =>
+        i === index ? { ...row, building: effect.trainingBuilding } : row);
+      break;
+    }
     case 'maxCharge':
       if (rules.fireCharge) rules.fireCharge = { ...rules.fireCharge, maximum: combine(effect.operation, rules.fireCharge.maximum, effect.amount) };
       break;

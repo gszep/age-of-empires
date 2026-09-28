@@ -1,11 +1,15 @@
 {
   "schemaVersion": 3,
   "civIndex": 1,
-  "profileCivilizations": ["franks"],
-  "enabledCivilizations": ["franks"],
+  "profileCivilizations": ["franks", "goths"],
+  "enabledCivilizations": ["franks", "goths"],
   "combatRoster": [
     { "unitId": 5 },
     { "unitId": 36 },
+    { "unitId": 41, "rosterAliases": [759] },
+    { "unitId": 441 },
+    { "unitId": 555, "rosterAliases": [761] },
+    { "unitId": 1795, "composite": true, "decay": false },
     { "unitId": 281 },
     { "unitId": 531 },
     { "unitId": 569 },
@@ -58,6 +62,11 @@
     }
   ],
   "entities": [
+    {
+      "key": "fire-ship-explosion", "unitId": 2624, "category": "projectile", "composite": true,
+      "deathParticleGraphic": 12206,
+      "animations": { "death": { "slot": "dying" } }
+    },
     {
       "key": "king", "unitId": 434, "category": "unit",
       "sounds": ["select", "train"],

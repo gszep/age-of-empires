@@ -76,7 +76,7 @@ The immutable match rules bundle holds a default civilisation plus optional
 complete additional profiles. `sim/civilizations.ts` resolves player-owned rules;
 Gaia and map generation use the root. Commands, per-player research lookups,
 placement/navigation and UI read through that boundary. The importer publishes
-independent Briton/Frank supported-roster profiles, bonus graphs and namespaced
+independent Briton/Frank/Goth supported-roster profiles, bonus graphs and namespaced
 assets. Selection carries both identities through solo/shared restarts and saves.
 Full civilisation roster/effect coverage remains tracked work. Converted entities carry a plain-data unit-rule
 snapshot consumed by `unitRulesForEntity`; creation and player-level systems still

@@ -9,13 +9,16 @@ does not repeat it.
 
 ## Run and play
 
-Franks' completion pass now includes paid Bearded Axe/Chivalry and elite axeman
-outcome/browser acceptance plus the previously omitted **Heresy** conversion-death
-mechanic. The owned profile has no missing roster entries or wholly skipped
-available research. Full gate GREEN:1061 tests/87 files, build,151 import tests,
-browser smoke; dedicated mixed-profile browser acceptance also passes. See
-[civilisation coverage](civilization-coverage.md#frankish-completion-pass-2026-09-28)
-for evidence and the retained shared conversion/reference limitations (#178).
+**Britons, Franks and Goths are selectable owned profiles.** Franks' completion
+pass adds paid unique-tech/elite acceptance and Heresy. Goths adds independent
+roster/art/voices, Anarchy secondary production, Perfusion, gated one-second paid
+Loom, infantry/hunting bonuses and the Imperial population ceiling bonus, plus
+Dromon and Incendiaries. Dedicated real-browser acceptance passes for both new
+completion passes. Latest full gate GREEN:1076 tests/88 files,7 inapplicable Goth
+fortification cases skipped, build,156 import tests and browser smoke. See
+[civilisation coverage](civilization-coverage.md) for evidence; conversion (#178),
+Incendiaries native calibration (#252) and population settings/defaults (#253)
+remain explicit shared boundaries.
 
 The #54 DAT inventory has been refreshed against the pinned data and actual
 consumers: [dat-field-audit.md](dat-field-audit.md). Most old garrison/audio/
