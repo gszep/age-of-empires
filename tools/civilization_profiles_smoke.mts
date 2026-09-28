@@ -9,8 +9,9 @@ import { createServer } from 'vite';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { activateAutomaticTechnologies, createGame } from '../src/sim/game.ts';
-import { buildingRulesFor } from '../src/sim/rules.ts';
+import { buildingRulesFor, unitRulesFor } from '../src/sim/rules.ts';
 import type { BuildingKind, Entity } from '../src/sim/types.ts';
+import { pageOf } from '../src/view/build-menu.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
@@ -115,6 +116,11 @@ try {
     tc.position = { x: 30, y: 40 };
     const workers = state.entities.filter(e => e.owner === 1 && e.kind === 'villager');
     workers.forEach((e, i) => { e.position = { x: 37, y: 40 + i * 4 }; });
+    const monkRules = unitRulesFor(state, 2, 'monk');
+    const enemyMonk: Entity = { id: state.nextId++, kind: 'monk', owner: 2,
+      position: { x: 70, y: 70 }, hp: monkRules.hp, maxHp: monkRules.hp,
+      radius: monkRules.radius, activity: 'idle', order: { kind: 'idle' } };
+    state.entities.push(enemyMonk);
     for (const [i, kind] of (['barracks', 'blacksmith', 'market', 'house', 'house'] as BuildingKind[]).entries()) {
       const b = buildingRulesFor(state, 1, kind);
       const e: Entity = { id: state.nextId++, kind, owner: 1, position: { x: 22, y: 28 + i * 5 },
@@ -140,7 +146,7 @@ try {
       await select(worker.id);
       await page.waitForFunction(() => !!document.querySelector('[data-command="page-back"], [data-command="page-economic"]'));
       if (await page.$('[data-command="page-back"]')) await click('page-back');
-      await click(['castle', 'barracks'].includes(kind) ? 'page-military' : 'page-economic');
+      await click(`page-${pageOf(kind)}`);
       await click(`build-${kind}`);
       await query({ type: 'look', rect: [target.x, target.y] });
       await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
@@ -214,10 +220,54 @@ try {
     assert(lateFood <= (civ === 'franks' ? 550 : 175) && lateFood > (civ === 'franks' ? 545 : 170));
     const imperialCastle = await build('castle', { x: 57, y: 54 }, workers[2]);
     assert.equal(imperialCastle.before.players[1].stone - imperialCastle.after.players[1].stone, civ === 'franks' ? 488 : 650);
+    let finalUnique = own;
+    if (civ === 'franks') {
+      const paidResearch = async (home: number, key: string) => {
+        await select(home);
+        await page.waitForSelector(`[data-command="research-${key}"]`);
+        const before = await snapshot();
+        await click(`research-${key}`);
+        const paid = await snapshot();
+        for (const resource of ['food', 'wood', 'gold', 'stone']) {
+          assert.equal(before.players[1][resource] - paid.players[1][resource], profile.technologies[key].cost[resource] ?? 0);
+        }
+        await runUntil((s, key) => s.players[1].researched.includes(key), key);
+        assert(!(await snapshot()).players[2].researched.includes(key));
+      };
+      await paidResearch(castle.site.id, 'bearded-axe');
+      await paidResearch(castle.site.id, 'elite-throwing-axeman');
+      finalUnique = 'dat-unit-531';
+      s = await snapshot();
+      assert.equal(s.entities.find((e: any) => e.id === trained.id).kind, finalUnique);
+      await query({ type: 'look', entity: trained.id }); await select(trained.id);
+      await page.waitForFunction(id => { const a = (window as any).__civAcceptance.art(id);
+        return a?.key === 'civilizations/franks/dat-unit-531' && a.texture && !a.pending && !a.fallback;
+      }, { timeout: 120_000 }, trained.id);
+      await paidResearch(castle.site.id, 'chivalry');
+      const stable = await build('stable', { x: 35.5, y: 59.5 });
+      await select(stable.site.id); await click('train-knight');
+      await runUntil(s => s.entities.some((e: any) => e.owner === 1 && e.kind === 'knight'));
+      const home = await build('monastery', { x: 43.5, y: 59.5 });
+      await paidResearch(home.site.id, 'heresy');
+      assert((await query({ type: 'command', command: { kind: 'order', player: 1,
+        entityIds: [workers[0].id], target: { x: 66, y: 70 } } })).ok);
+      await runUntil((s, id) => { const e = s.entities.find((e: any) => e.id === id);
+        return Math.hypot(e.position.x - 66, e.position.y - 70) < 0.5; }, workers[0].id);
+      s = await snapshot();
+      const victim = s.entities.find((e: any) => e.id === workers[0].id);
+      assert((await query({ type: 'command', command: { kind: 'order', player: 2,
+        entityIds: [enemyMonk.id], targetId: victim.id, target: victim.position } })).ok);
+      await query({ type: 'look', entity: victim.id });
+      await runUntil((s, id) => s.entities.some((e: any) => e.id === id && e.dead), victim.id);
+      s = await snapshot();
+      assert.equal(s.entities.find((e: any) => e.id === victim.id).owner, 1);
+      assert(s.entities.find((e: any) => e.id === enemyMonk.id).faith < 10);
+      console.log('franks: paid unique technologies, elite promotion/rendered art, stable training and Heresy conversion death GREEN');
+    }
     await page.reload({ waitUntil: 'domcontentloaded' }); await ready();
     s = await snapshot();
     assert.equal(s.players[1].civilization, civ); assert.equal(s.players[1].age, 3);
-    assert.equal(s.entities.filter((e: any) => e.owner === 1 && e.kind === own).length, 1);
+    assert.equal(s.entities.filter((e: any) => e.owner === 1 && e.kind === finalUnique).length, 1);
     assert.deepEqual(errors, []);
     console.log(`${civ}: menu/reload/restart, unique ${own} + icon/name/rendered art, own castle art, age prices, free farm lifecycle GREEN`);
     await page.close();

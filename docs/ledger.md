@@ -14,6 +14,19 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## Heresy conversion death (#180, shared conversion caveats #178)
+
+- **Owned:** technology439/effect188 sets player attribute192 (`heresy`) to1;
+  its monastery cost is1000 gold and research time60 seconds. English help28412
+  explicitly says converted units die instead of changing to the enemy's colour.
+- **Inferred integration:** successful conversion spends the usual monk/group
+  faith, reads the defending player's current Heresy attribute, and enters the
+  existing death lifecycle without changing ownership or creating a conversion
+  snapshot. Carrier unloading/sinking, relic release and demolition effects use
+  that same lifecycle. The general conversion timing/faith model and the precise
+  native Heresy cargo/demolition exceptions remain uncalibrated under#178;
+  regression tests establish deterministic implementation, not native parity.
+
 ## Audio pack boundary (#57)
 
 - **Owned:** shared PCK bank/stream tables, HIRC objects and DIDX prefetch

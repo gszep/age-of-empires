@@ -10,7 +10,7 @@ import type { Entity, GameState, PlayerId, UnitKind } from './types';
 function fixture() {
   const rules = structuredClone(FALLBACK_RULES);
   rules.units.monk.attackReloadSeconds = 1.6;
-  Object.assign(rules.playerAttributes, { convertResistMinAdj: 0, convertResistMaxAdj: 0, theocracy: 0, relicRate: 30 });
+  Object.assign(rules.playerAttributes, { convertResistMinAdj: 0, convertResistMaxAdj: 0, theocracy: 0, heresy: 0, relicRate: 30 });
   const state = createGame(130, rules);
   state.terrain = Array(state.width * state.height).fill(0); state.elevation.fill(0);
   state.entities = state.entities.filter(e => e.kind === 'town-center');
@@ -109,6 +109,28 @@ describe('Briton relic lifecycle', () => {
 });
 
 describe('offered Briton monastery research outcomes', () => {
+  it.each([false, true])('Heresy on the defender kills instead of capturing; attacker Heresy alone does not (%s)', defended => {
+    const s = fixture(), monk = spawn(s, 'monk', 1, 50), target = spawn(s, 'villager', 2, 54);
+    research(s, defended ? 2 : 1, 'heresy', [{ resource: 'heresy', operation: 'set', amount: 1 }]);
+    order(s, monk, target);
+    run(s, 40);
+    expect(target.owner).toBe(2); expect(target.dead).not.toBe(true);
+    const saved = JSON.parse(JSON.stringify(s)) as GameState;
+    until(s, () => !!target.dead || target.owner === 1);
+    run(saved, s.tick - saved.tick);
+    expect(checksumState(saved)).toBe(checksumState(s));
+    expect(target.owner).toBe(defended ? 2 : 1);
+    expect(!!target.dead).toBe(defended);
+    expect(monk.faith).toBe(0);
+    expect(monk.order.kind).toBe('idle');
+    if (defended) {
+      expect(target.hp).toBe(0);
+      expect(target.activity).toBe('dying');
+      expect(target.convertedRules).toBeUndefined();
+      expect(s.players[2].population).toBe(0);
+    }
+  });
+
   it.each([1, 5])('Devotion / Faith resistance adds %s seconds without breaking captured rule snapshots', amount => {
     const s = fixture(), monk = spawn(s, 'monk', 1, 50), target = spawn(s, 'militia', 2, 54);
     research(s, 2, 'devotion', ['convertResistMinAdj', 'convertResistMaxAdj'].map(resource =>
@@ -117,6 +139,19 @@ describe('offered Briton monastery research outcomes', () => {
       ({ resource, operation: 'add', amount: 4 } as TechEffect)));
     order(s, monk, target); run(s, (5 + amount) * 20 - 1); expect(target.owner).toBe(2);
     until(s, () => target.owner === 1); expect(target.convertedRules).toBeDefined(); expect(monk.faith).toBe(0);
+  });
+
+  it('Heresy death releases ram passengers under their original owner and spends group faith', () => {
+    const s = fixture(), a = spawn(s, 'monk', 1, 50), b = spawn(s, 'monk', 1, 50, 51);
+    const ram = spawn(s, 'battering-ram', 2, 54), passenger = spawn(s, 'militia', 2, 54);
+    s.entities = s.entities.filter(e => e.id !== passenger.id); ram.garrison = [passenger];
+    research(s, 2, 'heresy', [{ resource: 'heresy', operation: 'set', amount: 1 }]);
+    order(s, a, ram); order(s, b, ram); until(s, () => !!ram.dead);
+    expect(ram.owner).toBe(2); expect(ram.garrison?.length ?? 0).toBe(0);
+    expect(s.entities).toContain(passenger);
+    expect(passenger.owner).toBe(2); expect(passenger.dead).not.toBe(true);
+    expect(passenger.convertedRules).toBeUndefined();
+    expect(a.faith).toBeLessThan(1); expect(b.faith).toBeLessThan(1);
   });
 
   it.each([false, true])('Theocracy=%s changes how many participating monks expend faith', enabled => {

@@ -170,7 +170,7 @@ Current scoped acceptance and remaining shared work:
 | Civilisation | Remaining coverage beyond the enabled supported profile |
 |---|---|
 | Britons (#179) | Reviewed random-map gameplay scope accepted in db2c9c0/605f7f7 with full gates and actual browser outcomes; the shared limitations below remain explicit |
-| Franks (#180) | Generic fortifications/specialists are integrated, but full Frank-specific paid unique-tech/expanded-profile acceptance remains a separate task; no completion claim from the Briton pass |
+| Franks (#180) | Paid Bearded Axe/Chivalry/elite axeman acceptance and Heresy conversion-death implemented and browser-verified on2026-09-28; full gate GREEN. Shared native conversion/cargo calibration remains#178 |
 | Shared engine | Native relic-generation calibration/fish gaps (#130/#95), unlocked diplomacy/cooperative victories beyond the current locked two-player dialog (#138), Regicide timing/preset/task calibration (#240), charge/market runtime calibration and conversion-policy parity (#178). Relic placement and playable Regicide/Treason are implemented; the ledger distinguishes mechanics from unresolved engine interpretations |
 
 The imported catalogue now accounts for the already represented ram/tree alias,
@@ -223,6 +223,38 @@ fidelity certificate.
    descriptions in place of these commands.
 
 ## First contrasting civilisation: Franks
+
+### Frankish completion pass (2026-09-28)
+
+The refreshed published profile has no missing roster entries and no offered
+typed-tree research absent from its technology table. Heresy was the remaining
+wholly skipped available research: technology439/effect188 now reaches the
+defending player's conversion-death consumer, preserving ownership and entering
+normal death feedback. Owned cost/time/icon/help remain pipeline-derived.
+
+`src/sim/franks.test.ts` verifies paid Bearded Axe at actual added attack range,
+existing/garrisoned/new elite axemen, Chivalry's actual training/research completion
+against an unaffected opponent, paid Heresy and unavailable-Briton rejection,
+plus JSON continuation hashes. `monastery.test.ts` covers defending versus
+attacking-player Heresy, group faith and ram-passenger release. The latter cargo
+policy remains explicitly inferred in the ledger/#178.
+
+`tools/civilization_profiles_smoke.mts` now exercises real paid unique research,
+elite promotion and bound elite artwork, new stable training, monastery
+construction/Heresy and an enemy monk's public conversion order, in addition to
+the existing menu/restart/reload, castle-cost and free-farm lifecycle checks.
+Both profiles pass (`.local/franks-profiles-browser-r2.log`). The first attempt
+put monastery on the wrong probe menu page; the probe now uses the maintained
+`pageOf` helper, with unchanged timeouts. Full import succeeded
+(`.local/franks-import.log`); five profile import tests and39 focused simulation
+tests pass. Native conversion odds, cargo and other shared engine calibration
+limitations remain separately tracked; these checks do not establish native
+runtime parity.
+
+Checkpoint gate GREEN (`.local/franks-gate-r2.log`):1061 Vitest tests/87 files,
+build,151 owned-import tests and browser debug smoke. Three workers, unchanged
+timeouts. The first gate found a missing TypeScript player-attribute union member;
+it was added before the passing run. No fixture clocks were widened.
 
 Choose **Britons versus Franks** for #122/#123. Both use the owned `CivWest`
 HUD family; Franks test costs, automatic research, age gates and health while

@@ -2287,9 +2287,16 @@ function updateConverter(state: GameState, grid: NavGrid, entity: Entity): void 
   const ticksLeft = Math.max(1, Math.round((convert.maxSeconds - seconds) / TICK_SECONDS) + 1);
   if (random01(state) >= 1 / ticksLeft) return;
   spendConversionFaith(state, entity, target);
-  inheritConvertedUnit(state, target, entity.owner as PlayerId);
-  becomeIdle(target);
-  clearPath(target);
+  // Owned Heresy help (28412): die instead of changing to the enemy's colour.
+  // Resolve the defending player's attribute before any ownership transition.
+  if ((playerAttributeFor(state, target.owner, 'heresy') ?? 0) > 0) {
+    target.hp = 0;
+    kill(state, target);
+  } else {
+    inheritConvertedUnit(state, target, entity.owner as PlayerId);
+    becomeIdle(target);
+    clearPath(target);
+  }
   target.convertTicks = undefined;
   recalculatePopulation(state);
   entity.convertTicks = undefined;

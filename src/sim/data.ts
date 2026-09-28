@@ -622,7 +622,7 @@ export interface TechEffect {
  * fallback had hand-written before anybody looked.
  */
 export type PlayerAttribute = 'farmFoodAmount' | 'unitRepairCost' | 'buildingRepairCost'
-  | 'relicRate' | 'convertResistMinAdj' | 'convertResistMaxAdj' | 'theocracy'
+  | 'relicRate' | 'convertResistMinAdj' | 'convertResistMaxAdj' | 'theocracy' | 'heresy'
   | 'spies' | 'tradeVigRate' | 'tributeInefficency';
 
 export type TechAttribute =

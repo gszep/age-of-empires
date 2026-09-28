@@ -9,6 +9,14 @@ does not repeat it.
 
 ## Run and play
 
+Franks' completion pass now includes paid Bearded Axe/Chivalry and elite axeman
+outcome/browser acceptance plus the previously omitted **Heresy** conversion-death
+mechanic. The owned profile has no missing roster entries or wholly skipped
+available research. Full gate GREEN:1061 tests/87 files, build,151 import tests,
+browser smoke; dedicated mixed-profile browser acceptance also passes. See
+[civilisation coverage](civilization-coverage.md#frankish-completion-pass-2026-09-28)
+for evidence and the retained shared conversion/reference limitations (#178).
+
 The #54 DAT inventory has been refreshed against the pinned data and actual
 consumers: [dat-field-audit.md](dat-field-audit.md). Most old garrison/audio/
 terrain omissions are delivered; the ticket remains open for real remaining

@@ -54,6 +54,18 @@ class ProfileImportTest(unittest.TestCase):
         self.assertEqual(cues['civilizations/franks/villager-select']['switch'], 'Franks')
         self.assertIn('civilizations/franks/dat-unit-281-select', cues)
 
+    def test_frankish_heresy_reaches_the_conversion_consumer(self):
+        franks = self.content['civilizations']['franks']
+        tech = franks['technologies']['heresy']
+        self.assertEqual(tech['techId'], 439)
+        self.assertEqual(tech['cost'], {'gold': 1000, 'food': 0})
+        self.assertEqual(tech['researchSeconds'], 60)
+        self.assertEqual(tech['researchedAt'], 104)
+        self.assertEqual(tech['effects'], [{'resource': 'heresy', 'operation': 'set', 'amount': 1}])
+        self.assertEqual(franks['playerAttributeIds']['heresy'], 192)
+        self.assertEqual(franks['playerAttributes']['heresy'], 0)
+        self.assertNotIn('Heresy', [t['name'] for t in franks['skippedTechnologies']])
+
     def test_first_milestone_hud_bindings_exist_in_owned_materials(self):
         materials, textures = load_material_index(WIDGETUI)
         for key in ('britons', 'franks'):

@@ -1140,7 +1140,7 @@ OPERATION_NAMES = {0: "set", 4: "add", 5: "multiply"}
 # Importing a starting value does not implement the mechanic. Only these
 # attributes have simulation consumers for research effects (issue #53).
 SUPPORTED_PLAYER_ATTRIBUTES = {"farmFoodAmount", "unitRepairCost", "buildingRepairCost",
-    "relicRate", "convertResistMinAdj", "convertResistMaxAdj", "theocracy",
+    "relicRate", "convertResistMinAdj", "convertResistMaxAdj", "theocracy", "heresy",
     "spies", "tradeVigRate", "tributeInefficency"}
 # `b` on a type 1 command: 0 writes the value, 1 adds to it.
 RESOURCE_OPERATIONS = {0: "set", 1: "add"}
