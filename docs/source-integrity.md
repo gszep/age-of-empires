@@ -44,8 +44,54 @@ source leaves the last published manifest intact; a synthetic integration test
 checks that with a matching cache fingerprint. The pixel decoder and its cache
 fingerprint are unchanged, so complete sources retain byte-identical cached art.
 
-Restoring the missing original x1 bytes remains #119. The owned source tree was
-left read-only; no zero tail was patched, no contour synthesized and no decoder
-walk weakened. Re-download/revalidate the patch-matched owned source using the
-pins/setup instructions before attempting a base-only import from this damaged
-local depot.
+## Verified recovery (2026-09-28)
+
+The owner downloaded depot813784, manifest8087696953400240386, into a fresh
+destination after repeating the default-destination download failed to restore
+the files. SteamCMD's own help documents the explicit destination argument:
+
+```text
+download_depot 813780 813784 8087696953400240386 0 /home/fraser/repos/age-of-empires/.local/monk119-recovery
+```
+
+The two clean files retain their original lengths, but have these SHA-256 hashes:
+
+| File | Recovered SHA-256 |
+| --- | --- |
+| `u_monk_west_attackB_x1.sld` | `523c885807d9bed54dc863f7d5c154efc45ae7074a924facf4e5db5045c4e9df` |
+| `u_monk_west_idleA_x1.sld` | `b1b20ac3324312563ab062b6e3fc3a8a515c2970398c1d9e2a411c5778079872` |
+
+Both pass exact container validation; the recovered base source inventory passes
+**569/569** (`.local/monk119-base-audit.json`). A detached worktree at
+`.local/monk119-base` ran **`npm run import:aoe2`**, with a private depot-root
+overlay linking the recovered graphics and original DAT/UI, without the UHD or
+optional audio depots. The full pipeline exited0 (`.local/monk119-import.log`),
+and its manifest has **no skipped masks**. Monk idle-outline contains960 frames,
+attack-outline720, both at **scale1**. No decoder or cache fingerprint changed.
+
+The maintained `composite_outline_smoke.mts` now accepts `CONTOUR_KIND=monk`,
+`CONTOUR_ANIMATION=idle|attack`, `CONTOUR_SCALE=1`, and an absolute
+`CONTOUR_ROOT` pointing at that isolated import worktree. Idle and attack-art
+fixtures both pass real-browser A/B checks over the native TC occluder:
+
+- Idle:355 changed sRGB pixels, all355 player-blue;204 opaque samples.
+- Attack:356 changed sRGB pixels, all356 player-blue;205 opaque samples.
+- Both: correct contour/occluder/placement order, delayed load, expiration and
+  reload, empty-frame hiding, pixel-identical camera round trip, no page errors,
+  unchanged simulation hash. Logs: `.local/monk119-{idle,attack}-browser.log`.
+- Existing Galley and villager contour probes also pass against the normal x2
+  installation (`.local/monk119-{galley,villager}-regression.log`).
+- Full checkpoint gate is GREEN (`.local/monk119-gate.log`, exit0):997 Vitest
+  tests/81 files, build,149 Python/owned-source tests and real-browser debug
+  smoke. Three workers, unchanged timeouts; only Markdown edits after gate start.
+
+These are render fixtures for both recovered atlases, not a new claim about
+monk conversion gameplay animation. Import decoding covers the complete masks;
+browser pixel checks sample a paused pose, not every direction/frame.
+
+**Installation complete:** the owner copied both verified files back into the
+default depot on2026-09-28, preserving the `.sld.damaged` backups. Read-only
+verification confirmed both canonical files match the recovered SHA-256 hashes
+above, and `tools/sld_integrity.py --base` now passes569/569 against the default
+depot. This completes #119. The current x2 installation is unaffected. No source
+bytes were synthesized and no walk invariant was weakened.

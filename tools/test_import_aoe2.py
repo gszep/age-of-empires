@@ -90,6 +90,33 @@ class CivilizationAuditTest(unittest.TestCase):
                          "unmodelled-command-type")
 
 
+class TerrainScatterImportTest(unittest.TestCase):
+    @unittest.skipUnless(DAT.exists(), 'owned DAT unavailable')
+    def test_terrain_rows_retain_source_values_and_only_scenery_has_art_keys(self):
+        content = extracted_content()
+        rows = content['terrain']['ground']['scatter']
+        self.assertEqual([(r['unitId'], r['density'], r['maskedDensity'], r['centered']) for r in rows],
+                         [(1358, 60, 30, False)])
+        self.assertEqual(content['entities'][rows[0]['key']]['animations']['idle']['source'], sld('n_plant_grass_green'))
+        self.assertEqual(content['terrain']['farm']['scatter'], [])
+        self.assertEqual(content['terrain']['forest']['scatter'],
+                         [{'unitId': 411, 'density': 1000, 'maskedDensity': 0, 'centered': True}])
+        for slot in content['terrain'].values():
+            source = _dat().terrain_block.terrains[slot['terrainId']]
+            self.assertEqual(len(slot['scatter']), source.number_of_terrain_units_used)
+            for i, row in enumerate(slot['scatter']):
+                self.assertEqual(row['unitId'], source.terrain_unit_id[i])
+                self.assertEqual(row['density'], source.terrain_unit_density[i])
+                self.assertEqual(row['maskedDensity'], source.terrain_unit_masked_density[i])
+                if 'key' in row:
+                    entity = content['entities'][row['key']]
+                    self.assertEqual(entity['category'], 'decoration')
+                    self.assertEqual(entity['id'], row['unitId'])
+        with tempfile.TemporaryDirectory() as tmp:
+            published = convert_terrain({'ground': content['terrain']['ground']}, TERRAIN, Path(tmp), {})
+            self.assertEqual(published['ground']['scatter'], rows)
+
+
 class DropSiteImportTest(unittest.TestCase):
     def test_worker_sites_worker_filters_and_target_classes_are_all_required(self):
         with tempfile.TemporaryDirectory() as tmp:

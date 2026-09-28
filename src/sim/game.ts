@@ -14,6 +14,7 @@ import {
 } from './nav';
 import { random01, seedFrom } from './random';
 import { buildingLimitReached, buildingRulesFor, combine, inheritConvertedUnit, playerAttributeFor, unitRulesFor, unitRulesForEntity } from './rules';
+import { garrisonCount } from './garrison';
 import { civilizationRules, rulesForPlayer } from './civilizations';
 import { researchCostFor, technologyFor, technologyRequirementsMet } from './technologies';
 import { applyMarketCommand } from './market';
@@ -510,17 +511,23 @@ export function isCarcass(entity: Entity): boolean {
 /** A farmer's gather order reserves the farm while walking and banking too.
  * Derive the claim from live orders so Stop, death and retasking release it
  * immediately. Lowest id resolves duplicate orders in pre-fix saved matches. */
-function farmAvailable(state: GameState, farm: Entity, gatherer: Entity): boolean {
+function farmWorker(state: GameState, farm: Entity): Entity | undefined {
   let farmer: Entity | undefined;
   for (const worker of state.entities) {
-    if (worker.dead || worker.kind !== (farm.kind === 'fish-trap' ? 'fishing-ship' : 'villager') || worker.owner !== farm.owner
+    if (worker.dead || worker.kind !== (farm.kind === 'fish-trap' ? 'fishing-ship' : 'villager')
+      || (farm.kind === 'fish-trap' && worker.owner !== farm.owner)
       || worker.order.kind !== 'gather' || worker.order.targetId !== farm.id) continue;
     if (!farmer || worker.id < farmer.id) farmer = worker;
   }
+  return farmer;
+}
+
+function farmAvailable(state: GameState, farm: Entity, gatherer: Entity): boolean {
+  const farmer = farmWorker(state, farm);
   return !farmer || farmer.id === gatherer.id;
 }
 
-function isGatherable(state: GameState, entity: Entity, gatherer: Entity): boolean {
+function isGatherable(state: GameState, entity: Entity, gatherer: Entity, claimAbandonedFarm = false): boolean {
   // A boat gathers fish and nothing else; a villager casts for fish from the
   // bank as it picks a bush, and its reach is what decides which fish.
   if (gatherer.kind !== 'villager' && gatherer.kind !== 'fishing-ship') return false;
@@ -536,7 +543,9 @@ function isGatherable(state: GameState, entity: Entity, gatherer: Entity): boole
     if (entity.dead) return true;
     return rulesForPlayer(state, entity.owner).units[entity.kind].herdRange !== undefined && entity.owner === gatherer.owner;
   }
-  return entity.kind === 'farm' && entity.owner === gatherer.owner
+  // Owned help26149 permits explicit abandoned-farm capture. Automatic target
+  // searches keep their existing own-farm policy. Reservations span owners.
+  return entity.kind === 'farm' && (entity.owner === gatherer.owner || claimAbandonedFarm)
     && !entity.dead && entity.buildProgress === undefined && (entity.amount ?? 0) > 0
     && farmAvailable(state, entity, gatherer);
 }
@@ -580,12 +589,13 @@ export function resolveUnitOrder(state: GameState, entity: Entity, target: Point
     return { kind: 'trade', targetId: targetEntity.id };
   } else if (((entity.kind === 'villager' && targetEntity?.kind === 'farm')
     || (entity.kind === 'fishing-ship' && targetEntity?.kind === 'fish-trap'))
-    && !targetEntity.dead && targetEntity.owner === entity.owner
+    && !targetEntity.dead && (targetEntity.owner === entity.owner
+      || (targetEntity.kind === 'farm' && farmWorker(state, targetEntity)?.owner === entity.owner))
     && targetEntity.buildProgress === undefined && (targetEntity.amount ?? 0) > 0) {
-    const farm = isGatherable(state, targetEntity, entity)
+    const farm = isGatherable(state, targetEntity, entity, true)
       ? targetEntity : nearbyFreeFarm(state, entity, targetEntity.position);
     return farm ? { kind: 'gather', targetId: farm.id } : { kind: 'idle' };
-  } else if (targetEntity && isGatherable(state, targetEntity, entity)) {
+  } else if (targetEntity && isGatherable(state, targetEntity, entity, true)) {
     return { kind: 'gather', targetId: targetEntity.id };
   } else if (
     unitRules?.heal && !entity.relics?.length && targetEntity && targetEntity.id !== entity.id
@@ -1616,6 +1626,10 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
   }
   clearPath(entity);
 
+  // Claim only when work starts, never on hover or a remote/queued order.
+  // Keep the original crop and HP; the new owner's upgrades apply on reseed.
+  if (node.kind === 'farm' && node.owner !== entity.owner) node.owner = entity.owner;
+
   // AoE2 turns a herdable into a carcass the moment a villager works it: the
   // sheep stops walking about and the food comes off the body.
   if (isAnimal(node.kind) && !node.dead) kill(state, node);
@@ -2067,7 +2081,7 @@ export function canGarrison(state: GameState, unit: Entity, building: Entity): b
     const capacity = carrier.transportCapacity;
     const rules = rulesForPlayer(state, unit.owner);
     return !!capacity && !unit.unpacked && !rowAdmitsWater(rules, restrictionOf(rules, unit))
-      && (building.garrison?.length ?? 0) < capacity;
+      && garrisonCount(building) + 1 + garrisonCount(unit) <= capacity;
   }
   if (!isBuilding(building.kind)) return false;
   const garrison = buildingRulesFor(state, building.owner, building.kind as BuildingKind).garrison;

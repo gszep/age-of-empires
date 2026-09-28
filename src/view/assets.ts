@@ -123,6 +123,9 @@ export interface PlayerColors {
 
 /** One DAT terrain slot: a tiling texture spanning `dimensions` tiles. */
 export interface ImportedTerrain {
+  /** Original DAT rows. Only non-obstructing scenery has a render key; forest
+   * resource rows are retained as metadata, never decorative trees. */
+  scatter?: { unitId: number; density: number; maskedDensity: number; centered: boolean; key?: string }[];
   /** The DAT slot this is, so the ground can be bucketed by what the map says. */
   terrainId: number;
   soundEvent?: number;

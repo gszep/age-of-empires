@@ -70,7 +70,8 @@ and `xs/Constants.xs` (cost attributes 100, 103–106, work 13).
 Unsupported commands/targets remain in `unmodelled`, including search radius 23
 and enable-unit effects. Rounding, activation order and free-research building
 semantics are **inferred** in `ledger.md`; not DE runtime measurements or claims
-that #128/#126/#130 are complete.
+that #128/#130 are complete. Building age stats (#126) have since been verified
+against the owned replacements and actual gameplay; see `docs/handoff.md`.
 
 ## Verification
 

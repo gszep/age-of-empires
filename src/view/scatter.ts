@@ -16,11 +16,13 @@
  * wood. Which object each pass strews is the biome's, from `MAP_CONSTANTS`.
  */
 import * as THREE from 'three/webgpu';
-import { spriteLayerOrder } from './render-order';
+import { groundLayerOrder, spriteLayerOrder } from './render-order';
 import { ARABIA_BIOMES, TERRAIN_BEACH, isOpenWater, type BiomeSpec } from '../sim/mapgen';
 import { random01, seedFrom } from '../sim/random';
+import { isBuilding } from '../sim/data';
+import { rulesForPlayer } from '../sim/civilizations';
 import type { GameState, ReadonlyGameState, PlayerId } from '../sim/types';
-import { atlasPage, spriteTexture, type Atlas, type ContentAssets } from './assets';
+import { atlasPage, spriteTexture, type Atlas, type ContentAssets, type ImportedTerrain } from './assets';
 import { isoDepth, worldToIso } from './iso';
 import { elevationAt, ELEVATION_PIXELS, FOG_EXPLORED } from './world';
 
@@ -126,16 +128,43 @@ export function scatterPlacements(state: ReadonlyGameState): { key: string; x: n
   return placed;
 }
 
+/** DAT terrain plants, independent of RMS aesthetic passes and simulation RNG.
+ * Density/1000 and uncentered sub-tile jitter are inferred placement policy;
+ * masked-density engine semantics remain recorded separately in the ledger. */
+export function terrainPlantPlacements(state: ReadonlyGameState, terrain: Record<string, ImportedTerrain>): { key: string; x: number; y: number; terrainId: number }[] {
+  const byId = new Map(Object.values(terrain).map(slot => [slot.terrainId, slot]));
+  const placed: { key: string; x: number; y: number; terrainId: number }[] = [];
+  for (let tile = 0; tile < state.terrain.length; tile++) {
+    for (const row of byId.get(state.terrain[tile])?.scatter ?? []) {
+      if (!row.key || row.density <= 0) continue;
+      const rng = { seed: seedFrom((state.matchSeed ?? state.seed) ^ Math.imul(tile + 1, 73856093) ^ Math.imul(row.unitId, 19349663)) };
+      if (random01(rng) >= Math.min(row.density / 1000, 1)) continue;
+      placed.push({ key: row.key, terrainId: state.terrain[tile], x: tile % state.width + (row.centered ? 0.5 : random01(rng)),
+        y: Math.floor(tile / state.width) + (row.centered ? 0.5 : random01(rng)) });
+    }
+  }
+  return placed;
+}
+
 /** One static sprite per placement, from the object's own idle frames. */
 export function createScatter(state: ReadonlyGameState, assets: ContentAssets | undefined): THREE.Group {
   const group = new THREE.Group();
   if (!assets) return group;
-  for (const { key, x, y } of scatterPlacements(state)) {
-    const atlas: Atlas | undefined = assets.entities[key]?.atlases['idle'];
-    if (!atlas) continue;
-    // The idle sheet holds the object's variants; pick one by where it stands.
+  const layers = [...scatterPlacements(state), ...terrainPlantPlacements(state, assets.terrain)].flatMap(placement => {
+    const { key, x, y } = placement;
+    const atlases = assets.entities[key]?.atlases;
+    if (!atlases?.idle) return [];
+    // Use the same variant index for body and shadow, with each layer's own
+    // frame box and hotspot. A missing/empty mask never invents a shadow.
     const hash = (Math.imul(Math.floor(x * 7), 73_856_093) ^ Math.imul(Math.floor(y * 7), 19_349_663)) >>> 0;
-    const frame = atlas.frames[hash % atlas.frames.length];
+    const index = hash % atlases.idle.frames.length;
+    return ['idle-shadow', 'idle'].flatMap(name => {
+      const atlas: Atlas | undefined = atlases[name];
+      return atlas ? [{ placement, atlas, frame: atlas.frames[index], shadow: name === 'idle-shadow' }] : [];
+    });
+  });
+  for (const { placement, atlas, frame, shadow } of layers) {
+    const { key, x, y } = placement;
     if (!frame || frame.w === 0 || frame.h === 0) continue;
     const page = atlasPage(atlas, frame);
     // The page may still be loading (`spriteTexture`): the mesh is built
@@ -160,6 +189,8 @@ export function createScatter(state: ReadonlyGameState, assets: ContentAssets | 
     mesh.visible = false; // fillScatter applies authoritative tile visibility
     mesh.userData.page = page.image;
     mesh.userData.tile = Math.floor(y) * state.width + Math.floor(x);
+    mesh.userData.shadow = shadow;
+    if ('terrainId' in placement) mesh.userData.terrainId = placement.terrainId;
     const scale = atlas.scale ?? 1;
     const w = frame.w / scale;
     const h = frame.h / scale;
@@ -169,8 +200,8 @@ export function createScatter(state: ReadonlyGameState, assets: ContentAssets | 
     mesh.position.set(iso.x + w / 2 - frame.cx / scale, iso.y - h / 2 + frame.cy / scale, 0);
     // Among the entity bodies, at its own depth, so a villager walks in
     // front of a bush and behind the next one.
-    mesh.renderOrder = spriteLayerOrder(isoDepth(x, y));
-    mesh.name = `scatter-${key}`;
+    mesh.renderOrder = shadow ? groundLayerOrder(500, isoDepth(x, y)) : spriteLayerOrder(isoDepth(x, y));
+    mesh.name = `scatter-${key}${shadow ? '-shadow' : ''}`;
     group.add(mesh);
   }
   return group;
@@ -184,14 +215,40 @@ export function fillScatter(
 ): void {
   if (!assets) return;
   const visibility = state.visibility[player];
+  // Cover plants under known foundations/farms without leaking unseen enemy
+  // construction or demolition through a change in remembered decoration.
+  const covered = new Set<number>();
+  const cover = (x: number, y: number, rx: number, ry: number) => {
+    for (let ty = Math.max(0, Math.floor(y - ry)); ty < Math.min(state.height, Math.ceil(y + ry)); ty++) {
+      for (let tx = Math.max(0, Math.floor(x - rx)); tx < Math.min(state.width, Math.ceil(x + rx)); tx++) covered.add(ty * state.width + tx);
+    }
+  };
+  for (const entity of state.entities) {
+    if (!isBuilding(entity.kind) || entity.dead) continue;
+    const { x, y } = entity.position;
+    if (!reveal && entity.owner !== player && !visibility.visible[Math.floor(y) * state.width + Math.floor(x)]) continue;
+    cover(x, y, entity.footprint?.x ?? entity.radius, entity.footprint?.y ?? entity.radius);
+  }
+  if (!reveal) for (const remembered of Object.values(visibility.memory)) {
+    if (!isBuilding(remembered.kind) || visibility.visible[Math.floor(remembered.y) * state.width + Math.floor(remembered.x)]) continue;
+    const radius = rulesForPlayer(state, remembered.owner).buildings[remembered.kind].radius;
+    cover(remembered.x, remembered.y, radius, radius);
+  }
   for (const child of group.children) {
     const tile = child.userData.tile as number;
     if (!reveal && !visibility.explored[tile]) { child.visible = false; continue; }
+    if (child.userData.terrainId !== undefined && (covered.has(tile)
+      || child.userData.terrainId !== state.terrain[tile])) { child.visible = false; continue; }
     const texture = spriteTexture(assets, child.userData.page as string);
     if (!texture) { child.visible = false; continue; }
     const material = (child as THREE.Mesh).material as THREE.MeshBasicMaterial;
     if (material.map !== texture) { material.map = texture; material.needsUpdate = true; }
-    material.color.setScalar(reveal || visibility.visible[tile] ? 1 : 1 - FOG_EXPLORED);
+    if (child.userData.shadow) {
+      // Like entity shadows, these already receive ground fog. The owned mask
+      // contains its soft coverage; do not attenuate or dim it a second time.
+      material.opacity = assets.shadows?.strength ?? 1;
+      material.color.setRGB(...(assets.shadows?.color ?? [0, 0, 0]));
+    } else material.color.setScalar(reveal || visibility.visible[tile] ? 1 : 1 - FOG_EXPLORED);
     child.visible = true;
   }
 }

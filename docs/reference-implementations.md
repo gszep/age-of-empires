@@ -73,6 +73,13 @@ These files and [official AoE modding documentation](https://support.ageofempire
 
 The scripts reveal policy and available observations/actions, not the hidden implementation of pathfinding or collision.
 
+The owned `TC Random Map Scripting Guide.doc` LAND/TERRAIN/OBJECTS sections
+were reviewed for #56. The guide is primary for command/default contracts;
+patch-matched RMS supplies explicit values and can exceed legacy guide ranges.
+Land clumping defaults to8, terrain to20. See the contract audit and source hash
+in [map-generation-design.md](map-generation-design.md), including phase, clump
+quota, same-type spacing and height-filter limitations of the current adapter.
+
 The shipped English PDFs are readable using `uv run --locked python
 tools/pdf_text.py "<owned PDF>" > .local/manual.json` (#60). Physical page
 numbers and source SHA-256 accompany extracted text. These are legacy AoK/TC
@@ -82,7 +89,24 @@ manuals bundled with DE, not patch-current numeric tables. AoK printed p33
 p13 (PDF16) establishes repeatable temporary Treason. Exact current exceptions,
 price constants and reveal timers remain in the [bounded audit](shared-reference-audit.md).
 
+The remaining #60 reading is complete in [the English manual audit](manual-audit.md):
+AoK combat/elevation p34 (PDF37), garrison pp37–39 (PDF40–42), stances/formations
+pp35/40–43 (PDF38/43–46), conversion pp33/39/105 (PDF36/42/108), route trade
+p47 (PDF50); TC ram/worker/bulk-trade rules pp7–8 (PDF9–10) and monastery
+technologies pp20–21 (PDF22–23). Elevation multipliers and the trade-profit
+equation are **not** supplied. The audit distinguishes legacy conflicts,
+implemented policies and remaining gaps, including reproduced nested transport
+capacity #251. AoK score p18 (PDF21) is also indexed for #139.
+
 ### 4. Older independent engine implementations
+
+Historical map-generator reference: [genie-rms](https://github.com/genie-js/genie-rms)
+was read for algorithm understanding on2026-08-28 UTC (partly August29 BST).
+The contemporaneous licence check reported GPL-3.0, and the implementing agent
+declared a fresh project implementation. The specific files, original tool-trace
+anchors, project commits and missing upstream revision pin are recorded in
+[genie-rms-provenance.md](genie-rms-provenance.md) under #112/#142. It is not a
+runtime dependency or a substitute for the owned RMS guide (#56).
 
 - [freeaoe](https://github.com/sandsmark/freeaoe) (GPL-3.0): direct Genie data use, map/scenario loading, movement, attacks, buildings, AI scripting, and pathfinding. Smaller than openage and easier to inspect, but incomplete and largely inactive.
 - [Open Empires](https://github.com/jubalskaggs/openempires) (GPL-3.0): a small C99/SDL2 AoC reverse-engineering experiment. Inactive and minimally adopted; use only as independent corroboration.

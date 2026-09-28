@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
+import { garrisonCount } from './sim/garrison';
 import { observe } from './sim/observe';
 import { TRAINING_QUEUE_LIMIT, applyCommand as applyLocalCommand, buildingFootprint, civHas, createGame, gameTimeSeconds, isCarcass, isRepairable, placementLegal, planContextCommand, queuedCount, shortfall, stepGame, trainableUnitsAt, rulesForPlayer } from './sim/game';
 import { connectSharedMatch } from './shared/client';
@@ -1638,10 +1639,11 @@ function selectionInfo(): SelectionInfo | undefined {
   if (entity.kind === 'town-center' && entity.owner === localPlayer) details.push(AGE_NAMES[game.players[localPlayer].age]);
   if (entity.amount !== undefined) details.push(`${Math.floor(entity.amount)} ${entity.resourceKind}`);
   if (entity.owner === localPlayer && entity.garrison?.length) {
-    const capacity = isUnit(entity.kind)
-      ? rules.units[entity.kind].transportCapacity ?? rules.units[entity.kind].infantryCapacity
+    const carrier = isUnit(entity.kind) ? unitRulesForEntity(game, entity) : undefined;
+    const capacity = carrier
+      ? carrier.transportCapacity ?? carrier.infantryCapacity
       : rules.buildings[entity.kind as BuildingKind]?.garrison?.capacity;
-    details.push(`${entity.garrison.length}${capacity ? `/${capacity}` : ''} garrisoned`);
+    details.push(`${garrisonCount(entity)}${capacity ? `/${capacity}` : ''} garrisoned`);
   }
   if (entity.carrying) details.push(`Carrying ${entity.carrying.amount} ${entity.carrying.kind}`);
   if (entity.owner === localPlayer && entity.relics?.length) details.push(`Relics: ${entity.relics.length}`);

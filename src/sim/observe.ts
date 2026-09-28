@@ -11,6 +11,7 @@ import { fireChargeOf } from './fire-charge';
 import type { ObservedEntity, PlayerObservation, RememberedEntityObservation } from '../protocol/types';
 import { PROTOCOL_VERSION } from '../protocol/types';
 import { observedTerrain } from '../protocol/terrain';
+import { garrisonCount } from './garrison';
 
 function observeEntity(state: GameState, entity: Entity, player: PlayerId): ObservedEntity {
   const observed: ObservedEntity = {
@@ -47,7 +48,7 @@ function observeEntity(state: GameState, entity: Entity, player: PlayerId): Obse
       const { task, ...load } = entity.carrying;
       observed.carrying = load;
     }
-    if (entity.garrison?.length) observed.garrisoned = entity.garrison.length;
+    if (entity.garrison?.length) observed.garrisoned = garrisonCount(entity);
     // Production clocks hold remaining work. Agents need game-time seconds,
     // including the owner's active production/research speed modifiers.
     const workRate = entity.training || entity.researching

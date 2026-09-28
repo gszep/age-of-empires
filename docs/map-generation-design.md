@@ -1,53 +1,93 @@
-# Map generation: what the original does, and what to build
+# Map generation: source contracts and the implemented adapter
 
-`backlog.md` records two map complaints — the middle of a 120x120 board is
-empty, and a forest grown one free tile at a time has holes in it. Both are the
-same gap: the generator here is a hand-rolled scatter, and the original's is a
-small set of reusable primitives run in a fixed order. This note is the
-research, not an implementation. Nothing below is built.
+The original 2026-08-28 research addressed empty map centres and pinholed woods.
+Its M1/M2 primitives and subsequent map types are now implemented; historical
+plans below are retained as design history, not the current work queue. Current
+scope/evidence is in `status.md`; approximations are in `ledger.md`.
 `map-conditioning-design.md` extends it: driving the same phases from real
 geography, and the fidelity dial between a 1:1 map and a playable miniature.
 
 ## Where the evidence comes from, and how good it is
 
+- **Primary command/default specification:** the owned
+  `depot_813781/Docs/All/TC Random Map Scripting Guide.doc`, reviewed for #56.
+  Its LAND/TERRAIN/OBJECTS sections define distinct clumping defaults, phase
+  relationships, quotas, spacing and object grouping. See the contract audit below.
+- **Patch-matched script instances:** `Arabia.rms`, `Islands.rms`,
+  `land_resources.inc` and related includes under
+  `depot_813784/resources/_common/drs/gamedata_x2/`. Modern explicit script values
+  take precedence over legacy guide ranges; Islands uses land clumping22.
 - **`genie-rms`** (github.com/genie-js/genie-rms), a reverse-engineered
   evaluator whose modules are named after the decompiled functions
   (`RGE_RMM_Objects_Generator__place_object` is left in a comment). It is the
-  only public thing that states the algorithms rather than the script syntax.
+  corroborating description of algorithms rather than the primary specification.
   Its own README calls land positioning "buggy" and terrain/object generation
   "probably inaccurate compared to AoC" — so treat it as the *shape* of the
   algorithm, evidenced, and not as exact numbers.
-- **The shipped includes**, `land_resources.inc` and `Arabia.rms`. These are
-  data, not reconstruction, and they are what `OPENING` in `game.ts` was already
-  transcribed from — the counts and distance bands there match line for line.
 - **The DE scripting reference** for what an attribute means and its range.
 
-**Not** from the owned files: `.local/aoe2de` holds only `content.json` and the
-atlas cache, and the real scripts live in the resources depot (813784) under
-`resources/_common/random-map-scripts`. Before any number here is treated as
-fact, that depot should be pulled and the numbers read out of it, the way the
-DAT numbers are elsewhere in this project.
+Resolve the actual owned root with `tools/depot.py`; `.local/aoe2de` contains
+generated content/cache, not the original scripts. The former note claiming the
+scripts had not been obtained was stale: the original implementation trace
+records owned-script reads. See [genie-rms-provenance.md](genie-rms-provenance.md)
+for that chronology and the recorded GPL reference-reading boundary.
 
-## Seven phases over one grid
+## Owned guide contract audit (#56, 2026-09-28)
 
-`PLAYER_SETUP` → `LAND_GENERATION` → `ELEVATION_GENERATION` →
-`CLIFF_GENERATION` → `TERRAIN_GENERATION` → `CONNECTION_GENERATION` →
-`OBJECTS_GENERATION`.
+Source SHA-256:
+`413b05469c3109ec9f287d80cf105ec9e916e2529f4223c4657c908105a50d5c`.
+Read the LAND_GENERATION, TERRAIN_GENERATION and OBJECTS_GENERATION sections
+using `strings` on the owned legacy DOC; local extraction is
+`.local/rms56-guide.txt`. This is a text extraction, not a layout-faithful Word
+parser. Section/command names are the citation anchors, not invented page numbers.
 
-Two things in that order matter. Terrain runs *after* elevation and cliffs, so a
-terrain clump can be told to place only within a height band and cliffs are
-already in the way. Objects run last, over finished ground, which is why every
-object rule is a question about terrain and zones rather than about other
-objects.
+| Guide statement | Current adapter and disposition |
+| --- | --- |
+| Land `clumping_factor` defaults to8; terrain defaults to20. The historical land range is1–15. | **Fixed:** player-land fallback and resource-islet growth both use8; terrain/elevation growth retains20. Explicit modern overrides are preserved, including Islands22; no legacy-range clamp is applied. |
+| Land precedes elevation; terrain follows elevation. Land grows collectively, while terrain/objects run in script order. | The adapter reserves resource islets before growing mirrored homes, and grows forest masks before hills so hills can target forests/clearings. Biome painting then runs in ordered passes. This is not a complete RMS phase evaluator; land/order and elevation/terrain limitations remain under #130/#134. |
+| Terrain is painted on its declared base; if that base is absent at that point, the pass produces nothing. | `paintBiome` scans the currently matching base and skips empty candidate sets, preserving pass order. It is a fixed set of supported passes, not a parser for arbitrary scripts. |
+| Terrain quotas are evenly divided among clumps (18 tiles/3 clumps gives6 each). | Round-robin growth shares a total budget and can redistribute work when frontiers fail; independent exact quotas/failure semantics are not enforced. Remains an approximation, not a guide-proven algorithm. |
+| `spacing_to_other_terrain_types` also counts the same terrain type. | Existing shoreline exclusions and seed/group spacing are partial adapters, not a general same-type clump-edge separation rule. #90 fixed candidate exclusion, not this broader terrain contract. |
+| `height_limits` restricts terrain to an elevation band; `set_flat_terrain_only` prevents crossing slopes. | No general terrain height-band/flat-only predicate exists. The supported hill passes and flat water treatment do not implement these general flags (#134). |
+| Terrain `set_avoid_player_start_areas` is a flag; common blocking terrain avoids starts by default. | The current descriptors use explicit start masks/fades. There is no generic terrain/object flag interpreter; source-defined defaults and rejection details remain inferred. |
+| Object min/max player distances default to0/infinity; specific-land placement uses that land's centre. Tight groups are contiguous; loose groups allow gaps. Group spacing refers to group centres. | Existing descriptors supply finite bands; tight/loose placement and named islets are supported. Square distance metric, deterministic candidate scan, mirroring and retry details remain chosen/reconstructed. #90 now enforces the specified anchor spacing. |
+| `land_percent`, scaling flags and group counts determine quotas. | Biome percentages currently use eligible base-terrain area, and scaling is simplified around100×100. The guide's total-land wording and several inconsistent arithmetic examples are not proof of the exact current denominator/rounding. Existing policy is retained for calibration under #130, rather than changed by guesswork. |
 
-## Nearly all of it is two primitives
+The guide itself contains inconsistent examples (e.g. scaling arithmetic and
+fish described as never *more* than a minimum spacing apart). Definitions,
+patch-matched scripts and runtime measurements must be distinguished; reading
+this document does not make every old example a current engine constant.
+
+Verification: four new outcome regressions failed before the correction and now
+pass, including implicit8 versus explicit8/20 and preservation of22 overrides.
+All24 existing map-generation and5 spacing tests pass. Before/after terrain,
+elevation, land-ID and entity hashes for seeds3/7 are unchanged on Arabia,
+Black Forest, Windsor, Senlac and Painted Proof. Islands changes because its
+owned resource-islet blocks omit clumping; their gold/stone quotas remain intact.
+Six natural browser map cases and fresh reloads pass, with reviewed Islands
+minimaps (`.local/rms56-browser.log`, `.local/rms56-after-*`).
+The full gate is GREEN (`.local/rms56-gate.log`, exit0):1055 Vitest tests/86 files,
+build,150 Python/owned-source tests and real-browser debug smoke. No test timeout
+was widened and no owned asset regeneration was needed.
+
+## Phase model and its evidence limits
+
+The guide names seven sections, but its list is not a processing-order list.
+Its prose establishes land → elevation → terrain, followed by cliffs/connections;
+the object section states that objects follow land/elevation/terrain. The former
+total-order diagram placed cliffs before terrain based on the evaluator and
+should not have been presented as an owned contract. Exact scheduling and the
+current adapter's departures are recorded in the audit above.
+
+## Corroborating algorithm model: two primitives
 
 ### 1. Cost-ordered round-robin growth
 
 One `StackNode` per tile, shared by every phase, threaded onto a linked list
 kept sorted ascending by `totalCost`; a pop takes the head. Growth is then:
 
-- Seed. A land seeds a `base_size` square (default 3, so 7x7) at its origin and
+- Seed. A land seeds a `base_size` square (inferred default3, so7x7; the guide
+  does not state that omitted value) at its origin and
   stamps its zone id into a search map. A terrain or elevation clump seeds one
   tile taken from a randomised list of the whole map, and then *removes* the
   candidates within `2*sqrt(tiles/clumps)` of it so clumps start apart.
@@ -76,14 +116,15 @@ Each phase differs only in the accept test:
   it is the part the reverse engineering says is buggy.
 - **Elevation.** Accept if the tile is at the base elevation; hills grow the
   same way, height by height.
-- **Terrain.** Accept if the tile is still `base_terrain`, is inside
-  `min/max_height`, and has `spacing_to_other_terrain_types` clear of anything
-  that is neither the base nor the new type. `set_avoid_player_start_areas` is
+- **Terrain.** The evaluator model accepts matching `base_terrain` and height,
+  but its exclusion of the new type from spacing conflicts with the guide's
+  explicit same-type statement; this is not a confirmed native rule.
+  Its interpretation of `set_avoid_player_start_areas` is
   not a hard radius: a "hotspot" map holds `radius - distance` faded around each
   player start, and the tile is rejected with that as a percentage — so forests
   thin out towards a town center rather than stopping at a line.
 
-Then **`cleanTerrain`**, which is the piece we do not have at all. Two passes,
+Then **`cleanTerrain`**, represented locally by `cleanMask`. Two passes,
 repeated while anything changed and over a widening rectangle: pass one fills
 any tile whose north and south, or east and west, neighbours are the terrain;
 pass two fills tiles that are only diagonally connected. It is what removes the
@@ -131,7 +172,7 @@ Arabia is famously not fair. `createGame` mirrors every placement exactly. That
 is a deliberate difference and probably the right one for a 1v1 evaluation
 harness, but it should be a named choice rather than an accident.
 
-## Measured against what is here now
+## Historical comparison (2026-08-28, before M1/M2)
 
 | the original | `game.ts` today |
 |---|---|
@@ -229,7 +270,7 @@ them — base terrain, a list of lands, a list of terrain clumps, a connection
 table, the object list we already have — then Black Forest is a descriptor and
 not a feature.
 
-## What to build, in order
+## Historical implementation plan (2026-08-28)
 
 **M1. A terrain grid and the growth primitive.** `GameState` gains
 `terrain: Uint8Array` of DAT terrain ids — this is `water-design.md`'s W1, and
@@ -295,7 +336,7 @@ placement now reads DAT `hill_mode` (#176), enforcing flat-only or one-level
 relief over the footprint while exempting unrestricted buildings; exact discrete
 slope/corner correspondence to DE still needs reference measurement.
 
-## The things to decide before starting
+## Historical pre-implementation decisions (2026-08-28)
 
 1. **Mirroring.** Keep it (fair by construction, and the batch's paired seeds
    depend on nothing else) or drop it for the original's independent draws

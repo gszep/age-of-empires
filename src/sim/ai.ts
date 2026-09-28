@@ -45,6 +45,10 @@ const ASSIGNMENT: ResourceKind[] = [
  * one loses both. Recorded in `docs/backlog.md`.
  */
 const HERD: string[] = ['sheep', 'deer'];
+/** Strategy staging distance around a completed TC, not an engine sheep rule.
+ * Promisory/gatherers.per moves livestock to precise points by the TC; our
+ * observation-only adapter uses its centre and this arrival tolerance. */
+const HERD_HOME_RADIUS = 2.5;
 
 const HOUSE_SPOTS: { x: number; y: number }[] = [
   { x: -1, y: -4 }, { x: 2, y: -4 }, { x: -4, y: -2 }, { x: 5, y: -4 }, { x: -4, y: 1 },
@@ -197,6 +201,8 @@ export interface ExampleAiOptions {
    * blacksmith, so the two can be run against each other and measured. */
   blacksmith?: boolean;
   fishing?: boolean;
+  /** Control for measuring the livestock-return strategy against its baseline. */
+  herding?: boolean;
 }
 
 export function exampleAiCommands(
@@ -245,8 +251,23 @@ export function exampleAiCommands(
   // stable while workers walk or bank food. Promisory/gatherers.per likewise
   // tracks current-livestock by id instead of inferring work from proximity.
   const foodTargets = new Set(villagers.map(v => v.gatherTargetId));
+  const herdHome = options.herding === false ? undefined
+    : mine.find(e => e.kind === 'town-center' && e.buildProgress === undefined);
+  const incoming = new Set(mine.filter(e => e.kind === 'sheep' && e.hp > 0 && herdHome
+    && distance(e, herdHome) > HERD_HOME_RADIUS).map(e => e.id));
+  if (herdHome) for (const sheep of mine.filter(e => incoming.has(e.id) && e.order === 'idle')) {
+    commands.push({ kind: 'order', player, entityIds: [sheep.id], target: { x: herdHome.x, y: herdHome.y } });
+  }
+  // A resumed older strategy may already be chasing an incoming animal.
+  // Release those gather orders before they kill dinner on the road home.
+  const returningShepherds = new Set<number>();
+  if (herdHome) for (const worker of villagers) {
+    if (constructionWorkers.has(worker.id) || worker.order !== 'gather' || !incoming.has(worker.gatherTargetId!)) continue;
+    returningShepherds.add(worker.id);
+    commands.push({ kind: 'order', player, entityIds: [worker.id], target: { x: herdHome.x, y: herdHome.y } });
+  }
   const dinner = known.filter(e => HERD.includes(e.kind) && (e.amount ?? 0) > 0
-    && (e.hp <= 0 || e.owner === player))
+    && (e.hp <= 0 || e.owner === player) && !incoming.has(e.id))
     .sort((a, b) => Number(a.hp > 0) - Number(b.hp > 0)
       || Number(!foodTargets.has(a.id)) - Number(!foodTargets.has(b.id))
       || (tc ? distance(a, tc) - distance(b, tc) : 0) || a.id - b.id)[0];
@@ -289,7 +310,7 @@ export function exampleAiCommands(
   // gold, working something that is not wood or gold -- not carrying it, not
   // standing at a known node of it -- is sent to the nearest known node.
   for (const [index, villager] of villagers.entries()) {
-    if (constructionWorkers.has(villager.id)) continue;
+    if (constructionWorkers.has(villager.id) || returningShepherds.has(villager.id)) continue;
     const wanted = ASSIGNMENT[index % ASSIGNMENT.length];
     if (wanted === 'food') continue; // food assigns itself; the herd rule below
     if (villager.order === 'idle' || villager.order === 'build') continue;
@@ -311,7 +332,7 @@ export function exampleAiCommands(
   // the original worker is walking home with a load (#85).
   if (dinner) {
     for (const [index, worker] of villagers.entries()) {
-      if (constructionWorkers.has(worker.id) || ASSIGNMENT[index % ASSIGNMENT.length] !== 'food'
+      if (constructionWorkers.has(worker.id) || returningShepherds.has(worker.id) || ASSIGNMENT[index % ASSIGNMENT.length] !== 'food'
         || worker.order !== 'gather' || worker.gatherTargetId === dinner.id) continue;
       const current = known.find(e => e.id === worker.gatherTargetId);
       if (dinnerAssigned && !HERD.includes(current?.kind ?? '')) continue;

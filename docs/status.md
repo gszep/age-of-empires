@@ -9,6 +9,19 @@ does not repeat it.
 
 ## Run and play
 
+The #54 DAT inventory has been refreshed against the pinned data and actual
+consumers: [dat-field-audit.md](dat-field-audit.md). Most old garrison/audio/
+terrain omissions are delivered; the ticket remains open for real remaining
+collision, foundation, combat and slope-table gaps. The audit adds no gameplay
+rules and does not equate a field's presence with known engine semantics.
+
+The remaining owned English manual audit (#60) is complete. See
+[manual-audit.md](manual-audit.md) for physical/printed page references, source
+hashes and comparisons with implemented combat, garrison, elevation, conversion
+and trade. Legacy prose does not supply exact elevation multipliers or a trade
+profit formula. The audit reproduced nested transport-capacity undercount
+(#251) and attached other findings to their existing tracker issues.
+
 On the installed Ysgramor service, use **http://localhost:5173/?solo=1**
 for the human's current solo QA, or the same path through
 **https://ysgramor.tail6e864b.ts.net:5173/**. Shared joining is currently blocked
@@ -490,6 +503,103 @@ that run. These are network observations, not fixed speedup guarantees. Clients
 declining compression still work; a real-host fixture checks a large uncompressed
 50-command tick as well as snapshot identity and negotiation.
 
+**Nested transport capacity (#251):** a loaded ram and its passengers consume
+their combined slots. Boarding checks both existing and incoming nested cargo,
+and rechecks on arrival. The owner-only observation and HUD use the same count;
+captured ships display their stored capacity. Exact-fit boarding succeeds, while
+old over-capacity saves retain cargo and refuse further boarding until space is
+freed. Fourteen new fallback/owned outcomes cover capacity, arrival races, private
+observations, converted capacity, unload/JSON continuation and sinking. Both
+browser modes verify real rejected/exact-fit clicks,20/20 HUD, stored capacity,
+payload retention and reload (`tools/transport_capacity_smoke.mts`).
+Full gate `.local/transport251-gate.log` is GREEN:1051 Vitest tests/85 files,
+150 Python tests, build and real-browser smoke, exit0; no timeout widened.
+
+**AI sheep return (#136):** idle AI-owned sheep receive public move orders to a
+completed TC; live sheep are held out of dinner selection until within2.5 tiles.
+Existing carcasses remain first, and an older save's shepherds chasing incoming
+sheep are redirected home. Moving sheep are not repeatedly retasked. The strategy
+uses only observations; human-controlled sheep and simulator ownership rules
+are unchanged. Owned four-minute deposits on seeds1/7/42 rise120/130/90 →
+200/310/200; fallback120/120/80 →180/240/190. The `herding:false` control exactly
+reproduces the pre-change baseline. Both browser modes verify TC arrival before
+slaughter, banked food, one dinner, corpse decay/HUD and an independent manual
+sheep order. The source-backed intent and chosen staging geometry are in the ledger.
+Full gate `.local/herd136-gate.log` is GREEN:1037 Vitest tests/84 files,150 Python
+tests, build and real-browser smoke. Existing passive-opponent match and
+one-animal-at-a-time regressions pass; no timeout widened.
+
+**Abandoned farms (#156):** villagers can work a completed, nonempty enemy farm
+whose farmer has stopped/died/retasked. A live gather order reserves it across
+players during approach and banking; ownership transfers only when work starts.
+The crop and damaged HP are preserved, income goes to the farmer's player, and
+subsequent reseeding charges the new owner. Group clicks assign one farmer and
+avoid surplus villagers attacking a friendly claimant's still-foreign farm.
+Capture requires an explicit target: automatic food continuation, overflow and
+mill-completion assignment continue selecting owned farms only.
+Owned/fallback real-browser checks cover gather cursor, read-only hover, actual
+group right-click, new-owner food income, preserved HP and capture surviving
+reload. Simulation tests cover occupancy, queued races, hidden target filtering,
+JSON determinism and reseeding. Source26149 permits capture; exact timing and
+reservation policy remain explicitly inferred in `docs/ledger.md`.
+Full gate `.local/farm156-gate-r2.log` is GREEN:1028 Vitest tests/83 files,
+150 Python tests, build and browser smoke. Owned/fallback capture probes and
+the existing own-farm probe pass; no test clock widened.
+
+**Owned RMS guide/defaults (#56):** the land, terrain and object sections have
+been read against the adapter; `map-generation-design.md` now gives the owned
+guide primary status and records remaining phase/quota/spacing/height limitations.
+Omitted land clumping now uses8 for player lands and resource islets; terrain
+retains20 and explicit modern values such as Islands22 remain intact. Four new
+outcome regressions pass. Sampled seeds3/7 retain identical terrain/elevation/
+land-ID/entity hashes on Arabia, Black Forest, Windsor, Senlac and Painted Proof;
+Islands changes because the source resource-islet blocks omit clumping. Six
+browser cases and fresh reloads pass (`.local/rms56-browser.log`).
+Full gate `.local/rms56-gate.log` is GREEN:1055 Vitest tests/86 files,150 Python
+tests, build and browser smoke; no timeout widened.
+
+**Map spacing (#90):** seed and opening-group scans now consult live exclusion
+masks instead of reassigning the array being iterated. Five regression tests
+cover forest seeds, tight/loose groups, exhausted bands and exact spacing
+boundaries; the24 existing map-generation tests pass. Before/after browser
+checks cover Arabia, Islands and Black Forest seeds3/7, including deterministic
+fresh reloads and full-map minimap inspection. Arabia/Islands layouts change;
+both checked Black Forest hashes remain identical. Gold/stone/berry counts are
+preserved in these cases; wood and fish distributions/counts can change with
+growth and downstream RNG. Existing saved boards are not regenerated; old
+seed-based replays may disagree with new generation. Geometry remains the
+documented mirrored/square RMS adapter, not native engine parity.
+
+Final #90 gate: `.local/map90-gate-r2.log`,1004 Vitest tests/82 files, build,
+150 Python/owned-source tests and browser smoke, exit0. One navigation fixture
+was made explicitly dry after the new seed1 pond covered its fixed destination;
+the path-arrival, collision and time-limit assertions were retained.
+
+**Terrain plants (#55):** imported terrain slots retain their DAT unit IDs,
+densities, masked densities and centering, including zero-density and forest
+rows. Seven non-blocking Gaia plant types use their owned idle sprites, including
+green/dry grass, bushes, shrubs, weeds, dead plants and flowers. The renderer
+adds deterministic per-tile plants alongside the existing RMS aesthetic passes;
+it never adds simulation entities or consumes simulation RNG. Fog, last-seen
+building coverage, foundations/farms, late texture loading and x2 scale are
+checked. `tools/terrain_scatter_smoke.mts` measures21198 changed sRGB pixels in
+a paused grass fixture, stable placements on reload and an ordinary Islands3
+opening with196 plants /5 visible. The full import and source-contract tests
+pass. Full gate: `.local/scatter55-gate.log`,999 Vitest tests/81 files,150 Python
+tests, build and browser smoke, exit0. Exact native density and masked placement remain #249; the existing
+tropical Islands reference is qualitative, not a matched density/RGB target.
+
+**Plant grounding follow-up (#250):** the human reported detached-looking tufts.
+Their owned soft shadows had been imported but omitted by the scatter renderer.
+All seven plant types have nonempty masks (grass alpha reaches185/255), now drawn
+with the matching variant/hotspot/scale, owned shadow strength/colour and the
+existing ground-shadow pass. Browser A/B isolates5885 darkened sRGB pixels from
+28 visible masks, preserving bodies, placement and sim hash. Body and shadow
+coverage share fog/foundation policy; late shadow textures remain hidden until
+ready. Full gate `.local/scatter250-gate.log` is GREEN:999 Vitest tests/81 files,
+150 Python tests, build and browser smoke, exit0. This fixes an actual omitted layer, not the whole reported visual gap:
+the native composite, colour grading, bloom and AA/sharpening remain #149.
+
 **Import** (`tools/`): patch-matched DAT rules, palettes, terrain, blend
 masks, overlay masks, water and foam atlases, widgets, fonts, strings,
 particles, hotkeys and audio through a byte-identical local pipeline
@@ -500,8 +610,11 @@ and drawn at half size, where its drawn pixels land within one x1 pixel of
 the base art's; sheets over 8192 px continue on pages. The base depots
 alone import at x1 when their source files are complete. The atlas step now
 checks exact source container walks before cache reuse/publication (#247):569
-selected sources pass; two local base monk files have zero-filled1MiB tails
-and need source repair (#119, `docs/source-integrity.md`). The pixel decoder
+selected sources pass. The two base monk files with zero-filled1MiB tails were
+recovered from a fresh pinned download: all569 base sources and a full isolated
+x1 import now pass, with no skipped masks and browser-verified idle/attack
+contours. Owner copy-back is complete, and the default depot also passes569/569
+(#119, `docs/source-integrity.md`). The pixel decoder
 and atlas fingerprint remain unchanged. Sprite pages load on first use rather than all
 at start -- loading the whole pack up front took the machine down (WSL,
 15 GB) -- so a sprite may be absent

@@ -9,6 +9,11 @@ Tracking: market #128, conversion #178, Treason #240, charge #242, PDF audit
 
 ## Verification
 
+The remaining combat/garrison/elevation/conversion manual reading was completed
+on2026-09-28; see [manual-audit.md](manual-audit.md) for page-level findings and
+explicit negative results for elevation multipliers and route-profit formulas.
+The source-reading task #60 is complete; the runtime questions below remain.
+
 The pending tooling/evidence follow-up passed the full one-worker gate on
 2026-09-27 after the host became idle: **960 Vitest tests /73 files**, build,
 **130 Python/owned-content tests**, and real-browser debug smoke. Exit0 and

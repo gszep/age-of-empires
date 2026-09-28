@@ -94,6 +94,41 @@ browser smoke and are maintained regression tools.
   `CONTOUR_KIND=villager` tests an ordinary contour. Run all four combinations.
   Each also checks actual draw orders, every opaque contour sample under a real
   placement-footprint mesh, and pixel-identical camera round trips.
+  For #119, `CONTOUR_KIND=monk` checks the idle contour; add
+  `CONTOUR_ANIMATION=attack` for the attack-art fixture. `CONTOUR_ROOT` selects
+  an absolute isolated full-import worktree and `CONTOUR_SCALE=1` asserts the
+  base-resolution atlas was used. See `docs/source-integrity.md` for recovery
+  evidence; these paused render fixtures do not test conversion gameplay.
+- **`terrain_scatter_smoke.mts`** — #55's owned DAT plant sprites in a private
+  paused grass fixture and a natural Islands3 opening. Compares sRGB pixels with
+  scatter on/off, checks unexplored/foundation suppression, deterministic reload
+  and unchanged sim hash. For #250, a second A/B hides only the owned shadow
+  materials: every changed pixel must darken, using the imported profile colour/
+  strength and drawing below ground fog. Saves `.local/scatter55-fixture.png` and
+  `.local/scatter55-islands.png`. Source density/masked-density calibration is
+  separate (#249); this probe proves visibility, not exact native distribution.
+- **`transport_capacity_smoke.mts`** — #251's loaded-ram boarding. Actual
+  overflow/exact-fit right-clicks and cursors, recursive20/20 HUD, a converted
+  carrier's stored capacity, intact nested payload and reload hash. Also run
+  with `OPEN_FALLBACK=1`. Private coastal fixture, no shared-match mutation.
+- **`farm_occupancy_smoke.mts`** — #82/#156's real group right-click assigns one
+  farmer. `ENEMY_FARM=1` exercises abandoned-farm capture: owned gather cursor,
+  no hover/remote capture, preserved HP, new-owner food banking and reload.
+  `OPEN_FALLBACK=1` runs without owned graphics. Opponent initial resources are
+  zero so AI training cannot confound the stockpile comparison.
+- **`resource_feedback_smoke.mts`** — #70's real unaffordable train/research/build
+  clicks. Zero-resource fixture checks enabled buttons, food/gold/wood messages
+  and unchanged simulation hash. `OPEN_FALLBACK=1` verifies fallback reasons;
+  owned mode compares the imported strings. Pair with
+  `population_queue_smoke.mts` for queued production blocked by housing.
+- **`map_spacing_smoke.mts`** — #90's natural Arabia/Islands/Black Forest openings
+  at seeds3/7. Records resource positions/counts, screenshots and full-board
+  minimaps; checks every resource kind exists, no page errors and deterministic
+  fresh-seed reload. `MAPGEN_REF=<git-ref>` substitutes only that revision's
+  generator in the private Vite server for baseline inspection. Outputs stay
+  under `.local/map90-{before,after}-*`; production fog and shared play are untouched.
+  `MAPGEN_OUTPUT=<prefix>` preserves prior receipts when reusing the probe for
+  another generator change (for example `MAPGEN_OUTPUT=rms56`).
 - **`context_cursor_smoke.mts`** — #51's native CUR requests and embedded
   hotspots, 15 real hover/right-click action cases, read-only hover, unexplored
   Gaia rejection, and remembered-resource position/stock instead of hidden live
@@ -121,11 +156,12 @@ browser smoke and are maintained regression tools.
   green one-level ramp preview creates a paid, rendered foundation. Also run
   with `OPEN_FALLBACK=1`. Private accessors read the actual preview material and
   camera projection; building input still goes through the normal UI.
-- **`farm_occupancy_smoke.mts`** — group right-click on a farm gives one farmer
-  and actual food gathering.
 - **`group_movement_smoke.mts`** — #83's real 25-unit ground right-click settles
   into a compact two-dimensional group with all arrivals rendered.
-- **`herd_food_smoke.mts`** — #85's AI eats one sheep, and an unattended carcass
+- **`herd_food_smoke.mts`** — #85/#136's AI brings sheep to its TC before
+  slaughter and banks the food; a human sheep independently completes its public
+  move order. `OPEN_FALLBACK=1` verifies fallback rendering. The AI eats one sheep,
+  and an unattended carcass
   loses food at the imported rate with real selection and the remaining-food HUD.
 - **`ai_buildings_smoke.mts`** — #86's resource-constrained AI saves from 125
   wood, completes a blacksmith, and renders a building the player can select.

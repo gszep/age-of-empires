@@ -5,7 +5,9 @@ of 59 individual civilisation issues, each with source-specific findings and an
 acceptance checklist. Start with [Britons #179](https://github.com/gszep/age-of-empires/issues/179)
 and [Franks #180](https://github.com/gszep/age-of-empires/issues/180). The tracker
 separates 53 base-era profiles from the six Antiquity-era profiles; shared engine
-dependencies remain under #123, #129, #128, #126 and #178.
+dependencies remain under #128 and #178. Bonus/count-prerequisite consumers and
+building age stats (#123/#129/#126) have since shipped; their explicit inference
+boundaries remain in `docs/ledger.md`.
 
 ## Audit checkpoint
 

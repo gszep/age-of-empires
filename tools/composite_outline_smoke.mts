@@ -1,5 +1,7 @@
 /** #173/#238: contour pixels/lifetime/overlays. CONTOUR_FAR=1 moves to a far
- * surveyed-map position; CONTOUR_KIND=villager exercises an ordinary contour. */
+ * surveyed-map position; CONTOUR_KIND=villager|monk exercises an ordinary
+ * contour. CONTOUR_ANIMATION=attack stages the monk attack-art fixture.
+ * CONTOUR_ROOT can select an isolated full base-resolution import worktree. */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -11,10 +13,15 @@ import { rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { skinFamilies, skinnedKey } from '../src/view/skins.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
+const root = process.env.CONTOUR_ROOT
+  ? `${process.env.CONTOUR_ROOT.replace(/\/$/, '')}/` : fileURLToPath(new URL('../', import.meta.url));
 const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
 const far = process.env.CONTOUR_FAR === '1';
-const single = process.env.CONTOUR_KIND === 'villager';
+const kind = process.env.CONTOUR_KIND ?? 'galley';
+assert(kind === 'galley' || kind === 'villager' || kind === 'monk');
+const single = kind !== 'galley';
+const animation = process.env.CONTOUR_ANIMATION ?? 'idle';
+assert(animation === 'idle' || (kind === 'monk' && animation === 'attack'));
 const state = createGame(173, rulesFromManifest(manifest), undefined, far ? 'windsor' : 'arabia');
 const home = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
 const worker = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
@@ -27,14 +34,20 @@ state.terrain.fill(1); state.elevation.fill(0);
 for (const tc of state.entities) for (let y = tc.position.y - 2; y < tc.position.y + 2; y++) {
   for (let x = tc.position.x - 2; x < tc.position.x + 2; x++) state.terrain[y * state.width + x] = 0;
 }
-const ship = single ? worker : { id: state.nextId++, kind: 'galley' as const, owner: 1 as const,
+const ship = single ? { ...worker, kind: kind as 'villager' | 'monk',
+  hp: state.rules.units[kind].hp, maxHp: state.rules.units[kind].hp,
+  radius: state.rules.units[kind].radius,
+  activity: animation === 'attack' ? 'attacking' as const : 'idle' as const,
+} : { id: state.nextId++, kind: 'galley' as const, owner: 1 as const,
   position: { x: home.position.x - 2.5, y: home.position.y - 2.5 },
   hp: state.rules.units.galley.hp, maxHp: state.rules.units.galley.hp, radius: state.rules.units.galley.radius,
   activity: 'idle' as const, order: { kind: 'idle' as const } };
 if (single) ship.position = { x: home.position.x - 0.5, y: home.position.y - 0.5 };
 state.entities.push(ship);
 const key = skinnedKey(skinFamilies(manifest.entities), ship, ship.kind, ship.kind, state.matchSeed);
-const maskName = single ? 'idle-outline' : `${manifest.entities[key].animationLayers.idle[1].animation}-outline`;
+const maskName = single ? `${animation}-outline` : `${manifest.entities[key].animationLayers.idle[1].animation}-outline`;
+assert(manifest.entities[key].atlases[maskName], `${key} has the imported ${maskName} atlas`);
+if (process.env.CONTOUR_SCALE) assert.equal(manifest.entities[key].atlases[maskName].scale ?? 1, Number(process.env.CONTOUR_SCALE));
 const image = manifest.entities[key].atlases[maskName].image;
 const { rules: ignored, ...saved } = state;
 const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
@@ -199,5 +212,5 @@ try {
   await capture();
   assert.deepEqual(errors, []);
   assert.equal((await query({ type: 'sim' })).synchronizationHash, before.synchronizationHash);
-  console.log(`CONTOUR SMOKE GREEN (${ship.kind}, ${far ? 'far' : 'near'}): owned pixels/colour/depth, placement overlay, camera round trip, delayed load, expiry/reload, empty frame, unchanged simulation`);
+  console.log(`CONTOUR SMOKE GREEN (${ship.kind}, ${animation}, scale ${manifest.entities[key].atlases[maskName].scale ?? 1}, ${far ? 'far' : 'near'}): owned pixels/colour/depth, placement overlay, camera round trip, delayed load, expiry/reload, empty frame, unchanged simulation`);
 } finally { await browser.close(); await server.close(); }

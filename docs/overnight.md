@@ -91,10 +91,6 @@ in `git log` and `docs/status.md`.
 
 Named here so a run does not re-derive the reason; each has an issue.
 
-- **The base monk source repair** (#119) — x1 idle/attack files are zero-filled
-  after exactly1MiB, not a special outline format. Restore/revalidate the
-  original source bytes; never weaken the decoder invariant. The selected x2
-  sources pass. `docs/source-integrity.md` records the read-only audit.
 - **The wonder's exact countdown** (#110) — the human approved cosmetic first,
   then a reference countdown after settings. Settings now exist; the remaining
   block is the map-size timer defaults and query-clock units, not permission.

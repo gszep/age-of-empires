@@ -1,15 +1,16 @@
 /**
- * The map generator, rebuilt as the original's two primitives
- * (docs/map-generation-design.md, from the owned scripts in the resources
- * depot and the genie-rms reverse engineering, reimplemented here):
+ * A deterministic RMS adapter. The owned TC Random Map Scripting Guide is
+ * primary for command/default contracts; patch-matched scripts supply values.
+ * genie-rms corroborates the reimplemented algorithms, not exact DE parity
+ * (docs/map-generation-design.md and docs/genie-rms-provenance.md):
  *
- * 1. Cost-ordered round-robin growth. Every shape on an AoE2 map -- a wood, a
- *    land, a hill -- is grown one tile at a time from seeded clumps, popping
+ * 1. Cost-ordered round-robin growth. Supported woods, lands and hills are
+ *    grown one tile at a time from seeded clumps, popping
  *    the cheapest frontier tile, where
  *    `cost = 250 - clumping * neighbours + random(100)`; high clumping fills
  *    concavities into round blobs, low leaves tendrils. `cleanMask` then
- *    closes single-tile pinholes and diagonal squeezes, which is the
- *    original's own answer to the ragged forest interiors this replaced.
+ *    closes single-tile pinholes and diagonal squeezes using the reconstructed
+ *    cleaning passes.
  *
  * 2. A randomised candidate scan for objects. Distance bands are *boxes*, not
  *    rings: every tile of the band is a candidate in randomised order, so
@@ -238,7 +239,7 @@ export interface MapDescriptor {
    * two terrains are what it leaves.
    */
   waterMasking?: { rim: number };
-  resourceIslets?: typeof relicReference.islands.islets;
+  resourceIslets?: (typeof relicReference.islands.islets[number] & { clumping?: number })[];
   /**
    * DE's fish (`GeneratingObjects.inc`, `GNR_STANDARDFISH`, which Islands
    * defines): `MELKARYBA`, the shore fish (69), as many as fit along
@@ -530,18 +531,25 @@ const lessThan = (a: FrontierNode, b: FrontierNode): boolean =>
 
 const STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 
+// Owned TC Random Map Scripting Guide, LAND/TERRAIN_GENERATION clumping_factor.
+// Modern scripts can explicitly exceed the guide's historical land range.
+const LAND_CLUMPING = 8;
+const TERRAIN_CLUMPING = 20;
+
 /**
- * Grow clumps to a shared tile budget, the original's way: one tile per clump
+ * Grow clumps to a shared tile budget using the reconstructed round-robin
+ * adapter: one tile per clump
  * per outer pass, so clumps racing for the same ground advance at the same
  * rate; each clump's frontier pops cheapest-first, and a tile with more
  * same-mask neighbours in its 5x5 is cheaper, so `clumping` decides how round
  * the blobs come out (20 is the scripts' own default). A rejected pop --
  * occupied ground, or a failed avoid-start-area roll -- consumes that clump's
- * turn, exactly as the engine's does.
+ * turn. This scheduling is corroborated by genie-rms, not a measured DE rule;
+ * the owned guide's ideal equal-clump quota is not enforced per frontier here.
  */
 function growClumps(
   ctx: MapgenContext, mask: Uint8Array, seeds: { x: number; y: number }[],
-  tiles: number, accept: (x: number, y: number) => boolean, clumping = 20,
+  tiles: number, accept: (x: number, y: number) => boolean, clumping = TERRAIN_CLUMPING,
 ): number {
   const frontiers = seeds.map(seed => {
     const frontier = new Frontier();
@@ -632,15 +640,18 @@ export function cleanMask(
   }
 }
 
-/** Clear candidates in a per-axis square, `min_distance_group_placement`. */
-function clearAround(
-  candidates: number[], width: number, x: number, y: number, margin: number,
-): number[] {
-  return candidates.filter(tile => {
-    const tx = tile % width;
-    const ty = Math.floor(tile / width);
-    return Math.abs(tx - x) >= margin || Math.abs(ty - y) >= margin;
-  });
+/** Exclude candidates strictly inside the existing per-axis spacing square.
+ * A live mask is consulted by the scan; replacing an array during for…of does
+ * not change that iterator. Tiles exactly at the margin remain eligible. */
+function excludeAround(
+  excluded: Uint8Array, width: number, x: number, y: number, margin: number,
+): void {
+  if (margin <= 0) return;
+  const left = Math.max(0, Math.floor(x - margin) + 1);
+  const right = Math.min(width, Math.ceil(x + margin));
+  const top = Math.max(0, Math.floor(y - margin) + 1);
+  const bottom = Math.min(excluded.length / width, Math.ceil(y + margin));
+  for (let row = top; row < bottom; row++) excluded.fill(1, row * width + left, row * width + right);
 }
 
 /**
@@ -742,14 +753,15 @@ export function generateMap(
     ok: (x: number, y: number) => boolean,
   ): { x: number; y: number }[] => {
     const seeds: { x: number; y: number }[] = [];
-    let candidates = order;
-    for (const tile of candidates) {
+    const excluded = new Uint8Array(ctx.width * ctx.height);
+    for (const tile of order) {
       if (seeds.length >= count) break;
+      if (excluded[tile]) continue;
       const x = tile % ctx.width;
       const y = Math.floor(tile / ctx.width);
       if (!ok(x, y)) continue;
       seeds.push({ x, y });
-      candidates = clearAround(candidates, ctx.width, x, y, separation);
+      excludeAround(excluded, ctx.width, x, y, separation);
     }
     return seeds;
   };
@@ -815,7 +827,8 @@ export function generateMap(
     }
     const accept = (x: number, y: number) => room(x, y) > 0 && !isletAvoid[y * ctx.width + x]
       && (room(x, y) >= spec.fuzziness || randInt(isletCtx.rng, spec.fuzziness) < room(x, y));
-    growClumps(isletCtx, land, seeds, Math.max(0, Math.round(terrain.length * spec.percent / 100) - 49), accept);
+    growClumps(isletCtx, land, seeds, Math.max(0, Math.round(terrain.length * spec.percent / 100) - 49), accept,
+      spec.clumping ?? LAND_CLUMPING);
     cleanMask(land, ctx.width, ctx.height, (x, y) => room(x, y) > 0 && !isletAvoid[y * ctx.width + x]);
     for (let i = 0; i < land.length; i++) {
       if (!land[i]) continue;
@@ -876,7 +889,7 @@ export function generateMap(
       }
     }
     growClumps(ctx, land, ring, Math.max(0, Math.round(ctx.width * ctx.height * descriptor.land.percent / 100 / starts.length) - stamped),
-      inLand, descriptor.land.clumping ?? 20);
+      inLand, descriptor.land.clumping ?? LAND_CLUMPING);
     cleanMask(land, ctx.width, ctx.height, (x, y) => !isletAvoid[y * ctx.width + x]);
     // The fuzz can leave a tile of land on its own out at sea, which the
     // beach sweep would turn into a sandbar; a land tile with no land beside
@@ -1149,19 +1162,23 @@ export function generateMap(
   // The opening objects, one candidate scan per line.
   ctx.beforeObjects?.({ terrain, elevation, landIds });
   for (const spec of descriptor.opening) {
-    let order = candidateOrder(ctx, start, spec.far);
+    const order = candidateOrder(ctx, start, spec.far);
+    const excluded = new Uint8Array(ctx.width * ctx.height);
     let groupsLeft = spec.groups ?? 1;
     for (const tile of order) {
       if (groupsLeft <= 0) break;
+      if (excluded[tile]) continue;
       const x = tile % ctx.width;
       const y = Math.floor(tile / ctx.width);
       if (tooClose(starts, x, y, spec.near)) continue;
       if (!freeBoth(x, y)) continue;
-      if (spec.groupSpacing) order = clearAround(order, ctx.width, x, y, spec.groupSpacing);
       const placed = spec.grouping === 'tight'
         ? placeTight(ctx, spec, x, y, freeBoth, mirror)
         : placeLoose(ctx, spec, x, y, freeBoth, mirror);
-      if (placed) groupsLeft--;
+      if (placed) {
+        groupsLeft--;
+        excludeAround(excluded, ctx.width, x, y, spec.groupSpacing ?? 0);
+      }
     }
   }
 

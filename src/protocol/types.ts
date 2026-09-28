@@ -33,7 +33,8 @@ export interface ObservedEntity {
   training?: { kind: UnitKind; remainingSeconds: number };
   /** What it is researching; own buildings only, like `training`. */
   researching?: { tech: string; remainingSeconds: number };
-  /** How many shelter inside; own buildings only. They are not in the list. */
+  /** Own carriers/buildings only: all occupants, including nested passengers.
+   * They are not separate entries in the visible entity list. */
   garrisoned?: number;
   /** A visible flag reveals occupancy, not the private count or passengers. */
   hasGarrison?: boolean;

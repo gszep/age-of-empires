@@ -141,6 +141,14 @@ the task `proceeding` graphic because the DAT's `working` graphic is `-1`.
 
 ## genieutils DAT cheat-sheet
 
+Terrain decoration rows (#55): `terrain.number_of_terrain_units_used` bounds the
+parallel30-entry arrays `terrain_unit_id`, `terrain_unit_density`,
+`terrain_unit_masked_density`, `terrain_unit_centering`. Centering is0/1; forest
+rows include density1000 and collision-bearing class15 resources. View-only
+plants are Gaia class14 with zero x/y/z collision and obstruction class0. Keep
+zero-density rows and masked densities in the manifest; engine density units
+and mask selection need calibration rather than silently dropping the fields.
+
 `unit.placement_side_terrain` contains two alternative neighbouring terrain IDs
 (-1 unused): shore fish (69) require 2 or 35 (beach), deep fish (456/458) neither.
 
@@ -224,6 +232,29 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | garrison | `unit.garrison_capacity`; `unit.building.garrison_type` (flag field: 1 villagers, 2 infantry and foot archers, 4 cavalry, 8 monks, 16 livestock, 32 siege), `.garrison_heal_rate`; the volley is `unit.creatable.total_projectiles` to `.max_total_projectiles`, extra arrows `.secondary_projectile_unit` with that unit's own `type_50.attacks`; `unit.type_50.garrison_firepower` is 1.0 for archers and −2.5 for villagers. UGC attribute 130 documents positive as a DPS multiplier and negative as a flat-DPS addition; this interpretation is community documentation, not text in the DAT (#75/#137) |
 | garrison flags and land carriers | `unit.creatable.garrison_graphic` is usually a file-less composite: recursively retain its file-bearing graphic deltas and `offset_x/_y`, separately for each age's variant. TC 109's Dark flag is graphic 4472 at (-31,-158); ram 35/422's flag is 11385 at (2,-24), capacity 6. Production buildings have type 0 and capacity 10; owned help 4944 explains self-rally training into the building (#137) |
 | the reference's key bindings | not in the DAT either: `resources/_common/dat/hotkeys.json`, 457 bindings over 27 groups, four layouts apiece. `import_ui.py --hotkeys` resolves the ones the spec names |
+
+### Surveyed fields not yet consumed (#54)
+
+These are **not** additions to the supported-import list above. The current
+read/import/runtime matrix is in [the DAT field audit](../docs/dat-field-audit.md).
+Values are pinned Briton examples unless marked Gaia; do not infer engine
+semantics merely from the field name or a nonzero value.
+
+| Intended investigation | Field / owned XS alias | Source examples and boundary |
+| --- | --- | --- |
+| Moving collision limits | `unit.dead_fish.min_collision_size_multiplier` | Villager83=.25, infantry74≈.8, Knight38=.5, ram35≈.1, Archer4=1; not imported. Current moving/engaged units bypass pair separation; exact native shrink timing is unverified. |
+| Foundation ground | `unit.building.foundation_terrain_id`; `cFoundationTerrain=34` | TC109/House70=27, Farm50=7, Dock45/TC head621=−1. Not a universal27 rule, nor proof of persistent terrain mutation. |
+| Foundation rubble | `unit.building.destruction_rubble_graphic_id`; `cDestructionRubbleGraphic=88` | TC556/House499 resolve to foundation-rubble graphics. Distinct from the consumed `dead_unit_id` decay chain; lifecycle/composition still unverified. |
+| Armed idle | `unit.creatable.idle_attack_graphic`; `cIdleAttackGraphic=82` | Militia74→1102, Villager83→1282, Spearman93→1061; source slot not currently published. |
+| Combat reactions | `unit.type_50.break_off_combat`; `unit.old_attack_reaction` | Break flags Archer16/TC2/ram18/Mangonel26; legacy reactions villager/sheep/deer/monk2, boar4, knight3, packed treb1. No current bit/state decoder. |
+| Target-specific conversion | `creatable.min_conversion_time_mod/max_conversion_time_mod/conversion_chance_mod`; XS111/112/113 | Scout448 has3/1/2. Runtime currently applies target-player resistance adjustments, not these per-unit fields. Chance is not a seconds offset. |
+| Friendly-fire scaling | `unit.type_50.friendly_fire_damage`; `cFriendlyFireDamage=119` | Sampled value1; hit eligibility, damage scaling and auto-fire risk are separate questions. No generic consumer. |
+| Native slope shapes | `dat.terrain_block.tile_sizes[*].width/.height/.delta_y` |19 records, including96×24/48/72 and48×48 shapes. The renderer does not consume the complete table; #134 retains topology calibration. |
+
+Terrain restrictions are already consumed through
+`dat.terrain_restrictions[row].passable_buildable_dmg_multiplier`: nonzero
+entries become allowed terrain IDs, limited to imported slots. This includes
+row7; general damage multipliers are not thereby implemented.
 
 Fields that do **not** exist, and cost a failed call each time somebody assumes
 they do: `unit.clearance_size_x` (it is the tuple `clearance_size`),

@@ -1676,6 +1676,7 @@ WATER_CLASSES = {4: "shallow", 1: "normal", 2: "deep", 8: "walkable"}
 
 def terrain_entry(
     dat: DatFile, terrain_id: int, palette: list[tuple[int, int, int]] | None = None,
+    decoration_keys: dict[int, str] | None = None,
 ) -> dict[str, Any]:
     """Texture name, tile span, and minimap color for one DAT terrain slot."""
     terrain = dat.terrain_block.terrains[terrain_id]
@@ -1695,6 +1696,14 @@ def terrain_entry(
     minimap = shades[1] if shades else list(terrain.colors)
     return {
         "terrainId": terrain_id,
+        "scatter": [
+            {"unitId": unit_id, "density": terrain.terrain_unit_density[i],
+             "maskedDensity": terrain.terrain_unit_masked_density[i],
+             "centered": bool(terrain.terrain_unit_centering[i]),
+             **({"key": decoration_keys[unit_id]} if decoration_keys and unit_id in decoration_keys else {})}
+            for i, unit_id in enumerate(terrain.terrain_unit_id[:terrain.number_of_terrain_units_used])
+            if unit_id >= 0
+        ],
         "soundEvent": terrain.wwise_sound_id & 0xFFFFFFFF,
         "name": terrain.name,
         "texture": terrain.name_2,
@@ -1950,6 +1959,26 @@ def extract(
         keys = {e["key"] for e in spec["entities"]}
         spec = {**spec, "entities": [*spec["entities"], *(e for e in building_specs() if e["key"] not in keys)]}
     dat = _dat if _dat is not None else DatFile.parse(dat_path)
+    # Terrain trees remain authoritative resources. Only zero-collision Gaia
+    # scenery becomes view-only decoration; keep all source rows in terrain.
+    decoration_keys = {e["unitId"]: e["key"] for e in spec["entities"]
+                       if e.get("civ") == "gaia" and e.get("category") == "decoration"}
+    terrain_specs = []
+    for slot in spec.get("terrain", {}).values():
+        terrain = dat.terrain_block.terrains[slot["terrainId"]]
+        for unit_id in terrain.terrain_unit_id[:terrain.number_of_terrain_units_used]:
+            if unit_id < 0 or unit_id in decoration_keys:
+                continue
+            unit = dat.civs[spec["gaiaIndex"]].units[unit_id]
+            if unit is None or unit.class_ != 14 or unit.obstruction_class != 0 or any(
+                (unit.collision_size_x, unit.collision_size_y, unit.collision_size_z)
+            ):
+                continue
+            key = f"terrain-plant-{unit_id}"
+            decoration_keys[unit_id] = key
+            terrain_specs.append({"key": key, "unitId": unit_id, "civ": "gaia", "category": "decoration",
+                                  "animations": {"idle": {"slot": "standing"}}})
+    spec = {**spec, "entities": [*spec["entities"], *terrain_specs]}
     from civilization_profiles import shared_combat_specs
     spec = {**spec, "entities": [*spec["entities"], *shared_combat_specs(dat, spec)]}
     graphics = Graphics.of(graphics_dir, uhd_dir)
@@ -2057,7 +2086,7 @@ def extract(
             if unit is not None and unit.minimap_color:
                 entities[entity_spec["key"]]["minimapColor"] = list(palette[unit.minimap_color % 256])
     terrain = {
-        key: terrain_entry(dat, slot["terrainId"], palette)
+        key: terrain_entry(dat, slot["terrainId"], palette, decoration_keys)
         for key, slot in spec.get("terrain", {}).items()
     }
     result = {

@@ -454,6 +454,10 @@ describe('navigation compatibility suite', () => {
 
   it('dynamic building insertion: repaths around a foundation dropped on the route', () => {
     const state = arena();
+    // Test the inserted foundation, not incidental seeded ponds. Corrected
+    // clump spacing puts water at this fixed destination on seed1 (#90).
+    state.terrain.fill(0);
+    state.elevation.fill(0);
     const mover = unit(state, { x: 10, y: 15 }, 1, 'villager');
     const builder = unit(state, { x: 16, y: 14 }, 1, 'villager');
     applyCommand(state, { kind: 'order', player: 1, entityIds: [mover.id], target: { x: 24, y: 15 } });

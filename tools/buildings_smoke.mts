@@ -137,6 +137,10 @@ try {
     };
 
     console.log(civ, 'wall drag, gate and tower');
+    if (!fallback) {
+      await select(wounded.id);
+      await page.waitForFunction(() => document.querySelector('.object-hp')?.textContent?.trim() === '733 / 750');
+    }
     await military(); await click('build-stone-wall');
     await screen({ x: 42.5, y: 40.5 });
     const from = await page.evaluate(at => (window as any).__buildingProbe.screen(at), { x: 40.5, y: 40.5 });
@@ -157,6 +161,9 @@ try {
       const aged = await snapshot();
       const house = aged.entities.find((e: any) => e.id === wounded.id);
       assert.equal(house.maxHp, 900); assert.equal(house.hp, 883);
+      await select(wounded.id);
+      await page.waitForFunction(() => document.querySelector('.object-hp')?.textContent?.trim() === '883 / 900');
+      console.log(civ, 'age-up HUD: 733/750 -> 883/900; preserved 17 missing HP');
       assert(Math.abs(aged.entities.find((e: any) => e.id === walls[0].id).maxHp - 1800) < .001);
     }
     await research('guard-tower');

@@ -71,3 +71,23 @@ tests check saved-clock frame selection/expiry.
 real production buttons, boarding/unload, measured ram travel/damage, loaded-cargo
 reload, tower right-click crossing and petard damage/rendered particle pixels in
 the reported colour space. Gameplay clocks are unmodified.
+
+### #161 verification refresh (2026-09-28)
+
+The implementation already shipped in `db2c9c0`; the original issue body saying
+occupancy never changes movement/damage was stale. Re-ran `specialists.test.ts`
+and `garrison-edges.test.ts`:71 tests pass across fallback and owned profiles.
+`tools/specialists_smoke.mts` also passes for Britons and Franks
+(`.local/ram161-browser.log`): real training/boarding, .65 versus .60 tiles/s,
++10 actual building HP loss, unload reversal and loaded-cargo reload.
+
+Re-reading pinned ram35/422/548 creatable/combat/tasks and English help
+26094/26289/26446 still establishes the mechanic, not its numeric constants.
+The public [Battering Ram](https://ageofempires.fandom.com/wiki/Battering_Ram_(Age_of_Empires_II))
+and [Capped Ram](https://ageofempires.fandom.com/wiki/Capped_Ram_(Age_of_Empires_II))
+references, consulted2026-09-28, independently document +.05 speed and +10
+anti-building damage per infantry, no villager bonus, and no Siege Engineers
+multiplier on the crew addition. These corroborate the implementation but are
+not patch-pinned native measurements (their current LOS5 already differs from
+the pinned DAT's3). #161 therefore remains open specifically for native numeric
+calibration; passing our own tests is not proof of DE parity.
