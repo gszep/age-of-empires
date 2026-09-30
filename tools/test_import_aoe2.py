@@ -544,7 +544,8 @@ class ContentImportIntegrationTest(unittest.TestCase):
         # A monk's two works, as the DAT states them rather than as we guess.
         self.assertEqual(entities["monk"]["heal"], {"hitPointsPerSecond": 1.25, "range": 0.0})
         self.assertEqual(
-            entities["monk"]["convert"], {"minSeconds": 5.0, "maxSeconds": 9.0, "range": 9.0}
+            {key: entities["monk"]["convert"][key] for key in ("minSeconds", "maxSeconds", "range")},
+            {"minSeconds": 5.0, "maxSeconds": 9.0, "range": 9.0},
         )
         # A monk carries no attack at all, which is what keeps it out of the
         # units that pick their own fights. It does carry armour, which is why
@@ -1766,7 +1767,9 @@ class ContentImportIntegrationTest(unittest.TestCase):
         ids = self.result["playerAttributeIds"]
         values = self.result["playerAttributes"]
         resources = _dat().civs[SPEC["civIndex"]].resources
-        self.assertEqual(len(ids), len(rows))
+        self.assertEqual(len(ids), len(rows) + 1)
+        self.assertEqual(ids['resource-29'], 29)  # named by owned localization15029, not Constants.xs
+        self.assertEqual(values['resource-29'], resources[29])
         self.assertEqual(set(ids), set(values))
         for name, index in rows:
             key = "farmFoodAmount" if name == "FarmFood" else name[0].lower() + name[1:]

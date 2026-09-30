@@ -138,7 +138,7 @@ export interface UnitRules {
   };
   /** Monks: the DAT's window for a conversion — the earliest second it can
    * succeed and the second by which it must — and the reach it works at. */
-  convert?: { minSeconds: number; maxSeconds: number; range: number };
+  convert?: { minSeconds: number; maxSeconds: number; range: number; tasks?: ConversionTask[] };
   /**
    * How long this thing's death graphic runs, in seconds. A building's
    * collapse is 8.3 and a castle's 12.5 where a villager's is 1.5, and the
@@ -226,6 +226,8 @@ export interface UnitRules {
 }
 
 export interface BuildingRules {
+  conversionImmune?: boolean;
+  requires?: string[];
   datClass?: number;
   availabilityId?: number;
   /** Age-replacement stats under a stable building identity. */
@@ -302,6 +304,9 @@ export interface BuildingRules {
   blastDefenseLevel?: number;
   /** Set for buildings that shoot: range in tiles plus the militia-style timing. */
   attack?: {
+    projectileArt?: string;
+    blastRadius?: number;
+    blastAttackLevel?: number;
     range: number;
     attacks: AttackValue[];
     reloadSeconds: number;
@@ -442,6 +447,7 @@ export interface GameRules {
   repairCostFraction: { building: number; unit: number };
   /** Named DAT initial values; presence does not imply a supported mechanic. */
   playerAttributes: Partial<Record<string, number>>;
+  playerAttributeIds?: Record<string, number>;
   technologies: Record<TechKey, TechRules>;
   civilizationBonuses?: CivilizationBonuses;
   /**
@@ -494,9 +500,9 @@ export function groundAllows(rules: GameRules, row: number, terrain: number): bo
 }
 
 /** The restriction row an entity obeys: its own, or its category's default. */
-export function restrictionOf(rules: GameRules, entity: Pick<Entity, 'kind' | 'convertedRules'>): number {
+export function restrictionOf(rules: GameRules, entity: Pick<Entity, 'kind' | 'convertedRules' | 'convertedBuildingRules'>): number {
   if (isBuilding(entity.kind)) {
-    return rules.buildings[entity.kind as BuildingKind]?.terrainRestriction ?? BUILDING_RESTRICTION;
+    return (entity.convertedBuildingRules ?? rules.buildings[entity.kind as BuildingKind])?.terrainRestriction ?? BUILDING_RESTRICTION;
   }
   return (entity.convertedRules ?? rules.units[entity.kind as UnitKind])?.terrainRestriction ?? LAND_RESTRICTION;
 }
@@ -623,13 +629,17 @@ export interface TechEffect {
   resource?: PlayerAttribute;
 }
 
-/**
- * A modelled player-level attribute a technology can change. The imported
- * initial table is broader; importing a value does not enable its effects.
- * `farmFoodAmount` is
- * resource 36 in the DAT, where civ 1 starts it at 175 -- the number the open
- * fallback had hand-written before anybody looked.
- */
+/** A source conversion task, including target-specific permission and reach. */
+export interface ConversionTask {
+  unitId: number;
+  classId: number;
+  minSeconds: number;
+  maxSeconds: number;
+  range: number;
+  requiredResource: number;
+  failureMessage?: string;
+}
+
 export interface DeathExplosion {
   art: string;
   seconds: number;
@@ -638,14 +648,16 @@ export interface DeathExplosion {
   attacks: AttackValue[];
 }
 
+/** Modelled research consumers; the imported initial attribute table is broader. */
 export type PlayerAttribute = 'farmFoodAmount' | 'unitRepairCost' | 'buildingRepairCost'
   | 'relicRate' | 'convertResistMinAdj' | 'convertResistMaxAdj' | 'theocracy' | 'heresy'
-  | 'spies' | 'tradeVigRate' | 'tributeInefficency' | 'huntingProductivity' | 'unitLimit';
+  | 'spies' | 'tradeVigRate' | 'tributeInefficency' | 'huntingProductivity' | 'unitLimit'
+  | 'convertBuilding' | 'convertPriest' | 'resource-29' | 'healRange';
 
 export type TechAttribute =
   | 'hitPoints' | 'lineOfSight' | 'speed' | 'armor' | 'attack'
   | 'reloadSeconds' | 'accuracyPercent' | 'range' | 'minRange'
-  | 'garrisonHealRate'
+  | 'garrisonHealRate' | 'garrisonCapacity' | 'garrisonMaxProjectiles'
   | 'maxCharge' | 'chargeType'
   | 'blastRadius' | 'searchRadius' | 'trainSeconds' | 'trainLocation' | 'researchSeconds' | 'deathExplosion' | 'garrisonFirepower'
   | 'workRate' | 'carryCapacity' | 'cost' | 'foodCost' | 'woodCost' | 'goldCost' | 'stoneCost'
@@ -1469,7 +1481,7 @@ interface ManifestEntity {
     volley?: { base: number; max: number; arrowUnitId?: number; arrowSpeed?: number; arrowAttacks?: AttackValue[] };
   };
   garrisonFirepower?: number;
-  convert?: { minSeconds: number; maxSeconds: number; range: number };
+  convert?: UnitRules['convert'];
   searchRadius?: number;
   transportCapacity?: number;
   infantryCapacity?: number;
@@ -1638,7 +1650,9 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       searchRadius: e[key].searchRadius ?? fallback?.searchRadius,
       blastAttackLevel: e[key].combat?.blastAttackLevel === undefined ? fallback?.blastAttackLevel : e[key].combat!.blastAttackLevel! & 3,
       blastDefenseLevel: e[key].blastDefenseLevel ?? fallback?.blastDefenseLevel,
-      heal: e[key].heal ?? fallback?.heal,
+      // Zero task range is the engine default. Teuton resource90=8 and owned
+      // +100% healing-range help constrain that default to4 (ledger).
+      heal: e[key].heal ? { ...e[key].heal, range: e[key].heal.range || 4 } : fallback?.heal,
       // The repairer is the builder's own task unit; the villager carries it.
       repair: (key === 'villager' ? e['villager-builder']?.repair : undefined) ?? fallback?.repair,
       datClass: e[key].class ?? fallback?.datClass,
@@ -1708,6 +1722,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     const legacyTownCenter = key === 'town-center' && e[key].build?.sourceId === undefined;
     return {
       datId: e[key].id,
+      conversionImmune: e[key].conversionImmune ?? fallback.conversionImmune,
+      requires: e[key].requires ?? fallback.requires,
       workRate: e[key].workRate,
       availabilityId: e[key].availabilityId,
       ageStats: e[key].ageStats,
@@ -1725,7 +1741,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       buildSeconds: legacyTownCenter ? fallback.buildSeconds : e[key].build?.seconds ?? 25,
       additionalAge: e[key].build?.additionalAge ?? fallback.additionalAge,
       popSupport: e[key].popSupport ?? 0,
-      buildable,
+      buildable: buildable && !(manifest.civilization?.unavailable.buildings ?? [])
+        .includes(e[key].availabilityId ?? e[key].id ?? -1),
       armors: attackValues(e[key].combat?.armors),
       // Which resources a drop site takes, what a farm holds, and whether a
       // building shoots are gameplay roles, not DAT fields the importer reads.
@@ -1760,6 +1777,10 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
         : fallback.garrison,
       attack: fallback.attack && {
         ...fallback.attack,
+        projectileArt: projectileArt(key),
+        projectileSpeed: e[key].combat?.projectileSpeed ?? fallback.attack.projectileSpeed,
+        blastRadius: e[key].combat?.blastRadius,
+        blastAttackLevel: (e[key].combat?.blastAttackLevel ?? 2) & 3,
         range: e[key].combat?.maximumRange || fallback.attack.range,
         launchHeight: e[key].combat?.launchOffset?.[2] ?? fallback.attack.launchHeight,
         attacks: attackValues(e[key].combat?.attacks).length
@@ -1981,6 +2002,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       unit: manifest.playerAttributes?.unitRepairCost ?? FALLBACK_RULES.repairCostFraction.unit,
     },
     playerAttributes: { ...manifest.playerAttributes },
+    playerAttributeIds: manifest.playerAttributeIds,
     technologies: technologies(manifest, e),
     civilizationBonuses: manifest.civilizationBonuses,
     terrainRestrictions: manifest.terrainRestrictions

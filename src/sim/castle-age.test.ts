@@ -291,6 +291,9 @@ describe('what Delete asks about', () => {
       const flagged = Object.entries(rules!.buildings)
         .filter(([, b]) => b.confirmDelete).map(([kind]) => kind).sort();
       const expected = new Set(asks);
+      for (const [key, building] of Object.entries(rules!.buildings)) {
+        if (building.datClass === 52) expected.add(key);
+      }
       for (const tech of Object.values(rules!.technologies)) {
         for (const upgrade of tech.upgrades ?? []) {
           if (expected.has(upgrade.from) && upgrade.to in rules!.buildings) expected.add(upgrade.to);

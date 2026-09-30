@@ -119,7 +119,7 @@ export function entityGrid(
   for (const entity of state.entities) {
     if (entity.dead || entity.id === ignoreEntityId) continue;
     if (!isBuilding(entity.kind) && entity.kind !== 'resource') continue;
-    const building = rulesForPlayer(state, entity.owner).buildings[entity.kind as keyof typeof state.rules.buildings];
+    const building = entity.convertedBuildingRules ?? rulesForPlayer(state, entity.owner).buildings[entity.kind as keyof typeof state.rules.buildings];
     // A farm is a building nothing walks round, for either side and whether or
     // not it is finished — the DAT gives it no collision height and no
     // obstruction class (issue #40).

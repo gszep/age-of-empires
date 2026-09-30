@@ -59,9 +59,9 @@ describe('the villager build menu', () => {
   it('puts every villager-buildable building on exactly one page', () => {
     // A kind added without a page would land silently on the economic one;
     // this is what says so.
-    for (const rules of [FALLBACK_RULES, ...(importedRules ? [importedRules] : [])]) {
+    for (const rules of [FALLBACK_RULES, ...(importedRules ? [importedRules, ...Object.values(importedRules.civilizations ?? {})] : [])]) {
       const seen = new Set<BuildingKind>();
-      for (const researched of [[], ['guard-tower'], ['guard-tower', 'keep', 'fortified-wall']]) {
+      for (const researched of [[], ['guard-tower'], ['guard-tower', 'keep', 'fortified-wall'], Object.keys(rules.technologies)]) {
         const economic = buildMenu(rules, 3, 'economic', researched);
         const military = buildMenu(rules, 3, 'military', researched);
         for (const kind of [...economic, ...military]) seen.add(kind);

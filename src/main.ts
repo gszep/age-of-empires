@@ -19,7 +19,7 @@ import { loadMapPreference, saveMapPreference, mapChoices, validMatchSetup, vali
 import { matchOver, TREASON_GOLD } from './sim/regicide';
 import { loadAudioAssets, loadContentAssets, loadUiAssets } from './view/assets';
 import { worldToIso, isoToWorld, snapPlacement, wallLine, TILE_W, TILE_H } from './view/iso';
-import { buildingLimitReached, buildingRulesFor, populationLimitFor, trainingAt, unitRulesFor, unitRulesForEntity } from './sim/rules';
+import { buildingLimitReached, buildingRulesFor, buildingRulesForEntity, populationLimitFor, trainingAt, unitRulesFor, unitRulesForEntity } from './sim/rules';
 import { researchCostFor, researchSecondsFor, technologyRequirementsMet } from './sim/technologies';
 import { COMMODITIES, hasMarket, marketQuote, maximumTribute, tributeFee, type Commodity } from './sim/market';
 import type { DiplomacyModel } from './view/diplomacy';
@@ -1112,7 +1112,7 @@ addEventListener('keydown', event => {
     // castle and wonder and on nothing else, so a house or a barracks goes on
     // the keypress as a soldier does (issue #47).
     const asked = mine.filter(e =>
-      isBuilding(e.kind) ? playerRules(e.owner).buildings[e.kind as BuildingKind].confirmDelete
+      isBuilding(e.kind) ? buildingRulesForEntity(game, e).confirmDelete
         : isUnit(e.kind) && unitRulesForEntity(game, e).confirmDelete);
     const match = game;
     const player = localPlayer;
@@ -1515,7 +1515,7 @@ function selectionStats(entity: Entity): SelectionInfo['stats'] {
     if (range) stats.push({ icon: `${icons}range.png`, value: String(range), title: 'Range' });
     if (entity.carrying) stats.push({ icon: `${icons}${entity.carrying.kind}.png`, value: String(entity.carrying.amount), title: 'Carrying' });
   } else if (isBuilding(entity.kind)) {
-    const building = buildingRulesFor(game, entity.owner, entity.kind as BuildingKind);
+    const building = buildingRulesForEntity(game, entity);
     if (building.attack) {
       const attack = attacksOf(building.attack.attacks);
       if (attack?.amount) stats.push({ icon: `${icons}pierceAttack.png`, value: String(attack.amount), title: 'Attack' });
@@ -1647,7 +1647,7 @@ function selectionInfo(): SelectionInfo | undefined {
     const carrier = isUnit(entity.kind) ? unitRulesForEntity(game, entity) : undefined;
     const capacity = carrier
       ? carrier.transportCapacity ?? carrier.infantryCapacity
-      : rules.buildings[entity.kind as BuildingKind]?.garrison?.capacity;
+      : buildingRulesForEntity(game, entity)?.garrison?.capacity;
     details.push(`${garrisonCount(entity)}${capacity ? `/${capacity}` : ''} garrisoned`);
   }
   if (entity.carrying) details.push(`Carrying ${entity.carrying.amount} ${entity.carrying.kind}`);

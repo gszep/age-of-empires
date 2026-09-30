@@ -739,6 +739,11 @@ def extract_entity(
             "minSeconds": rounded(task.work_value_1),
             "maxSeconds": rounded(task.work_value_2),
             "range": rounded(unit.type_50.max_range),
+            "tasks": [{"unitId": t.unit_id, "classId": t.class_id,
+                "minSeconds": rounded(t.work_value_1), "maxSeconds": rounded(t.work_value_2),
+                "range": rounded(t.work_range), "requiredResource": t.unused_resource,
+                "failureMessage": strings.get(int(t.search_wait_time), "") if strings else ""}
+                for t in unit.bird.tasks if t.action_type == task.action_type],
         }
 
     if category == "unit-variant" or (category == "unit" and "task" in spec):
@@ -1114,6 +1119,7 @@ def available_age(dat: DatFile, unit_id: int) -> int:
 ATTRIBUTE_NAMES = {
     0: "hitPoints",
     1: "lineOfSight",
+    2: "garrisonCapacity",
     5: "speed",
     8: "armor",
     9: "attack",
@@ -1131,6 +1137,7 @@ ATTRIBUTE_NAMES = {
     104: "woodCost",
     105: "goldCost",
     106: "stoneCost",
+    107: "garrisonMaxProjectiles",
     108: "garrisonHealRate",
     59: "maxCharge",
     62: "chargeType",
@@ -1152,7 +1159,8 @@ OPERATION_NAMES = {0: "set", 4: "add", 5: "multiply"}
 # attributes have simulation consumers for research effects (issue #53).
 SUPPORTED_PLAYER_ATTRIBUTES = {"farmFoodAmount", "unitRepairCost", "buildingRepairCost",
     "relicRate", "convertResistMinAdj", "convertResistMaxAdj", "theocracy", "heresy",
-    "spies", "tradeVigRate", "tributeInefficency", "huntingProductivity", "unitLimit"}
+    "spies", "tradeVigRate", "tributeInefficency", "huntingProductivity", "unitLimit",
+    "convertBuilding", "convertPriest", "resource-29", "healRange"}
 # `b` on a type 1 command: 0 writes the value, 1 adds to it.
 RESOURCE_OPERATIONS = {0: "set", 1: "add"}
 
@@ -1323,7 +1331,7 @@ def effects_of(
             if attribute in PACKED_ATTRIBUTES:
                 packed = int(amount)
                 effect["armorClass"] = packed >> 8
-                low = packed & 0xFF
+                low = amount - ((packed >> 8) << 8)
                 effect["amount"] = rounded(low / 100) if operation == "multiply" else low
             else:
                 effect["amount"] = rounded(amount)
@@ -1555,7 +1563,10 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
         tech = dat.techs[tid]
         public = technologies.get(by_id.get(tid))
         automatic = not any(l.location_id >= 0 or l.research_time > 0 for l in tech.research_locations)
-        free = public is not None and public["researchSeconds"] == 0 and not any(public["cost"].values())
+        # Teuton Murder Holes is zero-time but retains a200-food source price;
+        # its owned civilisation help explicitly calls it free. The zero-time
+        # bonus is automatic, not a paid instant button.
+        free = public is not None and public["researchSeconds"] == 0
         effects, unmodelled, unreached = decoded[tid] if tid in decoded else effects_of(dat, tid, entities, attribute_ids)
         node = {
             "key": by_id.get(tid, f"automatic-{tid}"),
@@ -2037,6 +2048,9 @@ def extract(
     hashes: dict[str, str] = {"dat": sha256(dat_path)}
     constants_path = dat_path.parent.parent / "xs/Constants.xs"
     attribute_ids = player_attribute_ids(constants_path.read_text(encoding="utf-8-sig"))
+    # Missing from Constants.xs's named subset, but conversion tasks reference
+    # this gate and owned localization15029 calls it Enable Siege Conversion.
+    attribute_ids["resource-29"] = 29
     hashes["xs/Constants.xs"] = sha256(constants_path)
     attributes = player_attributes(dat.civs[spec["civIndex"]].resources, attribute_ids)
     if not SUPPORTED_PLAYER_ATTRIBUTES.issubset(attributes):
@@ -2101,7 +2115,7 @@ def extract(
         if entity is None:
             continue
         entity["age"] = int(node["Age ID"]) - 1
-        if node.get("Node Type") in ("Unit", "UniqueUnit"):
+        if node.get("Node Type") in ("Unit", "UniqueUnit") or node.get("Use Type") == "Building":
             # Tree JSON pads prerequisite slots with zero; DAT tech slots use -1.
             requires = [by_tech_id.get(i, f"dat-tech-{i}") for i in node.get("Prerequisite IDs", []) if i > 0]
             if requires:

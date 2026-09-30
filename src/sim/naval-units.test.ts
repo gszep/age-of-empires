@@ -177,6 +177,7 @@ describe.each(modes)('%s naval roster (#97)', (_mode, rules) => {
 
   it('boards only twenty passengers from a group order and never boards enemy units', () => {
     const { state, add } = sea(rules);
+    state.players[1].age = 0; // base hold; owned Castle/Imperial bonuses increase it
     const ship = add('transport-ship', 1, { x: 25.5, y: 8.5 });
     const passengers = Array.from({ length: 21 }, () => add('villager', 1, { x: 25.5, y: 7.5 }));
     const enemy = add('villager', 2, { x: 26.5, y: 7.5 });
@@ -196,4 +197,16 @@ describe.each(modes)('%s naval roster (#97)', (_mode, rules) => {
     expect(ship.order.kind).toBe('trade');
     until(state, () => state.players[1].gold > before);
   });
+});
+
+it.skipIf(!imported).each([[0,20],[1,20],[2,25],[3,35]])('owned age%s transport holds exactly%s passengers', (age, capacity) => {
+  const { state, add } = sea(imported!);
+  state.players[1].age = age;
+  stepGame(state);
+  const ship = add('transport-ship', 1, { x: 25.5, y: 8.5 });
+  const passengers = Array.from({ length: capacity + 1 }, () => add('villager', 1, { x: 25.5, y: 7.5 }));
+  expect(applyCommand(state, { kind: 'order', player: 1, entityIds: passengers.map(e => e.id), target: ship.position, targetId: ship.id }).ok).toBe(true);
+  run(state, 5);
+  expect(ship.garrison).toHaveLength(capacity);
+  expect(state.entities.filter(e => passengers.some(p => p.id === e.id))).toHaveLength(1);
 });

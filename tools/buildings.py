@@ -59,7 +59,7 @@ def age_stat_baselines(dat, civ_index, entities, replacements):
 def building_specs():
     result = []
     for key, uid in (("stone-wall", 117), ("fortified-wall", 155),
-                     ("guard-tower", 234), ("keep", 235),
+                     ("guard-tower", 234), ("keep", 235), ("bombard-tower", 236),
                      ("stone-gate", 64), ("stone-gate-y", 88),
                      ("fortified-gate", 63), ("fortified-gate-y", 85)):
         animations = {"idle": {"slot": "standing"},

@@ -27,6 +27,36 @@ off the reference; **measured** — fitted to a reference screenshot;
   native Heresy cargo/demolition exceptions remain uncalibrated under#178;
   regression tests establish deterministic implementation, not native parity.
 
+## Teuton monastery, fortification and bonus integration (#182)
+
+- **Owned:** action104 task rows identify target-specific min/max windows,
+  adjacency range, research permission attributes27/28/29 and failure strings.
+  The importer now preserves these fields, including the source label15029 for
+  the unnamed XS attribute29. Source hero immunity plus excluded wall/gate/farm
+  classes implement the non-convertible structures named in help28315.
+- **Inferred scheduling:** specific-unit tasks override class/default tasks;
+  zero task range uses the monk's normal conversion range, positive range uses
+  the task's adjacency distance. The existing uniform probability model is
+  unchanged, now using15–25-second building windows. Per-unit conversion modifiers,
+  resource182 odds, foundation eligibility and native exceptions remain#178.
+- **Owned healing evidence:** Teuton effect345 sets healRange90 to8 and help120153
+  describes +100% healing range. **Inferred engine default:** a0 task/initial
+  resource range means normal range4; this corrects the former adjacent-only
+  imported monk. Captured monks retain the resolved unit-local range snapshot.
+- **Owned capacity and projectiles:** effects335/352 separately modify capacity2
+  and maximum-projectiles107. Existing volley contribution/rounding interpretation
+  remains inferred; capacities, free healing and infantry-powered castle arrows
+  are measured through public orders and actual projectiles.
+- **Zero-time grants (#254):** Murder Holes retains a200-food source cost after
+  tree262 sets its time and stone to0, while owned help calls it free. Zero-time
+  public technologies now auto-complete without payment. Requiring the completed
+  research venue, activation order and native residual-price semantics remain
+  explicit integration inferences under#254.
+- **Building capture:** see the converted-entity section below for retained donor
+  rules and the inferred queue/cargo policy. Bombard Tower construction gates,
+  projectile506 and the .5 fractional class3 attack addition are owned; the
+  shared projectile collision/blast model remains the existing approximation.
+
 ## Gothic shared mechanics (#181)
 
 - **Owned:** Anarchy16 selects train-location entry1 with attribute158 and
@@ -265,7 +295,7 @@ off the reference; **measured** — fitted to a reference screenshot;
   also clicks Warwolf and verifies damage to a neighbouring unit. Its targets
   are inside the splash boundary, rather than on a floating-point boundary.
 
-## Converted-unit inheritance (#178)
+## Converted-entity inheritance (#178)
 
 - **Owned inspection (2026-09-24):** root resolved with the main checkout's
   `tools/depot.py`. Pinned `depot_813781/resources/_common/dat/empires2_x2_p1.dat`
@@ -299,10 +329,21 @@ off the reference; **measured** — fitted to a reference screenshot;
   runtime's conversion exceptions. Gather-task switching (villagers/fishing
   ships), projectile smart-mode,
   special future civilisation abilities, and reconversion/passenger inheritance
-  still need patch-matched DE captures before claiming full parity. No building
-  conversion support is added here. Pre-existing snapshots without conversion
+  still need patch-matched DE captures before claiming full parity. Building
+  conversion is now implemented by the Teuton pass below. Pre-existing snapshots without conversion
   provenance retain their legacy current-owner resolution; lost donor data
   cannot be reconstructed.
+- **Building extension (#182):** `convertedBuildingRules` freezes the donor's
+  resolved building stats before ownership changes. Combat, armour, sight,
+  garrison/healing, production work rate, repair cost, navigation and owner HUD
+  read that snapshot; later age/research promotions skip it. Existing HP/wounds
+  persist. **Inferred integration:** former production/research queues and rally
+  orders are cleared without refunds; future production uses recipient units and
+  technology permissions at the retained building work rate. New active/waiting
+  production entries receive the recipient's unit upgrades even though the
+  building itself remains locked. Cargo uses the
+  existing recursive capture/immunity policy. Native queue/cargo/presentation
+  exceptions remain#178, not source-established facts.
 - **Evidence:** `src/sim/conversion-inheritance.test.ts` uses deliberately
   synthetic contrasting profiles and public monk orders, research, movement,
   combat, boarding/unloading and construction. It measures retained wounds,
@@ -463,7 +504,7 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Speed / train / reload / frame defaults when a manifest field is absent | `?? 0.8`, `?? 25`, `?? 2`, `?? 10` | chosen; only reached when a manifest key is missing (`imported-rules.test.ts` holds the stated ones) | `data.ts` `rulesFromManifest` | — |
 | Game-speed multipliers | 1.0 / 1.5 / 1.7 / 2.0 | inferred (Steam, AoEZone threads); the names and the Default are owned strings 20033-20036 | `main.ts` | — |
 | A foundation's line of sight | 0 | chosen against observed behaviour (issue #1); DAT has no construction-time LOS | `visibility.ts` | — |
-| Conversion odds | uniform over the DAT's 5-9 s window | chosen shape; both ends owned | `game.ts` | — |
+| Conversion odds | uniform over the selected DAT task's window: ordinarily5–9 s for units,15–25 s for buildings, plus defender adjustments | chosen shape; task endpoints and ranges owned; per-unit modifiers/resource182 odds remain uncalibrated | `game.ts`, `monastery.ts` | #178 |
 | Converted-unit stat inheritance | unit-local rules snapshot before ownership/passenger ownership changes; stored HP/wounds persist; later research/promotions skip captures | **Owned legacy prose** now supports conversion-time attribute retention/no upgrades (AoK p33); exact snapshot boundaries and economic/projectile/reconversion/passenger exceptions remain **inferred**. Synthetic outcomes, owned Loom combat/HP and JSON/replay verify this implementation, not modern DE parity. No user approval of those inferences is claimed | `game.ts` `updateConverter`, `rules.ts` `unitRulesForEntity`, `types.ts` | #178 remains open |
 | Blast falloff | none inside `blast_width` | chosen; DAT states no falloff | `game.ts` | — |
 | Scorpion bolt travel and contact | swept circle, one hit per enemy, no friendly damage, full shooter attack on the intended target and projectile attacks on others; travels maximum range +3 | **inferred** engine interpretation of owned hit/vanish mode 1; extra three tiles and friendly immunity corroborated by [community Scorpion article](https://ageofempires.fandom.com/wiki/Scorpion_(Age_of_Empires_II)); radius, speed, primary/collateral attacks and upgrade effects owned | `game.ts` `releaseAttack`, `updateProjectiles` | #127 |
@@ -516,7 +557,7 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Bonus prices and production | cost multipliers in completion order, then nearest whole resource (half up); production/research advances by building work rate | multipliers **owned**: TC wood ×0.5; castle ×0.85 then ×0.882353; range work ×1.1. Rounding/tick quantization **inferred**: TC wood 138, castle stone 553/488 are implementation outcomes, not DE measurements. Existing HP policy adds max-HP delta preserving absolute damage; converted entities skip bulk HP/upgrades | `rules.ts`, `game.ts` | #123/#178 |
 | Bonus scope and remaining effects | current 1v1 applies each player's own team effect; unsupported commands/attributes remain diagnostic. No allied teams, timed locationless research or general enable/disable-unit effect execution | **owned** commands retained; range/sight, gathering, production, prices, cavalry HP, building age baselines, relic income and the documented monastery/market/Spies resources have consumers. This is not a general all-civilisation effect engine | `civilizationBonuses.nodes`, `import_content.py` | #123/#128/#126/#130/#180 |
 | Remaining attribute coverage | 23 limits combat acquisition and 130 modifies actual garrison firepower; generic 48/49 and noncombat automatic-search semantics remain diagnostic or outside the implemented consumers | owned fields; consumer scope explicit rather than treating decoder recognition as completeness | `rules.ts`, `game.ts`, manifest `unmodelled` | #128 |
-| Named player-attribute coverage | all named DAT initial values imported; research-aware consumers for farm food, repair, relic gold, conversion resistance windows, Theocracy, Spies, market and tribute fees. Other resource effects remain unmodelled; initial food/population/score entries are not live counters | names/indices **owned** from XS, values **owned** from configured civ. Lower-first-letter keys and legacy `FarmFood` → `farmFoodAmount` remain schema conventions | `import_content.py`, `rules.ts`, `monastery.ts`, `relics.ts`, `market.ts` | #53/#128/#130 |
+| Named player-attribute coverage | all named DAT initial values plus resource29 imported; research consumers include farm food, repair, relic gold, conversion permissions/resistance/Heresy/Theocracy, healing range, hunting productivity, population ceiling, Spies, market and tribute fees. Other resource effects remain unmodelled; initial food/population/score entries are not live counters | names/indices **owned** from XS, with29 identified by owned localization15029; values **owned** from configured civ. Lower-first-letter keys, legacy `FarmFood` → `farmFoodAmount` and numeric `resource-29` are schema conventions | `import_content.py`, `rules.ts`, `monastery.ts`, `relics.ts`, `market.ts` | #53/#128/#130/#182 |
 | Skipped technologies | not researchable, reason each | owned | manifest `skippedTechnologies` | #128, #97 |
 | Building age and paid upgrades | stable age variants select HP/armour/LOS; paid tower/wall/gate upgrades replace kind, retaining damage and scaling foundation gains by built fraction | baselines, IDs, costs/gates/armour **owned**; absolute damage retention, fractional foundation scaling and shared gate HP **inferred**. Generic sole-age rows 71/72 normalize into baselines with `includedTechs` preventing graph reapplication; source float precision retained | `tools/buildings.py`, `rules.ts`, `game.ts`; building contract | #126/#179/#180 |
 | Stone/fortified gate topology and art | four-tile construction, two-tile owner doorway, solid posts, two axes preserved by upgrade; previews supply closed/open parts/flags, heads supply construction, rubble/collapse includes posts | geometry, links and graphics **owned**; shared HP, owner passage and proximity-open display **inferred**. Diagonal placement/native timing remain #133 | `import_content.py`, `nav.ts`, `sprites.ts` | #126 roster slice |

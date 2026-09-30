@@ -162,7 +162,7 @@
               "wonder",
               "palisade-wall",
               "palisade-gate",
-              "stone-wall", "fortified-wall", "stone-gate", "fortified-gate", "guard-tower", "keep",
+              "stone-wall", "fortified-wall", "stone-gate", "fortified-gate", "guard-tower", "keep", "bombard-tower",
               "fish-trap",
               "resource", "relic"
             ]
@@ -322,7 +322,7 @@
               "wonder",
               "palisade-wall",
               "palisade-gate",
-              "stone-wall", "fortified-wall", "stone-gate", "fortified-gate", "guard-tower", "keep",
+              "stone-wall", "fortified-wall", "stone-gate", "fortified-gate", "guard-tower", "keep", "bombard-tower",
               "fish-trap",
               "resource", "relic"
             ]

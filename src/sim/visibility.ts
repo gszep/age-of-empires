@@ -4,7 +4,7 @@
  * entities. Observations and the viewer read only this state.
  */
 import { isBuilding, isUnit, lingersInFog } from './data';
-import { buildingRulesFor, playerAttributeFor, unitRulesForEntity } from './rules';
+import { buildingRulesForEntity, playerAttributeFor, unitRulesForEntity } from './rules';
 import { rulesForPlayer } from './civilizations';
 import type { BuildingKind, Entity, GameState, PlayerId } from './types';
 
@@ -51,7 +51,7 @@ export function lineOfSightOf(state: GameState, entity: Entity): number {
   // behaviour rather than an imported number -- see docs/ledger.md.
   if (isBuilding(entity.kind)) {
     if (entity.buildProgress !== undefined) return 0;
-    return buildingRulesFor(state, entity.owner, entity.kind as BuildingKind).lineOfSight;
+    return buildingRulesForEntity(state, entity).lineOfSight;
   }
   return 0;
 }

@@ -5,7 +5,7 @@
  * visibility, so they moved here to keep the import graph acyclic.
  */
 import type { BuildingRules, TechEffect, UnitRules } from './data';
-import { isUnit } from './data';
+import { isBuilding, isUnit } from './data';
 import { rulesForPlayer } from './civilizations';
 import { technologyFor } from './technologies';
 import type { BuildingKind, DeepReadonly, Entity, GameState, PlayerId, ReadonlyGameState, UnitKind } from './types';
@@ -72,6 +72,15 @@ export function unitRulesForEntity(state: ReadonlyGameState, entity: DeepReadonl
 export function inheritConvertedUnit(state: GameState, entity: Entity, owner: PlayerId): void {
   // A King's owned hero-mode immunity survives capture of its carrier too.
   if (isUnit(entity.kind) && unitRulesForEntity(state, entity).conversionImmune) return;
+  if (isBuilding(entity.kind)) {
+    if (buildingRulesForEntity(state, entity).conversionImmune) return;
+    entity.convertedBuildingRules ??= structuredClone(buildingRulesForEntity(state, entity));
+    entity.training = undefined;
+    entity.trainingQueue = undefined;
+    entity.trainingQueueCosts = undefined;
+    entity.researching = undefined;
+    entity.rally = undefined;
+  }
   if (isUnit(entity.kind) && !entity.convertedRules) {
     // Snapshot both forms, not the active form's temporary armour/sight view.
     entity.convertedRules = structuredClone(unitRulesFor(state, entity.owner, entity.kind));
@@ -124,6 +133,8 @@ export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: Uni
     }
   }
   if (rules.cost !== base.cost) roundCost(rules);
+  const healRange = rules.heal ? playerAttributeFor(state, owner, 'healRange') : undefined;
+  if (rules.heal && healRange !== undefined && healRange > 0) rules = { ...rules, heal: { ...rules.heal, range: healRange } };
   return rules;
 }
 
@@ -145,6 +156,10 @@ function applyEffect(rules: UnitRules, effect: TechEffect): void {
   if (applyCostEffect(rules, effect)) return;
   const armorClass = effect.armorClass ?? 0;
   switch (effect.attribute) {
+    case 'garrisonCapacity':
+      if (rules.transportCapacity !== undefined) rules.transportCapacity = combine(effect.operation, rules.transportCapacity, effect.amount);
+      if (rules.infantryCapacity !== undefined) rules.infantryCapacity = combine(effect.operation, rules.infantryCapacity, effect.amount);
+      break;
     case 'deathExplosion': rules.deathExplosion = effect.deathExplosion; break;
     case 'trainLocation': {
       const index = effect.trainingIndex ?? 0;
@@ -252,6 +267,12 @@ export function buildingRulesFor(
   return rules;
 }
 
+export function buildingRulesForEntity(state: GameState, entity: Entity): BuildingRules;
+export function buildingRulesForEntity(state: ReadonlyGameState, entity: DeepReadonly<Entity>): DeepReadonly<BuildingRules>;
+export function buildingRulesForEntity(state: ReadonlyGameState, entity: DeepReadonly<Entity>): DeepReadonly<BuildingRules> {
+  return entity.convertedBuildingRules ?? buildingRulesFor(state as GameState, entity.owner, entity.kind as BuildingKind);
+}
+
 function roundCost(rules: Pick<UnitRules, 'cost'>): void {
   for (const resource of ['food', 'wood', 'gold', 'stone'] as const) {
     rules.cost[resource] = Math.max(0, Math.round(rules.cost[resource]));
@@ -275,6 +296,16 @@ function applyBuildingEffect(rules: BuildingRules, effect: TechEffect): void {
   if (applyCostEffect(rules, effect)) return;
   const armorClass = effect.armorClass ?? 0;
   switch (effect.attribute) {
+    case 'blastRadius':
+      if (rules.attack) rules.attack.blastRadius = combine(effect.operation, rules.attack.blastRadius ?? 0, effect.amount);
+      break;
+    case 'garrisonCapacity':
+      if (rules.garrison) rules.garrison = { ...rules.garrison, capacity: combine(effect.operation, rules.garrison.capacity, effect.amount) };
+      break;
+    case 'garrisonMaxProjectiles':
+      if (rules.garrison?.volley) rules.garrison = { ...rules.garrison, volley: { ...rules.garrison.volley,
+        max: combine(effect.operation, rules.garrison.volley.max, effect.amount) } };
+      break;
     case 'garrisonHealRate':
       if (rules.garrison) rules.garrison = { ...rules.garrison, healRate: combine(effect.operation, rules.garrison.healRate, effect.amount) };
       break;

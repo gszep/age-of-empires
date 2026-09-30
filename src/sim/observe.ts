@@ -2,7 +2,7 @@ import { TICK_SECONDS } from './data';
 import { isEntityVisible } from './visibility';
 import { isAnimal, isUnit } from './data';
 import type { BuildingKind, Entity, GameState, PlayerId } from './types';
-import { buildingRulesFor } from './rules';
+import { buildingRulesForEntity } from './rules';
 import { researchCostFor } from './technologies';
 import { COMMODITIES, hasMarket, marketQuote, tributeFee } from './market';
 import { TREASON_GOLD, treasonMarkers } from './regicide';
@@ -52,7 +52,7 @@ function observeEntity(state: GameState, entity: Entity, player: PlayerId): Obse
     // Production clocks hold remaining work. Agents need game-time seconds,
     // including the owner's active production/research speed modifiers.
     const workRate = entity.training || entity.researching
-      ? buildingRulesFor(state, entity.owner, entity.kind as BuildingKind).workRate ?? 1 : 1;
+      ? buildingRulesForEntity(state, entity).workRate ?? 1 : 1;
     if (entity.training) {
       observed.training = {
         kind: entity.training.kind,

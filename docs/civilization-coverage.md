@@ -82,7 +82,7 @@ acceptance. These mode results do not imply completion of further civilisations.
 key. The root remains the default civilisation and shared Gaia/map input.
 Additional `GameRules.civilizations` / manifest `civilizations` entries are complete
 profiles, not patches over the enemy's rules. The importer now extracts Britons,
-Franks and Goths with independent bonus graphs and namespaced art/voices/icons. The
+Franks, Goths and Teutons with independent bonus graphs and namespaced art/voices/icons. The
 spec enables reviewed profiles after supported-gameplay browser acceptance; the 53-entry
 base-era catalogue remains an inventory, not 53 playable civilisations.
 
@@ -172,6 +172,7 @@ Current scoped acceptance and remaining shared work:
 | Britons (#179) | Reviewed random-map gameplay scope accepted in db2c9c0/605f7f7 with full gates and actual browser outcomes; the shared limitations below remain explicit |
 | Franks (#180) | Paid Bearded Axe/Chivalry/elite axeman acceptance and Heresy conversion-death implemented and browser-verified on2026-09-28; full gate GREEN. Shared native conversion/cargo calibration remains#178 |
 | Goths (#181) | Enabled and verified through published-profile browser acceptance and a GREEN full checkpoint gate. Shared population-setting/native Incendiaries calibration remains#253/#252 |
+| Teutons (#182) | Enabled and verified through published-profile browser acceptance and a GREEN full gate. Conversion queue/cargo/probability and zero-time grant calibration remain#178/#254 |
 | Shared engine | Native relic-generation calibration/fish gaps (#130/#95), unlocked diplomacy/cooperative victories beyond the current locked two-player dialog (#138), Regicide timing/preset/task calibration (#240), charge/market runtime calibration and conversion-policy parity (#178). Relic placement and playable Regicide/Treason are implemented; the ledger distinguishes mechanics from unresolved engine interpretations |
 
 The imported catalogue now accounts for the already represented ram/tree alias,
@@ -283,9 +284,68 @@ from a civilisation's typed tree as well as explicit `NotAvailable` nodes.
 Rule definitions needed for captured units are distinct
 from permission to train them.
 
-## Implementation checklist
+## Teutonic implementation pass (2026-09-30)
 
-### Gothic implementation pass (2026-09-28)
+Teutons now have their own selectable profile, source art/flags/icons/voices,
+Teutonic Knight/Elite, Siege Onager and Bombard Tower. Source-backed shared
+consumers include garrison capacity and maximum projectiles, heal-range changes,
+conversion task permissions/ranges/windows, captured-building rule snapshots,
+construction research prerequisites and fractional packed attack values.
+
+`src/sim/teutons.test.ts` has16 passing outcome tests:36-wood farms; once-only free
+Murder Holes/Herbal Medicine; extended healing and25/10 TC/tower garrisons; actual
+age-dependent armour on existing, garrisoned and new units; paid Ironclad,
+Crenellations and elite upgrades; ranged castle fire and infantry volley growth;
+Redemption/Atonement permissions, adjacency, protected structures and retained
+captured-building stats/work; Bombard Tower cannon art/damage; Siege Onager damage;
+captured Teutonic Knights and mixed replay/JSON continuation. Three source import
+tests verify the newly consumed task and effect encodings.
+
+`tools/teutons_smoke.mts` passes against the **published enabled manifest**, without
+an enablement override (`.local/teutons-published-browser.log`). Actual menu,
+restart/reload, paid research, farm/Bombard Tower placement, original unique/elite/
+Siege Onager/tower artwork, right-click permission feedback and building capture,
+monk conversion, retained captured HP and the25-capacity garrison HUD are exercised.
+The scenario is explicitly staged and the opposing example AI is replaced by a
+passive player; simulation clocks are unchanged and later actions use real buttons
+or public commands. Shared private-browser helpers live in `tools/civ_browser.mts`.
+
+The interrupted first browser run exposed a menu-refresh race in the probe, fixed
+by waiting for the villager menu before switching pages. A resumed attempt timed
+out during construction while source edits could trigger a page reload; the fresh,
+unchanged-source rerun and subsequent published run both pass. No timeout was
+widened. The Castle-Age confirmation test was updated to include independently
+researched tower types rather than assuming every tower is an upgrade descendant.
+
+The first full gate also exposed a definition/availability mismatch: unavailable
+building definitions remain available for captured/scenario entities, but their
+`buildable` flag now respects the civilisation's tree. The page invariant tests
+all loaded profiles and their full research sets. Mapping capacity attribute2
+also activates the owned standard transport bonuses1163/1164:20/20/25/35 by age.
+Four public group-boarding checks verify the exact limits; the old base-20 test
+now explicitly uses Dark Age. Long AI/relic tests pass focused reruns; host Windows
+game/Steam CPU contention motivated a one-worker gate, without changing timeouts.
+Redundant full-stat lookups for unchanged drop-site categories/attack presence
+were also removed. Before/after whole-state hashes match for three seeds through
+12000 ticks with both example AIs and a captured defensive structure
+(`.local/teutons-rule-equivalence.log`).
+Final review reproduced and fixed a captured-factory queue edge: preserving the
+building's donor stats must not prevent newly ordered units from receiving their
+current owner's upgrades. A public-command regression covers both active and
+waiting entries while retaining the captured barracks'1.2 work rate. A legacy
+import assertion was also narrowed to its original default conversion fields;
+the new task metadata is checked separately against owned source records.
+
+The owned DAT provides the new permission gates and error strings. Source-defined
+windows do not establish native random odds; queue cancellation, cargo inheritance,
+normal healing's zero-range sentinel and zero-time research venue/ordering remain
+explicit ledger inferences. #178 and#254 retain those reference questions. Full
+import completed (`.local/teutons-enabled-import.log`). Final checkpoint gate
+**GREEN** (`.local/teutons-gate-r4.log`):1105 Vitest tests/89 files,7 inapplicable
+Gothic fortification cases skipped, build,159 owned-import tests and real-browser
+debug smoke. One worker, unchanged timeouts. Only Markdown changed afterwards.
+
+## Gothic implementation pass (2026-09-28)
 
 The profile adds Huskarl/Elite Huskarl, Hussar and Dromon, independent
 availability/bonuses, architecture, flags, icons, voices and native hotkeys.
@@ -330,6 +390,8 @@ isolated AI test measured28.4→13.1s; three seeds through12000 ticks have ident
 whole-state and availability-stream hashes before/after the optimization
 (`.local/goths-training-equivalence.log`). No timeout increase.
 
+## Implementation checklist
+
 - [x] Reproducible all-civilisation coverage inventory with source provenance.
 - [x] Select a contrasting second civilisation from the owned data.
 - [x] Reject unloaded civilisation labels instead of silently granting the
@@ -344,8 +406,9 @@ whole-state and availability-stream hashes before/after the optimization
 - [x] Handle required-count prerequisites and eligible free research without
   treating scenario-only or inactive automatic candidates as unconditional.
 - [x] Enable reviewed shared combat/unique-unit roster, profile art and selection UI.
-- [ ] Complete every supported-era roster/effect for #179/#180.
-- [ ] Verify mixed matches, age changes, already-paid queues/refunds, conversions,
+- [x] Complete playable roster/research coverage for Britons, Franks, Goths and
+  Teutons, retaining the listed shared engine/reference gaps.
+- [x] Verify mixed matches, age changes, already-paid queues/refunds, conversions,
   garrisons, JSON save/reload and deterministic replay through public actions.
 - [x] Verify the actual selection/command UI in a private browser and run the gate.
 

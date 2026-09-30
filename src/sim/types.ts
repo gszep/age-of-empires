@@ -1,4 +1,4 @@
-import type { Cost, GameRules, NodeKind, UnitRules, VillagerGatherTask } from './data';
+import type { BuildingRules, Cost, GameRules, NodeKind, UnitRules, VillagerGatherTask } from './data';
 import type { PlayerVisibility } from './visibility';
 
 export type PlayerId = 1 | 2;
@@ -29,7 +29,7 @@ export type BuildingKind =
   | 'archery-range' | 'blacksmith' | 'market' | 'stable'
   | 'monastery' | 'siege-workshop' | 'castle' | 'university' | 'wonder' | 'dock'
   | 'palisade-wall' | 'palisade-gate' | 'fish-trap'
-  | 'stone-wall' | 'fortified-wall' | 'stone-gate' | 'fortified-gate' | 'guard-tower' | 'keep';
+  | 'stone-wall' | 'fortified-wall' | 'stone-gate' | 'fortified-gate' | 'guard-tower' | 'keep' | 'bombard-tower';
 export type EntityKind = UnitKind | BuildingKind | 'resource' | 'relic';
 export type Activity =
   | 'idle' | 'moving' | 'gathering' | 'carrying' | 'building' | 'attacking' | 'dying'
@@ -68,6 +68,7 @@ export interface Entity {
    * subsequent research. Player-level resources/tree permissions still follow
    * owner. Plain data so saves and replays preserve the same inheritance. */
   convertedRules?: UnitRules;
+  convertedBuildingRules?: BuildingRules;
   /** Intact off-map relics: one on a monk, up to capacity in a monastery. */
   relics?: Entity[];
   relicGoldProgress?: number;

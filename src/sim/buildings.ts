@@ -41,6 +41,11 @@ export const BUILDING_ROSTER = {
   'fortified-gate': { ...gate(4000, 7), datId: 63, age: 2 },
   'guard-tower': { ...tower(1500, 2, 8, 7, 2), datId: 234 },
   keep: { ...tower(2250, 3, 9, 8, 3), datId: 235 },
+  'bombard-tower': { ...tower(2220, 3, 9, 120, 3), datId: 236, buildable: false,
+    requires: ['bombard-tower'], buildButton: 10,
+    cost: { food: 0, wood: 0, gold: 100, stone: 125 },
+    attack: { range: 8, minRange: 1, attacks: [{ class: 3, amount: 120 }, { class: 16, amount: 40 }],
+      reloadSeconds: 6, releaseSeconds: 0, projectileSpeed: 3, launchHeight: 5, accuracyPercent: 100 } },
 } satisfies Record<string, BuildingRules>;
 
 export const BUILDING_TECHS: Record<string, TechRules> = {

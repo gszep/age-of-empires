@@ -1,24 +1,31 @@
-# Handoff — civilisation run checkpoint, 2026-09-28
+# Handoff — Teutons completion, 2026-09-30
 
 ## Current checkpoint
 
-- Branch `main`. Autonomous run authorised through **2026-09-29T16:57:14Z**;
-  started2026-09-28T20:57:14Z from60d37b4. Order: Franks, Goths, Teutons,
-  Japanese, Chinese, Byzantines, Persians, Saracens, Turks, Vikings, Mongols,
-  Celts; only then non-civilisation issues. Fix inhibiting bugs along the way,
-  verify/gate/commit/push each checkpoint. Scope answers are recorded on#180.
-- Franks completion pushed as**a770809**; #180 closed with evidence. Gothic
-  completion is the current verified checkpoint; **Teutons#182 is next**.
-- Latest full gate **GREEN**, `.local/goths-gate-r2.log`, exit0:
-  **1076 Vitest tests /88 files**,7 inapplicable Gothic stone/tower tests skipped,
-  build, **156 Python/owned-content tests**, real-browser debug smoke. Dedicated
-  published Goth browser acceptance also passes (`.local/goths-browser.log`).
-  Three workers, unchanged timeouts. Only Markdown changed after gate start.
-- Gothic additions include secondary producer slots/hotkeys, gated fast Loom,
-  hunting yield, population ceilings, Dromon and Incendiaries. New reference gaps
-  are#252/#253; [coverage](civilization-coverage.md) and ledger distinguish source
-  values from integration inferences. The first gate's availability regression
-  was fixed and measured, not hidden by increasing a timeout.
+- Branch `main`. **Stopped after Teutons**, per the user's revised instruction
+  on30 September. The original20-hour run started2026-09-28T20:57:14Z from60d37b4,
+  then hit a usage-limit interruption; its old deadline and through-Celts order
+  were superseded. The last verified pre-interruption tracker action was at
+  2026-09-29T00:14Z, not a measurement of the exact usage-limit event.
+- Franks completion is**a770809**, Goths**975d7dc**. Teutons#182 is this verified
+  completion checkpoint. Japanese and later civilisations were not started.
+- Latest full gate **GREEN**, `.local/teutons-gate-r4.log`, exit0:
+  **1105 Vitest tests /89 files**,7 inapplicable Gothic stone/tower cases skipped,
+  build, **159 Python/owned-content tests**, real-browser debug smoke. Dedicated
+  published Teuton acceptance passes (`.local/teutons-published-browser.log`).
+  One worker under host CPU contention, unchanged timeouts. Only Markdown
+  changed after gate start; no fixture clocks were widened.
+- Teuton additions include capacity/max-volley and healing-range consumers,
+  captured-building rule retention, source conversion task permissions/ranges,
+  both unique technologies, elite Teutonic Knights, Siege Onagers and Bombard
+  Towers. Tests cover actual payments, combat, garrisons, queue upgrades, capture,
+  JSON continuation and mixed replay. Standard transport holds now follow the
+  owned20/20/25/35 age progression. [Coverage](civilization-coverage.md) records
+  the test/benchmark receipts and corrected old fixture assumptions.
+- #178 retains conversion probability/queue/cargo/presentation calibration;
+  #254 retains zero-time grant venue/ordering questions. Existing#252/#253 cover
+  Gothic naval/population calibration. The ledger distinguishes the implementation
+  from native runtime evidence; none of these inferences is attributed to human approval.
 
 ## Play and deployment
 
@@ -29,7 +36,7 @@
   clients expect protocol2. Preserve its live state and routes. Do not restart
   or join it as a diagnostic substitute for a verified state-preserving migration.
   See [shared-reference-audit.md](shared-reference-audit.md).
-- The managed service remains active, MainPID631 / Node1201, NRestarts0. Tests
+- The managed service remains active after the host reboot, MainPID613 / Node1175, NRestarts0. Tests
   use private Vite/browser instances and leave no private test service running.
 - Observation **v8**, shared wire **v2**, recordings/results **v2**, dev snapshots
   **v3**. The nested `garrisoned` count is a correction to the existing private
@@ -105,7 +112,7 @@ remain `.local/music115-soak-r2.log` and `.local/audio-run-soak-r2.log`.
 - Remaining RMS phase/quota/terrain-height fidelity is documented in the #56
   contract audit and tracked with #130/#134; this is not a full native generator.
 
-Britons/Franks/Goths are the enabled profiles. Gothic art/UI/audio and rules were
-regenerated through the full pipeline (`.local/goths-enabled-import.log`). Fresh
+Britons/Franks/Goths/Teutons are the enabled profiles. Teuton art/UI/audio and rules were
+regenerated through the full pipeline (`.local/teutons-enabled-import.log`). Fresh
 installations need `npm run import:aoe2` for that content. Never overwrite the
 preserved managed match.

@@ -221,7 +221,7 @@
             "wonder",
             "palisade-wall",
             "palisade-gate", "fish-trap",
-            "stone-wall", "fortified-wall", "stone-gate", "fortified-gate", "guard-tower", "keep"
+            "stone-wall", "fortified-wall", "stone-gate", "fortified-gate", "guard-tower", "keep", "bombard-tower"
           ]
         },
         "target": {

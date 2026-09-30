@@ -1,14 +1,17 @@
 {
   "schemaVersion": 3,
   "civIndex": 1,
-  "profileCivilizations": ["franks", "goths"],
-  "enabledCivilizations": ["franks", "goths"],
+  "profileCivilizations": ["franks", "goths", "teutons"],
+  "enabledCivilizations": ["franks", "goths", "teutons"],
   "combatRoster": [
     { "unitId": 5 },
     { "unitId": 36 },
     { "unitId": 41, "rosterAliases": [759] },
     { "unitId": 441 },
     { "unitId": 555, "rosterAliases": [761] },
+    { "unitId": 25 },
+    { "unitId": 554 },
+    { "unitId": 588 },
     { "unitId": 1795, "composite": true, "decay": false },
     { "unitId": 281 },
     { "unitId": 531 },
@@ -62,6 +65,10 @@
     }
   ],
   "entities": [
+    {
+      "key": "bombard-tower-shot", "unitId": 506, "category": "projectile",
+      "animations": { "idle": { "slot": "standing" } }
+    },
     {
       "key": "fire-ship-explosion", "unitId": 2624, "category": "projectile", "composite": true,
       "deathParticleGraphic": 12206,

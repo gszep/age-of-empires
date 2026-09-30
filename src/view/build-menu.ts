@@ -42,7 +42,7 @@ export type BuildPage = 'economic' | 'military';
  */
 export const MILITARY_BUILDINGS: ReadonlySet<string> = new Set<string>([
   'barracks', 'archery-range', 'stable', 'siege-workshop',
-  'outpost', 'watch-tower', 'castle',
+  'outpost', 'watch-tower', 'castle', 'bombard-tower',
   // Gate slots come from construction heads, not the finished doorway units.
   'palisade-wall', 'palisade-gate',
   'stone-wall', 'fortified-wall', 'stone-gate', 'fortified-gate', 'guard-tower', 'keep',
@@ -61,6 +61,7 @@ export function buildMenu(rules: GameRules, age: number, page: BuildPage, resear
     (tech.upgrades ?? []).map(step => ({ ...step, done: researched.includes(key) })));
   return (Object.keys(rules.buildings) as BuildingKind[])
     .filter(kind => rules.buildings[kind].buildable
+      && (rules.buildings[kind].requires ?? []).every(key => researched.includes(key))
       && !upgrades.some(u => u.from === kind && u.done)
       && (!upgrades.some(u => u.to === kind) || upgrades.some(u => u.to === kind && u.done))
       && (rules.buildings[kind].builderKind ?? 'villager') === 'villager'
