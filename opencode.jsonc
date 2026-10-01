@@ -1,6 +1,14 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "default_agent": "build",
+  "provider": {
+    "openai": {
+      "options": {
+        // Bound incomplete streams even when heartbeat bytes prevent idle expiry.
+        "timeout": 600000
+      }
+    }
+  },
   "references": {
     "aoe2-owned": {
       "path": "~/.local/share/Steam/steamcmd/linux32/steamapps/content/app_813780",
@@ -23,6 +31,8 @@
           "~/.agents/skills/*": "allow",
           "~/.claude/projects/*": "allow",
           "~/.codex/sessions/*": "allow",
+          "~/.local/share/opencode/log": "allow",
+          "~/.local/share/opencode/log/*": "allow",
           "/tmp/opencode/*": "allow"
         },
         "read": {
@@ -33,7 +43,9 @@
         },
         "edit": {
           "*": "allow",
-          "*/steamapps/content/app_813780/*": "deny"
+          "*/steamapps/content/app_813780/*": "deny",
+          "~/.local/share/opencode/log": "deny",
+          "~/.local/share/opencode/log/*": "deny"
         },
         "doom_loop": "deny",
         "question": "deny"

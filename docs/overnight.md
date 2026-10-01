@@ -36,6 +36,11 @@ in `git log` and `docs/status.md`.
    still present. Check selected-provider authentication too; the CLI permission
    probe deliberately makes no model calls. Do not claim an eight-hour run is
    ready based on project instructions or `gh auth status` alone.
+6. **Bound provider requests separately from jobs.** The project config gives
+   OpenAI requests a ten-minute total deadline. Incoming heartbeat bytes can
+   keep an idle timer alive without completing a tool call. This deadline does
+   not impose a tool-job or overall run deadline; keep their handles and check
+   the wall clock separately. See [timeout evidence](timeout-investigation.md).
 
 ## During the run
 
@@ -48,6 +53,11 @@ in `git log` and `docs/status.md`.
   `tools/hooks/clock.sh` also prints the time every twenty-five tool calls.
   A run once wrapped up at dawn believing it was mid-afternoon because it
   had narrated the time for five hours.
+- **Honour the user's context wrap-up instruction.** When asked to wrap up
+  around60% context, stop broadening the task, reach a safe checkpoint and
+  provide a concise handoff with verification and remaining work. The user can
+  then compact or start a fresh session; continuing the same conversation does
+  not clear its context. No additional automatic compaction threshold is set.
 - **An unavailable action is a blocker, not a request to wait.** Record it and
   move to another eligible item during an unattended run. Do not retry denied
   actions through another tool. Check the deadline immediately after a long
