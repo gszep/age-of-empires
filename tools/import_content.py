@@ -873,6 +873,8 @@ def extract_entity(
             if parent_sound_events:
                 entity["animations"][name]["soundEvents"] = parent_sound_events
 
+    if spec["key"] == "trebuchet-unpacked":
+        entity["workRate"] = rounded(unit.bird.work_rate)
     if spec["key"] == "fish-trap":
         entity["foodAmount"] = rounded(dat.civs[1].resources[88])
         task = find_task(civ_units[13], {"actionType": 101, "unitId": 199})
@@ -909,6 +911,22 @@ def extract_entity(
         tracking = civ_units[unit.dead_fish.tracking_unit]
         entity["particleEffect"] = dat.graphics[tracking.standing_graphic[0]].particle_effect_name
         entity["impactEffect"] = dat.graphics[unit.dying_graphic].particle_effect_name
+    if category == "unit" and unit.creatable and unit.bird:
+        charge = unit.creatable
+        tasks = [t for t in unit.bird.tasks if t.action_type == 133 and t.work_flag_2 == 2001]
+        # Non-depleting charge movement (Samurai). Other charge modes have
+        # separate contracts; this does not infer their damage or targeting.
+        if charge.special_ability == 3 and charge.charge_type == 1 and charge.charge_event == 0 and charge.max_charge >= 1 and tasks:
+            if len(tasks) != 1 or tasks[0].class_id != -1 or tasks[0].unit_id != -1:
+                raise ValueError(f"unreviewed charge movement targets on {unit.id}")
+            task = tasks[0]
+            entity["attackApproach"] = {
+                "minimumDistance": rounded(task.work_value_1), "maximumDistance": rounded(task.work_value_2),
+                "speedMultiplier": rounded(task.work_range),
+                "source": {"task": 133, "flag": task.work_flag_2, "type": charge.charge_type,
+                    "event": charge.charge_event, "ability": charge.special_ability,
+                    "maximum": rounded(charge.max_charge), "rechargePerSecond": rounded(charge.recharge_rate)},
+            }
     if unit.id in (529, 532, 1103):
         charge = unit.creatable
         shot = civ_units[charge.charge_projectile_unit]
@@ -1131,6 +1149,7 @@ ATTRIBUTE_NAMES = {
     22: "blastRadius",
     23: "searchRadius",
     101: "trainSeconds",
+    102: "totalProjectiles",
     130: "garrisonFirepower",
     100: "cost",
     103: "foodCost",
@@ -1329,9 +1348,9 @@ def effects_of(
                 "unit": key, "attribute": attribute, "operation": operation,
             }
             if attribute in PACKED_ATTRIBUTES:
-                packed = int(amount)
+                packed = int(abs(amount))
                 effect["armorClass"] = packed >> 8
-                low = amount - ((packed >> 8) << 8)
+                low = (abs(amount) - ((packed >> 8) << 8)) * (-1 if amount < 0 else 1)
                 effect["amount"] = rounded(low / 100) if operation == "multiply" else low
             else:
                 effect["amount"] = rounded(amount)
@@ -1643,7 +1662,11 @@ def technologies_from_tree(
         # civilisation's unique unit takes the same shape: the Elite Longbowman
         # is a `UniqueUnit` node carrying a `Trigger Tech ID`, where the plain
         # Longbowman is a `UniqueUnit` with none because it simply exists.
-        upgrade = node.get("Node Type") in ("UnitUpgrade", "UniqueUnit") and node.get("Trigger Tech ID")
+        # Some owned upgrade rows (Elite Cannon Galleon691) omit Node Type.
+        # Their linked unit plus trigger still identify the paid upgrade.
+        upgrade = (node.get("Node Type") in ("UnitUpgrade", "UniqueUnit")
+                   or ("Node Type" not in node and node.get("Use Type") == "Unit" and "Link ID" in node)) \
+                  and node.get("Trigger Tech ID")
         if node.get("Node Type") != "Research" and not upgrade:
             continue
         name = node["Name"]

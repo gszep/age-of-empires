@@ -161,6 +161,8 @@ export interface Entity {
   unpacked?: boolean;
   /** Ticks left in a pack or unpack; the engine can do nothing else meanwhile. */
   packingTicks?: number;
+  /** Target of a task133 speed-up; discarded when the attack order changes. */
+  attackApproachTarget?: number;
   /** Monks: ticks spent working on the current conversion target. Reset the
    * moment the monk stops, so a broken-off attempt is not banked. */
   convertTicks?: number;

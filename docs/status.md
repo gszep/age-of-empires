@@ -9,18 +9,22 @@ does not repeat it.
 
 ## Run and play
 
-**Britons, Franks, Goths and Teutons are selectable owned profiles.** Franks adds
+**Britons, Franks, Goths, Teutons and Japanese are selectable owned profiles.** Franks adds
 paid unique-tech/elite acceptance and Heresy; Goths adds Anarchy secondary
 production, Perfusion, gated fast Loom, hunting/infantry/population bonuses,
 Dromon and Incendiaries. Teutons adds its own roster/art/voices, farm/armour/
 garrison/healing bonuses, free research, both unique technologies, Teutonic Knight
 and elite, Siege Onager, Bombard Towers, Redemption/Atonement and captured-building
 stat retention. New production at captured factories receives recipient upgrades.
-Dedicated published-profile browser acceptance passes. Latest full gate GREEN:
-1105 tests/89 files,7 inapplicable Gothic fortification cases skipped, build,
-159 import tests and browser smoke. See [civilisation coverage](civilization-coverage.md)
+Japanese adds Samurai/elite, Yasama tower volleys, Kataparuto packing/firing,
+Elite Cannon Galleons, fishing/infantry/camp/sight/archer bonuses and original
+Asia art/flags/icons/voices. Dedicated published-profile browser acceptance passes.
+Latest full gate GREEN:1150 tests/90 files,7 inapplicable Gothic fortification
+cases skipped, build,168 import tests and browser smoke
+(`.local/japanese183-gate.log`). See [civilisation coverage](civilization-coverage.md)
 for evidence. Shared conversion (#178), native Incendiaries (#252), population
-settings (#253) and zero-time grant timing (#254) remain documented boundaries.
+settings (#253), zero-time grant timing (#254) and native Samurai/Kataparuto
+calibration (#259) remain documented boundaries.
 
 The #54 DAT inventory has been refreshed against the pinned data and actual
 consumers: [dat-field-audit.md](dat-field-audit.md). Most old garrison/audio/

@@ -16,6 +16,8 @@ export interface FireChargeRules {
 }
 
 export interface UnitRules {
+  /** Owned non-depleting task133: speed boost during an attack approach. */
+  attackApproach?: { minimumDistance: number; maximumDistance: number; speedMultiplier: number };
   trainable?: boolean;
   conversionImmune?: boolean;
   confirmDelete?: boolean;
@@ -115,6 +117,7 @@ export interface UnitRules {
    */
   unpacked?: {
     unit?: string;
+    workRate?: number;
     lineOfSight?: number;
     searchRadius?: number;
     armors?: AttackValue[];
@@ -657,7 +660,7 @@ export type PlayerAttribute = 'farmFoodAmount' | 'unitRepairCost' | 'buildingRep
 export type TechAttribute =
   | 'hitPoints' | 'lineOfSight' | 'speed' | 'armor' | 'attack'
   | 'reloadSeconds' | 'accuracyPercent' | 'range' | 'minRange'
-  | 'garrisonHealRate' | 'garrisonCapacity' | 'garrisonMaxProjectiles'
+  | 'garrisonHealRate' | 'garrisonCapacity' | 'garrisonMaxProjectiles' | 'totalProjectiles'
   | 'maxCharge' | 'chargeType'
   | 'blastRadius' | 'searchRadius' | 'trainSeconds' | 'trainLocation' | 'researchSeconds' | 'deathExplosion' | 'garrisonFirepower'
   | 'workRate' | 'carryCapacity' | 'cost' | 'foodCost' | 'woodCost' | 'goldCost' | 'stoneCost'
@@ -1426,6 +1429,7 @@ export const FALLBACK_RULES: GameRules = {
 
 interface ManifestEntity {
   fireCharge?: FireChargeRules;
+  attackApproach?: UnitRules['attackApproach'];
   availabilityId?: number;
   ageStats?: BuildingRules['ageStats'];
   gate?: boolean;
@@ -1623,6 +1627,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       confirmDelete: e[key].confirmDelete ?? fallback?.confirmDelete,
       hp: e[key].hitPoints,
       fireCharge: e[key].fireCharge,
+      attackApproach: e[key].attackApproach,
       radius: e[key].collision[0],
       speed: e[key].speedTilesPerSecond ?? 0.8,
       lineOfSight: e[key].lineOfSight,
@@ -1894,6 +1899,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
         unpacked: {
           ...FALLBACK_RULES.units.trebuchet.unpacked!,
           unit: 'trebuchet-unpacked',
+          seconds: e['trebuchet-unpacked']?.workRate ?? FALLBACK_RULES.units.trebuchet.unpacked!.seconds,
+          workRate: e['trebuchet-unpacked']?.workRate,
           lineOfSight: e['trebuchet-unpacked']?.lineOfSight,
           searchRadius: e['trebuchet-unpacked']?.searchRadius,
           armors: e['trebuchet-unpacked']?.combat?.armors

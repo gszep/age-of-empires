@@ -1,8 +1,8 @@
 {
   "schemaVersion": 3,
   "civIndex": 1,
-  "profileCivilizations": ["franks", "goths", "teutons"],
-  "enabledCivilizations": ["franks", "goths", "teutons"],
+  "profileCivilizations": ["franks", "goths", "teutons", "japanese"],
+  "enabledCivilizations": ["franks", "goths", "teutons", "japanese"],
   "combatRoster": [
     { "unitId": 5 },
     { "unitId": 36 },
@@ -11,6 +11,9 @@
     { "unitId": 555, "rosterAliases": [761] },
     { "unitId": 25 },
     { "unitId": 554 },
+    { "unitId": 291 },
+    { "unitId": 560 },
+    { "unitId": 691, "composite": true, "decay": false },
     { "unitId": 588 },
     { "unitId": 1795, "composite": true, "decay": false },
     { "unitId": 281 },

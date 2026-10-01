@@ -82,7 +82,7 @@ acceptance. These mode results do not imply completion of further civilisations.
 key. The root remains the default civilisation and shared Gaia/map input.
 Additional `GameRules.civilizations` / manifest `civilizations` entries are complete
 profiles, not patches over the enemy's rules. The importer now extracts Britons,
-Franks, Goths and Teutons with independent bonus graphs and namespaced art/voices/icons. The
+Franks, Goths, Teutons and Japanese with independent bonus graphs and namespaced art/voices/icons. The
 spec enables reviewed profiles after supported-gameplay browser acceptance; the 53-entry
 base-era catalogue remains an inventory, not 53 playable civilisations.
 
@@ -166,6 +166,50 @@ Large pre-enablement manifest overrides use private HTTP/gzip because CDP's
 100 MiB message limit disconnected interception. The initial namespacing import
 reconverted shared canonical paths; subsequent full imports reused all atlases.
 
+### Japanese implementation (2026-10-01)
+
+DAT5's complete available roster now resolves, including Samurai291/Elite560
+and Elite Cannon Galleon691. Existing shared units/buildings remain independently
+gated per profile. Owned Japanese localization, Asia buildings/flags, unit icons,
+Samurai art and Japanese voice-switch branches flow through the full pipeline.
+No other civilisation is enabled by this checkpoint.
+
+Japanese integration consumes the half-price mill/camps, Feudal infantry reload,
+age-gated fishing speed/double HP, cavalry-archer anti-archer/skirmisher exception,
+and Galley-line sight effects. Yasama increases both base and maximum tower
+projectiles; Kataparuto modifies actual pack/unpack and deployed attack clocks.
+Samurai use the bounded source task133 approach-speed mode. Native runtime
+calibration of the latter two is#259; conversion retains the shared#178 policy.
+
+`src/sim/japanese.test.ts` passes24 outcome tests: paid construction, age research,
+existing/garrisoned/new infantry, actual fishing collection/banking and age
+progression, visible tiles, damage exceptions, paid/refunded training, elite
+upgrades, charge thresholds/cancellation, three-arrow empty-tower volleys through
+Guard Tower/Keep, packing/fire timing, captured unique units, naval upgrade damage,
+JSON continuation and mixed replay. Four owned Python tests cross-check source
+gates, roster completeness, signed/fractional attack decoding, task fields and
+unique research. The six-file shared regression pass covered80 tests before the
+six extra fishing/approach cases were added; all24 final Japanese cases pass.
+Receipts: `.local/japanese183-{sim-r3,source-tests,regressions}.log`.
+
+The private browser passes both pending and **published enabled** acceptance
+(`.local/japanese183-browser-r2.log`, `.local/japanese183-published-browser.log`):
+real menu/restart/reload, mill placement and
+50-wood payment, Samurai icon/name/training/elite art, own Asia building art,
+Yasama's three live tower arrows, paid Guard Tower/Keep/Kataparuto, actual unpack
+button and23-tick transition, fishing100HP/food banking and Elite Cannon Galleon
+research/art/reload. The first browser attempt exposed a probe comparing the
+raw editor qualifier `Trebuchet (Packed)` against the correctly normalised panel
+name `Trebuchet`; the shared probe now uses the existing display-name contract.
+Initial fixture corrections used source50HP fishing ships, TC garrison admission,
+Euclidean movement distance and the missing-type naval upgrade row, without
+widening any test clock.
+
+Final full gate **GREEN** (`.local/japanese183-gate.log`),14m47s:
+1150 Vitest tests/90 files,7 inapplicable Gothic fortification cases skipped,
+public build,168 owned/Python tests and real-browser smoke. Full enabled import
+completed (`.local/japanese183-enabled-import.log`), reusing3907 atlas groups.
+
 ## Reading the audit output
 
 Current scoped acceptance and remaining shared work:
@@ -176,6 +220,7 @@ Current scoped acceptance and remaining shared work:
 | Franks (#180) | Paid Bearded Axe/Chivalry/elite axeman acceptance and Heresy conversion-death implemented and browser-verified on2026-09-28; full gate GREEN. Shared native conversion/cargo calibration remains#178 |
 | Goths (#181) | Enabled and verified through published-profile browser acceptance and a GREEN full checkpoint gate. Shared population-setting/native Incendiaries calibration remains#253/#252 |
 | Teutons (#182) | Enabled and verified through published-profile browser acceptance and a GREEN full gate. Conversion queue/cargo/probability and zero-time grant calibration remain#178/#254 |
+| Japanese (#183) | Source-backed roster, bonuses, both unique technologies, Samurai/elite and Elite Cannon Galleon; native approach/packing calibration is#259, shared conversion is#178 |
 | Shared engine | Native relic-generation calibration/fish gaps (#130/#95), unlocked diplomacy/cooperative victories beyond the current locked two-player dialog (#138), Regicide timing/preset/task calibration (#240), charge/market runtime calibration and conversion-policy parity (#178). Relic placement and playable Regicide/Treason are implemented; the ledger distinguishes mechanics from unresolved engine interpretations |
 
 The imported catalogue now accounts for the already represented ram/tree alias,
@@ -409,8 +454,8 @@ whole-state and availability-stream hashes before/after the optimization
 - [x] Handle required-count prerequisites and eligible free research without
   treating scenario-only or inactive automatic candidates as unconditional.
 - [x] Enable reviewed shared combat/unique-unit roster, profile art and selection UI.
-- [x] Complete playable roster/research coverage for Britons, Franks, Goths and
-  Teutons, retaining the listed shared engine/reference gaps.
+- [x] Complete playable roster/research coverage for Britons, Franks, Goths,
+  Teutons and Japanese, retaining the listed shared engine/reference gaps.
 - [x] Verify mixed matches, age changes, already-paid queues/refunds, conversions,
   garrisons, JSON save/reload and deterministic replay through public actions.
 - [x] Verify the actual selection/command UI in a private browser and run the gate.

@@ -102,6 +102,14 @@ export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: Uni
   for (const key of researched) {
     for (const effect of technologyFor(source, key)?.effects ?? []) {
       if (rules.unpacked?.unit && effect.unit === rules.unpacked.unit) {
+        if (effect.attribute === 'workRate') {
+          // This pair's work-rate modifier is an inverse packing clock.
+          const before = rules.unpacked.workRate ?? 1;
+          const rate = combine(effect.operation, before, effect.amount);
+          rules = { ...rules, unpacked: { ...rules.unpacked, workRate: rate,
+            seconds: rules.unpacked.seconds * before / Math.max(Number.EPSILON, rate) } };
+          continue;
+        }
         const deployed: UnitRules = { ...rules, ...rules.unpacked,
           armors: (rules.unpacked.armors ?? rules.armors).map(a => ({ ...a })),
           attacks: rules.unpacked.attacks.map(a => ({ ...a })),
@@ -307,6 +315,10 @@ function applyBuildingEffect(rules: BuildingRules, effect: TechEffect): void {
     case 'garrisonMaxProjectiles':
       if (rules.garrison?.volley) rules.garrison = { ...rules.garrison, volley: { ...rules.garrison.volley,
         max: combine(effect.operation, rules.garrison.volley.max, effect.amount) } };
+      break;
+    case 'totalProjectiles':
+      if (rules.garrison?.volley) rules.garrison = { ...rules.garrison, volley: { ...rules.garrison.volley,
+        base: combine(effect.operation, rules.garrison.volley.base, effect.amount) } };
       break;
     case 'garrisonHealRate':
       if (rules.garrison) rules.garrison = { ...rules.garrison, healRate: combine(effect.operation, rules.garrison.healRate, effect.amount) };

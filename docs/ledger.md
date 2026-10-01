@@ -14,6 +14,40 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## Japanese bonus and unique-unit integration (#183; calibration #259)
+
+- **Owned:** Japanese DAT5/tree255/team406; automatic190/306/340/341/422–424
+  supply cavalry-archer attack exceptions, fishing HP/work, camp prices and
+  Feudal infantry reload. Negative packed command−9730 means class38/−2,
+  cancelling the class15/+2 bonus against skirmishers. Values, research gates,
+  Samurai291/560, Elite Cannon Galleon691, Asia art/flags and voices are imported.
+  Elite Cannon Galleon's tree row lacks `Node Type`; its `Link ID`420 and
+  `Trigger Tech ID`376 still identify the paid upgrade.
+- **Owned:** Yasama484/effect539 adds2 to both total-projectile attribute102
+  and maximum107 on Watch Tower/Guard Tower/Keep. The existing secondary-arrow
+  damage/scatter model supplies those extra shots; native volley calibration
+  remains part of the shared garrison boundary.
+- **Inferred engine interpretation:** Kataparuto59 multiplies deployed
+  trebuchet42 work rate by4 and reload duration by.75. Preserve the existing
+ 4.5-second packing baseline (now read from its work-rate field), scaling
+  duration inversely with the researched work-rate change. New pack/unpack
+  orders take1.125 seconds rounded to23 simulation ticks; already running
+  transitions retain their accepted duration. Native work-rate/time conversion
+  and tick rounding are not established by the DAT; tracked in#259.
+- **Owned + community interpretation:** Samurai task133 carries initiation
+  distances2–6 (elite2–7) and speed multiplier1.25, with flag2001, ability3,
+  type1/event0. UGC's task133/attribute61 documentation describes attack
+  approach speed and non-depleting event0. **Inferred integration:** measure
+  centre distance, latch the boost for the ordered target during pursuit, clear
+  it on retask/idle; move orders use ordinary speed. This bounded mode adds no
+  speculative charge damage or cooldown. Both running/task graphic slots are
+  absent, so the owned walking animation remains the visual. Exact native
+  boundary/pursuit/damage semantics require#259, not a claim of measured parity.
+- **Owned graphic placeholders:** Japanese `F` graphics reference legacy
+  SLP2220 (including garrison-flag parents and ship composites), with no F.sld.
+  Treat F like existing W/X/M/E placeholder parents and traverse its deltas;
+  file-bearing child offsets and original Asian flag sprites are preserved.
+
 ## Heresy conversion death (#180, shared conversion caveats #178)
 
 - **Owned:** technology439/effect188 sets player attribute192 (`heresy`) to1;

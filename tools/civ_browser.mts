@@ -9,6 +9,7 @@ import { createServer } from 'vite';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { pageOf } from '../src/view/build-menu.ts';
+import { displayName } from '../src/view/names.ts';
 import type { BuildingKind, GameState } from '../src/sim/types.ts';
 
 export async function civilizationBrowser(civ: string, port = 5269) {
@@ -101,7 +102,7 @@ export async function civilizationBrowser(civ: string, port = 5269) {
     await page.waitForFunction(({id,key})=>{const a=(window as any).__civProbe.art(id);return a?.key===key&&a.texture&&!a.pending&&!a.fallback;},
       {timeout:120000},{id,key:`civilizations/${civ}/${kind}`});
     const shown=await page.evaluate(id=>(window as any).__civProbe.art(id),id),entity=profile.entities[kind];
-    assert.equal(shown.name,entity.text.name);
+    assert.equal(shown.name,displayName(kind,entity.text.name));
     assert(Object.values(entity.atlases).flatMap((a:any)=>[a.image,...(a.pages??[])]).includes(shown.texture));
   };
   const build=async(worker:number,kind:BuildingKind,target:{x:number;y:number})=>{

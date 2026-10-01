@@ -1,19 +1,26 @@
-# Handoff — verified conversion/rendering checkpoint, 2026-10-01
+# Handoff — Japanese completion, 2026-10-01
 
 ## Current checkpoint
 
-- Branch `main`. This checkpoint integrates the subsequent interactive work on
-  mobile cargo, gate performance, sprite decoding and land/farm blend support.
-  **Civilisation expansion remains stopped after Teutons**, per the user's
-  instruction. Franks completed at**a770809**, Goths at**975d7dc**, Teutons at
-  **c65bf0b**; Japanese and later civilisations were not started.
-- Most recent full gate **GREEN**, `.local/land116-gate.log`, exit0, **13m52s**:
-  **1117 Vitest tests /89 files**,7 inapplicable Gothic stone/tower cases skipped,
-  public bundle build, **164 Python/owned-content tests**, real-browser debug
-  smoke. This covers the mobile-cargo, gate-performance and block
-  decoding work and #116 blend changes, including regenerated owned content.
-  Two workers, nice10, unchanged test timeouts. Dedicated owned/fallback
-  `conversion_cargo_smoke.mts` checks passed too.
+- Branch `main`. Japanese#183 is complete on the conversion/rendering baseline
+  **5be3f31**. The owner explicitly resumed Japanese after the autonomous session
+  stalled; this checkpoint implements no additional civilisation.
+- Most recent full gate **GREEN**, `.local/japanese183-gate.log`, exit0,
+  **14m47s**: **1150 Vitest tests /90 files**,7 inapplicable Gothic fortification
+  cases skipped, public bundle build, **168 Python/owned-content tests** and
+  real-browser debug smoke. Two workers, nice10, unchanged test timeouts.
+- Japanese has its full available roster, Samurai/elite and Elite Cannon Galleon,
+  source-backed bonuses, Yasama's extra tower arrows and Kataparuto's actual
+  packing/firing clocks.24 dedicated sim cases,4 owned import cases and the
+  **published enabled** private-browser acceptance pass
+  (`.local/japanese183-published-browser.log`). Actual menu/restart/reload,
+  construction/training/research payments, icons/names, Asia/unit art, three-arrow
+  volleys, unpack button and fishing banking are verified. Native Samurai approach
+  and packing-clock calibration remains#259; conversion remains#178.
+- The earlier interruption's partial worktree `.local/japanese183` is superseded
+  by this main-tree implementation. Its old branch is not the current checkpoint.
+  Dedicated private browser/import/gate processes have completed; the managed
+  shared host is preserved.
 - #116: all eight mapped DE blend families are imported and consumed, with
   per-family classic fallback. Farm patches use the receiving terrain-pair
   family, native corner neighbours and moving-preview invalidation. Owned
@@ -158,7 +165,8 @@ remain `.local/music115-soak-r2.log` and `.local/audio-run-soak-r2.log`.
 - Remaining RMS phase/quota/terrain-height fidelity is documented in the #56
   contract audit and tracked with #130/#134; this is not a full native generator.
 
-Britons/Franks/Goths/Teutons are the enabled profiles. Latest complete owned
-publication: `.local/blend116-import.log` (includes the regenerated RGB565 art
-and all eight mapped blend families). Fresh installations use
+Britons/Franks/Goths/Teutons/Japanese are the enabled profiles. Latest complete
+owned publication: `.local/japanese183-enabled-import.log` (3907 cached atlas
+groups, including the existing RGB565 correction and eight blend families).
+Fresh installations use
 `npm run import:aoe2`. Never overwrite the preserved managed match.

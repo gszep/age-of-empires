@@ -629,6 +629,7 @@ export function resolveUnitOrder(state: GameState, entity: Entity, target: Point
 }
 
 function assignOrder(state: GameState, entity: Entity, target: Point, targetEntity?: Entity): void {
+  entity.attackApproachTarget = undefined;
   const order = resolveUnitOrder(state, entity, target, targetEntity);
   entity.fishingPosition = undefined;
   if (order.kind === 'idle') { becomeIdle(entity); return; }
@@ -744,6 +745,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       // an order.
       entity.attackWindup = undefined;
       if (command.kind === 'stop') {
+        entity.attackApproachTarget = undefined;
         entity.order = { kind: 'idle' };
         entity.activity = 'idle';
         entity.orderQueue = undefined;
@@ -1447,6 +1449,7 @@ function nearestDropSite(state: GameState, entity: Entity, resource?: ResourceKi
 }
 
 function becomeIdle(entity: Entity): void {
+  entity.attackApproachTarget = undefined;
   entity.order = { kind: 'idle' };
   entity.activity = 'idle';
   entity.gatherProgress = 0;
@@ -1889,7 +1892,11 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
     // Retasking is what aborts a swing, as it does in the reference, and that
     // is handled where an order is given.
     entity.activity = 'moving';
-    moveAlong(state, grid, entity, target.position, rules.speed, interactionRange(target) + attackRange(state, entity, target));
+    const approach = rules.attackApproach;
+    const gap = distance(entity.position, target.position);
+    if (approach && gap >= approach.minimumDistance && gap <= approach.maximumDistance) entity.attackApproachTarget = target.id;
+    const speed = rules.speed * (approach && entity.attackApproachTarget === target.id ? approach.speedMultiplier : 1);
+    moveAlong(state, grid, entity, target.position, speed, interactionRange(target) + attackRange(state, entity, target));
     return;
   }
   // In reach -- but a target that is walking away has to be kept up with. The
