@@ -542,7 +542,8 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(entities["castle"]["popSupport"], 20)
         self.assertEqual(entities["longbowman"]["train"]["buildingId"], entities["castle"]["id"])
         # A monk's two works, as the DAT states them rather than as we guess.
-        self.assertEqual(entities["monk"]["heal"], {"hitPointsPerSecond": 1.25, "range": 0.0})
+        # Heal task105 contributes2 HP per work unit; work_rate alone omitted it.
+        self.assertEqual(entities["monk"]["heal"], {"hitPointsPerSecond": 2.5, "range": 0.0})
         self.assertEqual(
             {key: entities["monk"]["convert"][key] for key in ("minSeconds", "maxSeconds", "range")},
             {"minSeconds": 5.0, "maxSeconds": 9.0, "range": 9.0},
@@ -836,7 +837,8 @@ class ContentImportIntegrationTest(unittest.TestCase):
         manifest = Path("public/imported/aoe2/manifest.json")
         if not manifest.is_file():
             self.skipTest("no published manifest to check")
-        published = json.loads(manifest.read_text())
+        from atlas_metadata import expand_atlas_frames
+        published = expand_atlas_frames(json.loads(manifest.read_text()))
         for key, entity in published["entities"].items():
             for name, atlas in entity.get("atlases", {}).items():
                 # The pack's x2 art outgrows one sheet and continues on

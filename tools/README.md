@@ -75,7 +75,11 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    explicit migration to schema2. Tests compare fresh/cached fixture decoding,
    multipage relocation and dependency changes. The first complete schema2 import
    reused4101 groups with byte-identical root/UI/audio manifests; no measured
-   decoder-change speedup is claimed. `--fresh` ignores the cache.
+    decoder-change speedup is claimed. `--fresh` ignores the cache.
+    Published schema4 also interns repeated entity/annex frame arrays through
+    `atlas_metadata.py` (`atlasFrames` / `framesRef`). The browser hydrates shared
+    arrays before rendering; Python geometry probes call `expand_atlas_frames`.
+    Source extraction and decoder caches retain their existing inline format.
    When only DAT terrain slots changed,
    `convert_sld.py --terrain-only` updates those DDS textures in an existing
    manifest without needlessly decoding every SLD first.
@@ -187,6 +191,7 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | idle / death graphics | `unit.standing_graphic`, `unit.dying_graphic` |
 | cost and train time/location | `unit.creatable.resource_costs`; `unit.creatable.train_locations[0].unit_id/.train_time` |
 | combat (attacks, armor, range, projectile) | `unit.type_50.*` — `.attacks`, `.attack_graphic`, `.projectile_unit_id`, `.graphic_displacement` (launch offset, z = height) |
+| melee collateral and monk healing | `unit.type_50.blast_damage`: Cataphracts40/553=-5, enabled by Logistica's `.blast_width` increase. UGC attribute115 documents negative fixed HP versus nonnegative normal-damage factor. Monk task105 `.work_value_1=2` times `.bird.work_rate=1.25`; Byzantine team400 sets resource89=2, owned help120156 says +100%. Native boundary/cadence interpretation remains#267 |
 | projectile arc | `unit.projectile.projectile_arc` (fraction of shot distance, sign varies) |
 | how far a miss lands from the aim | `unit.type_50.accuracy_dispersion`, in tiles — 0.33 for the archer line, 0.2 for the set-up trebuchet (unit 42; the packed 331 reads accuracy 92 and no dispersion, and never shoots) |
 | a second look for the same unit (the female villager) | `resources/_common/dat/objreplacement.json`: `object_id` 83 → `replacement_object` 293 at `chance` 50, and the reverse. The task counterparts (212, 354, 218, 581, 220, 216, 590) are found by matching `bird.tasks`; the spec names them as `skinOf` entries and `test_import_aoe2.py` checks the match (issue #50) |

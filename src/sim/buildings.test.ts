@@ -152,13 +152,17 @@ describe.each(Object.entries(profiles))('%s building outcomes', (_key, source) =
       };
       const darkDamage = hit(), missing = house.maxHp - house.hp;
       research(state, 'feudal-age');
-      expect(house.maxHp).toBe(750); expect(house.maxHp - house.hp).toBe(missing);
+      // Byzantine DAT282/429/430 multiply each age's base HP; the other
+      // reviewed profiles retain the unmodified750/900 house values.
+      const feudalHp = _key === 'byzantines' ? 750 * 1.1 * 1.0909 : 750;
+      const castleHp = _key === 'byzantines' ? 900 * 1.1 * 1.0909 * 1.0833 : 900;
+      expect(house.maxHp).toBe(feudalHp); expect(house.maxHp - house.hp).toBe(missing);
       expect(hit()).toBeLessThan(darkDamage); expect(enemy.maxHp).toBe(oldEnemyHp);
-      expect(build(state, 'house', 50.5, 50.5).maxHp).toBe(750);
+      expect(build(state, 'house', 50.5, 50.5).maxHp).toBe(feudalHp);
       const clone = JSON.parse(JSON.stringify(state)) as GameState;
       research(state, 'castle-age'); research(clone, 'castle-age');
       expect(synchronizationHash(state)).toBe(synchronizationHash(clone));
-      expect(house.maxHp).toBe(900);
+      expect(house.maxHp).toBe(castleHp);
       if (state.rules.technologies['imperial-age']) {
         research(state, 'imperial-age'); research(clone, 'imperial-age');
         expect(buildingRulesFor(state, 1, 'house').armors.find(a => a.class === 4)?.amount).toBe(3);
@@ -198,7 +202,7 @@ describe.each(Object.entries(profiles))('%s building outcomes', (_key, source) =
     const state = fixture(source); state.players[1].age = 1;
     const wall = build(state, 'stone-wall'); wall.hp -= 19;
     research(state, 'castle-age');
-    expect(wall.maxHp).toBeCloseTo(1800, 3);
+    expect(wall.maxHp).toBeCloseTo(_key === 'byzantines' ? 1800 * 1.1 * 1.0909 * 1.0833 : 1800, 3);
     expect(wall.maxHp - wall.hp).toBeCloseTo(19);
     expect(build(state, 'stone-wall', 45.5, 45.5).maxHp).toBe(wall.maxHp);
     expect(state.players[1].researched).toContain('automatic-71');

@@ -14,6 +14,51 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## Shared atlas frame metadata (#268)
+
+- **Chosen wire representation:** asset manifest schema4 stores repeated entity/
+  annex frame arrays in `atlasFrames`, keyed by SHA256 of canonical frame JSON.
+  Each atlas keeps its own image/pages/size/scale/count and refers to `framesRef`.
+  Browser hydration restores shared arrays before any renderer consumes them;
+  legacy inline manifests remain accepted. Missing references fail rather than
+  supplying guessed geometry. This is transport/memory encoding, not a gameplay
+  approximation: no frame, hotspot, page index, source pixel or rule is removed.
+- **Measured trigger:** adding the seventh profile produced551,770,741 bytes of
+  minified JSON, exceeding V8's0x1fffffe8 string limit before tests or rendering
+  could load it. The six-profile pinned release was452,630,984 bytes. Shared PNG
+  URLs alone did not deduplicate the repeated frame arrays.
+
+## Byzantine healing, trample and bonuses (#185; calibration #267)
+
+- **Owned:** DAT7/tree256/team400; Cataphracts40/553 and Camel Riders329/330,
+  independent tech gates, MEDI buildings/HUD/flags, icons and Byzantine voices.
+  Tree research-cost operation2 multiplies Imperial food/gold by.67; operations0/1
+  remain set/add. Free Town Watch/Patrol and staged building-HP factors are imported.
+- **Owned:** healing task105 has work_value_1=2 and Monk work_rate=1.25; team400
+  sets resource89 (`healRateModifer`, source spelling) to2, and help120156 says
+  +100% healing. **Inferred integration:** task amount times work rate gives2.5HP/s;
+  resource0 means the ordinary rate and a positive resource multiplies it. This
+  corrects the old task-amount omission for all imported monks. Fractional progress
+  uses the existing integer-HP accumulator. Captured monks freeze this resolved
+  unit-local rate under the shared conversion policy. Native cadence/stacking and
+  sentinel semantics remain#267.
+- **Owned + documented interpretation:** Cataphract blast_damage=-5 and Logistica
+  radius+.5/+6 infantry attack; UGC attribute115 describes negative area damage as
+  fixed HP. **Inferred geometry:** use the existing target-centred radius plus
+  bystander hitbox, exclude owner/direct target, respect blast defense classes and
+  deal exactly5 collateral HP without armour/elevation scaling. Positive melee
+  blast damage scales the ordinary damage calculation. No native boundary/hill
+  calibration is claimed. Greek Fire's source radius/range changes and projectile
+  replacements506→537/508→1798 reach building and unit shots; shared ranged splash
+  assumptions remain unchanged.
+- **Inferred numeric policy:** building HP retains the source's fractional chained
+  factors1.1/1.0909/1.0833/1.0769, with existing wound/foundation handling rather than
+  substituting exact10/20/30/40% values. Native rounding remains#267.
+- **Owned graphic composition:** MEDI garrison parents retain legacy2260/2263
+  names (`I`, `R`, `B`, `RTWC2GI`, `MRKT2GI`, `ARRG2GI`, `STBL2GI`, `DOCK2GI`,
+  `BRKS2GI`) without corresponding SLD files. Their delta11380 supplies the DE
+  flag, retaining each original offset. The TC uses y−159/−165/−180 by age.
+
 ## Chinese opening, research and weapons (#184; calibration #260)
 
 - **Owned:** DAT6/tree257/team402;226 deducts starting food200/wood50 after

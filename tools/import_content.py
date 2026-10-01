@@ -636,6 +636,7 @@ def extract_entity(
         # A mangonel's stone hurts what it lands beside, not only what it hit.
         entity["combat"]["blastRadius"] = rounded(combat.blast_width)
         entity["combat"]["blastAttackLevel"] = int(combat.blast_attack_level)
+        entity["combat"]["blastDamage"] = rounded(combat.blast_damage)
 
     # Garrison (issue #75). A building says how many it holds
     # (`garrison_capacity`), who may enter (`building.garrison_type`, a flag
@@ -731,7 +732,7 @@ def extract_entity(
         # the task's own range is how close it has to come.
         task = find_task(unit, spec["heal"]["task"])
         entity["heal"] = {
-            "hitPointsPerSecond": rounded(unit.bird.work_rate),
+            "hitPointsPerSecond": rounded(unit.bird.work_rate * task.work_value_1),
             "range": rounded(task.work_range),
         }
 
@@ -1210,7 +1211,8 @@ SUPPORTED_PLAYER_ATTRIBUTES = {"farmFoodAmount", "unitRepairCost", "buildingRepa
     "relicRate", "convertResistMinAdj", "convertResistMaxAdj", "theocracy", "heresy",
     "spies", "tradeVigRate", "tributeInefficency", "huntingProductivity", "unitLimit",
     "convertBuilding", "convertPriest", "resource-29", "healRange", "researchCostMod",
-    "startingFood", "startingWood", "startingGold", "startingStone", "spawnCap", "resource-69"}
+    "startingFood", "startingWood", "startingGold", "startingStone", "spawnCap", "resource-69",
+    "healRateModifer"}
 # `b` on a type 1 command: 0 writes the value, 1 adds to it.
 RESOURCE_OPERATIONS = {0: "set", 1: "add"}
 
@@ -1585,22 +1587,23 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
                     if key not in owners:
                         owners.append(key)
         entities[key]["workRate"] = rounded(unit.bird.work_rate)
-    # Tree research cost/time commands: c=0 sets, c=1 adds. Unknown forms stay
+    # Tree research cost/time commands: c=0 sets, c=1 adds, c=2 multiplies. Unknown forms stay
     # in the provenance report instead of silently enabling free research.
     handled = {f"effect type {c.type}: a={c.a}, b={c.b}, c={c.c}, d={c.d}" for c in tree if c.type == 102}
     for c in modifiers:
         if c.type == 103 and c.c == 0:
             time_overrides[int(c.a)] = rounded(c.d)
         key = by_id.get(int(c.a))
-        if key is None or c.type not in (101, 103) or c.c not in (0, 1):
+        if key is None or c.type not in (101, 103) or c.c not in (0, 1, 2):
             continue
         tech = technologies[key]
         if c.type == 101 and int(c.b) in RESOURCE_NAMES:
             resource = RESOURCE_NAMES[int(c.b)]
             value = tech["cost"].get(resource, 0)
-            tech["cost"][resource] = rounded(c.d if c.c == 0 else value + c.d)
+            tech["cost"][resource] = rounded(c.d if c.c == 0 else value + c.d if c.c == 1 else value * c.d)
         elif c.type == 103:
-            tech["researchSeconds"] = rounded(c.d if c.c == 0 else tech["researchSeconds"] + c.d)
+            value = tech["researchSeconds"]
+            tech["researchSeconds"] = rounded(c.d if c.c == 0 else value + c.d if c.c == 1 else value * c.d)
         else:
             continue
         handled.add(f"effect type {c.type}: a={c.a}, b={c.b}, c={c.c}, d={c.d}")

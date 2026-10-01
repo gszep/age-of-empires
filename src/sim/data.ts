@@ -111,6 +111,8 @@ export interface UnitRules {
   /** Tiles around the point of impact that also take the hit: a mangonel's
    * stone hurts what it lands beside, not only what it was aimed at. */
   blastRadius?: number;
+  /** Melee collateral: negative is fixed HP, nonnegative scales normal damage. */
+  blastDamage?: number;
   /**
    * The DAT's `blast_attack_level`, read against each bystander's
    * `blastDefenseLevel`: a thing is caught in the blast when its defense level
@@ -695,7 +697,7 @@ export interface DeathExplosion {
 export type PlayerAttribute = 'farmFoodAmount' | 'unitRepairCost' | 'buildingRepairCost'
   | 'relicRate' | 'convertResistMinAdj' | 'convertResistMaxAdj' | 'theocracy' | 'heresy'
   | 'spies' | 'tradeVigRate' | 'tributeInefficency' | 'huntingProductivity' | 'unitLimit'
-  | 'convertBuilding' | 'convertPriest' | 'resource-29' | 'healRange'
+  | 'convertBuilding' | 'convertPriest' | 'resource-29' | 'healRange' | 'healRateModifer'
   | 'researchCostMod' | 'startingFood' | 'startingWood' | 'startingGold' | 'startingStone' | 'spawnCap' | 'resource-69';
 
 export type TechAttribute =
@@ -1507,6 +1509,7 @@ interface ManifestEntity {
     projectileSpeed?: number;
     launchOffset?: number[];
     blastRadius?: number;
+    blastDamage?: number;
     blastAttackLevel?: number;
     /** The DAT's `accuracy_percent`: how often a shot is aimed true. */
     accuracyPercent?: number;
@@ -1714,6 +1717,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       piercing: piercing(key) ?? fallback?.piercing,
       launchHeight: e[key].combat?.launchOffset?.[2] ?? fallback?.launchHeight,
       blastRadius: e[key].combat?.blastRadius ?? fallback?.blastRadius,
+      blastDamage: e[key].combat?.blastDamage ?? fallback?.blastDamage,
       searchRadius: e[key].searchRadius ?? fallback?.searchRadius,
       blastAttackLevel: e[key].combat?.blastAttackLevel === undefined ? fallback?.blastAttackLevel : e[key].combat!.blastAttackLevel! & 3,
       blastDefenseLevel: e[key].blastDefenseLevel ?? fallback?.blastDefenseLevel,

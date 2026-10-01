@@ -1230,6 +1230,7 @@ function combatOf(state: GameState, entity: Entity, target?: Entity): {
     piercingRange: rules.piercing ? (rules.range ?? 0) + 3 : undefined,
     launchHeight: rules.launchHeight,
     blastRadius: rules.blastRadius,
+    blastDamage: rules.blastDamage,
     blastAttackLevel: rules.blastAttackLevel,
     accuracyPercent: rules.accuracyPercent,
     accuracyDispersion: rules.accuracyDispersion,
@@ -1279,6 +1280,7 @@ export function swingSeconds(state: GameState, entity: Entity): number | undefin
  * hurt. All four are the DAT's own fields on the shooter.
  */
 interface Shot {
+  blastDamage?: number;
   ignoresArmor?: boolean;
   interceptRadius?: number;
   art?: string;
@@ -2031,9 +2033,8 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
 }
 
 /**
- * A monk mends a wounded ally. The DAT's heal task has no reach of its own
- * (`work_range` is 0), so the monk has to come alongside exactly as a gatherer
- * comes to a bush, and the rate is the unit's work rate in hit points a second.
+ * A monk mends a wounded ally within its resolved healing range. The importer
+ * combines task105's HP amount and work rate; owner modifiers are in rules.ts.
  */
 function updateHealer(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'heal') return;
@@ -2513,7 +2514,7 @@ function releaseAttack(
   if (!projectileSpeed) {
     applyDamage(state, target, attacks, shooter.id, shooter.position, shot.ignoresArmor);
     if (shot.blastRadius) applyBlast(state, target.position, shot.blastRadius,
-      shot.blastAttackLevel ?? 2, attacks, target.id, shooter.owner, shooter.position);
+      shot.blastAttackLevel ?? 2, attacks, target.id, shooter.owner, shooter.position, shot.ignoresArmor, shot.blastDamage);
     return;
   }
   // A shot is aimed once and then flies. Without Ballistics it goes to where
@@ -2596,6 +2597,7 @@ function shooterLeadsTarget(state: GameState, shooter: Entity): boolean {
 function applyBlast(
   state: GameState, at: Point, radius: number, attackLevel: number, attacks: AttackValue[],
   directHitId: number, excludeOwner?: Entity['owner'], origin: Point = at, ignoresArmor = false,
+  blastDamage = 1,
 ): void {
   for (const other of [...state.entities]) {
     if (other.dead || other.kind === 'relic' || other.id === directHitId) continue;
@@ -2608,7 +2610,7 @@ function applyBlast(
       other.amount = 0;
       continue;
     }
-    other.hp -= damageFrom(state, other, attacks, origin, ignoresArmor);
+    other.hp -= blastDamage < 0 ? -blastDamage : damageFrom(state, other, attacks, origin, ignoresArmor) * blastDamage;
     if (other.hp <= 0) kill(state, other);
   }
 }

@@ -28,7 +28,7 @@ resources, not immutable assets. See [shared-play.md](shared-play.md).
 | Area | Working scope | Evidence and limits |
 | --- | --- | --- |
 | Simulation | Fixed20Hz deterministic economy, construction/repair, production/refunds, gathering/hunting/farms, combat/projectiles/armour/elevation, garrisons/transports, research and fog memory | `src/sim/`; public-command outcome tests and deterministic replay; approximations in ledger |
-| Civilisations | Britons, Franks, Goths, Teutons, Japanese and Chinese with roster/research/bonus/art integration | [coverage](civilization-coverage.md), [bonus contract](civilization-bonuses.md); wider catalogue is inventory only |
+| Civilisations | Britons, Franks, Goths, Teutons, Japanese, Chinese and Byzantines with roster/research/bonus/art integration | [coverage](civilization-coverage.md), [bonus contract](civilization-bonuses.md); wider catalogue is inventory only |
 | Buildings/specialists | Additional TCs, fortifications, monasteries/relics, siege, conversion snapshots, nested cargo capacity and owner-preserving mobile-carrier conversion | [buildings](civ-buildings-integration.md), [specialists](civ-specialists-integration.md), [conversion](conversion-reference-checklist.md) |
 | Naval | Briton dock roster, transports, trade cogs and fish traps; enabled profiles' regional ships | Owned DAT/task/art imports; naval/transport browser acceptance; no claim of every native exception |
 | Modes/shared play | Solo and household two-seat play, reconnect/checkpoints, Regicide/Treason, locked diplomacy/tribute | [shared play](shared-play.md), [source audit](shared-reference-audit.md); public multiplayer and general migration are not delivered |
@@ -60,6 +60,12 @@ the measured allocation benefit and pixel-equivalence limits.
 Sprites load on demand. Scene-required pages may exceed the512MiB soft residency
 budget; it is not a hard total-memory cap. Eviction, warm grace and idle expiry
 are chosen application policies. First-use/expired art can be temporarily absent.
+
+Asset manifest schema4 interns repeated frame arrays while retaining every
+hotspot/page/scale. Seven-profile metadata measured552→53MB; whole-manifest
+expansion reproduced its original SHA256. Legacy inline metadata remains readable.
+This removes a reproduced JavaScript string-limit failure (#268); it does not
+change the PNG decoder or establish an FPS improvement.
 
 Owned files do not settle every engine rule. Conversion exceptions, volley/charge
 cadence, zero-time grants, population settings, RMS window/placement semantics and

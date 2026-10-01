@@ -35,7 +35,11 @@ def graphic_layers(dat, graphic_id, x=0, y=0, seen=()):
     if graphic is None:
         return []
     layers = []
-    if graphic.file_name not in (None, "", "None", "W", "X", "M", "E", "F") and not (graphic.slp < 0 and graphic.deltas):
+    # MEDI carriers retain legacy SLP2260/2263 parent names; their actual
+    # DE flags are delta11380, with each carrier's own offsets.
+    placeholders = (None, "", "None", "W", "X", "M", "E", "F", "I", "R", "B",
+                    "RTWC2GI", "MRKT2GI", "ARRG2GI", "STBL2GI", "DOCK2GI", "BRKS2GI")
+    if graphic.file_name not in placeholders and not (graphic.slp < 0 and graphic.deltas):
         layers.append((graphic_id, x, y))
     for delta in graphic.deltas or []:
         layers.extend(graphic_layers(dat, delta.graphic_id, x + delta.offset_x,

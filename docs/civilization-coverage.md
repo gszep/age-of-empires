@@ -3,7 +3,7 @@
 Tracking: [#122](https://github.com/gszep/age-of-empires/issues/122) is the parent
 of 59 individual civilisation issues, each with source-specific findings and an
 acceptance checklist. Start with [Britons #179](https://github.com/gszep/age-of-empires/issues/179)
-and [Franks #180](https://github.com/gszep/age-of-empires/issues/180). The tracker
+and [Franks #180](https://github.com/gszep/age-of-empires/issues/180) for the historical foundation. The tracker
 separates 53 base-era profiles from the six Antiquity-era profiles; shared engine
 dependencies remain under #128 and #178. Bonus/count-prerequisite consumers and
 building age stats (#123/#129/#126) have since shipped; their explicit inference
@@ -82,7 +82,7 @@ acceptance. These mode results do not imply completion of further civilisations.
 key. The root remains the default civilisation and shared Gaia/map input.
 Additional `GameRules.civilizations` / manifest `civilizations` entries are complete
 profiles, not patches over the enemy's rules. The importer now extracts Britons,
-Franks, Goths, Teutons, Japanese and Chinese with independent bonus graphs and namespaced art/voices/icons. The
+Franks, Goths, Teutons, Japanese, Chinese and Byzantines with independent bonus graphs and namespaced art/voices/icons. The
 spec enables reviewed profiles after supported-gameplay browser acceptance; the 53-entry
 base-era catalogue remains an inventory, not 53 playable civilisations.
 
@@ -276,6 +276,55 @@ Final gate **GREEN**, exit0,19m27s (`.local/chinese184-gate-r3.log`):
 skipped, public bundle build,172 Python/owned-content tests and real-browser
 debug smoke. No test timeout or fixture clock was widened.
 
+### Byzantine implementation (2026-10-02)
+
+DAT7/tree256/team400 now has no missing available roster IDs. Cataphracts40/553
+and Camel Riders329/330 join the existing shared roster, with independent gates,
+MEDI buildings/flags/HUD, icons and voices. The source's free sight technologies,
+discounted Imperial research and counter-unit prices, staged building HP and
+Fire Ship/Dromon reload bonuses have public-command outcome coverage.
+
+New shared consumers cover type101/103 multiplication, heal task amount times
+work rate and resource89, fixed melee collateral from negative `blast_damage`,
+and building projectile redirection. Logistica adds source infantry damage and
+five-HP collateral; Greek Fire reaches actual Fire Ship range and Dromon/Bombard
+Tower radius/projectile changes. Native geometry/healing/rounding remains#267;
+the ledger distinguishes source facts from those integration policies.
+
+Four source contracts pass (`.local/byzantines-source-tests-r2.log`). The52-case
+focused run covers Byzantine outcomes plus Teuton, monastery and elevation
+regressions (`.local/byzantines-focused-r5.log`). Fourteen Byzantine cases measure
+paid ages/building wounds/foundations/new construction/sight, discounted training
+and refunds, healing, Logistica damage/ally exclusion, elite/garrisoned/new units,
+naval reach and reload against an opponent, tower cannon art/collateral, captured
+unique stats, JSON continuation and command-record replay. Generic building
+expectations now include the source Byzantine house/wall HP multipliers; existing
+damage, wound and replay assertions and fixture clocks remain intact.
+
+The complete pending-profile private browser passes
+(`.local/byzantines-browser-r5.log`): menu/restart/reload, MEDI HUD/castle art,
+Cataphract icon/name/training/elite and Logistica collateral, discounted Camel
+Riders/elite, actual healing, house and Bombard Tower placement, free sight techs,
+670/536 Imperial payment, Greek Fire, Dromon and Fire Ship upgrades/projectiles.
+Earlier probe failures exposed a HUD refresh race, incorrect half-tile house
+placement, and a tower target killed during setup. The final fixture stages that
+target in range after paid research, at source HP, without changing clocks.
+
+The seventh profile exposed a shared release blocker#268:551,770,741 bytes of
+minified atlas metadata exceeded V8's string ceiling. Schema4 interns repeated
+frame arrays to52,882,276 bytes/2334 unique arrays. Expanding the whole manifest
+reproduced SHA2569380ea82b21c3108f24479a3e5e2531bdd24537137527d422c866d6875e28367
+exactly. Full publication reused all4850 cached atlas groups; no decoder or PNG
+changes were needed. Browser hydration preserves root/profile/annex frames and
+per-use scale/pages; malformed references fail and legacy inline metadata works.
+
+Published-enabled acceptance, frame-metadata/general-browser and owned/fallback
+cargo receipts all pass (`.local/byzantines-published-acceptance.log`,
+`.local/atlas268-acceptance.log`, `.local/byzantines-cargo-acceptance.log`). Final
+gate **GREEN**,13m05s:1218 TypeScript tests/100 files,8existing skips, build,
+184 owned/Python tests and real-browser smoke (`.local/byzantines-gate.log`).
+Live household deployment remains separately versioned in the current handoff.
+
 ## Reading the audit output
 
 Current scoped acceptance and remaining shared work:
@@ -288,6 +337,7 @@ Current scoped acceptance and remaining shared work:
 | Teutons (#182) | Enabled and verified through published-profile browser acceptance and a GREEN full gate. Conversion queue/cargo/probability and zero-time grant calibration remain#178/#254 |
 | Japanese (#183) | Source-backed roster, bonuses, both unique technologies, Samurai/elite and Elite Cannon Galleon; native approach/packing calibration is#259, shared conversion is#178 |
 | Chinese (#184) | Source-backed complete available roster, starting/economy/fortification bonuses and regional/unique weapons; native timing, projectile ordering and rounding calibration is#260 |
+| Byzantines (#185) | Source-backed roster, age/price/sight/naval/healing bonuses, Cataphracts/elite, Camel Riders/elite, Logistica and Greek Fire; native healing/blast/HP calibration is#267 |
 | Shared engine | Native relic-generation calibration/fish gaps (#130/#95), unlocked diplomacy/cooperative victories beyond the current locked two-player dialog (#138), Regicide timing/preset/task calibration (#240), charge/market runtime calibration and conversion-policy parity (#178). Relic placement and playable Regicide/Treason are implemented; the ledger distinguishes mechanics from unresolved engine interpretations |
 
 The imported catalogue now accounts for the already represented ram/tree alias,
@@ -522,7 +572,7 @@ whole-state and availability-stream hashes before/after the optimization
   treating scenario-only or inactive automatic candidates as unconditional.
 - [x] Enable reviewed shared combat/unique-unit roster, profile art and selection UI.
 - [x] Complete playable roster/research coverage for Britons, Franks, Goths,
-  Teutons, Japanese and Chinese, retaining the listed shared engine/reference gaps.
+  Teutons, Japanese, Chinese and Byzantines, retaining the listed shared engine/reference gaps.
 - [x] Verify mixed matches, age changes, already-paid queues/refunds, conversions,
   garrisons, JSON save/reload and deterministic replay through public actions.
 - [x] Verify the actual selection/command UI in a private browser and run the gate.

@@ -1,9 +1,13 @@
 {
   "schemaVersion": 3,
   "civIndex": 1,
-  "profileCivilizations": ["franks", "goths", "teutons", "japanese", "chinese"],
-  "enabledCivilizations": ["franks", "goths", "teutons", "japanese", "chinese"],
+  "profileCivilizations": ["franks", "goths", "teutons", "japanese", "chinese", "byzantines"],
+  "enabledCivilizations": ["franks", "goths", "teutons", "japanese", "chinese", "byzantines"],
   "combatRoster": [
+    { "unitId": 40 },
+    { "unitId": 553 },
+    { "unitId": 329 },
+    { "unitId": 330 },
     { "unitId": 5 },
     { "unitId": 36 },
     { "unitId": 41, "rosterAliases": [759] },
@@ -77,6 +81,14 @@
     }
   ],
   "entities": [
+    {
+      "key": "dat-projectile-537", "unitId": 537, "category": "projectile",
+      "animations": { "idle": { "slot": "standing" } }
+    },
+    {
+      "key": "dat-projectile-1798", "unitId": 1798, "category": "projectile",
+      "animations": { "idle": { "slot": "standing" } }
+    },
     {
       "key": "dat-projectile-1937", "unitId": 1937, "category": "projectile",
       "animations": { "idle": { "slot": "standing" } }

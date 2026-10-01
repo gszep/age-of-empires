@@ -161,6 +161,11 @@ export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: Uni
     projectile: projectileRulesFor(source, researched, rules.alternateAttack.projectile) } };
   const healRange = rules.heal ? playerAttributeFor(state, owner, 'healRange') : undefined;
   if (rules.heal && healRange !== undefined && healRange > 0) rules = { ...rules, heal: { ...rules.heal, range: healRange } };
+  const healRate = rules.heal ? playerAttributeFor(state, owner, 'healRateModifer') : undefined;
+  // DAT resource89=0 is the default sentinel; Byzantine team400 sets2,
+  // corroborated by the owned +100% healing description (120156).
+  if (rules.heal && healRate !== undefined && healRate > 0) rules = { ...rules,
+    heal: { ...rules.heal, hitPointsPerSecond: rules.heal.hitPointsPerSecond * healRate } };
   return rules;
 }
 
@@ -289,11 +294,13 @@ export function buildingRulesFor(
   const researched = state.players[owner as PlayerId].researched;
   if (!researched.length) return base;
   let rules = base;
+  let replacesProjectile = false;
   for (const key of researched) {
     const techId = source.technologies[key]?.techId ?? (key.startsWith('automatic-') ? Number(key.slice(10)) : undefined);
     if (variant && techId !== undefined && original.ageStats![variant].includedTechs?.includes(techId)) continue;
     for (const effect of technologyFor(source, key)?.effects ?? []) {
       const volley = rules.garrison?.volley;
+      if (effect.projectileFrom && effect.projectileFrom === base.attack?.projectileArt) replacesProjectile = true;
       if (volley?.arrowUnitId !== undefined && effect.unit === `dat-projectile-${volley.arrowUnitId}`
         && effect.attribute === 'attack') {
         const attacks = (volley.arrowAttacks ?? []).map(a => ({ ...a }));
@@ -315,6 +322,12 @@ export function buildingRulesFor(
     }
   }
   if (rules.cost !== base.cost) roundCost(rules);
+  const art = rules.attack?.projectileArt;
+  if (replacesProjectile && art && source.projectiles?.[art]) {
+    const projectile = projectileRulesFor(source, researched, source.projectiles[art]);
+    if (projectile.key !== art) rules = { ...rules, attack: { ...rules.attack!,
+      projectileArt: projectile.key, projectileSpeed: projectile.speed } };
+  }
   return rules;
 }
 

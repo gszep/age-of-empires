@@ -10,6 +10,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from depot import depot_root, Graphics, GRAPHICS, uhd_graphics_dir
+from atlas_metadata import expand_atlas_frames
 from sld_layers import decode_colors, decode_masks, LAYER_SHADOW, LAYER_PLAYERCOLOR, luminance
 from PIL import Image
 
@@ -19,7 +20,7 @@ def audit() -> dict:
     sources = Graphics(root / GRAPHICS, uhd_graphics_dir(root))
     content = json.loads(Path('.local/aoe2de/content.json').read_text())
     base = Path('public/imported/aoe2')
-    manifest = json.loads((base / 'manifest.json').read_text())
+    manifest = expand_atlas_frames(json.loads((base / 'manifest.json').read_text()))
     checked = []
     for key in ('villager', 'militia', 'galley'):
         source = sources.path(content['entities'][key]['animations']['idle']['source'])

@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { skinFamilies, type SkinFamily } from './skins';
 import { SpriteResidency } from './sprite-residency';
+import { expandAtlasFrames } from './atlas-metadata';
 
 /** A frame's box on its page, in the page's pixels; `page` indexes `Atlas.pages` and is absent on a one-page atlas. */
 export type Frame = { x: number; y: number; w: number; h: number; cx: number; cy: number; page?: number };
@@ -419,6 +420,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     particles?: Record<string, ParticleEffect>;
   }>(`${CONTENT_BASE}manifest.json`);
   if (!manifest) return undefined;
+  expandAtlasFrames(manifest);
   const rootSkins = skinFamilies(manifest.entities);
   const civilizationSkins: Record<string, Map<string, SkinFamily[]>> = {};
   for (const [civ, profile] of Object.entries(manifest.civilizations ?? {})) {

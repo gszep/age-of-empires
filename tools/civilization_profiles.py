@@ -77,6 +77,8 @@ def profile_spec(spec, entry):
 
 def art_entities(content):
     """Stable namespace; shared-atlas grouping still deduplicates identical sources."""
+    from atlas_metadata import expand_atlas_frames
+    expand_atlas_frames(content)
     result = dict(content["entities"])
     for civ, profile in sorted(content.get("civilizations", {}).items()):
         result.update({f"civilizations/{civ}/{key}": entity for key, entity in profile["entities"].items()})

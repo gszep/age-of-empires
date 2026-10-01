@@ -546,6 +546,9 @@ def main() -> None:
         previous = json.loads(manifest_path.read_text())
         if "blends" in previous:
             manifest["blends"] = previous["blends"]
+    from atlas_metadata import intern_atlas_frames
+    manifest["schemaVersion"] = 4
+    intern_atlas_frames(manifest)
     manifest_path.write_text(json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n")
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     cache_path.write_text(json.dumps({"schema": 2, "decoder": fingerprint, "atlases": cache},
