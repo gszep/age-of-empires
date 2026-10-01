@@ -1,5 +1,27 @@
 # Handoff — post-mortem follow-through, 2026-10-01
 
+## Follow-up checkpoint: #258 and #265
+
+- #258 preserves the resource node in rendered fog snapshots. The real-browser
+  `fish-fog` regression failed before the fix (fish bound to berries artwork)
+  and passes for deep fish, shore fish and berries through scout departure/return.
+- #265 now captures navigation/readiness failures before browser shutdown:
+  `.local/browser-diagnostics/startup-*/{events,page,renderer}.json` retain request,
+  console/init-error, DOM/readiness, GPU and host-load evidence. Node-side evidence
+  is written first; each subsequent diagnostic query is bounded to five seconds.
+  Original startup errors propagate and the60-second readiness clock is unchanged.
+- The intentional real-browser failure fixture passes, with an acceptance receipt
+  in `.local/acceptance/browser-startup.json`; `fish-fog` was also reverified on
+  the combined tree. This is diagnostics coverage, not a proven startup-cause fix.
+- Full gate **GREEN**, `.local/issue265-gate.log`, **17m05s**:1193 TypeScript tests
+  passed (8 explicit skips), build,177 Python tests and general browser smoke.
+  No existing assertions or timeouts were relaxed. Earlier failed gate evidence
+  remains in `.local/fish258-gate.log`; its standalone recheck also timed out.
+  Two instrumented standalone checks and the final gate passed, so the original
+  intermittent startup cause remains unproven.
+- These follow-up changes are included in this source checkpoint. The pinned
+  shared release still predates them.
+
 ## Work in this checkpoint
 
 The owner requested the six corrective actions from the
@@ -73,7 +95,8 @@ introduced. [Checkpoint workflow](checkpoint-workflow.md) documents the tools.
 - The first gate passed unit/build/import stages but timed out on browser startup.
   An instrumented unchanged-code rerun passed, then the whole second gate passed.
   The first remains failed evidence; root cause is unproven. #265 tracks missing
-  startup diagnostics. Do not describe this as a fixed renderer/cache regression.
+  startup diagnostics (implemented in the follow-up above). Do not describe
+  this as a fixed renderer/cache regression.
 - Final shared browser receipt: `.local/acceptance/shared.json`, pass against
   code/metadata fingerprint `927b246d02d0b5ac43580c3ffe5ee167bb12626ba7ee3d6b27f39fec67daf15c`;
   log `.local/review263-shared.log`. The AI counterpart records status1/failure at
@@ -101,7 +124,8 @@ introduced. [Checkpoint workflow](checkpoint-workflow.md) documents the tools.
 - Tailnet:<https://ysgramor.tail6e864b.ts.net:5173/>.
 - Six owned profiles remain enabled: Britons, Franks, Goths, Teutons, Japanese,
   Chinese. General native calibration is not implied by scoped completion.
-- Next human-filed bug:#258 fish/forage art in fog. Native terrain/compositor,
+- #258's fog resource fix and #265's diagnostics are verified in the follow-up
+  checkpoint above. Native terrain/compositor,
   conversion exceptions, audio/missing streams, zero-time research, population,
   Japanese/Chinese calibration and wonder countdown remain in the tracker.
   This process task did not resolve them.

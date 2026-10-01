@@ -20,6 +20,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import puppeteer from 'puppeteer';
+import { startupDiagnostics } from './browser-startup-diagnostics.mjs';
 
 const ROOT = join(import.meta.dirname, '..');
 const PORT = Number(process.env.SMOKE_PORT ?? 5199);
@@ -63,11 +64,20 @@ try {
   await page.setViewport({ width: 1280, height: 800 });
   const pageErrors = [];
   page.on('pageerror', error => { pageErrors.push(error.message); console.log(`page error: ${error.message}`); });
-  await page.goto(BASE, { waitUntil: 'networkidle2', timeout: 60_000 });
-  // The canvas is inserted before owned content finishes loading and before
-  // the debug listener is installed. Wait for readiness, not a three-second race.
-  await page.waitForFunction(() => document.querySelector('canvas.battlefield') !== null
-    && typeof window.__empiresDebug === 'function', { timeout: 60_000 });
+  const diagnostics = startupDiagnostics(page, browser, join(ROOT, '.local', 'browser-diagnostics'));
+  let phase = 'navigation';
+  try {
+    await page.goto(BASE, { waitUntil: 'networkidle2', timeout: 60_000 });
+    // The canvas is inserted before owned content finishes loading and before
+    // the debug listener is installed. Wait for readiness, not a three-second race.
+    phase = 'canvas/debug readiness';
+    await page.waitForFunction(() => document.querySelector('canvas.battlefield') !== null
+      && typeof window.__empiresDebug === 'function', { timeout: 60_000 });
+  } catch (error) {
+    try { await diagnostics.capture(error, phase); }
+    catch (diagnosticError) { console.error('Could not save startup diagnostics:', diagnosticError); }
+    throw error;
+  } finally { diagnostics.dispose(); }
 
   const query = async payload => {
     const response = await fetch(`${BASE}/__debug`, { method: 'POST', body: JSON.stringify(payload) });

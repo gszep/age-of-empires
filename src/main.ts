@@ -1792,7 +1792,7 @@ function syncScene(time: number): void {
         position: { x: remembered.x, y: remembered.y },
         hp: remembered.hp, maxHp: remembered.maxHp, radius: 0.5,
         activity: 'idle', order: { kind: 'idle' },
-        resourceKind: remembered.resource, amount: remembered.amount,
+        resourceKind: remembered.resource, node: remembered.node, amount: remembered.amount,
       };
       entityView = view.createEntityView(assets, fake);
       view.updateEntityView(entityView, assets, game, fake, 0, !!remembered.hasGarrison);

@@ -10,6 +10,17 @@ Run them from the repo root: `npx tsx tools/probes/snapshot.ts`.
 
 ## Maintained issue-acceptance checks
 
+- **`browser_startup_diagnostics_smoke.mjs`** — run with `node` for #265's
+  intentional startup-failure fixture. Asserts retained pending/failed/HTTP
+  requests, console/init errors, loading DOM, canvas/debug readiness and GPU
+  information. The general `debug_smoke.mjs` now saves those diagnostics under
+  `.local/browser-diagnostics/startup-*/` on navigation/readiness failure before
+  closing the page, retaining the original failure and60-second readiness clock.
+  `events.json` is saved first; page/GPU queries are each bounded to five seconds
+  and record diagnostic errors if unavailable. Completed requests and console
+  events retain the latest500 entries; DOM HTML is capped at100,000 characters.
+  This captures evidence; it does not establish or fix an intermittent init cause.
+
 - **`land_blend_smoke.mts`** — #116's eight native families through production
   geometry/materials:6200 shape samples,50 two-way crossing-policy samples,
   450 grown/construction farm samples, partial native-family fallback and
@@ -99,6 +110,10 @@ browser smoke and are maintained regression tools.
   placement with the profile's footprint/cost. It proves catalogue plumbing,
   not real Frankish bonuses, unique-unit artwork or conversion inheritance.
 
+- **`fish_fog_smoke.mts`** — #258's scout departure/return through public orders:
+  deep fish, shore fish and berries retain their respective owned body textures
+  across live → fog-memory → live scene views. Uses a staged coast and checks
+  loaded, visible sprite bodies rather than only simulation memory metadata.
 - **`tree_fog_smoke.mts`** — #88's accepted visual correction: opaque canopy
   pixels must be identical with ground fog on and F4 reveal, remembered trees
   retain full silhouettes at half linear brightness, and visible shadows match
