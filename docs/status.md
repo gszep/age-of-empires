@@ -25,10 +25,17 @@ Rocketry. Shared consumers include multi-shot/alternate weapons, interception,
 armour bypass/resistance and public ground fire. Dedicated published-profile
 browser acceptance passes. Latest full gate GREEN:1186 tests/91 files,7
 inapplicable Gothic fortification cases skipped, build,172 import tests and
-browser smoke (`.local/chinese184-gate-r3.log`). See [civilisation coverage](civilization-coverage.md)
+browser smoke (`.local/timeout261-gate.log`, repeated after the timeout-config
+checkpoint). See [civilisation coverage](civilization-coverage.md)
 for evidence. Shared conversion (#178), native Incendiaries (#252), population
 settings (#253), zero-time grant timing (#254) and native Samurai/Kataparuto
 calibration (#259), plus native Chinese weapon/bonus calibration (#260), remain documented boundaries.
+
+OpenCode's total OpenAI request deadline and read-only diagnostic-log access are
+configured in **678a7ba** (#261). [Investigation evidence](timeout-investigation.md)
+distinguishes the reproduced stream-watchdog gap from job-monitor expiry and
+browser-fixture interruption; [overnight rules](overnight.md) record the user's
+60%-context wrap-up policy.
 
 The #54 DAT inventory has been refreshed against the pinned data and actual
 consumers: [dat-field-audit.md](dat-field-audit.md). Most old garrison/audio/

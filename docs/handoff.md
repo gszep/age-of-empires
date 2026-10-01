@@ -1,11 +1,17 @@
-# Handoff — Chinese completion, 2026-10-01
+# Handoff — civilisation and timeout checkpoints, 2026-10-01
 
 ## Current checkpoint
 
-- Branch `main`. Chinese#184 is complete on Japanese checkpoint **3c5aa04**,
-  following the owner's explicit Chinese implementation request.
-- Most recent full gate **GREEN**, `.local/chinese184-gate-r3.log`, exit0,
-  **19m27s**: **1186 Vitest tests /91 files**,7 inapplicable Gothic fortification
+- Branch `main`. Japanese#183 is **3c5aa04**, Chinese#184 is **38ec89f**, and
+  the verified timeout safeguard#261 is **678a7ba**; all are pushed.
+- OpenAI provider requests now have a ten-minute total deadline; diagnostic log
+  access is allowed with file-edit denial. The user restarted after the config
+  edit. [Timeout evidence](timeout-investigation.md) records the controlled
+  stream/long-tool tests and remaining uncertainty about the original network
+  trigger. Honour the user's wrap-up instruction around60% context, then compact
+  or start fresh; no extra automatic compaction threshold was imposed.
+- Most recent full gate **GREEN**, `.local/timeout261-gate.log`, exit0,
+  **17m28s**: **1186 Vitest tests /91 files**,7 inapplicable Gothic fortification
   cases skipped, public bundle build, **172 Python/owned-content tests** and
   real-browser debug smoke. Two workers, nice10, unchanged test timeouts.
 - Chinese has its full available roster, source-backed opening/economy/TC/farm
