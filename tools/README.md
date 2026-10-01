@@ -92,11 +92,13 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
     the sounds DAT directory), retaining actual header dimensions/hotspots and
     source hashes. File suffixes are not size metadata: `flag32x32.cur` is 48×48.
 5. `import_blends.py` publishes the classic blendomatic masks plus square DE
-   water-family windows from `terrain/blends/{watershore,waterwater,shallowswater}.png`.
+   windows for the eight mapped water/land/farm/road/snow/ice families under
+   `terrain/blends/` (#116/#148).
    `blends.native` carries their dimensions/gutters/modes; source hashes are in
    the manifest. The 64-pixel window interpretation and edge unions are inferred
-   (ledger #148); their alpha bytes are owned. These sheets use tile-axis UVs,
-   while the classic sheets use isometric-diamond UVs. No SLD decoding changes.
+   (ledger #116/#148); their alpha bytes are owned. These sheets use tile-axis
+   UVs, while the classic sheets use isometric-diamond UVs. This stage does not
+   decode sprites; blend-only edits can reuse the existing SLD atlas cache.
 6. When sound depot 813783 and `vgmstream-cli` are available,
    `import_audio.py` follows consumed cues through the owned PCK/BNK HIRC
     graph across repeated `--pack` inputs, prefers complete PCK streams over

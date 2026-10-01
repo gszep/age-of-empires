@@ -106,8 +106,8 @@ describe('meshes that lie on the ground', () => {
         ground: slot('Grass', 'terrain/g_grs.png', 0),
         // The DAT's own differing dimensions for the two farm sheets, which is
         // the thing the farm scale must not be read from.
-        farm: { ...slot('Farm1', 'terrain/g_fm1.png', 7), dimensions: [6, 6] as [number, number] },
-        'farm-construction': { ...slot('Farm Cnst1', 'terrain/g_fc1.png', 29), dimensions: [3, 3] as [number, number] },
+        farm: { ...slot('Farm1', 'terrain/g_fm1.png', 7), blendType: 1, dimensions: [6, 6] as [number, number] },
+        'farm-construction': { ...slot('Farm Cnst1', 'terrain/g_fc1.png', 29), blendType: 1, dimensions: [3, 3] as [number, number] },
       },
       textures,
       playerRamps: new Map(),
@@ -115,7 +115,7 @@ describe('meshes that lie on the ground', () => {
         tile: [97, 49] as [number, number],
         modes: [new THREE.DataTexture(new Uint8Array(4), 1, 1)],
         // The four groups blendomatic's masks measure out to.
-        edges: { '+x': [12, 13, 14, 15], '+y': [4, 5, 6, 7], '-x': [0, 1, 2, 3], '-y': [8, 9, 10, 11] },
+        edges: { '+x': [8, 9, 10, 11], '+y': [0, 1, 2, 3], '-x': [4, 5, 6, 7], '-y': [12, 13, 14, 15] },
         // Thirty-one owned masks and the solid column past them, each with
         // two pixels of gutter either side.
         masksPerMode: 32,
@@ -283,6 +283,57 @@ describe('meshes that lie on the ground', () => {
     expect(40 * uvSpan('farm')).toBeCloseTo(12, 6);
     // And the ground does not change pitch when the crop comes up.
     expect(uvSpan('farm-construction')).toBeCloseTo(uvSpan('farm'), 6);
+  });
+
+  it.each([[0, 2], [1, 3], [7, 4], [6, 5], [5, 6]])('uses native land type %i / family %i and falls back per missing family', (type, mode) => {
+    const state = createGame(116);
+    state.width = state.height = 2;
+    state.terrain = [0, 7, 0, 7]; state.elevation = [0, 0, 0, 0];
+    const before = checksumState(state), assets = groundAssets();
+    assets.terrain.farm.blendType = type; assets.terrain.farm.blendPriority = 200;
+    assets.blends!.native = { tile: [64, 64], gutter: 2, masksPerMode: 32,
+      modes: { [mode]: new THREE.DataTexture(new Uint8Array(4), 1, 1) } };
+    const native = createGround(state, assets).getObjectByName('blend-farm') as THREE.Mesh;
+    const uv = native.geometry.getAttribute('uv1');
+    expect(uv.getX(0)).toBeCloseTo(maskU(assets.blends!.native, 8, 0));
+    expect(uv.getX(1)).toBeCloseTo(maskU(assets.blends!.native, 8, 1));
+    expect(uv.getY(1)).toBe(1);
+    delete assets.blends!.native.modes[mode]; // partial old manifest, not only total absence
+    const classic = createGround(state, assets).getObjectByName('blend-farm') as THREE.Mesh;
+    expect(classic.geometry.getAttribute('uv1').getY(1)).toBe(0.5);
+    expect(classic.geometry.getAttribute('position').array).toEqual(native.geometry.getAttribute('position').array);
+    expect(checksumState(state)).toBe(before);
+  });
+
+  it.each(['farm', 'farm-construction'])('%s uses farmland shapes, native corner tiles and classic fallback', slot => {
+    const assets = groundAssets();
+    assets.blends!.modes = Array.from({ length: 8 }, () => new THREE.DataTexture(new Uint8Array(4), 1, 1));
+    const farmland = new THREE.DataTexture(new Uint8Array(4), 1, 1);
+    assets.blends!.native = { tile: [64, 64], gutter: 2, masksPerMode: 32, modes: { 3: farmland } };
+    const patch = createTerrainPatch(assets, slot, 1.5, { x: 2, y: 2 })!;
+    expect((patch.material as THREE.MeshBasicMaterial).alphaMap).toBe(farmland);
+    expect(patch.geometry.getAttribute('position').count).toBe(25 * 6);
+    expect(patch.geometry.getAttribute('uv1').getX(0)).toBeCloseTo(maskU(assets.blends!.native, 17, 0));
+    delete assets.blends!.native;
+    const classic = createTerrainPatch(assets, slot, 1.5)!;
+    expect(classic.geometry.getAttribute('position').count).toBe(21 * 6);
+    expect((classic.material as THREE.MeshBasicMaterial).alphaMap).toBe(assets.blends!.modes[3]);
+    expect((classic.material as THREE.MeshBasicMaterial).alphaMap).not.toBe(assets.blends!.modes[1]);
+  });
+
+  it('chooses farm ring families from the actual receiving terrain without changing state', () => {
+    const state = createGame(116), assets = groundAssets();
+    state.width = state.height = 8; state.terrain = new Array(64).fill(0); state.elevation = new Array(64).fill(0);
+    state.terrain[3 * 8 + 1] = 24; // one road tile along the farm's left edge
+    assets.terrain.road = { ...assets.terrain.ground, terrainId: 24, blendType: 5 };
+    const farmland = new THREE.DataTexture(new Uint8Array(4), 1, 1), road = farmland.clone();
+    assets.blends!.native = { tile: [64, 64], gutter: 2, masksPerMode: 32, modes: { 3: farmland, 6: road } };
+    const before = checksumState(state);
+    const patch = createTerrainPatch(assets, 'farm', 1.5, { x: 2, y: 2 }, state)!;
+    const materials = patch.material as THREE.MeshBasicMaterial[];
+    expect(materials.map(m => m.alphaMap)).toEqual([farmland, road]);
+    expect(patch.geometry.groups.filter(g => g.materialIndex === 1).reduce((sum, g) => sum + g.count, 0)).toBe(6);
+    expect(checksumState(state)).toBe(before);
   });
 
   it('samples a farm by where it stands, so two are not one picture twice', () => {

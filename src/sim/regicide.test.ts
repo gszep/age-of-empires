@@ -95,7 +95,7 @@ describe('King survival and temporary Treason', () => {
     expect(k.dead).toBe(true); expect(s.winner).toBe(2); expect(attacker.hp).toBeGreaterThan(0);
     const before = checksumState(s); run(s, 2); expect(checksumState(s)).toBe(before);
   });
-  it('retains conversion immunity through nested carrier capture, tracks its position and loses the King when the ship sinks', () => {
+  it('retains nested passengers’ owners through carrier capture, tracks the King and loses it when the ship sinks', () => {
     const s = game(), k = king(s, 1);
     s.terrain = s.terrain.map(() => 0); s.elevation.fill(0);
     for (let y = 30; y < 50; y++) for (let x = 40; x < 60; x++) s.terrain[y * s.width + x] = 1;
@@ -104,9 +104,9 @@ describe('King survival and temporary Treason', () => {
     s.entities = s.entities.filter(e => e.id !== k.id && e.id !== tower.id);
     const monk = spawn(s, 'monk', 2, 36.5, 40.5);
     order(s, monk, ship); for (let i = 0; i < 500 && ship.owner !== 2; i++) stepGame(s);
-    expect(ship.owner).toBe(2); expect(tower.owner).toBe(2); expect(k.owner).toBe(1);
-    expect(s.players[1].population).toBe(12); // ten villagers, scout, King still aboard
-    expect(s.players[2].population).toBe(15); // original twelve + monk + captured ship/tower
+    expect(ship.owner).toBe(2); expect(tower.owner).toBe(1); expect(k.owner).toBe(1);
+    expect(s.players[1].population).toBe(13); // ten villagers, scout, King and tower still aboard
+    expect(s.players[2].population).toBe(14); // original twelve + monk + captured ship
     expect(livingKings(s).find(e => e.id === k.id)?.position).toEqual(ship.position);
     s.players[2].gold = 800;
     expect(applyCommand(s, { kind: 'treason', player: 2, castleId: castle(s, 2).id }).ok).toBe(true);

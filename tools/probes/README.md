@@ -10,6 +10,36 @@ Run them from the repo root: `npx tsx tools/probes/snapshot.ts`.
 
 ## Maintained issue-acceptance checks
 
+- **`land_blend_smoke.mts`** — #116's eight native families through production
+  geometry/materials:6200 shape samples,50 two-way crossing-policy samples,
+  450 grown/construction farm samples, partial native-family fallback and
+  state immutability. Source-alpha errors are measured in linear-sRGB. Saves
+  `.local/land116-crossings.png` as a real-texture overview; this is not a
+  matched DE capture. Pair with `shore_blend_smoke.mts` for the actual water IDs.
+
+**Hardware block-compression evaluation (#163):**
+`uv run --locked python tools/probes/block_compression_fixture.py`, then
+`node tools/probes/block_compression_desktop.mjs` from WSL. A private server and
+isolated native Windows Brave profiles measure untouched source BC1/BC4 versus
+PNG render readback and actual OS GPU-process memory counters. Artifacts stay
+under `.local/probes/bc163-*`. The initial RTX4060 result found memory savings
+but pixel differences. #256 subsequently corrected RGB565 endpoint promotion
+and established that legacy BC interpolation permits vendor variation. Native
+compressed loading is still pending; see `docs/block-compression-evaluation.md`
+and `docs/block-decode-contract.md` rather than treating zero-PNG-difference as
+a universal hardware contract.
+
+**Decode reconciliation (#256):** add `--synthetic` to the fixture command, then
+run the desktop script with `BC_PROBE_MODE=decode BC_PROBE_READBACK=1`. This skips
+the allocation experiment and captures float readbacks. Run
+`uv run --locked python tools/probes/block_decode_analysis.py` to check the
+Direct3D bounds/exact endpoints and compare independent Pillow decoding.
+`block_decode_atlas.py` checks regenerated published PNG crops against source
+frames after the full import. `dxbc_disassemble.ps1` uses Windows' installed
+disassembler on owned `.so` shader resources only. See
+`docs/block-decode-contract.md` for the contract and the distinction between
+the corrected endpoint bug and permitted hardware interpolation differences.
+
 These scripts live directly under `tools/` and start private Vite/browser
 fixtures. Run `npx tsx tools/<name>.mts`; they supplement the gate's general
 browser smoke and are maintained regression tools.
@@ -111,6 +141,9 @@ browser smoke and are maintained regression tools.
   overflow/exact-fit right-clicks and cursors, recursive20/20 HUD, a converted
   carrier's stored capacity, intact nested payload and reload hash. Also run
   with `OPEN_FALLBACK=1`. Private coastal fixture, no shared-match mutation.
+- **`conversion_cargo_smoke.mts`** — #178's public boarding/conversion fixture,
+  captured-ram occupancy HUD, JSON reload and real Ungarrison click releasing
+  the enemy passenger under its original owner. Run with `OPEN_FALLBACK=1` too.
 - **`farm_occupancy_smoke.mts`** — #82/#156's real group right-click assigns one
   farmer. `ENEMY_FARM=1` exercises abandoned-farm capture: owned gather cursor,
   no hover/remote capture, preserved HP, new-owner food banking and reload.

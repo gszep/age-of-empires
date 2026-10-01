@@ -189,7 +189,7 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
           const texture = slot && assets?.textures.get(slot.image);
           if (!texture) continue;
           const mode = blendModeFor(blendType(here), blendType(there));
-          const native = (isOpenWater(here) || isOpenWater(there)) && !!blends.native?.modes[mode];
+          const native = !!blends.native?.modes[mode];
           const maskSheet = native ? blends.native! : blends;
           const gated = masked(here, there);
           const key = `${there}:${mode}:${native ? 'native' : 'classic'}:${back ? 'back' : gated ? 'masked' : 'over'}`;
@@ -448,6 +448,7 @@ const FARM_SLOTS = new Set(['farm', 'farm-construction']);
 export function createTerrainPatch(
   assets: ContentAssets | undefined, slot: string, half: number,
   at: { x: number; y: number } = { x: 0, y: 0 },
+  state?: ReadonlyGameState,
 ): THREE.Mesh | undefined {
   const terrain = assets?.terrain?.[slot];
   const texture = terrain && assets?.textures.get(terrain.image);
@@ -457,6 +458,9 @@ export function createTerrainPatch(
   const positions: number[] = [];
   const uvs: number[] = [];
   const uv1s: number[] = [];
+  const materials: THREE.MeshBasicMaterial[] = [];
+  const materialIds = new Map<number, number>();
+  const groups: { start: number; count: number; materialIndex: number }[] = [];
   const tiles = Math.max(1, Math.round(half * 2));
   // A farm out-ranks the ground it sits in (the DAT gives it 186 against
   // grass's 111), so in the reference it bleeds outward through the same
@@ -467,21 +471,51 @@ export function createTerrainPatch(
   const blends = assets?.blends;
   const ring = blends ? 1 : 0;
   const solidColumn = blends?.solid ?? 0;
-  const mu = (column: number, t: number): number => blends ? maskU(blends, column, t) : t;
+  const byId = new Map(Object.values(assets?.terrain ?? {}).map(t => [t.terrainId, t]));
+  const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < tiles && y < tiles;
   for (let y = -ring; y < tiles + ring; y++) {
     for (let x = -ring; x < tiles + ring; x++) {
-      const outside = x < 0 || y < 0 || x >= tiles || y >= tiles;
-      // A ring tile fades toward whichever side of it the farm lies on; a
-      // diagonal one touches the farm only at a corner and is left out.
+      const outside = !inside(x, y);
+      const tx = Math.floor(at.x + x), ty = Math.floor(at.y + y);
+      if (state && (tx < 0 || ty < 0 || tx >= state.width || ty >= state.height)) continue;
+      const receiver = state ? byId.get(state.terrain[ty * state.width + tx]) : undefined;
+      // DAT blendType is a terrain category, not a mask family. In particular
+      // farm(1) on grass(0) uses family3, never watershore(1).
+      const mode = blendModeFor(receiver?.blendType ?? assets?.terrain.ground?.blendType ?? 0, terrain.blendType);
+      const native = !!blends?.native?.modes[mode];
+      const sheet = native ? blends!.native! : blends;
+      const mu = (column: number, t: number): number => sheet ? maskU(sheet, column, t) : t;
+      // Native windows also cover the four diagonal corner neighbours. Old
+      // imports retain their historical side-only ring and diamond UVs.
       let column = solidColumn;
       if (outside) {
-        const towards = x < 0 ? '+x' : x >= tiles ? '-x' : y < 0 ? '+y' : '-y';
-        const offAxis = (x < 0 || x >= tiles) && (y < 0 || y >= tiles);
-        const variants = blends?.edges[towards];
-        if (offAxis || !variants?.length) continue;
-        const hash = (Math.imul(x + 97, 73_856_093) ^ Math.imul(y + 131, 19_349_663)) >>> 0;
-        column = variants[hash % variants.length];
+        if (native) {
+          const bits = blendInfluences(0, id => id, (dx, dy) => inside(x + dx, y + dy) ? 1 : 0).get(1) ?? 0;
+          column = blendMasksFor(bits, tx, ty)[0];
+          if (column === undefined) continue;
+        } else {
+          const towards = x < 0 ? '+x' : x >= tiles ? '-x' : y < 0 ? '+y' : '-y';
+          const offAxis = (x < 0 || x >= tiles) && (y < 0 || y >= tiles);
+          const variants = blends?.edges[towards];
+          if (offAxis || !variants?.length) continue;
+          const hash = (Math.imul(x + 97, 73_856_093) ^ Math.imul(y + 131, 19_349_663)) >>> 0;
+          column = variants[hash % variants.length];
+        }
       }
+      let materialIndex = materialIds.get(mode);
+      if (materialIndex === undefined) {
+        materialIndex = materials.length;
+        materialIds.set(mode, materialIndex);
+        const maskTexture = native ? blends!.native!.modes[mode]
+          : blends && (blends.modes[mode] ?? blends.modes[0]);
+        materials.push(new THREE.MeshBasicMaterial({
+          ...(maskTexture ? { alphaMap: maskTexture } : {}), map: texture,
+          transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+        }));
+      }
+      const previous = groups.at(-1);
+      if (previous?.materialIndex === materialIndex) previous.count += 6;
+      else groups.push({ start: positions.length / 3, count: 6, materialIndex });
       // Position is patch-local (the mesh is placed at its north corner);
       // the texture coordinate is absolute, so neighbouring farms show
       // neighbouring ground rather than the same corner twice.
@@ -493,7 +527,9 @@ export function createTerrainPatch(
       // The mask's four points are the tile's four corners -- north, west,
       // south, east, since +x runs down-left; the texture is flipped on
       // load, so the north corner takes v = 1.
-      const mask: [number, number][] = [[0.5, 1], [0, 0.5], [0.5, 0], [1, 0.5]];
+      const mask: [number, number][] = native
+        ? [[0, 1], [1, 1], [1, 0], [0, 0]]
+        : [[0.5, 1], [0, 0.5], [0.5, 0], [1, 0.5]];
       const corners = [
         { p: worldToIso(x, y), ...uv(x, y) },
         { p: worldToIso(x + 1, y), ...uv(x + 1, y) },
@@ -509,19 +545,15 @@ export function createTerrainPatch(
       }
     }
   }
+  if (!materials.length) return undefined;
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setAttribute('uv1', new THREE.Float32BufferAttribute(uv1s, 2));
-  const maskTexture = blends && (blends.modes[terrain.blendType] ?? blends.modes[0]);
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-    ...(maskTexture ? { alphaMap: maskTexture } : {}),
-    // Double-sided like the ground: `worldToIso` winds a tile quad clockwise,
-    // so a ground-lying mesh left on the default FrontSide is back-face culled
-    // and simply never appears (issue #2 -- every farm was invisible).
-    map: texture, transparent: true, depthTest: false, depthWrite: false,
-    side: THREE.DoubleSide,
-  }));
+  // A patch can cross several terrain families. One mesh still owns its
+  // geometry/material lifetime; draw groups choose the receiver's family.
+  if (materials.length > 1) for (const group of groups) geometry.addGroup(group.start, group.count, group.materialIndex);
+  const mesh = new THREE.Mesh(geometry, materials.length === 1 ? materials[0] : materials);
   return mesh;
 }
 

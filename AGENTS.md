@@ -59,9 +59,16 @@ tools/gate.sh > .local/gate.log 2>&1
   on GREEN, stamped at gate start; any later non-Markdown edit invalidates it.
   Markdown-only commits need no gate. Commit only green work and push each
   commit; model-provider tests remain opt-in.
-- Vitest intentionally uses at most six workers, a 30 s test timeout, and a
+- The gate builds with `OPEN_CONTENT_ONLY=1`: do not copy the local owned asset
+  tree into `dist` on every verification. Import tests still read owned sources
+  and the private browser smoke still serves owned assets from `public/`.
+  Stage timings and separate `.local/gate-step-npm-*.log` files preserve evidence.
+  Gate children run at nice10 by default (`GATE_NICE=0` overrides).
+- Vitest defaults to at most two workers, a 30 s test timeout, and a
   macrotask yield after each test. CPU contention can otherwise report a worker
-  RPC failure after every assertion passed. Run the full gate on an idle host.
+  RPC failure after every assertion passed. `--maxWorkers=1` now overrides the
+  default; `VITEST_MAX_FORKS`/`VITEST_MAX_THREADS` still work for gate runs.
+  Run the full gate on an idle host.
 - For long jobs, keep a PID/file handle and wait with
   `tools/wait_for.sh pid|file|gone <target> [timeout]`; do not use `pgrep -f`,
   `pkill -f`, bare `sleep`, or sleep loops. After starting or killing work,

@@ -81,7 +81,9 @@ assets. Selection carries both identities through solo/shared restarts and saves
 Full civilisation roster/effect coverage remains tracked work. Converted entities carry plain-data unit/building-rule
 snapshots consumed by `unitRulesForEntity` / `buildingRulesForEntity`; creation and player-level systems still
 resolve through the player's catalogue. Captured production buildings retain their work rate while new units use
-the recipient's catalogue. The inheritance split and queue/cargo policy are inferred, with
+the recipient's catalogue. Mobile cargo retains original owners and is ejectable
+only by the carrier owner (user-supplied rule, 2026-09-30). Research traverses nested
+cargo by each entity's owner. The remaining inheritance split and queue/building-cargo policy are inferred, with
 remaining evidence gaps in `docs/civilization-coverage.md` and `docs/ledger.md`.
 
 Rendering uses bounded pass-local sort keys (`view/render-order.ts`): ground,

@@ -66,9 +66,9 @@ export function unitRulesForEntity(state: ReadonlyGameState, entity: DeepReadonl
   } : rules;
 }
 
-/** Capture before changing ownership, including passengers. A second conversion
- * keeps the first snapshot, not either player's intervening upgrades. The
- * locked-unit / live-player split is inferred; see ledger #178. */
+/** Capture before changing ownership. A second conversion keeps the first
+ * snapshot. Mobile carriers retain their passengers and their original owners;
+ * building cargo still uses the inferred capture policy. See ledger #178. */
 export function inheritConvertedUnit(state: GameState, entity: Entity, owner: PlayerId): void {
   // A King's owned hero-mode immunity survives capture of its carrier too.
   if (isUnit(entity.kind) && unitRulesForEntity(state, entity).conversionImmune) return;
@@ -85,7 +85,9 @@ export function inheritConvertedUnit(state: GameState, entity: Entity, owner: Pl
     // Snapshot both forms, not the active form's temporary armour/sight view.
     entity.convertedRules = structuredClone(unitRulesFor(state, entity.owner, entity.kind));
   }
-  for (const passenger of entity.garrison ?? []) inheritConvertedUnit(state, passenger, owner);
+  if (isBuilding(entity.kind)) {
+    for (const passenger of entity.garrison ?? []) inheritConvertedUnit(state, passenger, owner);
+  }
   entity.owner = owner;
 }
 

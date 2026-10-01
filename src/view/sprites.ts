@@ -57,6 +57,7 @@ export interface EntityView {
   /** Farms draw as a terrain patch instead of a sprite. */
   patch?: THREE.Mesh;
   patchSlot?: string;
+  patchOrigin?: string;
   shadow: Piece;
   body: Piece;
   /** Contour drawn in the owner's colour while a building hides the unit. */
@@ -965,7 +966,11 @@ function updateFarmView(
   view: EntityView, assets: ContentAssets | undefined, state: ReadonlyGameState, entity: Entity,
 ): void {
   const slot = entity.buildProgress !== undefined ? 'farm-construction' : 'farm';
-  if (view.patchSlot !== slot) {
+  const at = { x: entity.position.x - entity.radius, y: entity.position.y - entity.radius };
+  const origin = `${at.x},${at.y}`;
+  // Placement previews move between receiving terrain families. Rebuild their
+  // patch at the new origin rather than retaining the previous location's UVs.
+  if (view.patchSlot !== slot || view.patchOrigin !== origin) {
     if (view.patch) {
       view.group.remove(view.patch);
       view.patch.geometry.dispose();
@@ -976,10 +981,9 @@ function updateFarmView(
     // The north corner in world tiles, so the patch samples its texture by
     // absolute position like the ground does and two farms side by side are
     // not the same picture twice.
-    view.patch = createTerrainPatch(assets, slot, entity.radius, {
-      x: entity.position.x - entity.radius, y: entity.position.y - entity.radius,
-    });
+    view.patch = createTerrainPatch(assets, slot, entity.radius, at, state);
     view.patchSlot = slot;
+    view.patchOrigin = origin;
     if (view.patch) view.group.add(view.patch);
   }
   if (!view.patch) return;

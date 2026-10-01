@@ -167,7 +167,7 @@ export interface BlendMasks {
   gutter: number;
   /** The column past the owned masks: the whole diamond, opaque. Ours. */
   solid: number;
-  /** DE square tile-axis windows for water families; absent in old imports. */
+  /** DE square tile-axis terrain-family windows; absent/partial in old imports. */
   native?: Pick<BlendMasks, 'tile' | 'gutter' | 'masksPerMode'> & {
     modes: Partial<Record<number, THREE.Texture>>;
   };
@@ -510,7 +510,10 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
         texture.magFilter = THREE.LinearFilter;
         texture.minFilter = THREE.LinearMipmapLinearFilter;
         texture.generateMipmaps = true;
-        texture.anisotropy = 16;
+        // TerrainBlend_ps binds g_MaskTexture through sBilinear, unlike the
+        // terrain pictures' sAnisotropic. Anisotropy here spreads the authored
+        // crossing mask and disagrees with its bilinear source samples (#116).
+        texture.anisotropy = 1;
         textures.set(mask, texture);
       }));
     }

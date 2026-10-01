@@ -40,10 +40,25 @@ PY
 record_run
 trap record_run EXIT
 skipped_note=""
+gate_seconds=$SECONDS
 for step in "npm test" "npm run build" "npm run test:import" "npm run debug:smoke"; do
+  step_seconds=$SECONDS
+  # The browser step reads owned assets from public/ through its private dev
+  # server. Copying that 19 GB tree into dist adds no validation. Build the
+  # deployable open bundle; owned import tests and browser coverage still run.
   echo "=== $step ==="
-  $step > "$GATE_LOG" 2>&1
+  if [ "$step" = "npm run build" ]; then
+    echo "OPEN_CONTENT_ONLY=1 (owned assets verified by import tests and browser)"
+    OPEN_CONTENT_ONLY=1 nice -n "${GATE_NICE:-10}" $step > "$GATE_LOG" 2>&1
+  else
+    nice -n "${GATE_NICE:-10}" $step > "$GATE_LOG" 2>&1
+  fi
   status=$?
+  # Preserve every stage's evidence, not only the last stage's output. Keep
+  # GATE_LOG itself for existing callers that inspect the current stage.
+  stage_log="${GATE_LOG%.log}-${step// /-}.log"
+  cp "$GATE_LOG" "$stage_log"
+  echo "elapsed $((SECONDS - step_seconds))s; output: $stage_log"
   tail -"${GATE_TAIL:-8}" "$GATE_LOG"
   if [ "$status" -ne 0 ]; then
     gate_status="failed: $step"
@@ -73,4 +88,4 @@ if [ -n "$skipped_note" ]; then
 fi
 touch -r .local/gate.started .local/gate.ok
 gate_status=green
-echo "GATE GREEN"
+echo "GATE GREEN ($((SECONDS - gate_seconds))s total)"

@@ -14,7 +14,7 @@ on2026-09-28; see [manual-audit.md](manual-audit.md) for page-level findings and
 explicit negative results for elevation multipliers and route-profit formulas.
 The source-reading task #60 is complete; the runtime questions below remain.
 
-The pending tooling/evidence follow-up passed the full one-worker gate on
+The tooling/evidence follow-up passed the full one-worker gate on
 2026-09-27 after the host became idle: **960 Vitest tests /73 files**, build,
 **130 Python/owned-content tests**, and real-browser debug smoke. Exit0 and
 `GATE GREEN` are recorded in `.local/shared-reference-audit-gate.log`. The two
@@ -46,6 +46,14 @@ relative to `depot_813781`, except widget UI in `depot_813782/widgetui`.
   `xs/xs.txt` contains only its filename. RTF topic search found no rule answer.
 
 ## Results and remaining capture questions
+
+The native acceptance procedure for conversion is now in
+[conversion-reference-checklist.md](conversion-reference-checklist.md). It
+separates native measurements from regressions of the current implementation.
+The user's 2026-09-30 clarification resolves the mobile-cargo policy: retained
+passenger ownership, no automatic ejection, carrier-owner-only unloading. This
+is implemented and recorded as user-supplied evidence, not an agent-made native
+capture. Building cargo and the other exceptions remain unresolved.
 
 | Topic | Owned evidence now established | Still unresolved |
 |---|---|---|

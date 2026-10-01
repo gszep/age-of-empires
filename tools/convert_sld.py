@@ -24,10 +24,10 @@ def sha256(path: Path) -> str:
 def convert(source: Path, output: Path, expected_frames: int) -> dict[str, Any]:
     """Decode and pack an SLD's BC1 main graphics layer.
 
-    tools/sld_layers.py decodes it locally (verified byte-identical to the
-    previously used openage decoder over all 29,783 imported frames), which
-    also handles files whose outline branch crashes openage, such as the
-    stable.
+    tools/sld_layers.py decodes it locally and handles files whose outline
+    branch crashed the previous decoder, such as the stable. #256 corrects
+    RGB565 endpoint promotion; historical openage byte identity is no longer
+    the colour contract (see docs/block-decode-contract.md).
     """
     from sld_layers import decode_colors, pack_color_atlas
 

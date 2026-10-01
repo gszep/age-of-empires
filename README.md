@@ -170,7 +170,8 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 
 ```bash
 npm test
-npm run build
+npm run build:public      # typecheck + bundle, without copying local owned assets
+npm run build             # asset-inclusive local bundle (can copy many GB)
 npm run import:aoe2       # local owned AoE2DE depots only
 npm run test:import       # live DAT/SLD/widgetui integration
 npm run match -- --seed 7 --p1 builtin --p2 idle --replay .local/match.json
@@ -179,6 +180,28 @@ npm run test:live-agent   # opt-in: one bounded call using existing machine auth
 ```
 
 Strategies may be `builtin`, `idle`, `cmd:<shell>`, `deadline-cmd:<shell>`, `ws:<url>`, or `mcp:<shell>`. JSONL subprocesses, WebSockets, and MCP tools all return the same versioned public commands consumed by the browser and simulation.
+
+### Verification without unnecessary machine load
+
+During iteration, run the relevant test file/name and `npm run build:public`.
+For a checkpoint, run the complete gate once the code changes are ready:
+
+```bash
+npx vitest run src/sim/naval.test.ts --maxWorkers=1
+tools/gate.sh > .local/gate.log 2>&1
+```
+
+Vitest defaults to two workers; `--maxWorkers=1` lowers it for focused runs.
+For a one-worker full gate, prefix the command with
+`VITEST_MAX_FORKS=1 VITEST_MAX_THREADS=1`. Gate children run at lower scheduling
+priority (nice10; `GATE_NICE=0` overrides). This yields to interactive work but
+does not impose a hard CPU or memory limit.
+
+The gate runs every test, the public bundle build, owned-content import tests,
+and the private real-browser smoke. Only the build omits copying owned assets;
+import tests and browser checks still read them. `.local/gate.log` reports stage
+times and names the separate stage logs. The ordinary `npm run build` remains
+available when an asset-inclusive local bundle is actually needed.
 
 ## Two-machine shared play
 

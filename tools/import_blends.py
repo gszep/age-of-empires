@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Import classic blendomatic masks and DE's square water-family windows.
+"""Import classic blendomatic masks and DE's square terrain-family windows.
 
-DE's waterwater/watershore/shallowswater PNGs are sampled in tile-axis space.
+DE's land/farm/road/snow/ice/water PNGs are sampled in tile-axis space.
 Their inferred window layout is recorded by `de_masks`; the classic masks
-remain published for land transitions, farms and older-import compatibility.
+remain published for older-import compatibility and unmapped modes.
 
 Terrain-to-terrain edges in the reference are not hard tile boundaries: where
 two terrains meet, the higher-priority one is drawn over its neighbour through
@@ -66,7 +66,12 @@ GUTTER = 2
 NEIGHBOURS = ("+x", "+y", "-x", "-y")
 
 # DE's square blend families, using the existing engine family indices.
-DE_FAMILIES = {0: "waterwater", 1: "watershore", 7: "shallowswater"}
+DE_FAMILIES = {
+    0: "waterwater", 1: "watershore", 2: "landland", 3: "farmland",
+    4: "snowland", 5: "icewater", 6: "roadland", 7: "shallowswater",
+}
+# herbwatershore/reserved have no established consumer in the current pair
+# table. Do not guess extra indices from their position in a directory listing.
 DE_TILE = 64
 
 
@@ -306,7 +311,7 @@ def main() -> None:
     native, source_hashes = publish_de_masks(args.de_blends, args.out)
     manifest["blends"]["native"] = native
     manifest.setdefault("source", {}).setdefault("sha256", {}).update(source_hashes)
-    print(f"{len(native['modes'])} DE water families x 31 square windows -> {args.out / 'blends'}")
+    print(f"{len(native['modes'])} DE terrain families x 31 square windows -> {args.out / 'blends'}")
     manifest.setdefault("source", {}).setdefault("sha256", {})["blendomatic"] = hashlib.sha256(
         args.blendomatic.read_bytes()).hexdigest()
     manifest_path.write_text(json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n")

@@ -112,13 +112,16 @@ with all 1,984 cached sprite atlases reused. No timeouts were widened.
 
 **Conversion uses the documented inferred policy (#178).** It snapshots donor
 unit-local rules, retains wounds and
-excludes captures/passengers from future research and promotions, including after
+excludes converted entities from future research and promotions, including after
 reconversion. Synthetic public-command outcomes and owned Loom regressions cover
 the implementation; JSON continuation/replay preserve the snapshot. The boundary
 between frozen unit attributes and live recipient economic/player/projectile
-systems is explicitly inferred in `ledger.md`. Passenger, reconversion and
+systems is explicitly inferred in `ledger.md`. Building-cargo, reconversion and
 economic/projectile exception evidence remains open. The user authorized the
-implementation work, not this exact inheritance policy. Tests verify the chosen
+implementation work, not that entire inheritance policy. The user's 2026-09-30
+mobile-cargo rule is now implemented: passengers stay aboard under their original
+owners and only the carrier owner can eject them; original-owner research still
+reaches those unconverted passengers, including nested cargo. Tests verify the chosen
 implementation and do not establish patch-matched DE parity.
 
 The #177/#178 integration checkpoint passed **797 Vitest tests / 62 files**, the

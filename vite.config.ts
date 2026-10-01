@@ -79,11 +79,11 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, '.claude/**', '.local/**'],
     testTimeout: 30_000,
     setupFiles: ['./src/test-setup.ts'],
-    // The sim-heavy files each block their worker with seconds of pure CPU;
-    // running one per core thrashes every one of them until a single test can
-    // block past the worker RPC's 60s and the run is flagged failed with all
-    // tests green. Fewer workers, faster tests, live RPC.
-    poolOptions: { threads: { maxThreads: 6 }, forks: { maxForks: 6 } },
+    // Bound CPU/memory by default. Keep this at the top level so an explicit
+    // --maxWorkers=1 works; pool-specific maxima override that CLI option.
+    // VITEST_MAX_FORKS / VITEST_MAX_THREADS remain supported by Vitest.
+    minWorkers: 1,
+    maxWorkers: 2,
   },
   // Public deployments must never package locally converted Microsoft assets.
   // The viewer automatically uses its open fallback when this directory is absent.

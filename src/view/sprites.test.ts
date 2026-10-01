@@ -33,6 +33,34 @@ describe('surveyed elevation', () => {
   });
 });
 
+describe('farm placement terrain families (#116)', () => {
+  it('refreshes a moved preview’s blend family and disposes the old patch', () => {
+    const state = createGame(116), assets = fakeAssets();
+    state.width = state.height = 16;
+    state.terrain = Array.from({ length: 256 }, (_, i) => i % 16 >= 6 ? 24 : 0);
+    state.elevation = new Array(256).fill(0);
+    const slot = (terrainId: number, blendType: number, image: string) => ({ terrainId, blendType, image,
+      texture: image, name: image, blendPriority: 100, dimensions: [10,10] as [number,number], minimapColor: [0,0,0] as [number,number,number] });
+    assets.terrain = { ground: slot(0,0,'grass'), road: slot(24,5,'road'), farm: slot(7,1,'farm') };
+    assets.textures.set('farm',new THREE.Texture());
+    const farmland = new THREE.Texture(), road = new THREE.Texture();
+    assets.blends = { tile: [97,49], modes: [], edges: {}, masksPerMode: 32, gutter: 2, solid: 31,
+      native: { tile: [64,64], gutter: 2, masksPerMode: 32, modes: { 3: farmland, 6: road } } };
+    const entity: Entity = { id: state.nextId++, kind: 'farm', owner: 1, position: { x: 3.5, y: 3.5 },
+      hp: 100, maxHp: 100, radius: 1.5, activity: 'idle', order: { kind: 'idle' } };
+    const view = createEntityView(assets,entity);
+    updateEntityView(view,assets,state,entity,0);
+    const previous = view.patch!;
+    expect((previous.material as THREE.MeshBasicMaterial).alphaMap).toBe(farmland);
+    let disposed = false; previous.geometry.addEventListener('dispose',() => { disposed = true; });
+    entity.position.x = 8.5;
+    updateEntityView(view,assets,state,entity,0);
+    expect(disposed).toBe(true);
+    expect(view.patch).not.toBe(previous);
+    expect((view.patch!.material as THREE.MeshBasicMaterial).alphaMap).toBe(road);
+  });
+});
+
 describe('naval composite sprites (#97)', () => {
   it('draws offset hull/sails, grows layers on upgrade, and leaves no sails when an unanimated body is removed', () => {
     const state = createGame();

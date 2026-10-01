@@ -273,13 +273,17 @@ bonuses, required-count prerequisites, age-dependent costs, building work rates
 and eligible free farm research run from each profile's source-derived graph.
 The separate 53-base-era catalogue is an inventory, not a playability claim.
 Conversion snapshots
-resolved unit-local rules before ownership changes, including passengers, and
+resolved unit-local rules before ownership changes and
 excludes captures from later research/promotions. Public-command regressions
 measure wounds, damage/armour, movement, sight/range, reconversion, unloading,
 JSON continuation and replay; owned Loom cases check retained HP and actual
 damage before/after either player's research. The unit/player inheritance split
 remains inferred: #178 stays open for patch-matched DE evidence, especially
-economic/projectile exceptions and passenger/reconversion behaviour.
+economic/projectile exceptions and building-cargo/reconversion behaviour.
+The user's 2026-09-30 mobile-carrier clarification is implemented: passengers
+retain their owners and stay aboard through conversion and heavy nonlethal damage;
+only the carrier's owner can eject them. Original-owner research reaches nested
+cargo. Outcome/JSON tests and owned/fallback browser ejection clicks verify this.
 
 The reviewed added combat definitions include Throwing Axeman/Elite, Paladin,
 Hand Cannoneer, Bombard Cannon and Carrack; typed tree absence excludes foreign
@@ -399,9 +403,9 @@ the private browser. Briton Castle-Age TC wood discounts now apply through the
 bonus graph, independently of these construction and replacement limits.
 
 **View** (`src/view`, never mutates state): dimetric projection with AoE2's
-handedness (below); DAT terrain textures with classic land edge blending
-(#42), DE's overlay masks across land crossings (#116), and square DE
-water-family shape windows (#148); fog as a rounded per-tile contour with
+handedness (below); DAT terrain textures with DE shape windows across the eight
+mapped land/farm/road/snow/ice/water families (#116/#148), classic fallback
+(#42), and DE overlay masks across land crossings; fog as a rounded per-tile contour with
 `colorcorrection.json`'s levels; the reference's water shader read whole from its SM2 build (the
 height field, its drifts, the dome, the glint) over the tile in linear light;
 shore foam from the reference's own frame atlases, one to a shore tile (#89);
@@ -476,7 +480,18 @@ real browser: 31 configurations, 775 linear-sRGB alpha samples, maximum error
 0.002 against the imported artwork, and 603 samples visibly different from the
 classic path. State/terrain geometry is unchanged. Import tests verify source
 contour variation, edge/corner orientation, repeated byte-identical publication
-and the live manifest. Land/farm DE shape families remain #116.
+and the live manifest.
+
+#116 now extends square windows to landland/farmland/snowland/icewater/roadland.
+Farm patches use the receiving terrain pair's family (farm/grass is3, not the
+farm category1), include native corner neighbours, and refresh when previews
+move. Shader inspection also corrected overlay-mask anisotropy: the owned
+`sBilinear` binding is distinct from the terrain pictures' `sAnisotropic`.
+The eight-family browser probe passes6200 shape samples,50 existing-policy
+crossing samples and450 farm samples with maximum error below0.002 in
+linear-sRGB; partial old manifests and water regression pass. Source files,
+sampler failure/correction, screenshot and remaining native-window/crossing
+calibration are recorded in [terrain-blend-coverage.md](terrain-blend-coverage.md).
 
 **Agents and protocol**: versioned JSON contracts; browser, built-in AI,
 JSONL subprocess, deadline subprocess, WebSocket and MCP strategies share
@@ -627,8 +642,12 @@ selected sources pass. The two base monk files with zero-filled1MiB tails were
 recovered from a fresh pinned download: all569 base sources and a full isolated
 x1 import now pass, with no skipped masks and browser-verified idle/attack
 contours. Owner copy-back is complete, and the default depot also passes569/569
-(#119, `docs/source-integrity.md`). The pixel decoder
-and atlas fingerprint remain unchanged. Sprite pages load on first use rather than all
+(#119, `docs/source-integrity.md`). That source recovery did not change the
+decoder. The later #256 correction promotes RGB565 endpoints by bit replication,
+restoring full-range white/primaries; its atlas fingerprint invalidates prior art.
+The [decode contract](block-decode-contract.md) distinguishes that bug from
+allowed vendor interpolation and the existing quantized mask export.
+Sprite pages load on first use rather than all
 at start -- loading the whole pack up front took the machine down (WSL,
 15 GB) -- so a sprite may be absent
 until its page finishes loading. Unused pages now release both GPU
@@ -650,6 +669,17 @@ ten-ship idle/attack browser A/B, decoded sprite residency fell from
 3,881,869,760 to 874,990,464 bytes and GPU texture count from 128 to 65, with
 identical rendered sRGB PNGs and simulation hashes. `atlas_sharing_smoke.mts`
 recreates legacy URLs privately, so it also works with a fresh shared import.
+
+The #163 native RTX4060/WebGPU evaluation found an approximately8× reduction
+in measured dedicated GPU allocation for BC1 versus RGBA8, but direct source
+BC1/BC4 decoding changes sampled pixels relative to the current PNG pipeline.
+PNG remains the production path. #256 corrected a real endpoint-promotion bug
+and verified the remaining interpolation against the specification's vendor
+tolerances; zero equality to one PNG is not a universal hardware contract.
+The bounded source-block/readback experiment,
+actual OS memory counters and source hashes are in
+[block-compression-evaluation.md](block-compression-evaluation.md); #256 tracks
+the decode reconciliation needed before a source-preserving rollout.
 
 Retired entity/preview views dispose their own geometries and materials (#164),
 including ownership replacement, fog/view retirement, replay and presentation

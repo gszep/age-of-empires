@@ -205,33 +205,102 @@ describe('converted unit inheritance (#178)', () => {
     expect(rulesForPlayer(state, 2).units[kind].hp).toBe(80);
   });
 
-  it('locks boarded passengers too, persists through JSON saves and unloads with retained stats', () => {
+  it.each(['battering-ram', 'siege-tower'] as const)('%s keeps enemy passengers aboard under their original owner through JSON and ejection', kind => {
     const state = arena();
     research(state, 2, 'before');
-    const ram = spawn(state, 'battering-ram', 2), passenger = spawn(state, 'militia', 2, 61.3);
+    const ram = spawn(state, kind, 2), passenger = spawn(state, 'militia', 2, 61.3);
     command(state, { kind: 'order', player: 2, entityIds: [passenger.id], target: ram.position, targetId: ram.id });
     expect(passenger.order.kind).toBe('garrison');
     until(state, () => !!ram.garrison?.length);
     const monk = spawn(state, 'monk', 1, 58.5);
     convert(state, monk, ram);
-    expect(ram.garrison![0]).toMatchObject({ id: passenger.id, owner: 1, hp: 90, maxHp: 90 });
-    expect(state.players[1].population).toBe(3); // monk, ram, passenger
-    expect(state.players[2].population).toBe(0);
+    expect(ram.garrison![0]).toMatchObject({ id: passenger.id, owner: 2, hp: 90, maxHp: 90 });
+    expect(passenger.convertedRules).toBeUndefined();
+    expect(state.entities.some(e => e.id === passenger.id)).toBe(false);
+    expect(state.players[1].population).toBe(2); // monk and carrier only
+    expect(state.players[2].population).toBe(1);
     const resumed = JSON.parse(JSON.stringify(state)) as GameState;
     for (const match of [state, resumed]) {
       research(match, 1, 'after');
       research(match, 1, 'promote');
+      const held = match.entities.find(e => e.id === ram.id)!.garrison![0];
+      expect(held).toMatchObject({ kind: 'militia', owner: 2, hp: 90, maxHp: 90 });
+      expect(applyCommand(match, { kind: 'ungarrison', player: 2, buildingId: ram.id }).ok).toBe(false);
+      expect(applyCommand(match, { kind: 'order', player: 2, entityIds: [passenger.id], target: { x: 60, y: 60 } }).ok).toBe(false);
       command(match, { kind: 'ungarrison', player: 1, buildingId: ram.id });
       const released = match.entities.find(e => e.id === passenger.id)!;
-      expect(released).toMatchObject({ kind: 'militia', owner: 1, hp: 90, maxHp: 90 });
-      expect(released.convertedRules).toBeDefined();
+      expect(released).toMatchObject({ kind: 'militia', owner: 2, hp: 90, maxHp: 90 });
+      expect(released.convertedRules).toBeUndefined();
       const start = { ...released.position };
-      command(match, { kind: 'order', player: 1, entityIds: [released.id], target: { x: start.x, y: start.y + 10 } });
+      command(match, { kind: 'order', player: 2, entityIds: [released.id], target: { x: start.x, y: start.y + 10 } });
       run(match, 20);
       expect(Math.hypot(released.position.x - start.x, released.position.y - start.y)).toBeCloseTo(3, 1);
     }
     expect(JSON.parse(JSON.stringify(resumed))).toEqual(JSON.parse(JSON.stringify(state)));
     expect(synchronizationHash(resumed)).toBe(synchronizationHash(state));
+  });
+
+  it('retains nested transport cargo, original-owner research and unload authority through reconversion', () => {
+    const state = arena();
+    // A coastal fixture with a loaded ram; boarding itself is covered above
+    // and by transport-capacity.test.ts. Only the ship undergoes conversion.
+    for (let y = 48; y <= 54; y++) for (let x = 61; x <= 66; x++) state.terrain[y * state.width + x] = 1;
+    const ship = spawn(state, 'transport-ship', 2, 61.5), ram = spawn(state, 'battering-ram', 2, 60.5);
+    const passenger = spawn(state, 'militia', 2);
+    passenger.hp -= 7;
+    ram.garrison = [passenger]; ship.garrison = [ram];
+    state.entities = state.entities.filter(e => e.id !== ram.id && e.id !== passenger.id);
+    const monk = spawn(state, 'monk', 1, 58.5);
+    convert(state, monk, ship);
+    expect(ship.garrison![0].owner).toBe(2);
+    expect(ship.garrison![0].convertedRules).toBeUndefined();
+    expect(passenger).toMatchObject({ owner: 2, hp: 73, maxHp: 80 });
+    expect(passenger.convertedRules).toBeUndefined();
+    expect(state.players[1].population).toBe(2);
+    expect(state.players[2].population).toBe(2);
+    const resumed = JSON.parse(JSON.stringify(state)) as GameState;
+    for (const match of [state, resumed]) {
+      const carrier = match.entities.find(e => e.id === ship.id)!;
+      const held = carrier.garrison![0].garrison![0];
+      research(match, 1, 'after');
+      expect(held).toMatchObject({ hp: 73, maxHp: 80 });
+      research(match, 2, 'after');
+      expect(held).toMatchObject({ hp: 83, maxHp: 90 }); // wounds preserved, not frozen
+      research(match, 2, 'promote');
+      expect(held.kind).toBe('man-at-arms');
+      const otherMonk = spawn(match, 'monk', 2, 59.5, 52.5);
+      convert(match, otherMonk, carrier);
+      expect(carrier.garrison![0].owner).toBe(2);
+      expect(held.owner).toBe(2);
+      expect(held.convertedRules).toBeUndefined();
+      expect(applyCommand(match, { kind: 'ungarrison', player: 1, buildingId: ship.id }).ok).toBe(false);
+      command(match, { kind: 'ungarrison', player: 2, buildingId: ship.id });
+      const landed = match.entities.find(e => e.id === ram.id)!;
+      expect(landed).toBeDefined();
+      expect(landed.garrison![0].id).toBe(passenger.id);
+      command(match, { kind: 'ungarrison', player: 2, buildingId: ram.id });
+      expect(match.entities.find(e => e.id === passenger.id)).toMatchObject({ kind: 'man-at-arms', owner: 2 });
+    }
+    expect(synchronizationHash(resumed)).toBe(synchronizationHash(state));
+  });
+
+  it('does not eject passengers when a captured mobile carrier takes heavy nonlethal damage', () => {
+    const state = arena();
+    const ram = spawn(state, 'battering-ram', 2), passenger = spawn(state, 'militia', 2, 61.3);
+    command(state, { kind: 'order', player: 2, entityIds: [passenger.id], target: ram.position, targetId: ram.id });
+    until(state, () => !!ram.garrison?.length);
+    const monk = spawn(state, 'monk', 1, 58.5);
+    convert(state, monk, ram);
+    ram.hp = 16; // start at 20% HP; the public attack crosses below it
+    const attacker = spawn(state, 'villager', 2, ram.position.x + 0.8, ram.position.y);
+    command(state, { kind: 'order', player: 2, entityIds: [attacker.id], target: ram.position, targetId: ram.id });
+    until(state, () => ram.hp < 16);
+    expect(ram.hp).toBeGreaterThan(0);
+    expect(ram.garrison?.[0]).toMatchObject({ id: passenger.id, owner: 2 });
+    expect(state.entities.some(e => e.id === passenger.id)).toBe(false);
+    command(state, { kind: 'stop', player: 2, entityIds: [attacker.id] });
+    command(state, { kind: 'ungarrison', player: 1, buildingId: ram.id });
+    expect(state.entities.find(e => e.id === passenger.id)?.owner).toBe(2);
   });
 
   it('keeps player-level farm resources with the recipient while its captured builder retains unit health', () => {

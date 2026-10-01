@@ -1,20 +1,53 @@
-# Handoff — Teutons completion, 2026-09-30
+# Handoff — verified conversion/rendering checkpoint, 2026-10-01
 
 ## Current checkpoint
 
-- Branch `main`. **Stopped after Teutons**, per the user's revised instruction
-  on30 September. The original20-hour run started2026-09-28T20:57:14Z from60d37b4,
-  then hit a usage-limit interruption; its old deadline and through-Celts order
-  were superseded. The last verified pre-interruption tracker action was at
-  2026-09-29T00:14Z, not a measurement of the exact usage-limit event.
-- Franks completion is**a770809**, Goths**975d7dc**. Teutons#182 is this verified
-  completion checkpoint. Japanese and later civilisations were not started.
-- Latest full gate **GREEN**, `.local/teutons-gate-r4.log`, exit0:
-  **1105 Vitest tests /89 files**,7 inapplicable Gothic stone/tower cases skipped,
-  build, **159 Python/owned-content tests**, real-browser debug smoke. Dedicated
-  published Teuton acceptance passes (`.local/teutons-published-browser.log`).
-  One worker under host CPU contention, unchanged timeouts. Only Markdown
-  changed after gate start; no fixture clocks were widened.
+- Branch `main`. This checkpoint integrates the subsequent interactive work on
+  mobile cargo, gate performance, sprite decoding and land/farm blend support.
+  **Civilisation expansion remains stopped after Teutons**, per the user's
+  instruction. Franks completed at**a770809**, Goths at**975d7dc**, Teutons at
+  **c65bf0b**; Japanese and later civilisations were not started.
+- Most recent full gate **GREEN**, `.local/land116-gate.log`, exit0, **13m52s**:
+  **1117 Vitest tests /89 files**,7 inapplicable Gothic stone/tower cases skipped,
+  public bundle build, **164 Python/owned-content tests**, real-browser debug
+  smoke. This covers the mobile-cargo, gate-performance and block
+  decoding work and #116 blend changes, including regenerated owned content.
+  Two workers, nice10, unchanged test timeouts. Dedicated owned/fallback
+  `conversion_cargo_smoke.mts` checks passed too.
+- #116: all eight mapped DE blend families are imported and consumed, with
+  per-family classic fallback. Farm patches use the receiving terrain-pair
+  family, native corner neighbours and moving-preview invalidation. Owned
+  shader sampler bindings identified the overlay-mask anisotropy mismatch;
+  correcting16→1 lowered crossing error0.030495→0.001896 with the same limit.
+  Private browser checks pass6200 shapes,50 crossing-policy and450 farm samples,
+  plus775 water-regression samples; max error below0.002, linear-sRGB.
+  `.local/land116-crossings.png` is the overview. Full import reused all3162
+  sprite/layer groups. Exact native UV/window selection, texture-role/junction
+  ordering and matched-DE widths remain open on#116; see
+  [coverage](terrain-blend-coverage.md).
+- #163 evaluated on actual RTX4060 hardware through native Windows Brave/WebGPU:
+  about128MiB versus16MiB of measured dedicated allocation, but direct source
+  BC1/BC4 sampling differs from PNG. #256 separated an actual RGB565 endpoint
+  promotion bug (now corrected) from permitted vendor interpolation. White is
+  now255/255/255 instead of248/252/248. Float readbacks pass the D3D format bounds
+  and exact endpoint checks over2,121,728 texels. See the
+  [decode contract](block-decode-contract.md), which supersedes the first
+  evaluation's universal zero-PNG-difference assumption.
+- The RGB565 correction's full import completed (`.local/bc256-import.log`, exit0):3162
+  source/layer work groups, no cache reuse,11438 shared aliases. Manifest hash
+  was unchanged by that correction. The later blend import adds five family
+  entries/hashes. Published main/shadow/player-shade crops pass27 checks/300,032
+  pixels. The fleet browser's legacy/shared URLs retain identical sRGB pixels
+  and simulation hashes (`.local/bc256-render.log`). Production remains PNG;
+  compressed loader/atlas integration remains#163. #257 records avoidable global
+  cache invalidation of unchanged mask layers for a future import optimization.
+- Gate optimization: no redundant19GB owned-asset copy into `dist`; Vite took3s
+  versus11m38s in the previous checkpoint. Vitest now defaults to two workers
+  and honors `--maxWorkers=1`; the former pool-specific maxima overrode it.
+  Stage logs/timings are retained, and test-side DAT consumers share their
+  existing cached decode. The importer still independently parses the source.
+  Gate regression tests verify stage order, scoped build environment and
+  failure propagation at every stage. See `README.md` for lower-load commands.
 - Teuton additions include capacity/max-volley and healing-range consumers,
   captured-building rule retention, source conversion task permissions/ranges,
   both unique technologies, elite Teutonic Knights, Siege Onagers and Bombard
@@ -22,7 +55,10 @@
   JSON continuation and mixed replay. Standard transport holds now follow the
   owned20/20/25/35 age progression. [Coverage](civilization-coverage.md) records
   the test/benchmark receipts and corrected old fixture assumptions.
-- #178 retains conversion probability/queue/cargo/presentation calibration;
+- #178 mobile cargo now follows the user's rule: passengers stay aboard under
+  original owners; only the carrier owner can eject them, and heavy nonlethal
+  damage does not eject them. Original-owner research traverses nested cargo.
+  #178 retains economic/projectile/probability/queue/building-cargo/presentation calibration;
   #254 retains zero-time grant venue/ordering questions. Existing#252/#253 cover
   Gothic naval/population calibration. The ledger distinguishes the implementation
   from native runtime evidence; none of these inferences is attributed to human approval.
@@ -86,13 +122,23 @@ remain `.local/music115-soak-r2.log` and `.local/audio-run-soak-r2.log`.
 - **Transport capacity:** legacy TC Manual p8/PDF10 counts ram passengers too.
   The audit reproduced26 entities in a capacity20 ship. The fix preserves all
   old cargo, prevents more boarding when over capacity and uses the carrier's
-  current/stored capacity. Existing landing/conversion exceptions remain inferred.
+   current/stored capacity. Landing/building-cargo exceptions remain inferred;
+   mobile passenger ownership now follows the user's explicit rule above.
 - **Owned files:** the default monk sources are repaired. Owner-preserved
   `.sld.damaged` backups and ignored recovery evidence/worktree remain. No owned
   bytes, converted graphics, credentials, saves or `.local/` outputs belong in Git.
 
 ## Remaining work
 
+- **#258:** newly human-filed fish/forage-bush fog-memory bug is next in the
+  tracker queue. **#241:** preserve the managed match while resolving protocol
+  skew; the deployment constraints above still apply.
+- **#116/#163/#178:** native crossing/window calibration, compressed loader/atlas
+  integration and remaining conversion exceptions stay open. **#256:** the
+  endpoint bug and decoding contract are addressed; full compressed-renderer
+  acceptance belongs with#163. **#255:** gate builds avoid owned-asset copying;
+  asset-inclusive builds remain costly. **#257:** layer-aware atlas cache
+  invalidation is the next identified import optimization.
 - **#161:** implementation already existed and71 focused tests plus both browser
   profiles pass. Public references corroborate +.05 speed/+10 building attack per
   infantry; pinned native numeric calibration remains open. The issue was corrected
@@ -112,7 +158,7 @@ remain `.local/music115-soak-r2.log` and `.local/audio-run-soak-r2.log`.
 - Remaining RMS phase/quota/terrain-height fidelity is documented in the #56
   contract audit and tracked with #130/#134; this is not a full native generator.
 
-Britons/Franks/Goths/Teutons are the enabled profiles. Teuton art/UI/audio and rules were
-regenerated through the full pipeline (`.local/teutons-enabled-import.log`). Fresh
-installations need `npm run import:aoe2` for that content. Never overwrite the
-preserved managed match.
+Britons/Franks/Goths/Teutons are the enabled profiles. Latest complete owned
+publication: `.local/blend116-import.log` (includes the regenerated RGB565 art
+and all eight mapped blend families). Fresh installations use
+`npm run import:aoe2`. Never overwrite the preserved managed match.

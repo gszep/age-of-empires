@@ -125,8 +125,14 @@ def _decode_block(data: bytes, offset: int) -> list[int]:
 
 
 def _rgb565(value: int) -> tuple[int, int, int]:
-    """Expand one R5G6B5 colour to 8-bit channels by shifting."""
-    return ((value >> 11) << 3, ((value >> 5) & 0x3F) << 2, (value & 0x1F) << 3)
+    """Promote RGB565 endpoints by bit replication (D3D BC1, #256).
+
+    Shifting alone made white248/252/248 and violates the required exact1.0
+    endpoint. Interpolated colours retain our portable round-to-nearest policy;
+    legacy BC hardware interpolation is vendor-dependent, not bit-exact.
+    """
+    red, green, blue = value >> 11, (value >> 5) & 0x3F, value & 0x1F
+    return ((red << 3) | (red >> 2), (green << 2) | (green >> 4), (blue << 3) | (blue >> 2))
 
 
 def _bc1_lookup(color0: int, color1: int) -> list[tuple[int, int, int, int]]:

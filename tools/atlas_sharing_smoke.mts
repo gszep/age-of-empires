@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
 import { createServer } from 'vite';
 import puppeteer from 'puppeteer';
 import { createGame } from '../src/sim/game.ts';
@@ -46,9 +47,19 @@ for (const [index, kind] of (['cannon-galleon', 'fire-ship', 'galley', 'war-gall
   }
 }
 const { rules: ignored, ...saved } = state;
+// Multi-civilisation manifests exceed CDP's response-body message limit.
+// Serve the fixture privately over HTTP instead of base64 interception.
+const bodies = { legacy: gzipSync(JSON.stringify(legacy)), shared: gzipSync(JSON.stringify(manifest)) };
+let activeMode: keyof typeof bodies = 'legacy';
 const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
   name: 'atlas-sharing-probe', enforce: 'pre', configureServer(s) {
-    s.middlewares.use((req, _res, next) => {
+    s.middlewares.use((req, res, next) => {
+      if (req.url === '/imported/aoe2/manifest.json') {
+        res.setHeader('content-type', 'application/json');
+        res.setHeader('content-encoding', 'gzip');
+        res.end(bodies[activeMode]);
+        return;
+      }
       req.url = aliases.get(req.url ?? '') ?? req.url;
       next();
     });
@@ -63,7 +74,8 @@ await server.listen();
 const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
 const results: any[] = [];
 try {
-  for (const mode of ['legacy', 'shared']) {
+  for (const mode of ['legacy', 'shared'] as const) {
+    activeMode = mode;
     const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
       args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
     try {
@@ -72,10 +84,6 @@ try {
       const errors: string[] = [];
       page.on('pageerror', error => errors.push(String(error)));
       page.on('response', response => { if (response.url().endsWith('.png') && response.status() !== 200 && response.status() !== 304) errors.push(response.url()); });
-      await page.setRequestInterception(true);
-      page.on('request', req => { void (req.url().endsWith('/aoe2/manifest.json')
-        ? req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(mode === 'legacy' ? legacy : manifest) })
-        : req.continue()); });
       await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),
         { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });
       await page.goto('http://127.0.0.1:5236/?solo=1', { waitUntil: 'networkidle0', timeout: 120_000 });

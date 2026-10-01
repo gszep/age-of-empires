@@ -1352,9 +1352,10 @@ class ContentImportIntegrationTest(unittest.TestCase):
         armour class -- for every unit the spec names. A unit whose stats are
         quietly hand-written instead of imported shows up here as a mismatch.
         """
-        from genieutils.datfile import DatFile
-
-        dat = DatFile.parse(str(DAT))
+        # Reuse the test-side source decode, still independent of extract()'s
+        # own parse. Re-decoding this multi-civilisation DAT per assertion group
+        # adds CPU and another large object graph without a different check.
+        dat = _dat()
         spec = SPEC
         mismatches = []
         checked = 0

@@ -5,7 +5,8 @@ import os
 from pathlib import Path
 import unittest
 
-from datq import load_dat, DAT_RELATIVE
+from datq import DAT_RELATIVE
+from test_import_aoe2 import _dat
 from depot import depot_root
 from import_content import civilization_bonuses, technologies_from_tree, player_attribute_ids
 
@@ -17,7 +18,7 @@ class CivilizationBonusImportTest(unittest.TestCase):
         path = root / DAT_RELATIVE
         if not path.is_file():
             raise unittest.SkipTest("owned DAT unavailable")
-        cls.dat = load_dat()
+        cls.dat = _dat()
         spec = json.loads(Path(__file__).with_name("import-spec.json").read_text())
         ids = player_attribute_ids((path.parent.parent / "xs/Constants.xs").read_text())
         cls.profiles = {}

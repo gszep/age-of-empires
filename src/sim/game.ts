@@ -14,7 +14,7 @@ import {
 } from './nav';
 import { random01, seedFrom } from './random';
 import { buildingLimitReached, buildingRulesFor, buildingRulesForEntity, combine, inheritConvertedUnit, playerAttributeFor, populationLimitFor, trainingAt, unitRulesFor, unitRulesForEntity } from './rules';
-import { garrisonCount } from './garrison';
+import { entitiesWithGarrison, garrisonCount } from './garrison';
 import { civilizationRules, rulesForPlayer } from './civilizations';
 import { researchCostFor, researchSecondsFor, technologyFor, technologyRequirementsMet } from './technologies';
 import { applyMarketCommand } from './market';
@@ -2933,7 +2933,7 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
     const to = rulesForPlayer(state, owner).units[upgrade.to as UnitKind]
       ?? rulesForPlayer(state, owner).buildings[upgrade.to as BuildingKind];
     if (!to) continue;
-    for (const entity of state.entities.flatMap(e => [e, ...(e.garrison ?? [])])) {
+    for (const entity of entitiesWithGarrison(state.entities)) {
       if (entity.dead || entity.owner !== owner || entity.convertedRules) continue;
       if (entity.training?.kind === upgrade.from) entity.training.kind = upgrade.to as UnitKind;
       if (entity.trainingQueue) entity.trainingQueue = entity.trainingQueue.map(kind =>
@@ -2969,7 +2969,7 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
   // is next asked for, so nothing has to be walked.
   for (const effect of tech.effects) {
     if (effect.attribute !== 'hitPoints') continue;
-    for (const entity of state.entities.flatMap(e => [e, ...(e.garrison ?? [])])) {
+    for (const entity of entitiesWithGarrison(state.entities)) {
       if (entity.convertedRules || promotedIds.has(entity.id) || isBuilding(entity.kind)
         || entity.dead || entity.owner !== owner || entity.kind !== effect.unit) continue;
       const raised = combine(effect.operation, entity.maxHp, effect.amount);
