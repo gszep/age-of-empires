@@ -403,30 +403,19 @@ def main() -> None:
     # Decoding every frame of every animation takes about twenty minutes, and
     # adding one unit re-decodes the other seventy-odd sources for nothing. An
     # atlas is reused only when its source file, its frame count and the
-    # decoder's own fingerprint are all unchanged, so a decoder edit still
-    # regenerates the lot. `--fresh` skips the cache entirely.
+    # layer's decoder dependencies are unchanged. Canonical publication names
+    # do not define source identity. `--fresh` skips the cache entirely.
     cache_path = args.cache
     fingerprint = decoder_fingerprint()
-    previous: dict[str, Any] = {}
+    import inspect
+    from atlas_cache import AtlasCache, fingerprints
+    layer_fingerprints = fingerprints(Path(__file__).with_name("sld_layers.py").read_text(),
+        "\n".join(inspect.getsource(fn) for fn in (convert, convert_mask, page_path, save_pages)) + repr(MASK_LAYERS))
+    stored: dict[str, Any] = {}
     if cache_path.is_file() and not args.fresh:
         stored = json.loads(cache_path.read_text())
-        if stored.get("decoder") == fingerprint:
-            previous = stored.get("atlases", {})
+    reusable = AtlasCache(stored, layer_fingerprints, fingerprint, args.out)
     cache: dict[str, Any] = {}
-
-    def cached(identifier: str, job: dict[str, Any], image: str) -> dict[str, Any] | None:
-        entry = previous.get(identifier)
-        if not entry:
-            return None
-        if entry["source"] != source_hashes.get(job["source"]) or entry["expected"] != job["expected"]:
-            return None
-        if entry.get("image", image) != image:
-            return None
-        atlas = entry["atlas"]
-        if atlas and not all(page_path(args.out / image, page).is_file()
-                             for page in range(len(atlas.get("pages", [0])))):
-            return None
-        return atlas
 
     args.out.mkdir(parents=True, exist_ok=True)
     atlases: dict[str, dict[str, Any]] = {}
@@ -443,14 +432,15 @@ def main() -> None:
         for identifier, job, _alias_image, layer in group:
             suffix = "" if layer is None else f"-{layer}"
             cache[identifier] = {"source": source_hashes.get(job["source"]), "expected": job["expected"],
-                                 "image": image, "atlas": atlas}
+                                 "image": image, "atlas": atlas, "layer": layer or "main",
+                                 "decoder": layer_fingerprints[layer or "main"]}
             if atlas:
                 atlases.setdefault(job["key"], {})[f"{job['name']}{suffix}"] = published(atlas, image, job["scale"])
 
     groups = shared_atlas_jobs(jobs, source_hashes)
     for group in groups:
         identifier, job, image, _layer = group[0]
-        atlas = cached(identifier, job, image)
+        atlas = reusable.reuse(source_hashes.get(job["source"]), job["expected"], _layer or "main", image)
         if atlas is None:
             pending.append(group)
             continue
@@ -558,7 +548,7 @@ def main() -> None:
             manifest["blends"] = previous["blends"]
     manifest_path.write_text(json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n")
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    cache_path.write_text(json.dumps({"decoder": fingerprint, "atlases": cache},
+    cache_path.write_text(json.dumps({"schema": 2, "decoder": fingerprint, "atlases": cache},
                                      separators=(",", ":"), sort_keys=True) + "\n")
     print(f"{reused} atlases reused from {cache_path.name}")
     print(f"{sum(len(group) - 1 for group in groups)} identical source/layer aliases share atlas URLs")

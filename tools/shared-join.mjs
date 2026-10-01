@@ -13,8 +13,16 @@ const types = { '.png': 'image/png', '.json': 'application/json', '.ogg': 'audio
 const server = createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
   if (url.pathname === '/__match/config') {
-    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ enabled: true, player: 2, version: 1 }));
+    // The gateway selects a seat, not a wire protocol. Follow the same host
+    // that supplies frontend code, including future protocol upgrades.
+    fetch(new URL('/__match/config', host), { signal: AbortSignal.timeout(10_000) })
+      .then(async response => {
+        if (!response.ok) throw new Error(`Host config HTTP ${response.status}`);
+        const config = await response.json();
+        if (config.enabled !== true || !Number.isInteger(config.version)) throw new Error('Invalid host config');
+        res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+        res.end(JSON.stringify({ ...config, player: 2 }));
+      }).catch(error => { res.writeHead(502); res.end(`Ysgramor unavailable: ${error.message}`); });
     return;
   }
   if (url.pathname.startsWith('/imported/')) {
@@ -62,4 +70,4 @@ server.on('upgrade', (req, socket, head) => {
   socket.on('error', () => upstream.destroy());
   socket.on('close', () => upstream.destroy());
 });
-server.listen(port, '127.0.0.1', () => console.log(`Join Ysgramor at http://localhost:${port}/; artwork: ${root}`));
+server.listen(port, '127.0.0.1', () => console.log(`Join Ysgramor at http://localhost:${server.address().port}/; artwork: ${root}`));

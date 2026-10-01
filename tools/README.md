@@ -66,11 +66,17 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    Sheets convert in parallel (`--jobs`, four by default; a worker on a
    large x2 sheet holds two gigabytes). Decoding all of it still takes the
    better part of an hour, so an atlas is reused from
-   `.local/aoe2de/atlas-cache.json` when its source hash, its frame count and a
-   fingerprint of the decoder's own code are unchanged — adding one unit costs
-   under a minute, and editing the decoder still regenerates everything.
-   `--fresh` ignores the cache; a fresh run was verified to produce
-   byte-identical atlases and manifest. When only DAT terrain slots changed,
+   `.local/aoe2de/atlas-cache.json` when source hash, frame count and that layer's
+   decoder dependencies match. `atlas_cache.py` partitions BC1, BC4 and outline
+   dependencies; unknown/shared code and conversion/packing helpers remain
+   conservative. Source identity is independent of the canonical civilisation
+   namespace; reused pages are copied when the canonical URL changes. Unknown
+   schemas miss safely. An unchanged legacy whole-decoder fingerprint permits
+   explicit migration to schema2. Tests compare fresh/cached fixture decoding,
+   multipage relocation and dependency changes. The first complete schema2 import
+   reused4101 groups with byte-identical root/UI/audio manifests; no measured
+   decoder-change speedup is claimed. `--fresh` ignores the cache.
+   When only DAT terrain slots changed,
    `convert_sld.py --terrain-only` updates those DDS textures in an existing
    manifest without needlessly decoding every SLD first.
    With the Enhanced Graphics Pack downloaded (depot `1039811`, beside the

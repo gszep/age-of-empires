@@ -1,186 +1,110 @@
-# Handoff — civilisation and timeout checkpoints, 2026-10-01
+# Handoff — post-mortem follow-through, 2026-10-01
 
-## Current checkpoint
+## Work in this checkpoint
 
-- Branch `main`. Japanese#183 is **3c5aa04**, Chinese#184 is **38ec89f**, and
-  the verified timeout safeguard#261 is **678a7ba**; all are pushed.
-- OpenAI provider requests now have a ten-minute total deadline; diagnostic log
-  access is allowed with file-edit denial. The user restarted after the config
-  edit. [Timeout evidence](timeout-investigation.md) records the controlled
-  stream/long-tool tests and remaining uncertainty about the original network
-  trigger. Honour the user's wrap-up instruction around60% context, then compact
-  or start fresh; no extra automatic compaction threshold was imposed.
-- Most recent full gate **GREEN**, `.local/timeout261-gate.log`, exit0,
-  **17m28s**: **1186 Vitest tests /91 files**,7 inapplicable Gothic fortification
-  cases skipped, public bundle build, **172 Python/owned-content tests** and
-  real-browser debug smoke. Two workers, nice10, unchanged test timeouts.
-- Chinese has its full available roster, source-backed opening/economy/TC/farm
-  bonuses, Great Wall/Rocketry, Chu Ko Nu/elite, Fire Lancers/elite, Rocket
-  Carts/heavy, Dragon Ship, Lou Chuan and Siege Ram.27 dedicated sim cases,
-  4 owned import cases and the
-  **published enabled** private-browser acceptance pass
-  (`.local/chinese184-published-browser-r3.log`). Actual menu/restart/reload,
-  discounted payments, crops, fortification HP, firearm art/bullets/charge HUD,
-  ground-fire/Stop controls, regional upgrades and naval weapon/art changes are
-  verified. Native weapon cadence, research-order redirection and bonus rounding
-  remain#260; conversion remains#178. Japanese calibration#259 remains blocked
-  on native Windows-game access, as recorded on that issue.
-- Gate findings were source/fixture assumptions (fixed prices, three-villager
-  openings, projectile versus shooter dispersion, fixed Incendiaries targets and
-  an incomplete mock command). Final review also covered common command guards
-  and firearm-to-melee windup/animation coherence. The source-aware fixtures and
-  regressions pass; no timing limit was widened. The browser helper's multi-page
-  URL check now reads `pages[].image`, verified on Lou Chuan's second page.
-- The earlier interruption's partial worktree `.local/japanese183` is superseded
-  by this main-tree implementation. Its old branch is not the current checkpoint.
-  Dedicated private browser/import/gate processes have completed; the managed
-  shared host is preserved.
-- #116: all eight mapped DE blend families are imported and consumed, with
-  per-family classic fallback. Farm patches use the receiving terrain-pair
-  family, native corner neighbours and moving-preview invalidation. Owned
-  shader sampler bindings identified the overlay-mask anisotropy mismatch;
-  correcting16→1 lowered crossing error0.030495→0.001896 with the same limit.
-  Private browser checks pass6200 shapes,50 crossing-policy and450 farm samples,
-  plus775 water-regression samples; max error below0.002, linear-sRGB.
-  `.local/land116-crossings.png` is the overview. Full import reused all3162
-  sprite/layer groups. Exact native UV/window selection, texture-role/junction
-  ordering and matched-DE widths remain open on#116; see
-  [coverage](terrain-blend-coverage.md).
-- #163 evaluated on actual RTX4060 hardware through native Windows Brave/WebGPU:
-  about128MiB versus16MiB of measured dedicated allocation, but direct source
-  BC1/BC4 sampling differs from PNG. #256 separated an actual RGB565 endpoint
-  promotion bug (now corrected) from permitted vendor interpolation. White is
-  now255/255/255 instead of248/252/248. Float readbacks pass the D3D format bounds
-  and exact endpoint checks over2,121,728 texels. See the
-  [decode contract](block-decode-contract.md), which supersedes the first
-  evaluation's universal zero-PNG-difference assumption.
-- The RGB565 correction's full import completed (`.local/bc256-import.log`, exit0):3162
-  source/layer work groups, no cache reuse,11438 shared aliases. Manifest hash
-  was unchanged by that correction. The later blend import adds five family
-  entries/hashes. Published main/shadow/player-shade crops pass27 checks/300,032
-  pixels. The fleet browser's legacy/shared URLs retain identical sRGB pixels
-  and simulation hashes (`.local/bc256-render.log`). Production remains PNG;
-  compressed loader/atlas integration remains#163. #257 records avoidable global
-  cache invalidation of unchanged mask layers for a future import optimization.
-- Gate optimization: no redundant19GB owned-asset copy into `dist`; Vite took3s
-  versus11m38s in the previous checkpoint. Vitest now defaults to two workers
-  and honors `--maxWorkers=1`; the former pool-specific maxima overrode it.
-  Stage logs/timings are retained, and test-side DAT consumers share their
-  existing cached decode. The importer still independently parses the source.
-  Gate regression tests verify stage order, scoped build environment and
-  failure propagation at every stage. See `README.md` for lower-load commands.
-- Teuton additions include capacity/max-volley and healing-range consumers,
-  captured-building rule retention, source conversion task permissions/ranges,
-  both unique technologies, elite Teutonic Knights, Siege Onagers and Bombard
-  Towers. Tests cover actual payments, combat, garrisons, queue upgrades, capture,
-  JSON continuation and mixed replay. Standard transport holds now follow the
-  owned20/20/25/35 age progression. [Coverage](civilization-coverage.md) records
-  the test/benchmark receipts and corrected old fixture assumptions.
-- #178 mobile cargo now follows the user's rule: passengers stay aboard under
-  original owners; only the carrier owner can eject them, and heavy nonlethal
-  damage does not eject them. Original-owner research traverses nested cargo.
-  #178 retains economic/projectile/probability/queue/building-cargo/presentation calibration;
-  #254 retains zero-time grant venue/ordering questions. Existing#252/#253 cover
-  Gothic naval/population calibration. The ledger distinguishes the implementation
-  from native runtime evidence; none of these inferences is attributed to human approval.
+The owner requested the six corrective actions from the
+[post-mortem](reviews/2026-10-01.md) and authorised committing/pushing the verified
+checkpoint. No new civilisation or native gameplay policy was
+introduced. [Checkpoint workflow](checkpoint-workflow.md) documents the tools.
 
-## Play and deployment
+- **Shared deployment (#241):** the owner explicitly confirmed no current match
+  needed preservation. Passive inspection found the host already at protocol2
+  after its reboot. The actual remaining join failure was the gateway's hardcoded
+  version1, now replaced with the host's config and player2 override.
+- Ysgramor serves pinned code/JSON metadata from
+  `.local/releases/review-followthrough-final`; Artemis runs
+  `.local/shared-gateway-review241/tools/shared-join.mjs` with its unchanged
+  `.local/performance-runtime-bebb06e/public` base-art path. Both endpoint configs
+  report protocol2, both services are active with zero restarts, routes unchanged.
+  The final release includes private Vite-cache isolation. Its fingerprint is
+  `a90b773162af5fb34ce0a50b883c7eb81369b7efbeb7c414febbfaef5b676361`.
+  Private CLI startup checked all release hashes and matching host/frontend
+  version before installation (`.local/review-release-start.log`). No household
+  connections were present when switching; no checkpoint needed archiving.
+- Final read-only Artemis inventory found117 base-Briton entities and no extra
+  civilisation profiles in its retained asset manifest. #266 tracks a current
+  isolated base-art regeneration and actual remote asset acceptance. The wire
+  fix and private current-assets smoke do not establish complete six-civ art on
+  that older deployed import. Its existing files were preserved.
+- The private candidate's two-browser smoke passed actual train clicks, equal
+  state, selection-preserving resync, guest reload,1500+ ticks without unintended
+  resyncs, local guest art, and checkpoint restart/reconnect. Log:
+  `.local/review241-smoke-r3.log`. Earlier failures remain: r1 exposed the real
+  gateway mismatch; r2 exposed the old probe's detached-button click. The probe
+  now uses the same real locator click as maintained civilisation acceptance.
+- **Acceptance (#263):** registry/runner binds results to code and imported JSON,
+  exposes unmapped paths, and records fixture/assertion/clock scope notes.
+  Original #124 Dark-Age-start acceptance was restored as a separately named
+  opt-in case. It still fails to build a range by six minutes; the Feudal-start
+  component remains separate. This is not a newly passing AI acceptance claim.
+- **Active harness/supervision (#262):** auto-discovered OpenCode plugin invokes
+  existing wait/commit guards. Installed-CLI mock-provider smoke proves refusal
+  of prohibited waits and missing/stale gates plus a successful gated scratch
+  commit. Fresh-process preflight checks the evidence fingerprint and CLI version.
+  **Restart OpenCode to activate it in the user's session.**
+- External supervised runs have total and completed-tool-idle deadlines,
+  finite live-PID job leases, process-group termination and durable status. The
+  wrapper must launch a run; it does not supervise an already-running chat.
+  Tool completion is not proof of integrated feature progress or quota headroom.
+- **Integration:** one managed worktree under `.local/worktrees`, with a creation
+  lock and refusal to retire dirty/unmerged work. Existing .local test exclusions
+  remain. Unrelated old worktrees were preserved.
+- **Cache (#257):** per-layer fingerprints and source/frame/layer lookup survive
+  canonical namespace changes; all pages are copied to new canonical locations.
+  Unknown cache schemas/changed legacy fingerprints miss safely. A known,
+  unchanged whole-decoder legacy hash can migrate without unnecessary decoding.
+  Source integrity still runs before reuse.
+- Full import passed: all4101 groups reused; root/UI/audio manifest SHA256s are
+  byte-identical before/after (`.local/review257-import.log`, exit0). Dependency
+  mutation, cached-vs-clean fixture decode, multipage relocation and legacy tests
+  pass. No wall-time speedup is claimed without a controlled real workload.
+- **Docs (#264):** status pruned from970 lines to a current-scope summary; obsolete
+  Briton/Frank/scatter claims removed. Startup now states the actual scope of its
+  heuristic scan. A small explicit completion registry is checked against GitHub;
+  it does not certify arbitrary historical prose.
 
-- Solo desktop: <http://localhost:5173/?solo=1>
-- Tailnet solo: <https://ysgramor.tail6e864b.ts.net:5173/?solo=1>
-- Natural Islands opening: <http://localhost:5173/?solo=1&map=islands&seed=3>
-- **#241 remains blocked:** the managed host speaks protocol1 while current
-  clients expect protocol2. Preserve its live state and routes. Do not restart
-  or join it as a diagnostic substitute for a verified state-preserving migration.
-  See [shared-reference-audit.md](shared-reference-audit.md).
-- The managed service remains active after the host reboot, MainPID613 / Node1175, NRestarts0. Tests
-  use private Vite/browser instances and leave no private test service running.
-- Observation **v8**, shared wire **v2**, recordings/results **v2**, dev snapshots
-  **v3**. The nested `garrisoned` count is a correction to the existing private
-  owner field, not a new field or an enemy-information channel.
+## Final verification
 
-## Completed interactive work
+- **Full gate GREEN**, `.local/review-followthrough-gate-r2.log`, exit0, **16m42s**:
+  **1193 TypeScript tests/98 files**,8 explicit skips, build, **177 Python tests**
+  and real-browser debug smoke. No existing timeout was widened. The skips are
+  seven generic Gothic fortification cases unavailable in that profile plus the
+  explicit #124 opt-in scenario; Gothic rejection/non-spending tests run normally.
+- The first gate passed unit/build/import stages but timed out on browser startup.
+  An instrumented unchanged-code rerun passed, then the whole second gate passed.
+  The first remains failed evidence; root cause is unproven. #265 tracks missing
+  startup diagnostics. Do not describe this as a fixed renderer/cache regression.
+- Final shared browser receipt: `.local/acceptance/shared.json`, pass against
+  code/metadata fingerprint `927b246d02d0b5ac43580c3ffe5ee167bb12626ba7ee3d6b27f39fec67daf15c`;
+  log `.local/review263-shared.log`. The AI counterpart records status1/failure at
+  the same fingerprint (`.local/review263-ai.log`), not a hidden successful check.
+- Installed CLI auto-discovery smoke and unattended preflight pass. Evidence:
+  `.local/harness.ok.json`; current smoke directory
+  `.local/harness-probes/run-RW5o4c`. Existing live OpenCode still needs restart.
+- The second full gate itself ran under the external supervisor with40-minute
+  total/30-minute idle limits and exited0; durable state:
+  `.local/runs/review-gate-r2/status.json`. Short fixtures separately exercise
+  stuck/heartbeat processes, deadline termination and finite long-job leases.
+- Final process inspection found no private gate/import/browser jobs. Only the
+  intended managed shared service survives. Artemis's gateway remains active,
+  NRestarts0; both installed configs report v2 with the correct player seats.
+- #257's real decoder-change timing benchmark/full fresh owned re-decode remain
+  unmeasured. Cached-vs-clean fixture outputs and unchanged published manifests
+  are verified; no elapsed-time saving is asserted.
+- This checkpoint includes the implementation files, post-mortem and workflow
+  documents. Restart OpenCode after updating to activate the new safeguards.
 
-| Issue | Outcome | Main evidence |
-| --- | --- | --- |
-| #119 | Owner recovered clean pinned x1 monk files and copied them into the default depot. Both hashes verified,569/569 base sources pass, full isolated x1 import has no skipped masks, idle/attack contours pass. | [source-integrity.md](source-integrity.md), `.local/monk119-gate.log` |
-| #55 | Owned terrain-unit rows and seven non-blocking plant types imported; deterministic view-only placement, fog and foundation coverage. | `terrain_scatter_smoke.mts`, `.local/scatter55-gate.log`; density calibration #249 |
-| #250 | Fixed omitted owned plant shadows, matching body variant/scale/hotspot and owned shadow profile. Browser A/B isolates5885 darkened sRGB pixels. | `.local/scatter250-browser.log`, `.local/scatter250-gate.log`; full post-processing remains #149 |
-| #70 | Verified existing resource-feedback behaviour and closed stale body request. Owned/fallback real clicks show warnings without state mutation; population queue check passes. | `resource_feedback_smoke.mts`, `.local/issue70-*-browser*.log` |
-| #126 | Verified existing age HP/armour and deterministic continuation. Both browser profiles display wounded house733/750 →883/900 after real Castle Age research. | `.local/issue126-browser.log`,18 building tests plus owned replacement test |
-| #90 | Replaced ineffective array reassignment with live spacing masks. Five new regressions and before/after browser layout checks. | `.local/map90-gate-r2.log`, `map_spacing_smoke.mts` |
-| #156 | Explicit abandoned-farm capture on starting work; global order reservation, preserved crop/HP, new-owner income/reseed cost. Automatic gathering retains own-farm policy. | `.local/farm156-gate-r2.log`, `farm_occupancy_smoke.mts` with `ENEMY_FARM=1` |
-| #136 | User clarified AI sheep return to TC, not automatic discoverer-following. AI uses public moves and waits before live dinner selection. | `.local/herd136-gate.log`, `ai-herding.test.ts`, `herd_food_smoke.mts` |
-| #60 | Completed remaining English manual audit; page-level findings, hashes and legacy/current boundaries recorded. Found and filed #251. | [manual-audit.md](manual-audit.md),2 extraction tests |
-| #251 | Counts incoming and existing nested cargo; exact fits, arrival races, legacy saves, conversion capacity, unload/sinking/JSON and private observation coverage. Both browser modes verify clicks,20/20 HUD and reload. | `.local/transport251-{owned,fallback}-browser.log`,14 new outcome tests and latest full gate |
-| #142 | Recorded historical genie-rms reads/licence check/originality declaration from original traces, with explicit revision-pin limits. | [genie-rms-provenance.md](genie-rms-provenance.md) |
-| #56 | Owned guide is primary; land defaults corrected to8, terrain20 retained. Four regressions, twelve before/after map hash cases and six browser cases pass. | `mapgen-defaults.test.ts`, `.local/rms56-gate.log`, contract audit in `map-generation-design.md` |
+## Play and remaining product work
 
-The original 2026-09-27 audio/options/AI-fishing checkpoints are already pushed;
-their detailed sources and boundaries remain in `docs/status.md`,
-[audio-reference.md](audio-reference.md), [ai-fishing.md](ai-fishing.md) and the
-ledger. The27-track natural music cycle and39-minute five-map endurance receipts
-remain `.local/music115-soak-r2.log` and `.local/audio-run-soak-r2.log`.
-
-## Important measurements and boundaries
-
-- **AI herding:** canonical player2 AI versus passive player1,240 game seconds,
-  current generator and main-loop decision cadence, seeds1/7/42. Owned positive
-  food deposits120/130/90 →200/310/200; fallback120/120/80 →180/240/190. Stockpiles
-  after spending are a different metric. `herding:false` reproduces the old
-  baseline exactly; `.local/herd136-{baseline,control,after}.log`. The2.5-tile
-  staging tolerance is chosen strategy. Simulator/human sheep control is unchanged.
-- **Spacing:** Arabia/Islands generated layouts change; checked Black Forest
-  seeds3/7 keep identical hashes. Existing saved boards are not regenerated;
-  older seed-based replays may diverge. The failed first gate exposed a navigation
-  fixture targeting a new pond; the fixture is now explicitly dry without
-  weakening arrival/collision assertions or time limits.
-- **Farm capture:** the first gate exposed unintended automatic mill capture.
-  The implementation was corrected to preserve that existing regression; only
-  an explicit foreign target permits capture. Source permission is owned26149;
-  precise capture/reservation/retained-stat semantics are documented integration
-  choices, not a native runtime calibration.
-- **Transport capacity:** legacy TC Manual p8/PDF10 counts ram passengers too.
-  The audit reproduced26 entities in a capacity20 ship. The fix preserves all
-  old cargo, prevents more boarding when over capacity and uses the carrier's
-   current/stored capacity. Landing/building-cargo exceptions remain inferred;
-   mobile passenger ownership now follows the user's explicit rule above.
-- **Owned files:** the default monk sources are repaired. Owner-preserved
-  `.sld.damaged` backups and ignored recovery evidence/worktree remain. No owned
-  bytes, converted graphics, credentials, saves or `.local/` outputs belong in Git.
-
-## Remaining work
-
-- **#258:** newly human-filed fish/forage-bush fog-memory bug is next in the
-  tracker queue. **#241:** preserve the managed match while resolving protocol
-  skew; the deployment constraints above still apply.
-- **#116/#163/#178:** native crossing/window calibration, compressed loader/atlas
-  integration and remaining conversion exceptions stay open. **#256:** the
-  endpoint bug and decoding contract are addressed; full compressed-renderer
-  acceptance belongs with#163. **#255:** gate builds avoid owned-asset copying;
-  asset-inclusive builds remain costly. **#257:** layer-aware atlas cache
-  invalidation is the next identified import optimization.
-- **#161:** implementation already existed and71 focused tests plus both browser
-  profiles pass. Public references corroborate +.05 speed/+10 building attack per
-  infantry; pinned native numeric calibration remains open. The issue was corrected
-  rather than falsely closed. See [specialist contract](civ-specialists-integration.md).
-- **#113/#149/#249:** terrain/water fidelity, native compositor/grade/bloom/AA,
-  and exact terrain-plant density/masked placement remain unverified.
-- **#110:** wonder countdown is approved; exact map-size timer defaults and
-  clock units remain unresolved. Settings are implemented, not a blocker now.
-- **#243/#244:** remaining audio mixing/spatial calibration and missing complete
-  MUSIC17/27/30 streams. **#246:** battlefield colour-blind transform remains;
-  interface palettes work. A Windows inspection script was denied by execution
-  policy; no bypass was attempted.
-- **#54/#131/#178/#128/#139:** the manual audit attached concrete source findings
-  for remaining command/garrison edges, siege auto-fire friendly risk, conversion,
-  trade and scoring. Legacy prose does not supply exact elevation multipliers or
-  a trade-profit formula and does not override current DAT values.
-- Remaining RMS phase/quota/terrain-height fidelity is documented in the #56
-  contract audit and tracked with #130/#134; this is not a full native generator.
-
-Britons/Franks/Goths/Teutons/Japanese/Chinese are the enabled profiles. Latest complete
-owned publication: `.local/chinese184-enabled-import.log` (4101 cached atlas
-groups, including the existing RGB565 correction and eight blend families).
-Fresh installations use
-`npm run import:aoe2`. Never overwrite the preserved managed match.
+- Solo: <http://localhost:5173/?solo=1>.
+- Shared host: <http://localhost:5173/>; Artemis gateway:<http://localhost:5174/>.
+- Tailnet:<https://ysgramor.tail6e864b.ts.net:5173/>.
+- Six owned profiles remain enabled: Britons, Franks, Goths, Teutons, Japanese,
+  Chinese. General native calibration is not implied by scoped completion.
+- Next human-filed bug:#258 fish/forage art in fog. Native terrain/compositor,
+  conversion exceptions, audio/missing streams, zero-time research, population,
+  Japanese/Chinese calibration and wonder countdown remain in the tracker.
+  This process task did not resolve them.
+- Source-changing imports or npm installs must not mutate shared art/dependencies
+  during an active match. Releases pin code and JSON, not all bulk asset bytes.
+  Incompatible checkpoints still fail with78; no generic migration is supplied.

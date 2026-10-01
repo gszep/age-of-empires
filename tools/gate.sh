@@ -84,7 +84,7 @@ for step in "npm test" "npm run build" "npm run test:import" "npm run debug:smok
   esac
 done
 if [ -n "$skipped_note" ]; then
-  echo "skipped (not run, not passed):$skipped_note -- with the owned content only the opt-in live-agent test should skip"
+  echo "skipped (not run, not passed):$skipped_note -- inspect stage logs for inapplicable profiles and explicit known-gap/opt-in acceptance"
 fi
 touch -r .local/gate.started .local/gate.ok
 gate_status=green

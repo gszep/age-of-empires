@@ -8,6 +8,12 @@ in `git log` and `docs/status.md`.
 
 ## Before the run
 
+Use the [checkpoint workflow](checkpoint-workflow.md) for feature receipts,
+actual-harness probes, externally supervised deadlines and durable worktrees.
+Launch unattended work through the supervisor; a deadline in a prompt cannot
+interrupt a provider request that never completes. Restart OpenCode after plugin
+changes and verify the installed-CLI mock-provider smoke before promising readiness.
+
 1. `git pull`, then `tools/session_start.sh`. It says whether the manifest is
    stale (re-run `tools/import_aoe2.sh` if so — about three minutes with a
    warm atlas cache, an hour if a decoder file changed), what is running, and

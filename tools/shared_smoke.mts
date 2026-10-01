@@ -102,7 +102,7 @@ try {
     assert(tc.screen.x > 0 && tc.screen.x < 1280, `player ${player} camera opens at own town`);
     await page.mouse.click(tc.screen.x, tc.screen.y);
     await page.waitForSelector('.command-button[data-command="train-villager"]:not([disabled])');
-    await page.click('.command-button[data-command="train-villager"]');
+    await page.locator('.command-button[data-command="train-villager"]:not([disabled])').click();
   }
   const food = [sa.players['1'].food, sa.players['2'].food];
   await a.bringToFront();

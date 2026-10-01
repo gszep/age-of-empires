@@ -118,7 +118,7 @@ disassembled.
 
 ## Deployment and deferred dependencies
 
-Passive inspection: live `GET /__match/config` returns **version1**, while
+Historical passive inspection (2026-09-26): live `GET /__match/config` returned **version1**, while
 `GET /src/shared/protocol.ts` serves **SHARED_VERSION=2**. The service uses the
 mutable main checkout; server imports remain in memory while browser modules
 come from disk. Thus a reload is already incompatible, not a deployment fix.
@@ -134,8 +134,17 @@ guard without demonstrating simulation compatibility. A safe upgrade needs
 the old rules/runtime retained, a read-only state export, private continuation
 and two-client recovery verification, and a coordinated switch preserving
 state/queues/AI takeover/settings. No restart, join, reset, checkpoint edit or
-Tailscale change was performed. Do not use the general restart instruction
-for this version-skewed host.
+Tailscale change was performed during that audit. Its preservation requirement
+applied to that then-unexported match.
+
+**Superseded operational state, 2026-10-01:** the owner explicitly confirmed no
+current match needed preservation. The rebooted host already reported version2;
+the private two-browser check found a separate hardcoded version1 in the gateway.
+That is corrected, the host/frontend now use a pinned release, and both installed
+endpoint configs report version2 with the correct seats. Private evolved-match,
+two-client and restart recovery checks pass. See [shared play](shared-play.md)
+and [handoff](handoff.md) for the release/evidence. This fresh deployment does not
+supply or prove generic v1→v2 migration of an old match.
 
 Unlocked diplomacy/cooperative victory remain deferred. They depend on
 authoritative relations and asymmetric/mutual alliance semantics, targeting,

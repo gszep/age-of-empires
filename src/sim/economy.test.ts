@@ -2794,14 +2794,15 @@ describe('the built-in strategy', () => {
     expect(state.players[1].age).toBeGreaterThanOrEqual(1);
   }, 30_000);
 
-  it('builds what the new age opened rather than fighting on with militia', async () => {
+  for (const startingAge of [0, 1]) it.skipIf(startingAge === 0 && process.env.AI_PROGRESS_ACCEPTANCE !== '1')(
+    `builds what the new age opened rather than fighting on with militia (starting age ${startingAge}${startingAge === 0 ? ', integrated acceptance #124' : ''})`, async () => {
     // An age nothing uses is a number. Reaching the Feudal Age and then
     // fielding Dark Age militia for the rest of the match is most of it wasted.
     const state = createGame(1, importedRules ?? FALLBACK_RULES);
-    // Age spending is tested above. Start this acceptance at the unlock:
-    // corrected RMS start spacing changes the time spent buying early camps
-    // (seed1 had no range by6min, recorded in #124), not the unlock behavior.
-    Object.assign(state.players[1], { food: 900, wood: 900, gold: 400, age: 1 });
+    // Keep the reduced component fixture and the original integrated acceptance
+    // separately named. #124's unresolved progression case is explicitly opt-in,
+    // never represented as covered by the age-one component test.
+    Object.assign(state.players[1], { food: 900, wood: 900, gold: 400, age: startingAge });
     // The range needs a barracks, in AoE2 and here: its tree node links to
     // one. Stand it up rather than waiting out the economy that buys it.
     const barracksRules = state.rules.buildings.barracks;

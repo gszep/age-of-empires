@@ -99,9 +99,10 @@ tools/gate.sh > .local/gate.log 2>&1
   `uv run --locked python tools/datq.py fields|get|grep <expr>` and extend the
   table. More than two or three questions should use one script because each
   `datq.py` call reloads the DAT.
-- Editing `tools/sld_layers.py` or `convert`/`convert_mask`/`page_path`/
-  `save_pages` in `convert_sld.py` invalidates every atlas and costs about 57
-  minutes with four workers. Batch decoder edits and never restart a run before
+- Decoder cache fingerprints are layer-dependent (`tools/atlas_cache.py`):
+  shared geometry/packing and `convert`/`convert_mask`/`page_path`/`save_pages`
+  edits invalidate all layers; BC1 edits invalidate main/player-colour. A full
+  rebuild costs about57 minutes with four workers. Batch edits; never restart before
   checking the process table. `convert_sld.py --terrain-only` is only for a
   terrain-slot change; otherwise run the full pipeline.
 - With depot `1039811` present, sprites use `_x2.sld` at manifest `scale: 2`

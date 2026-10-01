@@ -1,970 +1,117 @@
 # Project status
 
-What is delivered, what is measured, and how it is verified. The current
-session/deployment handoff is in [handoff.md](handoff.md). What is
-approximated rather than read is in `docs/ledger.md`; what is still to do is
-the issue tracker (`docs/backlog.md` says how it is used). The evidence for
-each feature is in the commit that shipped it and on its issue — this file
-does not repeat it.
+Current scope, not a chronological run log. Operational state and the latest
+verification receipt live in [handoff.md](handoff.md); inferred or chosen rules
+live in [ledger.md](ledger.md). The issue tracker is the work queue. Historical
+checkpoint counts remain in git and [reviews](reviews/2026-10-01.md).
 
-## Run and play
+## Play
 
-**Britons, Franks, Goths, Teutons, Japanese and Chinese are selectable owned profiles.** Franks adds
-paid unique-tech/elite acceptance and Heresy; Goths adds Anarchy secondary
-production, Perfusion, gated fast Loom, hunting/infantry/population bonuses,
-Dromon and Incendiaries. Teutons adds its own roster/art/voices, farm/armour/
-garrison/healing bonuses, free research, both unique technologies, Teutonic Knight
-and elite, Siege Onager, Bombard Towers, Redemption/Atonement and captured-building
-stat retention. New production at captured factories receives recipient upgrades.
-Japanese adds Samurai/elite, Yasama tower volleys, Kataparuto packing/firing,
-Elite Cannon Galleons, fishing/infantry/camp/sight/archer bonuses and original
-Asia art/flags/icons/voices. Chinese adds its six-villager/resource-adjusted start,
-TC housing/sight, discounted research, farm team bonus, Great Wall, Chu Ko Nu/elite,
-Fire Lancers/elite, Rocket Carts/heavy, Dragon Ship, Lou Chuan, Siege Ram and
-Rocketry. Shared consumers include multi-shot/alternate weapons, interception,
-armour bypass/resistance and public ground fire. Dedicated published-profile
-browser acceptance passes. Latest full gate GREEN:1186 tests/91 files,7
-inapplicable Gothic fortification cases skipped, build,172 import tests and
-browser smoke (`.local/timeout261-gate.log`, repeated after the timeout-config
-checkpoint). See [civilisation coverage](civilization-coverage.md)
-for evidence. Shared conversion (#178), native Incendiaries (#252), population
-settings (#253), zero-time grant timing (#254) and native Samurai/Kataparuto
-calibration (#259), plus native Chinese weapon/bonus calibration (#260), remain documented boundaries.
+- Ysgramor: <http://localhost:5173/>; independent solo: <http://localhost:5173/?solo=1>.
+- Tailnet: <https://ysgramor.tail6e864b.ts.net:5173/>.
+- Artemis local-art gateway: <http://localhost:5174/>.
+- Public open-content build: <https://empires.gszep.com/>.
+- Standalone development: `npm install`, then `npm run dev`. When the managed
+  host occupies 5173, use `npm run dev -- --port 5175`.
+- Solo `?map=islands&seed=3` (plus `solo=1` on the shared host) selects a board;
+  F10 settings select map/seed/civilisations/mode without editing the URL.
+  Shared setup is controlled by player one. Controls are in [README](../README.md).
 
-OpenCode's total OpenAI request deadline and read-only diagnostic-log access are
-configured in **678a7ba** (#261). [Investigation evidence](timeout-investigation.md)
-distinguishes the reproduced stream-watchdog gap from job-monitor expiry and
-browser-fixture interruption; [overnight rules](overnight.md) record the user's
-60%-context wrap-up policy.
-
-The #54 DAT inventory has been refreshed against the pinned data and actual
-consumers: [dat-field-audit.md](dat-field-audit.md). Most old garrison/audio/
-terrain omissions are delivered; the ticket remains open for real remaining
-collision, foundation, combat and slope-table gaps. The audit adds no gameplay
-rules and does not equate a field's presence with known engine semantics.
-
-The remaining owned English manual audit (#60) is complete. See
-[manual-audit.md](manual-audit.md) for physical/printed page references, source
-hashes and comparisons with implemented combat, garrison, elevation, conversion
-and trade. Legacy prose does not supply exact elevation multipliers or a trade
-profit formula. The audit reproduced nested transport-capacity undercount
-(#251) and attached other findings to their existing tracker issues.
-
-On the installed Ysgramor service, use **http://localhost:5173/?solo=1**
-for the human's current solo QA, or the same path through
-**https://ysgramor.tail6e864b.ts.net:5173/**. Shared joining is currently blocked
-by the audited live-host protocol1/frontend protocol2 skew; preserve the host
-until migration is verified ([evidence](shared-reference-audit.md)). Artemis's
-gateway remains **http://localhost:5174/**.
-
-Both managed household services were active with zero automatic restarts at
-the 2026-09-23 performance handoff. Verification uses private servers rather
-than altering the shared match; current deployment details are in `handoff.md`.
-
-For a fresh standalone installation:
-
-```bash
-npm install
-npm run dev
-```
-
-- Public open-content URL: <https://empires.gszep.com/>
-- Local imported desktop URL: <http://localhost:5173/>
-- Tailnet/mobile QA URL: `https://<host>.tail6e864b.ts.net:5173/` — the
-  host is the machine running Vite (`calcifer` or `ysgramor`); both are in
-  `vite.config.ts`'s `allowedHosts`.
-- `?map=<name>&seed=<n>` deals a named solo board (`arabia`, `islands`,
-  `black-forest`, `windsor`, `senlac`, `painted-proof`). Omitting setup uses the
-  remembered choice, or Arabia/42 on a first visit. F4 reveals the map;
-  `+`/`-` step the game speed.
-
-The 2026-09-27 audio-first run also passed a39-minute private five-map endurance
-workload:150 samples,19 completed tick-limit rounds, no recorded browser/asset
-errors, and sampled audio within24 sources. The full natural27-track soundtrack
-cycle passed separately. Receipts, the earlier interrupted run and limits are
-recorded in [handoff.md](handoff.md).
-
-Controls and hotkeys are in `README.md`. `F10 → Load replay…` plays a
-headless record and checks its periodic hashes.
-
-Context cursors (#51) use 18 owned native CUR files and their embedded hotspots.
-Hover and actual right-clicks share pure dispatch/order classification, including
-gathering, hunting, construction, repair, healing, conversion, transport boarding,
-garrison. Producer selection keeps the ordinary pointer (#239); the owned
-Set Gather Point button/T explicitly arms the flag cursor for left-click rally
-placement. Escape/right-click/selection change cancels it. Right-click rally
-remains a shortcut without arming the flag. Hover never reserves farms or resets worker progress.
-Unseen Gaia is no longer pickable by live coordinates: remembered objects use
-last-seen position/status in cursors and selection info. The open fallback uses
-ordinary CSS cursors. `cursors.test.ts` and `tools/context_cursor_smoke.mts`
-verify read-only hover, command outcomes, explicit gather-point placement and
-cancellation, fog memory, native requests and hotspots;
-the browser script also runs with `OPEN_FALLBACK=1`.
-
-Native command sequences are zero-based (#245): town bell/return use cell15/B,
-building ungarrison uses cell10/G, and gather-point targeting uses cell5/T.
-`garrison_edges_smoke.mts` verifies actual B/G actions and displayed cells,
-alongside the existing bell/return, training, ram and occupied-flag pixel checks.
-
-`F10 → Game Settings` chooses the map and seed without editing a URL (#144).
-Start Game rebuilds the board and minimap; Random requests a fresh seed;
-Restart repeats the chosen setup. Solo sessions remember their setup across
-reloads, while shared selection belongs to the host and is sent to the guest.
-
-HUD feedback (#58) uses a compact, content-height stack for attacks, depleted
-farms, creation and research. Blocked paid production has a separate red lower-
-centre warning and the owned yellow `PopulationFlash`; being at the cap alone
-does not display it. A global two-row queue shows research/training and selects
-its producer on click. The supplied 2560×1440/100% captures exposed the native
-WPFG resources: confirmation now uses the black/gold frame with Yes/No/close,
-and the full victory/defeat screen has owned crests, fonts and Return/Leave
-buttons plus an explicitly approximate animated ember overlay. Return preserves
-the finished board; Leave opens the existing match launcher. The generic OK
-popup acknowledges replay errors. `tools/feedback_smoke.mts` covers both players'
-losses, modal lifetime/abort/dismissal, animation, production warnings, actual file
-uploads, read-only rebuilds, compact layout, 1440p scale and background/alpha pixels
-in imported and `OPEN_FALLBACK=1` modes. Source import tests reconstruct the nine-
-slice images byte-for-byte and assert the consumed XAML metrics and fonts.
-The Options screen (#141), reached through the settings gear or menu, persists
-speed, music/sound volume, four owned hotkey profiles and the three owned interface
-colour-blind palettes. Command keys resolve through native string/action IDs;
-explicitly unbound research keys remain unbound. Score/diplomacy colours,
-selection health and live/remembered minimap colours use the selected owned roles.
-`?uiPalette=` remains a preview override; world sprite/portrait LUTs are #246.
-The bounded panel uses original WPFG nine-slice art, fonts and button styles.
-`options_smoke.mts` checks real controls, actual training keys in all four profiles,
-native colours/minimap pixels, volume changes, storage/reload and Cancel in owned
-and fallback modes. `map_menu_smoke.mts` verifies shared speed authority across
-join/reload and explicit Apply on a private two-client host. Wonder UI belongs entirely
-to #110, and objectives/tech-tree surfaces to #138; these are not #58 blockers.
-The supplied captures are indexed locally; remaining font-raster, dimmer, ember
-and timing approximations are in the ledger. The human accepted source-backed
-OK-popup treatment without a runtime capture.
+On October 1 the owner confirmed no current match needed preservation. The
+shared host/frontend were pinned together and the gateway's hardcoded protocol1
+was corrected. Both deployed configs report protocol2. Code and JSON metadata
+are frozen in the release; bulk art and installed dependencies are shared local
+resources, not immutable assets. See [shared-play.md](shared-play.md).
 
 ## Delivered scope
 
-The example AI now builds and completes a dock, trains a bounded fishing fleet,
-works connected known schools and banks food (#91). Observation v8 supplies
-compact explored terrain/elevation runs with no hidden-neighbour leakage.
-Natural owned Islands openings at seeds2/3/7 and a real player2 browser opening
-all reach fish deposits with zero naval refusals; fallback does too. The dock,
-ship rendering and selection are exercised by `tools/ai_fishing_smoke.mts`.
-Source policy readings and the bounded strategy choices are in `docs/ai-fishing.md`;
-naval combat/transport and broader DE AI policy remain #124/#59.
-
-Regicide is now a real two-player mode in setup, saves, shared restarts,
-headless runs and recordings. Each side starts with ten villagers, King434 and
-a Castle; numeric placement data is in `refdata/regicide.json`, checked against
-owned RMS by `tools/regicide_reference.py`. Arabia uses centre-facing Castles,
-Black Forest its explicit backward override, and Islands its classic box bands.
-Original King art/icon/voice and occupied-building flags are published for both
-enabled profiles. Kings are unarmed, untrainable and conversion-immune; survival
-is tracked recursively through carriers. Actual combat/sinking loss ends the
-match, and simultaneous royal loss is an explicit draw.
-
-Treason is an immediate, repeatable400-gold Castle command with a temporary
-King-position channel, flashing minimap X and no permanent research/fog leakage.
-Its ten-second lifetime, marker cadence and availability interpretation remain
-explicit inferences (#240), alongside starting-resource preset and extra King
-task semantics. Fifty seeds per RMS map pass starts/constraints; private owned
-browser checks cover actual setup/reload/restart, King voice/art, paid Treason
-blink/expiry pixels, shelter flag, Delete defeat and verified v2 replay. A second
-private two-browser host verifies guest read-only setup, real Treason payment,
-equal client synchronization hashes, mode switches and reconnect.
-New observations are v8; records/results and shared protocol are v2; dev saves
-are v3 with mode-less v2 save compatibility. Legacy v1 recordings mean random
-map and cannot smuggle in a Regicide mode. The live managed host was not replaced.
-Final Regicide gate **GREEN** in `.local/regicide-gate-r3.log`: **960 tests /
-73 files, build,128 owned-content tests and real-browser debug smoke**, exit0.
-One worker; no test timeout widening. Full import receipt:
-`.local/regicide-import-r1.log`.
-
-The diplomacy follow-up enables the native menu button for the current fixed,
-opposing two-player teams. It replaces the compact market tribute page with an
-owned-WPFG-derived dialog: player/civilisation/stance rows, four resource buttons,
-100/Shift500/CTRL-all, Clear/OK/Cancel, and read-only replay. Confirmation sends
-one atomic public command; fees and all-stockpile amounts are resolved against
-current research/resources and a live completed market. Both owned and open
-fallback browser checks cover actual clicks, cancellation, decrement, fee changes
-after Coinage/Banking, market destruction and replay. Relation/Allied Victory
-controls remain visibly locked; no unlocked-alliance behavior is offered.
-`tools/diplomacy_smoke.mts` is the maintained acceptance; full pipeline receipt is
-`.local/diplomacy-import-r2.log`. Unrelated #138 surfaces remain open.
-Checkpoint gate **GREEN** in `.local/diplomacy-gate-r1.log`: **931 tests /72 files,
-build,126 owned-content tests and real-browser debug smoke**. One worker;
-no test timeouts widened.
-
-The 2026-09-26 Briton playable checkpoint passed the full gate:
-**898 Vitest tests / 68 files, build, 123 owned-import tests and browser smoke**
-(`.local/britons-playable-gate-r5.log`). Dedicated published-art monastery/Warwolf
-click/impact evidence is `.local/britons-monastery-browser-diagnostic.log`.
-The final research-action pass also passed its full gate: **906 Vitest tests /
-70 files, build, 124 owned-import tests and browser smoke**, recorded in
-`.local/britons-final-gate-r1.log`. Single worker; no timeout widening.
-
-The Briton completion pass adds stone/fortified walls and gates, Guard Tower/Keep,
-age-correct building durability, Petards, Siege Towers and ram crew bonuses. It
-also adds the relic lifecycle and carried art, six Briton monastery research
-consumers, deployed Warwolf/Siege Engineers effects, Shipwright production timing
-and original-price production refunds. The final pass adds Siphons, random-map
-Spies and real market/tribute actions for Guilds, Coinage and Banking. The private
-published-asset browser verified all five research buttons, payments, live Spies
-price/reveal and original charge impact feedback (729 changed sRGB pixels), in
-`.local/britons-final-research-browser.log`; the full import completed in
-`.local/britons-final-import.log`. Coverage is in `civilization-coverage.md`;
-source/engine inferences remain in `ledger.md`. The later Regicide checkpoint is
-separate from this historical Briton random-map acceptance.
-
-The shared relic-placement follow-up consumes a numeric source contract in
-`src/sim/refdata/relic-placement.json`, checked against the owned RMS by
-`tools/relic_reference.py`: Arabia five (one central, two/player), Black Forest
-four (two/player), Islands five (two/player plus land20). It corrects BF's
-44%-of-map clearing quota, Arabia's 32–34% start radius, and generates the two
-tiny Islands resource islets with their gold/stone groups. Land IDs persist;
-constraints are never relaxed to meet counts. Authored maps explicitly use an
-authored five-relic policy. Fifty seeds per RMS map pass count/distance/metric,
-forest/edge/land-zone/path and islet-connectivity/separation checks; all six maps
-pass deterministic initialization and JSON continuation. Cliffs remain absent,
-and exact native RNG, actor rasterization and land-growth parity remain inferred.
-`tools/relic_placement_smoke.mts` completed the generated Islands seed 130 home
-collection and transport of the fifth relic through two real relic right-clicks,
-public boarding/unloading, deposits and 60 gold/minute at tick 5500. The matching
-Node journey checks JSON replay parity throughout. Salmon and neritic fish remain
-#95; relic reference-calibration boundaries remain #130.
-Final follow-up gate: **929 Vitest tests / 72 files, build, 125 owned-import
-tests and real-browser debug smoke**, all GREEN in
-`.local/relic-placement-gate-r3.log`. One worker, unchanged test timeouts.
-
-**Simulation** (`src/sim`, authoritative, fixed 20 Hz tick, deterministic):
-integer resources with gathering, drop-off and depletion; building placement,
-construction, repair (#74), garrison (#75), destruction with each age's
-collapse and rubble (#61) and fire (#73); population and housing; fifteen-deep
-refundable training queues (#7), indexed cancellation (#140), and Shift-for-five (#76); rally points; tile
-A* with footprint obstruction, repathing and separation; the DAT's armour
-classes, minimum damage, discrete windup/release/cooldown, `accuracy_dispersion`
-misses (#45) and blast levels (#46); projectiles aimed once at launch;
-corpses that decay by food eaten and are selectable while worth something
-(#14); the DAT's hunter, shepherd and farmer villagers (#71), startled deer,
-herdable sheep; the Britons' technologies from `CivTechTrees` with
-the DAT's effect commands (types 0, 1, 3, 4, 5), prerequisites and ages, the
-Feudal, Castle and Imperial Ages and every land upgrade line to the champion;
-the trebuchet packed and unpacked (#28); scorpions and the Heavy Scorpion
-upgrade with pass-through bolts and DAT-backed collateral damage (#127);
-monks that heal and convert;
-palisade walls and owner-only gates; the wonder (no victory, #110); the
-trade cart; the dock, naval roster and fish on the DAT's `terrain_restrictions`
-(#81); fog with explored memory and legal last-seen observations.
-
-Named player attributes (#53) import the full `Constants.xs` Attributes section
-against the configured civilisation's DAT resource table, preserving the IDs
-and source hash through the published manifest. `playerAttributeFor` provides
-initial values plus completed research; farm capacity and repair bills use it.
-Unsupported mechanics remain explicit in technology diagnostics rather than
-becoming researchable merely because their values are imported. The table does
-not replace live stockpiles/counters. `player-attributes.test.ts` covers lookup,
-research ordering and older-rule compatibility; `repair.test.ts` exercises public
-research/repair commands, actual bills, owner isolation and deterministic replay;
-the mill tests verify completed farm food, and the import suite checks every
-named row against the owned source and its publication.
-The repair-discount researches are synthetic fixtures, not additions to the
-Britons' roster; discounted repair behavior is verified through simulation
-commands rather than a new browser button.
-
-Civilisation expansion begins with an all-source audit (#122/#123):
-`tools/audit_civilizations.py` inventories 59 non-Gaia definitions (53 base-era,
-6 antiquity-era), prerequisite choices, passive/team-effect candidates, missing
-roster IDs and unsupported effect families. It also flags foreign unique-tech
-references in alternate-era metadata. [The coverage checkpoint](civilization-coverage.md)
-selects Franks as the next contrasting civilisation and lists the mixed-match
-acceptance criteria. Match creation now rejects unloaded civilisation keys;
-availability checks no longer grant everything to a mismatched key in a restored
-state. The per-player rules foundation now resolves complete additional profiles
-for gameplay, placement/navigation, HUD prices/availability, selected-unit stats
-and save/restart/replay. Synthetic mixed-profile regressions and
-`tools/civilization_rules_smoke.mts` verify actual outcomes and real browser clicks.
-Britons and Franks now have independent supported-roster profiles, real namespaced
-art/icons/voices and menu selection, with reload/restart persistence. Passive/team
-bonuses, required-count prerequisites, age-dependent costs, building work rates
-and eligible free farm research run from each profile's source-derived graph.
-The separate 53-base-era catalogue is an inventory, not a playability claim.
-Conversion snapshots
-resolved unit-local rules before ownership changes and
-excludes captures from later research/promotions. Public-command regressions
-measure wounds, damage/armour, movement, sight/range, reconversion, unloading,
-JSON continuation and replay; owned Loom cases check retained HP and actual
-damage before/after either player's research. The unit/player inheritance split
-remains inferred: #178 stays open for patch-matched DE evidence, especially
-economic/projectile exceptions and building-cargo/reconversion behaviour.
-The user's 2026-09-30 mobile-carrier clarification is implemented: passengers
-retain their owners and stay aboard through conversion and heavy nonlethal damage;
-only the carrier's owner can eject them. Original-owner research reaches nested
-cargo. Outcome/JSON tests and owned/fallback browser ejection clicks verify this.
-
-The reviewed added combat definitions include Throwing Axeman/Elite, Paladin,
-Hand Cannoneer, Bombard Cannon and Carrack; typed tree absence excludes foreign
-uniques from production while retaining definitions for captures. #179/#180
-remain open for full roster/effect coverage: tower/wall and specialist/relic work
-is separate; Warwolf blast/packed-trebuchet research, search-radius effects and
-other unsupported commands remain tracked gaps. See [bonus contract](civilization-bonuses.md)
-and [profile contract](civ-roster-integration.md).
-
-The integration checkpoint is gate-green: **820 Vitest tests / 64 files**, build,
-**114 import tests**, general browser smoke, plus dedicated enabled-profile and
-TC browser acceptance. Full pipeline repetition is byte-identical for the three
-published manifests. Exact logs and fixture/source caveats are in
-`docs/civilization-coverage.md`.
-
-Shore fish honour the DAT's neighbouring-beach placement requirement (#145).
-The current Britons dock roster is implemented (#97): galley/galleon, fire,
-demolition and hulk lines; Cannon Galleon gated by Chemistry; Transport Ship
-and Trade Cog. The shared Medium/Heavy Warships researches include the DAT's
-automatic child upgrades. Transports carry twenty land units, preserve loads
-and population, unload at shore through the public command/UI, and lose cargo
-when sunk. Fishing ships build and exclusively work 700-food Fish Traps.
-Owned hull/sail composites, colour/shadow/outline masks and trap underwater art
-are imported; fire shots use the owned flame flipbook with an inferred binding.
-`src/sim/naval-units.test.ts` checks training, combat, research, cargo, trade and
-trap income under both rule modes; `tools/naval_units_smoke.mts` checks dock
-buttons/upgrades, real boarding/unload targeting, trap placement and visible
-fire shots. Observation v4 retains the naval kinds/unload order and adds own
-gather-target IDs plus edible carcasses (zero HP, remaining food).
-Fishing ships carry on to deep fish using footprint-aware clearance and remember
-their working position when a fish disappears during a dock trip (#87).
-`src/sim/fishing-continuation.test.ts` covers full/partial loads, another ship
-depleting the node, JSON reload determinism, visibility/range bounds and Stop;
-`tools/fishing_continuation_smoke.mts` exercises the round trip from a real click.
-Farms reserve one farmer through travel and drop-off; group orders, construction
-completion, queued orders and automatic continuation respect occupancy (#82).
-Drop-site acceptance (#52) is imported from `dropsites.json` intersected with
-each worker variant's DAT sites and gather target classes/resources. Building
-acceptance and worker-specific return lists both reach the published manifest
-and simulation: foragers cannot use fish-only docks, while fishermen can. Loads
-retain their task after their source disappears. `drop-sites.test.ts` checks
-actual banked resources for all eight villager tasks, rejected/unfinished/enemy
-sites, authoritative empty lists, open/imported parity and JSON continuation.
-Fishing ships use the same derived return-site contract; naval tests cover their
-round trips. Livestock acceptance metadata does not add the missing follow rule.
-Villagers use each DAT task variant's gathering rate and carry capacity (#132),
-including hunter 0.41/s into 35 and farmer 0.53/s into 10, with variant-specific
-research effects. `src/sim/villager-gather.test.ts` checks actual collection and
-banking across all eight tasks, both rule modes, task switches, vanished carcasses
-and JSON replay; `tools/villager_gather_smoke.mts` checks hunter/farmer banked loads
-from real browser right-clicks. Whole-resource capacity rounding remains inferred.
-Resource-camp builders automatically gather nearby visible trees, gold/stone,
-or (mills) berries/free farms, respecting queued orders (#79); regression tests
-in `src/sim/build-gather.test.ts` cover selection, exclusions and actual banking.
-`tools/build_gather_smoke.mts` checks real right-click construction-to-gathering
-with imported content for all three camps. The AI retains active builders and
-tries its other existing placement lists when house/range locations fill up;
-the passive-opponent regression keeps its original 2400-second bound.
-The AI also resumes paid, unstaffed house foundations without spending wood
-again (#146), gives separate houses distinct workers, and keeps building orders
-out of its demolition force. Own `buildTargetId` in observation v2 distinguishes
-an approaching builder from abandonment; a rounded 100% foundation is still
-unfinished. `src/sim/ai-house-recovery.test.ts` covers recovery, assignment
-privacy and JSON replay; `tools/ai_house_recovery_smoke.mts` verifies the page's
-AI replaces a deleted builder and completes the same house with zero wood.
-AI drop-site planning rejects redundant nearby mills across the entire placement
-cycle, searches onward for distinct unserved patches, excludes fish from mill
-targets, and respects unfinished camps even when their progress rounds to 100%
-(#147). Useful closer lumber/mining camps remain eligible. Ten regressions in
-`src/sim/ai-camps.test.ts` cover these cases; `tools/ai_camps_smoke.mts` verifies
-the page AI completes a mill at the separate berry patch with wood still available.
-Upgrades replace active and waiting training entries as well as living units.
-Paid training queues can exceed available housing (#143); completed units wait
-at 100% without advancing the queue until their population cost fits. The HUD
-shows the owned housing message. `src/sim/population-training.test.ts` covers
-payments, refunds, housing completion, simultaneous producers and JSON replay;
-`tools/population_queue_smoke.mts` checks real Shift-click queueing, the blocked
-status, portrait cancellation and resumption after a house is built.
-
-**Board** (`src/sim/mapgen.ts`): the original's two primitives from the owned
-RMS scripts — cost-ordered clump growth and banded candidate scans — with
-`cleanTerrain`; Arabia with four of its eleven biomes and its forest ponds;
-Black Forest; Islands with the engine's beach sweep and the water-masking
-depth chain; leaf litter and the script's aesthetic scatter; painted boards
-and two surveyed boards (Windsor, Senlac) from Environment Agency LIDAR with
-combat elevation; mirror-symmetric generated halves; the match seed mixed
-before any draw (#44). #134 adds deterministic Arabia global hills and Black
-Forest clearing/forest hills using owned RMS parameters with approximate
-terraced growth. Combat and entity rendering share `sim/elevation.ts`: fixed
-×1.25 downhill / ×0.75 uphill, including projectile, splash and piercing hits
-after the shooter disappears. The array is already checksummed and serialized.
-`elevation.test.ts` verifies HP loss, launch-point persistence/JSON replay,
-ordinary hill traversal, deterministic mirrored terraces and checksums;
-`economy.test.ts` also checks imported building damage on flat/raised ground.
-M5 remains open for explicit cliffs, exact hill-generation/legality rules and
-the remaining map-specific elevation passes. Approximation evidence is in
-`ledger.md`; a height difference alone does not create an impassable cliff.
-Elevation-aware placement (#176) imports each building's DAT `hill_mode`:
-town centers require level ground, ordinary buildings allow one level of relief,
-and houses/farms/gates/towers retain unrestricted hill placement. The public build
-command, preview and wall preview share this check; rejected sites spend nothing.
-Both Windsor starting TC footprints are minimally levelled during match creation,
-without changing survey sources or later construction ground. Tile-centre/corner
-interpretation remains an approximation rather than a DE runtime calibration.
-`elevation-placement.test.ts` covers imported/open rules, legal ramps/corners,
-steep/uneven sites, rotated footprints, completed construction and all map starts;
-`tools/elevation_placement_smoke.mts` verifies actual preview colours and rejected/
-accepted build clicks in both content modes. TC construction (#177) now follows
-the DAT construction head for cost, time and button: 275 wood / 100 stone,
-150 seconds, economic slot 11. Castle Age enables additional centers; Dark/Feudal
-can replace a lost center, counting foundations against the one-TC limit. The
-replacement-count interpretation is recorded as inferred in `ledger.md`.
-`town-center.test.ts` verifies construction, population, training, deposits and
-atomic rejection in open/owned rules; `tools/town_center_smoke.mts` presses the
-replacement/expansion buttons, rejects slopes and finishes a functioning TC in
-the private browser. Briton Castle-Age TC wood discounts now apply through the
-bonus graph, independently of these construction and replacement limits.
-
-**View** (`src/view`, never mutates state): dimetric projection with AoE2's
-handedness (below); DAT terrain textures with DE shape windows across the eight
-mapped land/farm/road/snow/ice/water families (#116/#148), classic fallback
-(#42), and DE overlay masks across land crossings; fog as a rounded per-tile contour with
-`colorcorrection.json`'s levels; the reference's water shader read whole from its SM2 build (the
-height field, its drifts, the dome, the glint) over the tile in linear light;
-shore foam from the reference's own frame atlases, one to a shore tile (#89);
-SLD sprites decoded locally (main, shadow, player-colour, outline and damage
-layers) with the keyframe delta rule (#78); player colour through the
-palette's own block; occlusion contours; task animations on the
-simulation's clock (#72); the HUD laid out from the widget files — command
-grid with the DAT's `button_id` cells and action icons, selection panel with
-stat row, group portraits and counted training-queue batches with a separate
-active-production portrait/status (#140), resource panel with gatherer counts and age
-bar, menu panel, minimap with four buttons and a flare, score panel — in the
-reference's face and colours (#69), names and tooltips from the strings file
-(#48), portraits in the owner's colour (#77), context refusals in the
-reference's words (#70); owned selection and distinct order voices, feedback,
-combat/work/death animation-frame sounds, building completion and visible-terrain
-ambience (#114). The importer reads both shared packs, including all722 indexed streams,
-and prefers complete streams over short DIDX prefetches (#57). Cross-bank and
-owned decode/determinism tests cover that boundary; `docs/audio-reference.md`
-records their source fields. `tools/audio_smoke.mts` exercises actual select,
-move, attack and house-placement gestures, observes browser media playing,
-measures non-silent decoded PCM and rejects hidden/offscreen audio leakage.
-Exact Wwise mixing, spatial balance and ambient scheduling remain #243.
-The Play-action boundary now preserves separate layers, owned delays/ranges,
-probability and linear fades (#248): a training horn and delayed voice both play,
-and terrain actions retain their own fades. Pending layers reserve source-budget
-slots and are cancelled with their group on replacement/reset/hidden-tab cleanup.
-In-game music (#115) resolves the owned `Ingame_Music` dialogue tree and plays
-27 complete numbered tracks (111 minutes) with one lazy native audio element,
-pause/foreground resume and restart cleanup. Three missing full streams are
-explicitly excluded (#244). `tools/music_smoke.mts` exercises all27 tracks,
-native end/wrap events and missing-audio fallback; the optional natural-cycle
-mode passed all27 natural endings and wrap on2026-09-27. Exact DE theme/chapter/playlist modes
-remain outside the numbered-playlist consumer.
-
-Minimap buildings use compact, equal-sized live and fog-memory markers (#84),
-with farms hidden according to the DAT's `minimap_mode`.
-Minimap relief (#96) now consumes each terrain's imported
-three-shade palette. Live/remembered woods use the Forest palette, with flat
-sRGB (21,118,21), instead of the old sampled (41,140,33). Plateaus, old manifests
-and the open fallback stay usable; palette changes refresh the cache. Nine
-focused tests, the sRGB browser pixel probe `tools/minimap_relief_smoke.mts`,
-the existing minimap-marker browser check and typecheck pass. The pixel probe
-also checks fog/reveal, state immutability and a 392×392 buffer (roughly 9–16 ms
-draw samples). The human's editor reference supplied on 2026-09-22 corrected the
-provisional axis: screen-right-facing hill slopes are light and left-facing
-slopes dark. A four-sided-hill regression and actual canvas pixels pin both
-front faces and both back faces. The precise discrete slope classifier remains
-inferred, as recorded in the ledger; this is not a pixel-identical recreation of
-the editor's unknown height grid. These minimap edits were included in the
-#96/#137 checkpoint.
-
-World terrain hillshade now follows the same screen-right lighting axis (#160),
-including blend-overlay vertices. The previous `-dx-dy` term lit both front
-faces; `+dx-dy` lights both right-facing slopes and shades both left-facing ones.
-`world.test.ts` pins all four equal-altitude faces, their unchanged positions/UVs
-and matching blend shades. `tools/world_relief_smoke.mts` renders the production
-ground meshes in a private real browser, normalizing 5×5 linear-sRGB crops by an
-unshaded draw of the identical geometry/UVs. Imported right-face factors are
-0.946/0.948 versus left 0.809/0.809; the pre-fix front pair were both ≈0.949.
-Both content modes pass, as do state-immutability checks. The existing altitude
-tone and shading strength remain approximations; this verifies the reference's
-orientation, not its unavailable absolute pixel values or full DE lightmap.
-
-Water boundaries (#148) now use the owned `watershore`, `waterwater` and
-`shallowswater` alpha artwork in square tile-axis windows rather than classic
-isometric mask columns. The full importer publishes deterministic derived sheets
-and source hashes; older manifests still use their classic masks. The inferred
-window/compound-mask interpretation is explicit in `ledger.md`; exact engine UV
-selection and a pixel-identical reference coastline are not claimed.
-`tools/shore_blend_smoke.mts` checks the production loader/geometry/material in a
-real browser: 31 configurations, 775 linear-sRGB alpha samples, maximum error
-0.002 against the imported artwork, and 603 samples visibly different from the
-classic path. State/terrain geometry is unchanged. Import tests verify source
-contour variation, edge/corner orientation, repeated byte-identical publication
-and the live manifest.
-
-#116 now extends square windows to landland/farmland/snowland/icewater/roadland.
-Farm patches use the receiving terrain pair's family (farm/grass is3, not the
-farm category1), include native corner neighbours, and refresh when previews
-move. Shader inspection also corrected overlay-mask anisotropy: the owned
-`sBilinear` binding is distinct from the terrain pictures' `sAnisotropic`.
-The eight-family browser probe passes6200 shape samples,50 existing-policy
-crossing samples and450 farm samples with maximum error below0.002 in
-linear-sRGB; partial old manifests and water regression pass. Source files,
-sampler failure/correction, screenshot and remaining native-window/crossing
-calibration are recorded in [terrain-blend-coverage.md](terrain-blend-coverage.md).
-
-**Agents and protocol**: versioned JSON contracts; browser, built-in AI,
-JSONL subprocess, deadline subprocess, WebSocket and MCP strategies share
-`applyCommand`; FNV-1a periodic checksums, command-stream records, Node
-verification and browser playback; process-isolated paired batches with
-Wilson intervals; an opt-in live-model boundary (`RUN_LIVE_AGENT=1`).
-
-**Household shared play**: one Node-hosted match, two human seats, late-join
-snapshots and tick-ordered command replication with periodic checksum checks;
-reconnect and disk checkpoints; player-specific cameras, selection, HUD and
-fog; transport-stable checksums, bounded buffered playback, interpolated
-presentation and same-map recovery without scene rebuilding (#153).
-Artemis's local gateway serves its own assets while fetching code and
-match traffic from Ysgramor. See `docs/shared-play.md` for setup and evidence.
-Its isolated base-asset runtime was refreshed on 2026-09-23 (#171): the live
-gateway now serves 117 entities, no redundant source/frame/layer atlas URLs,
-and garrison flags for 13 entities. Full base-content gate and fleet/garrison
-pixel probes passed; the optional Enhanced Graphics Pack test was skipped.
-
-Host HTTP modules now negotiate gzip/Brotli (#154); control routes and already
-compressed images are excluded, and the gateway preserves encoding headers.
-The 2,552,483-byte Three.js dependency transfers as 474,805 gzip / 445,736
-Brotli bytes, decoded byte-identically. On 2026-09-22 Artemis's direct private
-host probe completed Brotli in 14.0 s and gzip in 26.7 s; the uncompressed
-request timed out at 120 s after 2,209,922 bytes. These sequential network
-samples are variable-throughput observations, not a controlled speed ratio.
-`tools/compression_smoke.mts` verifies real cold/warm navigation and conditional
-304s; `tools/shared_smoke.mts` verifies commands, joins, reload and recovery
-through the local gateway with compression enabled.
-
-Shared-match snapshots also negotiate WebSocket DEFLATE (#174), with independent
-compression streams and ordinary server tick/control messages explicitly plain.
-The actual imported Windsor snapshot was 3,162,658 wire bytes without the
-extension and 95,679 with it; decoded 3,162,648-byte JSON and SHA-256 matched.
-Sequential private-host transfers to Artemis measured 4.504 s and 1.501 s on
-that run. These are network observations, not fixed speedup guarantees. Clients
-declining compression still work; a real-host fixture checks a large uncompressed
-50-command tick as well as snapshot identity and negotiation.
-
-**Nested transport capacity (#251):** a loaded ram and its passengers consume
-their combined slots. Boarding checks both existing and incoming nested cargo,
-and rechecks on arrival. The owner-only observation and HUD use the same count;
-captured ships display their stored capacity. Exact-fit boarding succeeds, while
-old over-capacity saves retain cargo and refuse further boarding until space is
-freed. Fourteen new fallback/owned outcomes cover capacity, arrival races, private
-observations, converted capacity, unload/JSON continuation and sinking. Both
-browser modes verify real rejected/exact-fit clicks,20/20 HUD, stored capacity,
-payload retention and reload (`tools/transport_capacity_smoke.mts`).
-Full gate `.local/transport251-gate.log` is GREEN:1051 Vitest tests/85 files,
-150 Python tests, build and real-browser smoke, exit0; no timeout widened.
-
-**AI sheep return (#136):** idle AI-owned sheep receive public move orders to a
-completed TC; live sheep are held out of dinner selection until within2.5 tiles.
-Existing carcasses remain first, and an older save's shepherds chasing incoming
-sheep are redirected home. Moving sheep are not repeatedly retasked. The strategy
-uses only observations; human-controlled sheep and simulator ownership rules
-are unchanged. Owned four-minute deposits on seeds1/7/42 rise120/130/90 →
-200/310/200; fallback120/120/80 →180/240/190. The `herding:false` control exactly
-reproduces the pre-change baseline. Both browser modes verify TC arrival before
-slaughter, banked food, one dinner, corpse decay/HUD and an independent manual
-sheep order. The source-backed intent and chosen staging geometry are in the ledger.
-Full gate `.local/herd136-gate.log` is GREEN:1037 Vitest tests/84 files,150 Python
-tests, build and real-browser smoke. Existing passive-opponent match and
-one-animal-at-a-time regressions pass; no timeout widened.
-
-**Abandoned farms (#156):** villagers can work a completed, nonempty enemy farm
-whose farmer has stopped/died/retasked. A live gather order reserves it across
-players during approach and banking; ownership transfers only when work starts.
-The crop and damaged HP are preserved, income goes to the farmer's player, and
-subsequent reseeding charges the new owner. Group clicks assign one farmer and
-avoid surplus villagers attacking a friendly claimant's still-foreign farm.
-Capture requires an explicit target: automatic food continuation, overflow and
-mill-completion assignment continue selecting owned farms only.
-Owned/fallback real-browser checks cover gather cursor, read-only hover, actual
-group right-click, new-owner food income, preserved HP and capture surviving
-reload. Simulation tests cover occupancy, queued races, hidden target filtering,
-JSON determinism and reseeding. Source26149 permits capture; exact timing and
-reservation policy remain explicitly inferred in `docs/ledger.md`.
-Full gate `.local/farm156-gate-r2.log` is GREEN:1028 Vitest tests/83 files,
-150 Python tests, build and browser smoke. Owned/fallback capture probes and
-the existing own-farm probe pass; no test clock widened.
-
-**Owned RMS guide/defaults (#56):** the land, terrain and object sections have
-been read against the adapter; `map-generation-design.md` now gives the owned
-guide primary status and records remaining phase/quota/spacing/height limitations.
-Omitted land clumping now uses8 for player lands and resource islets; terrain
-retains20 and explicit modern values such as Islands22 remain intact. Four new
-outcome regressions pass. Sampled seeds3/7 retain identical terrain/elevation/
-land-ID/entity hashes on Arabia, Black Forest, Windsor, Senlac and Painted Proof;
-Islands changes because the source resource-islet blocks omit clumping. Six
-browser cases and fresh reloads pass (`.local/rms56-browser.log`).
-Full gate `.local/rms56-gate.log` is GREEN:1055 Vitest tests/86 files,150 Python
-tests, build and browser smoke; no timeout widened.
-
-**Map spacing (#90):** seed and opening-group scans now consult live exclusion
-masks instead of reassigning the array being iterated. Five regression tests
-cover forest seeds, tight/loose groups, exhausted bands and exact spacing
-boundaries; the24 existing map-generation tests pass. Before/after browser
-checks cover Arabia, Islands and Black Forest seeds3/7, including deterministic
-fresh reloads and full-map minimap inspection. Arabia/Islands layouts change;
-both checked Black Forest hashes remain identical. Gold/stone/berry counts are
-preserved in these cases; wood and fish distributions/counts can change with
-growth and downstream RNG. Existing saved boards are not regenerated; old
-seed-based replays may disagree with new generation. Geometry remains the
-documented mirrored/square RMS adapter, not native engine parity.
-
-Final #90 gate: `.local/map90-gate-r2.log`,1004 Vitest tests/82 files, build,
-150 Python/owned-source tests and browser smoke, exit0. One navigation fixture
-was made explicitly dry after the new seed1 pond covered its fixed destination;
-the path-arrival, collision and time-limit assertions were retained.
-
-**Terrain plants (#55):** imported terrain slots retain their DAT unit IDs,
-densities, masked densities and centering, including zero-density and forest
-rows. Seven non-blocking Gaia plant types use their owned idle sprites, including
-green/dry grass, bushes, shrubs, weeds, dead plants and flowers. The renderer
-adds deterministic per-tile plants alongside the existing RMS aesthetic passes;
-it never adds simulation entities or consumes simulation RNG. Fog, last-seen
-building coverage, foundations/farms, late texture loading and x2 scale are
-checked. `tools/terrain_scatter_smoke.mts` measures21198 changed sRGB pixels in
-a paused grass fixture, stable placements on reload and an ordinary Islands3
-opening with196 plants /5 visible. The full import and source-contract tests
-pass. Full gate: `.local/scatter55-gate.log`,999 Vitest tests/81 files,150 Python
-tests, build and browser smoke, exit0. Exact native density and masked placement remain #249; the existing
-tropical Islands reference is qualitative, not a matched density/RGB target.
-
-**Plant grounding follow-up (#250):** the human reported detached-looking tufts.
-Their owned soft shadows had been imported but omitted by the scatter renderer.
-All seven plant types have nonempty masks (grass alpha reaches185/255), now drawn
-with the matching variant/hotspot/scale, owned shadow strength/colour and the
-existing ground-shadow pass. Browser A/B isolates5885 darkened sRGB pixels from
-28 visible masks, preserving bodies, placement and sim hash. Body and shadow
-coverage share fog/foundation policy; late shadow textures remain hidden until
-ready. Full gate `.local/scatter250-gate.log` is GREEN:999 Vitest tests/81 files,
-150 Python tests, build and browser smoke, exit0. This fixes an actual omitted layer, not the whole reported visual gap:
-the native composite, colour grading, bloom and AA/sharpening remain #149.
-
-**Import** (`tools/`): patch-matched DAT rules, palettes, terrain, blend
-masks, overlay masks, water and foam atlases, widgets, fonts, strings,
-particles, hotkeys and audio through a byte-identical local pipeline
-(`tools/import_aoe2.sh`, openage-free); the open fallback stays playable
-without any of it. With the Enhanced Graphics Pack downloaded (depot
-1039811, #150/#151) every sprite is sourced from its `_x2` file at scale 2
-and drawn at half size, where its drawn pixels land within one x1 pixel of
-the base art's; sheets over 8192 px continue on pages. The base depots
-alone import at x1 when their source files are complete. The atlas step now
-checks exact source container walks before cache reuse/publication (#247):569
-selected sources pass. The two base monk files with zero-filled1MiB tails were
-recovered from a fresh pinned download: all569 base sources and a full isolated
-x1 import now pass, with no skipped masks and browser-verified idle/attack
-contours. Owner copy-back is complete, and the default depot also passes569/569
-(#119, `docs/source-integrity.md`). That source recovery did not change the
-decoder. The later #256 correction promotes RGB565 endpoints by bit replication,
-restoring full-range white/primaries; its atlas fingerprint invalidates prior art.
-The [decode contract](block-decode-contract.md) distinguishes that bug from
-allowed vendor interpolation and the existing quantized mask export.
-Sprite pages load on first use rather than all
-at start -- loading the whole pack up front took the machine down (WSL,
-15 GB) -- so a sprite may be absent
-until its page finishes loading. Unused pages now release both GPU
-textures and decoded images after two minutes, or after one minute under a
-512 MiB soft-budget pressure (#152). Current scene art (including frozen fog
-views) remains resident even above that budget; this is not a total-memory
-cap or camera-frustum streaming. `tools/sprite_residency_smoke.mts` verifies
-repeated walk/idle/evict/reload cycles, reduced GPU texture counts, unchanged
-paused pixels and simulation hashes. Every DE capture in the reference corpus was taken with
-the pack installed, so texture detail now compares like for like.
-
-Identical source-SHA/frame-count/layer atlases share one canonical URL (#162),
-with per-use frame layout and scale intact. The import now references 1,930
-sprite/particle pages instead of 2,767 (5.71 GB PNG versus 6.92 GB). Existing
-legacy files are retained; this is a fresh-output/reference reduction, not a
-claim that migration deleted 1.21 GB from disk. The full PNG/layout audit and
-a repeated import were byte-identical after normalizing only URLs. In the
-ten-ship idle/attack browser A/B, decoded sprite residency fell from
-3,881,869,760 to 874,990,464 bytes and GPU texture count from 128 to 65, with
-identical rendered sRGB PNGs and simulation hashes. `atlas_sharing_smoke.mts`
-recreates legacy URLs privately, so it also works with a fresh shared import.
-
-The #163 native RTX4060/WebGPU evaluation found an approximately8× reduction
-in measured dedicated GPU allocation for BC1 versus RGBA8, but direct source
-BC1/BC4 decoding changes sampled pixels relative to the current PNG pipeline.
-PNG remains the production path. #256 corrected a real endpoint-promotion bug
-and verified the remaining interpolation against the specification's vendor
-tolerances; zero equality to one PNG is not a universal hardware contract.
-The bounded source-block/readback experiment,
-actual OS memory counters and source hashes are in
-[block-compression-evaluation.md](block-compression-evaluation.md); #256 tracks
-the decode reconciliation needed before a source-preserving rollout.
-
-Retired entity/preview views dispose their own geometries and materials (#164),
-including ownership replacement, fog/view retirement, replay and presentation
-rebuilds. Shared atlas/palette textures survive. The real build-house/cancel
-and same-seed restart probe formerly grew GPU geometries by 3 per preview and
-19 per restart; it now stays at 38 in imported mode and 15 in open fallback.
-Repeated reveal/retire cycles also plateau. Recreated-world pixels and paused
-simulation hashes match; farm-patch replacement also releases its old material.
-
-Fog snapshots finish binding late sprite pages without changing their frozen
-pose or reading newer entity state (#88). In particular, a tree that leaves
-sight before its shadow sheet arrives no longer keeps a permanently missing
-shadow. That initial fix did not address the human's visible-canopy report.
-Ground fog now draws below whole sprites; remembered sprites are dimmed in RGB
-rather than cut through by the ground contour. Decorative scenery separately
-checks its anchor tile, so this does not reveal unknown objects. Shadows use
-the imported Default profile strength instead of an extra 0.55 multiplier.
-The screenshot-driven browser check measures opaque canopy pixels across F4,
-remembered-canopy brightness, and visible-ground shadow coverage against the
-owned mask. Final biome-specific grading/compositing is still #149.
-The human accepted this corrected presentation on 2026-09-20 (“ok, this is
-good”). The acceptance evidence is recorded on #88 and in
-`tools/tree_fog_smoke.mts`; `docs/handoff.md` records current operational state.
-
-**Not drawn** (#149): DE's frame is composited offscreen through
-`CombineTerrainSpriteSMP` with bloom, the biome's colour grade, vignette and
-sprite supersampling, then an antialias and unsharp pass; ours draws
-straight to the canvas. Nor the ground's scatter and layer (#55).
-
-## Deliberately omitted
-
-Other civilisations (#122) and their bonuses (#123); selectable formations;
-campaigns; public multiplayer;
-unlocked diplomatic relations/cooperative victories; a genetic-algorithm framework;
-separate mobile gameplay. Skipped technologies are recorded individually, each
-with its reason in the manifest's `skippedTechnologies` (#128). The open
-fallback stops at the Castle Age (#125).
-
-## Measurements
-
-### Mapping checkpoint (#134/#176/#160/#148)
-
-The combined checkpoint gate is **GREEN**, `.local/mapping-checkpoint-final-gate.log`:
-**728 Vitest tests / 55 files**, production build, **92 Python/import tests**,
-and the real-browser debug smoke. It ran on 2026-09-24 from 00:11 +01:00 after
-final source review. Three Vitest workers were used on the
-idle host; no fixture timeout was widened. Dedicated placement (both content
-modes), world-relief, minimap-relief and shoreline-alpha browser checks also
-passed. Exact engine elevation topology, native blend UV choices and full DE
-lighting/compositing remain the explicit ledgered limits described above.
-
-### Garrison follow-on (#137)
-
-The town bell recalls workers into its selected town center and restores their
-previous orders/routes on release; its icons, cell, labels and start/stop audio
-come from owned UI/sound metadata. Production self-rally holds newly trained
-units up to capacity. Rams carry six infantry/villager passengers and can unload
-or release them on destruction. Garrison flags use recursively resolved DAT
-graphics, per-age positions and player-colour masks, including remembered
-occupancy without exposing passenger counts. Observation v5 adds the bell command,
-own bell state and public flag presence.
-
-The villager's negative firepower now contributes flat DPS according to the
-community attribute documentation; actual volley tests cover researched building
-damage and the town center's absent primary arrow. Exact engine classifications
-and bell routing assumptions are recorded in the ledger. Crew speed/attack
-bonuses are the explicit follow-on #161.
-
-Dedicated browser check `tools/garrison_edges_smoke.mts` passes real bell toggles,
-work return, self-rally/training/unload, ram right-click boarding/unload, and
-rendered blue flag pixels (TC 54, barracks 55, ram 105 in that fixture).
-The final browser check also verifies `1/6 garrisoned` on a loaded ram and both
-owned bell audio requests. The full gate is **GREEN**,
-`.local/issue137-gate-r3.log`: **658** Vitest tests, production build, **85**
-Python/import tests and general browser smoke. The idle-host retry passed with
-the same single-worker settings and unchanged test limits after the earlier
-host-contention timeouts. The implementation and its documented approximations
-are included in the #96/#137 checkpoint.
-
-### Performance verification
-
-The 2026-09-23 run replaced repeated fog-memory scans with an invocation-local
-live index (#165), reused bounded A* scratch storage without changing its f/h/tile
-order (#166), reused each gatherer's target lookup (#167), and fast-pathed resource
-kind checks (#168). Three imported 12,000-tick matches (seeds 3/7/19) retained
-identical raw-JSON state hashes every 1,000 ticks while stepping fell
-**50.087 → 34.025 s (32%)**. A full Windsor match retained its terminal state at
-tick 34,231. The 392×392 short-search microbenchmark fell 542 → 24 ms for 2,000
-queries; this is not a 20× whole-game/FPS claim. Same-tick fog changes, alternating
-board sizes, failed searches, cache-copy isolation, economy regressions and real
-movement/gathering browser actions cover the changes.
-
-Sustained verification found and fixed two additional lifetime problems. A
-60-second warm grace avoids worker-trip churn (#170): seven-minute evictions
-586 → 44, at an estimated sprite footprint of 1,051 → 1,459 MiB. Sprite builder
-keys now follow texture UUID/lifetime (#172), preventing Three r180 from cloning
-a cleared sampler after A→B→expire A→new B. Basic/ramp pixels remain identical;
-missing, pending and empty contours cannot revive retired bindings.
-
-Composite ship contours (#173) now use that same current-frame readiness
-contract instead of the never-assigned `atlasKey`. Each update retires old layer
-mask references, including animations with fewer/no layers. The owned Galley
-browser fixture measures 321 changed sRGB pixels, all shifting toward the imported
-player-blue contour colour, behind the native TC occluder. Delayed pages,
-expiry/reload and empty frames pass without simulation changes. The fixture hides
-animated terrain/foam for the A/B comparison; the existing whole-hull box coverage
-threshold remains an approximation. `tools/composite_outline_smoke.mts` and the
-older `outline_residency_smoke.mts` cover both composite and ordinary contours.
-The large-map order crossover is fixed in #238. The existing pass bases now use
-bounded monotone within-pass keys, preserving sprite/piece depth order while
-keeping projectiles, contours, rally flags and placement overlays in their own
-passes. At depth 515 the former body/contour/occluder orders were 6150/5015/6205,
-leaving just 32 blue contour pixels. The corrected near/far fixtures both return
-321 Galley pixels; ordinary villager contours return 147 at both positions.
-Placement overlays cover all 153/89 opaque samples, camera round trips preserve
-identical PNGs, and delayed pages/expiry/empty frames retain simulation hashes.
-The independent canopy/fog/shadow browser regression also passes.
-
-The combined player-rule/#173/#51/#52/#238 checkpoint is GREEN in `.local/wrapup-gate.log`:
-775 Vitest tests / 60 files, build, 103 Python/import tests and browser smoke.
-Dedicated cursor checks pass 15 real hover/right-click cases in both owned and
-fallback modes, plus remembered-resource selection; composite and ordinary
-contour lifetime probes pass, including the near/far ordinary/composite matrix.
-`.local/quickwins-import-r2.log` records full owned regeneration with cached sprite
-reuse. No timeouts were widened. `docs/handoff.md` records the complete checkpoint
-and the remaining civilisation implementation work.
-
-The final **156.67-minute** private browser run (#169) completed with **156
-samples, no page/asset errors and no invalid bindings**, across all four maps
-and 1.5×/2×/10× speeds. Six victories, one tick limit and one wall limit ended
-eight workloads; the ninth was partial at cutoff. Estimated sprite footprint
-peaked 3,329.88 MiB and ended 2,065.58 MiB; host available memory stayed above
-9.14 GiB. Three samples had pending body pages, so zero first-use pop-in is not
-claimed. Windsor seed 10 at 10× retained step spikes (worst sampled p95 189.1 ms),
-tracked in **#175**. Earlier failures and interrupted segments are not counted as
-passes. These SwiftShader measurements do not establish physical-GPU FPS.
-
-The generated [run report](reviews/2026-09-23-performance.md) contains the exact
-workload table, byte/timing comparisons, deployment and verification limits.
-`tools/performance_soak.mts` records timing/residency data and failure snapshots;
-`tools/probes/sim_performance.mts` records and compares deterministic traces.
-
-The maintained open-ground pathing probe now discovers/asserts a clear
-20-tile corridor (#5) instead of using a seed-200 destination occupied by a
-tree. It reaches the goal in 485 ticks at a 0.97 travel ratio. The ten-minute
-match probe records zero stuck ticks in 51,641 moving ticks; the other fixture
-results retain their reported wall counts rather than claiming a redesigned
-formation or generator.
-
-### Earlier checkpoint measurements
-
-All on the 120x120 generated board unless stated; older figures are not
-comparable because the board changed under them.
-
-- **Paired batch, 2026-08-29** (16 seeds, 2400 s clock): 14 decided, 2
-  timeout draws, **0 replay checksum failures**, 32/32 Feudal, 4 Castle.
-  The trade-off curve across seven configurations is on #124; the
-  smith/no-smith A/B is 7-7 (null).
-- **Per-tick cost** (seed 102, 900 s, warm, 1308 live entities): median
-  0.95 ms, p90 1.09 ms, p99 1.49 ms, worst 6.07 ms against the 50 ms budget.
-  A fifty-unit order lands in 8.85 ms warm (`docs/pathing-review.md`).
-- **Browser** (headless Chrome, SwiftShader, 1280x800): ~25 ticks/s at the
-  default speed, 17.5 at Slow (ratio 1.45 of the 1.50 asked); the absolute
-  rate is software rendering, the ratio is the claim.
-- **Import**: every consumed DAT graphic, rule and widget resolves; the
-  local SLD decoder is byte-identical to openage's on all 29,783 frames it
-  replaced; every modelled unit's stats match the DAT (487 values, 0
-  mismatches, #36).
-- **Tests**: 658 vitest, 85 Python/import tests, and the
-  browser smoke (`tools/debug_smoke.mjs`: a private server, real clicks and
-  keys). Fidelity assertions skip without the owned content; the gate says
-  how many skipped.
-
-The latest gate's actual log/status is recorded in `.local/gate.latest.json`
-and shared by session-start and morning-report through `tools/report-data.mjs`
-(#159). Tracker windows compare timestamp instants, paginate all updated issues,
-and include issues opened and closed within the same run. Timeout-related added
-diff lines are review candidates, not a claim that fixture clocks were widened.
-The four issue-specific naval browser
-scenarios also passed in `.local/issue97-naval-final-d1659.log`: dock buttons
-and upgrades, boarding and shore unloading, fish-trap construction/income,
-and visible fire shots.
-Earlier dedicated browser checks cover single-farmer group orders, live/fog-memory
-minimap marker pixels, counted queues (imported and fallback), scorpions, and
-delayed tree-shadow texture arrival, complete visible/remembered canopies and
-visible shadow coverage against the owned mask and Default strength.
-
-Group arrival (#83) no longer degenerates into an axis-aligned line: stationary
-collision normals break positional ties in two dimensions. Ten- and 25-unit
-public-command regressions check compactness, personal space and settlement;
-`tools/group_movement_smoke.mts` verifies a real 25-unit right-click in imported
-mode (2.186×2.083 tiles, radius 1.160). This is collision separation, not the
-reference's selectable formation system; its numerical tie-break is in the ledger.
-
-Shared-host incompatible checkpoint startup (#157/#158) now exits with
-non-retryable status 78 and preserves the saved bytes. The installed service
-also bounds transient retries, and session-start reports its failed/running
-state and restart count (#155). CLI regressions cover version/rules mismatch,
-malformed JSON, retryable port conflicts and compatible checkpoint restoration.
-Ysgramor's incompatible checkpoint was preserved byte-for-byte while its service
-entered `failed/78` without increasing the restart count. At 21:37 BST the human
-authorized ending matches unused by both machines for one hour. After over three
-hours down, that checkpoint was archived and the host restored; localhost and
-the existing Tailscale shared endpoints respond, with zero restarts.
-The private two-browser shared smoke passed adoption, training, synchronization,
-reconnection and checkpoint restoration; a transient systemd probe recovered
-on its second attempt under the same restart policy.
-
-Herd food (#85): the AI shares one animal target and can see edible carcasses;
-automatic shepherd continuation finishes carcasses and follows an already chosen
-next animal. Sheep/deer spoil at the live DAT unit's 0.25 food/s, boar at 0.4,
-even when nobody gathers. The full cached import published those rates.
-`tools/herd_food_smoke.mts` verifies one AI sheep killed, a separately unattended
-carcass losing five food over twenty game seconds, real carcass selection, and
-the HUD showing 95 food. Regression tests cover automatic continuation without
-AI correction, hidden foreign carcasses, own-only target IDs and JSON replay.
-The older collection-rate fixtures explicitly disable spoilage to isolate
-collection/capacity; the new suite also accounts for both food sinks together.
-
-AI Feudal construction (#86) now reserves wood against discretionary economic
-expansion and archer purchases. Fresh imported seeds 1/7 complete blacksmiths
-at 1300.2/1614.85 game seconds; before the change neither had a blacksmith by
-match end/the 1800-second probe cap. Seed 42 completes a range at 1570.2 seconds
-and wins at 1813.05 before building its smith. The private browser fixture
-starts the AI with only 125 wood and verifies a completed, rendered, selectable
-blacksmith by tick 2672. Four regressions cover saving, construction completion,
-urgent housing and releasing the reserve; broader later-age strategy remains #124.
-
-Corpse resight (#120) uses the simulation's existing corpse countdown to recover
-death age, including from old JSON saves. A recreated view resumes the correct
-death frame or corpse stage; a paused match cannot advance that clock. Tests
-cover resight, reload and mid-death frames. The imported browser check moves a
-scout out of and back into sight, verifies the old view was removed, and reads
-`villager-female/decay` both before and after resight without replaying the death.
-
-## The reference's default zoom is 0.8 of ours
-
-DE at its default zoom draws the 2x assets at 0.80 -- a 77-pixel tile
-against our 96 at zoom 1 (`islands-coast-2026-09-19.png`: a 143-texel
-mangrove stands 115 px, the water's repeat vector is (404, 202) px). A match
-here now opens at zoom 0.8, so a composite at each game's default compares
-like with like.
-
-## The projection has AoE2's handedness
-
-`worldToIso` sends +x down-**left** and +y down-**right**; tile (0, 0) is
-the diamond's top corner. Everything that turns a tile direction into a
-screen direction leans on it: `worldToIso`/`isoToWorld`, the minimap's
-`toCanvas`/`fromCanvas` and image transform, `directionIndex` (facing into
-sprite frame), the blend-mask neighbour table and tile-corner uv assignment,
-the wall run frames and the gate's art key, the water's world frame, and
-the two surveyed boards (transposed on import). Player 1's town, at
-x = W/4, is on the screen's right. A change to any of it is verified by
-mirroring an earlier screenshot and laying the new one beside it: layout
-lands on the mirror to the tile, sprites are not mirrored.
+| Area | Working scope | Evidence and limits |
+| --- | --- | --- |
+| Simulation | Fixed20Hz deterministic economy, construction/repair, production/refunds, gathering/hunting/farms, combat/projectiles/armour/elevation, garrisons/transports, research and fog memory | `src/sim/`; public-command outcome tests and deterministic replay; approximations in ledger |
+| Civilisations | Britons, Franks, Goths, Teutons, Japanese and Chinese with roster/research/bonus/art integration | [coverage](civilization-coverage.md), [bonus contract](civilization-bonuses.md); wider catalogue is inventory only |
+| Buildings/specialists | Additional TCs, fortifications, monasteries/relics, siege, conversion snapshots, nested cargo capacity and owner-preserving mobile-carrier conversion | [buildings](civ-buildings-integration.md), [specialists](civ-specialists-integration.md), [conversion](conversion-reference-checklist.md) |
+| Naval | Briton dock roster, transports, trade cogs and fish traps; enabled profiles' regional ships | Owned DAT/task/art imports; naval/transport browser acceptance; no claim of every native exception |
+| Modes/shared play | Solo and household two-seat play, reconnect/checkpoints, Regicide/Treason, locked diplomacy/tribute | [shared play](shared-play.md), [source audit](shared-reference-audit.md); public multiplayer and general migration are not delivered |
+| Maps | Arabia, Black Forest, Islands, Windsor, Senlac and painted proof; RMS-inspired land/terrain/object phases, surveys, elevation, relic placement and corrected spacing | [generation design](map-generation-design.md); mirrored adapter and several native placement/slope semantics remain inferred |
+| Rendering | Owned x1/x2 sprites, masks/contours/shadows, fog memory, source-backed water/foam, native blend families, terrain plants and their shadows | [blend coverage](terrain-blend-coverage.md), [decode contract](block-decode-contract.md); native compositor and exact calibration remain open |
+| UI | Native command cells/icons/cursors, garrison/training/production controls, notifications/confirmation/end screens, map menu and persistent options | [UI reference](ui-reference.md), [feedback review](reviews/2026-09-24-issue58.md); browser text rasterisation and some surfaces remain approximations |
+| Audio | Voices, combat/construction/ambient playback, layered action timing and27-track soundtrack | [audio reference](audio-reference.md); missing streams and native mix/spatial behaviour remain tracked |
+| AI | Observation-only economy/building/combat strategy, coastal fishing and public-command sheep return | [fishing](ai-fishing.md), herding outcomes; integrated early military progression/finishing power still incomplete |
+| Agents/replays | Browser/Node share commands; versioned observations and records, subprocess/WebSocket/MCP agents, deterministic batch/replay tools | Provider-dependent tests opt-in; open fallback stops at Castle Age |
+
+Briton/Frank scoped completion includes the previously pending fortification,
+relic, Warwolf and unique-research work. Terrain plants and their owned shadows
+are drawn. These statements supersede the stale early integration paragraphs
+removed in the October1 post-mortem follow-through.
+
+## Imports and fidelity boundaries
+
+`npm run import:aoe2` is the only full publication entrypoint. It resolves pinned
+owned depots, verifies source container integrity, imports DAT/RMS/UI/audio and
+converts sprites/blends. Enhanced Graphics Pack art is sourced at scale2 and
+drawn at half size; atlases above8192px continue on pages. Base x1 monk sources
+were recovered and validated; see [source integrity](source-integrity.md).
+
+Production uses PNG. Hardware block compression was evaluated, not deployed.
+RGB565 endpoint promotion is corrected; permitted vendor interpolation is distinct
+from that bug. [Compression evaluation](block-compression-evaluation.md) records
+the measured allocation benefit and pixel-equivalence limits.
+
+Sprites load on demand. Scene-required pages may exceed the512MiB soft residency
+budget; it is not a hard total-memory cap. Eviction, warm grace and idle expiry
+are chosen application policies. First-use/expired art can be temporarily absent.
+
+Owned files do not settle every engine rule. Conversion exceptions, volley/charge
+cadence, zero-time grants, population settings, RMS window/placement semantics and
+audio mixing remain explicitly qualified in the ledger. Closed scoped civilisation
+tickets are not a claim of complete native-DE equivalence.
+
+The machine-check, memory-pressure and provider-stall incidents have distinct
+evidence. Do not reuse one incident's diagnosis for every later failure.
 
 ## Verification
 
-```bash
-tools/gate.sh              # npm test, npm run build, npm run test:import, npm run debug:smoke
-npm run batch -- --matches 16 --concurrency 16 --seed-start 100 --max-time 2400 --out .local/batches/gate
-npm run test:live-agent    # opt-in
-```
+The checkpoint gate is exactly unit tests, build, owned import tests and general
+real-browser smoke. `tools/gate.sh` records its current result and stage logs;
+`tools/session_start.sh` reports the actual latest run, not a recalled count.
 
-The batch's `summary.json` carries `decided`, `timeouts`, `replayFailures`
-and `throughput`; a change that moves any of them is worth explaining.
+Feature-specific browser acceptance is additional. `node tools/acceptance.mjs plan
+HEAD` lists mapped scenarios and unmapped changed paths; `run <scenario>
+<scope-note>` records a pass/failure bound to code and imported JSON metadata.
+`check HEAD` rejects stale/missing selected receipts. The registry is deliberately
+explicit about known gaps and endurance tiers; it is not universal coverage.
+Review its generated scope diff for changes to assertions, supplied state and
+time limits. #124's Dark-Age-start acceptance remains opt-in and failing, separate
+from the green Feudal-start component fixture.
 
-Two things the gate does not measure, run by hand after anything touching the
-map, the pathfinder or the frame loop: the **worst tick** over a full match
-(`tools/probes/pathing.ts` is the shape), and **a real page** driven through
-a player's own input path — `page.mouse.click`, `page.keyboard.press` — read
-back through `/__debug`, on a private Vite server (`AGENTS.md`;
-`tools/probes/README.md` names the probes that do this).
+Established historical measurements, with their original scope:
+
+- Three12,000-tick simulation runs:50.087→34.025s with checked state equivalence.
+- Ten-ship estimated RGBA residency:3.88GB→0.875GB, identical rendered pixels.
+-156.67-minute browser soak: no invalid bindings; peak estimated sprite data
+  3,329.88MiB; remaining Windsor10× spike. See [performance report](reviews/2026-09-23-performance.md).
+-27-track natural music cycle and39-minute combined audio/browser soak; the latter
+  completed19 tick-limit rounds. These are not physical-GPU FPS or AI victory claims.
+
+## Projection invariant
+
+AoE2 tile +x projects down-left and +y down-right; tile(0,0) is the diamond's top.
+`worldToIso`/`isoToWorld`, minimap mapping/image transform, sprite facing,
+blend-neighbour indices, tile-corner UVs, wall/gate axes, surveyed-map transpose
+and water framing must agree. Player1 at x=W/4 is on the screen's right.
+Verify a projection change against a mirrored previous layout to the tile;
+sprites themselves must not be mirrored. Water shader-world x is the mirror of
+tile x; the eye is along world(1,-1). DAT footprints and RMS remain in tile space.
+
+## Remaining work
+
+See the tracker, bugs first; [handoff](handoff.md) names operational blockers.
+The scoped completion declarations in [current-claims.json](current-claims.json)
+are checked against the tracker by `node tools/check-current-docs.mjs`.
+Not yet delivered: campaigns, public multiplayer, selectable formations,
+unlocked diplomatic relations/cooperative victories, native final compositing,
+all owned civilisations, complete RMS/elevation fidelity and several HUD surfaces.
+The wonder's countdown is approved but unimplemented; settings are no longer its
+blocker. The [DAT](dat-field-audit.md), [manual](manual-audit.md) and
+[provenance](genie-rms-provenance.md) audits distinguish actual remaining gaps from
+old requests that were already implemented.

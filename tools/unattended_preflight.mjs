@@ -1,7 +1,8 @@
 /** Check the installed OpenCode's merged permissions without invoking a model. */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { harnessFingerprint } from './harness-safeguards.mjs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,6 +37,11 @@ function run(command, args) {
 }
 
 export function preflight() {
+  const receiptPath = resolve(root, '.local/harness.ok.json');
+  assert(existsSync(receiptPath), 'Run node tools/harness_smoke.mjs: actual installed-CLI safeguard evidence required');
+  const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
+  assert.equal(receipt.fingerprint, harnessFingerprint(root), 'Safeguards changed; rerun node tools/harness_smoke.mjs');
+  assert.equal(receipt.version, run('opencode', ['--version']), 'Installed CLI changed; rerun the harness smoke');
   const agent = JSON.parse(run('opencode', ['debug', 'agent', 'build']));
   assert(Array.isArray(agent.permission), 'OpenCode did not return resolved agent permissions');
   const asks = unresolvedAsks(agent.permission);
@@ -68,6 +74,7 @@ export function preflight() {
   assert(['ADMIN', 'MAINTAIN', 'WRITE'].includes(repo.viewerPermission), 'GitHub account lacks repository write permission');
   run('git', ['ls-remote', '--exit-code', 'origin', 'HEAD']);
   console.log(`UNATTENDED PREFLIGHT GREEN: resolved build agent has no outstanding ask rules; depot access and ${repo.nameWithOwner} authentication checked.`);
+  console.log(`Fresh-process safeguard enforcement verified ${receipt.at}: ${receipt.evidence}`);
   console.log('This validates a fresh OpenCode process, not an already-running server. Restart/recreate the session after config changes, then read the owned source with the actual Read tool before starting the clock.');
   console.log(`Owned-source probe: ${source}`);
 }

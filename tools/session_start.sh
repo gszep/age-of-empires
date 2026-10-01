@@ -66,14 +66,15 @@ if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then
     list=$(gh issue list --state open --label "$label" --limit 100 --json number,title --jq '.[] | "  #\(.number) \(.title)"' 2>/dev/null)
     [ -n "$list" ] && printf '%s:\n%s\n' "$label" "$list"
   done
-  section "closed issues still named as open in the docs"
+  section "closed-issue wording candidates (overnight.md and backlog.md only; not a full documentation audit)"
   closed=$(gh issue list --state closed --limit 300 --json number --jq '.[].number' 2>/dev/null)
   stale=0
   for n in $closed; do
     hits=$(grep -nE "(^|[^0-9])#$n([^0-9]|$)" docs/overnight.md docs/backlog.md 2>/dev/null | grep -iE 'open|left|remain|blocked|next|start' || true)
     [ -n "$hits" ] && echo "$hits" | cut -c1-140 && stale=1
   done
-  [ $stale -eq 0 ] && echo "none"
+  [ $stale -eq 0 ] && echo "none in these two queue documents; status/handoff claims require their own review"
+  node tools/check-current-docs.mjs || echo "-> current-scope declarations need reconciliation (or tracker access failed)"
 else
   echo "gh is not authenticated; run: gh auth login   (the tracker is the queue)"
 fi
