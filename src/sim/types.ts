@@ -47,6 +47,7 @@ export type Order =
   | { kind: 'gather'; targetId: number }
   | { kind: 'build'; targetId: number }
   | { kind: 'attack'; targetId: number }
+  | { kind: 'attack-ground'; target: Point }
   /** A trade cart shuttling to the market with this id and back to its own. */
   | { kind: 'trade'; targetId: number }
   /** A monk restoring a wounded ally's hit points. */
@@ -163,6 +164,16 @@ export interface Entity {
   packingTicks?: number;
   /** Target of a task133 speed-up; discarded when the attack order changes. */
   attackApproachTarget?: number;
+  attackWeapon?: 'alternate';
+  attackVolley?: {
+    targetId: number; remaining: number; nextTicks: number; intervalTicks: number;
+    attacks: { class: number; amount: number }[]; speed: number; launchHeight: number;
+    art?: string; blastRadius?: number; blastAttackLevel?: number; accuracyPercent?: number; accuracyDispersion?: number;
+    interceptRadius?: number;
+    ignoresArmor?: boolean;
+    piercing?: { radius: number; attacks: { class: number; amount: number }[]; unit: string };
+    piercingRange?: number;
+  };
   /** Monks: ticks spent working on the current conversion target. Reset the
    * moment the monk stops, so a broken-off attempt is not banked. */
   convertTicks?: number;
@@ -212,6 +223,8 @@ export interface PlayerState {
  * dies first simply takes the arrow into empty ground.
  */
 export interface Projectile {
+  ignoresArmor?: boolean;
+  interceptRadius?: number;
   impactEffect?: string;
   impactSeconds?: number;
   impact?: { effect: string; remainingTicks: number; totalTicks: number };
@@ -297,6 +310,7 @@ export type DeepReadonly<T> =
 export type ReadonlyGameState = DeepReadonly<GameState>;
 
 export type Command =
+  | { kind: 'attack-ground'; player: PlayerId; entityIds: number[]; target: Point }
   | { kind: 'treason'; player: PlayerId; castleId: number }
   | { kind: 'exchange'; player: PlayerId; marketId: number; resource: 'wood' | 'food' | 'stone'; side: 'buy' | 'sell'; amount: 100 | 500 }
   | { kind: 'tribute'; player: PlayerId; recipient: PlayerId; resource: ResourceKind; amount: number }

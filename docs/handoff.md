@@ -1,22 +1,30 @@
-# Handoff — Japanese completion, 2026-10-01
+# Handoff — Chinese completion, 2026-10-01
 
 ## Current checkpoint
 
-- Branch `main`. Japanese#183 is complete on the conversion/rendering baseline
-  **5be3f31**. The owner explicitly resumed Japanese after the autonomous session
-  stalled; this checkpoint implements no additional civilisation.
-- Most recent full gate **GREEN**, `.local/japanese183-gate.log`, exit0,
-  **14m47s**: **1150 Vitest tests /90 files**,7 inapplicable Gothic fortification
-  cases skipped, public bundle build, **168 Python/owned-content tests** and
+- Branch `main`. Chinese#184 is complete on Japanese checkpoint **3c5aa04**,
+  following the owner's explicit Chinese implementation request.
+- Most recent full gate **GREEN**, `.local/chinese184-gate-r3.log`, exit0,
+  **19m27s**: **1186 Vitest tests /91 files**,7 inapplicable Gothic fortification
+  cases skipped, public bundle build, **172 Python/owned-content tests** and
   real-browser debug smoke. Two workers, nice10, unchanged test timeouts.
-- Japanese has its full available roster, Samurai/elite and Elite Cannon Galleon,
-  source-backed bonuses, Yasama's extra tower arrows and Kataparuto's actual
-  packing/firing clocks.24 dedicated sim cases,4 owned import cases and the
+- Chinese has its full available roster, source-backed opening/economy/TC/farm
+  bonuses, Great Wall/Rocketry, Chu Ko Nu/elite, Fire Lancers/elite, Rocket
+  Carts/heavy, Dragon Ship, Lou Chuan and Siege Ram.27 dedicated sim cases,
+  4 owned import cases and the
   **published enabled** private-browser acceptance pass
-  (`.local/japanese183-published-browser.log`). Actual menu/restart/reload,
-  construction/training/research payments, icons/names, Asia/unit art, three-arrow
-  volleys, unpack button and fishing banking are verified. Native Samurai approach
-  and packing-clock calibration remains#259; conversion remains#178.
+  (`.local/chinese184-published-browser-r3.log`). Actual menu/restart/reload,
+  discounted payments, crops, fortification HP, firearm art/bullets/charge HUD,
+  ground-fire/Stop controls, regional upgrades and naval weapon/art changes are
+  verified. Native weapon cadence, research-order redirection and bonus rounding
+  remain#260; conversion remains#178. Japanese calibration#259 remains blocked
+  on native Windows-game access, as recorded on that issue.
+- Gate findings were source/fixture assumptions (fixed prices, three-villager
+  openings, projectile versus shooter dispersion, fixed Incendiaries targets and
+  an incomplete mock command). Final review also covered common command guards
+  and firearm-to-melee windup/animation coherence. The source-aware fixtures and
+  regressions pass; no timing limit was widened. The browser helper's multi-page
+  URL check now reads `pages[].image`, verified on Lou Chuan's second page.
 - The earlier interruption's partial worktree `.local/japanese183` is superseded
   by this main-tree implementation. Its old branch is not the current checkpoint.
   Dedicated private browser/import/gate processes have completed; the managed
@@ -165,8 +173,8 @@ remain `.local/music115-soak-r2.log` and `.local/audio-run-soak-r2.log`.
 - Remaining RMS phase/quota/terrain-height fidelity is documented in the #56
   contract audit and tracked with #130/#134; this is not a full native generator.
 
-Britons/Franks/Goths/Teutons/Japanese are the enabled profiles. Latest complete
-owned publication: `.local/japanese183-enabled-import.log` (3907 cached atlas
+Britons/Franks/Goths/Teutons/Japanese/Chinese are the enabled profiles. Latest complete
+owned publication: `.local/chinese184-enabled-import.log` (4101 cached atlas
 groups, including the existing RGB565 correction and eight blend families).
 Fresh installations use
 `npm run import:aoe2`. Never overwrite the preserved managed match.

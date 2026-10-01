@@ -187,7 +187,7 @@ extern const int cAttributeSet = 0;
         # Synthetic IDs prove the decoder uses the source map, not the old
         # 36/270/271 allow-list. Unimplemented attributes remain diagnostic.
         ids = {"farmFoodAmount": 8, "unitRepairCost": 9, "buildingRepairCost": 10, "militaryConversionChance": 11}
-        commands = [SimpleNamespace(type=1, a=a, b=b, d=d) for a, b, d in (
+        commands = [SimpleNamespace(type=1, a=a, b=b, c=-1, d=d) for a, b, d in (
             (8, 1, 75), (9, 0, 0), (10, 1, -0.25), (11, 0, 0.1), (999, 0, 1), (9, 2, 1),
         )]
         dat = SimpleNamespace(techs=[SimpleNamespace(effect_id=0)],
@@ -1152,7 +1152,9 @@ class ContentImportIntegrationTest(unittest.TestCase):
                 continue
             # The packed trebuchet reads 92 with no dispersion, and never
             # shoots: it is the set-up unit's numbers that a shot carries.
-            if combat["accuracyPercent"] < 100 and combat["attacks"] and key != "trebuchet":
+            # Secondary-projectile tables can carry85% accuracy with zero
+            # dispersion; the shooter's nonzero dispersion is a separate field.
+            if combat["accuracyPercent"] < 100 and combat["attacks"] and key != "trebuchet" and entities[key]["category"] != "projectile":
                 self.assertIn("accuracyDispersion", combat, key)
             entity = entities[key]
             civ = 0 if entity["category"] in ("resource", "animal") else SPEC["civIndex"]
@@ -1768,9 +1770,11 @@ class ContentImportIntegrationTest(unittest.TestCase):
         ids = self.result["playerAttributeIds"]
         values = self.result["playerAttributes"]
         resources = _dat().civs[SPEC["civIndex"]].resources
-        self.assertEqual(len(ids), len(rows) + 1)
+        self.assertEqual(len(ids), len(rows) + 2)
         self.assertEqual(ids['resource-29'], 29)  # named by owned localization15029, not Constants.xs
         self.assertEqual(values['resource-29'], resources[29])
+        self.assertEqual(ids['resource-69'], 69)  # localization15069: Farm Food Multiplier
+        self.assertEqual(values['resource-69'], resources[69])
         self.assertEqual(set(ids), set(values))
         for name, index in rows:
             key = "farmFoodAmount" if name == "FarmFood" else name[0].lower() + name[1:]

@@ -8,6 +8,7 @@ import puppeteer from 'puppeteer';
 import { createServer } from 'vite';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
+import { researchCostFor } from '../src/sim/technologies.ts';
 import { pageOf } from '../src/view/build-menu.ts';
 import { displayName } from '../src/view/names.ts';
 import type { BuildingKind, GameState } from '../src/sim/types.ts';
@@ -89,7 +90,8 @@ export async function civilizationBrowser(civ: string, port = 5269) {
   const research=async(id:number,key:string)=>{
     await select(id);await page.waitForSelector(`[data-command="research-${key}"]`);
     const before=await snapshot();await click(`research-${key}`);const paid=await snapshot();
-    for(const r of ['food','wood','gold','stone'])assert.equal(before.players[1][r]-paid.players[1][r],profile.technologies[key].cost[r]??0);
+    const price=researchCostFor({...before,rules},1,key);
+    for(const r of ['food','wood','gold','stone'] as const)assert.equal(before.players[1][r]-paid.players[1][r],price[r]);
     await until((s,key)=>s.players[1].researched.includes(key),key);console.log(civ,'paid research',key,'GREEN');
   };
   const train=async(id:number,kind:string)=>{
@@ -103,7 +105,8 @@ export async function civilizationBrowser(civ: string, port = 5269) {
       {timeout:120000},{id,key:`civilizations/${civ}/${kind}`});
     const shown=await page.evaluate(id=>(window as any).__civProbe.art(id),id),entity=profile.entities[kind];
     assert.equal(shown.name,displayName(kind,entity.text.name));
-    assert(Object.values(entity.atlases).flatMap((a:any)=>[a.image,...(a.pages??[])]).includes(shown.texture));
+    const images=Object.values(entity.atlases).flatMap((a:any)=>[a.image,...(a.pages??[]).map((p:any)=>p.image)]);
+    assert(images.includes(shown.texture),JSON.stringify({id,kind,shown,images}));
   };
   const build=async(worker:number,kind:BuildingKind,target:{x:number;y:number})=>{
     await select(worker);await page.waitForFunction(()=>!!document.querySelector('[data-command="page-back"],[data-command="page-economic"]'));

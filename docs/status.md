@@ -9,7 +9,7 @@ does not repeat it.
 
 ## Run and play
 
-**Britons, Franks, Goths, Teutons and Japanese are selectable owned profiles.** Franks adds
+**Britons, Franks, Goths, Teutons, Japanese and Chinese are selectable owned profiles.** Franks adds
 paid unique-tech/elite acceptance and Heresy; Goths adds Anarchy secondary
 production, Perfusion, gated fast Loom, hunting/infantry/population bonuses,
 Dromon and Incendiaries. Teutons adds its own roster/art/voices, farm/armour/
@@ -18,13 +18,17 @@ and elite, Siege Onager, Bombard Towers, Redemption/Atonement and captured-build
 stat retention. New production at captured factories receives recipient upgrades.
 Japanese adds Samurai/elite, Yasama tower volleys, Kataparuto packing/firing,
 Elite Cannon Galleons, fishing/infantry/camp/sight/archer bonuses and original
-Asia art/flags/icons/voices. Dedicated published-profile browser acceptance passes.
-Latest full gate GREEN:1150 tests/90 files,7 inapplicable Gothic fortification
-cases skipped, build,168 import tests and browser smoke
-(`.local/japanese183-gate.log`). See [civilisation coverage](civilization-coverage.md)
+Asia art/flags/icons/voices. Chinese adds its six-villager/resource-adjusted start,
+TC housing/sight, discounted research, farm team bonus, Great Wall, Chu Ko Nu/elite,
+Fire Lancers/elite, Rocket Carts/heavy, Dragon Ship, Lou Chuan, Siege Ram and
+Rocketry. Shared consumers include multi-shot/alternate weapons, interception,
+armour bypass/resistance and public ground fire. Dedicated published-profile
+browser acceptance passes. Latest full gate GREEN:1186 tests/91 files,7
+inapplicable Gothic fortification cases skipped, build,172 import tests and
+browser smoke (`.local/chinese184-gate-r3.log`). See [civilisation coverage](civilization-coverage.md)
 for evidence. Shared conversion (#178), native Incendiaries (#252), population
 settings (#253), zero-time grant timing (#254) and native Samurai/Kataparuto
-calibration (#259) remain documented boundaries.
+calibration (#259), plus native Chinese weapon/bonus calibration (#260), remain documented boundaries.
 
 The #54 DAT inventory has been refreshed against the pinned data and actual
 consumers: [dat-field-audit.md](dat-field-audit.md). Most old garrison/audio/

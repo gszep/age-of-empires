@@ -4,7 +4,7 @@
  * table and nothing that computes sight ever read it); game.ts imports
  * visibility, so they moved here to keep the import graph acyclic.
  */
-import type { BuildingRules, TechEffect, UnitRules } from './data';
+import type { BuildingRules, GameRules, ProjectileRules, TechEffect, UnitRules } from './data';
 import { isBuilding, isUnit } from './data';
 import { rulesForPlayer } from './civilizations';
 import { technologyFor } from './technologies';
@@ -39,12 +39,18 @@ export function playerAttributeFor(
   const attributes = rules.playerAttributes;
   let value = (attributes && Object.hasOwn(attributes, name) ? attributes[name] : undefined) ?? legacy;
   if (value === undefined || owner === 0) return value;
+  let reapplied = 1;
+  const multiplierResources = new Set<string>();
   for (const key of state.players[owner as PlayerId].researched) {
     for (const effect of technologyFor(rules, key)?.effects ?? []) {
-      if (effect.resource === name) value = combine(effect.operation, value, effect.amount);
+      if (effect.resource !== name) continue;
+      if (effect.reapplyMultiplierFrom) multiplierResources.add(effect.reapplyMultiplierFrom);
+      else if (effect.reapplyMultiplier) reapplied *= effect.amount;
+      else value = combine(effect.operation, value, effect.amount);
     }
   }
-  return value;
+  for (const resource of multiplierResources) reapplied *= playerAttributeFor(state, owner, resource) ?? 1;
+  return value * reapplied;
 }
 
 export function populationLimitFor(state: GameState, owner: PlayerId): number {
@@ -99,8 +105,10 @@ export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: Uni
   const researched = state.players[owner as PlayerId].researched;
   if (!researched.length) return base;
   let rules = base;
+  let replacesPrimaryProjectile = false;
   for (const key of researched) {
     for (const effect of technologyFor(source, key)?.effects ?? []) {
+      if (effect.projectileFrom && effect.projectileFrom === base.projectileArt) replacesPrimaryProjectile = true;
       if (rules.unpacked?.unit && effect.unit === rules.unpacked.unit) {
         if (effect.attribute === 'workRate') {
           // This pair's work-rate modifier is an inverse packing clock.
@@ -143,9 +151,38 @@ export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: Uni
     }
   }
   if (rules.cost !== base.cost) roundCost(rules);
+  if (replacesPrimaryProjectile && rules.projectileArt && source.projectiles?.[rules.projectileArt]) {
+    const projectile = projectileRulesFor(source, researched, source.projectiles[rules.projectileArt]);
+    if (projectile.key !== rules.projectileArt) rules = { ...rules, projectileArt: projectile.key, projectileSpeed: projectile.speed,
+      interceptRadius: projectile.interceptRadius, piercing: projectile.piercing };
+  }
+  if (rules.volley?.secondary) rules = { ...rules, volley: { ...rules.volley, secondary: projectileRulesFor(source, researched, rules.volley.secondary) } };
+  if (rules.alternateAttack) rules = { ...rules, alternateAttack: { ...rules.alternateAttack,
+    projectile: projectileRulesFor(source, researched, rules.alternateAttack.projectile) } };
   const healRange = rules.heal ? playerAttributeFor(state, owner, 'healRange') : undefined;
   if (rules.heal && healRange !== undefined && healRange > 0) rules = { ...rules, heal: { ...rules.heal, range: healRange } };
   return rules;
+}
+
+/** Projectile research has its own target IDs, including Rocketry's art swap. */
+function projectileRulesFor(source: GameRules, researched: string[], original: ProjectileRules): ProjectileRules {
+  let base = original;
+  const replacements = new Map<string, string>();
+  for (const key of researched) for (const e of technologyFor(source, key)?.effects ?? []) {
+    if (e.projectileFrom && e.projectileTo && source.projectiles?.[e.projectileTo]) replacements.set(e.projectileFrom, e.projectileTo);
+  }
+  const seen = new Set<string>();
+  while (replacements.has(base.key) && !seen.has(base.key)) {
+    seen.add(base.key); base = source.projectiles![replacements.get(base.key)!];
+  }
+  const attacks = base.attacks.map(a => ({ ...a }));
+  for (const key of researched) for (const e of technologyFor(source, key)?.effects ?? []) {
+    if (e.unit !== base.key || e.attribute !== 'attack') continue;
+    const entry = attacks.find(a => a.class === e.armorClass);
+    if (entry) entry.amount = combine(e.operation, entry.amount, e.amount);
+    else attacks.push({ class: e.armorClass ?? 0, amount: combine(e.operation, 0, e.amount) });
+  }
+  return { ...base, attacks, ...(base.piercing ? { piercing: { ...base.piercing, attacks } } : {}) };
 }
 
 /** Production slot, not just unit identity: a secondary producer can have a
@@ -180,6 +217,10 @@ function applyEffect(rules: UnitRules, effect: TechEffect): void {
     }
     case 'maxCharge':
       if (rules.fireCharge) rules.fireCharge = { ...rules.fireCharge, maximum: combine(effect.operation, rules.fireCharge.maximum, effect.amount) };
+      break;
+    case 'chargeRangeModifier':
+      if (rules.alternateAttack) rules.alternateAttack = { ...rules.alternateAttack,
+        rangeModifier: combine(effect.operation, rules.alternateAttack.rangeModifier, effect.amount) };
       break;
     case 'chargeType':
       if (rules.fireCharge) rules.fireCharge = { ...rules.fireCharge, type: combine(effect.operation, rules.fireCharge.type, effect.amount) };
@@ -309,6 +350,7 @@ function applyBuildingEffect(rules: BuildingRules, effect: TechEffect): void {
     case 'blastRadius':
       if (rules.attack) rules.attack.blastRadius = combine(effect.operation, rules.attack.blastRadius ?? 0, effect.amount);
       break;
+    case 'populationSupport': rules.popSupport = combine(effect.operation, rules.popSupport, effect.amount); break;
     case 'garrisonCapacity':
       if (rules.garrison) rules.garrison = { ...rules.garrison, capacity: combine(effect.operation, rules.garrison.capacity, effect.amount) };
       break;

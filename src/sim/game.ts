@@ -221,7 +221,7 @@ function recalculatePopulation(state: GameState): void {
     state.players[player].population = population[player];
     const housing = rules.startingPopulationCap + state.entities
       .filter(e => !e.dead && e.owner === player && isBuilding(e.kind) && e.buildProgress === undefined)
-      .reduce((sum, e) => sum + (e.convertedBuildingRules ?? rules.buildings[e.kind as BuildingKind]).popSupport, 0);
+      .reduce((sum, e) => sum + buildingRulesForEntity(state, e).popSupport, 0);
     state.players[player].populationCap = Math.min(housing, populationLimitFor(state, player));
   }
 }
@@ -630,6 +630,8 @@ export function resolveUnitOrder(state: GameState, entity: Entity, target: Point
 
 function assignOrder(state: GameState, entity: Entity, target: Point, targetEntity?: Entity): void {
   entity.attackApproachTarget = undefined;
+  entity.attackVolley = undefined;
+  entity.attackWeapon = undefined;
   const order = resolveUnitOrder(state, entity, target, targetEntity);
   entity.fishingPosition = undefined;
   if (order.kind === 'idle') { becomeIdle(entity); return; }
@@ -700,6 +702,19 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
   }
   if (matchOver(state)) return rejected('match is over');
   if (command.player !== 1 && command.player !== 2) return rejected('unknown player');
+  if (command.kind === 'attack-ground') {
+    if (!state.players[command.player] || !Number.isFinite(command.target.x) || !Number.isFinite(command.target.y)
+      || command.target.x < 0 || command.target.y < 0 || command.target.x >= state.width || command.target.y >= state.height) return rejected('target is not on the map');
+    const units = state.entities.filter(e => !e.dead && e.owner === command.player && command.entityIds.includes(e.id)
+      && isUnit(e.kind) && !!((unitRulesForEntity(state, e).abilityFlags ?? 0) & 8));
+    if (!units.length) return rejected('no selected unit can attack ground');
+    for (const unit of units) {
+      becomeIdle(unit);
+      unit.order = { kind: 'attack-ground', target: { ...command.target } };
+      unit.activity = 'attacking'; unit.orderQueue = undefined;
+    }
+    return { ok: true };
+  }
   if (command.kind === 'exchange' || command.kind === 'tribute' || command.kind === 'tribute-batch') return applyMarketCommand(state, command);
   if (command.kind === 'treason') return applyTreason(state, command);
 
@@ -746,6 +761,8 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       entity.attackWindup = undefined;
       if (command.kind === 'stop') {
         entity.attackApproachTarget = undefined;
+        entity.attackVolley = undefined;
+        entity.attackWeapon = undefined;
         entity.order = { kind: 'idle' };
         entity.activity = 'idle';
         entity.orderQueue = undefined;
@@ -1164,12 +1181,31 @@ const inRange = (entity: Entity, target: Entity, margin = 0.15): boolean =>
  * carries nothing and an unpacked one carries the whole of it, so the answer
  * depends on the entity and not only on its kind (issue #28).
  */
-function combatOf(state: GameState, entity: Entity): {
+function combatOf(state: GameState, entity: Entity, target?: Entity): {
   attacks: AttackValue[]; range: number; minRange: number;
   reloadSeconds: number; releaseSeconds: number;
   projectileSpeed?: number; launchHeight?: number;
+  volley?: UnitRules['volley']; alternate?: boolean;
 } & Shot {
   const rules = unitRulesForEntity(state, entity);
+  const alt = rules.alternateAttack;
+  const targetClass = alt && target && isUnit(target.kind) ? unitRulesForEntity(state, target).datClass : undefined;
+  const alternate = alt && (target ? (entity.charge ?? alt.maximum) + 1e-9 >= alt.maximum
+    && (!alt.unitTargetsOnly || (isUnit(target.kind) && targetClass !== 13 && !unitRulesForEntity(state, target).unpacked))
+    && !inRange(entity, target, Math.max(rules.minRange ?? 0, alt.minRange))
+    : entity.attackWeapon === 'alternate');
+  if (alt && alternate) {
+    const p = alt.projectile, range = (rules.range ?? 0) + alt.rangeModifier;
+    return { attacks: p.attacks, range, minRange: Math.max(rules.minRange ?? 0, alt.minRange),
+      reloadSeconds: rules.attackReloadSeconds, releaseSeconds: alt.releaseSeconds,
+      projectileSpeed: p.speed, launchHeight: rules.launchHeight, art: p.key,
+      blastRadius: p.blastRadius, blastAttackLevel: p.blastAttackLevel,
+      accuracyPercent: p.accuracyPercent, accuracyDispersion: p.accuracyDispersion,
+      piercing: p.piercing, piercingRange: p.piercing ? range : undefined,
+      interceptRadius: p.interceptRadius,
+      ignoresArmor: p.ignoresArmor,
+      volley: { count: alt.count, intervalSeconds: alt.intervalSeconds, secondary: p }, alternate: true };
+  }
   const setup = rules.unpacked;
   if (setup) {
     return entity.unpacked
@@ -1189,12 +1225,15 @@ function combatOf(state: GameState, entity: Entity): {
     releaseSeconds: rules.attackReleaseSeconds,
     projectileSpeed: rules.projectileSpeed,
     piercing: rules.piercing,
+    interceptRadius: rules.interceptRadius,
+    ignoresArmor: !!((rules.abilityFlags ?? 0) & 1),
     piercingRange: rules.piercing ? (rules.range ?? 0) + 3 : undefined,
     launchHeight: rules.launchHeight,
     blastRadius: rules.blastRadius,
     blastAttackLevel: rules.blastAttackLevel,
     accuracyPercent: rules.accuracyPercent,
     accuracyDispersion: rules.accuracyDispersion,
+    volley: rules.volley,
   };
 }
 
@@ -1221,7 +1260,8 @@ export function swingSeconds(state: GameState, entity: Entity): number | undefin
     const target = 'targetId' in entity.order
       ? state.entities.find(e => e.id === (entity.order as { targetId: number }).targetId)
       : undefined;
-    releaseSeconds = attackProfile(state, entity, target).releaseSeconds ?? rules.attackReleaseSeconds;
+    releaseSeconds = entity.attackWeapon === 'alternate' ? combatOf(state, entity).releaseSeconds
+      : attackProfile(state, entity, target).releaseSeconds ?? rules.attackReleaseSeconds;
     reloadSeconds = combatOf(state, entity).reloadSeconds;
   }
   const releaseTicks = Math.max(1, Math.round(releaseSeconds * TICKS_PER_SECOND));
@@ -1239,6 +1279,8 @@ export function swingSeconds(state: GameState, entity: Entity): number | undefin
  * hurt. All four are the DAT's own fields on the shooter.
  */
 interface Shot {
+  ignoresArmor?: boolean;
+  interceptRadius?: number;
   art?: string;
   piercing?: UnitRules['piercing'];
   piercingRange?: number;
@@ -1270,7 +1312,7 @@ function attackProfile(
   }
   const rules = unitRulesForEntity(state, entity);
   if (rules.hunt && target && isAnimal(target.kind)) return { ...rules.hunt };
-  const combat = combatOf(state, entity);
+  const combat = combatOf(state, entity, target);
   return {
     range: combat.range,
     projectileSpeed: combat.projectileSpeed,
@@ -1294,7 +1336,7 @@ const inAttackRange = (state: GameState, entity: Entity, target: Entity): boolea
 function tooClose(state: GameState, entity: Entity, target: Entity): boolean {
   const minimum = isBuilding(entity.kind)
     ? buildingRulesForEntity(state, entity).attack?.minRange ?? 0
-    : combatOf(state, entity).minRange;
+    : combatOf(state, entity, target).minRange;
   return minimum > 0 && inRange(entity, target, minimum);
 }
 
@@ -1450,6 +1492,8 @@ function nearestDropSite(state: GameState, entity: Entity, resource?: ResourceKi
 
 function becomeIdle(entity: Entity): void {
   entity.attackApproachTarget = undefined;
+  entity.attackVolley = undefined;
+  entity.attackWeapon = undefined;
   entity.order = { kind: 'idle' };
   entity.activity = 'idle';
   entity.gatherProgress = 0;
@@ -1840,15 +1884,18 @@ function updateBuilder(state: GameState, grid: NavGrid, entity: Entity, builderC
 }
 
 function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
-  if (entity.order.kind !== 'attack') return;
+  if (entity.order.kind !== 'attack' && entity.order.kind !== 'attack-ground') return;
   // Everything below reads the *researched* rules. Reading the base ones here
   // is how a blacksmith upgrade could change `unitRulesFor` and change nothing
   // a target ever felt: Fletching moved the archer's attack from 4 to 5 and a
   // villager went on taking 4 (issue #26). The tower path has always gone
   // through `buildingRulesFor`, which is why Murder Holes worked and this did
   // not.
-  const targetId = (entity.order as { targetId: number }).targetId;
-  const target = state.entities.find(e => !e.dead && e.id === targetId);
+  const targetId = entity.order.kind === 'attack' ? entity.order.targetId : 0;
+  const target: Entity | undefined = entity.order.kind === 'attack-ground'
+    ? { id: 0, kind: 'resource', owner: 0, position: entity.order.target, radius: 0,
+      hp: 1, maxHp: 1, activity: 'idle', order: { kind: 'idle' } }
+    : state.entities.find(e => !e.dead && e.id === targetId);
   if (!target || target.owner === entity.owner || target.hp <= 0) {
     // A hunter carries home what it just killed rather than standing over it.
     const carcass = state.entities.find(e => e.id === targetId);
@@ -1866,6 +1913,17 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
   if (rules.unpacked) {
     if (!entity.unpacked) { becomeIdle(entity); return; }
     if (!inAttackRange(state, entity, target)) { entity.activity = 'idle'; clearPath(entity); return; }
+  }
+  if (entity.attackVolley) {
+    const volley = entity.attackVolley;
+    entity.activity = 'attacking';
+    if (entity.attackCooldown) entity.attackCooldown--;
+    if (--volley.nextTicks <= 0) {
+      releaseAttack(state, entity, target, volley.attacks, volley.speed, volley.launchHeight, volley);
+      volley.nextTicks = volley.intervalTicks;
+      if (--volley.remaining <= 0) entity.attackVolley = undefined;
+    }
+    return;
   }
   if (tooClose(state, entity, target)) {
     // Inside its minimum range a skirmisher cannot bring its javelin to bear.
@@ -1919,12 +1977,17 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
   // The bow a villager hunts with has its own reach, arrow and swing time.
   const profile = attackProfile(state, entity, target);
   const releaseSeconds = profile.releaseSeconds ?? rules.attackReleaseSeconds;
+  const weapon = rules.alternateAttack && combatOf(state, entity, target).alternate ? 'alternate' : undefined;
+  // Preserve pursuit windup for the same weapon, but a firearm-to-melee switch
+  // needs that weapon's own animation/release clock rather than the old one.
+  if (entity.attackWindup !== undefined && entity.attackWeapon !== weapon) entity.attackWindup = undefined;
   if (entity.attackWindup === undefined) {
+    entity.attackWeapon = weapon;
     entity.attackWindup = Math.max(1, Math.round(releaseSeconds * TICKS_PER_SECOND));
   }
   entity.attackWindup -= 1;
   if (entity.attackWindup <= 0) {
-    const combat = combatOf(state, entity);
+    const combat = combatOf(state, entity, target);
     if (rules.selfDestruct) {
       entity.hp = 0;
       kill(state, entity);
@@ -1936,6 +1999,29 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
     }
     for (let shot = 0; shot < (rules.projectilesPerAttack ?? 1); shot++) {
       releaseAttack(state, entity, target, combat.attacks, profile.projectileSpeed, profile.launchHeight, combat);
+    }
+    if (combat.alternate) entity.charge = 0;
+    if (combat.volley && combat.volley.count > 1) {
+      const secondary = combat.volley.secondary;
+      const intervalTicks = Math.max(1, Math.round(combat.volley.intervalSeconds * TICKS_PER_SECOND));
+      entity.attackVolley = { targetId: target.id, remaining: combat.volley.count - 1,
+        nextTicks: intervalTicks, intervalTicks,
+        attacks: (secondary?.attacks ?? combat.attacks).map(a => ({ ...a })),
+        speed: secondary?.speed ?? profile.projectileSpeed!, launchHeight: profile.launchHeight ?? 0,
+        art: secondary?.key ?? combat.art ?? rules.projectileArt,
+        blastRadius: secondary?.blastRadius ?? combat.blastRadius,
+        blastAttackLevel: secondary?.blastAttackLevel ?? combat.blastAttackLevel,
+        accuracyPercent: secondary?.accuracyPercent ?? combat.accuracyPercent,
+        accuracyDispersion: secondary?.accuracyDispersion ?? combat.accuracyDispersion,
+        interceptRadius: secondary?.interceptRadius ?? combat.interceptRadius,
+        ignoresArmor: secondary?.ignoresArmor ?? combat.ignoresArmor,
+        piercing: secondary?.piercing ?? combat.piercing,
+        piercingRange: (secondary?.piercing || combat.piercing) ? combat.range : undefined };
+      if (combat.alternate && rules.alternateAttack?.bulk) {
+        const volley = entity.attackVolley;
+        for (let i = 0; i < volley.remaining; i++) releaseAttack(state, entity, target, volley.attacks, volley.speed, volley.launchHeight, volley);
+        entity.attackVolley = undefined;
+      }
     }
     const charge = fireChargeOf(state, entity);
     if (charge) releaseFireCharge(state, entity, target, leadPoint(state, entity, target, charge.projectile.speed));
@@ -2350,12 +2436,10 @@ function updateConverter(state: GameState, grid: NavGrid, entity: Entity): void 
  */
 function applyDamage(
   state: GameState, target: Entity, attacks: AttackValue[], attackerId: number,
-  origin: Point,
+  origin: Point, ignoresArmor = false,
 ): void {
   if (target.kind === 'relic') return;
-  target.hp -= computeDamage(attacks, armorsOf(state, target)) * elevationDamageMultiplier(
-    elevationAt(state, origin.x, origin.y), elevationAt(state, target.position.x, target.position.y),
-  );
+  target.hp -= damageFrom(state, target, attacks, origin, ignoresArmor);
   if (target.hp <= 0) {
     kill(state, target);
     return;
@@ -2372,6 +2456,16 @@ function applyDamage(
       target.activity = 'moving';
     }
   }
+}
+
+function damageFrom(state: GameState, target: Entity, attacks: AttackValue[], origin: Point, ignoresArmor = false): number {
+  const resistance = !ignoresArmor ? 0 : isUnit(target.kind) ? unitRulesForEntity(state, target).abilityFlags
+    : isBuilding(target.kind) ? buildingRulesForEntity(state, target).abilityFlags : 0;
+  const armors = armorsOf(state, target);
+  return computeDamage(attacks, ignoresArmor && !((resistance ?? 0) & 2)
+    ? armors.map(a => a.class === 3 || a.class === 4 ? { ...a, amount: 0 } : a) : armors) * elevationDamageMultiplier(
+    elevationAt(state, origin.x, origin.y), elevationAt(state, target.position.x, target.position.y),
+  );
 }
 
 /**
@@ -2417,7 +2511,9 @@ function releaseAttack(
   shot: Shot = {},
 ): void {
   if (!projectileSpeed) {
-    applyDamage(state, target, attacks, shooter.id, shooter.position);
+    applyDamage(state, target, attacks, shooter.id, shooter.position, shot.ignoresArmor);
+    if (shot.blastRadius) applyBlast(state, target.position, shot.blastRadius,
+      shot.blastAttackLevel ?? 2, attacks, target.id, shooter.owner, shooter.position);
     return;
   }
   // A shot is aimed once and then flies. Without Ballistics it goes to where
@@ -2459,6 +2555,8 @@ function releaseAttack(
     speed: projectileSpeed,
     launchHeight,
     aim,
+    ...(shot.interceptRadius !== undefined ? { interceptRadius: shot.interceptRadius } : {}),
+    ...(shot.ignoresArmor ? { ignoresArmor: true } : {}),
     ...(shot.piercing ? {
       art: shot.piercing.unit,
       piercing: { radius: shot.piercing.radius, attacks: shot.piercing.attacks.map(a => ({ ...a })), hitIds: [] },
@@ -2497,7 +2595,7 @@ function shooterLeadsTarget(state: GameState, shooter: Entity): boolean {
  */
 function applyBlast(
   state: GameState, at: Point, radius: number, attackLevel: number, attacks: AttackValue[],
-  directHitId: number, excludeOwner?: Entity['owner'], origin: Point = at,
+  directHitId: number, excludeOwner?: Entity['owner'], origin: Point = at, ignoresArmor = false,
 ): void {
   for (const other of [...state.entities]) {
     if (other.dead || other.kind === 'relic' || other.id === directHitId) continue;
@@ -2510,9 +2608,7 @@ function applyBlast(
       other.amount = 0;
       continue;
     }
-    other.hp -= computeDamage(attacks, armorsOf(state, other)) * elevationDamageMultiplier(
-      elevationAt(state, origin.x, origin.y), elevationAt(state, other.position.x, other.position.y),
-    );
+    other.hp -= damageFrom(state, other, attacks, origin, ignoresArmor);
     if (other.hp <= 0) kill(state, other);
   }
 }
@@ -2590,14 +2686,17 @@ function updateProjectiles(state: GameState): void {
 
     // Anything not the shooter's own can be struck, gaia's animals included:
     // a hunter's arrow is the same arrow.
-    const intended = state.entities.find(e => e.id === projectile.targetId
-      && !e.dead && e.owner !== projectile.owner);
-    if (intended && pointToSegment(intended.position, projectile.position, next) <= intended.radius) {
+    const intended = projectile.interceptRadius !== undefined
+      ? state.entities.filter(e => !e.dead && e.owner !== projectile.owner && e.kind !== 'resource' && e.kind !== 'relic'
+        && pointToSegment(e.position, projectile.position, next) <= e.radius + projectile.interceptRadius!)
+        .sort((a, b) => distance(a.position, projectile.position) - distance(b.position, projectile.position) || a.id - b.id)[0]
+      : state.entities.find(e => e.id === projectile.targetId && !e.dead && e.owner !== projectile.owner);
+    if (intended && pointToSegment(intended.position, projectile.position, next) <= intended.radius + (projectile.interceptRadius ?? 0)) {
       const at = { ...intended.position };
-      applyDamage(state, intended, projectile.attacks, projectile.shooterId, projectile.origin);
+      applyDamage(state, intended, projectile.attacks, projectile.shooterId, projectile.origin, projectile.ignoresArmor);
       if (projectile.blastRadius) {
         applyBlast(state, at, projectile.blastRadius, projectile.blastAttackLevel ?? 0,
-          projectile.attacks, intended.id, undefined, projectile.origin);
+          projectile.attacks, intended.id, undefined, projectile.origin, projectile.ignoresArmor);
       }
       if (beginProjectileImpact(projectile, at)) remaining.push(projectile);
       continue;
@@ -2609,10 +2708,10 @@ function updateProjectiles(state: GameState): void {
     }
     const at = { ...projectile.aim };
     const struck = struckBy(state, projectile, at);
-    if (struck) applyDamage(state, struck, projectile.attacks, projectile.shooterId, projectile.origin);
+    if (struck) applyDamage(state, struck, projectile.attacks, projectile.shooterId, projectile.origin, projectile.ignoresArmor);
     if (projectile.blastRadius) {
       applyBlast(state, at, projectile.blastRadius, projectile.blastAttackLevel ?? 0,
-        projectile.attacks, struck?.id ?? -1, undefined, projectile.origin);
+        projectile.attacks, struck?.id ?? -1, undefined, projectile.origin, projectile.ignoresArmor);
     }
     if (beginProjectileImpact(projectile, at)) remaining.push(projectile);
   }
@@ -2740,6 +2839,10 @@ function updateTower(state: GameState, entity: Entity): void {
 
 function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCounts: Map<number, number>): void {
   rechargeFireCharge(state, entity);
+  if (entity.charge !== undefined) {
+    const alternate = unitRulesForEntity(state, entity).alternateAttack;
+    if (alternate) entity.charge = Math.min(alternate.maximum, entity.charge + alternate.rechargePerSecond * TICK_SECONDS);
+  }
   rechargeFaith(state, entity);
   // A siege engine being set up or packed away does nothing else while it is:
   // the DAT gives the pair a work rate and this spends it (issue #28).
@@ -2800,7 +2903,8 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
     case 'gather': return updateGatherer(state, grid, entity);
     case 'trade': return updateTrader(state, grid, entity);
     case 'build': return updateBuilder(state, grid, entity, builderCounts);
-    case 'attack': return updateAttacker(state, grid, entity);
+    case 'attack':
+    case 'attack-ground': return updateAttacker(state, grid, entity);
     case 'heal': return updateHealer(state, grid, entity);
     case 'repair': return updateRepairer(state, grid, entity);
     case 'garrison': return updateGarrisoner(state, grid, entity);
@@ -2929,7 +3033,22 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
   const player = state.players[owner];
   if (!tech || player.researched.includes(key)) return;
   player.researched.push(key);
-  if (tech.effects.some(effect => effect.resource === 'unitLimit')) recalculatePopulation(state);
+  for (const effect of tech.effects) {
+    for (const resource of ['food', 'wood', 'gold', 'stone'] as const) {
+      if (effect.resource === `starting${resource[0].toUpperCase()}${resource.slice(1)}`) {
+        player[resource] = Math.max(0, combine(effect.operation, player[resource], effect.amount));
+      }
+    }
+    if (effect.spawn) {
+      const spawn = effect.spawn;
+      const homes = state.entities.filter(e => e.owner === owner && !e.dead && e.kind === spawn.building && e.buildProgress === undefined);
+      const cap = playerAttributeFor(state, owner, 'spawnCap') ?? 0;
+      for (const home of cap > 0 ? homes.slice(0, cap) : homes) {
+        for (let i = 0; i < spawn.count; i++) spawnTrainedUnit(state, home, spawn.unit);
+      }
+    }
+  }
+  if (tech.effects.some(effect => effect.resource === 'unitLimit' || effect.attribute === 'populationSupport' || effect.spawn)) recalculatePopulation(state);
   if ('grantsAge' in tech && tech.grantsAge !== undefined) player.age = Math.max(player.age, tech.grantsAge);
   const promotedIds = new Set<number>();
   // An upgrade replaces what you own: every militia becomes a man-at-arms the

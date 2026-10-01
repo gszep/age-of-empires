@@ -2,8 +2,8 @@ import { TICK_SECONDS } from './data';
 import { isEntityVisible } from './visibility';
 import { isAnimal, isUnit } from './data';
 import type { BuildingKind, Entity, GameState, PlayerId } from './types';
-import { buildingRulesForEntity } from './rules';
-import { researchCostFor } from './technologies';
+import { buildingRulesForEntity, playerAttributeFor, unitRulesForEntity } from './rules';
+import { researchCostFor, technologyRequirementsMet } from './technologies';
 import { COMMODITIES, hasMarket, marketQuote, tributeFee } from './market';
 import { TREASON_GOLD, treasonMarkers } from './regicide';
 import { rulesForPlayer } from './civilizations';
@@ -36,7 +36,7 @@ function observeEntity(state: GameState, entity: Entity, player: PlayerId): Obse
     if (entity.relics?.length) observed.relics = entity.relics.length;
     if (entity.faith !== undefined) observed.faith = Math.floor(entity.faith);
     if (isUnit(entity.kind)) {
-      const charge = fireChargeOf(state, entity);
+      const charge = fireChargeOf(state, entity) ?? unitRulesForEntity(state, entity).alternateAttack;
       if (charge) observed.charge = { current: Math.round((entity.charge ?? charge.maximum) * 1000) / 1000, maximum: charge.maximum };
     }
     if (entity.kind === 'town-center') observed.townBell = !!entity.townBell;
@@ -124,8 +124,11 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
     untilTick: state.treasonUntil?.[player] ?? 0,
     kings: treasonMarkers(state, player).map(k => ({ owner: k.owner, x: k.position.x, y: k.position.y })),
   };
+  const modifiedResearchPrices = (playerAttributeFor(state, player, 'researchCostMod') ?? 0) !== 0;
   observation.researchCosts = Object.fromEntries(Object.entries(rulesForPlayer(state, player).technologies)
-    .filter(([key, tech]) => state.mode !== 'regicide' && !self.researched.includes(key) && tech.requiresAge <= self.age && tech.effects.some(e => e.resource === 'spies')
+    .filter(([key, tech]) => !(state.mode === 'regicide' && tech.effects.some(e => e.resource === 'spies'))
+      && (modifiedResearchPrices || tech.effects.some(e => e.resource === 'spies'))
+      && !self.researched.includes(key) && tech.requiresAge <= self.age && technologyRequirementsMet(state, player, tech)
       && state.entities.some(e => e.owner === player && !e.dead && e.kind === tech.researchedAt && e.buildProgress === undefined))
     .map(([key]) => [key, researchCostFor(state, player, key)]));
   if (hasMarket(state, player)) observation.market = {

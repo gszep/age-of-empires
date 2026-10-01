@@ -472,7 +472,7 @@ export function chooseAnimation(state: ReadonlyGameState, entity: Entity): { key
       return { key, name: 'idle' };
     }
     if (entity.dead) return { key: kind, name: 'death' };
-    if (entity.activity === 'attacking') return { key: kind, name: 'attack' };
+    if (entity.activity === 'attacking') return { key: kind, name: entity.attackWeapon === 'alternate' ? 'attack-special' : 'attack' };
     // A fishing ship at work casts its net (the gather task's own graphic);
     // laden, it is the same boat, as the DAT gives it no carrying art.
     if (kind === 'fishing-ship' && (entity.activity === 'gathering' || entity.activity === 'building')) return { key: kind, name: 'work' };
@@ -1139,7 +1139,7 @@ export function updateEntityView(
   // view's clock stands in as before.
   // The one place the view hands its read-only state to a simulation helper
   // typed on the mutable one; `swingSeconds` only reads.
-  let swing = choice.name === 'attack' ? swingSeconds(state as GameState, entity) : undefined;
+  let swing = choice.name.startsWith('attack') ? swingSeconds(state as GameState, entity) : undefined;
   if (swing !== undefined) {
     const attack = imported?.animations['attack'];
     const length = attack ? attack.frames * (attack.frameSeconds > 0 ? attack.frameSeconds : 0.1) : 0;

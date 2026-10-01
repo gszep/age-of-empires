@@ -396,6 +396,7 @@
               "gather",
               "build",
               "attack",
+              "attack-ground",
               "trade",
               "heal",
               "convert",

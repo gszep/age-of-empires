@@ -1,6 +1,6 @@
 # DAT field consumption audit (#54)
 
-Refreshed 2026-09-28 against the pinned owned DAT, current importer, published
+Refreshed 2026-09-28, with Chinese combat-consumer updates on2026-10-01, against the pinned owned DAT, current importer, published
 content and runtime. This replaces the old blanket description of these fields
 as unread. A field mentioned by a script is not necessarily imported; a field
 present in a manifest is not necessarily used correctly at runtime.
@@ -20,6 +20,8 @@ civilisations can differ. Diagnostic output remains ignored at
 | Garrison capacity/type/healing | `import_content.py` publishes capacity, type mask and healing; `game.ts` checks boarding, heals occupants and supports producer self-rally. | Admission/egress policies and native calibration remain explicit in the ledger. Garrison is no longer an absent feature. |
 | Garrison graphics | `creatable.garrison_graphic` is resolved through file-bearing deltas into age-specific flags; `sprites.ts` renders them. | Parent IDs and leaf graphics differ: TC109 parent4566 is not the same thing as a file-bearing flag ID. |
 | Firepower and TC arrows | `type_50.garrison_firepower`, primary/secondary projectiles and projectile limits feed actual volleys and attribute130 effects. TC109 has primary−1, secondary54, maximum11. | The empty TC's absent primary is modelled, not a missing projectile-art bug. Exact volley arithmetic is still an identified interpretation. |
+| Combat ability | The misleading `type_50.break_off_combat` field maps to XS Combat Ability63. Bits1/2 implement melee/pierce-armour bypass/resistance,8 enables public ground fire,16 bulk alternate volleys (#184). | Bit meanings follow UGC documentation plus the owned values; native timing/targeting calibration remains#260. This field is distinct from `old_attack_reaction`. |
+| Multi-projectile/alternate weapons | Owned total/secondary/charge projectile IDs, range modifier61, special graphics and recharge rates drive Chu Ko Nu, Rocket Cart, Fire Lancer and Lou Chuan attacks. | Non-bulk scheduling and projectile-replacement precedence are explicitly inferred in ledger#260; they are not native measurements. |
 | Loaded transports | Capacity is imported; `garrisonCount` includes nested passengers in admission, observation and HUD (#251). | Old over-capacity cargo is preserved; native carrier-conversion exceptions remain #178. |
 | Corpse/age rubble | `dead_unit_id`, corpse lifetime storage and age replacements supply death/decay art and clocks. | This does **not** consume the separate `destruction_rubble_graphic_id` below. |
 | Language and audio | Name/create/help/hotkey IDs, `bird` move/attack events, building construction events and graphic frame sounds are imported and used. | Wwise mixing/spatial calibration is #243; the original selection/train-only claim is obsolete. |
@@ -34,7 +36,6 @@ civilisations can differ. Diagnostic output remains ignored at
 | `building.foundation_terrain_id` | XS `cFoundationTerrain=34`; completed TC109/House70=27; Farm50=7; Dock45 and TC construction head621=−1. | Not imported as a general foundation rule. `updateFarmView` handles named farm terrain slots, not arbitrary building foundations. The old “every building except farms” claim is false. A terrain ID alone does not prove persistent authoritative terrain mutation after rubble disappears. |
 | `building.destruction_rubble_graphic_id` | XS `cDestructionRubbleGraphic=88`; TC109=556 (`b_foundation_town_center_rubble_x1`), House70=499 (`b_foundation_house_rubble_x1`). | Not imported/rendered separately. These are foundation-rubble graphics, distinct from the already supported dead-unit decay chain. Determine composition, timing and persistence before adding a second layer or replacing existing rubble. |
 | `creatable.idle_attack_graphic` | XS `cIdleAttackGraphic=82`; Militia74=1102, Villager83=1282, Spearman93=1061; ram35=686. | Not imported as an armed-idle slot. Exact selection/transition lifetime is not established by the ID; existing standing/walk/attack animation support is not a consumer of this field. |
-| `type_50.break_off_combat` | Archer4=16, TC109=2, ram35=18, Mangonel280=26. | Not consumed; bit meanings are unverified. Existing acquisition/pursuit rules are hand-authored. Related siege automation is #131. |
 | `old_attack_reaction` | Villager83, Monk125 and Gaia sheep/deer=2; boar=4; Knight38=3; packed Trebuchet331=1. | Not consumed. The parser's legacy field name and differing values do not establish a current DE reaction state machine. |
 | `creatable.min_conversion_time_mod`, `.max_conversion_time_mod`, `.conversion_chance_mod` | XS111/112/113 respectively. Scout448=3/1/2; TC109 chance modifier3 with time modifiers0/0. | Not imported. `monastery.ts::conversionWindow` uses caster base timing plus target-player178/179 adjustments, not these target-unit values. Chance and time are different fields; do not add chance2 as two seconds. Current uniform timing and modern modifier semantics remain #128/#178. |
 | `type_50.friendly_fire_damage` | XS `cFriendlyFireDamage=119`; sampled units read1. | Not imported as a general multiplier. Existing direct-hit/splash/self-destruct owner filtering is explicit code. A value1 does not alone specify which allies can be hit or when automatic fire must be suppressed (#131/#242). |
@@ -62,7 +63,7 @@ and general technology/modifier coverage #128.
   and garrison implementations.
 - Five owned integration tests passed: garrison publication, terrain restriction
   rows, terrain scatter rows, live-animal decay and world audio publication.
-- No simulation, importer, asset or timing changes in this audit. Earlier
+- The original September audit made no simulation, importer, asset or timing changes. Earlier
   lifecycle/garrison gameplay tests remain recorded in their feature receipts.
 
 The original documentation action is complete: the cheat-sheet now includes the

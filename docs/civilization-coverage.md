@@ -82,7 +82,7 @@ acceptance. These mode results do not imply completion of further civilisations.
 key. The root remains the default civilisation and shared Gaia/map input.
 Additional `GameRules.civilizations` / manifest `civilizations` entries are complete
 profiles, not patches over the enemy's rules. The importer now extracts Britons,
-Franks, Goths, Teutons and Japanese with independent bonus graphs and namespaced art/voices/icons. The
+Franks, Goths, Teutons, Japanese and Chinese with independent bonus graphs and namespaced art/voices/icons. The
 spec enables reviewed profiles after supported-gameplay browser acceptance; the 53-entry
 base-era catalogue remains an inventory, not 53 playable civilisations.
 
@@ -210,6 +210,72 @@ Final full gate **GREEN** (`.local/japanese183-gate.log`),14m47s:
 public build,168 owned/Python tests and real-browser smoke. Full enabled import
 completed (`.local/japanese183-enabled-import.log`), reusing3907 atlas groups.
 
+### Chinese implementation (2026-10-01)
+
+DAT6/tree257/team402 now has no missing available roster IDs. The pinned roster
+includes Chu Ko Nu/elite, Fire Lancers/elite, Rocket Carts/heavy, Dragon Ship,
+Lou Chuan and Siege Ram, with original profile-local buildings, flags, icons,
+voices and unit/projectile art. Regional upgrade nodes are recognised alongside
+ordinary/unique upgrades. Dragon Ship is the source's free Heavy Warships
+descendant, including existing ships and later production.
+
+The starting tech graph grants three extra villagers once, deducts200 food/50
+wood and supplies15 TC housing/+7 sight. Age-gated research-cost resource85 feeds
+actual command payments, tooltips and agent quotes. Hidden free team tech232
+combines the farm-capacity copy with source resource69 (Farm Food Multiplier)
+instead of compounding two10% bonuses. Great Wall reaches existing/occupied
+structures, foundations and later construction. Pending crops keep their food.
+
+Shared combat consumers now support sequential primary/secondary volleys,
+source bulk-fire flags, charged alternate weapons with original special art and
+charge HUD, target-specific Lou Chuan weapons, projectile research/redirection,
+first-hit interception, armour bypass/resistance and public ground fire. Rocketry
+reaches real Scorpion/Rocket Cart damage and Lou Chuan rocket art. Exact native
+cadence/spread, replacement ordering and opening/bonus rounding are#260; the
+ledger distinguishes source values from the deterministic integration policy.
+
+`src/sim/chinese.test.ts` has27 outcome cases: three-map starts and reload,
+TC construction without repeated grants, research payments through all ages,
+farm yields, Great Wall HP, Chu Ko Nu damage/refunds/elite/capture, firearm
+animation/bullets/melee/recharge, interception, ground-fire schema and splash,
+regional upgrades, moving-target firearm/melee windup switching, Lou Chuan range/Chemistry/Rocketry, Scorpion/Ram damage,
+Dragon Ship/Siphons, in-progress volley JSON continuation and mixed opening
+replay. The focused Chinese/protocol/sprite run passed82 tests
+(`.local/chinese184-sim-r4.log`, before the final switching case); the final
+Chinese/building/civilisation pass has85 passing cases plus7 existing inapplicable
+skips (`.local/chinese184-final-focused.log`). Four owned contracts pass
+(`.local/chinese184-source-tests-r2.log`).
+
+Both pending and **published enabled** private-browser acceptance pass:
+`.local/chinese184-browser-pending.log` and
+`.local/chinese184-published-browser-r3.log`. Actual menus/restart/reload, discounted
+age/research payments, farm placement/yields, Great Wall, all new unit lines and
+upgrades, special firearm art/three bullets/charge HUD, ground-fire button/Stop,
+Dragon Ship's free upgrade and Lou Chuan's rocket change are exercised. A naval
+probe failure exposed its pages-as-strings assumption: the correctly rendered
+`attack-special-p1.png` was in `pages[].image`. The helper now verifies every
+actual page URL. Another attempt was interrupted by an agent edit causing a full
+reload/pause; the complete run was repeated with code frozen. No clock widened.
+
+The broader gate exposed old fixture assumptions: every civilisation paying200
+food for Fortified Wall, every opening containing three villagers, an effect mock
+omitting its real `c` field, a shooter-dispersion assertion applied to projectile
+definitions, and an Incendiaries target inventory predating the captured Dragon
+Ship definition. Fixtures now check live prices, an explicit three-unit crew,
+source-shaped commands, shooter/projectile distinctions and actual DAT targets.
+Targeted regressions pass without weakening damage or changing timeouts. Final
+review also kept ground fire behind the common civilisation/match guards and
+synchronised firearm-to-melee windup with the selected animation.
+
+The complete enabled import (`.local/chinese184-enabled-import.log`) reused4101
+atlas groups. The first import's canonical-namespace cache misses took about80
+minutes; concrete evidence is recorded on#257, not hidden as a stalled job.
+
+Final gate **GREEN**, exit0,19m27s (`.local/chinese184-gate-r3.log`):
+1186 Vitest tests/91 files,7 existing inapplicable Gothic fortification cases
+skipped, public bundle build,172 Python/owned-content tests and real-browser
+debug smoke. No test timeout or fixture clock was widened.
+
 ## Reading the audit output
 
 Current scoped acceptance and remaining shared work:
@@ -221,6 +287,7 @@ Current scoped acceptance and remaining shared work:
 | Goths (#181) | Enabled and verified through published-profile browser acceptance and a GREEN full checkpoint gate. Shared population-setting/native Incendiaries calibration remains#253/#252 |
 | Teutons (#182) | Enabled and verified through published-profile browser acceptance and a GREEN full gate. Conversion queue/cargo/probability and zero-time grant calibration remain#178/#254 |
 | Japanese (#183) | Source-backed roster, bonuses, both unique technologies, Samurai/elite and Elite Cannon Galleon; native approach/packing calibration is#259, shared conversion is#178 |
+| Chinese (#184) | Source-backed complete available roster, starting/economy/fortification bonuses and regional/unique weapons; native timing, projectile ordering and rounding calibration is#260 |
 | Shared engine | Native relic-generation calibration/fish gaps (#130/#95), unlocked diplomacy/cooperative victories beyond the current locked two-player dialog (#138), Regicide timing/preset/task calibration (#240), charge/market runtime calibration and conversion-policy parity (#178). Relic placement and playable Regicide/Treason are implemented; the ledger distinguishes mechanics from unresolved engine interpretations |
 
 The imported catalogue now accounts for the already represented ram/tree alias,
@@ -455,7 +522,7 @@ whole-state and availability-stream hashes before/after the optimization
   treating scenario-only or inactive automatic candidates as unconditional.
 - [x] Enable reviewed shared combat/unique-unit roster, profile art and selection UI.
 - [x] Complete playable roster/research coverage for Britons, Franks, Goths,
-  Teutons and Japanese, retaining the listed shared engine/reference gaps.
+  Teutons, Japanese and Chinese, retaining the listed shared engine/reference gaps.
 - [x] Verify mixed matches, age changes, already-paid queues/refunds, conversions,
   garrisons, JSON save/reload and deterministic replay through public actions.
 - [x] Verify the actual selection/command UI in a private browser and run the gate.

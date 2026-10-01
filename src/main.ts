@@ -150,6 +150,7 @@ let selectedIds: number[] = [];
 let buildMode: BuildingKind | undefined;
 /** The villager's Repair button is down: the next click names what to mend. */
 let repairMode = false;
+let groundAttackers: number[] = [];
 let unloadShips: number[] = [];
 let gatherPointBuildings: number[] = [];
 let gatherPointSelection = '';
@@ -185,6 +186,7 @@ let revealMap = false;
  * farm-reseed ring lit and unlit.
  */
 const ACTION_ICON = {
+  attackGround: 60,
   cancel: 0, ungarrison: 2, stop: 3, pack: 12, unpack: 13, buildEconomic: 30, buildMilitary: 31, repair: 33,
   reseedOn: 70, reseedOff: 71,
 } as const;
@@ -237,6 +239,7 @@ function startReplay(raw: unknown): void {
   selectedIds = [];
   buildMode = undefined;
   repairMode = false;
+  groundAttackers = [];
   unloadShips = [];
   paused = false;
   hud.hideEnd();
@@ -595,6 +598,7 @@ function resetMatchView(): void {
   selectedIds = [];
   buildMode = undefined;
   repairMode = false;
+  groundAttackers = [];
   unloadShips = [];
   wallStart = undefined;
   orderFlash = undefined;
@@ -739,6 +743,10 @@ function runUiCommand(id: string, shift = false): void {
     });
     return;
   }
+  if (id === 'attack-ground') {
+    groundAttackers = selection.filter(e => isUnit(e.kind) && !!((unitRulesForEntity(game, e).abilityFlags ?? 0) & 8)).map(e => e.id);
+    return;
+  }
   if (id === 'reseed') {
     const mill = selection.find(e => e.kind === 'mill' && e.buildProgress === undefined);
     if (!mill) return;
@@ -760,7 +768,7 @@ function runUiCommand(id: string, shift = false): void {
   if (id === 'page-economic') { buildPage = 'economic'; return; }
   if (id === 'page-military') { buildPage = 'military'; return; }
   if (id === 'page-back') { buildPage = undefined; return; }
-  if (id === 'cancel') { buildMode = undefined; repairMode = false; unloadShips = []; gatherPointBuildings = []; }
+  if (id === 'cancel') { buildMode = undefined; repairMode = false; unloadShips = []; gatherPointBuildings = []; groundAttackers = []; }
   if (id === 'repair') { repairMode = true; return; }
 }
 
@@ -873,6 +881,14 @@ function placeBuilding(kind: BuildingKind, targets: Point[]): void {
 
 renderer.domElement.addEventListener('pointerdown', event => {
   const point = screenToWorld(event.clientX, event.clientY);
+  if (groundAttackers.length && !replay) {
+    if (event.button === 0) {
+      const result = applyCommand(game, { kind: 'attack-ground', player: localPlayer,
+        entityIds: groundAttackers.filter(id => ownSelected().some(e => e.id === id)), target: point });
+      if (!result.ok) reject(result.reason); else acknowledge('attack');
+    }
+    groundAttackers = []; return;
+  }
   if (gatherPointBuildings.length && !replay) {
     const ids = gatherPointBuildings;
     gatherPointBuildings = [];
@@ -1016,15 +1032,16 @@ function contextOrder(point: Point, _clientX: number, _clientY: number, queue = 
 }
 
 function updateContextCursor(): void {
+  if (groundAttackers.some(id => !ownSelected().some(e => e.id === id))) groundAttackers = [];
   if (gatherPointSelection !== selectedIds.join(',')
     || gatherPointBuildings.some(id => !ownSelected().some(e => e.id === id && e.buildProgress === undefined))) gatherPointBuildings = [];
-  const stamp = `${pointerOnCanvas}/${game.tick}/${selectedIds.join(',')}/${buildMode}/${repairMode}/${unloadShips.length}/${gatherPointBuildings.join(',')}/${!!replay}/${cursorPoint.x}/${cursorPoint.y}/${cameraCenter.x}/${cameraCenter.y}/${zoom}`;
+  const stamp = `${pointerOnCanvas}/${game.tick}/${selectedIds.join(',')}/${buildMode}/${repairMode}/${groundAttackers.join(',')}/${unloadShips.length}/${gatherPointBuildings.join(',')}/${!!replay}/${cursorPoint.x}/${cursorPoint.y}/${cameraCenter.x}/${cameraCenter.y}/${zoom}`;
   if (game === cursorGame && stamp === cursorStamp) return;
   cursorGame = game; cursorStamp = stamp;
   const point = screenToWorld(cursorPoint.x, cursorPoint.y);
   const selection = pointerOnCanvas ? ownSelected() : [];
   const target = pointerOnCanvas && selection.length ? pickEntity(point) : undefined;
-  const name = pointerOnCanvas ? contextCursor(game, localPlayer, selection, point, target,
+  const name = pointerOnCanvas && groundAttackers.length ? 'attack' : pointerOnCanvas ? contextCursor(game, localPlayer, selection, point, target,
     { build: !!buildMode, repair: repairMode, unload: !!unloadShips.length,
       rally: !!gatherPointBuildings.length, replay: !!replay }) : 'default';
   const css = cursorCss(uiAssets, name);
@@ -1067,6 +1084,7 @@ addEventListener('keydown', event => {
   }
   if (key.startsWith('Arrow')) { heldKeys.add(key); event.preventDefault(); return; }
   if (key === 'Escape') {
+    if (groundAttackers.length) { groundAttackers = []; event.preventDefault(); return; }
     if (gatherPointBuildings.length) { gatherPointBuildings = []; event.preventDefault(); return; }
     if (unloadShips.length) { unloadShips = []; event.preventDefault(); return; }
     if (buildMode) { buildMode = undefined; wallStart = undefined; }
@@ -1214,7 +1232,7 @@ function currentCommands(): CommandButton[] {
   const player = game.players[localPlayer];
   const buttons: CommandButton[] = [];
   const selectedMarket = selection.find(e => e.kind === 'market' && e.buildProgress === undefined);
-  if (gatherPointBuildings.length) {
+  if (gatherPointBuildings.length || groundAttackers.length) {
     return [{ id: 'cancel', label: messages.cancel ?? 'Cancel', hotkey: 'escape', enabled: true,
       active: true, icon: hud.actionIcon(ACTION_ICON.cancel), slot: GRID_SLOT.cancel }];
   }
@@ -1270,6 +1288,11 @@ function currentCommands(): CommandButton[] {
   }
   if (selection.some(e => isUnit(e.kind))) {
     buttons.push({ id: 'stop', label: 'Stop', slot: GRID_SLOT.stop, enabled: true, icon: hud.actionIcon(ACTION_ICON.stop) });
+  }
+  if (selection.some(e => isUnit(e.kind) && !!((unitRulesForEntity(game, e).abilityFlags ?? 0) & 8))) {
+    buttons.push({ id: 'attack-ground', label: messages.attackGround ?? 'Attack Ground',
+      help: messages.attackGroundHelp ? plainHelp(messages.attackGroundHelp) : undefined,
+      icon: hud.actionIcon(ACTION_ICON.attackGround), slot: 5, enabled: true });
   }
   if (selection.some(e => e.kind === 'fishing-ship') && player.age >= (rules.buildings['fish-trap'].age ?? 0)) {
     const trap = buildingRulesFor(game, localPlayer, 'fish-trap');
@@ -1415,7 +1438,7 @@ function currentCommands(): CommandButton[] {
   return placeCommands(buttons).flatMap((button, index) => {
     if (!button) return [];
     const actions: Record<string, number> = { 'page-economic': 116, 'page-military': 115, repair: 31,
-      stop: 5, pack: 110, unpack: 111, 'set-gather-point': 51, 'town-bell': 163,
+      stop: 5, pack: 110, unpack: 111, 'attack-ground': 23, 'set-gather-point': 51, 'town-bell': 163,
       ungarrison: selection.some(e => e.kind === 'monk') ? 159
         : selection.some(e => e.kind === 'transport-ship') ? 7
           : selection.some(e => e.kind === 'battering-ram' || e.kind === 'capped-ram') ? 172 : 78 };
@@ -1654,8 +1677,9 @@ function selectionInfo(): SelectionInfo | undefined {
   if (entity.owner === localPlayer && entity.relics?.length) details.push(`Relics: ${entity.relics.length}`);
   if (entity.owner === localPlayer && entity.kind === 'monk') details.push(`Faith: ${Math.floor(entity.faith ?? 100)}%`);
   if (entity.owner === localPlayer && isUnit(entity.kind)) {
-    const charge = unitRulesForEntity(game, entity).fireCharge;
-    if (charge && charge.type === 6 && charge.maximum > 0) details.push(`Charge: ${Math.floor(100 * (entity.charge ?? charge.maximum) / charge.maximum)}%`);
+    const unit = unitRulesForEntity(game, entity);
+    const charge = unit.alternateAttack ?? (unit.fireCharge?.type === 6 ? unit.fireCharge : undefined);
+    if (charge && charge.maximum > 0) details.push(`Charge: ${Math.floor(100 * (entity.charge ?? charge.maximum) / charge.maximum)}%`);
   }
   let progress: SelectionInfo['progress'];
   if (entity.buildProgress !== undefined) {

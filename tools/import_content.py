@@ -235,6 +235,8 @@ def resolve_graphic_id(unit: Any, animation: dict[str, Any], civ_units: Any, dat
             return unit.dead_fish.walking_graphic
         if slot == "attack":
             return unit.type_50.attack_graphic
+        if slot == "special":
+            return unit.creatable.special_graphic
         if slot == "dying":
             return unit.dying_graphic
         if slot == "construction":
@@ -545,6 +547,8 @@ def extract_entity(
             if head.building and head.building.stack_unit_id == unit.id:
                 construction = head
         cost, population = costs_of(construction.creatable)
+        if not population and category == "unit":
+            population = next((int(-s.amount) for s in unit.resource_storages if s.type == 4 and s.amount < 0), 0)
         if cost:
             entity["cost"] = cost
         if population:
@@ -596,6 +600,7 @@ def extract_entity(
     if combat is not None and (any(attack.amount for attack in combat.attacks)
                                or combat.armours):
         entity["combat"] = {
+            "abilityFlags": int(combat.break_off_combat),
             "reloadSeconds": rounded(combat.reload_time),
             "frameDelay": combat.frame_delay,
             "minimumRange": rounded(combat.min_range),
@@ -883,8 +888,32 @@ def extract_entity(
         entity["gather"]["trapFactor"] = rounded(find_task(unit, {"actionType": 5, "unitId": 199}).work_value_1)
     if spec["key"] == "transport-ship":
         entity["transportCapacity"] = unit.garrison_capacity
-    if spec.get("composite") and category == "unit":
+    if category == "unit" and not spec.get("composite") and unit.creatable and unit.type_50.projectile_unit_id >= 0 and unit.creatable.total_projectiles > 1:
+        count = int(unit.creatable.total_projectiles)
+        attack = dat.graphics[unit.type_50.attack_graphic]
+        # DAT owns animation/counts, not the engine's inter-missile scheduler.
+        # Distribute this bounded volley through the remaining attack frames.
+        interval = attack.frame_duration * max(1, attack.frame_count - unit.type_50.frame_delay) / count
+        entity["volley"] = {"count": count, "intervalSeconds": rounded(interval)}
+        if unit.creatable.secondary_projectile_unit >= 0:
+            entity["volley"]["secondaryId"] = unit.creatable.secondary_projectile_unit
+    elif spec.get("composite") and category == "unit":
         entity["projectilesPerAttack"] = max(1, int(unit.creatable.total_projectiles))
+    if category == "unit" and unit.creatable and unit.creatable.charge_type == 6 and unit.creatable.charge_target == 127:
+        charge = unit.creatable
+        graphic = dat.graphics[charge.special_graphic]
+        projectile = civ_units[charge.charge_projectile_unit]
+        count = charge.max_total_projectiles
+        entity["alternateAttack"] = {
+            "maximum": rounded(charge.max_charge), "rechargePerSecond": float(charge.recharge_rate),
+            "rangeModifier": rounded(charge.charge_event), "unitTargetsOnly": charge.charge_event < 0,
+            "projectileId": charge.charge_projectile_unit, "count": count,
+            "minRange": rounded(projectile.type_50.min_range),
+            "releaseSeconds": rounded(unit.type_50.frame_delay * graphic.frame_duration),
+            "intervalSeconds": rounded(graphic.frame_duration * max(1, graphic.frame_count - unit.type_50.frame_delay) / count),
+            "animation": "attack-special",
+            "bulk": bool(unit.type_50.break_off_combat & 16),
+        }
     if spec["key"].startswith(("demolition-", "heavy-demolition-")):
         entity["selfDestruct"] = True
     if unit.id == 440:
@@ -927,7 +956,7 @@ def extract_entity(
                     "event": charge.charge_event, "ability": charge.special_ability,
                     "maximum": rounded(charge.max_charge), "rechargePerSecond": rounded(charge.recharge_rate)},
             }
-    if unit.id in (529, 532, 1103):
+    if unit.creatable and unit.creatable.charge_projectile_unit == 2629:
         charge = unit.creatable
         shot = civ_units[charge.charge_projectile_unit]
         entity["fireCharge"] = {
@@ -1160,6 +1189,7 @@ ATTRIBUTE_NAMES = {
     108: "garrisonHealRate",
     59: "maxCharge",
     62: "chargeType",
+    61: "chargeRangeModifier",
     # How close is too close. A watch tower and a castle each have a tile of
     # it, and Murder Holes is one `set` of this to zero.
     20: "minRange",
@@ -1179,7 +1209,8 @@ OPERATION_NAMES = {0: "set", 4: "add", 5: "multiply"}
 SUPPORTED_PLAYER_ATTRIBUTES = {"farmFoodAmount", "unitRepairCost", "buildingRepairCost",
     "relicRate", "convertResistMinAdj", "convertResistMaxAdj", "theocracy", "heresy",
     "spies", "tradeVigRate", "tributeInefficency", "huntingProductivity", "unitLimit",
-    "convertBuilding", "convertPriest", "resource-29", "healRange"}
+    "convertBuilding", "convertPriest", "resource-29", "healRange", "researchCostMod",
+    "startingFood", "startingWood", "startingGold", "startingStone", "spawnCap", "resource-69"}
 # `b` on a type 1 command: 0 writes the value, 1 adds to it.
 RESOURCE_OPERATIONS = {0: "set", 1: "add"}
 
@@ -1269,16 +1300,29 @@ def effects_of(
     unreached: set[str] = set()
     training_indices: dict[str, int] = {}
     for command in (dat.effects[effect_id].effect_commands if effect_id >= 0 else []):
+        if command.type == 7:
+            spawned = next((key for key in by_id.get(int(command.a), []) if entities[key].get("category") == "unit"), None)
+            homes = [key for key, e in entities.items() if e.get("category") == "building"
+                     and (e.get("id") == command.b or any(a.get("unitId") == command.b for a in e.get("annexes", [])))]
+            if spawned and len(homes) == 1 and command.c > 0:
+                effects.append({"spawn": {"unit": spawned, "building": homes[0], "count": int(command.c)}, "operation": "set", "amount": int(command.c)})
+                continue
+        if command.type == 3:
+            before = next((k for k in by_id.get(int(command.a), []) if entities.get(k, {}).get("category") == "projectile"), None)
+            after = next((k for k in by_id.get(int(command.b), []) if entities.get(k, {}).get("category") == "projectile"), None)
+            if before and after:
+                effects.append({"projectileFrom": before, "projectileTo": after, "operation": "set", "amount": int(command.b)})
+                continue
         if command.type == 103 and command.c in (0, 1, 2):
             effects.append({"technologyId": int(command.a), "attribute": "researchSeconds",
                 "operation": {0: "set", 1: "add", 2: "multiply"}[int(command.c)], "amount": rounded(command.d)})
             continue
         if command.type in (1, 6):
-            # A player attribute: `a` names the resource, `b` chooses write or
-            # add, `d` is the amount. `c` is a bookkeeping slot this does not
-            # read.
+            # A player attribute: a names the resource, b chooses write/add,
+            # d is the amount. The owned farm-team row uses c=a as a scaled
+            # resource copy, paired with its persistent farm multiplier69.
             resource = resource_names.get(int(command.a))
-            resource_operation = "multiply" if command.type == 6 else RESOURCE_OPERATIONS.get(int(command.b))
+            resource_operation = "multiply" if command.type == 6 or (command.type == 1 and command.c == command.a and command.b == 0) else RESOURCE_OPERATIONS.get(int(command.b))
             if resource not in SUPPORTED_PLAYER_ATTRIBUTES or resource_operation is None:
                 name = f" ({resource})" if resource is not None else ""
                 reason = "not modelled" if resource not in SUPPORTED_PLAYER_ATTRIBUTES else f"unsupported operation {int(command.b)}"
@@ -1288,6 +1332,9 @@ def effects_of(
                 "resource": resource,
                 "operation": resource_operation,
                 "amount": rounded(float(command.d)),
+                **({"reapplyMultiplier": True} if command.type == 1 and command.c == command.a and command.b == 0 else {}),
+                **({"reapplyMultiplierFrom": "resource-69"} if command.type == 1 and command.a == 36 and command.c == 36
+                   and any(c.type == 6 and c.a == 69 for c in dat.effects[effect_id].effect_commands) else {}),
             })
             continue
         operation = OPERATION_NAMES.get(command.type)
@@ -1297,6 +1344,12 @@ def effects_of(
         target = int(command.a)
         targets = by_id.get(target, []) if target >= 0 else by_class.get(int(command.b), [])
         attribute_id = int(command.c)
+        if attribute_id == 21:
+            supported = [key for key in targets if entities[key].get("category") == "building" and entities[key].get("popSupport", 0) > 0]
+            for key in supported:
+                effects.append({"unit": key, "attribute": "populationSupport", "operation": operation, "amount": rounded(command.d)})
+            if supported:
+                continue
         if attribute_id == 57 and operation == "set":
             spawned = next((key for key in by_id.get(int(command.d), [])
                 if entities[key].get("hitPoints", 0) < 0 and entities[key].get("combat", {}).get("blastRadius", 0) > 0), None)
@@ -1341,6 +1394,9 @@ def effects_of(
             continue
         amount = float(command.d)
         for key in targets:
+            if attribute == "chargeRangeModifier" and not entities.get(key, {}).get("alternateAttack"):
+                unreached.add(f"attribute {attribute_id} on {key}: unsupported alternate weapon")
+                continue
             if attribute in ("maxCharge", "chargeType") and not entities.get(key, {}).get("fireCharge"):
                 unreached.add(f"attribute {attribute_id} on {key}: unsupported charge mode")
                 continue
@@ -1510,6 +1566,8 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
     """
     civ = dat.civs[civ_index]
     tree = dat.effects[civ.tech_tree_id].effect_commands
+    modifiers = [*tree, *dat.effects[civ.team_bonus_id].effect_commands]
+    time_overrides = {}
     disabled = {int(c.d) for c in tree if c.type == 102}
     by_id = {t["techId"]: key for key, t in technologies.items()}
     buildings = {e["id"]: key for key, e in entities.items()
@@ -1530,7 +1588,9 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
     # Tree research cost/time commands: c=0 sets, c=1 adds. Unknown forms stay
     # in the provenance report instead of silently enabling free research.
     handled = {f"effect type {c.type}: a={c.a}, b={c.b}, c={c.c}, d={c.d}" for c in tree if c.type == 102}
-    for c in tree:
+    for c in modifiers:
+        if c.type == 103 and c.c == 0:
+            time_overrides[int(c.a)] = rounded(c.d)
         key = by_id.get(int(c.a))
         if key is None or c.type not in (101, 103) or c.c not in (0, 1):
             continue
@@ -1544,7 +1604,7 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
         else:
             continue
         handled.add(f"effect type {c.type}: a={c.a}, b={c.b}, c={c.c}, d={c.d}")
-    ids = set(by_id) | set(triggers) | {
+    ids = set(by_id) | set(triggers) | set(time_overrides) | {
         i for i, t in enumerate(dat.techs) if t.civ == civ_index
         and not any(l.location_id >= 0 for l in t.research_locations)
     }
@@ -1581,7 +1641,7 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
     for tid in sorted(ids):
         tech = dat.techs[tid]
         public = technologies.get(by_id.get(tid))
-        automatic = not any(l.location_id >= 0 or l.research_time > 0 for l in tech.research_locations)
+        automatic = not any(l.location_id >= 0 or time_overrides.get(tid, l.research_time) > 0 for l in tech.research_locations)
         # Teuton Murder Holes is zero-time but retains a200-food source price;
         # its owned civilisation help explicitly calls it free. The zero-time
         # bonus is automatic, not a paid instant button.
@@ -1609,7 +1669,7 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
         nodes[str(tid)] = node
     for tid, eid in [(-1, civ.tech_tree_id), (-2, civ.team_bonus_id)]:
         effects, unmodelled, unreached = effects_of(dat, 0, entities, attribute_ids, effect_id=eid)
-        if tid == -1:
+        if tid in (-1, -2):
             unreached = [r for r in unreached if r not in handled]
             # Tree modifiers above are already folded into the profile tables;
             # automatic-tech modifiers remain ordered runtime effects.
@@ -1664,7 +1724,7 @@ def technologies_from_tree(
         # Longbowman is a `UniqueUnit` with none because it simply exists.
         # Some owned upgrade rows (Elite Cannon Galleon691) omit Node Type.
         # Their linked unit plus trigger still identify the paid upgrade.
-        upgrade = (node.get("Node Type") in ("UnitUpgrade", "UniqueUnit")
+        upgrade = (node.get("Node Type") in ("UnitUpgrade", "UniqueUnit", "RegionalUnit")
                    or ("Node Type" not in node and node.get("Use Type") == "Unit" and "Link ID" in node)) \
                   and node.get("Trigger Tech ID")
         if node.get("Node Type") != "Research" and not upgrade:
@@ -2074,6 +2134,8 @@ def extract(
     # Missing from Constants.xs's named subset, but conversion tasks reference
     # this gate and owned localization15029 calls it Enable Siege Conversion.
     attribute_ids["resource-29"] = 29
+    # Localization15069 names Farm Food Multiplier, also absent from XS.
+    attribute_ids["resource-69"] = 69
     hashes["xs/Constants.xs"] = sha256(constants_path)
     attributes = player_attributes(dat.civs[spec["civIndex"]].resources, attribute_ids)
     if not SUPPORTED_PLAYER_ATTRIBUTES.issubset(attributes):
@@ -2234,6 +2296,7 @@ def extract(
                 ("allyHelp", 30350), ("neutralHelp", 30351), ("enemyHelp", 30352), ("cancel", 4006),
                 ("townBell", 40111), ("townBellHelp", 41111),
                 ("setGatherPoint", 4144), ("setGatherPointHelp", 4944),
+                ("attackGround", 4123), ("attackGroundHelp", 4923),
                 ("options", 8800), ("apply", 4011), ("optionsOk", 4001), ("optionsCancel", 4002),
                 ("optionsGame", 4058), ("optionsInterface", 4060), ("optionsAudio", 4062), ("optionsHotkeys", 8801),
                 ("musicVolume", 8837), ("musicVolumeHelp", 98837), ("soundVolume", 8840), ("soundVolumeHelp", 98840),

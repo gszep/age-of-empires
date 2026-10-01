@@ -62,7 +62,10 @@ class GothImportTest(unittest.TestCase):
             self.assertEqual(blast['level'], 2)
             self.assertEqual(blast['attacks'], [{'class': 4, 'amount': 10}, {'class': 60, 'amount': 5}])
             self.assertGreater(blast['seconds'], 0)
-        self.assertEqual({e['unit'] for e in tech['effects']}, {'fire-galley', 'fire-ship', 'fast-fire-ship'})
+        dat = _dat()
+        targets = {int(c.a) for c in dat.effects[dat.techs[910].effect_id].effect_commands if c.type == 0 and c.c == 57}
+        expected = {key for key, entity in self.goths['entities'].items() if entity.get('id') in targets}
+        self.assertEqual({e['unit'] for e in tech['effects']}, expected)
         self.assertEqual(self.goths['entities']['fire-ship-explosion']['deathEffect'], 'explosion_demo_ships')
         self.assertFalse([t for t in self.goths['skippedTechnologies'] if 'do not have' not in t['reason']])
 

@@ -15,7 +15,38 @@ export interface FireChargeRules {
     impactEffect: string; impactSeconds: number };
 }
 
+export interface ProjectileRules {
+  ignoresArmor?: boolean;
+  interceptRadius?: number;
+  key: string;
+  speed: number;
+  attacks: AttackValue[];
+  blastRadius: number;
+  blastAttackLevel: number;
+  accuracyPercent: number;
+  accuracyDispersion: number;
+  piercing?: { radius: number; attacks: AttackValue[]; unit: string };
+}
+
+export interface AlternateAttack {
+  bulk: boolean;
+  maximum: number;
+  rechargePerSecond: number;
+  rangeModifier: number;
+  unitTargetsOnly: boolean;
+  minRange: number;
+  releaseSeconds: number;
+  count: number;
+  intervalSeconds: number;
+  animation: string;
+  projectile: ProjectileRules;
+}
+
 export interface UnitRules {
+  abilityFlags?: number;
+  interceptRadius?: number;
+  volley?: { count: number; intervalSeconds: number; secondary?: ProjectileRules };
+  alternateAttack?: AlternateAttack;
   /** Owned non-depleting task133: speed boost during an attack approach. */
   attackApproach?: { minimumDistance: number; maximumDistance: number; speedMultiplier: number };
   trainable?: boolean;
@@ -229,6 +260,7 @@ export interface UnitRules {
 }
 
 export interface BuildingRules {
+  abilityFlags?: number;
   conversionImmune?: boolean;
   requires?: string[];
   datClass?: number;
@@ -427,6 +459,7 @@ export type VillagerGatherTask = 'forager' | 'farmer' | 'hunter' | 'shepherd'
 export interface VillagerGatherRules { ratePerSecond: number; capacity: number; dropSites?: BuildingKind[] }
 
 export interface GameRules {
+  projectiles?: Record<string, ProjectileRules>;
   origin: 'fallback' | 'imported';
   civilization: CivilizationRules;
   /** Additional complete player rulesets. Gaia and map generation use the root.
@@ -611,6 +644,13 @@ export interface TechRules {
  * or one of the villager task variants that carry the gather rates.
  */
 export interface TechEffect {
+  /** One-shot DAT type7 grant, attached to its original automatic-tech gate. */
+  spawn?: { unit: UnitKind; building: BuildingKind; count: number };
+  /** Repeatable resource-copy multipliers reapply after additive crop research. */
+  reapplyMultiplier?: boolean;
+  reapplyMultiplierFrom?: PlayerAttribute;
+  projectileFrom?: string;
+  projectileTo?: string;
   /** Absent on a player-level effect, which names no unit. */
   unit?: string;
   attribute?: TechAttribute;
@@ -655,13 +695,14 @@ export interface DeathExplosion {
 export type PlayerAttribute = 'farmFoodAmount' | 'unitRepairCost' | 'buildingRepairCost'
   | 'relicRate' | 'convertResistMinAdj' | 'convertResistMaxAdj' | 'theocracy' | 'heresy'
   | 'spies' | 'tradeVigRate' | 'tributeInefficency' | 'huntingProductivity' | 'unitLimit'
-  | 'convertBuilding' | 'convertPriest' | 'resource-29' | 'healRange';
+  | 'convertBuilding' | 'convertPriest' | 'resource-29' | 'healRange'
+  | 'researchCostMod' | 'startingFood' | 'startingWood' | 'startingGold' | 'startingStone' | 'spawnCap' | 'resource-69';
 
 export type TechAttribute =
   | 'hitPoints' | 'lineOfSight' | 'speed' | 'armor' | 'attack'
   | 'reloadSeconds' | 'accuracyPercent' | 'range' | 'minRange'
-  | 'garrisonHealRate' | 'garrisonCapacity' | 'garrisonMaxProjectiles' | 'totalProjectiles'
-  | 'maxCharge' | 'chargeType'
+  | 'garrisonHealRate' | 'garrisonCapacity' | 'garrisonMaxProjectiles' | 'totalProjectiles' | 'populationSupport'
+  | 'maxCharge' | 'chargeType' | 'chargeRangeModifier'
   | 'blastRadius' | 'searchRadius' | 'trainSeconds' | 'trainLocation' | 'researchSeconds' | 'deathExplosion' | 'garrisonFirepower'
   | 'workRate' | 'carryCapacity' | 'cost' | 'foodCost' | 'woodCost' | 'goldCost' | 'stoneCost'
   /** On a projectile: whether the shot leads a moving target. Ballistics. */
@@ -1428,6 +1469,8 @@ export const FALLBACK_RULES: GameRules = {
 };
 
 interface ManifestEntity {
+  volley?: { count: number; intervalSeconds: number; secondaryId?: number };
+  alternateAttack?: Omit<AlternateAttack, 'projectile'> & { projectileId: number };
   fireCharge?: FireChargeRules;
   attackApproach?: UnitRules['attackApproach'];
   availabilityId?: number;
@@ -1454,6 +1497,7 @@ interface ManifestEntity {
   trainLocations?: { buildingId: number; seconds: number; button?: number; hotkeyTextId?: number }[];
   build?: { builderId: number; seconds: number; button?: number; sourceId?: number; additionalAge?: number };
   combat?: {
+    abilityFlags?: number;
     reloadSeconds: number;
     frameDelay: number;
     minimumRange?: number;
@@ -1605,6 +1649,20 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     const id = e[key]?.combat?.projectileUnitId;
     return id === undefined ? undefined : projectileArtById.get(id);
   };
+  const projectiles: Record<string, ProjectileRules> = {};
+  for (const [key, entity] of Object.entries(e)) {
+    if (entity.category !== 'projectile') continue;
+    const attacks = attackValues(entity.combat?.attacks);
+    projectiles[key] = { key, speed: entity.speedTilesPerSecond ?? 0,
+      ignoresArmor: !!((entity.combat?.abilityFlags ?? 0) & 1),
+      attacks, blastRadius: entity.combat?.blastRadius ?? 0,
+      blastAttackLevel: (entity.combat?.blastAttackLevel ?? 3) & 3,
+      accuracyPercent: entity.combat?.accuracyPercent ?? 100,
+      accuracyDispersion: entity.combat?.accuracyDispersion ?? 0,
+      ...(entity.projectile?.hitMode === 1 && entity.projectile.vanishMode === 1 ? { piercing: { radius: entity.collision[0], attacks, unit: key } } : {}),
+      ...(entity.projectile?.hitMode === 1 && entity.projectile.vanishMode === 0 ? { interceptRadius: entity.collision[0] } : {}),
+    };
+  }
   const piercing = (key: string): UnitRules['piercing'] => {
     const art = projectileArt(key);
     const bolt = art ? e[art] : undefined;
@@ -1626,8 +1684,11 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       conversionImmune: e[key].conversionImmune ?? fallback?.conversionImmune,
       confirmDelete: e[key].confirmDelete ?? fallback?.confirmDelete,
       hp: e[key].hitPoints,
+      abilityFlags: e[key].combat?.abilityFlags,
       fireCharge: e[key].fireCharge,
       attackApproach: e[key].attackApproach,
+      volley: e[key].volley ? { ...e[key].volley!, secondary: projectiles[projectileArtById.get(e[key].volley!.secondaryId ?? -1) ?? ''] } : undefined,
+      alternateAttack: e[key].alternateAttack ? { ...e[key].alternateAttack!, projectile: projectiles[projectileArtById.get(e[key].alternateAttack!.projectileId)!] } : undefined,
       radius: e[key].collision[0],
       speed: e[key].speedTilesPerSecond ?? 0.8,
       lineOfSight: e[key].lineOfSight,
@@ -1649,6 +1710,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       minRange: e[key].combat?.minimumRange || fallback?.minRange,
       projectileSpeed: e[key].combat?.projectileSpeed ?? fallback?.projectileSpeed,
       projectileArt: projectileArt(key) ?? fallback?.projectileArt,
+      interceptRadius: projectiles[projectileArt(key) ?? '']?.interceptRadius,
       piercing: piercing(key) ?? fallback?.piercing,
       launchHeight: e[key].combat?.launchOffset?.[2] ?? fallback?.launchHeight,
       blastRadius: e[key].combat?.blastRadius ?? fallback?.blastRadius,
@@ -1746,6 +1808,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       buildSeconds: legacyTownCenter ? fallback.buildSeconds : e[key].build?.seconds ?? 25,
       additionalAge: e[key].build?.additionalAge ?? fallback.additionalAge,
       popSupport: e[key].popSupport ?? 0,
+      abilityFlags: e[key].combat?.abilityFlags,
       buildable: buildable && !(manifest.civilization?.unavailable.buildings ?? [])
         .includes(e[key].availabilityId ?? e[key].id ?? -1),
       armors: attackValues(e[key].combat?.armors),
@@ -1817,6 +1880,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
     };
   };
   const result: GameRules = {
+    projectiles,
     origin: 'imported',
     // Each profile names its own units and tree. The root is also Gaia/map
     // input; alternative profiles never inherit its player-specific rules.

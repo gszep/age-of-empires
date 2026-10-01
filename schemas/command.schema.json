@@ -5,6 +5,15 @@
   "oneOf": [
     {
       "type": "object", "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "attack-ground" }, "player": { "enum": [1, 2] },
+        "entityIds": { "type": "array", "items": { "type": "integer" }, "minItems": 1 },
+        "target": { "$ref": "#/definitions/point" }
+      },
+      "required": ["kind", "player", "entityIds", "target"]
+    },
+    {
+      "type": "object", "additionalProperties": false,
       "properties": { "kind": { "const": "treason" }, "player": { "enum": [1, 2] }, "castleId": { "type": "integer" } },
       "required": ["kind", "player", "castleId"]
     },

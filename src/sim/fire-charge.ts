@@ -1,9 +1,9 @@
-import { TICK_SECONDS, TICKS_PER_SECOND } from './data';
+import { isUnit, TICK_SECONDS, TICKS_PER_SECOND } from './data';
 import { unitRulesForEntity } from './rules';
 import type { Entity, GameState, Point, Projectile } from './types';
 
 export function fireChargeOf(state: GameState, unit: Entity) {
-  if (!['fire-galley', 'fire-ship', 'fast-fire-ship'].includes(unit.kind)) return;
+  if (!isUnit(unit.kind)) return;
   const charge = unitRulesForEntity(state, unit).fireCharge;
   return charge && charge.type === 6 && charge.event === 0 && charge.target === 64 && charge.maximum >= 1 ? charge : undefined;
 }

@@ -8,6 +8,7 @@ import { validateCommand, validateObservation } from '../protocol/validate';
 import { buildMenu } from '../view/build-menu';
 import { gateArtKey, wallShape, WALL_RUN_X } from '../view/sprites';
 import { synchronizationHash } from '../shared/checksum';
+import { researchCostFor } from './technologies';
 import type { BuildingKind, Entity, GameState } from './types';
 
 const manifestPath = 'public/imported/aoe2/manifest.json';
@@ -72,8 +73,9 @@ describe.each(Object.entries(profiles))('%s building outcomes', (_key, source) =
     const denied = { kind: 'build' as const, player: 1 as const, builderIds: [], building: 'fortified-wall' as const, target: { x: 50.5, y: 40.5 } };
     expect(applyCommand(state, denied).ok).toBe(false);
     const food = state.players[1].food;
+    const researchFood = researchCostFor(state, 1, 'fortified-wall').food;
     research(state, 'fortified-wall', university);
-    expect(food - state.players[1].food).toBe(200);
+    expect(food - state.players[1].food).toBe(researchFood);
     expect(wall.kind).toBe('fortified-wall'); expect(wall.hp).toBe(wall.maxHp - 10);
     expect(gate.kind).toBe('fortified-gate'); expect(gate.hp).toBe(gate.maxHp - 20);
     expect(gate.footprint).toEqual({ x: 2, y: .5 });
@@ -232,7 +234,10 @@ describe.each(Object.entries(profiles))('%s building outcomes', (_key, source) =
       research(state, 'keep', university); attack = 11;
       expect(state.players[1].researched.filter(k => k === 'automatic-611')).toHaveLength(1);
     }
-    for (const worker of state.entities.filter(e => e.owner === 1 && e.kind === 'villager')) {
+    // Three occupants define this two-arrow fixture; openings can contain more.
+    const crew = state.entities.filter(e => e.owner === 1 && e.kind === 'villager').slice(0, 3);
+    expect(crew).toHaveLength(3);
+    for (const worker of crew) {
       worker.position = { x: 41.2, y: 40.5 };
       expect(applyCommand(state, { kind: 'order', player: 1, entityIds: [worker.id], target: tower.position, targetId: tower.id }).ok).toBe(true);
       until(state, () => !!tower.garrison?.some(e => e.id === worker.id));

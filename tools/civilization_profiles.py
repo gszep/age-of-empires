@@ -108,10 +108,13 @@ def shared_combat_specs(dat, spec):
             additions[-1]["rosterAliases"] = row["rosterAliases"]
         if row.get("decay") is False:
             additions[-1]["animations"].pop("decay")
+        if unit.creatable.charge_type == 6 and unit.creatable.charge_target == 127:
+            additions[-1]["animations"]["attack-special"] = {"slot": "special"}
         known.add(uid)
-        projectile = unit.type_50.projectile_unit_id
-        if projectile >= 0 and projectile not in known:
-            additions.append({"key": f"dat-projectile-{projectile}", "unitId": projectile,
-                              "category": "projectile", "animations": {"idle": {"slot": "standing"}}})
-            known.add(projectile)
+        for projectile in (unit.type_50.projectile_unit_id, unit.creatable.secondary_projectile_unit,
+                           unit.creatable.charge_projectile_unit):
+            if projectile >= 0 and projectile not in known:
+                additions.append({"key": f"dat-projectile-{projectile}", "unitId": projectile,
+                                  "category": "projectile", "animations": {"idle": {"slot": "standing"}}})
+                known.add(projectile)
     return additions

@@ -319,6 +319,10 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   copy a different file from the offset it had reached; kill the run,
   edit, restart. The sentinel guards against the other half: anything
   edited after a gate *started* counts as untested.
+- **Freeze app code during private-browser acceptance.** A live simulation edit
+  during#184 caused a full reload and restored the fixture paused halfway through
+  research. The wait correctly timed out; repeating with frozen code passed.
+  Finish edits before measuring, or stop and restart the probe explicitly.
 - **More than two or three DAT questions is a one-shot script.**
   `tools/datq.py` reloads the DAT per call; fourteen calls beside a running
   gate hit the tool timeout.

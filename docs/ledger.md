@@ -14,6 +14,65 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## Chinese opening, research and weapons (#184; calibration #260)
+
+- **Owned:** DAT6/tree257/team402;226 deducts starting food200/wood50 after
+  Town Center Spawn639,302 requires639 and annex307 and spawns three83 villagers
+  at annex619 with spawnCap234=1.425 sets TC first resource storage to15 and adds7
+  sight/search. **Inferred integration:** the automatic graph grants once at the
+  first eligible completed TC, using the existing safe production exit placement;
+  no subsequent TC rebuild, save/reload or age change repeats it. Starting-resource
+  adjustments apply once to the current opening bank, including Regicide's preset.
+- **Owned:** researchCostMod85 is1/.95/.9/.85 through304/350/351/352. The price
+  at command acceptance uses the current factor, including age advances and Spies.
+  **Inferred integer policy:** nearest-integer per resource, consistent with the
+  existing cost consumer; pending accepted research is not repriced. Dynamic prices
+  are visible to the HUD and agents. Native half-resource rounding remains#260.
+- **Owned:** team402 makes repeatable232 free/zero-time;232 copies resource36
+  multiplied by1.1 and multiplies resource69 (localization15069: Farm Food
+  Multiplier, initial1). **Inferred reapplication:** use that multiplier once on the final additive farm
+  capacity once (including later Horse Collar/Heavy Plow), round when sowing and
+  keep existing crops unchanged. The resource36 copy and69 multiplier are paired,
+  not two independent10% increases. Other232 targets (pastures/Folwarks)
+  remain diagnostics outside this roster; native reapplication details are#260.
+- **Owned:** Chu Ko Nu73/559 fire3/5 projectiles, first from the shooter and
+  subsequent from510; Rocket Carts1904/1907 fire8/10 shooter-strength rockets.
+  **Inferred scheduling:** distribute non-bulk shots through the remaining owned
+  attack-animation duration, quantized to the20Hz simulation clock. Pending shots
+  snapshot their damage/art, cancel on retask/Stop or target loss, and survive JSON
+  saves. Source counts/stats are not proof of native cadence/spread;#260 retains it.
+  Their embedded aura task155 templates are dormant: Combat Ability is0, without
+  the enabling32 bit documented by UGC. They are not unconditional Chinese buffs.
+- **Owned + documented interpretation:** Fire Lancers1901/1903 use type6,
+  target127, range modifier4/5, special graphics13031/13067 and three1925 bullets;
+  raw recharge precision preserves the30-second threshold. Lou Chuan1948 uses
+  type6/target127/range modifier−3 and ten1936 arrows. English help26601 identifies
+  arrows versus units and the long-range primary versus buildings/siege.
+  **Inferred targeting/timing:** use that split, full-charge readiness, source
+  special-animation windup and source bulk flag16; recharge in ordinary on-map
+  simulation ticks. Fire Lancers close to melee while charge is unavailable.
+  A weapon-mode change restarts its windup/animation together; ordinary pursuit
+  with the same weapon keeps the existing windup. Native switching policy is#260.
+  Arrow range follows attribute61 separately from the primary weapon's range.
+- **Owned:** Rocketry483 changes weapon attacks and redirects1936→1879;
+  Chemistry redirects1936→1937 and510→522. Projectile tables retain their own
+  research effects, including repeated source commands. **Inferred redirection:**
+  the latest completed replacement for an original projectile ID wins, then follow
+  its replacement chain; already fired/pending shots keep their payload. Native
+  order-dependent Chemistry/Rocketry redirection is explicitly unresolved in#260.
+- **Owned + UGC interpretation:** `type_50.break_off_combat` corresponds to
+  Combat Ability63: bits1/2 ignore melee/pierce armour/resist that bypass,8 permits
+  Attack Ground,16 releases a bulk volley. Projectile hitMode1/vanishMode0 intercepts
+  the first enemy and disappears; vanishMode1 keeps the existing piercing path.
+  Rocket splash shares the same armour-bypass calculation. **Inferred geometry:**
+  existing swept-radius collision, nearest intercepted enemy and melee splash
+  against enemies only; native blast/friendly-fire boundaries remain uncalibrated.
+- **Owned UI:** Attack Ground label4123/help4923, hotkey action23 (Definitive T)
+  and the imported action-sheet rock/ground icon60. **Chosen layout:** cell5 in the
+  current compact command grid; the owned buttons.json subset has no ground-fire
+  placement row. A selected artillery unit receives a public coordinate order;
+  subsequent targeting, damage and cancellation remain simulation-owned.
+
 ## Japanese bonus and unique-unit integration (#183; calibration #259)
 
 - **Owned:** Japanese DAT5/tree255/team406; automatic190/306/340/341/422–424

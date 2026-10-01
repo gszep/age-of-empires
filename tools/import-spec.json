@@ -1,8 +1,8 @@
 {
   "schemaVersion": 3,
   "civIndex": 1,
-  "profileCivilizations": ["franks", "goths", "teutons", "japanese"],
-  "enabledCivilizations": ["franks", "goths", "teutons", "japanese"],
+  "profileCivilizations": ["franks", "goths", "teutons", "japanese", "chinese"],
+  "enabledCivilizations": ["franks", "goths", "teutons", "japanese", "chinese"],
   "combatRoster": [
     { "unitId": 5 },
     { "unitId": 36 },
@@ -14,6 +14,15 @@
     { "unitId": 291 },
     { "unitId": 560 },
     { "unitId": 691, "composite": true, "decay": false },
+    { "unitId": 73 },
+    { "unitId": 559 },
+    { "unitId": 548 },
+    { "unitId": 1901 },
+    { "unitId": 1903 },
+    { "unitId": 1904 },
+    { "unitId": 1907 },
+    { "unitId": 1302, "composite": true, "decay": false },
+    { "unitId": 1948, "composite": true, "decay": false },
     { "unitId": 588 },
     { "unitId": 1795, "composite": true, "decay": false },
     { "unitId": 281 },
@@ -68,6 +77,18 @@
     }
   ],
   "entities": [
+    {
+      "key": "dat-projectile-1937", "unitId": 1937, "category": "projectile",
+      "animations": { "idle": { "slot": "standing" } }
+    },
+    {
+      "key": "dat-projectile-522", "unitId": 522, "category": "projectile",
+      "animations": { "idle": { "slot": "standing" } }
+    },
+    {
+      "key": "dat-projectile-1879", "unitId": 1879, "category": "projectile",
+      "animations": { "idle": { "slot": "standing" } }
+    },
     {
       "key": "bombard-tower-shot", "unitId": 506, "category": "projectile",
       "animations": { "idle": { "slot": "standing" } }
