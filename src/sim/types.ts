@@ -46,7 +46,8 @@ export type Order =
   | { kind: 'move'; target: Point }
   | { kind: 'gather'; targetId: number }
   | { kind: 'build'; targetId: number }
-  /** Guarded catapult auto-acquisition; explicit/legacy orders omit the marker. */
+  /** Guarded catapult or stationary trebuchet acquisition; explicit/legacy
+   * orders omit the marker. */
   | { kind: 'attack'; targetId: number; automatic?: true }
   | { kind: 'attack-ground'; target: Point }
   /** A trade cart shuttling to the market with this id and back to its own. */
@@ -142,6 +143,9 @@ export interface Entity {
   /** Half-extents in tiles when the footprint is not the square `radius` says:
    * a gate is two tiles by one, and which way round is its orientation. */
   footprint?: { x: number; y: number };
+  /** Authoritative gate pose; blocked is closed by an enemy at the doorway.
+   * Absent in older snapshots means closed until the next simulation tick. */
+  gateState?: 'closed' | 'open' | 'blocked';
   buildProgress?: number; // 0..1; undefined once complete
   training?: { kind: UnitKind; remainingTicks: number; paidCost?: Cost };
   /**
@@ -165,6 +169,8 @@ export interface Entity {
   unpacked?: boolean;
   /** Ticks left in a pack or unpack; the engine can do nothing else meanwhile. */
   packingTicks?: number;
+  /** A manual Pack holds the engine packed until its next player order. */
+  autoUnpackSuppressed?: boolean;
   /** Target of a task133 speed-up; discarded when the attack order changes. */
   attackApproachTarget?: number;
   attackWeapon?: 'alternate';

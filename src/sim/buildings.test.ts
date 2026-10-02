@@ -90,12 +90,13 @@ describe.each(Object.entries(profiles))('%s building outcomes', (_key, source) =
     expect(validateObservation(JSON.parse(JSON.stringify(observe(state, 1))))).toBe(true);
   });
 
-  it.skipIf(!available('stone-gate'))('keeps end posts solid while the owner walks through the gate doorway; enemy must go around', () => {
+  it.skipIf(!available('stone-gate'))('keeps end posts solid while the open doorway is shared', () => {
     const state = fixture(source); state.players[1].age = 1;
     const gate = build(state, 'stone-gate', 40, 40.5);
+    gate.gateState = 'open';
     const own = buildNavGrid(state, undefined, 1), enemy = buildNavGrid(state, undefined, 2);
     for (const x of [38, 41]) expect(isBlocked(own, x, 40)).toBe(true);
-    for (const x of [39, 40]) { expect(isBlocked(own, x, 40)).toBe(false); expect(isBlocked(enemy, x, 40)).toBe(true); }
+    for (const x of [39, 40]) { expect(isBlocked(own, x, 40)).toBe(false); expect(isBlocked(enemy, x, 40)).toBe(false); }
     const walker = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
     walker.position = { x: 39.5, y: 38.5 };
     expect(applyCommand(state, { kind: 'order', player: 1, entityIds: [walker.id], target: { x: 39.5, y: 42.5 } }).ok).toBe(true);

@@ -55,7 +55,10 @@ After research, building HP synchronizes once from effective rules; buildings
 skip the later scalar HP loop and promoted unit IDs keep their exclusion.
 Absolute damage retention, proportional foundation gains, shared gate HP,
 owner passage and proximity-open display are **inferred**, not closed-runtime
-parity. Diagonal gates/native open-close timing remain #133. Views retain owner-
+parity. Gates now share authoritative open/closed/enemy-blocked state between
+collision and imported art; owner approach routing does not grant physical
+passage through a closed leaf. Diagonal gates/native trigger and open-close timing
+remain #133. Views retain owner-
 profile lookup and separate stone versus palisade frame conventions.
 
 ## Verification

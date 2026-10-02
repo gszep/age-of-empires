@@ -1181,7 +1181,7 @@ describe('gates', () => {
     expect(gateBoxKey(gateAt(state, 24.5, 8, 'y'))).toBe('palisade-gate-y');
   });
 
-  it('swings open for its owner and stays shut for everybody else', () => {
+  it('draws only the authoritative gate state, regardless of nearby units', () => {
     const state = createGame(65);
     // Somewhere nobody starts, so only the units this test places are near.
     const gate = gateAt(state, 26, 26.5, 'x');
@@ -1189,11 +1189,15 @@ describe('gates', () => {
 
     const mine = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
     mine.position = { x: 26.5, y: 26.5 };
+    expect(chooseAnimation(state, gate).name).toBe('idle');
+    gate.gateState = 'open';
     expect(chooseAnimation(state, gate).name).toBe('open');
 
     mine.position = { x: 40, y: 40 };
     const theirs = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
     theirs.position = { x: 26.5, y: 26.5 };
+    expect(chooseAnimation(state, gate).name).toBe('open');
+    gate.gateState = 'blocked';
     expect(chooseAnimation(state, gate).name).toBe('idle');
   });
 

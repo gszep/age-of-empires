@@ -3,6 +3,7 @@ import { isBuilding, isFishKind } from './data';
 import { distance } from './nav';
 import type { PlayerObservation } from '../protocol/types';
 import { DOCK_WOOD, FISHING_SHIP_WOOD, fishingWater, fishingDockSite, fishingOrders, fishingProducer, plannedWood } from './ai-fishing';
+import { CASTLE_STONE, TREBUCHET_BUDGET, siegePlan } from './ai-siege';
 
 interface Spotted {
   id: number; kind: string; owner: number; x: number; y: number; hp: number;
@@ -203,6 +204,8 @@ export interface ExampleAiOptions {
   fishing?: boolean;
   /** Control for measuring the livestock-return strategy against its baseline. */
   herding?: boolean;
+  /** Control for measuring the late-game siege policy. */
+  siege?: boolean;
 }
 
 export function exampleAiCommands(
@@ -219,7 +222,13 @@ export function exampleAiCommands(
   // Age opens the archery range, and the attack, the endgame raze and the
   // decision to keep saving all count soldiers rather than militia.
   const army = mine.filter(
-    e => e.kind === 'militia' || e.kind === 'man-at-arms' || e.kind === 'archer');
+    e => ['militia', 'man-at-arms', 'long-swordsman', 'two-handed-swordsman', 'champion',
+      'archer', 'crossbowman', 'arbalester'].includes(e.kind));
+  const siege = options.siege === false ? undefined : siegePlan(observation, army.length);
+  const stoneWorkers = new Set(villagers.map((_, index) => index)
+    .filter(index => ASSIGNMENT[index % ASSIGNMENT.length] !== 'food').slice(-2));
+  const wantedResource = (index: number): ResourceKind => siege?.gatherStone && stoneWorkers.has(index)
+    ? 'stone' : ASSIGNMENT[index % ASSIGNMENT.length];
   const militia = army;
   const tc = mine.find(e => e.kind === 'town-center');
   const water = options.fishing === false ? undefined : fishingWater(observation);
@@ -235,7 +244,7 @@ export function exampleAiCommands(
   // even if its rounded public value has reached 1 (#146).
   const constructionWorkers = new Set<number>();
   const staffed = new Set(villagers.filter(e => e.order === 'build').map(e => e.buildTargetId));
-  for (const house of mine.filter(e => (e.kind === 'house' || e.kind === 'dock') && e.buildProgress !== undefined)
+  for (const house of mine.filter(e => (e.kind === 'house' || e.kind === 'dock' || e.kind === 'castle') && e.buildProgress !== undefined)
     .sort((a, b) => a.id - b.id)) {
     if (staffed.has(house.id)) continue;
     const worker = villagers.filter(e => !constructionWorkers.has(e.id) && (e.order === 'idle' || e.order === 'gather'))
@@ -274,7 +283,7 @@ export function exampleAiCommands(
   let dinnerAssigned = !!dinner && foodTargets.has(dinner.id);
   for (const [index, villager] of villagers.entries()) {
     if (villager.order !== 'idle' || constructionWorkers.has(villager.id)) continue;
-    const wanted = ASSIGNMENT[index % ASSIGNMENT.length];
+    const wanted = wantedResource(index);
     // Farms are food sources too once complete, so they keep villagers fed
     // after the berries run out.
     // Fishing ships get their own water-component orders below; villagers
@@ -311,7 +320,7 @@ export function exampleAiCommands(
   // standing at a known node of it -- is sent to the nearest known node.
   for (const [index, villager] of villagers.entries()) {
     if (constructionWorkers.has(villager.id) || returningShepherds.has(villager.id)) continue;
-    const wanted = ASSIGNMENT[index % ASSIGNMENT.length];
+    const wanted = wantedResource(index);
     if (wanted === 'food') continue; // food assigns itself; the herd rule below
     if (villager.order === 'idle' || villager.order === 'build') continue;
     if (villager.carrying?.kind === wanted) continue;
@@ -474,7 +483,7 @@ export function exampleAiCommands(
   const housesAtOnce = headroom <= 0 ? 2 : 1;
   const building = mine.filter(e => e.kind === 'house' && e.buildProgress !== undefined).length;
   if (idleBuilder && headroom <= houseHeadroom && building < housesAtOnce
-      && observation.wood >= 25) {
+      && observation.wood >= 25 + (headroom > 0 ? siege?.reserve ?? 0 : 0)) {
     // Cycle deterministically through candidate spots so a blocked placement
     // is retried elsewhere on the next decision.
     const spot = clearSpot(HOUSE_SPOTS, 1) ?? clearSpot(RANGE_SPOTS, 1)
@@ -495,11 +504,12 @@ export function exampleAiCommands(
   // before a newly unlocked military building becomes affordable (#86).
   // Keep housing, first drop sites and the first farm available, but reserve
   // the next range/smith's existing price against discretionary expansion.
-  const militaryWoodReserve = observation.age >= 1 && barracks
+  const militaryWoodReserve = Math.max(siege?.reserve ?? 0, observation.age >= 1 && barracks
     ? !range ? 175 : options.blacksmith !== false && !smith ? 150 : 0
-    : 0;
+    : 0);
   const dockReserve = water && !dock && woodIsHandy ? DOCK_WOOD : 0;
-  for (const camp of CAMPS) {
+  const camps = siege?.gatherStone ? [...CAMPS, { resource: 'stone' as const, building: 'mining-camp' as const }] : CAMPS;
+  for (const camp of camps) {
     if (observation.wood < CAMP_COST_WOOD || !idleBuilder || !tc) continue;
     if (camp.resource !== 'wood' && !woodIsHandy) continue;
     // Gold waits for the barracks: the mining camp was a hundred wood the
@@ -575,6 +585,11 @@ export function exampleAiCommands(
     if (spot) build('barracks', spot);
   }
 
+  if (siege?.needsCastle && observation.stone >= CASTLE_STONE && idleBuilder) {
+    const spot = clearSpot(RANGE_SPOTS, 2) ?? clearSpot(BARRACKS_SPOTS, 2) ?? clearSpot(HOUSE_SPOTS, 2);
+    if (spot) build('castle', spot);
+  }
+
   // Farms keep the food supply alive once the berries and the herd are gone.
   //
   // Waiting for the map to be empty of food was too late, and measurably so:
@@ -635,6 +650,12 @@ export function exampleAiCommands(
     commands.push({ kind: 'research', player, buildingId: tc.id, tech: nextAge.tech });
   }
 
+  const siegeGold = siege?.reserve ?? 0;
+  if (siege?.producer && observation.wood - plannedWood(commands) >= TREBUCHET_BUDGET
+    && observation.gold >= TREBUCHET_BUDGET && headroom > 0) {
+    commands.push({ kind: 'train', player, buildingId: siege.producer.id, unit: 'trebuchet' });
+  }
+  const plannedPopulation = commands.filter(c => c.kind === 'train').length;
   const wantVillagers = VILLAGERS_BY_AGE[Math.min(observation.age, VILLAGERS_BY_AGE.length - 1)];
   // Spend what the age is not waiting for. Anything on the list it can afford
   // outright, at a building of its own that is standing idle.
@@ -643,8 +664,8 @@ export function exampleAiCommands(
     // Saving for an age is saving food; a technology that costs none of it
     // -- loom is fifty gold -- is not what the age is waiting for.
     if (banking && want.food > 0) continue;
-    if (observation.food < want.food || observation.wood < want.wood
-      || observation.gold < want.gold) continue;
+    if (observation.food < want.food || observation.wood < want.wood + (siege?.reserve ?? 0)
+      || observation.gold < want.gold + siegeGold) continue;
     const at = mine.find(e => e.kind === want.at && (e.buildProgress ?? 1) >= 1 && !e.researching);
     if (!at) continue;
     commands.push({ kind: 'research', player, buildingId: at.id, tech: want.tech });
@@ -652,12 +673,12 @@ export function exampleAiCommands(
   }
 
   if (tc && !tc.training && villagers.length < wantVillagers
-      && observation.food >= 50 && headroom > 0) {
+      && observation.food >= 50 && headroom > plannedPopulation) {
     commands.push({ kind: 'train', player, buildingId: tc.id, unit: 'villager' });
   }
   if (
     barracks && (barracks.buildProgress ?? 1) >= 1 && !barracks.training && !banking &&
-    observation.food >= 50 && observation.gold >= 20 && headroom > 0
+    observation.food >= 50 && observation.gold >= 20 + siegeGold && headroom > plannedPopulation
   ) {
     // Whatever the barracks actually offers: once the upgrade lands the
     // militia is gone from it, and asking for one is refused for ever.
@@ -673,9 +694,11 @@ export function exampleAiCommands(
     || observation.gold >= nextAge.gold + 100;
   if (
     range && (range.buildProgress ?? 1) >= 1 && !range.training && goldFree &&
-    observation.wood >= 25 + militaryWoodReserve && observation.gold >= 45 && headroom > 0
+    observation.wood >= 25 + militaryWoodReserve && observation.gold >= 45 + siegeGold && headroom > plannedPopulation
   ) {
-    commands.push({ kind: 'train', player, buildingId: range.id, unit: 'archer' });
+    const archer = observation.researched.includes('arbalester') ? 'arbalester'
+      : observation.researched.includes('crossbowman') ? 'crossbowman' : 'archer';
+    commands.push({ kind: 'train', player, buildingId: range.id, unit: archer });
   }
 
   // What could actually stop a demolition. Villagers are not it: counting them
@@ -704,7 +727,7 @@ export function exampleAiCommands(
     // paid for the Castle Age.
     const razers = villagers.filter((e, index) =>
       e.order !== 'attack' && e.order !== 'build' && !constructionWorkers.has(e.id)
-      && ASSIGNMENT[index % ASSIGNMENT.length] !== 'food');
+      && wantedResource(index) !== 'food' && wantedResource(index) !== 'stone');
     if (razers.length) {
       commands.push({
         kind: 'order', player, entityIds: razers.map(e => e.id).sort((a, b) => a - b),
@@ -754,6 +777,7 @@ export function exampleAiCommands(
       });
     }
   }
+  if (siege) commands.push(...siege.orders);
   if (water) {
     commands.push(...fishingOrders(water));
     const producer = fishingProducer(water);

@@ -1,6 +1,74 @@
-# Handoff — siege friendly-fire guard verified, 2026-10-02
+# Handoff — trebuchet automation verified, 2026-10-02
 
-## Siege checkpoint: #278
+## Verified checkpoint: #131 and #133
+
+Trebuchets now automatically deploy for eligible visible enemy buildings. Packed
+right-click attacks approach, set up and fire; distant explicit targets cause
+repacking/redeployment. Manual Pack holds until a new command, move orders can
+cancel unfinished setup, and repeated moves do not restart packing. The example
+AI gathers missing castle stone, builds/re-staffs a castle, reserves siege
+resources, trains a bounded force and attacks known buildings through public
+commands. [Contract and source audit](trebuchet-automation.md).
+
+- **Full gate GREEN**,918s (15m18s):1351 TypeScript tests/108files,8 existing
+  explicit skips, build,192 Python/owned import tests and general browser smoke.
+  Log:`.local/trebuchet131-gate.log`. This includes the prior#133 working-tree
+  changes. Only Markdown changed after gate start.
+- **26 new outcome tests**:21deployment/control/JSON cases,5AI cases, with open
+  and owned actual damage plus Japanese setup timing. The old packed-right-click
+  assertion was replaced by the behavior explicitly described in the owned
+  AoK manual p81; its timing/damage checks remain.
+- Registered `trebuchet-automation` acceptance passes on this code/metadata:
+  `.local/trebuchet131-acceptance.log` and
+  `.local/acceptance/trebuchet-automation.json`. Real owned/open browser input
+  covers Stop→automatic deployment/fire, paid castle training, packed right-click
+  approach/fire, ground-click repacking, manual Pack hold and group Pack/Unpack.
+  Owned checks bind original packed/deployed sprite art.
+- AI acceptance supplies a late-game army, Imperial Age, housing and640stone;
+  the remaining gathering, construction, training and bombardment are real.
+  Early fixture attempts ended at the last-TC defeat shortcut or lacked sight
+  of the second objective. The final fixture asserts its scouting precondition
+  and supplies a second enemy TC. An intermediate full-map wall fixture exceeded
+  the shell timeout and was replaced by the open-field durable-objective fixture;
+  no test/browser timeout was widened. It is not a natural-start balance claim.
+- Remaining: native acquisition/retarget/stance/task109 wait and interruption
+  calibration under#131/#259; natural-start AI progression/balance under#124.
+  The inferred rules are explicit in the ledger. No native-DE runtime capture,
+  siege-specific two-client browser scenario or new strategy batch was run.
+- This checkpoint is **not deployed**. Verification processes have
+  exited; the managed household release is unchanged.
+
+## Earlier gate verification: #133
+
+Automatic gates now have authoritative `closed/open/blocked` state. Collision
+and imported art read the same state; owner approach opens an uncontested gate,
+enemy doorway contact closes it for everybody, and departure closes it again.
+Owner routing can approach a closed gate without treating it as physically open.
+All three gate kinds and both axes retain their doorway/post geometry.
+
+- **Full gate GREEN**,908s (15m08s):1325 TypeScript tests/106files,8 existing
+  explicit skips, build,192 Python/owned import tests and general browser smoke.
+  Log:`.local/gates133-gate.log`. Only Markdown changed after gate start.
+- Fifteen new gate tests cover crossing, automatic closure/reopening, enemy
+  precedence, cached paths, foundations/destruction, neutral/dead units, both
+  checksums and JSON continuation. Existing navigation/building/render tests pass.
+- `npx tsx tools/gates_smoke.mts` passes public-command movement and actual
+  imported poses for palisade/x, stone/y and fortified/x. A sealed wall forces
+  owner passage through the gate; enemy contact closes it, retreat reopens it,
+  and the owner returns through it before it shuts. The fixture disables the
+  solo AI so it cannot overwrite the controlled enemy's orders. The first run
+  reached owner passage but timed out at enemy contact with that AI still active;
+  no assertion or timeout was relaxed. Log:`.local/gates133-browser-r2.log`.
+  Registered as `automatic-gates`; the successful direct run is not a registry receipt.
+- Owned DAT transform pairs789↔790,793↔794,64↔78 prove closed/open obstruction
+  types2/0. Trigger range, enemy contact boundary, neutral handling and immediate
+  tick transitions remain inferred in the ledger. Native timing/range, diagonal
+  gates, two-client gate-specific acceptance and fallback gate artwork were not
+  verified. #133 remains open for the native calibration boundary.
+- This earlier browser evidence predates#131; the current combined-tree gate is
+  listed above. Both changes are included in this checkpoint and are not deployed.
+
+## Previous siege checkpoint: #278
 
 This checkpoint includes the Mangonel-family automatic friendly-fire guard,
 reviewed against `d1db0fc` and fully reverified. It is **not deployed** to the
@@ -31,10 +99,11 @@ household services; their live seven-profile release is still the one listed bel
 - **Full gate GREEN**,808s (13m28s):1310 TypeScript tests/105files,8 existing
   explicit skips, build,192 Python/owned import tests and real-browser smoke.
   Log:`.local/siege278-interactive-gate.log`. Registered siege-safety/shared
-  receipts match this tree. Only Markdown changed after gate start.
+   receipts matched that checkpoint. Only Markdown changed after its gate start.
 - Private verification processes have exited; the intended managed shared host
-  remains running. The parent#131 wording now correctly separates remaining
-  trebuchet automation/calibration from already shipped Petards and group packing.
+  remained running. At that checkpoint, parent#131 separated pending trebuchet
+  automation/calibration from shipped Petards and group packing; see the current
+  section above for the later implementation.
 
 ## Run ended; interactive Persian audio follow-up
 

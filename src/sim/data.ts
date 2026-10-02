@@ -319,13 +319,13 @@ export interface BuildingRules {
   /** Half-extents in tiles when the building is not the square `radius` says.
    * A gate lies along x by default and swaps both when placed along y. */
   footprint?: { x: number; y: number };
-  /** A gate: its owner walks through it, everybody else has to knock it down. */
+  /** A gate: its owner can request automatic opening on approach. */
   passableForOwner?: boolean;
   /**
    * Nothing walks round it, whoever owns it. A farm has a collision box like
    * any other building but no height to it and no obstruction class, and in
    * the reference units walk straight over one (issue #40). Distinct from
-   * `passableForOwner`, which is a gate standing open for its own side.
+   * `passableForOwner`, which requests stateful gate opening on approach.
    */
   passable?: boolean;
   /**

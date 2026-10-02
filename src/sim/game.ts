@@ -8,6 +8,7 @@ import type {
 } from './data';
 import { MAPS, generateMap } from './mapgen';
 import { isWallLineKind } from './buildings';
+import { updateGates } from './gates';
 import { elevationAt, elevationAllowsPlacement, elevationDamageMultiplier, levelStartingFootprint } from './elevation';
 import {
   buildNavGrid, distance, entityGrid, findPath, halfExtent, isBlocked, separateUnits, terrainLayer, tileOf, type NavGrid,
@@ -582,7 +583,8 @@ export function resolveUnitOrder(state: GameState, entity: Entity, target: Point
   const unitRules = isUnit(entity.kind) ? unitRulesForEntity(state, entity) : undefined;
   // A unit with no attack is never given one by a right-click: a monk sent at
   // a boar would otherwise stand over it forever, swinging nothing.
-  const armed = !unitRules || combatOf(state, entity).attacks.some(attack => attack.amount > 0);
+  const armed = !unitRules || (unitRules.unpacked?.attacks ?? combatOf(state, entity).attacks)
+    .some(attack => attack.amount > 0);
   if (targetEntity && canCrossWall(state, entity, targetEntity)) {
     return { kind: 'cross-wall', targetId: targetEntity.id };
   }
@@ -629,6 +631,7 @@ export function resolveUnitOrder(state: GameState, entity: Entity, target: Point
 }
 
 function assignOrder(state: GameState, entity: Entity, target: Point, targetEntity?: Entity): void {
+  entity.autoUnpackSuppressed = undefined;
   entity.attackApproachTarget = undefined;
   entity.attackVolley = undefined;
   entity.attackWeapon = undefined;
@@ -643,9 +646,11 @@ function assignOrder(state: GameState, entity: Entity, target: Point, targetEnti
     // Told to go somewhere, a siege engine that is set up packs itself away
     // first, as the reference does. An order to *attack* does not: an engine
     // in range should shoot rather than fold up.
-    if (entity.unpacked && unitRules?.unpacked) {
-      entity.packingTicks = Math.max(
-        1, Math.round(unitRules.unpacked.seconds * TICKS_PER_SECOND));
+    if (unitRules?.unpacked) {
+      // Moving cancels an unfinished unpack; repeated move orders must not
+      // restart an already-running pack clock.
+      if (entity.unpacked) startPacking(entity, unitRules.unpacked.seconds);
+      else entity.packingTicks = undefined;
     }
   }
   entity.order = order;
@@ -710,6 +715,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (!units.length) return rejected('no selected unit can attack ground');
     for (const unit of units) {
       becomeIdle(unit);
+      unit.autoUnpackSuppressed = undefined;
       unit.order = { kind: 'attack-ground', target: { ...command.target } };
       unit.activity = 'attacking'; unit.orderQueue = undefined;
     }
@@ -760,6 +766,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       // an order.
       entity.attackWindup = undefined;
       if (command.kind === 'stop') {
+        entity.autoUnpackSuppressed = undefined;
         entity.attackApproachTarget = undefined;
         entity.attackVolley = undefined;
         entity.attackWeapon = undefined;
@@ -974,13 +981,15 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
         && unitRulesForEntity(state, entity).unpacked;
       if (!setup) continue;
       matched++;
-      if ((entity.unpacked === true) === command.unpacked) continue;  // already there
+      entity.autoUnpackSuppressed = command.unpacked ? undefined : true;
       // Setting up takes the DAT's own time, and nothing else happens while it
       // does: the order is dropped so a half-packed engine does not keep
       // walking or shooting.
-      entity.packingTicks = Math.max(1, Math.round(setup.seconds * TICKS_PER_SECOND));
+      if ((entity.unpacked === true) === command.unpacked) entity.packingTicks = undefined;
+      else startPacking(entity, setup.seconds);
       entity.attackWindup = undefined;
       entity.order = { kind: 'idle' };
+      entity.orderQueue = undefined;
       entity.activity = 'idle';
       clearPath(entity);
     }
@@ -1130,11 +1139,12 @@ function moveAlong(state: GameState, grid: NavGrid, entity: Entity, destination:
   }
   const goalChanged = !entity.pathGoal ||
     Math.abs(entity.pathGoal.x - destination.x) > 0.5 || Math.abs(entity.pathGoal.y - destination.y) > 0.5;
+  const routing = grid.routing ?? grid;
   const nextBlocked = entity.path?.length
-    ? isBlocked(grid, Math.floor(entity.path[0].x), Math.floor(entity.path[0].y))
+    ? isBlocked(routing, Math.floor(entity.path[0].x), Math.floor(entity.path[0].y))
     : false;
   if (goalChanged || nextBlocked || !entity.path || (entity.stuckTicks ?? 0) > 30) {
-    entity.path = findPath(grid, entity.position, destination);
+    entity.path = findPath(routing, entity.position, destination);
     entity.pathGoal = { ...destination };
     entity.stuckTicks = 0;
     if (!entity.path) {
@@ -1163,7 +1173,7 @@ function moveAlong(state: GameState, grid: NavGrid, entity: Entity, destination:
     if (arrivedExactly) clearPath(entity);
     return arrivedExactly;
   }
-  moveToward(entity, entity.path[0], speed);
+  moveDirect(grid, entity, entity.path[0], speed);
   if (distance(before, entity.position) < speed * TICK_SECONDS * 0.5) {
     entity.stuckTicks = (entity.stuckTicks ?? 0) + 1;
   } else {
@@ -1885,6 +1895,16 @@ function updateBuilder(state: GameState, grid: NavGrid, entity: Entity, builderC
   builderCounts.set(site.id, (builderCounts.get(site.id) ?? 0) + 1);
 }
 
+/** A transition always goes to the other pose; repeated requests preserve its
+ * clock. Reversing to the current pose cancels it at the command boundary. */
+function startPacking(entity: Entity, seconds: number): void {
+  entity.packingTicks ??= Math.max(1, Math.round(seconds * TICKS_PER_SECOND));
+  entity.attackWindup = undefined;
+  entity.attackVolley = undefined;
+  entity.activity = 'idle';
+  clearPath(entity);
+}
+
 function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
   if (entity.order.kind !== 'attack' && entity.order.kind !== 'attack-ground') return;
   // Everything below reads the *researched* rules. Reading the base ones here
@@ -1910,11 +1930,27 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
     return;
   }
   const rules = unitRulesForEntity(state, entity);
-  // A siege engine that is packed has no attack, and one that is set up cannot
-  // walk to reach anything: either way there is nothing to do but stand.
+  // The owned AoK manual (printed p81) explicitly describes packed right-click:
+  // approach, unpack, then attack. Automatic orders never pursue out of range.
   if (rules.unpacked) {
-    if (!entity.unpacked) { becomeIdle(entity); return; }
-    if (!inAttackRange(state, entity, target)) { entity.activity = 'idle'; clearPath(entity); return; }
+    const setup = rules.unpacked;
+    const reachable = inRange(entity, target, .35 + setup.range);
+    const insideMinimum = setup.minRange > 0 && inRange(entity, target, setup.minRange);
+    if (entity.order.kind === 'attack' && entity.order.automatic
+      && (!reachable || insideMinimum || !isEntityVisible(state, entity.owner as PlayerId, target))) {
+      becomeIdle(entity);
+      return;
+    }
+    if (!reachable) {
+      if (entity.unpacked) startPacking(entity, setup.seconds);
+      else {
+        entity.activity = 'moving';
+        moveAlong(state, grid, entity, target.position, rules.speed);
+      }
+      return;
+    }
+    if (insideMinimum) { entity.activity = 'idle'; clearPath(entity); return; }
+    if (!entity.unpacked) { startPacking(entity, setup.seconds); return; }
   }
   if (entity.order.kind === 'attack' && entity.order.automatic && automaticBlastRisk(state, entity, target, rules)) {
     // Friends can enter after acquisition or between shots. Keep the saved
@@ -2781,12 +2817,17 @@ function autoAcquire(state: GameState, entity: Entity): void {
  * acquisition cadence. If none is safe, retain its current automatic order. */
 function acquireAutomaticTarget(state: GameState, entity: Entity): void {
   const rules = unitRulesForEntity(state, entity);
-  if (!rules.attacks.some(attack => attack.amount > 0)) return;
+  if (!(rules.unpacked?.attacks ?? rules.attacks).some(attack => attack.amount > 0)) return;
+  if (rules.unpacked && !entity.unpacked && entity.autoUnpackSuppressed) return;
   const los = Math.min(rules.lineOfSight, rules.searchRadius ?? rules.lineOfSight);
   let best: Entity | undefined;
   let bestDistance = Infinity;
   for (const candidate of state.entities) {
     if (candidate.dead || candidate.owner === 0 || candidate.owner === entity.owner) continue;
+    if (rules.unpacked && (candidate.hp <= 0 || !isBuilding(candidate.kind)
+      || !isEntityVisible(state, entity.owner as PlayerId, candidate)
+      || !inRange(entity, candidate, .35 + rules.unpacked.range)
+      || (rules.unpacked.minRange > 0 && inRange(entity, candidate, rules.unpacked.minRange)))) continue;
     const d = distance(entity.position, candidate.position) - candidate.radius;
     if (d <= los && (d < bestDistance - 1e-9 || (Math.abs(d - bestDistance) <= 1e-9 && (best?.id ?? Infinity) > candidate.id))) {
       if (automaticBlastRisk(state, entity, candidate, rules)) continue;
@@ -2795,7 +2836,7 @@ function acquireAutomaticTarget(state: GameState, entity: Entity): void {
     }
   }
   if (best) {
-    entity.order = guardsFriendlyBlast(entity, rules)
+    entity.order = rules.unpacked || guardsFriendlyBlast(entity, rules)
       ? { kind: 'attack', targetId: best.id, automatic: true }
       : { kind: 'attack', targetId: best.id };
     entity.activity = 'moving';
@@ -3308,13 +3349,11 @@ export function stepGame(state: GameState): void {
   activateAutomaticTechnologies(state);
   state.tick += 1;
   updateAnimals(state);
+  updateGates(state);
   const land = terrainLayer(state, LAND_RESTRICTION);
   const grid = entityGrid(state, undefined, undefined, land);
-  // A gate is a hole in its owner's wall and a wall to everybody else, so the
-  // owner of one walks a different map; and a unit on another restriction
-  // row than the villager's walks another map again. Rows that agree over
-  // the board's terrains share one layer object, so on a board with no water
-  // this is one grid per gate owner and no more.
+  // Collision is shared. Owners additionally plan routes through uncontested
+  // closed gates so a distant move order can approach and open one.
   const gateOwners = new Set<PlayerId>();
   for (const entity of state.entities) {
     if (entity.dead || entity.owner === 0 || entity.buildProgress !== undefined) continue;
@@ -3334,6 +3373,7 @@ export function stepGame(state: GameState): void {
     let built = byOwner.get(owner);
     if (!built) {
       built = entityGrid(state, undefined, owner || undefined, layer);
+      if (owner) built.routing = entityGrid(state, undefined, owner, layer, true);
       byOwner.set(owner, built);
     }
     return built;

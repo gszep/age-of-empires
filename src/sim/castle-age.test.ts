@@ -559,18 +559,13 @@ describe('the trebuchet', () => {
       kind: 'order', player: 1, entityIds: [engine.id],
       target: enemy.position, targetId: enemy.id,
     });
-    // Packed, it is not armed: the order cannot become an attack. It reads as
-    // a move instead, so stop it before it walks inside its own minimum range.
-    expect(engine.order.kind).not.toBe('attack');
+    // The owned manual's packed right-click retains attack intent, but cannot
+    // release a rock until the full setup clock has completed.
+    expect(engine.order).toEqual({ kind: 'attack', targetId: enemy.id });
     const untouched = enemy.hp;
-    run(state, 20);
-    applyCommand(state, { kind: 'stop', player: 1, entityIds: [engine.id] });
-    run(state, 100);
-    expect(enemy.hp).toBe(untouched);
-
-    // Set it up where it stands, then send it at the town center again.
-    applyCommand(state, { kind: 'pack', player: 1, entityIds: [engine.id], unpacked: true });
     run(state, Math.round(state.rules.units.trebuchet.unpacked!.seconds * TICKS_PER_SECOND));
+    expect(enemy.hp).toBe(untouched);
+    stepGame(state);
     expect(engine.unpacked).toBe(true);
     const where = { ...engine.position };
     applyCommand(state, {

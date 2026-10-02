@@ -374,20 +374,6 @@ export const gateBoxKey = (entity: Entity): string =>
 export const gateArtKey = gateBoxKey;
 
 /**
- * How close one of the owner's units has to come for the gate to swing open.
- * AoE2 opens on approach and closes behind; the simulation lets the owner
- * through regardless, so this is the art catching up with the pathing.
- */
-export const GATE_OPEN_RANGE = 2.5;
-
-export function gateIsOpen(state: ReadonlyGameState, entity: Entity): boolean {
-  return state.entities.some(other => !other.dead && other.owner === entity.owner
-    && isUnit(other.kind)
-    && Math.abs(other.position.x - entity.position.x) <= GATE_OPEN_RANGE
-    && Math.abs(other.position.y - entity.position.y) <= GATE_OPEN_RANGE);
-}
-
-/**
  * Ages in the order the DAT's own upgrade technologies grant them, so index 1
  * is the Feudal Age. Ageing up in AoE2 replaces the building with the next
  * age's unit -- the barracks becomes "Barracks Age2", the town center grows
@@ -460,7 +446,7 @@ export function chooseAnimation(state: ReadonlyGameState, entity: Entity): { key
     const key = isGateKind(kind) ? gateArtKey(entity) : kind;
     if (entity.dead) return { key, name: ageIdle(state, entity, 'death') };
     if (entity.buildProgress !== undefined) return { key, name: 'construction' };
-    if (isGateKind(kind) && gateIsOpen(state, entity)) return { key, name: 'open' };
+    if (isGateKind(kind) && entity.gateState === 'open') return { key, name: 'open' };
     return { key, name: ageIdle(state, entity) };
   }
   if (kind !== 'villager') {

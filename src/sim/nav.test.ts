@@ -4,6 +4,7 @@ import { applyCommand, createGame, placementLegal, stepGame } from './game';
 import { TERRAIN_WATER } from './mapgen';
 import { buildNavGrid, findPath, isBlocked, type NavGrid } from './nav';
 import { observe } from './observe';
+import { updateGates } from './gates';
 import type { BuildingKind, Entity, GameState, Point } from './types';
 
 /** An empty arena: the seeded map with every resource node removed. */
@@ -208,18 +209,21 @@ describe('navigation compatibility suite', () => {
     expect(isBlocked(buildNavGrid(state), 20, 20)).toBe(true);
   });
 
-  it('gate: is a doorway for its owner and a wall for everybody else', () => {
+  it('gate: closed collision is shared, and opening frees the doorway for everybody', () => {
     const state = arena();
     const gate = wallWithGate(state, 1);
 
+    expect(isBlocked(buildNavGrid(state, undefined, 1), 15, 15)).toBe(true);
+    unit(state, { x: 13.5, y: 15 }, 1);
+    updateGates(state);
     const shared = buildNavGrid(state);
     const mine = buildNavGrid(state, undefined, 1);
     const theirs = buildNavGrid(state, undefined, 2);
     // Both tiles the gate covers, and no more than those.
     for (const y of [14, 15]) {
-      expect(isBlocked(shared, 15, y), `shared ${y}`).toBe(true);
+      expect(isBlocked(shared, 15, y), `shared ${y}`).toBe(false);
       expect(isBlocked(mine, 15, y), `owner ${y}`).toBe(false);
-      expect(isBlocked(theirs, 15, y), `enemy ${y}`).toBe(true);
+      expect(isBlocked(theirs, 15, y), `enemy ${y}`).toBe(false);
     }
     expect(isBlocked(mine, 15, 13)).toBe(true);
     expect(isBlocked(mine, 15, 16)).toBe(true);
@@ -581,8 +585,7 @@ describe('asking the same question twice in one tick', () => {
   });
 
   it('separates one grid\'s answers from another\'s', () => {
-    // Per-player grids exist in the same tick: a gate is a hole in its owner's
-    // wall and a wall to everybody else.
+    // Physical collision and owner approach routing can differ in one tick.
     const open: NavGrid = { width: 12, height: 12, blocked: new Uint8Array(144) };
     const walled: NavGrid = { width: 12, height: 12, blocked: new Uint8Array(144) };
     for (let y = 0; y < 12; y++) walled.blocked[y * 12 + 6] = 1;

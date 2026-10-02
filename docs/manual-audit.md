@@ -82,8 +82,10 @@ have regression coverage. The paragraph above records the audit-time failure;
 the implementation was a separate, user-authorized follow-up.
 
 Other findings are attached to existing work items rather than left only here:
-#54 (remaining movement/formation/stance and garrison edges), #131 (siege
-auto-fire should consider friendly blast risk, TC pp3/5), #161 (ram bonus
+#54 (remaining movement/formation/stance and garrison edges), #131 (remaining
+native siege targeting calibration; #278 implements the scoped friendly-blast
+guard from TC pp3/5, and [trebuchet automation](trebuchet-automation.md) implements
+the packed right-click flow from AoK p81), #161 (ram bonus
 evidence without constants), #178 (conversion and passenger ejection), #134
 (elevation), #128 (trade) and #139 (score). Allied/cooperative behaviour remains
 the explicitly deferred #138 scope.

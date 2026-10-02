@@ -142,6 +142,12 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 - Select a villager to place land and shoreline buildings — the build menu has an economic and a military page, as in the original. Select a town center to train villagers, a barracks for militia and spearmen, an archery range for archers, skirmishers and cavalry archers, a stable for scout cavalry and knights, a market for trade carts, a siege workshop for battering rams, mangonels and scorpions, a monastery for monks, a castle for the civilisation's unique unit, or a dock — placed across a shoreline — for fishing ships, transports, trade cogs and warships.
 - Owned-content match setup offers **Britons** (default), **Franks**, **Goths**, **Teutons**, **Japanese**, **Chinese** and **Byzantines**. Open the menu with **F10** to choose the sides and start a match. Their ages, availability, bonuses, unique units and technologies come from the owned files; open content retains a reduced fallback. The Britons, for example, have no Thumb Ring, Bloodlines, Hussar or Paladin.
 - A monk right-clicked onto a wounded ally heals it, and onto an enemy soldier converts it to your side — it takes between five and nine seconds, and walking out of the monk's reach loses all of that work. A mangonel's stone hurts everything it lands beside, your own soldiers included, so keep them clear.
+- Castles train **Trebuchets** in the Imperial Age. Right-click an enemy with a
+  packed trebuchet to approach, unpack and attack. Idle trebuchets automatically
+  deploy for visible enemy buildings within firing range. Ground moves pack them
+  before travel; **Pack/Unpack** works on groups, and manual Pack holds them packed
+  until another order. The example AI can prepare castles and field a bounded
+  late-game siege force; [source and calibration limits](docs/trebuchet-automation.md).
 - Mangonels, Onagers and Siege Onagers skip automatic targets whose predicted
   blast area contains a friendly unit or building. They hold fire or pick a safe
   alternative, then resume when the area clears. Explicit right-click attacks and

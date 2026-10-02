@@ -24,6 +24,8 @@ export interface NavGrid {
   height: number;
   /** 1 where something stands, 0 where a unit may walk. */
   blocked: Uint8Array;
+  /** Owner route through gates that can open on approach, never collision. */
+  routing?: NavGrid;
 }
 
 const index = (grid: NavGrid, x: number, y: number) => y * grid.width + x;
@@ -33,9 +35,8 @@ export const tileOf = (p: Point) => ({ x: Math.floor(p.x), y: Math.floor(p.y) })
  * Static obstructions: the ground itself, then complete buildings,
  * foundations, and resource nodes.
  *
- * `forOwner` builds the map one player walks on rather than the map everybody
- * shares: a gate is a hole in its owner's wall and a wall to everyone else, so
- * passability is per player and the grid has to be too. `restriction` is the
+ * Gates use their authoritative state, shared by every player. `forOwner`
+ * selects the player's terrain rules. `restriction` is the
  * DAT row the walker obeys -- which terrains it may stand on -- so a pond is
  * a wall to a villager on row 7 and, one day, a road to a ship on row 3.
  */
@@ -110,6 +111,7 @@ export function terrainLayer(state: GameState, restriction: number, owner: Entit
  */
 export function entityGrid(
   state: GameState, ignoreEntityId?: number, forOwner?: PlayerId, base?: Uint8Array,
+  planGateApproach = false,
 ): NavGrid {
   const grid: NavGrid = {
     width: state.width,
@@ -124,8 +126,9 @@ export function entityGrid(
     // not it is finished — the DAT gives it no collision height and no
     // obstruction class (issue #40).
     if (building?.passable) continue;
-    const open = forOwner !== undefined && entity.owner === forOwner && entity.buildProgress === undefined
-      && building?.passableForOwner;
+    const open = entity.buildProgress === undefined && building?.passableForOwner
+      && (entity.gateState === 'open' || (planGateApproach && forOwner !== undefined
+        && entity.owner === forOwner && entity.gateState !== 'blocked'));
     if (open && building.gateOpening === undefined) {
       continue;
     }
