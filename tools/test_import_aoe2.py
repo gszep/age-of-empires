@@ -2040,6 +2040,42 @@ class AudioImportIntegrationTest(unittest.TestCase):
         cls.packs = [AUDIO_PACK, AUDIO_PACK.with_name('Base.1.pck')]
         cls.banks = read_audio_packs(cls.packs)
 
+    def test_persian_cart_source_gaps_publish_without_losing_its_available_sounds(self):
+        # Exercise raw owned Persian records even before the profile is enabled.
+        from import_content import graphic_sound_events
+        dat = _dat()
+        cart = dat.civs[8].units[128]
+        events = graphic_sound_events(dat.graphics[cart.dying_graphic])
+        profile = {'audio': {'switch': 'Persians'}, 'entities': {'trade-cart': {
+            'internalName': cart.name,
+            'sounds': {'select': cart.wwise_selection_sound_id, 'train': cart.wwise_train_sound_id,
+                       'move': cart.bird.wwise_move_sound_id, 'attack': cart.bird.wwise_attack_sound_id},
+            'animations': {'death': {'soundEvents': events}},
+        }}}
+        self.assertEqual({event['event'] for event in events}, {2892846699, 1206866217})
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ui, content = root / 'ui.json', root / 'content.json'
+            ui.write_text('{"sounds":{}}')
+            content.write_text(json.dumps({'civilizations': {'persians': profile}}))
+            first = import_audio(self.packs, ui, root / 'first', content=content)
+            second = import_audio(list(reversed(self.packs)), ui, root / 'second', content=content)
+            self.assertEqual(first, second)
+            prefix = 'civilizations/persians/'
+            self.assertEqual({alias.removeprefix(prefix): gap['eventId']
+                              for alias, gap in first['unavailable'].items()}, {
+                'trade-cart-select': 3167914911, 'trade-cart-train': 955679769,
+                'events/2892846699': 2892846699,
+            })
+            self.assertEqual(set(first['audio']), {prefix + suffix for suffix in
+                             ('trade-cart-move', 'trade-cart-attack', 'events/1206866217')})
+            for cue in first['audio'].values():
+                self.assertTrue(cue['files'])
+                for file in cue['files']:
+                    self.assertGreater(file['seconds'], 0)
+                    self.assertEqual((root / 'first' / file['file']).read_bytes(),
+                                     (root / 'second' / file['file']).read_bytes())
+
     def test_second_pack_stream_decodes_completely_and_repeatably(self):
         from import_audio import resolve_event_id
         # Base.1 has no HIRC banks: its event lives in Base, with only a short
@@ -2127,20 +2163,30 @@ class AudioImportIntegrationTest(unittest.TestCase):
         self.assertEqual([m for bank in self.banks
                           for m in resolve_event_id(bank, militia_select, "NoSuchCiv")], [])
 
-    def test_every_consumed_cue_resolves_to_owned_media(self):
-        # Each alias the game plays has to reach real embedded media: a unit
-        # voice that silently resolved to nothing would be a quiet game, not a
-        # failed import.
-        from import_audio import consumed_cues, resolve_event_id
+    def test_every_consumed_cue_is_playable_or_an_explicit_reviewed_source_gap(self):
+        # Owner-approved #271 exceptions remain visible and disjoint from playable
+        # audio. Every other cue must still resolve; an existing broken event can
+        # never qualify as an absent-source exception.
+        from import_audio import consumed_cues, resolve_event_id, reviewed_unavailable_cue
         ui = Path("public/imported/aoe2/ui/manifest.json")
         content = Path(".local/aoe2de/content.json")
         if not (ui.is_file() and content.is_file()):
             self.skipTest("run the importer first")
         cues = consumed_cues(ui, content)
         self.assertGreater(len(cues), 10)
+        published = json.loads(Path('public/imported/aoe2/audio/manifest.json').read_text())
+        gaps = {}
         for cue in cues:
             media = [m for bank in self.banks for m in resolve_event_id(bank, cue["id"], cue["switch"])]
-            self.assertTrue(media, cue["alias"])
+            if media:
+                self.assertTrue(published['audio'][cue['alias']]['files'], cue['alias'])
+                self.assertNotIn(cue['alias'], published.get('unavailable', {}))
+            else:
+                gap = reviewed_unavailable_cue(cue, self.banks)
+                self.assertIsNotNone(gap, cue['alias'])
+                gaps[cue['alias']] = gap
+                self.assertNotIn(cue['alias'], published['audio'])
+        self.assertEqual(published.get('unavailable', {}), gaps)
         # Every unit the slice trains speaks when it is picked.
         aliases = {cue["alias"] for cue in cues}
         for key in ("villager", "militia", "spearman", "archer", "skirmisher",

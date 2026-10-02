@@ -25,6 +25,17 @@ from typing import Any
 from wwise_pck import PackedFile, extract, read_index
 
 
+# Reviewed source gaps, not a general missing-audio fallback. DAT8's ORIE cart
+# names these events, but the pinned common/English banks contain no HIRC object
+# for them (#271, docs/audio-reference.md). The owner approved silence for these
+# three Persian aliases only on 2026-10-02. Other profiles require their own audit.
+REVIEWED_ABSENT_CUES = {
+    ("civilizations/persians/trade-cart-select", 3167914911, "Persians"),
+    ("civilizations/persians/trade-cart-train", 955679769, "Persians"),
+    ("civilizations/persians/events/2892846699", 2892846699, "Persians"),
+}
+
+
 @dataclass(frozen=True)
 class Stream:
     pack: Path
@@ -460,6 +471,25 @@ def consumed_cues(ui_manifest: Path, content: Path | None) -> list[dict[str, Any
     return cues
 
 
+def reviewed_unavailable_cue(cue: dict[str, Any], banks: Sequence[Bank]) -> dict[str, Any] | None:
+    """A reviewed absent event, never an existing event whose graph failed.
+
+    Normalize signed DAT IDs only for comparison/evidence. A supplied object of
+    *any* type at this ID revokes the exception: malformed graphs, wrong object
+    types, absent switch branches, missing media and decoder errors still fail.
+    If a later pack supplies a playable event, the normal importer uses it.
+    """
+    if 'id' not in cue:
+        return None
+    event_id = cue['id'] & 0xffffffff
+    if (cue['alias'], event_id, cue['switch']) not in REVIEWED_ABSENT_CUES:
+        return None
+    if not banks or any(event_id in bank.objects for bank in banks):
+        return None
+    return {'event': cue['event'], 'eventId': event_id, 'switch': cue['switch'],
+            'reason': 'event-absent-from-owned-banks', 'issue': 271}
+
+
 def import_audio(
     pack: Path | Sequence[Path], ui_manifest: Path, out: Path, decoder: str = "vgmstream-cli",
     content: Path | None = None, music: bool = False,
@@ -480,6 +510,7 @@ def import_audio(
         old.unlink()
 
     imported: dict[str, Any] = {}
+    unavailable: dict[str, Any] = {}
     source_hashes: dict[str, str] = {}
     with tempfile.TemporaryDirectory(prefix="aoe2-audio-") as temporary:
         temp = Path(temporary)
@@ -493,6 +524,10 @@ def import_audio(
                     if not any(b.name == bank.name and mid == media_id for b, mid in matches):
                         matches.append((bank, media_id))
             if not matches:
+                gap = reviewed_unavailable_cue(cue, banks)
+                if gap is not None:
+                    unavailable[alias] = gap
+                    continue
                 raise ValueError(f"Wwise event {event_name!r} did not resolve to complete media")
             files = []
             for index, (bank, media_id) in enumerate(matches):
@@ -543,6 +578,10 @@ def import_audio(
     }
     if catalogue:
         manifest['music'] = {**catalogue, 'playlist': [f"music/{track['name']}" for track in catalogue['tracks']]}
+    if unavailable:
+        # Do not publish empty/synthetic WAVs or claim these aliases are playable.
+        # No field is added for existing complete profiles (byte-identical output).
+        manifest['unavailable'] = unavailable
     (out / "manifest.json").write_text(json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n")
     return manifest
 

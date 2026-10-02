@@ -1,10 +1,15 @@
 """Synthetic pack boundaries: no owned media needed for these regressions."""
+import json
 import struct
+import subprocess
+import sys
 import tempfile
 import unittest
+import wave
 from pathlib import Path
+from unittest.mock import patch
 
-from import_audio import Bank, Stream, dialogue_leaves, music_catalogue, play_parameters, read_audio_packs, read_bank, resolve_event_id, resolve_event_layers, wwise_id
+from import_audio import Bank, Stream, dialogue_leaves, import_audio, music_catalogue, play_parameters, read_audio_packs, read_bank, resolve_event_id, resolve_event_layers, wwise_id
 from wwise_pck import PackedFile
 
 
@@ -139,6 +144,113 @@ class AudioPackTest(unittest.TestCase):
     def test_malformed_bank_is_not_silently_skipped(self):
         with self.assertRaisesRegex(ValueError, 'truncated HIRC'):
             read_bank('bad', chunk(b'HIRC', struct.pack('<I', 1)))
+
+
+class ReviewedAudioGapTest(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.pack = self.root / 'Base.pck'
+        self.ui = self.root / 'ui.json'
+        self.ui.write_text('{"sounds":{}}')
+        self.content = self.root / 'content.json'
+        self.out = self.root / 'audio'
+
+    def profile(self, sounds, events=(), key='persians', switch='Persians'):
+        self.content.write_text(json.dumps({'civilizations': {key: {
+            'audio': {'switch': switch}, 'entities': {'trade-cart': {
+                'internalName': 'TCART', 'sounds': sounds,
+                'animations': {'death': {'soundEvents': [{'event': event} for event in events]}}
+            }}}}}))
+
+    def source(self, objects=(), media=None):
+        pack(self.pack, [(1, chunk(b'BKHD', struct.pack('<I', 154)) + bank(objects, media))])
+
+    @staticmethod
+    def playable(event_id):
+        return [(event_id, 4, b'\x01' + struct.pack('<I', 200)),
+                (200, 3, struct.pack('<BBIB', 3, 4, 300, 0) + b'\0\0' + struct.pack('<BII', 4, 1, 0)),
+                (300, 2, struct.pack('<IBI', 0x140001, 0, 400))]
+
+    @staticmethod
+    def decode(args, **kwargs):
+        if args[-1] == '-V':
+            return subprocess.CompletedProcess(args, 0, '{"version":"fixture"}')
+        with wave.open(args[args.index('-o') + 1], 'wb') as output:
+            output.setparams((1, 2, 8000, 0, 'NONE', 'not compressed'))
+            output.writeframes(struct.pack('<4h', 0, 100, -100, 0))
+        return subprocess.CompletedProcess(args, 0)
+
+    def publish(self):
+        return import_audio(self.pack, self.ui, self.out, decoder=sys.executable, content=self.content)
+
+    def test_publishes_three_reviewed_gaps_separately_and_decodes_available_cue(self):
+        self.profile({'select': -1127052385, 'train': 955679769, 'move': 100}, [2892846699])
+        self.source(self.playable(100), {400: b'fixture'})
+        with patch('import_audio.subprocess.run', side_effect=self.decode) as decoder:
+            first = self.publish()
+            self.assertEqual(decoder.call_count, 2, 'one available cue and decoder version, no silent WAVs')
+            second = self.publish()
+        self.assertEqual(first, second)
+        self.assertEqual(set(first['audio']), {'civilizations/persians/trade-cart-move'})
+        self.assertEqual(first['unavailable'], {
+            f'civilizations/persians/{alias}': {
+                'event': event, 'eventId': event_id, 'switch': 'Persians',
+                'reason': 'event-absent-from-owned-banks', 'issue': 271,
+            } for alias, event, event_id in [
+                ('trade-cart-select', 'TCART select', 3167914911),
+                ('trade-cart-train', 'TCART train', 955679769),
+                ('events/2892846699', 'graphic 2892846699', 2892846699)]})
+        self.assertEqual(json.loads((self.out / 'manifest.json').read_text()), first)
+        self.assertEqual([p.relative_to(self.out).as_posix() for p in self.out.rglob('*.wav')],
+                         ['civilizations/persians/trade-cart-move.wav'])
+
+    def test_unknown_id_alias_or_switch_still_fails(self):
+        self.source()
+        for sounds, key, switch in [({'select': 123}, 'persians', 'Persians'),
+                                    ({'move': 3167914911}, 'persians', 'Persians'),
+                                    ({'select': 3167914911}, 'saracens', 'Saracens'),
+                                    ({'select': 3167914911}, 'persians', 'Britons')]:
+            with self.subTest(sounds=sounds, key=key, switch=switch):
+                self.profile(sounds, key=key, switch=switch)
+                with self.assertRaisesRegex(ValueError, 'did not resolve to complete media'):
+                    self.publish()
+
+    def test_present_but_broken_event_never_qualifies_as_absent(self):
+        event_id = 3167914911
+        self.profile({'select': event_id})
+        for objects in [[(event_id, 8, b'wrong type')],
+                        [(event_id, 4, b'\x01' + struct.pack('<I', 999))],
+                        [(event_id, 4, b'\x01')],
+                        self.playable(event_id)]:
+            with self.subTest(objects=objects):
+                self.source(objects)  # last case has a sound but no media
+                with self.assertRaises(ValueError):
+                    self.publish()
+        # A stream prefix is still not a complete replacement sound.
+        objects = self.playable(event_id)
+        objects[-1] = (300, 2, struct.pack('<IBI', 0x140001, 1, 400))
+        self.source(objects, {400: b'incomplete prefix'})
+        with self.assertRaisesRegex(ValueError, 'did not resolve to complete media'):
+            self.publish()
+
+    def test_recovered_event_uses_real_decode_and_decode_failures_propagate(self):
+        self.profile({'select': 3167914911})
+        self.source(self.playable(3167914911), {400: b'fixture'})
+        with patch('import_audio.subprocess.run', side_effect=self.decode):
+            result = self.publish()
+        self.assertNotIn('unavailable', result)
+        self.assertTrue(result['audio']['civilizations/persians/trade-cart-select']['files'])
+        with patch('import_audio.subprocess.run', side_effect=subprocess.CalledProcessError(1, 'decoder')):
+            with self.assertRaises(subprocess.CalledProcessError):
+                self.publish()
+
+    def test_no_banks_is_not_evidence_for_a_reviewed_source_gap(self):
+        self.profile({'select': 3167914911})
+        pack(self.pack)
+        with self.assertRaisesRegex(ValueError, 'did not resolve to complete media'):
+            self.publish()
 
 
 if __name__ == '__main__':

@@ -72,6 +72,42 @@ silences combat and unseen terrain; watcher tests cover reveal/reconnect,
 direction changes, paused frames and bounded missed intervals. This does not
 claim a microphone comparison against a running DE mixer.
 
+## Reviewed Persian Trade Cart source gaps (#271)
+
+The owner approved an explicit unavailable-cue policy on2026-10-02 after the
+following source audit. This removes the publication blocker; it does **not**
+recover these sounds or establish native silence/fallback behaviour.
+
+| Persian alias suffix | Unsigned Wwise event | Owned reference |
+| --- | ---: | --- |
+| `trade-cart-select` |3167914911| DAT8 unit128 selection (`-1127052385` signed) |
+| `trade-cart-train` |955679769| DAT8 unit128 training |
+| `events/2892846699` |2892846699| Graphic4862 ORIE cart death, frame15 |
+
+All three are absent from every HIRC object table in the supplied common packs
+(sound depot813783, manifest8547122694393480152). The earlier Artemis audit also
+checked its matching English813787 Base/Base.1/DLCParis packs and found none.
+This is absence before civilisation-switch filtering, not a graph decoding
+failure. Local inventory contains no loose WAV/WEM/BNK alternative. The same
+regional cart IDs appear in several other civilisations, but the approved
+exception is restricted to the three `civilizations/persians/` aliases and the
+`Persians` switch. DAT legacy sound305 still lists ordinary cart WAV names; that
+does not establish a native fallback for the distinct modern Wwise IDs.
+
+`import_audio.py` retains each gap under the audio manifest's top-level
+`unavailable`, with its event ID, switch, reason and issue271. It does not add an
+empty file or substitute audio under `audio`. The cart's move/attack cues and
+the separate death event1206866217 remain imported normally. Existing complete
+profiles retain their prior manifest shape.
+
+An object of **any type** at a reviewed ID disables the exception. A recovered
+playable event imports normally; wrong types, broken graphs, missing media,
+incomplete stream prefixes and decoder failures remain failures. Unknown IDs,
+aliases or switches also fail. The published coverage contract now requires
+every consumed alias to be either playable owned media or an exact, visible
+reviewed gap; the sets must be disjoint. Tests exercise both recovery and failure
+paths, as well as real Persian DAT records and deterministic owned-WAV decoding.
+
 ## Gameplay music (#115)
 
 ```sh

@@ -50,6 +50,15 @@ removed in the October1 post-mortem follow-through.
 
 ## Imports and fidelity boundaries
 
+The Persian audio publication blocker (#271) has a narrowly scoped, owner-approved
+resolution: three absent Trade Cart events are explicitly `unavailable`, while
+other missing events and broken audio still fail. The isolated eight-profile
+audio fixture passes with4321 playable cues and exactly3 gaps; the regular audio
+browser acceptance passes. Persians itself is not enabled: its preserved profile
+still needs integration, full regeneration, civilisation-specific browser checks
+and the checkpoint gate. See [handoff](handoff.md) and
+[audio evidence](audio-reference.md#reviewed-persian-trade-cart-source-gaps-271).
+
 `npm run import:aoe2` is the only full publication entrypoint. It resolves pinned
 owned depots, verifies source container integrity, imports DAT/RMS/UI/audio and
 converts sprites/blends. Enhanced Graphics Pack art is sourced at scale2 and

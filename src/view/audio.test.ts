@@ -31,6 +31,19 @@ const layered = (layers: AudioLayer[]): AudioAssets => ({ ...assets, audio: { ..
   layered: { event: 'layered', files: assets.audio.cue.files, layers } } });
 
 describe('bounded browser sound player', () => {
+  it('leaves reviewed Persian gaps silent without borrowing the default cart cue', () => {
+    const alias = 'civilizations/persians/trade-cart-select';
+    const player = new AudioPlayer(() => ({ ...assets,
+      audio: { ...assets.audio, 'trade-cart-select': assets.audio.cue },
+      unavailable: { [alias]: { event: 'TCART select', eventId: 3167914911, switch: 'Persians',
+        reason: 'event-absent-from-owned-banks', issue: 271 } },
+    }));
+    player.unlock(); player.play(alias, 'voice');
+    expect(FakeAudio.instances).toHaveLength(0);
+    player.play('trade-cart-select', 'voice');
+    expect(FakeAudio.instances.map(e => e.src)).toEqual(['/audio/one.wav']);
+  });
+
   it('plays each action layer at its owned delay rather than choosing between layers', async () => {
     vi.useFakeTimers();
     const player = new AudioPlayer(() => layered([layer(0), layer(1, { delaySeconds: 0.5 })]));

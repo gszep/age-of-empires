@@ -129,6 +129,11 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
     delay/ranges, transition/fade time and probability (#248); `audio_inventory.py
     --event <id>` reports those layers. Container weights/loops and bus DSP remain
     a separate fidelity boundary, documented in `docs/audio-reference.md`.
+    Three owner-reviewed Persian Trade Cart source events absent from the pinned
+    banks are reported under audio `unavailable` (#271), without substitute WAVs.
+    The exception matches exact alias/ID/switch tuples and cannot conceal an
+    existing broken event, missing media or decoder failure. Other missing cues
+    still fail; recovered playable events import normally.
 
 `npm run test:import` runs the integration suite (`test_import_aoe2.py`) against
 the owned fixture, including determinism checks.

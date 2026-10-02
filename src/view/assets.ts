@@ -337,6 +337,9 @@ export interface AudioAssets {
   music?: { playlist: string[] };
   base: string;
   audio: Record<string, { event: string; files: { file: string; mediaId: number; seconds: number }[]; layers?: AudioLayer[] }>;
+  /** Reviewed source gaps; these aliases deliberately have no playable substitute. */
+  unavailable?: Record<string, { event: string; eventId: number; switch: string;
+    reason: 'event-absent-from-owned-banks'; issue: number }>;
 }
 
 export interface AudioLayer {

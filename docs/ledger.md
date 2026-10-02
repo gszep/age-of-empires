@@ -14,6 +14,23 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## Persian Trade Cart unavailable audio (#271)
+
+- **Owned absence:** DAT8 unit128 and death graphic4862 reference Wwise events
+  3167914911,955679769 and2892846699, absent from the inspected pinned common and
+  English bank object tables. Legacy sound305's ordinary cart filenames do not
+  establish a native fallback. Detailed source evidence is in
+  [audio-reference.md](audio-reference.md#reviewed-persian-trade-cart-source-gaps-271).
+- **Human-approved application policy, 2026-10-02:** these exact Persian
+  selection/training/death aliases may remain silent and explicitly listed as
+  `unavailable` rather than blocking the civilisation import. No foreign/default
+  voice or synthetic audio is substituted. Other cart sounds import normally.
+  This is a source-gap exception, not native-DE audio parity or recovered media.
+- **Strict boundary:** only the three reviewed alias/ID/switch tuples qualify,
+  and only while the event has no object in any loaded bank. Existing broken
+  events and all other missing cues still fail. If original playable definitions
+  become available, normal decoding wins automatically. Code: `import_audio.py`.
+
 ## Household startup discovery (#276)
 
 - **Application policy, not a DE networking model:** HTTP/network/JSON/config

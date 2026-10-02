@@ -1,14 +1,35 @@
-# Handoff — Islands fish and household deployment, 2026-10-02
+# Handoff — Persian audio checkpoint and household deployment, 2026-10-02
 
-## Active authorised run
+## Run ended; interactive Persian audio follow-up
 
-The supervised run continues until **2026-10-02 17:00 UTC**, with wrap-up from
-16:30 UTC. Baseline da81bf3; actual worker start2026-10-01T21:30:37Z. The owner
-authorised GREEN commits/pushes, privately verified household deployment updates
-and necessary restart/reset, and recording genuine blockers before moving on.
-Native DE launch/control and additional agents are not authorised. Durable files:
-`.local/autonomous-20261001-{brief,progress,report}.md`. Continue eligible tracker
-work after this checkpoint rather than ending early.
+The supervised worker exited at **2026-10-02 14:01 UTC** with a provider-operation
+timeout, before its17:00UTC deadline. It left the separately verified#278 siege
+changes uncommitted and did not create the planned final report. Baseline da81bf3;
+actual worker start2026-10-01T21:30:37Z. Ten commits were pushed through8b91dcc.
+Durable evidence: `.local/autonomous-20261001-{brief,progress}.md` and
+`.local/runs/autonomous-20261001-r2/status.json`.
+
+This checkpoint implements the owner's approved#271 source-gap policy below.
+Its focused/feature verification and exact staged-tree full gate pass. The
+archived Persian implementation and live seven-profile deployment have not been
+replaced by this audio-only follow-up.
+
+### Audio-only checkpoint verification
+
+- **Full gate GREEN**,812s (13m32s):1268 TypeScript tests/104files,8 existing
+  explicit skips, build,192 Python/owned import tests and real-browser smoke.
+  Log:`.local/audio271-gate.log`; stage logs:`.local/audio271-gate-step-*.log`.
+- Verification ran against exactly the staged audio change. Unrelated#278 work
+  was archived, excluded from that test tree, then restored and compared with
+  the archive byte-for-byte. It remains uncommitted. Its39 additional tests are
+  therefore not part of this checkpoint's1268 count.
+- Registered audio acceptance also passed on that exact tree:
+  `.local/audio271-staged-acceptance.log`, `.local/acceptance/audio.json`.
+  The restored working tree has additional siege code, so that receipt certifies
+  this commit's code/metadata rather than the combined uncommitted tree.
+- Only Markdown changed after the gate started. No fixture clock or existing
+  browser assertion was relaxed; the three-gap coverage policy was explicitly
+  approved by the owner and tested as recorded below.
 
 ## Earlier pushed source checkpoints
 
@@ -188,7 +209,7 @@ recovery read-only. Owner default-depot copy-back remains open; see
   and private listening ports rechecked. Only the intended managed services
   survive. The user's interactive Artemis Chrome was not controlled or stopped.
 
-## Persians#186: verified source blocker, preserved implementation
+## Persians#186: audio blocker removed under approved source-gap policy
 
 Persians reached29 passing gameplay outcomes and four owned contracts; the broader
 Persian/Chinese/Byzantine run passed69 cases before the added cart-conversion case.
@@ -197,15 +218,40 @@ Its full art/UI conversion succeeded, but audio publication failed.
 Three Persian Trade Cart event IDs are absent from every supplied common bank:
 3167914911 (selection),955679769 (training),2892846699 (animation). Artemis's
 matching common and additional English Base/Base.1/DLCParis packs also lack them.
-This is **#271**, not a civilisation-switch decoder failure. The existing
-every-consumed-cue-to-owned-media assertion was retained.
+This is **#271**, not a civilisation-switch decoder failure. The overnight worker
+retained the all-cues-playable requirement. On2026-10-02 the owner explicitly
+approved allowing those exact three aliases to be recorded as unavailable.
+
+The audio importer now publishes disjoint `audio` and `unavailable`
+records. Only the three reviewed Persian alias/ID/switch tuples qualify, and an
+existing object at an ID revokes the exception. Recovered playable events decode
+normally; unknown missing events, malformed graphs, missing complete media and
+decoder failures remain fatal. No placeholder or foreign/default cue is used.
+
+Verification:12 synthetic audio tests,9 owned-audio integration tests (including
+raw Persian cart records, real decoding and reversed-pack determinism),13 focused
+view tests and `npm run build:public` pass. The registered audio acceptance also
+passes its unchanged real-browser gestures, layered timing and12 non-silent PCM
+checks (`.local/audio271-acceptance.log`, `.local/acceptance/audio.json`). No clock
+changed. The coverage assertion explicitly adopts the approved
+playable-or-reviewed-gap contract, rather than claiming every cue is audible.
+
+The saved eight-profile content passed an isolated complete audio-stage test:
+4324 consumed cues,4321 playable, exactly3 unavailable,27 music tracks and22534
+decoded files. Evidence:`.local/audio271-pending-test.log` and
+`.local/audio271-pending-fixture/verification.json`. This writes private fixture
+output only; it is not a full `npm run import:aoe2` publication or Persian gameplay
+acceptance. Original media recovery remains#271; the publication blocker is removed.
 
 Pending code is staged/uncommitted in `.local/worktrees/persians186-blocked`, branch
 `work/persians186-blocked`, basef94b18e. Its complete backup
 `.local/persians186-blocked.patch` was compared byte-for-byte with the worktree's
 staged diff before restoring main. No incomplete selectable Persian profile was
-committed. Its private-browser probe is authored but unrun; the full Persian gate
-is unmet. Source/aura/payout calibration is#269. Evidence:
+committed. Resume by integrating that staged implementation with current main's
+audio fix; the archived worktree still has its original importer. Its
+private-browser probe is authored but unrun; full regeneration, integration
+regressions and the full Persian gate remain unmet. Source/aura/payout calibration
+is#269. Earlier evidence:
 `.local/persians-{source-tests,focused-r3,sim-r4,import}.log` and
 `.local/audio271-{diagnose,trace}.log`.
 
@@ -216,5 +262,5 @@ native-DE parity. Terrain/compositing, conversion exceptions, audio/missing
 streams, zero-time research/population settings, Japanese/Chinese/Byzantine and
 ordinary A/B cadence calibration, and wonder countdown remain tracked. The
 restored#124 Dark-Age-start AI acceptance remains explicitly failing/opt-in and
-separate from its Feudal-start component case. Follow the tracker and the brief's
-absolute stopping rule; Persians remains blocked until#271 is resolved.
+separate from its Feudal-start component case. The autonomous deadline has passed;
+Persians can resume integration under the approved#271 exception above.
