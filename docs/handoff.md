@@ -1,4 +1,4 @@
-# Handoff — Byzantine checkpoint, 2026-10-02
+# Handoff — household asset refresh, 2026-10-02
 
 ## Active authorised run
 
@@ -67,6 +67,42 @@ charge HUD, ground fire and Lou Chuan/Rocketry. Full checkpoint gate **GREEN**,
 exit0, **13m31s**:1227 TypeScript tests/101files,8existing skips, build,
 185 Python/owned tests and real-browser smoke. Evidence:
 `.local/attack270-gate.log` / `.exit`. No fixture clock or timeout was widened.
+
+## In-progress Artemis refresh and watcher fix (#266/#273)
+
+The alternate-attack checkpoint was pushed as **a208f7c** and#270 closed. A fresh
+isolated Artemis runtime at
+`/home/gszep/Documents/repos/age-of-empires/.local/owned-runtime-a208f7c` imports
+all seven current profiles from Artemis's matching owned base depots. Its original
+dirty clone and deployed assets remain preserved. The full import **passes**;
+source integrity passed before the fresh decode. The runtime started from exact
+a208f7c source and has the scoped watcher config/helper applied for private QA.
+
+Private shared startup exposed#273: the dev watcher scanned private archives and
+bulk art, starving filesystem/compression work before any canvas existed. Captured
+JS requests took seconds; a CPU profile showed6.7s in lstat and1.7s in stat.
+Resolved-root exclusions reduced measured warm Brotli module response times from
+3.5s/2.1s/0.9s to114ms/43ms/4ms for main/world/water, without disabling compression.
+The same shared browser probe now passes its original30-second navigation limit.
+Actual Vite tests retain src HMR in a project under an ancestor.local and verify
+the immutable ignore-all option; inline watch:null was demonstrably discarded.
+
+The default local shared receipt passes, including both train clicks, equal state,
+selection-preserving recovery, reload,1500+ticks and checkpoint restart. Full local
+gate **GREEN**,13m14s:1229TS/102files,8existing skips, build185Python/owned and general
+browser smoke (`.local/asset266-gate.log`). Actual Ysgramor/Artemis two-browser
+acceptance also passes (`.local/asset266-cross-machine.log`):308 guest PNG responses
+served from Artemis disk, both train clicks, equal state, recovery/reload,
+1500+ticks with0 unintended resyncs, and private-host checkpoint restart.
+
+Artemis inventory has seven profiles/182 definitions each,4586 unique x1 sprite
+pages and3666 audio aliases, with0 missing referenced images/audio. Ysgramor has
+4738 x2 pages; both resolve rules hash
+`3ab65818a6e9600a58bf26478779b9b591e92092716133ee3c5c1c4fdbcb6303`.
+Inventory logs:`.local/asset266-{remote,local}-inventory.log`.
+Remote owned tests/civilisation browser checks, candidate-release acceptance and
+the live switch remain pending. Private gateway/CDP/tunnel handles and deadlines
+are in the durable progress file; no live service was changed.
 
 ## Pushed Byzantine source checkpoint
 

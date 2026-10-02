@@ -1,6 +1,6 @@
 /** Two real browsers, a private host and local-asset gateway; no shared debug broadcast. */
 import { createServer } from 'vite';
-import puppeteer, { type Page } from 'puppeteer';
+import puppeteer, { type Browser, type Page } from 'puppeteer';
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -10,8 +10,14 @@ import assert from 'node:assert/strict';
 import { createGame, stepGame } from '../src/sim/game.ts';
 import { rulesFromManifest, FALLBACK_RULES } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
+import { startupDiagnostics } from './browser-startup-diagnostics.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+// Dedicated remote Chrome and gateway only; their operator keeps both endpoints
+// private and points the gateway at this test's host (e.g. through SSH tunnels).
+const remoteGuest = process.env.SHARED_GUEST_URL;
+const remoteBrowserUrl = process.env.SHARED_GUEST_BROWSER_URL;
+assert.equal(!!remoteGuest, !!remoteBrowserUrl, 'remote guest URL and dedicated browser URL are a pair');
 const checkpoint = `${root}.local/shared-smoke-${process.pid}.json`;
 console.log('Starting private shared host');
 const startServer = () => createServer({ root, configFile: `${root}vite.config.ts`, plugins: [sharedMatchPlugin(root, checkpoint)], server: { port: 5201, strictPort: true }, logLevel: 'error' });
@@ -22,11 +28,11 @@ const manifestPath = `${root}public/imported/aoe2/manifest.json`;
 const rules = existsSync(manifestPath) ? rulesFromManifest(JSON.parse(readFileSync(manifestPath, 'utf8'))) : FALLBACK_RULES;
 const resumed = createGame(7, rules, undefined, 'islands');
 for (let i = 0; i < 150; i++) stepGame(resumed);
-const gateway = spawn(process.execPath, [`${root}tools/shared-join.mjs`], {
+const gateway = remoteGuest ? undefined : spawn(process.execPath, [`${root}tools/shared-join.mjs`], {
   env: { ...process.env, PORT: '5202', MATCH_HOST: 'http://127.0.0.1:5201', MATCH_ASSETS: `${root}public` }, stdio: ['ignore', 'pipe', 'inherit'],
 });
-await new Promise<void>(resolve => gateway.stdout!.once('data', () => resolve()));
-console.log('Private gateway listening');
+if (gateway) await new Promise<void>(resolve => gateway.stdout!.once('data', () => resolve()));
+console.log(remoteGuest ? `Dedicated remote gateway: ${remoteGuest}` : 'Private gateway listening');
 const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
 const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
@@ -40,9 +46,16 @@ const wait = (page: Page, predicate: string) => page.waitForFunction(async p => 
 const errors: string[] = [];
 let localImages = 0;
 console.log('Browser launched');
+let remoteBrowser: Browser | undefined;
+let guestPage: Page | undefined;
+const diagnostics: ReturnType<typeof startupDiagnostics>[] = [];
+let phase = 'shared startup';
 try {
+  if (remoteBrowserUrl) remoteBrowser = await puppeteer.connect({ browserURL: remoteBrowserUrl });
   const a = await browser.newPage();
-  const b = await browser.newPage();
+  const b = guestPage = await (remoteBrowser ?? browser).newPage();
+  diagnostics.push(startupDiagnostics(a, browser, `${root}.local/browser-diagnostics/shared-host`));
+  diagnostics.push(startupDiagnostics(b, remoteBrowser ?? browser, `${root}.local/browser-diagnostics/shared-guest`));
   const { rules: _rules, ...savedState } = resumed;
   await a.evaluateOnNewDocument(snapshot => {
     sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot));
@@ -58,14 +71,17 @@ try {
     });
   }
   await a.bringToFront();
+  phase = 'host navigation/readiness';
   await a.goto('http://127.0.0.1:5201', { waitUntil: 'domcontentloaded' });
   console.log('Host page loaded');
   await ready(a);
   await a.keyboard.press('F3');
   await wait(a, 's.connection.paused');
   await b.bringToFront();
-  await b.goto('http://127.0.0.1:5202', { waitUntil: 'domcontentloaded' });
+  phase = 'guest navigation/readiness';
+  await b.goto(remoteGuest ?? 'http://127.0.0.1:5202', { waitUntil: 'domcontentloaded' });
   await ready(b);
+  phase = 'shared outcomes';
   let sa = await debug(a, { type: 'sim' });
   let sb = await debug(b, { type: 'sim' });
   assert.equal(sa.synchronizationHash, sb.synchronizationHash, 'guest joins current state');
@@ -178,9 +194,19 @@ try {
   console.log('Host restart restored the checkpoint and guest automatically reconnected');
   assert.deepEqual(errors, []);
   console.log('SHARED SMOKE GREEN');
+} catch (error) {
+  for (const trace of diagnostics) await trace.capture(error, phase).catch((failure: unknown) => console.error('Shared diagnostic failure', failure));
+  throw error;
 } finally {
-  await browser.close();
-  gateway.kill('SIGTERM');
-  await server.close();
-  rmSync(checkpoint, { force: true });
+  for (const trace of diagnostics) trace.dispose();
+  try {
+    if (remoteBrowser) {
+      try { await guestPage?.close(); } finally { await remoteBrowser.disconnect(); }
+    }
+  } finally {
+    await browser.close();
+    gateway?.kill('SIGTERM');
+    await server.close();
+    rmSync(checkpoint, { force: true });
+  }
 }

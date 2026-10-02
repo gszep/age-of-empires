@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { sharedMatchPlugin, SharedCheckpointError } from '../src/shared/server.ts';
+import { immutableWatch } from './vite-watch.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const releasePath = `${root}release.json`;
@@ -22,7 +23,7 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`,
   ...(existsSync(releasePath) ? { cacheDir: `${root}.local/vite-cache` } : {}),
   plugins: [sharedMatchPlugin(root, process.env.MATCH_CHECKPOINT)],
   server: { ...(process.env.MATCH_PORT ? { port: Number(process.env.MATCH_PORT) } : {}),
-    ...(existsSync(releasePath) ? { watch: null, hmr: false } : {}) },
+    ...(existsSync(releasePath) ? { watch: immutableWatch, hmr: false } : {}) },
 }).catch(error => {
   console.error(error instanceof Error ? error.message : error);
   process.exit(error instanceof SharedCheckpointError ? error.exitCode : 1);

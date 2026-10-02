@@ -164,6 +164,47 @@ The join script needs only Node, not npm dependencies. `MATCH_HOST` overrides
 the default `https://ysgramor.tail6e864b.ts.net:5173`; `MATCH_ASSETS` is the
 public directory containing `imported/`; `PORT` defaults to 5174.
 
+### Private cross-machine acceptance
+
+`tools/shared_smoke.mts` defaults to its private local host5201/gateway5202 and
+two local pages. It also accepts the paired environment variables
+`SHARED_GUEST_URL` and `SHARED_GUEST_BROWSER_URL`: the guest page then runs in a
+dedicated remote Chrome, while the host page remains local. All original click,
+checksum, reload/resync,1500-tick and checkpoint-restart assertions remain active.
+
+For a two-machine check, prepare a separate remote gateway pointing to this
+private host through an SSH reverse tunnel, plus a dedicated remote headless
+Chrome/CDP port through a local tunnel. Keep those ports bound to127.0.0.1 and
+use a separate temporary browser profile. For example, remote15201 forwards to
+local5201; remote gateway15202 uses that host and the candidate local-art directory;
+local15222 forwards to the dedicated remote CDP15222. Then run:
+
+```bash
+SHARED_GUEST_URL=http://127.0.0.1:15202 \
+SHARED_GUEST_BROWSER_URL=http://127.0.0.1:15222 \
+npx tsx tools/shared_smoke.mts
+```
+
+The guest URL is interpreted by the remote browser. The probe closes its created
+guest page and disconnects CDP; the operator retains ownership of the remote
+browser/gateway/tunnel processes and must clean them by recorded PID. Existing
+household services and a user's interactive browser are separate from this setup.
+Failure diagnostics are saved under `.local/browser-diagnostics/shared-{host,guest}`
+with the original error and bounded requests/DOM/GPU evidence; clocks are unchanged.
+
+### Watcher scope and frozen releases
+
+Vite's dev watcher excludes the resolved project's `.local/` archives/worktrees
+and `public/imported/` bulk assets. Its own `src/` still hot-reloads, including
+when the project root happens to live under an ancestor `.local/` directory.
+Imported metadata continues to require a page reload after publication.
+
+An inline `watch: null` was found to disappear during Vite config merging (#273).
+Pinned hosts now use the merge-stable `immutableWatch` ignore-all option and
+`hmr: false`; actual watcher-registration tests verify both behaviours. Excessive
+filesystem scanning previously delayed small compressed module responses by
+seconds and exceeded the private shared probe's30-second navigation limit.
+
 Local asset responses have `X-Empires-Assets: local`. A missing local file
 returns 404 and names the path. Sprite loads have bounded concurrency and
 failed loads retry after a cooldown; local storage still requires image
