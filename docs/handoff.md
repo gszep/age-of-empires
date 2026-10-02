@@ -33,7 +33,7 @@ work after this checkpoint rather than ending early.
   startup failures. Gate GREEN:1229TS/102files,8skips, build185Python/owned and
   browser;13m14s (`.local/asset266-gate.log`). No fixture clock was widened.
 
-## Islands fish checkpoint (#95)
+## Islands fish checkpoint 0d86953 (#95)
 
 - Salmon456 and dorado455 now have distinct original underwater/leap art alongside
   snapper458 and shore fish69. Shared fish-kind handling covers gathering/banking,
@@ -61,12 +61,36 @@ bindings. Actual interval:06:21:01.913–06:50:59.607UTC; startup is inside the
 established overall budget. Log:`.local/fish95-soak.log`. This is general renderer
 endurance, not Islands-specific endurance or a physical-GPU FPS claim.
 
-The islands-fish, fish-fog and soak receipts are current and passing. Overall
-`acceptance.mjs check` still reports the explicitly known-gap#124 AI progression
+At the fish checkpoint, islands-fish, fish-fog and soak receipts matched and passed.
+Its overall `acceptance.mjs check` reported the explicitly known-gap#124 AI progression
 receipt missing, plus unmapped shared files. Those files were verified by the full
 gate, owned fish source contracts, species gathering/banking outcomes, fishing AI
-outcomes and cursor/continuation tests; no claim that the registry itself is green
+outcomes and cursor/continuation tests; no claim that its aggregate check was green
 or that#124 is fixed.
+
+## Gateway reused-socket failure (#275)
+
+Private rollout checks exposed `ECONNRESET` on a reused upstream HTTP socket while
+loading `/src/dev-debug-stats.ts`. The gateway now retries a body-free GET/HEAD
+once on a fresh connection, before headers only. POST/body/fresh-socket failures
+are not replayed; partial responses terminate safely. Eight real-upstream tests
+cover those outcomes. The config endpoint also logs its failure cause.
+
+Hash-verified Artemis/Ysgramor acceptance passes all original train clicks, equal
+state, recovery, reload,1500+ticks with0unintended resyncs, checkpoint restart and
+311guest PNG responses from local disk. Frozen host acceptance also passes, with
+original x1 fish decoding, both resource-islet coasts and paid training/reload;
+the gateway logs recovery of the reproduced reset. Logs:
+`.local/proxy275-{cross-machine-final,frozen,confirmed-reset,gate}.log`.
+Gate GREEN:1256TS/103files,8existing skips, build,186Python/owned and browser;
+755s. The selected shared receipt and aggregate acceptance check pass. No fixture
+clock or original browser assertion changed.
+
+Earlier supposed-fixed remote attempts actually retained the old helper: a
+post-stop `ps` exit1 skipped the chained copy. Their failures remain recorded and
+are not claimed to test the fix. Corrected publication independently compared
+local/remote SHA256 before running acceptance. A separate client gap, silently
+starting solo on config502, is tracked in#276 and remains unimplemented here.
 
 ## Live deployment (#266)
 

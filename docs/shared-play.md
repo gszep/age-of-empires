@@ -215,6 +215,14 @@ returns 404 and names the path. Sprite loads have bounded concurrency and
 failed loads retry after a cooldown; local storage still requires image
 decoding and GPU memory. Page eviction remains tracked as #152.
 
+The gateway also handles a host closing an idle HTTP keep-alive socket just as
+Node reuses it (#275). Before any response headers, an `ECONNRESET` on a reused
+socket permits one fresh-connection retry for a body-free GET/HEAD. POSTs,
+body-bearing requests, fresh-socket errors and partial responses are not replayed.
+This is a bounded transport recovery policy, not a change to match commands.
+Retry diagnostics name the method/path; a failed retry still returns502. An
+interrupted response is terminated without crashing the gateway.
+
 ## Verification
 
 ```bash

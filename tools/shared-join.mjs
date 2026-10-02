@@ -22,7 +22,10 @@ const server = createServer((req, res) => {
         if (config.enabled !== true || !Number.isInteger(config.version)) throw new Error('Invalid host config');
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
         res.end(JSON.stringify({ ...config, player: 2 }));
-      }).catch(error => { res.writeHead(502); res.end(`Ysgramor unavailable: ${error.message}`); });
+      }).catch(error => {
+        console.error(`Host config unavailable: ${error.message}${error.cause?.code ? ` (${error.cause.code})` : ''}`);
+        res.writeHead(502); res.end(`Ysgramor unavailable: ${error.message}`);
+      });
     return;
   }
   if (url.pathname.startsWith('/imported/')) {
@@ -48,14 +51,34 @@ const server = createServer((req, res) => {
     } catch { res.writeHead(404); res.end(`Local asset missing: ${url.pathname}`); }
     return;
   }
-  const upstream = (host.protocol === 'https:' ? httpsRequest : request)(new URL(req.url, host), {
-    method: req.method, headers: { ...req.headers, host: host.host },
-  }, response => {
-    res.writeHead(response.statusCode, response.headers);
-    response.pipe(res);
-  });
-  upstream.on('error', error => { res.writeHead(502); res.end(`Ysgramor unavailable: ${error.message}`); });
-  req.pipe(upstream);
+  const bodyFreeRead = (req.method === 'GET' || req.method === 'HEAD')
+    && !req.headers['transfer-encoding'] && (!req.headers['content-length'] || req.headers['content-length'] === '0');
+  const forward = (retry = false) => {
+    const upstream = (host.protocol === 'https:' ? httpsRequest : request)(new URL(req.url, host), {
+      method: req.method, headers: { ...req.headers, host: host.host },
+      // A reset idle socket must not send the retry into the same pool.
+      agent: retry ? false : undefined,
+    }, response => {
+      res.writeHead(response.statusCode, response.headers);
+      response.on('error', error => res.destroy(error));
+      response.pipe(res);
+    });
+    upstream.on('error', error => {
+      if (res.destroyed) return;
+      if (res.headersSent) { res.destroy(error); return; }
+      // The host can close an idle keep-alive socket just as Node reuses it.
+      // Never replay a command/body or an already-started response (#275).
+      if (!retry && bodyFreeRead && upstream.reusedSocket && error.code === 'ECONNRESET') {
+        console.error(`Retrying upstream ${req.method} ${url.pathname}: ECONNRESET on reused socket`);
+        forward(true);
+        return;
+      }
+      res.writeHead(502); res.end(`Ysgramor unavailable: ${error.message}`);
+    });
+    if (retry) upstream.end();
+    else req.pipe(upstream);
+  };
+  forward();
 });
 server.on('upgrade', (req, socket, head) => {
   const options = { host: host.hostname, port: Number(host.port || (host.protocol === 'https:' ? 443 : 80)), servername: host.hostname };
