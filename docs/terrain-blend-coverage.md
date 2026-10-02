@@ -127,3 +127,46 @@ A patch-matched DE capture of a controlled grass/beach/road crossing and both
 farm stages, with known tiles/zoom, is still needed to settle physical crossing
 widths, placement and those binding/ordering questions. #116 remains open for
 that acceptance rather than declaring visual parity from self-comparison.
+
+## Native capture compatibility, October2 calibration run
+
+Native desktop automation now reaches the scenario editor, paints terrain,
+places a real farm and saves a separately named scenario. The first controlled
+fixture is `OpenEmpires-20261003-terrain116`: blank144-square grass map,
+Default colour mood/water definition, a5×5 Beach stamp,3×3 Farm and Farm0%
+terrain stamps, and a separate player-one Farm building. Eye candy is disabled.
+Grid-on captures establish the painted footprints independently of texture edges.
+
+The installed executable reports `101.103.54800.0 (#185872) 25464371`.
+It is **not the pinned source build**:
+
+| Input | Pinned depot | Installed native game |
+| --- | --- | --- |
+| DAT SHA-256 | `ce3530df36cf0b333a9751cb0ff94460fe904f811feecec8ae9794701622b4cf` | `4aa2f0a719e88e5f1502517eddb27c669aeb40c2fe9d8c4f3eec7751c01e7baa` |
+| DAT version / civilisation rows | VER8.9 /60 | VER8.9 /63 |
+| TerrainBlend VS/PS, Water VS/PS | byte-identical to installed resources | byte-identical to pinned resources |
+| Water definitions / colour-correction JSON | byte-identical | byte-identical |
+| landland/farmland/watershore/waterwater sheets and grass overlay | byte-identical | byte-identical |
+
+For terrain IDs0,2,24, the only row difference is absolute blend priority
+(111→110,131→130,146→145); their relative ordering is unchanged. Farm7,
+construction29 and water1/22/23 rows are identical. These checks establish
+asset compatibility for this fixture, **not equivalence of engine-set UVs,
+draw ordering or shader constants across executable versions**.
+
+Private evidence is indexed in `.local/reference/index.md`. Captures are
+full-resolution2560×1440 desktop PNGs, display/sRGB, default-zoom slider50%,
+UHD unchecked. Diagnostic settings disable depth of field, bloom, sharpen,
+vignette, map lighting and game-object antialiasing; gamma remains1.0.
+These settings intentionally isolate crossings and are not comparable to the
+older enhanced-pack, postprocessed reference corpus without normalization.
+The original options screen and source comparison receipt are retained privately.
+
+No runtime value is tuned from these pictures yet. The Farm terrain brush and
+real Farm building were both captured so that a painted-terrain result cannot
+silently stand in for building rendering. Exact pixel/alpha comparison, a road
+junction and construction gameplay remain unverified. Reading the native saved
+scenario directory was denied by the unattended harness; no alternative read
+route was attempted. A permitted scenario export plus a matching native build
+would enable stronger tile/engine provenance. #116 and its human-acceptance
+umbrella#113 remain open.
