@@ -92,7 +92,7 @@ are not claimed to test the fix. Corrected publication independently compared
 local/remote SHA256 before running acceptance. The separate client failure mode,
 silently starting solo on config502, is addressed in the following#276 checkpoint.
 
-## Shared startup discovery (#276)
+## Shared startup checkpoint 43e10ad (#276, closed)
 
 Failed HTTP/network/JSON/configuration discovery keeps startup pending with a
 visible unavailable/reconnecting notice. It preserves saved state and retries at
@@ -111,25 +111,28 @@ Logs:`.local/config276-{acceptance-r2,shared,gate}.log`.
 Gate GREEN:1267TS/104files,8existing skips, build,186Python/owned and browser;
 747s. Both selected feature receipts pass. Aggregate acceptance check only flags
 the newly edited registry file as unmapped; that JSON was parsed and its commands
-executed by the passing shared-startup/shared runs. Live deployment below remains
-385da49 until a separately verified release switch.
+executed by the passing shared-startup/shared runs. The privately verified frontend
+is now live as recorded below.
 
-## Live deployment (#266/#95/#275)
+## Live deployment (#266/#95/#275/#276)
 
 - Host:<http://localhost:5173/>; solo:<http://localhost:5173/?solo=1>.
 - Tailnet:<https://ysgramor.tail6e864b.ts.net:5173/>.
 - Artemis gateway:<http://localhost:5174/>.
-- Updated at approximately **08:08 UTC** after private acceptance. Both managed
-  `open-empires-shared` services are active/running, NRestarts0, ExecMainStatus0;
+- Gateway/art updated at **08:08 UTC**, frontend at **08:57 UTC**, after private
+  acceptance. Both managed `open-empires-shared` services are active/running,
+  NRestarts0, ExecMainStatus0;
   installed configs report protocol2 and seats1/2 respectively.
-- Ysgramor release:`.local/releases/autonomous-20261002-385da49`, source
-  `385da4954dc70073d548b29164dc1a30d73fa119`, fingerprint
-  `19a0d8b4735b4abd5c971b7b6bd5979cb9ffd58d2518d9bdfe3b9e0ce51a3ee6`.
+- Ysgramor release:`.local/releases/autonomous-20261002-43e10ad`, source
+  `43e10adfdfefa62aae3437065a30aa481a41e02b`, fingerprint
+  `c54c2fd402804f6d9926edee17e7c9e665e91e5a909bc70402c57c7f545488f1`.
 - Artemis gateway/source/art runtime:
   `/home/gszep/Documents/repos/age-of-empires/.local/owned-runtime-0d86953`;
   assets are its `public` directory. Its source was advanced to exact385da49,
   recorded in `.local/source-revision.txt`, with the helper SHA256 independently
   matched before acceptance. The original dirty application clone was preserved.
+  This gateway proxies the newer43e10ad frontend; its assets/code did not need
+  changing for that frontend-only update.
 - Both have seven profiles/184 definitions each. Artemis has4598 x1 sprite pages;
   Ysgramor has4750 x2 pages. Each has3666 audio aliases and0 missing referenced
   image/audio files. Both resolve rules hash
@@ -148,19 +151,23 @@ executed by the passing shared-startup/shared runs. Live deployment below remain
 - The actual frozen host entrypoint was also accepted privately with an Artemis
   guest: Islands rare-fish count, both resource-islet shores, source x1 fish PNG
   decoding, Byzantine/Japanese menu selection, paid training, equal state and
-  reload. Receipt:`.local/proxy275-release-final.log`, tick86/hash17d8766f. Earlier
-  candidate failures remain recorded; no timeout was widened. Live manifest-driven
+  reload. Latest receipt:`.local/config276-release.log`, tick85/hash25e94191, for
+  the exact43e10ad frozen host with Artemis guest. Earlier candidate failures
+  remain recorded; no timeout was widened. Live manifest-driven
   PNG signature checks also pass on both endpoints (`proxy275-live-*-assets.log`).
+  Live client modules are byte-identical through both endpoints and contain the
+  recovery logic (`config276-live-*-client.js`).
 - Before switching, Artemis had no active5174 TCP connections; Ysgramor had two
   unchanged queued loopback connections and one CLOSE-WAIT socket. The authorised
   stop accounted for those. No current `.local/shared-match.json` existed before
   or after shutdown. Useful private candidate state is retained separately.
-  Current route/preservation notes are in `.local/proxy275-pre-deploy/`; prior
+  Latest route/preservation notes are in `.local/config276-pre-deploy/`; gateway
+  update notes are in `.local/proxy275-pre-deploy/`; prior
   deployment service evidence remains in `.local/asset266-pre-deploy/`. Direct
   local service-file Read was denied; no alternate file read was attempted, and
   the authorised maintained installer performed the service update.
   Both hosts' Tailscale route JSON is byte-identical before/after; no route reset.
-- Preceding Ysgramor `.local/releases/autonomous-20261002-5ced752` and Artemis
+- Preceding Ysgramor `.local/releases/autonomous-20261002-385da49`/`5ced752` and Artemis
   `.local/owned-runtime-a208f7c` remain intact for rollback, alongside the older
   review-followthrough-final/shared-gateway-review241/performance-runtime paths.
   No generic incompatible-checkpoint migration is claimed.

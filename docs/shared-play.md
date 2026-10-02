@@ -21,13 +21,15 @@ and requires reloading matching client code.
   localhost:5173 behind the existing Tailscale route. Your usual link is unchanged.
 - Artemis: the same user-service name runs `tools/shared-join.mjs` on
   localhost:5174. Open **http://localhost:5174/** on Artemis.
-- Since October2's08:08UTC update, Ysgramor serves
-  `.local/releases/autonomous-20261002-385da49`, fingerprint
-  `19a0d8b4735b4abd5c971b7b6bd5979cb9ffd58d2518d9bdfe3b9e0ce51a3ee6`.
+- Since October2's08:57UTC frontend update, Ysgramor serves
+  `.local/releases/autonomous-20261002-43e10ad`, fingerprint
+  `c54c2fd402804f6d9926edee17e7c9e665e91e5a909bc70402c57c7f545488f1`.
   Artemis's gateway and isolated owned base-art runtime are under
   `/home/gszep/Documents/repos/age-of-empires/.local/owned-runtime-0d86953`;
   that candidate directory now contains source385da49 (recorded in its
   `.local/source-revision.txt`), including the reset-socket gateway fix.
+  It proxies the newer frontend from Ysgramor; no asset regeneration or gateway
+  restart was needed for the shared-discovery fix.
   `MATCH_ASSETS` points to its `public` directory. The gateway follows the host
   protocol and selects player2. Both services report protocol2/active/NRestarts0.
 - Both machines now have seven profiles with184 definitions per profile.
@@ -43,7 +45,7 @@ and requires reloading matching client code.
   pinned host entrypoint for Islands fish/islet/art, Byzantine/Japanese menu,
   paid training and reload acceptance before installation. Logs and exact hashes
   are in [handoff.md](handoff.md).
-- The preceding5ced752 host release and Artemis `owned-runtime-a208f7c` remain
+- The preceding385da49/5ced752 host releases and Artemis `owned-runtime-a208f7c` remain
   intact for rollback, alongside older rollback directories. The original dirty
   Artemis clone was preserved. No current shared checkpoint existed before or
   after stopping the old host; route JSON is byte-identical before/after the
