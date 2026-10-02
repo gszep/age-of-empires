@@ -235,6 +235,8 @@ def resolve_graphic_id(unit: Any, animation: dict[str, Any], civ_units: Any, dat
             return unit.dead_fish.walking_graphic
         if slot == "attack":
             return unit.type_50.attack_graphic
+        if slot == "attack-2":
+            return unit.type_50.attack_graphic_2
         if slot == "special":
             return unit.creatable.special_graphic
         if slot == "dying":
@@ -436,6 +438,8 @@ def extract_entity(
     if unit is None:
         raise ValueError(f"unit {spec['unitId']} missing for {spec['key']}")
     category = spec["category"]
+    if "attack" in spec["animations"] and unit.type_50 and unit.type_50.attack_graphic_2 >= 0:
+        spec = {**spec, "animations": {**spec["animations"], "attack-2": {"slot": "attack-2"}}}
 
     entity: dict[str, Any] = {
         "id": unit.id,
@@ -878,6 +882,10 @@ def extract_entity(
                 entity["animationLayers"][name].append({"animation": key, "x": x, "y": y})
             if parent_sound_events:
                 entity["animations"][name]["soundEvents"] = parent_sound_events
+
+    if "attack-2" in entity["animations"]:
+        second = dat.graphics[unit.type_50.attack_graphic_2]
+        entity["combat"]["secondAttackReleaseSeconds"] = rounded(unit.type_50.frame_delay * second.frame_duration)
 
     if spec["key"] == "trebuchet-unpacked":
         entity["workRate"] = rounded(unit.bird.work_rate)

@@ -38,6 +38,8 @@ export async function civilizationBrowser(civ: string, port = 5269) {
             preview:()=>({kind:buildMode,target:placementTarget(),tint:ghostFootprint?.material.color.getHex()}),
             art:id=>{const e=game.entities.find(e=>e.id===id);if(!e)return;const v=views.get('e'+id);
               return{key:artKey(assets,e,chooseAnimation(game,e).key,game.matchSeed),name:nameOf(e),texture:v?.body.textureImage,
+                animation:v?.animationState,pieces:v?[v.body,...v.annexes].filter(p=>p.mesh.visible).map(p=>p.textureImage):[],
+                partsPending:v?[v.body,...v.annexes].some(p=>p.pendingTexture):false,
                 pending:v?.body.pendingTexture,fallback:v?.fallback};}}});`);
       },
     }] });

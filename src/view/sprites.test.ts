@@ -93,6 +93,28 @@ describe('naval composite sprites (#97)', () => {
   });
 });
 
+describe('second attack duration', () => {
+  it('keeps the chosen second clip visible after the shorter primary clip would have ended', () => {
+    const state = createGame(270); state.rules = structuredClone(state.rules);
+    state.rules.units.militia.attackReleaseSeconds = .1;
+    state.rules.units.militia.secondAttackReleaseSeconds = .1;
+    state.rules.units.militia.attackReloadSeconds = 2;
+    const entity: Entity = { id: state.nextId++, kind: 'militia', owner: 1,
+      position: { x: 20, y: 20 }, hp: 40, maxHp: 40, radius: .2,
+      activity: 'attacking', order: { kind: 'idle' }, attackAnimation: 1, attackCooldown: 30 };
+    const assets = fakeAssets();
+    const animation = (frames: number) => ({ frames, directions: 1, frameSeconds: .1, mirroringMode: 0 });
+    const atlas = (image: string, count: number): Atlas => ({ image, size: [16, 16], framesInFile: count,
+      frames: Array.from({ length: count }, () => ({ x: 0, y: 0, w: 16, h: 16, cx: 8, cy: 8 })) });
+    for (const name of ['idle', 'attack', 'attack-2']) assets.textures.set(name, new THREE.DataTexture(new Uint8Array(16 * 16 * 4), 16, 16));
+    assets.entities.militia = { category: 'unit', animations: { idle: animation(1), attack: animation(2), 'attack-2': animation(10) },
+      atlases: { idle: atlas('idle', 1), attack: atlas('attack', 2), 'attack-2': atlas('attack-2', 10) } };
+    const view = createEntityView(assets, entity); updateEntityView(view, assets, state, entity, 10);
+    expect(view.animationState).toBe('militia/attack-2');
+    expect(view.body.textureImage).toBe('attack-2'); expect(view.frameIndex).toBe(5);
+  });
+});
+
 describe('specialist death feedback', () => {
   it('replaces the petard body with its death particle on the saved simulation clock', () => {
     const assets = fakeAssets();

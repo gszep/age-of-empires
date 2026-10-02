@@ -10,7 +10,65 @@ launch/control and additional agents are not. The durable brief/progress/report
 paths are `.local/autonomous-20261001-{brief,progress,report}.md`; actual worker
 start was2026-10-01T21:30:37Z at da81bf3. Continue the run after this checkpoint.
 
-## Current source checkpoint
+## Persian attempt: source blocker, preserved work
+
+Byzantines/#268 was pushed as **f94b18e** and both issues closed. Persians#186
+subsequently reached29 passing gameplay outcomes and four owned contracts; the
+69-case Persian/Chinese/Byzantine regression also passed before the extra cart
+conversion case. Its full art/UI conversion succeeded, but the audio stage failed.
+
+Three Persian Trade Cart event IDs are wholly absent from every supplied common
+bank:3167914911 (selection),955679769 (training),2892846699 (animation). Artemis's
+matching common packs and additional English Base/Base.1/DLCParis packs also lack
+them. This is **#271**, not a civilization-switch decoder failure. The existing
+every-consumed-cue-to-owned-media assertion was retained.
+
+The pending implementation is preserved, staged/uncommitted, in
+`.local/worktrees/persians186-blocked` on `work/persians186-blocked`, based on
+f94b18e. `.local/persians186-blocked.patch` was compared byte-for-byte with that
+worktree's staged diff before restoring main. No incomplete selectable Persian
+profile was committed. Its private-browser probe is authored but unrun; the full
+Persian gate is unmet. Source/aura/payout calibration is#269. Relevant evidence:
+`.local/persians-{source-tests,focused-r3,sim-r4,import}.log` and
+`.local/audio271-{diagnose,trace}.log`.
+
+Per the authorised blocker rule, current work proceeds with#270's missing ordinary
+second attack artwork, then#266's remote art refresh. The failed import's baseline
+release audio references were checked:0 missing files. The existing shared service
+was restored active/NRestarts0. Regenerate the current seven-profile main through
+the full pipeline before the next checkpoint; the failed pending import is not a
+GREEN published release.
+
+## Alternate attack artwork checkpoint (#270)
+
+The source's second ordinary attack slot is now imported with its own clocks,
+sound events and composite deltas. Simulation windups choose A/B before release,
+preserve the sequence through saves/orders, and retain charged special-weapon
+priority. The renderer uses the chosen clip's duration rather than always using
+the primary clip. Native first/reset/naval cadence is#272.
+
+The source contract and103 focused simulation/sprite regressions passed;
+the final chosen-duration regression brings the two-file rendering check to63
+passing cases. Full seven-profile import passes (`.local/attack270-import.log`),
+reusing4850 groups and adding32. All77 second-graphic switch/event pairs audited
+resolve to complete owned audio. Published browser A/B/A texture binding,
+composite parts, reload, actual hits and ground shots pass
+(`.local/attack270-browser-r2.log`). The initial probe used a non-namespaced
+animation expectation; its exact identity comparison is corrected.
+
+Fish-fog and the unchanged default30-minute renderer soak pass. The soak recorded
+30samples, one completed round and Arabia/Windsor coverage, with no renderer errors
+or invalid bindings. Peak estimated sprite data was2918.46MiB; minimum host
+available memory8.81GiB. Its actual recorded interval was02:28:21.890–02:57:56.180UTC
+(startup is inside the existing overall budget). Log:`.local/attack270-soak.log`.
+The maintained full Chinese browser regression passes too
+(`.local/attack270-chinese-browser.log`), including special firearm artwork/bullets,
+charge HUD, ground fire and Lou Chuan/Rocketry. Full checkpoint gate **GREEN**,
+exit0, **13m31s**:1227 TypeScript tests/101files,8existing skips, build,
+185 Python/owned tests and real-browser smoke. Evidence:
+`.local/attack270-gate.log` / `.exit`. No fixture clock or timeout was widened.
+
+## Pushed Byzantine source checkpoint
 
 - Byzantines adds Cataphract/elite and Camel Rider/elite definitions, complete
   available-tree roster coverage, independent MEDI buildings/HUD/flags/icons/voices,
@@ -68,7 +126,8 @@ preserved, including actual damage after the final target staging.
   This pinned code/JSON predates the Byzantine and fish-fog/startup-diagnostics
   source changes. No new release has been switched in this checkpoint.
 - The host was explicitly paused for each full bulk-asset publication and restored
-  afterwards; latest restoration23:25 UTC, active/NRestarts0. No current
+  afterwards; latest restoration followed the#270 import on October2,
+  active/NRestarts0. No current
   `.local/shared-match.json` existed to archive. Socket inspection found two
   unchanged loopback ESTAB receive queues and a CLOSE-WAIT socket; those were
   accounted for by the authorised pause rather than assumed to be absent users.
@@ -97,5 +156,5 @@ completion does not establish native-DE parity. Native terrain/compositing,
 conversion exceptions, audio/missing streams, zero-time research/population settings,
 Japanese/Chinese/Byzantine calibration and wonder countdown remain tracked.
 The restored#124 Dark-Age-start AI acceptance is explicitly failing/opt-in and is
-separate from the Feudal-start component case. Follow the authorised brief's next
-item, Persians#186, after the verified Byzantine checkpoint is pushed.
+separate from the Feudal-start component case. Persians remains blocked as recorded
+above; continue eligible work under the same absolute deadline.

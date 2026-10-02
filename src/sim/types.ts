@@ -77,6 +77,8 @@ export interface Entity {
   faith?: number;
   /** Fire Ship charge reservoir; absent means the current maximum. */
   charge?: number;
+  /** Owned first/second ordinary attack graphic; retained across orders/saves. */
+  attackAnimation?: 0 | 1;
   position: Point;
   hp: number;
   maxHp: number;

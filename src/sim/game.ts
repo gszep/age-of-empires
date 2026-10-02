@@ -1222,7 +1222,8 @@ function combatOf(state: GameState, entity: Entity, target?: Entity): {
     range: rules.range ?? 0,
     minRange: rules.minRange ?? 0,
     reloadSeconds: rules.attackReloadSeconds,
-    releaseSeconds: rules.attackReleaseSeconds,
+    releaseSeconds: entity.attackAnimation === 1
+      ? rules.secondAttackReleaseSeconds ?? rules.attackReleaseSeconds : rules.attackReleaseSeconds,
     projectileSpeed: rules.projectileSpeed,
     piercing: rules.piercing,
     interceptRadius: rules.interceptRadius,
@@ -1977,16 +1978,19 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
     return;
   }
   // The bow a villager hunts with has its own reach, arrow and swing time.
-  const profile = attackProfile(state, entity, target);
-  const releaseSeconds = profile.releaseSeconds ?? rules.attackReleaseSeconds;
   const weapon = rules.alternateAttack && combatOf(state, entity, target).alternate ? 'alternate' : undefined;
   // Preserve pursuit windup for the same weapon, but a firearm-to-melee switch
   // needs that weapon's own animation/release clock rather than the old one.
   if (entity.attackWindup !== undefined && entity.attackWeapon !== weapon) entity.attackWindup = undefined;
   if (entity.attackWindup === undefined) {
     entity.attackWeapon = weapon;
+    entity.attackAnimation = !weapon && rules.secondAttackReleaseSeconds !== undefined
+      ? entity.attackAnimation === 0 ? 1 : 0 : undefined;
+    const releaseSeconds = attackProfile(state, entity, target).releaseSeconds ?? rules.attackReleaseSeconds;
     entity.attackWindup = Math.max(1, Math.round(releaseSeconds * TICKS_PER_SECOND));
   }
+  const profile = attackProfile(state, entity, target);
+  const releaseSeconds = profile.releaseSeconds ?? rules.attackReleaseSeconds;
   entity.attackWindup -= 1;
   if (entity.attackWindup <= 0) {
     const combat = combatOf(state, entity, target);

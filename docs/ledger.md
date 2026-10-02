@@ -14,6 +14,25 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## Ordinary second attack graphics (#270; native cadence #272)
+
+- **Owned:** `type_50.attack_graphic_2` supplies second attack artwork for Camel
+  Riders, Long/Two-Handed Swordsmen, Huskarls, Teutonic Knights and naval composites.
+  Both graphics' frame clocks, original sound events and file-bearing deltas are
+  retained. Camel pairs have frameDelay20 and.025s frames; the selected other
+  pairs have zero frame delay. No decoder/packing function changes are required.
+- **Documented interpretation:** UGC attribute131 describes alternating the two
+  graphics. **Inferred scheduling:** start with the primary, alternate on each
+  started ordinary windup, retain the last choice across retasking/Stop and saves.
+  Each chosen source clock drives its windup and cooldown. A charged special
+  weapon keeps its own graphic/clock and resets the next ordinary choice to the
+  primary. If an upgrade removes the second slot, stale state uses the primary.
+- **Native limits:** first-choice, cancellation/reset and continuous naval recoil
+  cadence remain#272. Naval parent placeholders can have zero duration while their
+  second composite is timed; drawing both owned compositions does not establish
+  the closed engine's exact animation scheduler. The cosmetic source choice is
+  authoritative saved state, never a view-side random draw.
+
 ## Shared atlas frame metadata (#268)
 
 - **Chosen wire representation:** asset manifest schema4 stores repeated entity/

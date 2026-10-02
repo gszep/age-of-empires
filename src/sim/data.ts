@@ -43,6 +43,8 @@ export interface AlternateAttack {
 }
 
 export interface UnitRules {
+  /** Presence enables the source's alternating ordinary attack graphic. */
+  secondAttackReleaseSeconds?: number;
   abilityFlags?: number;
   interceptRadius?: number;
   volley?: { count: number; intervalSeconds: number; secondary?: ProjectileRules };
@@ -1499,6 +1501,7 @@ interface ManifestEntity {
   trainLocations?: { buildingId: number; seconds: number; button?: number; hotkeyTextId?: number }[];
   build?: { builderId: number; seconds: number; button?: number; sourceId?: number; additionalAge?: number };
   combat?: {
+    secondAttackReleaseSeconds?: number;
     abilityFlags?: number;
     reloadSeconds: number;
     frameDelay: number;
@@ -1708,6 +1711,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       attackReleaseSeconds: Math.round(
         (e[key].combat?.frameDelay ?? 10) * (e[key].animations?.attack?.frameSeconds ?? 0.05) * 100,
       ) / 100,
+      secondAttackReleaseSeconds: e[key].combat?.secondAttackReleaseSeconds,
       age: e[key].age ?? fallback?.age,
       range: e[key].combat?.maximumRange || fallback?.range,
       minRange: e[key].combat?.minimumRange || fallback?.minRange,

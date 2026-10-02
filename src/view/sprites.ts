@@ -6,6 +6,7 @@ import { isAnimal, isBuilding, isUnit, TICK_SECONDS } from '../sim/data';
 import type { SoundPose } from './world-sounds';
 import { isGateKind, isWallKind, isWallLineKind } from '../sim/buildings';
 import { rulesForPlayer } from '../sim/civilizations';
+import { unitRulesForEntity } from '../sim/rules';
 import { corpseAgeSeconds, swingSeconds } from '../sim/game';
 import { createTerrainPatch, elevationAt, ELEVATION_PIXELS, elevatedWorldToIso, FOG_EXPLORED } from './world';
 import { contourLayerOrder, groundLayerOrder, projectileLayerOrder, rallyLayerOrder, spriteLayerOrder } from './render-order';
@@ -472,7 +473,8 @@ export function chooseAnimation(state: ReadonlyGameState, entity: Entity): { key
       return { key, name: 'idle' };
     }
     if (entity.dead) return { key: kind, name: 'death' };
-    if (entity.activity === 'attacking') return { key: kind, name: entity.attackWeapon === 'alternate' ? 'attack-special' : 'attack' };
+    if (entity.activity === 'attacking') return { key: kind, name: entity.attackWeapon === 'alternate' ? 'attack-special'
+      : entity.attackAnimation === 1 && unitRulesForEntity(state, entity).secondAttackReleaseSeconds !== undefined ? 'attack-2' : 'attack' };
     // A fishing ship at work casts its net (the gather task's own graphic);
     // laden, it is the same boat, as the DAT gives it no carrying art.
     if (kind === 'fishing-ship' && (entity.activity === 'gathering' || entity.activity === 'building')) return { key: kind, name: 'work' };
@@ -1141,7 +1143,7 @@ export function updateEntityView(
   // typed on the mutable one; `swingSeconds` only reads.
   let swing = choice.name.startsWith('attack') ? swingSeconds(state as GameState, entity) : undefined;
   if (swing !== undefined) {
-    const attack = imported?.animations['attack'];
+    const attack = imported?.animations[choice.name];
     const length = attack ? attack.frames * (attack.frameSeconds > 0 ? attack.frameSeconds : 0.1) : 0;
     if (swing >= length) { choice.name = 'idle'; swing = undefined; }
   }
