@@ -1916,6 +1916,18 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
     if (!entity.unpacked) { becomeIdle(entity); return; }
     if (!inAttackRange(state, entity, target)) { entity.activity = 'idle'; clearPath(entity); return; }
   }
+  if (entity.order.kind === 'attack' && entity.order.automatic && automaticBlastRisk(state, entity, target, rules)) {
+    // Friends can enter after acquisition or between shots. Keep the saved
+    // automatic intent while holding fire, and let the existing cooldown run.
+    entity.attackWindup = undefined;
+    entity.attackVolley = undefined;
+    entity.attackWeapon = undefined;
+    entity.activity = 'idle';
+    clearPath(entity);
+    if (entity.attackCooldown && entity.attackCooldown > 0) entity.attackCooldown--;
+    if (state.tick % 10 === 0) acquireAutomaticTarget(state, entity);
+    return;
+  }
   if (entity.attackVolley) {
     const volley = entity.attackVolley;
     entity.activity = 'attacking';
@@ -2740,10 +2752,34 @@ function struckBy(state: GameState, projectile: Projectile, at: Point): Entity |
   return closest;
 }
 
+/** The TC Manual names this family, not all siege or all area weapons. */
+function guardsFriendlyBlast(entity: Entity, rules: UnitRules): boolean {
+  return entity.kind === 'mangonel' || entity.kind === 'onager'
+    || rules.datId === 280 || rules.datId === 550 || rules.datId === 588;
+}
+
+/** Bounded prediction: current friendly bodies around the target and nominal
+ * led aim, using the same eligibility/radius test as actual splash. Future
+ * friendly movement and interception/scatter remain native calibration (#131). */
+function automaticBlastRisk(state: GameState, entity: Entity, target: Entity, rules: UnitRules): boolean {
+  if (!guardsFriendlyBlast(entity, rules) || !rules.projectileSpeed || !rules.blastRadius) return false;
+  const points = [target.position];
+  if (shooterLeadsTarget(state, entity)) points.push(leadPoint(state, entity, target, rules.projectileSpeed));
+  return state.entities.some(other => !other.dead && other.owner === entity.owner && other.kind !== 'relic'
+    && blastDefenseLevelOf(state, other) >= (rules.blastAttackLevel ?? 0)
+    && points.some(at => distance(other.position, at) - other.radius <= rules.blastRadius!));
+}
+
 /** Idle military units acquire the nearest living enemy in line of sight. */
 function autoAcquire(state: GameState, entity: Entity): void {
   if (entity.order.kind !== 'idle' || !isUnit(entity.kind) || entity.kind === 'villager'
     || entity.kind === 'trade-cart' || isAnimal(entity.kind)) return;
+  acquireAutomaticTarget(state, entity);
+}
+
+/** Also lets a holding catapult choose a different safe target at the existing
+ * acquisition cadence. If none is safe, retain its current automatic order. */
+function acquireAutomaticTarget(state: GameState, entity: Entity): void {
   const rules = unitRulesForEntity(state, entity);
   if (!rules.attacks.some(attack => attack.amount > 0)) return;
   const los = Math.min(rules.lineOfSight, rules.searchRadius ?? rules.lineOfSight);
@@ -2753,12 +2789,15 @@ function autoAcquire(state: GameState, entity: Entity): void {
     if (candidate.dead || candidate.owner === 0 || candidate.owner === entity.owner) continue;
     const d = distance(entity.position, candidate.position) - candidate.radius;
     if (d <= los && (d < bestDistance - 1e-9 || (Math.abs(d - bestDistance) <= 1e-9 && (best?.id ?? Infinity) > candidate.id))) {
+      if (automaticBlastRisk(state, entity, candidate, rules)) continue;
       best = candidate;
       bestDistance = d;
     }
   }
   if (best) {
-    entity.order = { kind: 'attack', targetId: best.id };
+    entity.order = guardsFriendlyBlast(entity, rules)
+      ? { kind: 'attack', targetId: best.id, automatic: true }
+      : { kind: 'attack', targetId: best.id };
     entity.activity = 'moving';
   }
 }

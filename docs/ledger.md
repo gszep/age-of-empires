@@ -31,6 +31,32 @@ off the reference; **measured** — fitted to a reference screenshot;
   events and all other missing cues still fail. If original playable definitions
   become available, normal decoding wins automatically. Code: `import_audio.py`.
 
+## Catapult automatic friendly-blast avoidance (#278; calibration #131)
+
+- **Owned intent:** bundled TC Manual printed3/5 (physical5/7) says Mangonels,
+  Onagers and Siege Onagers avoid automatic attacks that may harm friendly units.
+  These are legacy manual statements, not a measurement of current DE targeting.
+  Pinned DAT280/550/588 gives blast radii1/1.25/1.5, levels2/1/1, friendly-fire
+  damage1 and accuracy100. Existing resolved rules supply the actual radius,
+  projectile speed, research effects and blast-defense eligibility.
+- **Inferred prediction:** test current same-owner bodies using the existing
+  circular splash geometry, around the target's current centre and nominal led
+  aim when the existing Ballistics policy leads it. Do not simulate future
+  friendly movement, interception or scatter; an already airborne shot may still
+  hit a friend who subsequently enters. Same-owner eligible buildings are guarded
+  too because the current splash consumer damages them. Generic DAT friendly-fire
+  scaling remains separate#54 work.
+- **Chosen control/state adapter:** unsafe automatic targets are skipped; a held
+  automatic order rechecks every simulation step, cancels pending windup/volley,
+  keeps its cooldown running and seeks a safe alternative at the existing10-tick
+  acquisition cadence. An optional saved attack-order marker preserves that
+  intent through JSON. Explicit attack/attack-ground and unmarked legacy orders
+  retain their existing friendly-fire behavior. Other unit families are unchanged.
+- The open fallback's Mangonel/Onager now also carry their owned Combat Ability26
+  flags, restoring deliberate ground attack rather than weakening the new
+  fallback acceptance. Native pursuit, prediction, override and retarget timing
+  remain#131; no exact modern-DE parity is claimed.
+
 ## Household startup discovery (#276)
 
 - **Application policy, not a DE networking model:** HTTP/network/JSON/config

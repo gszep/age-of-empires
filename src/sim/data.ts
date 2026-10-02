@@ -975,6 +975,7 @@ export const FALLBACK_RULES: GameRules = {
     },
     onager: {
       age: 3,
+      abilityFlags: 26,
       hp: 60, radius: 0.5, speed: 0.6, lineOfSight: 10.0,
       cost: cost(0, 160, 135, 0), trainSeconds: 46,
       trainedAt: 'siege-workshop', popCost: 1, trainButton: 2,
@@ -1151,6 +1152,7 @@ export const FALLBACK_RULES: GameRules = {
     },
     mangonel: {
       age: 2,
+      abilityFlags: 26,
       hp: 50, radius: 0.5, speed: 0.6, lineOfSight: 9, cost: cost(0, 160, 135), trainSeconds: 46,
       trainedAt: 'siege-workshop', popCost: 1, trainButton: 2,
       datClass: 13,

@@ -1,4 +1,40 @@
-# Handoff — Persian audio checkpoint and household deployment, 2026-10-02
+# Handoff — siege friendly-fire guard verified, 2026-10-02
+
+## Siege checkpoint: #278
+
+This checkpoint includes the Mangonel-family automatic friendly-fire guard,
+reviewed against `d1db0fc` and fully reverified. It is **not deployed** to the
+household services; their live seven-profile release is still the one listed below.
+
+- Mangonels, Onagers and Siege Onagers skip unsafe automatic targets, hold fire
+  if a friend enters the blast area after acquisition, and resume or select a
+  safe alternative. The optional automatic-order marker survives JSON saves;
+  explicit and unmarked legacy attacks retain their existing friendly fire.
+- The guard uses resolved blast radius/eligibility and current friendly bodies
+  around current/nominal led aim, including buildings that actually take splash.
+  It does not predict future friendly movement or protect against already
+  airborne stones. Native pursuit/retarget/interception/scatter calibration stays
+  under#131; the ledger names the legacy manual versus inferred implementation.
+- **42 outcome tests pass**. The39 saved cases are retained; added regressions
+  cover friendly buildings, unmarked legacy JSON orders and a Ballistics-led
+  moving-target case whose explicit counterpart really hurts the friendly unit.
+- Real-browser acceptance passes all three owned units and both fallback units:
+  actual Stop, right-click move, right-click attack and the added **Attack Ground
+  button plus ground click**, original owned body artwork, target/friendly HP and
+  actual splash. Scenarios are staged; no original assertion or clock changed.
+  Log:`.local/siege278-interactive-acceptance.log`.
+- The original two-browser shared checks pass: paid training, equal state,
+  selection-preserving recovery, reload,1500+ticks with0 unintended resyncs and
+  checkpoint restart/reconnect. Log:`.local/siege278-interactive-shared.log`.
+  Siege-specific saved-order continuation is covered by the outcome tests; the
+  shared smoke is the existing generic scenario, not a two-client siege battle.
+- **Full gate GREEN**,808s (13m28s):1310 TypeScript tests/105files,8 existing
+  explicit skips, build,192 Python/owned import tests and real-browser smoke.
+  Log:`.local/siege278-interactive-gate.log`. Registered siege-safety/shared
+  receipts match this tree. Only Markdown changed after gate start.
+- Private verification processes have exited; the intended managed shared host
+  remains running. The parent#131 wording now correctly separates remaining
+  trebuchet automation/calibration from already shipped Petards and group packing.
 
 ## Run ended; interactive Persian audio follow-up
 
@@ -9,24 +45,24 @@ actual worker start2026-10-01T21:30:37Z. Ten commits were pushed through8b91dcc.
 Durable evidence: `.local/autonomous-20261001-{brief,progress}.md` and
 `.local/runs/autonomous-20261001-r2/status.json`.
 
-This checkpoint implements the owner's approved#271 source-gap policy below.
-Its focused/feature verification and exact staged-tree full gate pass. The
-archived Persian implementation and live seven-profile deployment have not been
-replaced by this audio-only follow-up.
+The preceding pushed checkpoint `d1db0fc` implements the owner's approved#271
+source-gap policy below. Its focused/feature verification and exact staged-tree
+full gate passed. The archived Persian implementation and live seven-profile
+deployment were not replaced by that audio-only follow-up.
 
-### Audio-only checkpoint verification
+### Previous audio-only checkpoint verification (`d1db0fc`)
 
 - **Full gate GREEN**,812s (13m32s):1268 TypeScript tests/104files,8 existing
   explicit skips, build,192 Python/owned import tests and real-browser smoke.
   Log:`.local/audio271-gate.log`; stage logs:`.local/audio271-gate-step-*.log`.
 - Verification ran against exactly the staged audio change. Unrelated#278 work
   was archived, excluded from that test tree, then restored and compared with
-  the archive byte-for-byte. It remains uncommitted. Its39 additional tests are
-  therefore not part of this checkpoint's1268 count.
+  the archive byte-for-byte. Its then39 additional tests were not part of that
+  checkpoint's1268 count; the siege change is included in the current checkpoint.
 - Registered audio acceptance also passed on that exact tree:
   `.local/audio271-staged-acceptance.log`, `.local/acceptance/audio.json`.
-  The restored working tree has additional siege code, so that receipt certifies
-  this commit's code/metadata rather than the combined uncommitted tree.
+  That receipt certifies `d1db0fc`'s code/metadata, rather than the subsequent
+  combined siege checkpoint.
 - Only Markdown changed after the gate started. No fixture clock or existing
   browser assertion was relaxed; the three-gap coverage policy was explicitly
   approved by the owner and tested as recorded below.

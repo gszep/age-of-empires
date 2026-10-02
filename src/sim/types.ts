@@ -46,7 +46,8 @@ export type Order =
   | { kind: 'move'; target: Point }
   | { kind: 'gather'; targetId: number }
   | { kind: 'build'; targetId: number }
-  | { kind: 'attack'; targetId: number }
+  /** Guarded catapult auto-acquisition; explicit/legacy orders omit the marker. */
+  | { kind: 'attack'; targetId: number; automatic?: true }
   | { kind: 'attack-ground'; target: Point }
   /** A trade cart shuttling to the market with this id and back to its own. */
   | { kind: 'trade'; targetId: number }

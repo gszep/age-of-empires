@@ -31,7 +31,7 @@ resources. See [shared-play.md](shared-play.md).
 
 | Area | Working scope | Evidence and limits |
 | --- | --- | --- |
-| Simulation | Fixed20Hz deterministic economy, construction/repair, production/refunds, gathering/hunting/farms, combat/projectiles/armour/elevation, garrisons/transports, research and fog memory | `src/sim/`; public-command outcome tests and deterministic replay; approximations in ledger |
+| Simulation | Fixed20Hz deterministic economy, construction/repair, production/refunds, gathering/hunting/farms, combat/projectiles/armour/elevation, garrisons/transports, research and fog memory; Mangonel-family automatic friendly-blast avoidance | `src/sim/`; public-command outcome tests and deterministic replay; targeting prediction/legacy-order boundaries in ledger |
 | Civilisations | Britons, Franks, Goths, Teutons, Japanese, Chinese and Byzantines with roster/research/bonus/art integration | [coverage](civilization-coverage.md), [bonus contract](civilization-bonuses.md); wider catalogue is inventory only |
 | Buildings/specialists | Additional TCs, fortifications, monasteries/relics, siege, conversion snapshots, nested cargo capacity and owner-preserving mobile-carrier conversion | [buildings](civ-buildings-integration.md), [specialists](civ-specialists-integration.md), [conversion](conversion-reference-checklist.md) |
 | Naval | Briton dock roster, transports, trade cogs and fish traps; enabled profiles' regional ships; distinct snapper/salmon/dorado and shore fish | Owned DAT/task/art imports; all four fish identities gather/deplete/bank in open and imported modes and retain original art in fog; no claim of every native exception |
