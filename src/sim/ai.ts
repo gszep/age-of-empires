@@ -1,5 +1,5 @@
 import type { BuildingKind, Command, EntityKind, ResourceKind } from './types';
-import { isBuilding } from './data';
+import { isBuilding, isFishKind } from './data';
 import { distance } from './nav';
 import type { PlayerObservation } from '../protocol/types';
 import { DOCK_WOOD, FISHING_SHIP_WOOD, fishingWater, fishingDockSite, fishingOrders, fishingProducer, plannedWood } from './ai-fishing';
@@ -281,7 +281,7 @@ export function exampleAiCommands(
     // must not be repeatedly sent at fish they cannot reach from land.
     const node = known
       .filter(e => e.resource === wanted && (e.amount ?? 1) > 0
-        && e.node !== 'fish' && e.node !== 'shore-fish'
+        && !isFishKind(e.node)
         && (e.kind === 'resource' || e.id === dinner?.id
           || (e.kind === 'farm' && e.owner === player && (e.buildProgress ?? 1) >= 1)))
       // A claimed herdable first, as the reference opening eats sheep before
@@ -437,7 +437,7 @@ export function exampleAiCommands(
   const supply = function* (resource: ResourceKind, unservedOnly = false) {
     const nodes = known
       .filter(e => e.kind === 'resource' && e.resource === resource && (e.amount ?? 0) > 0
-        && e.node !== 'fish' && e.node !== 'shore-fish')
+        && !isFishKind(e.node))
       .sort((a, b) => distance(tc ?? a, a) - distance(tc ?? b, b) || a.id - b.id);
     const sites = mine.filter(e => (BANKS[e.kind] ?? []).includes(resource) && e.buildProgress === undefined);
     // A lumber camp goes by a *wood*. The map scatters lone trees, and a camp
@@ -584,7 +584,7 @@ export function exampleAiCommands(
   // the question is what is near home -- and from the Feudal Age a player
   // farms whatever else it has, which is what pays for the Castle Age.
   const foodNearby = known.some(e => e.resource === 'food' && (e.amount ?? 0) > 0
-    && e.node !== 'fish' && e.node !== 'shore-fish'
+    && !isFishKind(e.node)
     && (e.kind === 'resource' || HERD.includes(e.kind))
     && tc && distance(e, tc) <= FOOD_WALK);
   const farms = mine.filter(e => e.kind === 'farm');

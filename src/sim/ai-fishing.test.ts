@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { exampleAiCommands } from './ai';
 import { fishingWater, fishingDockSite, fishingOrders, FISHING_LIMIT } from './ai-fishing';
-import { FALLBACK_RULES, rulesFromManifest } from './data';
+import { FALLBACK_RULES, isFishKind, rulesFromManifest } from './data';
 import { applyCommand, createGame, placementLegal, stepGame } from './game';
 import { isOpenWater } from './mapgen';
 import { observe } from './observe';
@@ -12,7 +12,7 @@ function fishingFixture(rules = FALLBACK_RULES, seed = 2): { state: GameState; w
   const state = createGame(seed, rules, undefined, 'islands');
   const home = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
   const worker = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
-  const fish = state.entities.filter(e => e.node === 'fish' || e.node === 'shore-fish');
+  const fish = state.entities.filter(e => isFishKind(e.node));
   const sites: Point[] = [];
   for (let y = 2; y < state.height - 2; y++) for (let x = 2; x < state.width - 2; x++) {
     const at = { x: x + 0.5, y: y + 0.5 };

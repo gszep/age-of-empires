@@ -338,7 +338,7 @@ Current scoped acceptance and remaining shared work:
 | Japanese (#183) | Source-backed roster, bonuses, both unique technologies, Samurai/elite and Elite Cannon Galleon; native approach/packing calibration is#259, shared conversion is#178 |
 | Chinese (#184) | Source-backed complete available roster, starting/economy/fortification bonuses and regional/unique weapons; native timing, projectile ordering and rounding calibration is#260 |
 | Byzantines (#185) | Source-backed roster, age/price/sight/naval/healing bonuses, Cataphracts/elite, Camel Riders/elite, Logistica and Greek Fire; native healing/blast/HP calibration is#267 |
-| Shared engine | Native relic-generation calibration/fish gaps (#130/#95), unlocked diplomacy/cooperative victories beyond the current locked two-player dialog (#138), Regicide timing/preset/task calibration (#240), charge/market runtime calibration and conversion-policy parity (#178). Relic placement and playable Regicide/Treason are implemented; the ledger distinguishes mechanics from unresolved engine interpretations |
+| Shared engine | Native relic-generation/water-mask calibration (#130/#95) and remaining Islands seasons/object passes (#274), unlocked diplomacy/cooperative victories beyond the current locked two-player dialog (#138), Regicide timing/preset/task calibration (#240), charge/market runtime calibration and conversion-policy parity (#178). Relic placement, distinct seasonal fish/islet shore fish and playable Regicide/Treason are implemented; the ledger distinguishes mechanics from unresolved engine interpretations |
 
 The imported catalogue now accounts for the already represented ram/tree alias,
 palisade construction head and TC foundation. Raw unrepresented IDs are not a

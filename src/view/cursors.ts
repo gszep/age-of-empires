@@ -1,4 +1,4 @@
-import { isAnimal, isUnit } from '../sim/data';
+import { isAnimal, isUnit, isFishKind } from '../sim/data';
 import { rulesForPlayer } from '../sim/civilizations';
 import { isRepairable, planContextCommand, resolveUnitOrder } from '../sim/game';
 import type { Entity, GameState, PlayerId, Point, ReadonlyGameState, DeepReadonly } from '../sim/types';
@@ -46,7 +46,7 @@ export function contextCursor(
     case 'gather': {
       const node = order.targetId === targetEntity?.id ? targetEntity : game.entities.find(e => e.id === order.targetId);
       if (node && isAnimal(node.kind)) return 'gather_meat';
-      if (node?.kind === 'fish-trap' || node?.node === 'fish' || node?.node === 'shore-fish') return 'fish';
+      if (node?.kind === 'fish-trap' || isFishKind(node?.node)) return 'fish';
       return node?.resourceKind === 'wood' ? 'chop' : node?.resourceKind === 'gold' ? 'mine_gold'
         : node?.resourceKind === 'stone' ? 'mine_stone' : 'gather';
     }

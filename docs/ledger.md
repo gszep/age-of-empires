@@ -14,6 +14,23 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## Islands fish (#95; remaining seasons/content #274)
+
+- **Owned:** `GeneratingObjects.inc` GNR_STANDARDFISH requests global Gaia shore
+  fish (9999, temporary spacing6), then scaled FISH_A/FISH_B (6/170, spacing4/8,
+  maximum land-zone distance4). DAT69/455/456/458 provide shore/dorado/salmon/snapper
+  food, classes, placement restrictions, original underwater/leap graphics and
+  localization. `tools/fish_reference.py` checks the numeric map reference.
+- **Inferred adapter:** global shuffled tile candidates use the existing isolated
+  fish RNG, area/10000 scaling with nearest-integer counts, square spacing and the
+  existing near-non-water mask as a proxy for native land-zone distance. Removing
+  compulsory fish mirroring permits the two unpaired resource-islet coasts; it
+  does not reproduce native placement order, random draws or distance semantics.
+- **Season boundary:** PH_SPRING/PH_MEDISOUTH supply salmon/snapper and PH_DESERT
+  dorado/snapper. The borrowed Nearctic-temperate dressing uses the spring pair as
+  an explicit inference. Native weighted Islands seasons and additional object
+  passes remain#274; grown water-mask clumps remain#95/#130 calibration scope.
+
 ## Ordinary second attack graphics (#270; native cadence #272)
 
 - **Owned:** `type_50.attack_graphic_2` supplies second attack artwork for Camel
@@ -778,9 +795,8 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Fish Trap economy | ship-built water-only trap, 100 wood, 700 food, one reserved fishing ship, manual rebuilding on depletion; ship's 0.24/s × task factor 1.45, dock drop-off | cost, resource 88, builder 13, task factor **owned**. Build duration derived as DAT 40 / (0.24 × build task 3.57); applying that work-rate interpretation and the existing multi-builder rule, exclusive reservation, open-water placement and no automatic reseed **inferred**. Fishing Lines/Gillnets affect collection/carry; construction uses the imported baseline duration | `import_content.py`, `game.ts` | #97 |
 | Trade Cog income | dock-to-foreign-dock round trips, 0.375375 per travel second, capacity 200 | work rate/capacity/dock target **owned**; travel-time income reuses the existing trade-cart approximation rather than reproducing DE's distance formula | `game.ts` `updateTrader` | #97 |
 | A ship is afloat or nowhere; final approach slides along the bank | rule | inferred from the table's shape | `game.ts` `groundAllows`, `moveTowardOnGround` | — |
-| `FISH_A` (salmon) | dealt as the snapper | chosen | `mapgen.ts` | #95 |
 | Placement-side neighbourhood | any of the eight neighbouring tiles satisfies the DAT's `placement_side_terrain` alternatives | inferred engine interpretation; the shore fish's beach IDs 2/35 are owned | `mapgen.ts` `dealFish` | #145 |
-| Islands resource islets | tiny-map lands20/23, zones56/57, 1% each; gold2×3 on20, stone2 on23; fifth relic on20 | **Owned** `Islands.rms` 121–147,2498–2558: exactly **two** tiny-map islets (21/22/24 belong to larger branches), borders30%, fuzz10, avoidance7. **Inferred adapter** reserves connected islets before mirrored home growth, selects centres furthest from starts with seeded tie order, uses square base_size3 (omitted RMS engine default from earlier algorithm read), existing cost growth/default clumping and cleaning. This differs from native land-phase order/RNG, but retains quotas, named IDs and water separation. Existing fish pairing now validates both shores because islets are unmirrored. Salmon identity and neritic fish remain #95 | `mapgen.ts`, `refdata/relic-placement.json` | #95 |
+| Islands resource islets | tiny-map lands20/23, zones56/57, 1% each; gold2×3 on20, stone2 on23; fifth relic on20 | **Owned** `Islands.rms` 121–147,2498–2558: exactly **two** tiny-map islets (21/22/24 belong to larger branches), borders30%, fuzz10, avoidance7. **Inferred adapter** reserves connected islets before mirrored home growth, selects centres furthest from starts with seeded tie order, uses square base_size3 (omitted RMS engine default from earlier algorithm read), existing cost growth/default clumping and cleaning. This differs from native land-phase order/RNG, but retains quotas, named IDs and water separation. Fish now use global Gaia candidate scans, including both unpaired islet coasts; see the Islands fish section above for remaining season/distance inferences. | `mapgen.ts`, `refdata/relic-placement.json` | #130/#274 |
 | Black Forest clearing quota | 44% of actual map area shared across players, not a fixed1580/player | **Owned** `Black_Forest.rms` 288–296: land_percent44, circular base14, clumping2, avoidance6. At120×120 this is3168/player before cleaning. Existing mirrored growth/road adapter remains inferred. The old half-size quota made source24-tile relic constraints infeasible | `mapgen.ts`, `refdata/relic-placement.json` | #130 |
 | The AI never orders a villager onto a boar | rule | chosen (deliberate) | `ai.ts` | — |
 | AI tuning constants | `ARMY_BEFORE_AGE`, `FARM_SPOTS`, camp costs… | chosen; strategy, not fidelity | `ai.ts` | #124 |

@@ -1,0 +1,12 @@
+{
+  "shore": { "tiles": 9999, "spacing": 6 },
+  "deep": [
+    { "tiles": 6, "spacing": 4, "nearLand": 4 },
+    { "tiles": 170, "spacing": 8, "nearLand": 4 }
+  ],
+  "seasons": {
+    "PH_SPRING": [456, 458, 69],
+    "PH_MEDISOUTH": [456, 458, 69],
+    "PH_DESERT": [455, 458, 69]
+  }
+}

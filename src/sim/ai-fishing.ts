@@ -3,7 +3,7 @@
  *25-tile dock search. units.per has bounded4/8/12-boat branches; this example
  * caps at4. It never asks the simulation for hidden terrain or legal sites.
  */
-import { FALLBACK_RULES, isBuilding, LAND_RESTRICTION, terrainAllows } from './data';
+import { FALLBACK_RULES, isBuilding, isFishKind, LAND_RESTRICTION, terrainAllows } from './data';
 import { isOpenWater } from './mapgen';
 import { distance } from './nav';
 import { decodeObservedTerrain, type TerrainGrid } from '../protocol/terrain';
@@ -28,7 +28,7 @@ export interface FishingWater {
   docks: ObservedEntity[];
 }
 
-const fishNode = (entity: Known) => (entity.node === 'fish' || entity.node === 'shore-fish') && (entity.amount ?? 0) > 0;
+const fishNode = (entity: Known) => isFishKind(entity.node) && (entity.amount ?? 0) > 0;
 
 function neighbours(grid: TerrainGrid, index: number): number[] {
   const x = index % grid.width, y = Math.floor(index / grid.width);
@@ -142,7 +142,7 @@ export function fishingOrders(water: FishingWater): Command[] {
       .sort((a, b) => distance(ship, a) - distance(ship, b) || a.id - b.id)[0];
     const fish = (dock ? nearFish(water, dock, component) : []).sort((a, b) => distance(ship, a) - distance(ship, b) || a.id - b.id);
     const shore = fish.find(e => e.node === 'shore-fish');
-    const deep = fish.find(e => e.node === 'fish');
+    const deep = fish.find(e => isFishKind(e.node) && e.node !== 'shore-fish');
     const target = deep && (!shore || distance(ship, deep) <= distance(ship, shore) + DEEP_FISH_ALLOWANCE) ? deep : shore;
     if (target) {
       commands.push({ kind: 'order', player, entityIds: [ship.id], target: { x: target.x, y: target.y }, targetId: target.id });

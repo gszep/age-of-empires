@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { FALLBACK_RULES, terrainAllows } from './data';
+import { FALLBACK_RULES, isFishKind, rulesFromManifest, terrainAllows } from './data';
 import {
   applyCommand, createGame, holdOf, placementLegal, rateOn, stepGame,
 } from './game';
@@ -9,6 +10,7 @@ import type { Entity, GameState, Point } from './types';
 
 /** An Islands board with player 1's villagers and town center to hand. */
 const islands = (seed = 2): GameState => createGame(seed, FALLBACK_RULES, undefined, 'islands');
+const imported = rulesFromManifest(JSON.parse(readFileSync('public/imported/aoe2/manifest.json', 'utf8')));
 
 const tileAt = (state: GameState, p: Point): number =>
   state.terrain[Math.floor(p.y) * state.width + Math.floor(p.x)];
@@ -100,20 +102,24 @@ describe('W4, the dock', () => {
 describe('W5, the fishing ship and the fish', () => {
   it('deals fish on the sea and none on land', () => {
     const state = islands(3);
-    const fish = state.entities.filter(e => e.kind === 'resource' && (e.node === 'fish' || e.node === 'shore-fish'));
+    const fish = state.entities.filter(e => e.kind === 'resource' && isFishKind(e.node));
     expect(fish.length).toBeGreaterThan(0);
     for (const f of fish) {
       expect(isOpenWater(tileAt(state, f.position)), `fish ${f.id} on ${tileAt(state, f.position)}`).toBe(true);
       expect(f.resourceKind).toBe('food');
     }
     expect(fish.filter(f => f.node === 'fish').length).toBeGreaterThan(10);
-    // Mirrored like everything else dealt.
-    for (const f of fish) {
-      const mirrored = { x: state.width - f.position.x, y: f.position.y };
-      expect(fish.some(g => Math.abs(g.position.x - mirrored.x) < 1e-6 && Math.abs(g.position.y - mirrored.y) < 1e-6)).toBe(true);
+    // Global Gaia passes, not paired player objects (GeneratingObjects.inc).
+    // Check actual same-species spacing rather than requiring a false mirror.
+    for (const [i, f] of fish.entries()) {
+      const spacing = f.node === 'shore-fish' ? 6 : f.node === 'fish' ? 8 : 4;
+      for (const g of fish.slice(i + 1).filter(g => g.node === f.node)) {
+        expect(Math.max(Math.abs(f.position.x - g.position.x), Math.abs(f.position.y - g.position.y))).toBeGreaterThanOrEqual(spacing);
+      }
     }
+    expect(islands(3).entities).toEqual(state.entities);
     // No fish on Arabia's ponds: the script deals none there.
-    expect(createGame(3).entities.some(e => e.node === 'fish' || e.node === 'shore-fish')).toBe(false);
+    expect(createGame(3).entities.some(e => isFishKind(e.node))).toBe(false);
   });
 
   it.each([2, 3, 7, 42])('keeps every shore fish beside a beach, seed %i', seed => {
@@ -132,8 +138,10 @@ describe('W5, the fishing ship and the fish', () => {
     }
   });
 
-  it('works a fish to exhaustion, banks the food at the dock, and never leaves the water', () => {
-    const state = islands();
+  it.each((['fish', 'fish-salmon', 'fish-dorado', 'shore-fish'] as const).flatMap(kind =>
+    ([['fallback', FALLBACK_RULES], ['imported', imported]] as const).map(([mode, rules]) => ({ kind, mode, rules }))
+  ))('works $kind ($mode) to exhaustion, banks the food at the dock, and never leaves the water', ({ kind, rules }) => {
+    const state = createGame(2, rules, undefined, 'islands');
     const dock = dockFor(state);
     state.players[1].wood = 1000;
     applyCommand(state, { kind: 'train', player: 1, buildingId: dock.id, unit: 'fishing-ship' });
@@ -145,13 +153,17 @@ describe('W5, the fishing ship and the fish', () => {
     expect(ship).toBeDefined();
     // The nearest fish, made small enough to empty in the test's patience.
     const fish = state.entities
-      .filter(e => e.kind === 'resource' && (e.node === 'fish' || e.node === 'shore-fish'))
+      .filter(e => e.kind === 'resource' && isFishKind(e.node))
       .sort((a, b) => Math.hypot(a.position.x - ship!.position.x, a.position.y - ship!.position.y)
         - Math.hypot(b.position.x - ship!.position.x, b.position.y - ship!.position.y))[0];
+    // Same nearby coastal fixture for every DAT fish identity; the command,
+    // movement, gather clock, depletion and two banking trips are real.
+    fish.node = kind;
+    fish.radius = state.rules.nodes[kind].radius;
     fish.amount = 20;
     // The DAT's rates: the ship's 0.24 a second times 1.75 on a deep fish and
     // 1.0 on a shore fish; its hold is 15.
-    expect(rateOn(state, ship!, fish)).toBeCloseTo(fish.node === 'fish' ? 0.42 : 0.24, 5);
+    expect(rateOn(state, ship!, fish)).toBeCloseTo(kind === 'shore-fish' ? 0.24 : 0.42, 5);
     expect(holdOf(state, ship!)).toBe(15);
     expect(applyCommand(state, {
       kind: 'order', player: 1, entityIds: [ship!.id], target: fish.position, targetId: fish.id,

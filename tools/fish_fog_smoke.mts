@@ -24,6 +24,8 @@ const resources = [
   addNode(state, 'fish', { x: 52, y: 48 }),
   addNode(state, 'shore-fish', { x: 51, y: 52 }),
   addNode(state, 'berries', { x: 48, y: 53 }),
+  addNode(state, 'fish-salmon', { x: 52, y: 50 }),
+  addNode(state, 'fish-dorado', { x: 51, y: 47 }),
 ];
 const { rules: omitted, ...saved } = state;
 const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
@@ -46,6 +48,7 @@ try {
   page.on('pageerror', error => { errors.push(String(error)); console.error(error); });
   page.on('console', message => { if (message.type() === 'error') console.error(message.text()); });
   page.on('requestfailed', request => console.error('Request failed:', request.url(), request.failure()?.errorText));
+  page.on('response', response => { if (response.status() >= 400) console.error('HTTP failure:', response.status(), response.url()); });
   await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),
     { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });
   await page.goto('http://127.0.0.1:5238/?solo=1', { waitUntil: 'domcontentloaded' });
@@ -67,7 +70,7 @@ try {
       assert(!images[i].fallback, `${prefix}: ${key} uses owned art`);
       assert.equal(images[i].image, manifest.entities[key].atlases.idle.image, `${prefix}: ${key} retains its owned atlas`);
     }
-    console.log(prefix === 'm' ? 'Remembered fish/shore-fish/berries use correct owned textures' : 'Visible resources use correct owned textures');
+    console.log(`${prefix === 'm' ? 'Remembered' : 'Visible'} ${resources.map(e => e.node).join('/')} use correct owned textures`);
   };
   await inspect('e');
   for (let i = 0; i < 6; i++) await page.keyboard.press('+');
@@ -78,5 +81,5 @@ try {
   await query({ type: 'command', command: { kind: 'order', player: 1, entityIds: [scout.id], target: scout.position } });
   await inspect('e');
   assert.deepEqual(errors, []);
-  console.log('FISH FOG SMOKE GREEN: owned fish, shore fish and berries survive scout departure and return');
+  console.log('FISH FOG SMOKE GREEN: owned snapper, salmon, dorado, shore fish and berries survive scout departure and return');
 } finally { await browser.close(); await server.close(); }

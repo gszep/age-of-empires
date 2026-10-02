@@ -55,6 +55,11 @@ def _dat():
 
 
 class CivilizationAuditTest(unittest.TestCase):
+    def test_islands_fish_reference_matches_owned_global_passes(self):
+        from fish_reference import extract as fish_reference
+        reference = Path(__file__).parents[1] / 'src/sim/refdata/islands-fish.json'
+        self.assertEqual(fish_reference(ROOT), json.loads(reference.read_text()))
+
     @unittest.skipUnless((ROOT / 'depot_813784/resources/_common/drs/gamedata_x2/Arabia.rms').exists(), 'owned RMS unavailable')
     def test_relic_reference_matches_owned_tiny_standard_branches(self):
         from relic_reference import extract as relic_reference
@@ -1619,7 +1624,8 @@ class ContentImportIntegrationTest(unittest.TestCase):
         fishes with its own task unit (56) at 0.43 a second and banks at the
         dock as well as the town center and the mill."""
         entities = self.result["entities"]
-        for key, unit_id, food, unit_class in (("shore-fish", 69, 200, 33), ("fish", 458, 225, 5)):
+        for key, unit_id, food, unit_class in (("shore-fish", 69, 200, 33), ("fish", 458, 225, 5),
+                                              ("fish-salmon", 456, 225, 5), ("fish-dorado", 455, 225, 5)):
             fish = entities[key]
             self.assertEqual(fish["id"], unit_id)
             self.assertEqual(fish["storage"], {"food": food})
@@ -1631,6 +1637,8 @@ class ContentImportIntegrationTest(unittest.TestCase):
             self.assertEqual(fish["animations"]["idle"]["frames"], 90)
             self.assertNotIn("alpha", fish["animations"]["leap"])
             self.assertNotEqual(fish["animations"]["leap"]["graphicId"], fish["animations"]["idle"]["graphicId"])
+        for key, species in (("fish", "snapper"), ("fish-salmon", "salmon"), ("fish-dorado", "dorado")):
+            self.assertEqual(entities[key]["animations"]["idle"]["source"], sld(f"a_fish_{species}_underwater"))
         fisher = entities["villager-fisher"]
         self.assertEqual(fisher["gather"]["ratePerSecond"], 0.43)
         self.assertEqual(fisher["gather"]["task"], {"actionType": 5, "classId": 33})

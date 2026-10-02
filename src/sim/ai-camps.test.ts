@@ -81,7 +81,7 @@ describe('AI drop-site placement (#147)', () => {
     expect(camps(state, kind)).toEqual([]);
   });
 
-  it.each(['fish', 'shore-fish'] as const)('does not buy a mill for %s that the land economy will not work', kind => {
+  it.each(['fish', 'shore-fish', 'fish-salmon', 'fish-dorado'] as const)('does not buy a mill for %s that the land economy will not work', kind => {
     const { state, existing, node } = fixture();
     state.entities = state.entities.filter(e => e.id !== existing.id);
     node.node = kind;

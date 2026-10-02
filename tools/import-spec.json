@@ -1473,6 +1473,26 @@
       }
     },
     {
+      "key": "fish-salmon",
+      "unitId": 456,
+      "civ": "gaia",
+      "category": "resource",
+      "animations": {
+        "idle": { "delta": "Underwater", "alphaPalette": "n_alpha_underwater.palx" },
+        "leap": { "slot": "standing" }
+      }
+    },
+    {
+      "key": "fish-dorado",
+      "unitId": 455,
+      "civ": "gaia",
+      "category": "resource",
+      "animations": {
+        "idle": { "delta": "Underwater", "alphaPalette": "n_alpha_underwater.palx" },
+        "leap": { "slot": "standing" }
+      }
+    },
+    {
       "key": "plant-bush",
       "unitId": 1360,
       "civ": "gaia",

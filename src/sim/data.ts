@@ -560,7 +560,11 @@ const FALLBACK_SHORE_TERRAINS = [...FALLBACK_LAND_TERRAINS, 2];
 /** Shallow and medium water, and the beach between them and the land. */
 const FALLBACK_WATER_TERRAINS = [1, 23, 2];
 
-export type NodeKind = 'berries' | 'tree' | 'gold' | 'stone' | 'shore-fish' | 'fish';
+export type FishNodeKind = 'shore-fish' | 'fish' | 'fish-salmon' | 'fish-dorado';
+export type NodeKind = 'berries' | 'tree' | 'gold' | 'stone' | FishNodeKind;
+export function isFishKind(node: string | undefined): node is FishNodeKind {
+  return node === 'shore-fish' || node === 'fish' || node === 'fish-salmon' || node === 'fish-dorado';
+}
 
 /** Which node rules a resource plays by when it does not say (`Entity.node`). */
 export const NODE_OF_RESOURCE: Record<ResourceKind, NodeKind> = {
@@ -1409,6 +1413,14 @@ export const FALLBACK_RULES: GameRules = {
       resource: 'food', radius: 1, amount: 225, fogVisibility: 1, blastDefenseLevel: 0,
       datClass: 5, terrainRestriction: 19, villagerRatePerSecond: 0.43,
     },
+    'fish-salmon': {
+      resource: 'food', radius: 1, amount: 225, fogVisibility: 1, blastDefenseLevel: 0,
+      datClass: 5, terrainRestriction: 19, villagerRatePerSecond: 0.43,
+    },
+    'fish-dorado': {
+      resource: 'food', radius: 1, amount: 225, fogVisibility: 1, blastDefenseLevel: 0,
+      datClass: 5, terrainRestriction: 19, villagerRatePerSecond: 0.43,
+    },
   },
   gatherRatePerSecond: { food: 0.31, wood: 0.39, gold: 0.38, stone: 0.36 },
   carryCapacity: 10,
@@ -2058,6 +2070,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       stone: node('stone', 'stone', 'stone'),
       'shore-fish': node('shore-fish', 'food', 'shore-fish'),
       fish: node('fish', 'food', 'fish'),
+      'fish-salmon': node('fish-salmon', 'food', 'fish-salmon'),
+      'fish-dorado': node('fish-dorado', 'food', 'fish-dorado'),
     },
     gatherRatePerSecond: {
       food: e['villager-forager']?.gather?.ratePerSecond ?? FALLBACK_RULES.gatherRatePerSecond.food,

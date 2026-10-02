@@ -1,7 +1,7 @@
 import {
   BUILDING_RESTRICTION, GARRISON_CATEGORY, FALLBACK_RULES, LAND_RESTRICTION, TICK_SECONDS, TICKS_PER_SECOND,
   OPEN_WATER_TERRAINS, groundAllows, isAnimal, isBuilding, isUnit, restrictionOf, rowAdmitsWater,
-  terrainAllows, NODE_OF_RESOURCE,
+  terrainAllows, NODE_OF_RESOURCE, isFishKind,
 } from './data';
 import type {
   AttackValue, BuildingRules, Cost, GameRules, NodeKind, TechEffect, TechKey, UnitRules, VillagerGatherTask,
@@ -64,7 +64,7 @@ export function nodeOf(entity: Entity): NodeKind {
 
 /** A fish, shore or deep: what a boat may gather and a villager may cast for from the bank. */
 export function isFishNode(entity: Entity): boolean {
-  return entity.kind === 'resource' && (entity.node === 'shore-fish' || entity.node === 'fish');
+  return entity.kind === 'resource' && isFishKind(entity.node);
 }
 
 /**
@@ -1466,10 +1466,9 @@ function nearestDropSite(state: GameState, entity: Entity, resource?: ResourceKi
   // villager wherever the building takes the resource -- except that the
   // dock takes fish and not berries, which is the fisherman's own site list
   // (town center, mill, dock) against the forager's (town center, mill).
-  const fishOnly = new Set<NodeKind>(['shore-fish', 'fish']);
   const rules = rulesForPlayer(state, entity.owner);
   const task = entity.carrying?.task
-    ?? (fishOnly.has(entity.carrying?.node ?? 'berries') ? 'fisher' : GATHER_TASK[wanted ?? 'food']);
+    ?? (isFishKind(entity.carrying?.node) ? 'fisher' : GATHER_TASK[wanted ?? 'food']);
   const sites = entity.kind === 'villager' ? rules.villagerGather[task].dropSites
     : unitRulesForEntity(state, entity)?.dropSites;
   let best: Entity | undefined;
@@ -1483,7 +1482,7 @@ function nearestDropSite(state: GameState, entity: Entity, resource?: ResourceKi
     const accepts = (candidate.convertedBuildingRules
       ?? rulesForPlayer(state, candidate.owner).buildings[candidate.kind]).accepts;
     if (!wanted || !accepts.includes(wanted)) continue;
-    if (!sites && candidate.kind === 'dock' && !fishOnly.has(entity.carrying?.node ?? 'berries')) continue;
+    if (!sites && candidate.kind === 'dock' && !isFishKind(entity.carrying?.node)) continue;
     const d = distance(entity.position, candidate.position);
     if (d < bestDistance || (d === bestDistance && best && candidate.id < best.id)) {
       best = candidate;

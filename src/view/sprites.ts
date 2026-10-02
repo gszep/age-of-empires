@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import { materialColor, materialOpacity, texture as textureNode, vec2 } from 'three/tsl';
 import { skinnedKey } from './skins';
 import { atlasPage, spriteTexture, type ContentAssets, type Atlas, type AnimationInfo, type ImportedEntity } from './assets';
-import { isAnimal, isBuilding, isUnit, TICK_SECONDS } from '../sim/data';
+import { isAnimal, isBuilding, isUnit, isFishKind, TICK_SECONDS } from '../sim/data';
 import type { SoundPose } from './world-sounds';
 import { isGateKind, isWallKind, isWallLineKind } from '../sim/buildings';
 import { rulesForPlayer } from '../sim/civilizations';
@@ -255,7 +255,7 @@ export function profileArtKey(assets: ContentAssets | undefined, owner: number, 
 
 export function entityKey(entity: Entity): string {
   if (entity.kind === 'resource') {
-    if (entity.node === 'shore-fish' || entity.node === 'fish') return entity.node;
+    if (isFishKind(entity.node)) return entity.node;
     if (entity.resourceKind === 'food') return 'berries';
     if (entity.resourceKind === 'gold') return 'gold';
     if (entity.resourceKind === 'stone') return 'stone';
@@ -501,7 +501,7 @@ export function chooseAnimation(state: ReadonlyGameState, entity: Entity): { key
       // The fisherman (56) is the task unit for a fish worked from the bank.
       const node = entity.carrying?.node ?? target?.node;
       if (target?.kind === 'farm') variant = 'villager-farmer';
-      else if (node === 'shore-fish' || node === 'fish') variant = 'villager-fisher';
+      else if (isFishKind(node)) variant = 'villager-fisher';
       else if (resource === 'food') variant = 'villager-forager';
       else if (resource === 'wood') variant = 'villager-lumberjack';
       else if (resource === 'gold') variant = 'villager-goldminer';

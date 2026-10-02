@@ -24,6 +24,7 @@ import paintedProof from './maps/painted-proof.json';
 import senlac from './maps/senlac.json';
 import windsor from './maps/windsor.json';
 import relicReference from './refdata/relic-placement.json';
+import fishReference from './refdata/islands-fish.json';
 import { FALLBACK_RULES, OPEN_WATER_TERRAINS } from './data';
 import { random01, seedFrom } from './random';
 import type { AnimalKind, BuildingKind, Point, UnitKind } from './types';
@@ -248,8 +249,8 @@ export interface MapDescriptor {
    * tiles of a land zone (`max_distance_to_other_zones`).
    */
   fish?: {
-    shore: { spacing: number };
-    deep: { tiles: number; spacing: number; nearLand: number }[];
+    shore: { tiles?: number; spacing: number };
+    deep: { kind: NodeKind; desertKind?: NodeKind; tiles: number; spacing: number; nearLand: number }[];
   };
   /** The connection between the two clearings, cut through the wood. */
   road?: { width: number };
@@ -382,7 +383,10 @@ export const ISLANDS: MapDescriptor = {
   resourceIslets: relicReference.islands.islets,
   woodShoreSpacing: 3,
   waterMasking: { rim: 5 },
-  fish: { shore: { spacing: 6 }, deep: [{ tiles: 6, spacing: 4, nearLand: 4 }, { tiles: 170, spacing: 8, nearLand: 4 }] },
+  fish: { shore: fishReference.shore, deep: [
+    { kind: 'fish-salmon', desertKind: 'fish-dorado', ...fishReference.deep[0] },
+    { kind: 'fish', ...fishReference.deep[1] },
+  ] },
   playerForest: { tiles: 55, groups: 2, near: 14, far: 26, groupSpacing: 6 },
   // The script's island woods: 450-550 tiles in 9-10 clumps at map scale,
   // avoiding the start areas; halved here because every placement mirrors.
@@ -1210,9 +1214,9 @@ export function generateMap(
   }
 
   // The fish, last of all and from their own stream, so a board dealt before
-  // there were fish keeps every sheep where it was. The scanning half is
-  // walked in the stream's order, each accepted tile clears its spacing, and
-  // the mirror takes the other half.
+  // there were fish keeps every sheep where it was. GNR_STANDARDFISH places
+  // global Gaia objects, not per-player pairs: a resource-islet coast must not
+  // depend on there also being a beach at its reflection.
   if (descriptor.fish) {
     const fishCtx: MapgenContext = { ...ctx, rng: { seed: seedFrom(ctx.rng.seed ^ 0xf15_4) } };
     const scale = (ctx.width * ctx.height) / 10_000;
@@ -1222,7 +1226,7 @@ export function generateMap(
         [-1, 0, 1].some(dx => (dx !== 0 || dy !== 0)
           && x + dx >= 0 && x + dx < ctx.width && y + dy >= 0 && y + dy < ctx.height
           && sides.includes(terrain[(y + dy) * ctx.width + x + dx])));
-      const order = candidateOrderBox(fishCtx, 0, 0, halfWidth - 1, ctx.height - 1);
+      const order = candidateOrderBox(fishCtx, 0, 0, ctx.width - 1, ctx.height - 1);
       // The spacing is kept as a mask of tiles too close to one already
       // placed: filtering the candidate list under a `for...of` would leave
       // the iteration on the unfiltered array.
@@ -1234,13 +1238,8 @@ export function generateMap(
         const x = tile % ctx.width;
         const y = Math.floor(tile / ctx.width);
         const here = tileCentre(x, y);
-        const other = mirror(here);
-        const otherTile = Math.floor(other.y) * ctx.width + Math.floor(other.x);
-        if (!OPEN_WATER.has(terrain[otherTile]) || !ok(otherTile)) continue;
-        if (!sideAllows(x, y) || !sideAllows(Math.floor(other.x), Math.floor(other.y))) continue;
-        if (!ctx.free(here) || !ctx.free(other)) continue;
+        if (!sideAllows(x, y) || !ctx.free(here)) continue;
         ctx.place(kind, here);
-        ctx.place(kind, other);
         for (let dy = 1 - spacing; dy < spacing; dy++) {
           for (let dx = 1 - spacing; dx < spacing; dx++) {
             const nx = x + dx;
@@ -1251,10 +1250,15 @@ export function generateMap(
         left--;
       }
     };
-    dealFish('shore-fish', Infinity, descriptor.fish.shore.spacing, () => true);
+    dealFish('shore-fish', descriptor.fish.shore.tiles ?? Infinity, descriptor.fish.shore.spacing, () => true);
     for (const school of descriptor.fish.deep) {
       const coast = nearNonWater(terrain, ctx.width, ctx.height, school.nearLand);
-      dealFish('fish', Math.round(school.tiles * scale / 2), school.spacing, tile => coast[tile] === 1);
+      // F_seasons.inc PH_DESERT uses dorado455 for FISH_A; spring and
+      // Mediterranean use salmon456. Borrowed Nearctic dressing uses spring's
+      // pair until Islands has its native season roll (ledger).
+      const kind = biome?.name === 'PALAEARCTIC_MIDDLE_EAST_DESERT'
+        ? school.desertKind ?? school.kind : school.kind;
+      dealFish(kind, Math.round(school.tiles * scale), school.spacing, tile => coast[tile] === 1);
     }
   }
 

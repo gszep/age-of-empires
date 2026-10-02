@@ -1,4 +1,4 @@
-# Handoff — household deployment, 2026-10-02
+# Handoff — Islands fish and household deployment, 2026-10-02
 
 ## Active authorised run
 
@@ -33,11 +33,40 @@ work after this checkpoint rather than ending early.
   startup failures. Gate GREEN:1229TS/102files,8skips, build185Python/owned and
   browser;13m14s (`.local/asset266-gate.log`). No fixture clock was widened.
 
-The unchanged default30-minute renderer soak recorded30samples, one completed
-round and Arabia/Windsor coverage, with0errors/invalid bindings. Peak estimated
-sprite data2918.46MiB, minimum host available8.81GiB. Actual interval:
-02:28:21.890–02:57:56.180UTC; startup is inside the established overall budget.
-Log:`.local/attack270-soak.log`. This is not a physical-GPU FPS claim.
+## Islands fish checkpoint (#95)
+
+- Salmon456 and dorado455 now have distinct original underwater/leap art alongside
+  snapper458 and shore fish69. Shared fish-kind handling covers gathering/banking,
+  continuation, AI, cursors and live/fog rendering. All four identities pass actual
+  gathering/depletion/banking outcomes in both fallback and imported modes.
+- Owned `GeneratingObjects.inc` global Gaia passes replace compulsory fish
+  mirroring. Both unpaired resource-islet coasts receive shore fish across six
+  tested seeds. A narrow owned extractor checks counts/spacing/season pairs;
+  terrain and non-fish object placement remain unchanged by fish configuration.
+- PH_DESERT selects dorado, spring/Mediterranean salmon; the borrowed Nearctic
+  dressing uses the spring pair as an explicit inference. Native weighted seasons
+  and missing Whale/Gaia Dock passes are#274. #95 retains grown-water-mask/native
+  placement calibration; no native RNG parity is claimed.
+- Full owned import EXIT0; gate GREEN1249TS/103files,8existing skips, build,
+  186Python/owned and browser,758s. Final feature receipt covers49 outcomes plus
+  original live→memory→live textures for all four fish and berries. Initial browser
+  fixture positions outside scout sight were corrected; no clock changed or
+  assertion waived. Observed HTTP404s are `favicon.ico`, not artwork.
+- Logs:`.local/fish95-{import,gate,acceptance,soak}.log`. Household services still
+  use the preceding deployment below; a new source checkpoint is not a live switch.
+
+The unchanged default30-minute renderer soak for this fish checkpoint recorded
+30samples, one completed round and Arabia/Windsor coverage, with0errors/invalid
+bindings. Actual interval:06:21:01.913–06:50:59.607UTC; startup is inside the
+established overall budget. Log:`.local/fish95-soak.log`. This is general renderer
+endurance, not Islands-specific endurance or a physical-GPU FPS claim.
+
+The islands-fish, fish-fog and soak receipts are current and passing. Overall
+`acceptance.mjs check` still reports the explicitly known-gap#124 AI progression
+receipt missing, plus unmapped shared files. Those files were verified by the full
+gate, owned fish source contracts, species gathering/banking outcomes, fishing AI
+outcomes and cursor/continuation tests; no claim that the registry itself is green
+or that#124 is fixed.
 
 ## Live deployment (#266)
 
