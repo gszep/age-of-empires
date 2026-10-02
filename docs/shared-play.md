@@ -13,29 +13,33 @@ play again.
   localhost:5173 behind the existing Tailscale route. Your usual link is unchanged.
 - Artemis: the same user-service name runs `tools/shared-join.mjs` on
   localhost:5174. Open **http://localhost:5174/** on Artemis.
-- Since October2, Ysgramor serves
-  `.local/releases/autonomous-20261002-5ced752`, fingerprint
-  `ea84026072f2a95523b9c884e2a3a3c614044783b0cbed134d896725e2d3e445`.
+- Since October2's08:08UTC update, Ysgramor serves
+  `.local/releases/autonomous-20261002-385da49`, fingerprint
+  `19a0d8b4735b4abd5c971b7b6bd5979cb9ffd58d2518d9bdfe3b9e0ce51a3ee6`.
   Artemis's gateway and isolated owned base-art runtime are under
-  `/home/gszep/Documents/repos/age-of-empires/.local/owned-runtime-a208f7c`;
+  `/home/gszep/Documents/repos/age-of-empires/.local/owned-runtime-0d86953`;
+  that candidate directory now contains source385da49 (recorded in its
+  `.local/source-revision.txt`), including the reset-socket gateway fix.
   `MATCH_ASSETS` points to its `public` directory. The gateway follows the host
   protocol and selects player2. Both services report protocol2/active/NRestarts0.
-- Both machines now have seven profiles with182 definitions per profile.
-  Artemis serves4586 x1 sprite pages; Ysgramor serves4738 x2 pages. Both have3666
+- Both machines now have seven profiles with184 definitions per profile.
+  Artemis serves4598 x1 sprite pages; Ysgramor serves4750 x2 pages. Both have3666
   audio aliases and0 missing referenced files, and their simulation-rules hashes
-  agree. Each renderer uses its own frame metadata/scale. Remote owned tests and
-  Byzantine, Chinese and A/B-attack browser acceptance pass; the one x2-only
-  import test is inapplicable to Artemis's base import.
+  agree. Each renderer uses its own frame metadata/scale. Fresh remote186 owned
+  tests,49 fish outcomes and original-species/fog browser acceptance pass; the one
+  x2-only import test is inapplicable to Artemis's base import. Earlier Byzantine,
+  Chinese and A/B acceptance evidence remains in the preceding deployment logs.
 - Actual cross-machine acceptance passed both train clicks, equal state,
   selection-preserving resync, guest reload,1500+ticks without unintended resyncs,
   local guest PNG delivery and checkpoint restart. A second check used the actual
-  pinned host entrypoint for Byzantine/Japanese menu/train/reload acceptance before
-  installation. Logs and exact hashes are in [handoff.md](handoff.md).
-- The old `.local/shared-gateway-review241` gateway and
-  `.local/performance-runtime-bebb06e/public` import remain for rollback. The
-  original dirty Artemis clone was preserved. Service configurations/routes were
-  captured, no current shared checkpoint existed to archive, and route JSON is
-  byte-identical before/after the authorised switch.
+  pinned host entrypoint for Islands fish/islet/art, Byzantine/Japanese menu,
+  paid training and reload acceptance before installation. Logs and exact hashes
+  are in [handoff.md](handoff.md).
+- The preceding5ced752 host release and Artemis `owned-runtime-a208f7c` remain
+  intact for rollback, alongside older rollback directories. The original dirty
+  Artemis clone was preserved. No current shared checkpoint existed before or
+  after stopping the old host; route JSON is byte-identical before/after the
+  authorised switch. Private QA processes were stopped and ports rechecked.
 - The gateway serves `/imported/` locally and proxies everything else,
   including the application code and match WebSocket, to Ysgramor. There is
   no need to update Artemis's application clone for each code change.

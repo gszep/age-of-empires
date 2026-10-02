@@ -18,9 +18,10 @@ checkpoint counts remain in git and [reviews](reviews/2026-10-01.md).
   Shared setup is controlled by player one. Controls are in [README](../README.md).
 
 On October2 the authorised deployment switched both services to the verified
-seven-profile setup: a pinned Ysgramor host/frontend and a fresh isolated Artemis
+seven-profile setup, then updated to385da49 with distinct Islands fish and the
+reset-socket gateway fix: a pinned Ysgramor host/frontend and an isolated Artemis
 base-art runtime. Both configs report protocol2; actual two-machine acceptance
-and local guest-art delivery pass. Old assets/configurations remain for rollback,
+and local guest-art delivery pass. Old assets/releases remain for rollback,
 no current checkpoint needed archiving, and Tailscale routes are unchanged. Code
 and JSON metadata are release-pinned; bulk art/dependencies remain shared local
 resources. See [shared-play.md](shared-play.md).

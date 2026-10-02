@@ -52,8 +52,8 @@ work after this checkpoint rather than ending early.
   original live→memory→live textures for all four fish and berries. Initial browser
   fixture positions outside scout sight were corrected; no clock changed or
   assertion waived. Observed HTTP404s are `favicon.ico`, not artwork.
-- Logs:`.local/fish95-{import,gate,acceptance,soak}.log`. Household services still
-  use the preceding deployment below; a new source checkpoint is not a live switch.
+- Logs:`.local/fish95-{import,gate,acceptance,soak}.log`. The fish content and gateway
+  fix are now included in the privately verified household deployment below.
 
 The unchanged default30-minute renderer soak for this fish checkpoint recorded
 30samples, one completed round and Arabia/Windsor coverage, with0errors/invalid
@@ -68,7 +68,7 @@ gate, owned fish source contracts, species gathering/banking outcomes, fishing A
 outcomes and cursor/continuation tests; no claim that its aggregate check was green
 or that#124 is fixed.
 
-## Gateway reused-socket failure (#275)
+## Gateway checkpoint 385da49 (#275, closed)
 
 Private rollout checks exposed `ECONNRESET` on a reused upstream HTTP socket while
 loading `/src/dev-debug-stats.ts`. The gateway now retries a body-free GET/HEAD
@@ -92,51 +92,55 @@ are not claimed to test the fix. Corrected publication independently compared
 local/remote SHA256 before running acceptance. A separate client gap, silently
 starting solo on config502, is tracked in#276 and remains unimplemented here.
 
-## Live deployment (#266)
+## Live deployment (#266/#95/#275)
 
 - Host:<http://localhost:5173/>; solo:<http://localhost:5173/?solo=1>.
 - Tailnet:<https://ysgramor.tail6e864b.ts.net:5173/>.
 - Artemis gateway:<http://localhost:5174/>.
-- Switched at approximately **05:19 UTC** after private acceptance. Both managed
+- Updated at approximately **08:08 UTC** after private acceptance. Both managed
   `open-empires-shared` services are active/running, NRestarts0, ExecMainStatus0;
   installed configs report protocol2 and seats1/2 respectively.
-- Ysgramor release:`.local/releases/autonomous-20261002-5ced752`, source
-  `5ced75200bec4af493c324383cbff8115a056962`, fingerprint
-  `ea84026072f2a95523b9c884e2a3a3c614044783b0cbed134d896725e2d3e445`.
+- Ysgramor release:`.local/releases/autonomous-20261002-385da49`, source
+  `385da4954dc70073d548b29164dc1a30d73fa119`, fingerprint
+  `19a0d8b4735b4abd5c971b7b6bd5979cb9ffd58d2518d9bdfe3b9e0ce51a3ee6`.
 - Artemis gateway/source/art runtime:
-  `/home/gszep/Documents/repos/age-of-empires/.local/owned-runtime-a208f7c`;
-  assets are its `public` directory. It began with exact a208f7c and has the
-  verified watcher config/helper for isolated QA. Gateway code is unchanged by
-  that watcher fix. The original dirty application clone was preserved.
-- Both have seven profiles/182 definitions each. Artemis has4586 x1 sprite pages;
-  Ysgramor has4738 x2 pages. Each has3666 audio aliases and0 missing referenced
+  `/home/gszep/Documents/repos/age-of-empires/.local/owned-runtime-0d86953`;
+  assets are its `public` directory. Its source was advanced to exact385da49,
+  recorded in `.local/source-revision.txt`, with the helper SHA256 independently
+  matched before acceptance. The original dirty application clone was preserved.
+- Both have seven profiles/184 definitions each. Artemis has4598 x1 sprite pages;
+  Ysgramor has4750 x2 pages. Each has3666 audio aliases and0 missing referenced
   image/audio files. Both resolve rules hash
-  `3ab65818a6e9600a58bf26478779b9b591e92092716133ee3c5c1c4fdbcb6303`.
-  Logs:`.local/asset266-{remote,local}-inventory.log`.
+  `15c4e2017d0f62c40dc979c60df45855dd80ec6bbce54d30db2678886b9def78`.
+  Logs:`.local/fish95-{remote,local}-inventory.log`.
 - Remote full import passes from patch-matched owned base depots, validating
-  source integrity before decoding; no source recovery was needed.185 remote
-  Python/import cases completed with1 existing x2-only skip. Full Byzantine,
-  Chinese and alternate-art acceptance pass on Artemis's actual x1 renderer.
-  Logs:`.local/asset266-remote-{import-tests,byzantines,chinese,attack}.log`.
+  source integrity before decoding; no source recovery was needed.186 remote
+  Python/import cases completed with1 existing x2-only skip.49 fish outcomes and
+  the original-species/fog browser pass on Artemis's x1 renderer. Local relay:
+  `.local/fish95-remote-verify.log`; individual logs are in that runtime's `.local`.
+  Earlier Byzantine/Chinese/alternate-art evidence remains in asset266 logs.
 - Actual two-machine shared smoke passes: both train clicks/equal state,
   selection-preserving recovery, reload,1500+ticks with0 unintended resyncs,
-  checkpoint restart and308 guest PNG responses from Artemis disk
-  (`.local/asset266-cross-machine.log`).
+  checkpoint restart and311 guest PNG responses from Artemis disk
+  (`.local/proxy275-cross-machine-final.log`).
 - The actual frozen host entrypoint was also accepted privately with an Artemis
-  guest: Byzantine/Japanese menu selection, paid training, equal state, reload,
-  seven-profile x1 metadata and second-attack art presence. Receipt:
-  `.local/asset266-release-smoke-r3.log`, tick29/hash678e6c5b. Earlier candidate
-  readiness/pause failures remain recorded; the final probe acknowledges a fresh
-  setup seed before measuring pause. No timeout was widened.
+  guest: Islands rare-fish count, both resource-islet shores, source x1 fish PNG
+  decoding, Byzantine/Japanese menu selection, paid training, equal state and
+  reload. Receipt:`.local/proxy275-release-final.log`, tick86/hash17d8766f. Earlier
+  candidate failures remain recorded; no timeout was widened. Live manifest-driven
+  PNG signature checks also pass on both endpoints (`proxy275-live-*-assets.log`).
 - Before switching, Artemis had no active5174 TCP connections; Ysgramor had two
   unchanged queued loopback connections and one CLOSE-WAIT socket. The authorised
   stop accounted for those. No current `.local/shared-match.json` existed before
   or after shutdown. Useful private candidate state is retained separately.
-  Service files and route/connection evidence are in `.local/asset266-pre-deploy/`.
+  Current route/preservation notes are in `.local/proxy275-pre-deploy/`; prior
+  deployment service evidence remains in `.local/asset266-pre-deploy/`. Direct
+  local service-file Read was denied; no alternate file read was attempted, and
+  the authorised maintained installer performed the service update.
   Both hosts' Tailscale route JSON is byte-identical before/after; no route reset.
-- Old Ysgramor release `.local/releases/review-followthrough-final`, old Artemis
-  gateway `.local/shared-gateway-review241` and old assets
-  `.local/performance-runtime-bebb06e/public` remain available for rollback.
+- Preceding Ysgramor `.local/releases/autonomous-20261002-5ced752` and Artemis
+  `.local/owned-runtime-a208f7c` remain intact for rollback, alongside the older
+  review-followthrough-final/shared-gateway-review241/performance-runtime paths.
   No generic incompatible-checkpoint migration is claimed.
 - Owned QA host/gateway/tunnel/Chrome processes have been stopped and their PIDs
   and private listening ports rechecked. Only the intended managed services
