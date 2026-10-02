@@ -17,11 +17,13 @@ checkpoint counts remain in git and [reviews](reviews/2026-10-01.md).
   F10 settings select map/seed/civilisations/mode without editing the URL.
   Shared setup is controlled by player one. Controls are in [README](../README.md).
 
-On October 1 the owner confirmed no current match needed preservation. The
-shared host/frontend were pinned together and the gateway's hardcoded protocol1
-was corrected. Both deployed configs report protocol2. Code and JSON metadata
-are frozen in the release; bulk art and installed dependencies are shared local
-resources, not immutable assets. See [shared-play.md](shared-play.md).
+On October2 the authorised deployment switched both services to the verified
+seven-profile setup: a pinned Ysgramor host/frontend and a fresh isolated Artemis
+base-art runtime. Both configs report protocol2; actual two-machine acceptance
+and local guest-art delivery pass. Old assets/configurations remain for rollback,
+no current checkpoint needed archiving, and Tailscale routes are unchanged. Code
+and JSON metadata are release-pinned; bulk art/dependencies remain shared local
+resources. See [shared-play.md](shared-play.md).
 
 ## Delivered scope
 

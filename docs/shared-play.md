@@ -13,24 +13,29 @@ play again.
   localhost:5173 behind the existing Tailscale route. Your usual link is unchanged.
 - Artemis: the same user-service name runs `tools/shared-join.mjs` on
   localhost:5174. Open **http://localhost:5174/** on Artemis.
-- Artemis's gateway script is now under `.local/shared-gateway-review241/tools`
-  (October1); it forwards the host's protocol version and selects player2.
-  Its current import is generated from its owned base depots under
-  `/home/gszep/Documents/repos/age-of-empires/.local/performance-runtime-bebb06e/public`
-  (#171). This detached runtime supplies the assets. The earlier
-  `.local/shared-runtime/public` remains available for rollback.
-  Ysgramor uses its own `public/imported/` HD import. The manifests keep each
-  machine's frame metadata and image scale together.
-- The 2026-09-23 base import has 117 entities, shared atlas URLs and 13 entities'
-  garrison-flag metadata. Its gate passed 681 Vitest tests, build and browser
-  smoke, plus 88 Python/import tests; the Enhanced Graphics Pack-only test was
-  skipped because that optional pack is not installed on Artemis. The
-  x1 fleet A/B retained identical pixels while reducing estimated RGBA page
-  footprint from 1,014,989,440 to 228,268,096 bytes (GPU textures 128 → 65).
-- October1 read-only inventory confirms that retained import still has117 entities
-  and no additional civilisation profiles. #266 owns its refresh for the expanded
-  roster. Protocol compatibility is restored; complete current-roster artwork on
-  Artemis has not been established by the private current-assets smoke.
+- Since October2, Ysgramor serves
+  `.local/releases/autonomous-20261002-5ced752`, fingerprint
+  `ea84026072f2a95523b9c884e2a3a3c614044783b0cbed134d896725e2d3e445`.
+  Artemis's gateway and isolated owned base-art runtime are under
+  `/home/gszep/Documents/repos/age-of-empires/.local/owned-runtime-a208f7c`;
+  `MATCH_ASSETS` points to its `public` directory. The gateway follows the host
+  protocol and selects player2. Both services report protocol2/active/NRestarts0.
+- Both machines now have seven profiles with182 definitions per profile.
+  Artemis serves4586 x1 sprite pages; Ysgramor serves4738 x2 pages. Both have3666
+  audio aliases and0 missing referenced files, and their simulation-rules hashes
+  agree. Each renderer uses its own frame metadata/scale. Remote owned tests and
+  Byzantine, Chinese and A/B-attack browser acceptance pass; the one x2-only
+  import test is inapplicable to Artemis's base import.
+- Actual cross-machine acceptance passed both train clicks, equal state,
+  selection-preserving resync, guest reload,1500+ticks without unintended resyncs,
+  local guest PNG delivery and checkpoint restart. A second check used the actual
+  pinned host entrypoint for Byzantine/Japanese menu/train/reload acceptance before
+  installation. Logs and exact hashes are in [handoff.md](handoff.md).
+- The old `.local/shared-gateway-review241` gateway and
+  `.local/performance-runtime-bebb06e/public` import remain for rollback. The
+  original dirty Artemis clone was preserved. Service configurations/routes were
+  captured, no current shared checkpoint existed to archive, and route JSON is
+  byte-identical before/after the authorised switch.
 - The gateway serves `/imported/` locally and proxies everything else,
   including the application code and match WebSocket, to Ysgramor. There is
   no need to update Artemis's application clone for each code change.
