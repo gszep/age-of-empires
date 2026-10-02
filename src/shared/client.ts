@@ -6,6 +6,33 @@ import { SHARED_VERSION, type HostMessage, type MatchSettings } from './protocol
 import { TickPlayback } from './playback';
 import { validGameMode, validMatchSetup, type MatchSetup } from '../match-setup';
 
+const RECONNECT_DELAY_MS = 1500;
+
+/** Absence of a shared endpoint is a standalone host; failure of one is not.
+ * Keep startup pending until discovery recovers, just like socket reconnects. */
+async function sharedConfiguration(notice?: (text: string) => void): Promise<{ version: number; player: PlayerId } | undefined> {
+  for (;;) {
+    try {
+      const response = await fetch('/__match/config', { cache: 'no-store' });
+      if (response.status === 404) return;
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const type = response.headers.get('content-type')?.toLowerCase() ?? '';
+      // Static/Vite hosts may serve index.html for an unknown path.
+      if (type.includes('text/html')) return;
+      if (!type.includes('application/json')) throw new Error('Invalid shared configuration content type');
+      const config = await response.json();
+      if (config?.enabled === false) return;
+      if (config?.enabled !== true || !Number.isInteger(config.version) || ![1, 2].includes(config.player)) {
+        throw new Error('Invalid shared configuration');
+      }
+      return config;
+    } catch (error) {
+      notice?.(`Shared match unavailable — reconnecting… (${error instanceof Error ? error.message : String(error)})`);
+      await new Promise(resolve => setTimeout(resolve, RECONNECT_DELAY_MS));
+    }
+  }
+}
+
 export class SharedClient {
   state!: GameState;
   settings!: MatchSettings;
@@ -157,7 +184,7 @@ export class SharedClient {
           this.connected = false; this.syncing = true;
           this.clearPlayback();
           this.onNotice?.('Disconnected — reconnecting to Ysgramor…');
-          setTimeout(open, 1500);
+          setTimeout(open, RECONNECT_DELAY_MS);
         };
         socket.onerror = () => socket.close();
       };
@@ -193,14 +220,13 @@ export class SharedClient {
 export async function connectSharedMatch(initialState?: () => GameState | undefined, notice?: (text: string) => void, setup?: MatchSetup): Promise<SharedClient | undefined> {
   // An independent browser match for solo play and QA, even on the shared host.
   if (new URLSearchParams(location.search).get('solo') === '1') return;
-  let config;
-  try {
-    const response = await fetch('/__match/config');
-    if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) return;
-    config = await response.json();
-  } catch { return; }
-  if (!config.enabled) return;
-  if (config.version !== SHARED_VERSION) throw new Error('Host/client version mismatch; reload the game');
+  const config = await sharedConfiguration(notice);
+  if (!config) return;
+  if (config.version !== SHARED_VERSION) {
+    const message = 'Host/client version mismatch; reload the game';
+    notice?.(message);
+    throw new Error(message);
+  }
   const requested = new URLSearchParams(location.search).get('player');
   const player: PlayerId = requested === '2' ? 2 : requested === '1' ? 1 : config.player;
   const client = new SharedClient(player);

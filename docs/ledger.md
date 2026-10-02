@@ -14,6 +14,18 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## Household startup discovery (#276)
+
+- **Application policy, not a DE networking model:** HTTP/network/JSON/config
+  failures keep startup pending and preserve the saved match; retry uses the
+  existing1500ms WebSocket reconnect cadence. Static404/successful HTML fallback,
+  explicit disabled configuration and `?solo=1` establish standalone mode.
+- **Chosen diagnostic:** the existing startup banner displays an unavailable/
+  reconnecting notice with the HTTP/parse failure, and protocol mismatch requests
+  a reload. The owned English table's `IDS_MPS_RECONNECTING` concerns an already
+  lost Multiplayer Services connection, not this application's initial HTTP
+  gateway discovery. No native DE recovery timing or message parity is claimed.
+
 ## Islands fish (#95; remaining seasons/content #274)
 
 - **Owned:** `GeneratingObjects.inc` GNR_STANDARDFISH requests global Gaia shore

@@ -7,6 +7,14 @@ URL. This bypasses the match connection and uses the normal browser simulation,
 map/seed options and local session saving. Remove the parameter to join shared
 play again.
 
+Startup discovery distinguishes a missing shared endpoint from a failed one
+(#276). HTTP/network/JSON/configuration failures leave the loading notice visible
+and retry at the existing1500ms reconnect cadence; they do not start a separate
+solo game or overwrite the saved match. A later valid configuration joins without
+a reload. Standalone404, a successful HTML fallback, explicit `enabled:false`,
+and `?solo=1` retain independent play. A protocol mismatch is shown explicitly
+and requires reloading matching client code.
+
 ## Installed arrangement
 
 - Ysgramor: `open-empires-shared.service` runs a pinned release's `tools/shared-host.mts` on

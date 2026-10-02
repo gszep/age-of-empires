@@ -89,8 +89,30 @@ clock or original browser assertion changed.
 Earlier supposed-fixed remote attempts actually retained the old helper: a
 post-stop `ps` exit1 skipped the chained copy. Their failures remain recorded and
 are not claimed to test the fix. Corrected publication independently compared
-local/remote SHA256 before running acceptance. A separate client gap, silently
-starting solo on config502, is tracked in#276 and remains unimplemented here.
+local/remote SHA256 before running acceptance. The separate client failure mode,
+silently starting solo on config502, is addressed in the following#276 checkpoint.
+
+## Shared startup discovery (#276)
+
+Failed HTTP/network/JSON/configuration discovery keeps startup pending with a
+visible unavailable/reconnecting notice. It preserves saved state and retries at
+the existing1500ms reconnect cadence; a valid response joins without reloading.
+Explicit solo, static404/successful HTML and explicit disabled config still work.
+Protocol mismatch is visible rather than silently becoming a solo game.
+
+Eleven focused cases and real owned/fallback browsers pass repeated502, no solo
+HUD/debug startup, unchanged saved state, recovery to the saved match and a paid
+train click. Normal two-browser acceptance passes all existing state/recovery/
+reload/1500ticks/restart checks with0unintended resyncs. The first new fixture
+incorrectly expected no debug connection record in standalone mode; the existing
+schema always supplies one, so it now checks disconnected/no shared stats and
+no discovery fetch for explicit solo. No original assertion or clock changed.
+Logs:`.local/config276-{acceptance-r2,shared,gate}.log`.
+Gate GREEN:1267TS/104files,8existing skips, build,186Python/owned and browser;
+747s. Both selected feature receipts pass. Aggregate acceptance check only flags
+the newly edited registry file as unmapped; that JSON was parsed and its commands
+executed by the passing shared-startup/shared runs. Live deployment below remains
+385da49 until a separately verified release switch.
 
 ## Live deployment (#266/#95/#275)
 
