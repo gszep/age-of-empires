@@ -20,7 +20,7 @@ checkpoint counts remain in git and [reviews](reviews/2026-10-01.md).
 On October2 the authorised deployment switched both services to the verified
 seven-profile setup, then added distinct Islands fish, gateway socket recovery
 and43e10ad's explicit shared-startup recovery: a pinned Ysgramor host/frontend
-and an isolated Artemis base-art runtime. Both configs report protocol2;
+and an isolated Artemis base-art runtime. Both configs were verified at protocol2;
 actual two-machine acceptance
 and local guest-art delivery pass. Old assets/releases remain for rollback,
 no current checkpoint needed archiving, and Tailscale routes are unchanged. Code
@@ -53,8 +53,10 @@ removed in the October1 post-mortem follow-through.
 `npm run import:aoe2` is the only full publication entrypoint. It resolves pinned
 owned depots, verifies source container integrity, imports DAT/RMS/UI/audio and
 converts sprites/blends. Enhanced Graphics Pack art is sourced at scale2 and
-drawn at half size; atlases above8192px continue on pages. Base x1 monk sources
-were recovered and validated; see [source integrity](source-integrity.md).
+drawn at half size; atlases above8192px continue on pages. Western x1 monk sources
+were recovered and installed. A newly consumed Slavic x1 file still needs default
+depot copy-back (#277); its existing original recovery copy validates. See
+[source integrity](source-integrity.md).
 
 Production uses PNG. Hardware block compression was evaluated, not deployed.
 RGB565 endpoint promotion is corrected; permitted vendor interpolation is distinct
@@ -70,6 +72,11 @@ hotspot/page/scale. Seven-profile metadata measured552→53MB; whole-manifest
 expansion reproduced its original SHA256. Legacy inline metadata remains readable.
 This removes a reproduced JavaScript string-limit failure (#268); it does not
 change the PNG decoder or establish an FPS improvement.
+
+Layer-aware, namespace-independent atlas reuse has a full owned x1 verification:
+24715cached/fresh publication files are byte-identical after a real BC1 correction;
+the single controlled run saved31.03% atlas elapsed time and32.67% aggregate CPU.
+See [cache verification](reviews/2026-10-02-atlas-cache.md) for inputs and limits.
 
 Owned files do not settle every engine rule. Conversion exceptions, volley/charge
 cadence, zero-time grants, population settings, RMS window/placement semantics and

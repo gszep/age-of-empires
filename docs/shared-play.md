@@ -31,7 +31,9 @@ and requires reloading matching client code.
   It proxies the newer frontend from Ysgramor; no asset regeneration or gateway
   restart was needed for the shared-discovery fix.
   `MATCH_ASSETS` points to its `public` directory. The gateway follows the host
-  protocol and selects player2. Both services report protocol2/active/NRestarts0.
+  protocol and selects player2. The08:59 joint check reported both services at
+  protocol2/active/NRestarts0; Artemis SSH timed out at09:14 and12:35,
+  so that is the last remote live-health evidence.
 - Both machines now have seven profiles with184 definitions per profile.
   Artemis serves4598 x1 sprite pages; Ysgramor serves4750 x2 pages. Both have3666
   audio aliases and0 missing referenced files, and their simulation-rules hashes

@@ -10,28 +10,16 @@ Native DE launch/control and additional agents are not authorised. Durable files
 `.local/autonomous-20261001-{brief,progress,report}.md`. Continue eligible tracker
 work after this checkpoint rather than ending early.
 
-## Pushed source checkpoints
+## Earlier pushed source checkpoints
 
-- **f94b18e — Byzantines#185 and manifest limit#268.** Source-backed roster,
-  bonuses, healing, Logistica, Greek Fire and original MEDI art/UI have published
-  browser/outcome acceptance. Schema4 losslessly interns frame arrays: the pending
-  seven-profile manifest measured551,770,741→52,882,276bytes, with identical
-  expanded SHA256. Native healing/blast/rounding remains#267.
-  Gate GREEN:1218TS/100files,8skips, build184Python/owned and browser;13m05s.
-- **a208f7c — second ordinary attack graphics#270.** Original A/B graphics,
-  clocks, sounds and composites are selected by saved simulation windups. The
-  renderer respects each selected clip's duration; special weapons keep priority.
-  Source/owned outcomes, actual A/B/A texture bindings, fish fog and full Chinese
-  browser regression pass. Native first/reset/naval cadence is#272.
-  Gate GREEN:1227TS/101files,8skips, build185Python/owned and browser;13m31s.
-- **5ced752 — watcher starvation#273 and cross-machine verification tools.**
-  Resolved-root dev exclusions keep source HMR while ignoring private archives and
-  bulk art. A merge-stable ignore-all object fixes immutable-host watching;
-  inline watch:null was being discarded. Real watcher tests and unchanged shared
-  acceptance pass. Warm Brotli main/world/water measurements improved from
-  3.5s/2.1s/0.9s to114ms/43ms/4ms. Bounded shared-page diagnostics retain earlier
-  startup failures. Gate GREEN:1229TS/102files,8skips, build185Python/owned and
-  browser;13m14s (`.local/asset266-gate.log`). No fixture clock was widened.
+| Commit | Verified scope | Remaining boundary |
+| --- | --- | --- |
+| f94b18e | Byzantines#185; lossless schema4 atlas-frame interning#268 (552→53MB) | Native healing/blast/rounding#267 |
+| a208f7c | Original ordinary A/B attack art, source clocks/sounds/composites#270 | Native first/reset/naval cadence#272 |
+| 5ced752 | Scoped dev/immutable watchers and actual cross-machine shared verification#273 | Detailed evidence in `.local/asset266-*` logs |
+
+Each passed its full gate and feature/browser checks. Current delivered scope
+is in [status](status.md); source/inferred distinctions are in [ledger](ledger.md).
 
 ## Islands fish checkpoint 0d86953 (#95)
 
@@ -114,15 +102,40 @@ the newly edited registry file as unmapped; that JSON was parsed and its command
 executed by the passing shared-startup/shared runs. The privately verified frontend
 is now live as recorded below.
 
+## Real atlas-cache verification (#257)
+
+The previously implemented layer-aware cache now has the missing real-workload
+proof: three complete isolated x1 imports replay the historical RGB565 correction.
+Corrected cached/fresh publications have24715byte-identical files and identical
+cache metadata. Exactly2558 unaffected shadow/outline/damage groups are reused;
+1170main+1170player-colour groups regenerate. Atlas-only elapsed falls
+2415.81→1666.23s (31.03%); aggregate CPU9209.14→6200.41s (32.67%) in this one
+four-worker/nice10 run. No x2/universal/FPS claim. Decoded RGBA8 samples confirm
+actual nontransparent texel changes in both dependent layers.
+
+Method, complete hashes, timing limits and reproduction command:
+[cache verification](reviews/2026-10-02-atlas-cache.md). Full study receipt:
+`.local/cache257-study-r2/report.json`; pixel supplement:`pixel-evidence.json`.
+The production decoder, cache implementation and live assets were not changed.
+Checkpoint gate GREEN:1267TS/104files,8existing skips, build,186Python/owned and
+real-browser smoke,831s (`.local/cache257-gate.log`). No fixture clock changed.
+
+Source validation found the newly consumed default Slavic monk x1 file truncated
+at1MiB (#277). Its existing pinned recovery copy validates; all1170 recovered
+inputs pass and this is their only difference from default. The study used that
+recovery read-only. Owner default-depot copy-back remains open; see
+[source integrity](source-integrity.md).
+
 ## Live deployment (#266/#95/#275/#276)
 
 - Host:<http://localhost:5173/>; solo:<http://localhost:5173/?solo=1>.
 - Tailnet:<https://ysgramor.tail6e864b.ts.net:5173/>.
 - Artemis gateway:<http://localhost:5174/>.
 - Gateway/art updated at **08:08 UTC**, frontend at **08:57 UTC**, after private
-  acceptance. Both managed `open-empires-shared` services are active/running,
-  NRestarts0, ExecMainStatus0;
-  installed configs report protocol2 and seats1/2 respectively.
+  acceptance. At the **08:59 joint check**, both managed `open-empires-shared`
+  services were active/running, NRestarts0, ExecMainStatus0; configs reported
+  protocol2 and seats1/2. Artemis SSH timed out at09:14 and again12:35, so later
+  remote live-health is unverified. All private remote jobs had already been cleaned.
 - Ysgramor release:`.local/releases/autonomous-20261002-43e10ad`, source
   `43e10adfdfefa62aae3437065a30aa481a41e02b`, fingerprint
   `c54c2fd402804f6d9926edee17e7c9e665e91e5a909bc70402c57c7f545488f1`.

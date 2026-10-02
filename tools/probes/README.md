@@ -28,6 +28,27 @@ Run them from the repo root: `npx tsx tools/probes/snapshot.ts`.
   `.local/land116-crossings.png` as a real-texture overview; this is not a
   matched DE capture. Pair with `shore_blend_smoke.mts` for the actual water IDs.
 
+**Real atlas-cache replay (#257):**
+`uv run --locked python tools/probes/atlas_cache_benchmark.py --out .local/cache-study-unique`
+creates private exports and runs three complete `npm run import:aoe2` pipelines:
+the historical pre-5be3f31 RGB565 decoder, the corrected decoder with a changed
+legacy/global cache and clean output, and corrected layer-aware reuse. It checks
+exact layer misses, complete publication/cache byte equality and changed page
+bytes, plus independently decoded nontransparent RGBA8 samples. Recheck those
+samples without repeating imports with `--verify-pixels .local/cache-study-unique`.
+Default scope is the owned base/x1 installation; optional1039811 is omitted
+only from this private read-only depot view. `--resources-depot` may name an
+existing complete pinned813784 recovery directory (see source-integrity.md).
+Live assets, original depots and the production decoder are not modified.
+
+Check backing-drive space first: this keeps three publication trees and caches.
+Stages run sequentially at nice10/default worker count with retained process-group
+handles and per-stage timeouts. Logs, GNU-time metrics and a final `report.json`
+stay under the new `.local` directory; an existing directory is never overwritten.
+Atlas-stage timing is separate from whole-pipeline timing so cold audio/UI work
+is not counted as an atlas-cache speedup. A single x1 measurement is not an x2,
+physical-GPU or universal throughput claim. This long probe is outside the gate.
+
 **Hardware block-compression evaluation (#163):**
 `uv run --locked python tools/probes/block_compression_fixture.py`, then
 `node tools/probes/block_compression_desktop.mjs` from WSL. A private server and
