@@ -78,13 +78,14 @@ function remember(state: GameState, player: PlayerId, entity: Entity): void {
 }
 
 export function updateVisibility(state: GameState): void {
-  // The forget pass used to scan every entity for every remembered object.
-  // Keep this index local to the invocation, not to state.tick: a command can
-  // remove/claim an entity between visibility updates in the same tick (#165).
-  const livingById = new Map<number, Entity>();
-  for (const entity of state.entities) if (!entity.dead) livingById.set(entity.id, entity);
+  // Only stale memories need a living-entity lookup. Most updates merely
+  // refresh visible objects, so defer indexing the whole map until needed.
+  // Keep both the index and refresh marks local to this invocation: commands
+  // can remove/claim entities between updates in the same tick (#165).
+  let livingById: Map<number, Entity> | undefined;
   for (const player of [1, 2] as PlayerId[]) {
     const visibility = state.visibility[player];
+    const refreshed = new Set<number>();
     visibility.visible.fill(0);
     const spies = state.mode !== 'regicide' && (playerAttributeFor(state, player, 'spies') ?? 0) > 0;
     for (const entity of state.entities) {
@@ -132,14 +133,21 @@ export function updateVisibility(state: GameState): void {
         continue;
       }
       if (entity.dead) continue;
+      if (!isEntityVisible(state, player, entity)) continue;
       if (!lingersInFog(rulesForPlayer(state, entity.owner), entity)) continue;
-      if (isEntityVisible(state, player, entity)) remember(state, player, entity);
+      remember(state, player, entity);
+      refreshed.add(entity.id);
     }
     // Forget remembered entities whose last position is seen empty.
     for (const key of Object.keys(visibility.memory)) {
       const remembered = visibility.memory[Number(key)];
+      if (refreshed.has(remembered.id)) continue;
       const index = tileIndex(state, Math.floor(remembered.x), Math.floor(remembered.y));
       if (!visibility.visible[index]) continue;
+      if (!livingById) {
+        livingById = new Map();
+        for (const entity of state.entities) if (!entity.dead) livingById.set(entity.id, entity);
+      }
       const entity = livingById.get(remembered.id);
       if (!entity) delete visibility.memory[Number(key)];
       else if (remembered.lastSeenAt !== state.tick) {

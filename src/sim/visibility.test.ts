@@ -47,4 +47,21 @@ describe('fog-memory lookup lifetime (#165)', () => {
     expect(state.visibility[1].memory[sheep.id]).toBeUndefined();
     expect(state.visibility[2].memory[sheep.id]).toBeDefined();
   });
+
+  it('refreshes visible objects and forgets a removed neighbour in the same tick', () => {
+    const { state, sheep } = fixture();
+    const neighbour = { ...sheep, id: state.nextId++, position: { x: 41, y: 40 }, amount: 100 };
+    state.entities.push(neighbour);
+    updateVisibility(state);
+    state.entities = state.entities.filter(entity => entity !== sheep);
+    neighbour.hp -= 1;
+    neighbour.amount = 12;
+    updateVisibility(state);
+    for (const player of [1, 2] as const) {
+      expect(state.visibility[player].memory[sheep.id]).toBeUndefined();
+      expect(state.visibility[player].memory[neighbour.id]).toMatchObject({
+        hp: neighbour.hp, amount: 12, x: 41, y: 40, lastSeenAt: state.tick,
+      });
+    }
+  });
 });
