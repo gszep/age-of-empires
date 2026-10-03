@@ -6,7 +6,7 @@ reviews. Do not append old test counts here as if they describe the latest tree.
 
 ## Source and verification
 
-- Latest source checkpoint at this review: `70bda6c` (#280). Owned match-speed
+- Gameplay baseline: `70bda6c` (#280). Owned match-speed
   names are Slow/Casual/Normal/Fast; new preferences and pristine shared hosts
   default to Normal (1.7). Existing saved indices retain their multipliers.
   [Issue evidence](https://github.com/gszep/age-of-empires/issues/280#issuecomment-5966448309)
@@ -64,6 +64,13 @@ installed protocol 2 are distinct. [Shared play](shared-play.md) describes use.
   trigger and automation calibration remain #133/#131.
 
 ## Documentation checks
+
+The process follow-through (#262/#263/#264/#265) is complete. The
+[checkpoint workflow](checkpoint-workflow.md) describes installed-CLI enforcement
+verification and tree/asset-bound acceptance receipts, including scope-change
+review. Restart OpenCode after safeguard/plugin changes before an unattended run;
+fresh-process evidence does not certify an already-running server. Browser startup
+failures retain diagnostics as described in [maintained probes](../tools/probes/README.md).
 
 `node tools/check-current-docs.mjs` checks three scoped completion declarations
 against GitHub and their exact block in status. Targeted #264 wording guards
