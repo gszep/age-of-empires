@@ -2331,6 +2331,8 @@ def extract(
                 # Map setup labels and the three shipped random-map names (#144).
                 ("mapType", 9691), ("mapSeed", 10658), ("startGame", 9472),
                 ("populationLimit", 13516), ("populationLimitHelp", 93516),
+                ("gameSpeedSlow", 13101), ("gameSpeedCasual", 13126),
+                ("gameSpeedNormal", 13102), ("gameSpeedFast", 13103),
                 ("wonderTimer", 11301), ("wonderYears", 11300),
                 ("wonderStartedSelf", 3058), ("wonderStartedOther", 3019),
                 ("wonderCompletedSelf", 3020), ("wonderCompletedEnemy", 3022),

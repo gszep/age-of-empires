@@ -134,13 +134,14 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   at Battle, East Sussex), `windsor` (392x392 real ground at 15 m/tile around
   Windsor Castle, the Long Walk, Snow Hill and the Thames), `painted-proof`, or nothing for Arabia. Real-ground maps
   use Environment Agency LIDAR/VOM. Asking explicitly always deals a fresh board.
-- `+` and `-` step the game speed through the original's own four settings —
-  Slow, Normal, Fast and Extra Fast — and then two fast-forward steps past them
+- `+` and `-` step the game speed through the original's own four match settings —
+  Slow(1×), Casual(1.5×), Normal(1.7×) and Fast(2×) — and then two fast-forward steps past them
   for watching a whole match go by. The first visit starts at **Normal** and
   subsequent visits remember your selected speed. Normal is the
-  setting the reference's own hotkey names call "Default": every duration in the
-  data is quoted in game seconds, and Normal runs 1.5 of them a second, so a
-  25-second villager arrives in about 17 real seconds. The simulation's tick
+  match setting shown as1.7 by the native clock: every duration in the
+  data is quoted in game seconds, so a25-second villager takes about15 real
+  seconds at Normal. Existing saved speed indices keep their previous pace
+  (saved1 remains1.5×, now correctly labelled Casual). The simulation's tick
   length does not change — the speed only decides how many of the same ticks a
   second holds — so a match run fast plays out exactly as it would at any other
   speed, and replays and checksums are unaffected.

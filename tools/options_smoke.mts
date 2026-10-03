@@ -28,7 +28,7 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, l
       const anchor = 'renderer.setAnimationLoop(now => {'; assert(code.includes(anchor));
       return code.replace('if (!shared && !paused && !matchOver(game))', 'if (false && !shared && !paused && !matchOver(game))')
         .replace(anchor, `Object.assign(globalThis, { __optionsState: () => ({
-          preferences, speedIndex, music: (musicPlayer as any).element ? {
+          preferences, speedIndex, gameSpeed: gameSpeed(), music: (musicPlayer as any).element ? {
             volume:(musicPlayer as any).element.volume, paused:(musicPlayer as any).element.paused,
             time:(musicPlayer as any).element.currentTime } : null,
           sounds:[...(audioPlayer as any).active.keys()].map((e: HTMLAudioElement) => ({volume:e.volume,src:e.src}))
@@ -78,6 +78,17 @@ try {
   assert.equal((await query({ type: 'snapshot' })).tick, state.tick);
   await selectEntity(own.id); await open();
   const before = (await query({ type: 'sim' })).synchronizationHash;
+  assert.equal((await runtime()).speedIndex, 2, 'fresh preferences select native Normal');
+  assert.deepEqual(await page.$$eval('#option-speed option', rows => rows.slice(0,4).map(e => e.textContent)), ['Slow','Casual','Normal','Fast']);
+  for (const [index, multiplier] of [1,1.5,1.7,2].entries()) {
+    await page.select('#option-speed', String(index)); await apply();
+    assert.equal((await runtime()).gameSpeed, multiplier);
+    assert.equal((await query({ type: 'sim' })).synchronizationHash, before);
+  }
+  await page.select('#option-speed', '1'); await ok();
+  await page.reload({ waitUntil: 'domcontentloaded' }); await ready(); await open();
+  assert.equal((await runtime()).speedIndex, 1, 'saved index1 retains its pace instead of migrating to the new Normal');
+  assert.equal((await runtime()).gameSpeed, 1.5);
   await page.select('#option-speed', '4');
   await range('music', 0); await range('sound', 25);
   if (!fallback) await page.select('#option-hotkeys', 'classic');

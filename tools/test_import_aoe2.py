@@ -1071,6 +1071,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
             "mapType": "Map Type", "mapSeed": "Seed", "startGame": "Start Game",
             "populationLimit": "Population:",
             "wonderTimer": "Wonder: %d Years", "wonderYears": "Years",
+            "gameSpeedSlow": "Slow", "gameSpeedCasual": "Casual", "gameSpeedNormal": "Normal", "gameSpeedFast": "Fast",
             "gameSettings": "Game Settings", "randomSeed": "Random",
             "mapArabia": "Arabia", "mapBlackForest": "Black Forest", "mapIslands": "Islands",
         }

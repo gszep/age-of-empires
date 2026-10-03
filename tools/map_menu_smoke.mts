@@ -10,6 +10,7 @@ import { createGame } from '../src/sim/game.ts';
 import { FALLBACK_RULES, rulesFromManifest } from '../src/sim/data.ts';
 import { MAPS } from '../src/sim/mapgen.ts';
 import { POPULATION_LIMITS } from '../src/sim/population.ts';
+import { DEFAULT_GAME_SPEED } from '../src/shared/protocol.ts';
 import { runMatch } from '../src/headless/runner.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -155,10 +156,10 @@ try {
   await solo.close();
 
   const host = await open('/', 5);
-  assert.equal((await query(host, { type: 'sim' })).connection.speed, 1, 'joining does not send a local speed preference');
+  assert.equal((await query(host, { type: 'sim' })).connection.speed, DEFAULT_GAME_SPEED, 'joining does not send a local speed preference');
   await host.keyboard.press('F3'); await until(host, 's.connection.paused');
   const guest = await open('/?player=2', 0);
-  assert.equal((await query(guest, { type: 'sim' })).connection.speed, 1);
+  assert.equal((await query(guest, { type: 'sim' })).connection.speed, DEFAULT_GAME_SPEED);
   await guest.keyboard.press('F10');
   assert(await guest.$eval('#map-choice', e => (e as HTMLSelectElement).disabled));
   assert(await guest.$eval('#population-limit', e => (e as HTMLSelectElement).disabled));

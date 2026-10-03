@@ -3,12 +3,12 @@ import { exampleAiCommands } from '../sim/ai';
 import { observe } from '../sim/observe';
 import { synchronizationHash } from './checksum';
 import type { Command, GameMode, GameState, PlayerId } from '../sim/types';
-import type { HostMessage, MatchSettings } from './protocol';
+import { DEFAULT_GAME_SPEED, type HostMessage, type MatchSettings } from './protocol';
 import type { MatchSetup } from '../match-setup';
 
 /** One trusted household match. Only this instance orders commands and ticks. */
 export class SharedMatch {
-  settings: MatchSettings = { paused: false, speed: 1, generation: 0 };
+  settings: MatchSettings = { paused: false, speed: DEFAULT_GAME_SPEED, generation: 0 };
   humanTwo = false;
   private pending: { player: PlayerId; command: Command; reject: (reason: string) => void }[] = [];
   constructor(public state: GameState, public setup?: MatchSetup) {}

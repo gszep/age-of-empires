@@ -1,4 +1,5 @@
 /** Local presentation preferences never enter authoritative game state. */
+import { DEFAULT_GAME_SPEED } from '../shared/protocol';
 export const HOTKEY_PROFILES = ['definitive', 'classic', 'high definition', 'left handed'] as const;
 export const UI_PALETTES = ['default', 'deuteranopia', 'protanopia', 'tritanopia'] as const;
 export interface Preferences {
@@ -8,7 +9,7 @@ export interface Preferences {
   music: number;
   sound: number;
 }
-export const DEFAULT_PREFERENCES: Preferences = { speed: 1, hotkeys: 'definitive', palette: 'default', music: 35, sound: 100 };
+export const DEFAULT_PREFERENCES: Preferences = { speed: DEFAULT_GAME_SPEED, hotkeys: 'definitive', palette: 'default', music: 35, sound: 100 };
 export const PREFERENCES_KEY = 'open-empires-lab:preferences';
 
 export function normalizePreferences(value: unknown): Preferences {

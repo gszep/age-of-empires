@@ -171,13 +171,10 @@ let revealMap = false;
  * villager's 0.31 food a second — is quoted in game seconds, so the multiplier
  * is the whole difference between the reference's pace and a slideshow.
  *
- * The reference ships four: `key-value-strings-utf8.txt` names them Slow,
- * Default, Fast and Extra Fast (20033..20036), and the lobby dropdown lists the
- * first three as Slow/Normal/Fast (13101..13103). The multipliers themselves
- * are engine constants in code we do not read, so the four values below come
- * from the community references recorded in `docs/ledger.md`; what the owned
- * files do settle is that there are four, and that the *second* is the
- * default — which is why the game no longer starts at 1x, the Slow setting.
+ * Match labels13101/13126/13102/13103 are Slow/Casual/Normal/Fast.
+ * Native185872's clock explicitly displays1.0/1.5/1.7/2.0 respectively.
+ * The previously used20033..20036 names belong to REPLAY_SPEED_* bindings,
+ * not the match menu. Stored indices keep their pace; new sessions use Normal.
  */
 /**
  * Indices into the reference's action-icon sheet (`IconAction###`), which its
@@ -194,10 +191,10 @@ const ACTION_ICON = {
 } as const;
 
 const GAME_SPEEDS: { label: string; multiplier: number }[] = [
-  { label: 'Slow', multiplier: 1 },
-  { label: 'Normal', multiplier: 1.5 },
-  { label: 'Fast', multiplier: 1.7 },
-  { label: 'Extra Fast', multiplier: 2 },
+  { label: messages.gameSpeedSlow ?? 'Slow', multiplier: 1 },
+  { label: messages.gameSpeedCasual ?? 'Casual', multiplier: 1.5 },
+  { label: messages.gameSpeedNormal ?? 'Normal', multiplier: 1.7 },
+  { label: messages.gameSpeedFast ?? 'Fast', multiplier: 2 },
   // Past the original's own settings: fast-forward, for watching a match out
   // or for an automated pass. Not a claim about AoE2.
   { label: 'Fast-forward 5x', multiplier: 5 },
