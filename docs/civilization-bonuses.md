@@ -89,5 +89,6 @@ building rate; tests compare those reported game-time seconds with completion.
 
 `tools/civilization_profiles_smoke.mts` uses full published art/rules with
 unmodified gameplay clocks, real menu choices and build/research/train input.
-Conversion snapshots remain entity-level authority. Full civilisation completion
-remains tracked on #179/#180 independently of this supported-profile milestone.
+Conversion snapshots remain entity-level authority. Briton/Frank scoped
+completion (#179/#180) has since shipped; [coverage](civilization-coverage.md)
+records the outcomes. Native conversion exceptions remain under #178.

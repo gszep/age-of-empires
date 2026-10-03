@@ -4,7 +4,7 @@ The standing rules for an autonomous run. **The queue itself is the issue
 tracker** — `tools/session_start.sh` prints it, bugs first — and nothing in
 this file names an open item, because a list written here was wrong within a
 day every time it was tried (`docs/reviews/2026-09-19.md`, §7). History lives
-in `git log` and `docs/status.md`.
+in `git log` and `docs/reviews/`; `docs/status.md` describes current scope.
 
 ## Before the run
 

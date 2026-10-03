@@ -73,7 +73,7 @@ if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then
     hits=$(grep -nE "(^|[^0-9])#$n([^0-9]|$)" docs/overnight.md docs/backlog.md 2>/dev/null | grep -iE 'open|left|remain|blocked|next|start' || true)
     [ -n "$hits" ] && echo "$hits" | cut -c1-140 && stale=1
   done
-  [ $stale -eq 0 ] && echo "none in these two queue documents; status/handoff claims require their own review"
+  [ $stale -eq 0 ] && echo "none in these two queue documents; separate bounded current-scope check follows"
   node tools/check-current-docs.mjs || echo "-> current-scope declarations need reconciliation (or tracker access failed)"
 else
   echo "gh is not authenticated; run: gh auth login   (the tracker is the queue)"

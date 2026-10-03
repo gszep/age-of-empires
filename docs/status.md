@@ -43,10 +43,15 @@ resources. See [shared-play.md](shared-play.md).
 | AI | Observation-only economy/building/combat strategy, coastal fishing, public-command sheep return and bounded late-game castle/trebuchet production and attacks | [fishing](ai-fishing.md), [siege](trebuchet-automation.md), herding outcomes; staged siege chain passes, natural-start progression/balance remains#124 |
 | Agents/replays | Browser/Node share commands; versioned observations and records, subprocess/WebSocket/MCP agents, deterministic batch/replay tools | Provider-dependent tests opt-in; open fallback stops at Castle Age |
 
-Briton/Frank scoped completion includes the previously pending fortification,
-relic, Warwolf and unique-research work. Terrain plants and their owned shadows
-are drawn. These statements supersede the stale early integration paragraphs
-removed in the October1 post-mortem follow-through.
+<!-- current-claims:start -->
+- #179 (CLOSED): Briton scoped roster/research completion; native conversion exceptions remain separate.
+- #180 (CLOSED): Frankish unique-tech/elite and Heresy acceptance completed.
+- #55 (CLOSED): Terrain plants are drawn; density calibration and final compositing remain separate.
+<!-- current-claims:end -->
+
+Briton/Frank scoped completion includes fortifications, relics, Warwolf and unique
+research. [Civilisation evidence](civilization-coverage.md#briton-completion-pass-2026-09-26)
+and [terrain evidence](dat-field-audit.md) retain their source and fidelity limits.
 
 ## Imports and fidelity boundaries
 
@@ -116,10 +121,8 @@ replay and private host/guest checkpoint/rejoin. Paid production stays at100%
 when the chosen ceiling is full despite spare houses, then releases after a loss;
 Gothic Imperial+10 still requires housing. Native selector values were captured
 on the installed newer DE build; factory default and pinned-build bonus runtime
-calibration remain open. The combined October3 population/Wonder checkpoint
-passes1363 tests/8 skipped, build,193 owned import/tool tests and real-browser
-gate; six mapped acceptance scenarios passed. A stale wrong-rules replay fixture gained its missing seed to
-reach the original popup assertion; no assertion or clock was relaxed.
+calibration remain open. [Population/Wonder evidence](wonder-victory.md) records
+the checkpoint verification; latest gate results come from session startup.
 
 Established historical measurements, with their original scope:
 
@@ -144,7 +147,10 @@ tile x; the eye is along world(1,-1). DAT footprints and RMS remain in tile spac
 
 See the tracker, bugs first; [handoff](handoff.md) names operational blockers.
 The scoped completion declarations in [current-claims.json](current-claims.json)
-are checked against the tracker by `node tools/check-current-docs.mjs`.
+are checked against the tracker and the mirrored block above by
+`node tools/check-current-docs.mjs`. Targeted #264 wording guards also read
+status, handoff, backlog and overnight; reviews, ledger and other prose are
+excluded. This bounded regression check does not certify arbitrary prose as fresh.
 Not yet delivered: campaigns, public multiplayer, selectable formations,
 unlocked diplomatic relations/cooperative victories, native final compositing,
 all owned civilisations, complete RMS/elevation fidelity and several HUD surfaces.
