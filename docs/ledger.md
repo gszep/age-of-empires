@@ -14,6 +14,33 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## Opt-in Wonder countdown (#110)
+
+- **Owned:** Wonder task120, existing building DAT stats, announcement/timer
+  strings3019–3024/3058/11300/11301/300180/300182 and `wonderpanel.json` geometry/
+  original player banners. String9786 gives300years/25minutes.
+- **Measured on installed185872, not pinned engine:** paid completion announces
+  200years;353game seconds elapse for71displayed years; eventual victory occurs
+  with the opponent's TC standing. The trial and rejected house-only/preplaced
+  fixtures are distinguished in [wonder-victory.md](wonder-victory.md).
+- **Chosen scope:** fixed opt-in200years, five simulation seconds/year, off when
+  omitted. This is not a recovered automatic map-size default table or full
+  Standard victory. It applies wherever explicitly selected, including surveys.
+- **Inferred integration:** only actual completion arms a deadline; each building
+  retains its own deadline, with one earliest banner per side. Destruction or
+  ownership change cancels it; a rebuild starts fresh. Combat/death and ordinary
+  conquest/royal loss resolve before expiry; opposing simultaneous expiries draw.
+  Display rounds remaining years up. Native boundary/tie/multiple-Wonder/Atheism
+  behaviour is not claimed. A banner's public focus position does not reveal fog.
+- **View adapters:** adjacent flags pack one source flag-width apart; original
+  default player colours and browser text rendering are used. Import every player
+  banner because the widget's blue material is an engine-swapped placeholder.
+  Visible controls beat the menu PNG's transparent hit rectangle without raising
+  the cloth above its art. Palette/compositor/SDF parity remains unverified.
+- Optional state/config/record fields preserve omitted legacy checksums. Shared
+  protocol4 rejects older simulators; installed services remain on protocol2.
+  `sim/wonder.ts`, `view/wonder.ts`, `tools/wonder_smoke.mts`.
+
 ## Configurable population ceiling (#253)
 
 - **Owned:** `screensingleplayercreate.json` PopulationDropDown names label13516
@@ -36,7 +63,7 @@ off the reference; **measured** — fitted to a reference screenshot;
   uncapped rules, without inserting a new checksum field. Explicit limits travel
   in v2 configs/records and JSON snapshots; v1 cannot carry one. Shared protocol3
   rejects older simulators and incompatible checkpoints rather than silently
-  ignoring the ceiling. Installed services remain release-pinned on protocol2;
+  ignoring the ceiling (subsequently protocol4 for Wonder victory). Installed services remain release-pinned on protocol2;
   this change does not deploy or migrate their live state.
 - Native factory-default policy and Gothic bonus-versus-housing runtime checks
   on a matching executable remain unverified. `src/sim/population.ts`,

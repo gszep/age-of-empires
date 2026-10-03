@@ -4,6 +4,7 @@ import { checksumState } from '../sim/checksum';
 import { matchOver } from '../sim/regicide';
 import { validRecordedMode } from '../match-setup';
 import { validPopulationLimit } from '../sim/population';
+import { validWonderVictory } from '../sim/wonder';
 import { describeObservation, observe } from '../sim/observe';
 import type { Command, PlayerId } from '../sim/types';
 import type { MatchConfig, MatchRecord, MatchResult, RejectedCommand, StrategyInputMessage } from '../protocol/types';
@@ -24,9 +25,10 @@ export async function runMatch(
   if (config.version !== 1 && config.version !== 2) throw new Error('unknown match format');
   if (config.version === 1 && config.mode !== undefined) throw new Error('game mode requires match format v2');
   if (config.version === 1 && config.populationLimit !== undefined) throw new Error('population limit requires match format v2');
+  if (config.version === 1 && config.wonderVictory !== undefined) throw new Error('Wonder victory requires match format v2');
   const maxTime = config.maxTimeSeconds ?? 1800;
   const decideInterval = config.decideIntervalSeconds ?? 0.5;
-  const state = createGame(config.seed, rules, config.civilizations, config.map ?? 'arabia', config.mode, config.populationLimit);
+  const state = createGame(config.seed, rules, config.civilizations, config.map ?? 'arabia', config.mode, config.populationLimit, config.wonderVictory);
   const rejectedCommands: RejectedCommand[] = [];
   const pendingRejections: Record<PlayerId, RejectedCommand[]> = { 1: [], 2: [] };
   const recordedCommands: MatchRecord['commands'] = [];
@@ -86,6 +88,7 @@ export async function runMatch(
   if (state.winner) result.winner = state.winner;
   if (state.draw) result.draw = true;
   const record: MatchRecord = {
+    ...(config.wonderVictory !== undefined ? { wonderVictory: config.wonderVictory } : {}),
     ...(config.populationLimit !== undefined ? { populationLimit: config.populationLimit } : {}),
     version: 2,
     seed: config.seed,
@@ -120,7 +123,10 @@ export function replayRecord(
   if (!validPopulationLimit(record.populationLimit) || (record.version === 1 && record.populationLimit !== undefined)) {
     return { ok: false, checked: 0, expected: 'valid population limit', actual: String(record.populationLimit) };
   }
-  const state = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode, record.populationLimit);
+  if (!validWonderVictory(record.wonderVictory) || (record.version === 1 && record.wonderVictory !== undefined)) {
+    return { ok: false, checked: 0, expected: 'valid Wonder victory setting', actual: String(record.wonderVictory) };
+  }
+  const state = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode, record.populationLimit, record.wonderVictory);
   const commands = [...record.commands];
   const checksums = new Map(record.checksums.map(entry => [entry.tick, entry.hash]));
   const lastTick = record.checksums.at(-1)?.tick ?? 0;

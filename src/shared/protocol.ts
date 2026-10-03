@@ -1,8 +1,8 @@
 import type { Command, GameState } from '../sim/types';
 import type { MatchSetup } from '../match-setup';
 
-/** v3: authoritative match population ceiling; older clients ignore it and must not simulate these matches. */
-export const SHARED_VERSION = 3;
+/** v4: opt-in Wonder countdown/win state; older simulators must not join these matches. */
+export const SHARED_VERSION = 4;
 export const SHARED_SPEEDS = [1, 1.5, 1.7, 2, 5, 10];
 export interface MatchSettings { paused: boolean; speed: number; generation: number }
 export type HostMessage =

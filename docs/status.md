@@ -35,7 +35,7 @@ resources. See [shared-play.md](shared-play.md).
 | Civilisations | Britons, Franks, Goths, Teutons, Japanese, Chinese and Byzantines with roster/research/bonus/art integration | [coverage](civilization-coverage.md), [bonus contract](civilization-bonuses.md); wider catalogue is inventory only |
 | Buildings/specialists | Additional TCs, fortifications with authoritative automatic gate state, monasteries/relics, siege, conversion snapshots, nested cargo capacity and owner-preserving mobile-carrier conversion | [buildings](civ-buildings-integration.md), [specialists](civ-specialists-integration.md), [conversion](conversion-reference-checklist.md); gate trigger distance/timing remain inferred under#133 |
 | Naval | Briton dock roster, transports, trade cogs and fish traps; enabled profiles' regional ships; distinct snapper/salmon/dorado and shore fish | Owned DAT/task/art imports; all four fish identities gather/deplete/bank in open and imported modes and retain original art in fog; no claim of every native exception |
-| Modes/shared play | Solo and household two-seat play, reconnect/checkpoints, Regicide/Treason, locked diplomacy/tribute, configurable population ceilings through menu/headless/replays | [shared play](shared-play.md), [source audit](shared-reference-audit.md); source protocol3 population support is verified privately; installed releases remain protocol2 |
+| Modes/shared play | Solo and household two-seat play, reconnect/checkpoints, Regicide/Treason, locked diplomacy/tribute, configurable population ceilings and opt-in Wonder victory through menu/headless/replays | [shared play](shared-play.md), [Wonder evidence](wonder-victory.md); source protocol4 is verified privately; installed releases remain protocol2 |
 | Maps | Arabia, Black Forest, Islands, Windsor, Senlac and painted proof; RMS-inspired phases, surveys, elevation, relics and corrected spacing; global Islands fish reach both resource-islet coasts | [generation design](map-generation-design.md); home-land mirroring and native placement/slope semantics remain inferred; native Islands seasons/additional objects tracked in#274 |
 | Rendering | Owned x1/x2 sprites and ordinary A/B attack graphics, masks/contours/shadows, fog memory, source-backed water/foam, native blend families, terrain plants and their shadows | [blend coverage](terrain-blend-coverage.md), [decode contract](block-decode-contract.md); native compositor and exact calibration remain open |
 | UI | Native command cells/icons/cursors, garrison/training/production controls, notifications/confirmation/end screens, map menu and persistent options | [UI reference](ui-reference.md), [feedback review](reviews/2026-09-24-issue58.md); browser text rasterisation and some surfaces remain approximations |
@@ -116,9 +116,9 @@ replay and private host/guest checkpoint/rejoin. Paid production stays at100%
 when the chosen ceiling is full despite spare houses, then releases after a loss;
 Gothic Imperial+10 still requires housing. Native selector values were captured
 on the installed newer DE build; factory default and pinned-build bonus runtime
-calibration remain open. October3 checkpoint:1356 tests passed/8 skipped,
-build,192 owned import/tool tests and real-browser gate; six mapped acceptance
-scenarios passed. A stale wrong-rules replay fixture gained its missing seed to
+calibration remain open. The combined October3 population/Wonder checkpoint
+passes1363 tests/8 skipped, build,193 owned import/tool tests and real-browser
+gate; six mapped acceptance scenarios passed. A stale wrong-rules replay fixture gained its missing seed to
 reach the original popup assertion; no assertion or clock was relaxed.
 
 Established historical measurements, with their original scope:
@@ -148,7 +148,9 @@ are checked against the tracker by `node tools/check-current-docs.mjs`.
 Not yet delivered: campaigns, public multiplayer, selectable formations,
 unlocked diplomatic relations/cooperative victories, native final compositing,
 all owned civilisations, complete RMS/elevation fidelity and several HUD surfaces.
-The wonder's countdown is approved but unimplemented; settings are no longer its
-blocker. The [DAT](dat-field-audit.md), [manual](manual-audit.md) and
+The Wonder has an opt-in fixed200-year completion countdown with owned banners,
+public focus/notices and solo/shared/replay preservation; automatic map-size
+defaults and matching-build calibration remain open ([evidence](wonder-victory.md)).
+The [DAT](dat-field-audit.md), [manual](manual-audit.md) and
 [provenance](genie-rms-provenance.md) audits distinguish actual remaining gaps from
 old requests that were already implemented.

@@ -449,9 +449,8 @@ describe('the monk', () => {
 });
 
 describe('the wonder', () => {
-  // Issue #27, shipped deliberately without a victory condition: it stands
-  // there and it can be knocked down, and that decision is the human's, in
-  // backlog.md. Everything it *is* comes from the DAT.
+  // #27's original monument remains cosmetic when #110's countdown is off.
+  // Its building statistics still come from the DAT.
   it.skipIf(!importedRules)('costs and stands as the DAT says', () => {
     const rules = importedRules!.buildings.wonder;
     expect(rules.age).toBe(3);
@@ -466,9 +465,8 @@ describe('the wonder', () => {
     expect(rules.accepts).toEqual([]);
   });
 
-  it('wins nothing by standing', () => {
-    // The check that keeps the omission honest: if a countdown is added later,
-    // this test is what it has to argue with.
+  it('wins nothing by standing in a legacy/conquest match', () => {
+    // Omitted victory settings must preserve old recordings and saved matches.
     const state = createGame(130, importedRules);
     for (const player of [1, 2] as const) {
       state.players[player].age = 3;

@@ -102,6 +102,13 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   that ceiling; civilisation bonuses such as Gothic Imperial+10 apply separately.
   Start Game, Restart, reload, saved setup and replays retain the choice. Headless
   matches and batches accept `--population-limit 25` (or another offered value).
+- **Wonder:200 Years** in Game Settings enables an optional completion countdown.
+  Complete a Wonder and defend it for1000game seconds to win; destroying it
+  cancels its timer. The original player banner shows the years remaining and
+  focuses the Wonder when clicked. The setting survives restart/reload/shared
+  checkpoints and replays; headless runners accept `--wonder-victory true`.
+  This fixed setting is separate from native automatic map-size defaults and
+  relic victory. [Evidence and remaining calibration](docs/wonder-victory.md).
 - **Regicide Mode** in Game Settings starts each side with ten villagers,
   a King and a Castle. Losing the King ends the match, including loss aboard a
   sinking transport; simultaneous King loss is a draw. Mode persists through

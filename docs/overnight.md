@@ -107,8 +107,9 @@ changes and verify the installed-CLI mock-provider smoke before promising readin
 
 Named here so a run does not re-derive the reason; each has an issue.
 
-- **The wonder's exact countdown** (#110) — the human approved cosmetic first,
-  then a reference countdown after settings. Settings now exist; the remaining
-  block is the map-size timer defaults and query-clock units, not permission.
-  The task120/announcement/manual/AI read is recorded on the issue. Relics have
-  collection/deposit/income and placement; their remaining placement calibration is #130.
+- **Automatic native Wonder timer defaults** (#110) — a fixed opt-in200-year
+  countdown is now implemented, supported by newer-build completion/clock
+  captures and owned strings. Other map defaults, native boundary/tie semantics
+  and matching-build confirmation remain open; see`docs/wonder-victory.md`.
+  Relics have collection/deposit/income and placement; their remaining placement
+  calibration is#130 and relic victory is not implied by the Wonder option.

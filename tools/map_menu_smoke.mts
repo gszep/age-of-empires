@@ -84,6 +84,7 @@ try {
   const before = await query(solo, { type: 'sim' });
   assert.deepEqual(await solo.$$eval('#population-limit option', options => options.map(o => Number((o as HTMLOptionElement).value))), POPULATION_LIMITS);
   await solo.select('#population-limit', '25');
+  await solo.click('#wonder-victory');
   assert.equal((await query(solo, { type: 'sim' })).synchronizationHash, before.synchronizationHash, 'population edits do not change a live match');
   await solo.select('#map-choice', 'islands');
   await fillSeed(solo, '2');
@@ -97,6 +98,7 @@ try {
   await choose(solo, 'islands', 2);
   const islands = await query(solo, { type: 'snapshot' });
   assert.equal(islands.populationLimit, 25);
+  assert.equal(islands.wonderVictory, true);
   assert.equal((await query(solo, { type: 'sim' })).connection.setup.populationLimit, 25);
   assert.deepEqual(islands.terrain, createGame(2, rules, undefined, 'islands').terrain);
   assert.equal(new URL(solo.url()).searchParams.get('solo'), '1');
@@ -109,6 +111,7 @@ try {
   assert.equal(resumed.connection.setup.seed, 2);
   assert.equal(resumed.connection.setup.mode ?? 'random-map', 'random-map');
   assert.equal(resumed.connection.setup.populationLimit, 25);
+  assert.equal(resumed.connection.setup.wonderVictory, true);
   assert.equal((await query(solo, { type: 'snapshot' })).populationLimit, 25);
   assert(resumed.tick >= tick, 'reload resumes rather than re-dealing the chosen board');
   console.log('Solo: six maps, safe text input, seed validation, Islands seed 2 and reload persistence');
@@ -137,7 +140,7 @@ try {
   assert.equal(await solo.evaluate(() => JSON.parse(localStorage.getItem('open-empires-lab:map-setup')!).populationLimit), 500);
   console.log('Population menu: source-measured choices, no live mutation, chosen 25/500, reload/restart and preferences');
   console.log('Solo: large/small map transitions rebuild terrain; Random creates a new seed');
-  const replay = await runMatch({ version: 2, seed: 253, populationLimit: 25, maxTimeSeconds: 5 },
+  const replay = await runMatch({ version: 2, seed: 253, populationLimit: 25, wonderVictory: true, maxTimeSeconds: 5 },
     { 1: { decide: () => [] }, 2: { decide: () => [] } }, rules);
   await solo.evaluate(record => {
     const input = document.querySelector<HTMLInputElement>('#replay-file')!, transfer = new DataTransfer();
@@ -147,6 +150,7 @@ try {
   await solo.waitForFunction(() => (globalThis as any).__populationReplay().verified === 1, { timeout: 30_000 });
   assert.equal(await solo.evaluate(() => (globalThis as any).__populationReplay().failed), false);
   assert.equal((await query(solo, { type: 'snapshot' })).populationLimit, 25);
+  assert.equal((await query(solo, { type: 'snapshot' })).wonderVictory, true);
   console.log('Population replay: actual file input restores 25 and verifies the real-clock headless checksum');
   await solo.close();
 
@@ -158,6 +162,7 @@ try {
   await guest.keyboard.press('F10');
   assert(await guest.$eval('#map-choice', e => (e as HTMLSelectElement).disabled));
   assert(await guest.$eval('#population-limit', e => (e as HTMLSelectElement).disabled));
+  assert(await guest.$eval('#wonder-victory', e => (e as HTMLInputElement).disabled));
   assert(await guest.$eval('#map-setup button[type="submit"]', e => (e as HTMLButtonElement).disabled));
   await guest.click('#menu-dialog [data-options]');
   await guest.waitForSelector('#options-dialog[open]');
@@ -169,19 +174,23 @@ try {
   assert.equal((await query(host, { type: 'sim' })).connection.speed, 4);
   console.log('Shared options: local saved speed never overwrites host on join/reload; explicit Apply uses shared settings');
   await host.bringToFront(); await host.keyboard.press('F10'); await host.select('#population-limit', '50');
+  if (!(await host.$eval('#wonder-victory', e => (e as HTMLInputElement).checked))) await host.click('#wonder-victory');
   await choose(host, 'islands', 2);
   await until(guest, "s.connection.setup.map === 'islands' && s.connection.setup.seed === 2");
   await host.keyboard.press('F3'); await until(host, 's.connection.paused'); await until(guest, 's.connection.paused');
   assert.equal((await query(host, { type: 'sim' })).synchronizationHash, (await query(guest, { type: 'sim' })).synchronizationHash);
   assert.equal((await query(host, { type: 'snapshot' })).populationLimit, 50);
   assert.equal((await query(guest, { type: 'snapshot' })).populationLimit, 50);
+  assert.equal((await query(guest, { type: 'snapshot' })).wonderVictory, true);
   const savedSetup = JSON.parse(readFileSync(checkpoint, 'utf8')).setup;
   assert.equal(savedSetup.map, 'islands'); assert.equal(savedSetup.seed, 2);
   assert.equal(savedSetup.mode ?? 'random-map', 'random-map');
   assert.equal(savedSetup.populationLimit, 50);
+  assert.equal(savedSetup.wonderVictory, true);
   assert.equal(JSON.parse(readFileSync(checkpoint, 'utf8')).state.populationLimit, 50);
   await guest.reload({ waitUntil: 'domcontentloaded' }); await ready(guest);
   assert.equal((await query(guest, { type: 'snapshot' })).populationLimit, 50, 'rejoin preserves the host ceiling');
+  assert.equal((await query(guest, { type: 'snapshot' })).wonderVictory, true);
   assert.equal((await query(host, { type: 'sim' })).synchronizationHash, (await query(guest, { type: 'sim' })).synchronizationHash);
   console.log('Shared: host menu changes both clients; guest is read-only; setup is checkpointed');
   assert.deepEqual(errors, []);

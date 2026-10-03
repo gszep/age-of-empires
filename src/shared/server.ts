@@ -7,6 +7,7 @@ import { FALLBACK_RULES, rulesFromManifest, TICK_SECONDS } from '../sim/data';
 import { createGame } from '../sim/game';
 import { validGameMode, validMatchSetup } from '../match-setup';
 import { validPopulationLimit } from '../sim/population';
+import { validWonderVictory } from '../sim/wonder';
 import { matchOver } from '../sim/regicide';
 import { validateCommand } from '../protocol/validate';
 import type { PlayerId } from '../sim/types';
@@ -43,7 +44,7 @@ export function sharedMatchPlugin(root: string, checkpointPath = resolve(root, '
           throw error;
         }
         if (!saved || saved.version !== SHARED_VERSION || saved.rulesHash !== rulesHash || !validGameMode(saved.state?.mode)
-          || !validPopulationLimit(saved.state?.populationLimit)) {
+          || !validPopulationLimit(saved.state?.populationLimit) || !validWonderVictory(saved.state?.wonderVictory)) {
           throw new SharedCheckpointError(checkpoint, 'uses different rules/version');
         }
         match.state = { ...saved.state, rules };
@@ -51,7 +52,7 @@ export function sharedMatchPlugin(root: string, checkpointPath = resolve(root, '
         match.humanTwo = saved.humanTwo;
         match.setup = validMatchSetup(saved.setup) ? saved.setup : undefined;
         if (match.setup && ((match.setup.mode ?? 'random-map') !== (match.state.mode ?? 'random-map')
-          || match.setup.populationLimit !== match.state.populationLimit)) {
+          || match.setup.populationLimit !== match.state.populationLimit || !!match.setup.wonderVictory !== !!match.state.wonderVictory)) {
           throw new SharedCheckpointError(checkpoint, 'has inconsistent game setup metadata');
         }
       }
@@ -107,9 +108,10 @@ export function sharedMatchPlugin(root: string, checkpointPath = resolve(root, '
                 const resume = message.resume;
                 if (resume && !validGameMode(resume.mode)) { error('Invalid game mode'); return; }
                 if (resume && !validPopulationLimit(resume.populationLimit)) { error('Invalid population limit'); return; }
+                if (resume && !validWonderVictory(resume.wonderVictory)) { error('Invalid Wonder victory setting'); return; }
                 if (resume && validMatchSetup(message.setup)
                   && ((message.setup.mode ?? 'random-map') !== (resume.mode ?? 'random-map')
-                    || message.setup.populationLimit !== resume.populationLimit)) { error('Inconsistent game setup metadata'); return; }
+                    || message.setup.populationLimit !== resume.populationLimit || !!message.setup.wonderVictory !== !!resume.wonderVictory)) { error('Inconsistent game setup metadata'); return; }
                 if (pristine && player === 1 && resume && Number.isInteger(resume.tick)
                   && Array.isArray(resume.entities) && resume.players && resume.visibility
                   && createHash('sha256').update(JSON.stringify(resume.rules)).digest('hex') === rulesHash) {
@@ -135,7 +137,7 @@ export function sharedMatchPlugin(root: string, checkpointPath = resolve(root, '
                 broadcast({ type: 'settings', settings: match.settings });
               } else if (message.type === 'restart' && player === 1) {
                 if (!validMatchSetup(message)) { error('Invalid map or seed'); return; }
-                match.restart(message.seed, message.map, message.civilizations, message.mode ?? 'random-map', message.populationLimit);
+                match.restart(message.seed, message.map, message.civilizations, message.mode ?? 'random-map', message.populationLimit, message.wonderVictory);
                 broadcast(match.snapshot());
                 save();
               }

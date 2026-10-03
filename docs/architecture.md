@@ -99,6 +99,7 @@ read-only King-position channel, never mutate fog. Observation v8 exposes mode,
 draw, temporary positions and run-length encoded explored terrain/elevation for
 fog-safe coastal planning. New records/results are v2 with mode; legacy v1
 recordings are accepted only without a mode field and mean random map. Shared
-protocol3 additionally carries the authoritative match population ceiling and
+protocol4 additionally carries the authoritative match population ceiling and
+opt-in Wonder completion deadlines/win state, and
 rejects old simulation clients; dev snapshot3 admits mode-less v2
 snapshots as legacy random maps. A mode is not inferred from a map filename.

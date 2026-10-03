@@ -52,6 +52,10 @@ if (args.interval) config.decideIntervalSeconds = Number(args.interval);
 if (args.map) config.map = args.map;
 if (args.mode) config.mode = args.mode as MatchConfig['mode'];
 if (args['population-limit'] !== undefined) config.populationLimit = Number(args['population-limit']);
+if (args['wonder-victory'] !== undefined) {
+  if (!['true', 'false'].includes(args['wonder-victory'])) throw new Error('--wonder-victory must be true or false');
+  config.wonderVictory = args['wonder-victory'] === 'true';
+}
 if (!validateMatchConfig(config)) {
   console.error(`invalid match config ${explain(validateMatchConfig)}`);
   process.exit(2);

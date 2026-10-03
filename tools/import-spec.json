@@ -2424,7 +2424,8 @@
       "dialogconfirmrestartreplay",
       "GameNotificationPanel",
       "popupmessage",
-      "technologyprogresspanel"
+      "technologyprogresspanel",
+      "wonderpanel"
     ],
     "iconCategories": {
       "Buildings": "entities",
@@ -2449,6 +2450,7 @@
       "flare"
     ],
     "materialPrefixes": [
+      "WonderBanner",
       "IconAction",
       "ButtonsShield",
       "MinimapColorFull",

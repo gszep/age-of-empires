@@ -2331,6 +2331,11 @@ def extract(
                 # Map setup labels and the three shipped random-map names (#144).
                 ("mapType", 9691), ("mapSeed", 10658), ("startGame", 9472),
                 ("populationLimit", 13516), ("populationLimitHelp", 93516),
+                ("wonderTimer", 11301), ("wonderYears", 11300),
+                ("wonderStartedSelf", 3058), ("wonderStartedOther", 3019),
+                ("wonderCompletedSelf", 3020), ("wonderCompletedEnemy", 3022),
+                ("wonderDestroyedSelf", 3023), ("wonderDestroyedOther", 3024),
+                ("wonderTimerSelf", 300180), ("wonderTimerEnemy", 300182),
                 ("civilization", "IDS_MPS_CIVILIZATION"),
                 ("gameSettings", 9682), ("randomSeed", 10107),
                 ("regicideMode", 13078), ("regicideHelp", 13081), ("regicideObjective", 9846),

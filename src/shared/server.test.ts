@@ -50,6 +50,7 @@ it('carries Regicide/Treason over the real wire, rejects old clients and bad mod
       if (restored) {
         expect(joined.setup.map).toBe('islands'); expect(joined.setup.seed).toBe(131);
         expect(joined.setup.populationLimit).toBe(25); expect(joined.state.populationLimit).toBe(25);
+        expect(joined.setup.wonderVictory).toBe(true); expect(joined.state.wonderVictory).toBe(true);
         continue;
       }
       socket.send(JSON.stringify({ type: 'command', command: { kind: 'treason', player: 1, castleId: castle.id } }));
@@ -60,7 +61,7 @@ it('carries Regicide/Treason over the real wire, rejects old clients and bad mod
       expect(paid.state.players[1].gold).toBe(500); expect(paid.state.treasonUntil['1']).toBeGreaterThan(paid.state.tick);
       expect((await request({ type: 'restart', map: 'islands', seed: 131, mode: 'king-hunt' }, 'error')).reason).toContain('Invalid');
       expect((await request({ type: 'restart', map: 'islands', seed: 131, populationLimit: 26 }, 'error')).reason).toContain('Invalid');
-      const reset = await request({ type: 'restart', map: 'islands', seed: 131, mode: 'regicide', populationLimit: 25 }, 'snapshot');
+      const reset = await request({ type: 'restart', map: 'islands', seed: 131, mode: 'regicide', populationLimit: 25, wonderVictory: true }, 'snapshot');
       expect(reset.state.populationLimit).toBe(25); expect(reset.setup.populationLimit).toBe(25);
       expect(reset.state.mode).toBe('regicide'); expect(reset.state.treasonUntil).toBeUndefined();
       expect(reset.state.entities.filter((e: any) => e.kind === 'king')).toHaveLength(2);

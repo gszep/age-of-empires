@@ -424,6 +424,15 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 .dialog button:hover { filter: brightness(1.2); }
 .dialog :disabled { opacity: 0.45; cursor: default; }
 #menu-dialog { max-height: 95vh; overflow-y: auto; }
+/* WonderPanel's90×457 flag and45/34/65-point labels; boxes come from widgetui. */
+.wonder-banner { position: absolute; padding: 0; border: 0; background-color: transparent; background-size: 100% 100%; color: white; pointer-events: auto; cursor: pointer; }
+/* The menu's PNG has a transparent276px box; visible timer controls must win
+ * hit testing there while the flag's upper cloth remains behind menu artwork. */
+.wonder-banner span { position: absolute; z-index: 1; pointer-events: auto; display: block; text-align: center; background-size: contain; background-repeat: no-repeat; text-shadow: 1px 1px 1px black, -1px -1px 1px black; }
+.wonder-years { font-size: calc(45px * var(--text-scale)); }
+.wonder-unit { font-size: calc(34px * var(--text-scale)); }
+.wonder-owner { font-size: calc(65px * var(--text-scale)); }
+.wonder-banner.open-banner { background-color: #241c10; clip-path: polygon(0 0,100% 0,100% 90%,50% 100%,0 90%); }
 /* Compact project map launcher: reference labels, existing dialog palette. */
 #map-setup {
   margin: calc(32px * var(--ui-scale)) 0;

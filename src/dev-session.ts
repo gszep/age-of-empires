@@ -18,6 +18,7 @@ import { validGameMode, validMatchSetup, type MatchSetup } from './match-setup';
 import { seedFrom } from './sim/random';
 import { civilizationRules } from './sim/civilizations';
 import { validPopulationLimit } from './sim/population';
+import { validWonderVictory } from './sim/wonder';
 
 const KEY = 'open-empires-lab:dev-session';
 /**
@@ -64,6 +65,7 @@ export function loadSession(rules: GameRules): GameState | undefined {
     if (!compatibleSnapshot(snapshot) || snapshot.rulesOrigin !== rules.origin) return undefined;
     if (!validGameMode(snapshot.state.mode)) return undefined;
     if (!validPopulationLimit(snapshot.state.populationLimit)) return undefined;
+    if (!validWonderVictory(snapshot.state.wonderVictory)) return undefined;
     if (![1, 2].every(player => civilizationRules(rules, snapshot.state.players[player as 1 | 2]?.civilization))) return undefined;
     return { ...snapshot.state, rules };
   } catch {
@@ -85,6 +87,7 @@ export function loadSessionSetup(rules: GameRules): MatchSetup | undefined {
     if (saved && compatibleSnapshot(saved) && saved.rulesOrigin === rules.origin && validMatchSetup(saved.setup)
       && seedFrom(saved.setup.seed) === saved.state.matchSeed
       && saved.setup.populationLimit === saved.state.populationLimit
+      && !!saved.setup.wonderVictory === !!saved.state.wonderVictory
       && (saved.setup.mode ?? 'random-map') === (saved.state.mode ?? 'random-map')) return saved.setup;
   } catch { /* old or unavailable session */ }
   return;

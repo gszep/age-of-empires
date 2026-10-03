@@ -108,6 +108,7 @@ const seedParam = Number(pageParams.get('seed'));
 const seedFixed = Number.isInteger(seedParam) && seedParam > 0 && seedParam <= MAX_MAP_SEED ? seedParam : undefined;
 const initialSetup: MatchSetup = { map: mapType, seed: seedFixed ?? (mapParam === null ? mapPreference?.seed : undefined) ?? 42 };
 if (mapPreference?.populationLimit !== undefined) initialSetup.populationLimit = mapPreference.populationLimit;
+if (mapPreference?.wonderVictory) initialSetup.wonderVictory = true;
 if (pageParams.get('mode') === 'regicide' || (!pageParams.has('mode') && mapPreference?.mode === 'regicide')) initialSetup.mode = 'regicide';
 if (mapPreference?.civilizations && [1, 2].every(player => civilizationRules(rules, mapPreference.civilizations![player as 1 | 2]))) {
   initialSetup.civilizations = mapPreference.civilizations;
@@ -118,14 +119,14 @@ const savedSetup = loadSessionSetup(rules);
 const hostResume = loadSession(rules);
 loading.textContent = 'Connecting to shared match…';
 const shared = await connectSharedMatch(
-  () => hostResume ?? createGame(initialSetup.seed, rules, initialSetup.civilizations, initialSetup.map, initialSetup.mode, initialSetup.populationLimit),
+  () => hostResume ?? createGame(initialSetup.seed, rules, initialSetup.civilizations, initialSetup.map, initialSetup.mode, initialSetup.populationLimit, initialSetup.wonderVictory),
   notice => { loading.textContent = notice; },
   hostResume ? savedSetup : initialSetup,
 );
 loading.remove();
 const localPlayer: PlayerId = shared?.player ?? 1;
 if (shared) rules = shared.state.rules;
-let game = shared?.state ?? restored ?? createGame(initialSetup.seed, rules, initialSetup.civilizations, initialSetup.map, initialSetup.mode, initialSetup.populationLimit);
+let game = shared?.state ?? restored ?? createGame(initialSetup.seed, rules, initialSetup.civilizations, initialSetup.map, initialSetup.mode, initialSetup.populationLimit, initialSetup.wonderVictory);
 const playerRules = (owner: Entity['owner'] = localPlayer): GameRules => rulesForPlayer(game, owner);
 const importedEntity = (key: string, owner: number = localPlayer) => {
   const civ = owner === 1 || owner === 2 ? game.players[owner].civilization : undefined;
@@ -220,8 +221,8 @@ function startReplay(raw: unknown): void {
   if (shared) { hud.showPopup('Open a standalone game to watch a replay'); return; }
   const record = raw as MatchRecord;
   if (!record || !validRecordedMode(record.version, record.mode) || !Array.isArray(record.commands) || !Array.isArray(record.checksums)
-    || (record.version === 1 && record.populationLimit !== undefined)
-    || !validMatchSetup({ map: record.map ?? 'arabia', seed: record.seed, mode: record.mode, populationLimit: record.populationLimit })) {
+    || (record.version === 1 && (record.populationLimit !== undefined || record.wonderVictory !== undefined))
+    || !validMatchSetup({ map: record.map ?? 'arabia', seed: record.seed, mode: record.mode, populationLimit: record.populationLimit, wonderVictory: record.wonderVictory })) {
     hud.showPopup('Not a valid replay file');
     return;
   }
@@ -234,9 +235,10 @@ function startReplay(raw: unknown): void {
   clearSession();
   // A record from before civilisations were written down replays as whatever
   // the content is for, which is what it was played as.
-  game = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode, record.populationLimit);
+  game = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode, record.populationLimit, record.wonderVictory);
   activeSetup = { map: record.map ?? 'arabia', seed: record.seed, mode: record.mode, civilizations: record.civilizations,
-    ...(record.populationLimit !== undefined ? { populationLimit: record.populationLimit } : {}) };
+    ...(record.populationLimit !== undefined ? { populationLimit: record.populationLimit } : {}),
+    ...(record.wonderVictory ? { wonderVictory: true } : {}) };
   setupKnown = true;
   cameraCenter = homeCamera(game);
   selectedIds = [];
@@ -451,6 +453,10 @@ function createHud(): Hud {
       playSound('flare');
     },
     onSelectIdleVillager: () => selectIdleVillager(),
+    onWonderFocus: id => {
+      const e = game.entities.find(e => e.id === id && e.kind === 'wonder' && !e.dead);
+      if (e) cameraCenter = elevatedWorldToIso(game, e.position.x, e.position.y);
+    },
     onSelectMember: id => {
       if (game.entities.some(e => e.id === id && !e.dead)) selectedIds = [id];
       hud.setSelection(selectionInfo());
@@ -489,7 +495,7 @@ function createHud(): Hud {
 
 function configureMapMenu(target: Hud): void {
   target.configureMapMenu(mapChoices(messages), { ...activeSetup, mode: game.mode ?? 'random-map',
-    populationLimit: game.populationLimit ?? rules.populationLimit }, !shared || localPlayer === 1, messages, setupKnown);
+    populationLimit: game.populationLimit ?? rules.populationLimit, wonderVictory: game.wonderVictory }, !shared || localPlayer === 1, messages, setupKnown);
   const profiles = [rules, ...Object.values(rules.civilizations ?? {}).filter(profile => profile.civilization.enabled !== false)];
   target.configureCivilizations(profiles.map(profile => ({ id: profile.civilization.key,
     label: profile.civilization.displayName ?? profile.civilization.name })),
@@ -580,10 +586,10 @@ function restart(setup: MatchSetup | undefined = setupKnown ? activeSetup : unde
   if (setup.civilizations && ![1, 2].every(player => civilizationRules(rules, setup.civilizations![player as 1 | 2]))) return false;
   if (shared) {
     if (localPlayer !== 1) { hud.showMessage('Ysgramor starts a new match'); return false; }
-    return shared.send({ type: 'restart', seed: setup.seed, map: setup.map, civilizations: setup.civilizations, mode: setup.mode, populationLimit: setup.populationLimit });
+    return shared.send({ type: 'restart', seed: setup.seed, map: setup.map, civilizations: setup.civilizations, mode: setup.mode, populationLimit: setup.populationLimit, wonderVictory: setup.wonderVictory });
   }
   const sides = setup.civilizations ?? { 1: game.players[1].civilization, 2: game.players[2].civilization };
-  const next = createGame(setup.seed, rules, sides, setup.map, setup.mode, setup.populationLimit);
+  const next = createGame(setup.seed, rules, sides, setup.map, setup.mode, setup.populationLimit, setup.wonderVictory);
   replay = undefined;
   clearSession();
   activeSetup = setup;
@@ -2130,6 +2136,7 @@ renderer.setAnimationLoop(now => {
     if (hud.diplomacy.open) hud.diplomacy.update(diplomacyModel());
     hud.updateProduction(productionItems());
     hud.updateScore(scoreRows());
+    hud.wonders.update(game, localPlayer, { 1: scoreRows()[0].name, 2: scoreRows()[1].name });
     hud.setCommands(currentCommands());
     hud.setSelection(selectionInfo());
     hud.minimap.draw(game, isoToWorld(cameraCenter.x, cameraCenter.y), {
@@ -2139,7 +2146,7 @@ renderer.setAnimationLoop(now => {
     if (game.draw && !ended) {
       ended = true;
       hud.diplomacy.close();
-      hud.showPopup(`${(messages.gameOver ?? 'Game over.').split('.')[0]}.\nDraw: both Kings were lost in the same tick.`);
+      hud.showPopup(`${(messages.gameOver ?? 'Game over.').split('.')[0]}.\n${game.wonderDraw ? 'Draw: both Wonder countdowns expired together.' : 'Draw: both Kings were lost in the same tick.'}`);
     }
     if (game.winner && !ended) {
       ended = true;

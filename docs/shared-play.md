@@ -58,13 +58,16 @@ and requires reloading matching client code.
 
 ## Match behaviour
 
-Current source uses **protocol3** for configurable population ceilings (#253).
+Current source uses **protocol4** for configurable population ceilings (#253)
+and optional Wonder countdowns (#110).
 The installed release-pinned services described above remain on protocol2.
 A future rollout needs matching host/client code and an explicit checkpoint
 plan; no protocol2 checkpoint migration or deployment is part of this change.
 The host owns the population selection, includes it in authoritative snapshots
 and setup metadata, and preserves it across restart/checkpoint/rejoin. Guests
-see a disabled selector. Older clients are rejected before simulation.
+see disabled setup controls. Wonder deadlines are authoritative state and travel
+with snapshots/checkpoints; ordinary ordered ticks reproduce expiry and victory.
+Older clients are rejected before simulation.
 
 The server imports `src/sim/` and owns the clock, command order and AI.
 Clients receive the host's actual rules and current snapshot, then reproduce

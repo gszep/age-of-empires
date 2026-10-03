@@ -14,6 +14,8 @@ import { DiplomacyDialog, type TributeDraft } from './diplomacy';
 import { OptionsDialog } from './options';
 import type { Preferences } from './preferences';
 import { POPULATION_LIMITS } from '../sim/population';
+import { WONDER_YEARS } from '../sim/wonder';
+import { WonderPanel } from './wonder';
 import type { GameState, PlayerId, Point, ReadonlyGameState } from '../sim/types';
 
 /**
@@ -90,6 +92,7 @@ export interface SelectionInfo {
 }
 
 export interface HudCallbacks {
+  onWonderFocus?(id: number): void;
   onOptions?(): void;
   onPreferences?(preferences: Preferences): void;
   /** A grid button was pressed; `shift` is the reference's batch modifier. */
@@ -118,6 +121,7 @@ export interface ProductionItem {
 }
 
 export class Hud {
+  wonders: WonderPanel;
   private civilizationName = 'Britons';
   root: HTMLElement;
   minimap: Minimap;
@@ -159,6 +163,7 @@ export class Hud {
     parent.appendChild(this.root);
     this.installFonts();
     this.build();
+    this.wonders = new WonderPanel(this.root, ui, strings, text => this.showMessage(text), id => this.callbacks.onWonderFocus?.(id));
     installUiColors(this.root, ui, new URLSearchParams(location.search).get('uiPalette') ?? 'default');
     placeFeedback(this.root, ui);
     this.diplomacy = new DiplomacyDialog(this.root, ui, strings,
@@ -309,6 +314,8 @@ export class Hud {
           <input id="regicide-mode" name="regicide" type="checkbox">
           <label for="population-limit" data-map-label="populationLimit">Population:</label>
           <select id="population-limit" name="populationLimit"></select>
+          <label for="wonder-victory" id="wonder-victory-label">Wonder: 200 Years</label>
+          <input id="wonder-victory" name="wonderVictory" type="checkbox">
           <label for="map-seed" data-map-label="mapSeed">Seed</label>
           <div class="seed-row">
             <input id="map-seed" name="seed" type="number" min="1" max="4294967295" step="1" inputmode="numeric" placeholder="Random">
@@ -438,7 +445,8 @@ export class Hud {
       const mode = this.root.querySelector<HTMLInputElement>('#regicide-mode')!.checked ? 'regicide' : 'random-map';
       const limit = this.root.querySelector<HTMLSelectElement>('#population-limit')!.value;
       const populationLimit = limit === '' ? undefined : Number(limit);
-      if (this.callbacks.onStartMatch({ map, seed, civilizations, mode, populationLimit })) this.toggleMenu(false);
+      const wonderVictory = this.root.querySelector<HTMLInputElement>('#wonder-victory')!.checked;
+      if (this.callbacks.onStartMatch({ map, seed, civilizations, mode, populationLimit, wonderVictory })) this.toggleMenu(false);
     });
 
     this.root.addEventListener('pointerdown', event => event.stopPropagation());
@@ -620,6 +628,8 @@ export class Hud {
     if (setup.populationLimit === undefined) population.prepend(new Option('Default', ''));
     population.value = setup.populationLimit === undefined ? '' : String(setup.populationLimit);
     population.title = strings.populationLimitHelp ?? 'Select the maximum number of units each player can create.';
+    this.root.querySelector<HTMLInputElement>('#wonder-victory')!.checked = !!setup.wonderVictory;
+    this.root.querySelector('#wonder-victory-label')!.textContent = (strings.wonderTimer ?? 'Wonder: %d Years').replace('%d', String(WONDER_YEARS));
     const seed = this.root.querySelector<HTMLInputElement>('#map-seed')!;
     seed.value = setupKnown ? String(setup.seed) : '';
     seed.placeholder = strings.randomSeed ?? 'Random';

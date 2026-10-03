@@ -6,6 +6,7 @@ import { SHARED_VERSION, type HostMessage, type MatchSettings } from './protocol
 import { TickPlayback } from './playback';
 import { validGameMode, validMatchSetup, type MatchSetup } from '../match-setup';
 import { validPopulationLimit } from '../sim/population';
+import { validWonderVictory } from '../sim/wonder';
 
 const RECONNECT_DELAY_MS = 1500;
 
@@ -150,8 +151,9 @@ export class SharedClient {
           if (message.type === 'snapshot') {
             if (!validGameMode(message.state.mode)) { this.onNotice?.('Invalid game mode in snapshot'); socket.close(); return; }
             if (!validPopulationLimit(message.state.populationLimit)) { this.onNotice?.('Invalid population limit in snapshot'); socket.close(); return; }
+            if (!validWonderVictory(message.state.wonderVictory)) { this.onNotice?.('Invalid Wonder victory setting in snapshot'); socket.close(); return; }
             if (validMatchSetup(message.setup) && ((message.setup.mode ?? 'random-map') !== (message.state.mode ?? 'random-map')
-              || message.setup.populationLimit !== message.state.populationLimit)) {
+              || message.setup.populationLimit !== message.state.populationLimit || !!message.setup.wonderVictory !== !!message.state.wonderVictory)) {
               this.onNotice?.('Inconsistent game setup metadata'); socket.close(); return;
             }
             const changedMap = !this.state || !this.settings || this.settings.generation !== message.settings.generation

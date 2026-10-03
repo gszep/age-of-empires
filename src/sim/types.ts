@@ -271,6 +271,10 @@ export interface Projectile {
 }
 
 export interface GameState {
+  /** Opt-in fixed200-year Wonder victory. Absent preserves legacy conquest. */
+  wonderVictory?: boolean;
+  wonderDraw?: boolean;
+  wonderCountdowns?: { entityId: number; owner: PlayerId; finishTick: number }[];
   /** Explicit match ceiling, before civilisation bonuses; absent uses legacy rules. */
   populationLimit?: number;
   /** Absent in legacy saves/records means random map. */

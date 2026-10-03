@@ -16,6 +16,7 @@ import {
 import { random01, seedFrom } from './random';
 import { buildingLimitReached, buildingRulesFor, buildingRulesForEntity, combine, inheritConvertedUnit, playerAttributeFor, populationLimitFor, trainingAt, unitRulesFor, unitRulesForEntity } from './rules';
 import { validPopulationLimit } from './population';
+import { completeWonder, updateWonderVictory, validWonderVictory } from './wonder';
 import { entitiesWithGarrison, garrisonCount } from './garrison';
 import { civilizationRules, rulesForPlayer } from './civilizations';
 import { researchCostFor, researchSecondsFor, technologyFor, technologyRequirementsMet } from './technologies';
@@ -102,8 +103,9 @@ function freeSpot(state: GameState, at: Point): boolean {
 export function createGame(
   seed = 42, rules: GameRules = FALLBACK_RULES,
   civilizations: Record<PlayerId, string> = { 1: rules.civilization.key, 2: rules.civilization.key },
-  map = 'arabia', mode: GameMode = 'random-map', populationLimit?: number,
+  map = 'arabia', mode: GameMode = 'random-map', populationLimit?: number, wonderVictory?: boolean,
 ): GameState {
+  if (!validWonderVictory(wonderVictory)) throw new Error(`invalid Wonder victory setting ${wonderVictory}`);
   if (!validPopulationLimit(populationLimit)) throw new Error(`invalid population limit ${populationLimit}`);
   if (mode !== 'random-map' && mode !== 'regicide') throw new Error(`unknown game mode ${mode}`);
   // A civilisation label is not a ruleset; both players must resolve before
@@ -124,6 +126,7 @@ export function createGame(
     start.x = Math.round(width * (0.5 - (radius.min + Math.floor(random01(rng) * (radius.max - radius.min + 1))) / 100));
   }
   const state: GameState = {
+    ...(wonderVictory ? { wonderVictory: true } : {}),
     ...(populationLimit !== undefined ? { populationLimit } : {}),
     ...(mode === 'regicide' ? { mode } : {}),
     rules, seed: seedFrom(seed || 1), matchSeed: seedFrom(seed || 1), tick: 0, nextId: 1, width, height,
@@ -3421,6 +3424,7 @@ export function stepGame(state: GameState): void {
     if (site.buildProgress >= 1) {
       site.buildProgress = undefined;
       site.hp = Math.min(site.maxHp, Math.round(site.hp));
+      completeWonder(state, site);
       // Only a farm stores food. How *much* is a player attribute the mill's
       // technologies raise, but whether this building stores any at all is
       // still the building's own rule -- asking the player attribute first
@@ -3503,4 +3507,5 @@ export function stepGame(state: GameState): void {
     if (state.mode === 'regicide') state.draw = true;
     else state.winner = 2; // legacy conquest tie policy
   }
+  updateWonderVictory(state);
 }

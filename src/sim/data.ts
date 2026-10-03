@@ -1365,10 +1365,9 @@ export const FALLBACK_RULES: GameRules = {
     /**
      * Five tiles across, 4800 hit points, and 3500 build seconds spread across
      * however many villagers are on it -- all the DAT's own numbers. It stands
-     * there and it can be knocked down; **it wins nothing**. AoE2's wonder
-     * starts a countdown to victory, and whether this game should have one is
-     * the human's decision rather than this run's, so it is recorded in
-     * `backlog.md` and deliberately not built (issue #27).
+     * there and it can be knocked down. The opt-in Wonder victory setting
+     * starts its completion countdown; automatic map-size policy remains
+     * calibration work under#110.
      */
     wonder: {
       hillMode: 3,

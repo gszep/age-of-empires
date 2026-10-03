@@ -42,10 +42,11 @@ export class SharedMatch {
   }
 
   restart(seed: number, map: string, civilizations = { 1: this.state.players[1].civilization, 2: this.state.players[2].civilization },
-    mode: GameMode = this.state.mode ?? 'random-map', populationLimit = this.state.populationLimit): void {
-    this.state = createGame(seed, this.state.rules, civilizations, map, mode, populationLimit);
+    mode: GameMode = this.state.mode ?? 'random-map', populationLimit = this.state.populationLimit,
+    wonderVictory = this.state.wonderVictory): void {
+    this.state = createGame(seed, this.state.rules, civilizations, map, mode, populationLimit, wonderVictory);
     this.setup = { map, seed, civilizations, ...(mode === 'regicide' ? { mode } : {}),
-      ...(populationLimit !== undefined ? { populationLimit } : {}) };
+      ...(populationLimit !== undefined ? { populationLimit } : {}), ...(wonderVictory ? { wonderVictory: true } : {}) };
     this.pending = [];
     this.settings = { ...this.settings, paused: false, generation: this.settings.generation + 1 };
   }

@@ -1070,6 +1070,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
         expected = {
             "mapType": "Map Type", "mapSeed": "Seed", "startGame": "Start Game",
             "populationLimit": "Population:",
+            "wonderTimer": "Wonder: %d Years", "wonderYears": "Years",
             "gameSettings": "Game Settings", "randomSeed": "Random",
             "mapArabia": "Arabia", "mapBlackForest": "Black Forest", "mapIslands": "Islands",
         }
@@ -2318,6 +2319,19 @@ class UiImportIntegrationTest(unittest.TestCase):
         self.assertIn('"ResourceWood"', dumped)
         self.assertIn('"ResourceFood"', dumped)
         self.assertIn('"ResourceGold"', dumped)
+
+    def test_wonder_panel_retains_its_banner_anchor_boxes_and_original_art(self):
+        layout = self.result["layouts"]["wonderpanel"]
+        banner = layout["widgets"][0]["ChildWidgets"][0]["ChildWidgets"][0]
+        self.assertEqual(banner["Anchor"], {"xorigin": -105, "yorigin": -55})
+        flag = banner["ChildWidgets"][0]
+        self.assertEqual((flag["ViewPort"]["width"], flag["ViewPort"]["height"]), (90, 457))
+        children = {child["Name"]: child for child in flag["ChildWidgets"]}
+        self.assertEqual(children["Icon1"]["ViewPort"]["yorigin"], 175)
+        self.assertEqual(children["TimeText1"]["ViewPort"]["yorigin"], 235)
+        self.assertEqual(children["Years"]["Text"], 11300)
+        self.assertTrue(self.result["materials"]["WonderBanner0"]["texture"].endswith("player_banner_blue.png"))
+        self.assertTrue(self.result["materials"]["WonderBanner1"]["texture"].endswith("player_banner_red.png"))
 
     def test_feedback_fields_and_color_palettes_survive_extraction(self):
         layouts = self.result["layouts"]
