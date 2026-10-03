@@ -2044,12 +2044,18 @@ class AudioImportIntegrationTest(unittest.TestCase):
         cls.banks = read_audio_packs(cls.packs)
 
     def test_persian_cart_source_gaps_publish_without_losing_its_available_sounds(self):
-        # Exercise raw owned Persian records even before the profile is enabled.
+        self.assert_cart_source_gaps(8, 'persians', 'Persians', 271)
+
+    def test_saracen_cart_source_gaps_publish_without_losing_its_available_sounds(self):
+        self.assert_cart_source_gaps(9, 'saracens', 'Saracens', 271)
+
+    def assert_cart_source_gaps(self, civ_index, key, switch, issue):
+        # Exercise raw owned records, independent of profile enablement.
         from import_content import graphic_sound_events
         dat = _dat()
-        cart = dat.civs[8].units[128]
+        cart = dat.civs[civ_index].units[128]
         events = graphic_sound_events(dat.graphics[cart.dying_graphic])
-        profile = {'audio': {'switch': 'Persians'}, 'entities': {'trade-cart': {
+        profile = {'audio': {'switch': switch}, 'entities': {'trade-cart': {
             'internalName': cart.name,
             'sounds': {'select': cart.wwise_selection_sound_id, 'train': cart.wwise_train_sound_id,
                        'move': cart.bird.wwise_move_sound_id, 'attack': cart.bird.wwise_attack_sound_id},
@@ -2060,11 +2066,12 @@ class AudioImportIntegrationTest(unittest.TestCase):
             root = Path(directory)
             ui, content = root / 'ui.json', root / 'content.json'
             ui.write_text('{"sounds":{}}')
-            content.write_text(json.dumps({'civilizations': {'persians': profile}}))
+            content.write_text(json.dumps({'civilizations': {key: profile}}))
             first = import_audio(self.packs, ui, root / 'first', content=content)
             second = import_audio(list(reversed(self.packs)), ui, root / 'second', content=content)
             self.assertEqual(first, second)
-            prefix = 'civilizations/persians/'
+            prefix = f'civilizations/{key}/'
+            self.assertTrue(all(gap['issue'] == issue for gap in first['unavailable'].values()))
             self.assertEqual({alias.removeprefix(prefix): gap['eventId']
                               for alias, gap in first['unavailable'].items()}, {
                 'trade-cart-select': 3167914911, 'trade-cart-train': 955679769,

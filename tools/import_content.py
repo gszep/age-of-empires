@@ -1293,7 +1293,7 @@ def slug(name: str) -> str:
 
 def effects_of(
     dat: DatFile, tech_id: int, entities: dict[str, Any], attribute_ids: dict[str, int],
-    *, effect_id: int | None = None,
+    *, effect_id: int | None = None, scripted_effects=None,
 ) -> tuple[list[dict[str, Any]], list[str], list[str]]:
     """Decode one technology's effect commands against the entities we have.
 
@@ -1331,6 +1331,13 @@ def effects_of(
     unreached: set[str] = set()
     training_indices: dict[str, int] = {}
     for command in (dat.effects[effect_id].effect_commands if effect_id >= 0 else []):
+        if command.type == 1 and command.a == 33 and command.b == 0 and scripted_effects and command.d in scripted_effects:
+            aura = scripted_effects[command.d]
+            for key, entity in entities.items():
+                if entity.get('class') in aura['sourceClasses'] and entity.get('id') not in aura['excludedSourceIds'] and 'skinOf' not in entity:
+                    effects.append({'unit': key, 'attribute': 'healingAura', 'operation': 'set', 'amount': 1,
+                                    'healingAura': aura})
+            continue
         if command.type == 7:
             spawned = next((key for key in by_id.get(int(command.a), []) if entities[key].get("category") == "unit"), None)
             homes = [key for key, e in entities.items() if e.get("category") == "building"
@@ -1488,7 +1495,8 @@ def technology_entry(
 
     # What it changes, decoded from the effect commands against the entities
     # this game actually has, rather than transcribed into the spec.
-    effects, unmodelled, unreached = effects_of(dat, spec["techId"], spec["entities"], attribute_ids)
+    effects, unmodelled, unreached = effects_of(dat, spec["techId"], spec["entities"], attribute_ids,
+                                             scripted_effects=spec.get('scriptedEffects'))
     if effects:
         entry["effects"] = effects
     if unmodelled or (effects and unreached):
@@ -1747,6 +1755,10 @@ def technologies_from_tree(
     disabled_techs = {int(c.d) for c in dat.effects[dat.civs[spec["civIndex"]].tech_tree_id].effect_commands
                       if c.type == 102}
     research_ids = {int(n["Node ID"]) for n in nodes if n.get("Node Type") == "Research"}
+    scripted_effects = {}
+    if any(n.get('Node ID') == 28 and n.get('Node Status') != 'NotAvailable' for n in nodes):
+        from scripted_effects import healing_aura
+        scripted_effects[7] = healing_aura(dat_path.parent.parent, hashes)
     for node in nodes:
         # A `UnitUpgrade` node is a technology too -- it just replaces one unit
         # with another rather than adding to it, and the tree names the
@@ -1785,7 +1797,7 @@ def technologies_from_tree(
                             "reason": "the DAT gives it no research location or no effect"})
             continue
         entry = technology_entry(
-            dat, {"techId": tech_id, "entities": entities}, hashes, attribute_ids, strings
+            dat, {"techId": tech_id, "entities": entities, "scriptedEffects": scripted_effects}, hashes, attribute_ids, strings
         )
         commands = list(dat.effects[tech.effect_id].effect_commands) if tech.effect_id >= 0 else []
         # Heavy Warships (35) has no effect itself: automatic technologies

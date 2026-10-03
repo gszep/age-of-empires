@@ -29,10 +29,15 @@ from wwise_pck import PackedFile, extract, read_index
 # names these events, but the pinned common/English banks contain no HIRC object
 # for them (#271, docs/audio-reference.md). The owner approved silence for these
 # three Persian aliases only on 2026-10-02. Other profiles require their own audit.
+# Saracens were independently audited against both pinned packs on 2026-10-03:
+# exactly the same three absent event objects (#271), with no substitute audio.
 REVIEWED_ABSENT_CUES = {
-    ("civilizations/persians/trade-cart-select", 3167914911, "Persians"),
-    ("civilizations/persians/trade-cart-train", 955679769, "Persians"),
-    ("civilizations/persians/events/2892846699", 2892846699, "Persians"),
+    ("civilizations/persians/trade-cart-select", 3167914911, "Persians"): 271,
+    ("civilizations/persians/trade-cart-train", 955679769, "Persians"): 271,
+    ("civilizations/persians/events/2892846699", 2892846699, "Persians"): 271,
+    ("civilizations/saracens/trade-cart-select", 3167914911, "Saracens"): 271,
+    ("civilizations/saracens/trade-cart-train", 955679769, "Saracens"): 271,
+    ("civilizations/saracens/events/2892846699", 2892846699, "Saracens"): 271,
 }
 
 
@@ -482,12 +487,13 @@ def reviewed_unavailable_cue(cue: dict[str, Any], banks: Sequence[Bank]) -> dict
     if 'id' not in cue:
         return None
     event_id = cue['id'] & 0xffffffff
-    if (cue['alias'], event_id, cue['switch']) not in REVIEWED_ABSENT_CUES:
+    issue = REVIEWED_ABSENT_CUES.get((cue['alias'], event_id, cue['switch']))
+    if issue is None:
         return None
     if not banks or any(event_id in bank.objects for bank in banks):
         return None
     return {'event': cue['event'], 'eventId': event_id, 'switch': cue['switch'],
-            'reason': 'event-absent-from-owned-banks', 'issue': 271}
+            'reason': 'event-absent-from-owned-banks', 'issue': issue}
 
 
 def import_audio(

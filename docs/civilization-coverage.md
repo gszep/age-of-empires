@@ -555,6 +555,44 @@ isolated AI test measured28.4→13.1s; three seeds through12000 ticks have ident
 whole-state and availability-stream hashes before/after the optimization
 (`.local/goths-training-equivalence.log`). No timeout increase.
 
+## Saracens (#187)
+
+The October3 re-audit reconciles civ9/tree261/team409 with `SARACENS.json`,
+English120158, original graphics/audio metadata and `Effects.xs` function7.
+No Saracen-specific RMS/include branches were found in the common depot;
+Promisory's Saracen research branch describes strategy rather than replacing
+the DAT rules. Mameluke282/556 additions close the remaining roster coverage.
+The current unique research is **Bimaristan** and **Counterweights**;
+Zealotry/Madrasah are retired gated definitions.
+
+Existing consumers implement camel HP, transport HP/capacity, faster galley
+reloads, market wood discount/five-percent fee and the archer/skirmisher building
+attack bonus. The new shared passive-healing consumer expands the owned XS task
+into per-unit research effects and preserves conversion snapshots. Its precise
+cadence, stacking, self-targeting and range geometry remain explicitly inferred
+under #285, which also tracks the DAT+3 versus localization+2 team-bonus mismatch.
+Aura particle feedback remains #49. The scoped implementation preserves the
+shared #178 conversion and #128 research boundaries.
+The original Trade Cart selection/training/graphic events are absent from both
+pinned audio packs; #271 tracks these same events shared with Persians. Their three
+exact aliases publish as unavailable, with no substitute audio. Remaining
+Saracen cues resolve through the owned switch normally.
+
+Reproduction: `src/sim/saracens.test.ts`, `tools/test_saracens.py` and
+`tools/saracens_smoke.mts`. The full pipeline passes
+(`.local/saracens-final-import.log`), as does published-enabled private-browser
+acceptance (`.local/saracens-browser-r2.log`): selection/restart/reload, ORIE HUD,
+castle/Mameluke/elite/camel/monk/market/ship art, paid age and unique research,
+passive healing, Mameluke damage, discounted market construction/exchange and
+naval upgrades. Detailed source exports stay local under `.local/saracens-*`.
+Final checkpoint gate **GREEN** (`.local/saracens-final-gate.log`):1403 Vitest tests across111
+files, build,204 owned-import tests and general real-browser debug smoke.
+Ten Saracen-specific outcomes pass; generic profile building tests additionally
+exercise Saracen age stats, armour damage and JSON continuation. Eight existing
+skips remain (seven inapplicable Gothic building cases and the opt-in economy
+acceptance). No test/fixture clocks were widened. Native #285/#271 and shared
+fidelity gaps remain open; this receipt does not claim native calibration.
+
 ## Implementation checklist
 
 - [x] Reproducible all-civilisation coverage inventory with source provenance.
@@ -572,7 +610,7 @@ whole-state and availability-stream hashes before/after the optimization
   treating scenario-only or inactive automatic candidates as unconditional.
 - [x] Enable reviewed shared combat/unique-unit roster, profile art and selection UI.
 - [x] Complete playable roster/research coverage for Britons, Franks, Goths,
-  Teutons, Japanese, Chinese and Byzantines, retaining the listed shared engine/reference gaps.
+  Teutons, Japanese, Chinese, Byzantines and Saracens, retaining the listed shared engine/reference gaps.
 - [x] Verify mixed matches, age changes, already-paid queues/refunds, conversions,
   garrisons, JSON save/reload and deterministic replay through public actions.
 - [x] Verify the actual selection/command UI in a private browser and run the gate.

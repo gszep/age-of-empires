@@ -108,6 +108,25 @@ every consumed alias to be either playable owned media or an exact, visible
 reviewed gap; the sets must be disjoint. Tests exercise both recovery and failure
 paths, as well as real Persian DAT records and deterministic owned-WAV decoding.
 
+## Saracen aliases of the shared Trade Cart source gaps (#271)
+
+The October3 Saracen audit enumerated every consumed profile cue against both
+supplied common packs (five banks). Exactly three fail, with no HIRC object in
+any bank: `civilizations/saracens/trade-cart-select`3167914911,
+`trade-cart-train`955679769 and `events/2892846699`2892846699, all with switch
+`Saracens`. Evidence: `.local/saracens-audio-audit.log`; the initial full import
+stopped at `TCART select`. These are independently verified absent source events,
+not a general extension to every civilisation sharing cart graphics.
+
+These are the same three regional Trade Cart event objects as the Persian gaps
+above, absent before switch filtering, not three additional missing sounds.
+Duplicate#286 was consolidated into#271. The exact Saracen alias tuples publish
+as unavailable with issue271. The same present-object,
+missing-stream and recovery guards apply. No silence WAV or replacement voice
+is generated, and native fallback behaviour remains unverified. Fixture tests
+cover Saracen publication, recovered real decoding and broken-present-event
+rejection. #271 tracks original-source recovery for both profiles.
+
 ## Gameplay music (#115)
 
 ```sh

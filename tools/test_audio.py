@@ -210,12 +210,32 @@ class ReviewedAudioGapTest(unittest.TestCase):
         self.source()
         for sounds, key, switch in [({'select': 123}, 'persians', 'Persians'),
                                     ({'move': 3167914911}, 'persians', 'Persians'),
-                                    ({'select': 3167914911}, 'saracens', 'Saracens'),
+                                    ({'select': 3167914911}, 'turks', 'Turks'),
+                                    ({'select': 3167914911}, 'saracens', 'Persians'),
                                     ({'select': 3167914911}, 'persians', 'Britons')]:
             with self.subTest(sounds=sounds, key=key, switch=switch):
                 self.profile(sounds, key=key, switch=switch)
                 with self.assertRaisesRegex(ValueError, 'did not resolve to complete media'):
                     self.publish()
+
+    def test_saracen_source_gaps_have_their_own_evidence_and_recovered_events_decode(self):
+        self.profile({'select': -1127052385, 'train': 955679769}, [2892846699], 'saracens', 'Saracens')
+        self.source()
+        with patch('import_audio.subprocess.run', side_effect=self.decode):
+            missing = self.publish()
+        self.assertEqual(len(missing['unavailable']), 3)
+        self.assertTrue(all(row['issue'] == 271 and row['switch'] == 'Saracens'
+                            for row in missing['unavailable'].values()))
+        self.assertEqual(missing['audio'], {})
+        self.profile({'select': 3167914911}, key='saracens', switch='Saracens')
+        self.source(self.playable(3167914911), {400: b'fixture'})
+        with patch('import_audio.subprocess.run', side_effect=self.decode):
+            recovered = self.publish()
+        self.assertNotIn('unavailable', recovered)
+        self.assertTrue(recovered['audio']['civilizations/saracens/trade-cart-select']['files'])
+        self.source(self.playable(3167914911))
+        with self.assertRaises(ValueError):
+            self.publish()
 
     def test_present_but_broken_event_never_qualifies_as_absent(self):
         event_id = 3167914911

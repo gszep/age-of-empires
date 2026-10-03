@@ -14,6 +14,39 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## Saracen healing aura and source discrepancy (#187/#285)
+
+- **Owned:** DAT civ9/tree261/team409, current tree research28/454/368,
+  `xs/Effects.xs` EffectFunction7 and `xs/Constants.xs` define the Bimaristan
+  task's work values75/1, range5, target classes, owner4/combat-level2,
+  search-wait109/gather-type21 and help string13404. The importer expands only
+  this reviewed function into unit research effects; unknown script functions
+  remain unsupported. Mameluke282/556 stats/art and bonuses are imported normally.
+- **Inferred runtime:** interpret75 as HP/minute (1.25HP/s), use inclusive
+  centre-distance range5, strongest-only overlapping auras, exclude the emitter
+  itself and garrisoned sources/recipients, and continue during movement, healing,
+  conversion and relic carrying. Apply fractional HP each fixed tick after unit
+  actions. Captured monks retain the researched aura with their conversion rules;
+  its beneficiaries follow their current owner. The two-seat locked-enemy model
+  means owner4 ally targeting currently reduces to same-owner recipients.
+  These are observable, tested policies, not native calibration; #285 tracks it.
+- **Source mismatch:** team409 adds class21 attack+3 to DAT class0, whereas owned
+  English120158 says+2 versus buildings. Preserve DAT arithmetic and original
+  localization rather than silently editing either. Native resolution is #285.
+- Feedback currently uses recipient health and original research text. The
+  original aura overlay/tooltip marker remains part of particle-feedback #49.
+  Existing market curve, conversion inheritance and projectile timing inferences
+  still apply. Retired Zealotry/Madrasah impossible-prerequisite research is not
+  offered; this is the pinned modern profile, not a remembered historical tree.
+- **Owned source gap / explicit silence:** both supplied audio packs contain no
+  HIRC objects for Saracen Trade Cart events3167914911,955679769,2892846699.
+  The fresh all-cue audit found exactly these three unresolved events. Publish
+  only their exact Saracens alias/ID/switch tuples as unavailable (#271), without
+  substituted voices. Existing/broken events and missing streams still fail;
+  recovered events automatically take the normal decode path. These are the same
+  three underlying regional-cart events as the owner-reviewed Persian exceptions,
+  with separately audited profile aliases; duplicate#286 was folded into#271.
+
 ## Opt-in Wonder countdown (#110)
 
 - **Owned:** Wonder task120, existing building DAT stats, announcement/timer

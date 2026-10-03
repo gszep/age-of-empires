@@ -137,6 +137,9 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
     a separate fidelity boundary, documented in `docs/audio-reference.md`.
     Three owner-reviewed Persian Trade Cart source events absent from the pinned
     banks are reported under audio `unavailable` (#271), without substitute WAVs.
+    A separate all-cue Saracen audit confirms three exact matching event gaps
+    for that profile: the same underlying events tracked in#271, also published
+    explicitly as unavailable under exact Saracen aliases.
     The exception matches exact alias/ID/switch tuples and cannot conceal an
     existing broken event, missing media or decoder failure. Other missing cues
     still fail; recovered playable events import normally.
@@ -204,6 +207,7 @@ failed run each time. The ones this importer consumes (`unit` is an entry of
 | combat (attacks, armor, range, projectile) | `unit.type_50.*` — `.attacks`, `.attack_graphic`, `.projectile_unit_id`, `.graphic_displacement` (launch offset, z = height) |
 | second ordinary attack | `unit.type_50.attack_graphic_2` is an optional second source graphic, distinct from `creatable.special_graphic` charged weapons. Import its own `.frame_duration` × shared `.frame_delay`, all composite deltas and sound events. Camel Riders use20×.025s for both; several naval primary parents are untimed placeholders with timed second composites. UGC attribute131 describes alternation; exact native first/reset/naval cadence remains#272 |
 | melee collateral and monk healing | `unit.type_50.blast_damage`: Cataphracts40/553=-5, enabled by Logistica's `.blast_width` increase. UGC attribute115 documents negative fixed HP versus nonnegative normal-damage factor. Monk task105 `.work_value_1=2` times `.bird.work_rate=1.25`; Byzantine team400 sets resource89=2, owned help120156 says +100%. Native boundary/cadence interpretation remains#267 |
+| scripted passive healing | DAT tech28/effect28 writes resource33 (`cAttributeEffectFunctionNumber`) to7. `xs/Effects.xs` EffectFunction7 creates aura155 tasks for monk classes; XS class constants are DAT class+900. Work75/1, range5, search-wait109 (`cRegenerationRate`), gather-type21, combat-level flag2 and owner4 are reviewed by `scripted_effects.py`. Runtime scheduling/stacking/geometry remains#285. `unit.combat_level` is distinct from the task's repurposed aura flag: farm50=2, villager83=3, Mameluke282/relic-monk286=4, monk125=5. |
 | projectile arc | `unit.projectile.projectile_arc` (fraction of shot distance, sign varies) |
 | how far a miss lands from the aim | `unit.type_50.accuracy_dispersion`, in tiles — 0.33 for the archer line, 0.2 for the set-up trebuchet (unit 42; the packed 331 reads accuracy 92 and no dispersion, and never shoots) |
 | a second look for the same unit (the female villager) | `resources/_common/dat/objreplacement.json`: `object_id` 83 → `replacement_object` 293 at `chance` 50, and the reverse. The task counterparts (212, 354, 218, 581, 220, 216, 590) are found by matching `bird.tasks`; the spec names them as `skinOf` entries and `test_import_aoe2.py` checks the match (issue #50) |

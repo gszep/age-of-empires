@@ -128,6 +128,7 @@ export interface UnitRules {
   blastDefenseLevel?: number;
   /** Monks: hit points restored a second, and how close they must come. */
   heal?: { hitPointsPerSecond: number; range: number };
+  healingAura?: HealingAura;
   /**
    * Villagers: hit points mended a second on a building, and the DAT's
    * factor for each class of unit they will mend at all -- siege and ships
@@ -678,6 +679,14 @@ export interface TechEffect {
    * unit that this game models.
    */
   resource?: PlayerAttribute;
+  healingAura?: HealingAura;
+}
+
+export interface HealingAura {
+  range: number;
+  hitPointsPerSecond: number;
+  targetClasses: number[];
+  helpStringId: number;
 }
 
 /** A source conversion task, including target-specific permission and reach. */
@@ -714,7 +723,7 @@ export type TechAttribute =
   | 'blastRadius' | 'searchRadius' | 'trainSeconds' | 'trainLocation' | 'researchSeconds' | 'deathExplosion' | 'garrisonFirepower'
   | 'workRate' | 'carryCapacity' | 'cost' | 'foodCost' | 'woodCost' | 'goldCost' | 'stoneCost'
   /** On a projectile: whether the shot leads a moving target. Ballistics. */
-  | 'leadsTarget';
+  | 'leadsTarget' | 'healingAura';
 
 export const AGE_NAMES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'];
 

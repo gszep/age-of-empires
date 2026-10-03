@@ -23,6 +23,7 @@ import { researchCostFor, researchSecondsFor, technologyFor, technologyRequireme
 import { applyMarketCommand } from './market';
 import { beginProjectileImpact, fireChargeOf, rechargeFireCharge, releaseFireCharge } from './fire-charge';
 import { relicOrder, transferRelic, releaseRelics, updateRelicIncome } from './relics';
+import { updateHealingAuras } from './auras';
 import { canConvert, conversionPermissionError, conversionWindow, rechargeFaith, spendConversionFaith } from './monastery';
 import { placeMapRelics } from './relic-placement';
 import relicReference from './refdata/relic-placement.json';
@@ -3410,6 +3411,7 @@ export function stepGame(state: GameState): void {
     }
   }
   separateUnits(state, movable, gridFor);
+  updateHealingAuras(state);
   updateProjectiles(state);
   for (const site of state.entities) {
     if (site.buildProgress === undefined) continue;

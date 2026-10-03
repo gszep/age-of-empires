@@ -6,6 +6,16 @@ reviews. Do not append old test counts here as if they describe the latest tree.
 
 ## Source and verification
 
+- Saracens (#187) are implemented as the eighth selectable
+  owned profile. Full import and dedicated private-browser acceptance pass;
+  final gate `.local/saracens-final-gate.log` is GREEN:1403 tests/111 files (eight existing
+  skips), build,204 owned-import tests and general debug smoke. No timeout
+  widening. [Coverage](civilization-coverage.md#saracens-187) records outcomes;
+  #285 tracks aura calibration/text discrepancy and #271 the three missing
+  regional Trade Cart events shared with Persians. Duplicate#286 was consolidated
+  into#271. This source change has not been deployed to the installed household release.
+  Final regeneration after consolidation passed (`.local/saracens-final-import.log`);
+  the complete gate ran865s, including the real-browser smoke.
 - Shoreline tile-grid correction (#284): `watershore` now uses complete
   96-pixel source windows with per-family UV layout metadata. The full import,
   shoreline/land/farm probes and checkpoint gate passed; see the
@@ -63,7 +73,7 @@ installed protocol 2 are distinct. [Shared play](shared-play.md) describes use.
   the installed newer build do not establish pinned-runtime equivalence.
 - **AI #124:** Dark-Age-start acceptance is still failing/opt-in; the passing
   staged Feudal/late-game fixtures do not prove natural-start progression.
-- Seven enabled civilisations are scoped completions, not native-DE parity.
+- Eight source-enabled civilisations are scoped completions, not native-DE parity.
   Terrain/final compositing, conversion exceptions, audio mixing/missing streams,
   automatic research timing, RMS placement and combat/bonus calibration retain
   their explicit [ledger](ledger.md) and tracker boundaries. Gate/trebuchet native

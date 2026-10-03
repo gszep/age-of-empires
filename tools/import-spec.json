@@ -1,9 +1,11 @@
 {
   "schemaVersion": 3,
   "civIndex": 1,
-  "profileCivilizations": ["franks", "goths", "teutons", "japanese", "chinese", "byzantines"],
-  "enabledCivilizations": ["franks", "goths", "teutons", "japanese", "chinese", "byzantines"],
+  "profileCivilizations": ["franks", "goths", "teutons", "japanese", "chinese", "byzantines", "saracens"],
+  "enabledCivilizations": ["franks", "goths", "teutons", "japanese", "chinese", "byzantines", "saracens"],
   "combatRoster": [
+    { "unitId": 282 },
+    { "unitId": 556 },
     { "unitId": 40 },
     { "unitId": 553 },
     { "unitId": 329 },
