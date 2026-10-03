@@ -33,6 +33,8 @@ try {
   assert.equal(result.samples, 775);
   assert(result.maxError < 0.025, 'rendered alpha must match the owned window through the production UVs');
   assert(result.changedFromClassic > 100, 'native shapes must visibly replace the classic masks');
+  assert.equal(result.seamSamples, 160);
+  assert(result.maxSeamExposure < 0.025, 'shore joins must not expose sand along the water tile grid');
   assert.deepEqual(errors, []);
-  console.log('SHORE BLEND SMOKE GREEN: 31 mask orientations, 775 linear-sRGB alpha samples, classic fallback and state immutability');
+  console.log('SHORE BLEND SMOKE GREEN: 31 mask orientations, 775 linear-sRGB alpha samples, 160 shoreline joins, classic fallback and state immutability');
 } finally { await browser.close(); await server.close(); }

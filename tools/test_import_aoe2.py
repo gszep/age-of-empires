@@ -2603,8 +2603,9 @@ class UiImportIntegrationTest(unittest.TestCase):
             self.assertEqual(len(masks), 31)
             for index, mask in enumerate(masks[:16]):
                 # Sample the middle of the edge to exclude its two corner fades.
-                edges = [mask[-8:, 16:48].mean(), mask[16:48, :8].mean(),
-                         mask[16:48, -8:].mean(), mask[:8, 16:48].mean()]
+                middle = slice(mask.shape[0] // 4, mask.shape[0] * 3 // 4)
+                edges = [mask[-8:, middle].mean(), mask[middle, :8].mean(),
+                         mask[middle, -8:].mean(), mask[:8, middle].mean()]
                 facing = index // 4
                 opposite = [3, 2, 1, 0][facing]
                 self.assertGreater(edges[facing] - edges[opposite], 150, (family, index))
@@ -2613,7 +2614,8 @@ class UiImportIntegrationTest(unittest.TestCase):
                 corners = [mask[:8, :8].mean(), mask[:8, -8:].mean(),
                            mask[-8:, -8:].mean(), mask[-8:, :8].mean()]
                 self.assertEqual(int(np.argmax(corners)), corner, (family, index))
-            self.assertLess(masks[30][28:36, 28:36].mean(), 30, family)
+            centre = masks[30].shape[0] // 2
+            self.assertLess(masks[30][centre-4:centre+4, centre-4:centre+4].mean(), 30, family)
             self.assertGreater(masks[30][:8, :8].mean(), 220, family)
             # Adjacent edge pairs leave only the opposite corner uncovered.
             for index, low_corner in [(22, 3), (23, 2), (24, 0), (25, 1)]:
@@ -2623,8 +2625,10 @@ class UiImportIntegrationTest(unittest.TestCase):
                 self.assertEqual(int(np.argmin(corners)), low_corner, (family, index))
             for index, missing in [(26, 3), (27, 1), (28, 0), (29, 2)]:
                 mask = masks[index]
-                edges = [mask[-4:, 28:36].mean(), mask[28:36, :4].mean(),
-                         mask[28:36, -4:].mean(), mask[:4, 28:36].mean()]
+                centre = mask.shape[0] // 2
+                middle = slice(centre - 4, centre + 4)
+                edges = [mask[-4:, middle].mean(), mask[middle, :4].mean(),
+                         mask[middle, -4:].mean(), mask[:4, middle].mean()]
                 for edge in range(4):
                     if edge != missing:
                         self.assertGreater(edges[edge] - edges[missing], 40, (family, index))
@@ -2635,7 +2639,7 @@ class UiImportIntegrationTest(unittest.TestCase):
 
     def test_de_blend_publication_is_deterministic_and_contains_original_samples(self):
         import numpy as np
-        from import_blends import DE_FAMILIES, DE_TILE, GUTTER, de_masks, publish_de_masks
+        from import_blends import DE_FAMILIES, GUTTER, de_masks, publish_de_masks
         directory = ROOT / "depot_813782/resources/_common/terrain/blends"
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
@@ -2649,9 +2653,10 @@ class UiImportIntegrationTest(unittest.TestCase):
             for mode, family in DE_FAMILIES.items():
                 entry = metadata["modes"][str(mode)]
                 sheet = np.asarray(Image.open(out / entry["image"]))
+                tile = entry.get("tile", metadata["tile"])[0]
                 for index, mask in enumerate(de_masks(directory / f"{family}.png")):
-                    x = index * (DE_TILE + 2 * GUTTER)
-                    self.assertTrue(np.array_equal(sheet[:, x + GUTTER:x + GUTTER + DE_TILE], mask))
+                    x = index * (tile + 2 * GUTTER)
+                    self.assertTrue(np.array_equal(sheet[:, x + GUTTER:x + GUTTER + tile], mask))
                     self.assertTrue((sheet[:, x:x + GUTTER] == mask[:, :1]).all())
             published = Path("public/imported/aoe2/manifest.json")
             if published.is_file():

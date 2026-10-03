@@ -1,6 +1,6 @@
 /** #148: authored square masks through production geometry and the real GPU. */
 import * as THREE from 'three/webgpu';
-import { loadContentAssets, maskU } from '../src/view/assets';
+import { loadContentAssets, maskU, nativeMaskLayout } from '../src/view/assets';
 import { createGround } from '../src/view/world';
 import { worldToIso, isoToWorld } from '../src/view/iso';
 import { createGame } from '../src/sim/game';
@@ -10,6 +10,7 @@ async function run() {
   const assets = await loadContentAssets();
   if (!assets?.blends?.native) throw new Error('run the full owned import first');
   const native = assets.blends.native;
+  const layout = nativeMaskLayout(assets.blends, 1)!;
   const sheet = native.modes[1]!;
   const canvas = document.createElement('canvas');
   canvas.width = sheet.image.width; canvas.height = sheet.image.height;
@@ -17,7 +18,7 @@ async function run() {
   context.drawImage(sheet.image, 0, 0);
   const source = context.getImageData(0, 0, canvas.width, canvas.height).data;
   const sampleSource = (column: number, u: number, v: number) => {
-    const x = maskU(native, column, u) * canvas.width - 0.5;
+    const x = maskU(layout, column, u) * canvas.width - 0.5;
     const y = v * canvas.height - 0.5;
     const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
     const at = (px: number, py: number) => source[(Math.max(0, Math.min(canvas.height - 1, py)) * canvas.width
@@ -53,6 +54,7 @@ async function run() {
   const configurations = [8, 8, 8, 8, 2, 2, 2, 2, 32, 32, 32, 32, 128, 128, 128, 128,
     4, 16, 1, 64, 34, 136, 160, 130, 40, 10, 42, 168, 162, 138, 170];
   let maxError = 0, samples = 0, changedFromClassic = 0;
+  let maxSeamExposure = 0, seamSamples = 0;
   for (const [column, bits] of configurations.entries()) {
     const cx = column < 16 ? 2 + column % 4 : 2, cy = 2;
     state.terrain = new Array(48).fill(2);
@@ -74,6 +76,19 @@ async function run() {
       return pixels;
     };
     const pixels = await draw(true), classic = await draw(false);
+    // Unlike the interior source-sampling test, these probe the join to an
+    // opaque water tile. A truncated fade exposes sand along the tile grid.
+    if (column < 16) for (const t of [.05, .15, .25, .35, .45, .55, .65, .75, .85, .95]) {
+      const [u, v] = [[t, .99], [.01, t], [.99, t], [t, .01]][Math.floor(column / 4)];
+      const iso = worldToIso(cx + u, cy + v);
+      const px = Math.floor((iso.x - centre.x) * 2 + size / 2);
+      const py = Math.floor((iso.y - centre.y) * 2 + size / 2);
+      const i = (py * size + px) * 4;
+      const sand = pixels[i] / (pixels[i] + pixels[i + 1]);
+      if (!Number.isFinite(sand)) throw new Error('empty shoreline join sample');
+      maxSeamExposure = Math.max(maxSeamExposure, sand);
+      seamSamples++;
+    }
     for (const u of [0.1, 0.3, 0.5, 0.7, 0.9]) for (const v of [0.1, 0.3, 0.5, 0.7, 0.9]) {
       const iso = worldToIso(cx + u, cy + v);
       const px = Math.floor((iso.x - centre.x) * 2 + size / 2);
@@ -90,7 +105,8 @@ async function run() {
     if (checksumState(state) !== initial) throw new Error('view mutated authoritative state');
   }
   target.dispose(); renderer.dispose();
-  return { colorSpace: 'linear-srgb', configurations: configurations.length, samples, maxError, changedFromClassic };
+  return { colorSpace: 'linear-srgb', configurations: configurations.length, samples, maxError, changedFromClassic,
+    seamSamples, maxSeamExposure };
 }
 run().then(result => { (window as any).__shoreBlendResult = result; }, error => {
   (window as any).__shoreBlendResult = { error: error.stack };

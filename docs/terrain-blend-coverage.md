@@ -6,8 +6,8 @@ crossing calibration remain open; source-alpha agreement is not that evidence.
 
 ## Delivered
 
-The full importer publishes deterministic64×64 windows, replicated gutters and
-source hashes for these modes:
+The full importer publishes deterministic64×64 windows (96×96 for `watershore`
+after #284), replicated gutters and source hashes for these modes:
 
 | Mode | Owned sheet | Use in the current pair table |
 |---|---|---|
@@ -111,7 +111,7 @@ npx tsx tools/shore_blend_smoke.mts
 
 ## Remaining calibration
 
-The64-pixel cuts, classic-table family bindings, edge-variant selection and
+The window cuts, classic-table family bindings, edge-variant selection and
 maximum-alpha unions for compound edges remain the documented interpretation
 from#148, extended to compatible source layouts. Native farm corner inclusion
 uses that same neighbour topology. No native draw-call capture established the
@@ -127,6 +127,43 @@ A patch-matched DE capture of a controlled grass/beach/road crossing and both
 farm stages, with known tiles/zoom, is still needed to settle physical crossing
 widths, placement and those binding/ordering questions. #116 remains open for
 that acceptance rather than declaring visual parity from self-comparison.
+
+## Shoreline tile-grid correction (#284, October3)
+
+The reported Islands seed2 coast was reproduced on a private browser. The pale
+tile pattern persisted with foam and the animated surface disabled. Changing
+corner suppression did not remove it; opacity gain and synthetic boundary
+correction were rejected as substitutes for complete source windows.
+
+The64-pixel `watershore` cuts truncate the authored fades: the original first
+edge's terminal row retains at least18% sand at its worst source sample. The
+new160-sample production-renderer join check measured15.2% exposed sand before
+the fix, despite the existing775 interior samples matching the imported atlas.
+
+`watershore` now uses96-pixel original-source windows, with border variants
+positioned clear of the sheet's other motifs. Other families retain their
+existing64-pixel cuts. Per-family `tile` metadata is consumed by ground and
+terrain-patch UVs; old imports still use the common layout. Original samples,
+the authored irregular contour and source hash are preserved; no gain, blur or
+repainted alpha is used. The new join check requires less than2.5% exposed sand
+in linear-sRGB, alongside the unchanged0.025 source-alpha error limit.
+
+The96-pixel extent and exact cut coordinates are **inferred**, not a recovered
+native-engine UV table. This fixes the demonstrated truncated-fade defect; #116
+still owns exact DE crossing-width and junction calibration.
+
+Verification on the regenerated assets: maximum exposed-sand fraction at the160
+sampled joins fell from0.152 to0.008, with the same0.025 acceptance limit. All775
+shore and6200 family interior samples remain within0.002001 of the source alpha;
+the50 land-crossing and450 farm checks also pass. The full import reused4898
+sprite/layer atlases and completed all stages. Same-camera seed2 captures are
+`.local/shore284-all.png` and `.local/shore284-after-all.png`; foam/surface-off
+controls are retained beside them. No simulation-state changes were observed.
+Full gate GREEN: `.local/shore284-gate.log`, exit0,790s;1384 Vitest passes with
+the same8 skips,200 Python passes, typecheck/build and real-browser debug smoke.
+The focused view suite passed39 tests and the two new owned-source window tests
+passed. Existing orientation/contour and deterministic-publication checks also
+passed with their original thresholds.
 
 ## Native capture compatibility, October2 calibration run
 

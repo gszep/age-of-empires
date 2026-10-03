@@ -3,7 +3,7 @@ import { attribute, floor, fract, smoothstep as smoothstepNode, texture as textu
 import { TILE_W, TILE_H, worldToIso } from './iso';
 import { isOpenWater } from '../sim/mapgen';
 import { elevationAt } from '../sim/elevation';
-import { maskU, type ContentAssets, type ImportedTerrain } from './assets';
+import { maskU, nativeMaskLayout, type ContentAssets, type ImportedTerrain } from './assets';
 import { createFoam } from './foam';
 import { GROUND_FOG_ORDER } from './render-order';
 import { createWaterMaterial, surfaceOpacity, waterPresetFor } from './water';
@@ -189,8 +189,9 @@ export function createGround(state: ReadonlyGameState, assets?: ContentAssets): 
           const texture = slot && assets?.textures.get(slot.image);
           if (!texture) continue;
           const mode = blendModeFor(blendType(here), blendType(there));
-          const native = !!blends.native?.modes[mode];
-          const maskSheet = native ? blends.native! : blends;
+          const layout = nativeMaskLayout(blends, mode);
+          const native = !!layout;
+          const maskSheet = layout ?? blends;
           const gated = masked(here, there);
           const key = `${there}:${mode}:${native ? 'native' : 'classic'}:${back ? 'back' : gated ? 'masked' : 'over'}`;
           let bucket = overlays.get(key);
@@ -482,8 +483,9 @@ export function createTerrainPatch(
       // DAT blendType is a terrain category, not a mask family. In particular
       // farm(1) on grass(0) uses family3, never watershore(1).
       const mode = blendModeFor(receiver?.blendType ?? assets?.terrain.ground?.blendType ?? 0, terrain.blendType);
-      const native = !!blends?.native?.modes[mode];
-      const sheet = native ? blends!.native! : blends;
+      const layout = blends && nativeMaskLayout(blends, mode);
+      const native = !!layout;
+      const sheet = layout ?? blends;
       const mu = (column: number, t: number): number => sheet ? maskU(sheet, column, t) : t;
       // Native windows also cover the four diagonal corner neighbours. Old
       // imports retain their historical side-only ring and diamond UVs.

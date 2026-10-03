@@ -1,7 +1,7 @@
 /** #116: source alpha through production terrain/farm geometry and materials.
  * Diagnostic terrain categories isolate all eight family routes. */
 import * as THREE from 'three/webgpu';
-import { loadContentAssets, maskU } from '../src/view/assets';
+import { loadContentAssets, maskU, nativeMaskLayout } from '../src/view/assets';
 import { createGround, createTerrainPatch } from '../src/view/world';
 import { worldToIso, isoToWorld } from '../src/view/iso';
 import { createGame } from '../src/sim/game';
@@ -42,7 +42,8 @@ async function run() {
   }
   const shape = Array.from({ length: 8 }, (_, mode) => {
     const sample = sampler(native.modes[mode]!);
-    return (column: number, u: number, v: number) => sample(maskU(native, column, u), v);
+    const layout = nativeMaskLayout(assets.blends!, mode)!;
+    return (column: number, u: number, v: number) => sample(maskU(layout, column, u), v);
   });
   const renderer = new THREE.WebGPURenderer();
   renderer.setSize(512,512); renderer.toneMapping = THREE.NoToneMapping;

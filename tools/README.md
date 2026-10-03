@@ -109,7 +109,9 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    windows for the eight mapped water/land/farm/road/snow/ice families under
    `terrain/blends/` (#116/#148).
    `blends.native` carries their dimensions/gutters/modes; source hashes are in
-   the manifest. The 64-pixel window interpretation and edge unions are inferred
+   the manifest. Mode entries can override the common tile dimensions: #284's
+   `watershore` uses96-pixel cuts to include the complete source fade, while the
+   other seven families retain64-pixel cuts. Window interpretation and edge unions are inferred
    (ledger #116/#148); their alpha bytes are owned. These sheets use tile-axis
    UVs, while the classic sheets use isometric-diamond UVs. This stage does not
    decode sprites; blend-only edits can reuse the existing SLD atlas cache.

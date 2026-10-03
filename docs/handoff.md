@@ -6,6 +6,12 @@ reviews. Do not append old test counts here as if they describe the latest tree.
 
 ## Source and verification
 
+- Shoreline tile-grid correction (#284): `watershore` now uses complete
+  96-pixel source windows with per-family UV layout metadata. The full import,
+  shoreline/land/farm probes and checkpoint gate passed; see the
+  [correction evidence](terrain-blend-coverage.md#shoreline-tile-grid-correction-284-october3).
+  Regenerated shore assets need the updated viewer. Exact native UV and
+  crossing-width calibration remains #116; broader visual acceptance is #113.
 - Gameplay baseline: `70bda6c` (#280). Owned match-speed
   names are Slow/Casual/Normal/Fast; new preferences and pristine shared hosts
   default to Normal (1.7). Existing saved indices retain their multipliers.

@@ -73,6 +73,10 @@ DE_FAMILIES = {
 # herbwatershore/reserved have no established consumer in the current pair
 # table. Do not guess extra indices from their position in a directory listing.
 DE_TILE = 64
+# Shore fades extend beyond the old 64-pixel cuts. Keep their complete authored
+# transition; unlike a 128-pixel cut, 96 avoids the adjacent atlas motifs.
+# Engine UVs remain inferred: see the #284 entry in docs/ledger.md.
+DE_SHORE_TILE = 96
 
 
 def de_masks(path: Path) -> list[np.ndarray]:
@@ -87,29 +91,32 @@ def de_masks(path: Path) -> list[np.ndarray]:
         if image.size != (512, 512):
             raise ValueError(f"unexpected DE blend sheet size: {path}: {image.size}")
         source = np.asarray(image.convert("RGB"))[:, :, 0]
+    shore = path.stem == "watershore"
+    tile = DE_SHORE_TILE if shore else DE_TILE
+    far = 512 - tile
     def window(x: int, y: int) -> np.ndarray:
-        return source[y:y + DE_TILE, x:x + DE_TILE].copy()
+        return source[y:y + tile, x:x + tile].copy()
     masks = [
         # +y, -x, +x, -y: alpha rises toward that world-tile edge.
-        *[window(x, 0) for x in (64, 128, 192, 320)],
-        *[window(448, y) for y in (64, 192, 320, 384)],
-        *[window(0, y) for y in (64, 128, 192, 320)],
-        *[window(x, 448) for x in (64, 192, 320, 384)],
+        *[window(x, 0) for x in ((64, 96, 128, 320) if shore else (64, 128, 192, 320))],
+        *[window(far, y) for y in ((192, 224, 256, 320) if shore else (64, 192, 320, 384))],
+        *[window(0, y) for y in ((96, 112, 128, 320) if shore else (64, 128, 192, 320))],
+        *[window(x, far) for x in ((192, 224, 256, 320) if shore else (64, 192, 320, 384))],
         # Diagonal neighbour: -x/+y, +x/+y, -x/-y, +x/-y.
-        window(448, 0), window(0, 0), window(448, 448), window(0, 448),
+        window(far, 0), window(0, 0), window(far, far), window(0, far),
     ]
     masks.extend([
         np.maximum(masks[4], masks[8]),  # opposite x edges
         np.maximum(masks[0], masks[12]),  # opposite y edges
-        window(320, 256),  # +x/-y: three white corners, low -x/+y corner
-        window(256, 256),  # -x/-y
+        window(320, 320 - tile),  # +x/-y: three white corners, low -x/+y corner
+        window(320 - tile, 320 - tile),  # -x/-y
         window(320, 320),  # +x/+y
-        window(256, 320),  # -x/+y
+        window(320 - tile, 320),  # -x/+y
         np.maximum.reduce([masks[0], masks[4], masks[8]]),
         np.maximum.reduce([masks[0], masks[8], masks[12]]),
         np.maximum.reduce([masks[4], masks[8], masks[12]]),
         np.maximum.reduce([masks[0], masks[4], masks[12]]),
-        window(128, 128),  # four higher neighbours, low centre
+        window(160 - tile // 2, 160 - tile // 2),  # four higher neighbours, low centre
     ])
     return masks
 
@@ -117,16 +124,19 @@ def de_masks(path: Path) -> list[np.ndarray]:
 def publish_de_masks(directory: Path, out: Path) -> tuple[dict, dict[str, str]]:
     """Keep original alpha bytes in square windows, with edge-replicated gutters."""
     modes, hashes = {}, {}
-    pitch = DE_TILE + 2 * GUTTER
     for mode, name in DE_FAMILIES.items():
         path = directory / f"{name}.png"
         masks = de_masks(path)
-        masks.append(np.full((DE_TILE, DE_TILE), 255, dtype=np.uint8))
+        tile = masks[0].shape[0]
+        pitch = tile + 2 * GUTTER
+        masks.append(np.full((tile, tile), 255, dtype=np.uint8))
         sheet = np.concatenate([np.pad(mask, ((0, 0), (GUTTER, GUTTER)), mode="edge") for mask in masks], axis=1)
-        assert sheet.shape == (DE_TILE, pitch * len(masks))
+        assert sheet.shape == (tile, pitch * len(masks))
         image = f"blends/de-{name}.png"
         Image.fromarray(sheet).save(out / image, optimize=True)
         modes[str(mode)] = {"image": image, "masks": len(masks), "source": f"{name}.png"}
+        if tile != DE_TILE:
+            modes[str(mode)]["tile"] = [tile, tile]
         hashes[f"blend-{name}"] = hashlib.sha256(path.read_bytes()).hexdigest()
     return {"tile": [DE_TILE, DE_TILE], "gutter": GUTTER, "modes": modes}, hashes
 

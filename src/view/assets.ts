@@ -171,7 +171,15 @@ export interface BlendMasks {
   /** DE square tile-axis terrain-family windows; absent/partial in old imports. */
   native?: Pick<BlendMasks, 'tile' | 'gutter' | 'masksPerMode'> & {
     modes: Partial<Record<number, THREE.Texture>>;
+    /** Family-specific source windows; old imports use the common tile size. */
+    tiles?: Partial<Record<number, [number, number]>>;
   };
+}
+
+export function nativeMaskLayout(blends: BlendMasks, mode: number): Pick<BlendMasks, 'tile' | 'gutter' | 'masksPerMode'> | undefined {
+  const native = blends.native;
+  if (!native?.modes[mode]) return undefined;
+  return { tile: native.tiles?.[mode] ?? native.tile, gutter: native.gutter, masksPerMode: native.masksPerMode };
 }
 
 /**
@@ -567,7 +575,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   // so they must not repeat or filter across a column boundary: clamped, and
   // linear only within a mask.
   let blends: BlendMasks | undefined;
-  type BlendEntry = { image: string; masks: number };
+  type BlendEntry = { image: string; masks: number; tile?: [number, number] };
   const blendSpec = (manifest as { blends?: { tile: [number, number]; gutter?: number; modes: BlendEntry[];
     edges: Record<string, number[]>; solid: number;
     native?: { tile: [number, number]; gutter: number; modes: Record<string, BlendEntry> };
@@ -594,7 +602,8 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
       const entries = Object.entries(blendSpec.native.modes);
       const nativeModes = await Promise.all(entries.map(async ([mode, entry]) => [Number(mode), await loadMask(entry)]));
       blends.native = { tile: blendSpec.native.tile, gutter: blendSpec.native.gutter,
-        masksPerMode: entries[0][1].masks, modes: Object.fromEntries(nativeModes) };
+        masksPerMode: entries[0][1].masks, modes: Object.fromEntries(nativeModes),
+        tiles: Object.fromEntries(entries.filter(([, entry]) => entry.tile).map(([mode, entry]) => [Number(mode), entry.tile])) };
     }
   }
   return {

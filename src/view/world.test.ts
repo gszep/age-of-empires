@@ -232,7 +232,7 @@ describe('meshes that lie on the ground', () => {
     }
   });
 
-  it('uses square DE UVs at a water boundary and preserves classic UVs for old imports', () => {
+  it.each([64, 96])('uses %i-pixel DE shore UVs and preserves classic UVs for old imports', size => {
     const state = createGame(148);
     state.width = state.height = 2;
     state.terrain = [0, 1, 0, 1];
@@ -241,13 +241,15 @@ describe('meshes that lie on the ground', () => {
     const assets = groundAssets();
     assets.terrain.water = { ...assets.terrain.ground, terrainId: 1, blendType: 3, blendPriority: 200 };
     assets.blends!.native = { tile: [64, 64], gutter: 2, masksPerMode: 32,
+      ...(size === 96 ? { tiles: { 1: [96, 96] as [number, number] } } : {}),
       modes: { 1: new THREE.DataTexture(new Uint8Array(4), 1, 1) } };
     const native = createGround(state, assets).getObjectByName('blend-water') as THREE.Mesh;
     const uv = native.geometry.getAttribute('uv1');
     // Tile (0,0) has water across +x: mask 8. Square TL/TR/BR/BL maps
     // to north/west/south/east in the projected world, with PNG v inverted.
-    expect(uv.getX(0)).toBeCloseTo(maskU(assets.blends!.native, 8, 0));
-    expect(uv.getX(1)).toBeCloseTo(maskU(assets.blends!.native, 8, 1));
+    const layout = { ...assets.blends!.native, tile: [size, size] as [number, number] };
+    expect(uv.getX(0)).toBeCloseTo(maskU(layout, 8, 0), 7);
+    expect(uv.getX(1)).toBeCloseTo(maskU(layout, 8, 1), 7);
     expect(uv.getY(0)).toBe(1);
     expect(uv.getY(1)).toBe(1);
     expect(uv.getY(2)).toBe(0);

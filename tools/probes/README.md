@@ -27,6 +27,10 @@ Run them from the repo root: `npx tsx tools/probes/snapshot.ts`.
   state immutability. Source-alpha errors are measured in linear-sRGB. Saves
   `.local/land116-crossings.png` as a real-texture overview; this is not a
   matched DE capture. Pair with `shore_blend_smoke.mts` for the actual water IDs.
+  The shore probe also samples160 joins to opaque water (#284), requiring less
+  than2.5% exposed sand in linear-sRGB; matching interior atlas samples alone
+  previously passed despite a visible pale tile grid. Family-specific window
+  dimensions come from the imported layout, with common-layout compatibility.
 
 **Real atlas-cache replay (#257):**
 `uv run --locked python tools/probes/atlas_cache_benchmark.py --out .local/cache-study-unique`
