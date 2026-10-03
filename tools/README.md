@@ -56,7 +56,11 @@ See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matc
    Dark Age slice (militia, villager + task variants, town center, barracks,
    house, berries, gold, oak tree) from the patch-matched DAT with
    `genieutils-py`, resolving graphic IDs from semantic slots/task fields and
-   hashing every source file into `.local/aoe2de/content.json`.
+   hashing every source file into `.local/aoe2de/content.json`. Repeated animation
+   references and civilisation profiles share SLD hash reads within one extraction;
+   every profile still publishes only its own source entries, and separate
+   extractions start fresh. Source roots/files must stay fixed during extraction.
+   This does not cache DAT animation metadata or change sprite decoding.
 3. `convert_sld.py` converts every referenced SLD with the local
    `sld_layers.py` decoder — BC1 main layer, BC4 shadow and player-colour
    masks, and the outline layer's own command stream — producing

@@ -47,6 +47,22 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+class _SourceHashes(dict[str, str]):
+    """A profile's provenance, with SLD reads shared by one extraction only."""
+
+    def __init__(self, sld_hashes: dict[Path, str] | None = None):
+        super().__init__()
+        self.sld_hashes = sld_hashes if sld_hashes is not None else {}
+
+    def add_sld(self, path: Path) -> None:
+        # Cache by path, not published basename: different source roots must
+        # never borrow one another's digest. Only requested files enter this
+        # profile's public table, even when another profile hashed them first.
+        if path not in self.sld_hashes:
+            self.sld_hashes[path] = sha256(path)
+        self[path.name] = self.sld_hashes[path]
+
+
 def rounded(value: float) -> float:
     return round(value, 6)
 
@@ -290,7 +306,12 @@ def animation_entry(
     sld, scale = Graphics.of(graphics_dir).source(graphic.file_name)
     if not sld.is_file():
         raise FileNotFoundError(sld)
-    hashes[sld.name] = sha256(sld)
+    # Each independent extraction reads sources afresh; its profiles share SLD
+    # reads but still retain separate provenance and DAT animation metadata.
+    if isinstance(hashes, _SourceHashes):
+        hashes.add_sld(sld)
+    else:
+        hashes[sld.name] = sha256(sld)
     return {
         "graphicId": graphic_id,
         "source": sld.name,
@@ -2100,6 +2121,7 @@ def extract(
     strings_path: Path | None = None,
     uhd_dir: Path | None = None,
     _dat: DatFile | None = None,
+    _sld_hashes: dict[Path, str] | None = None,
 ) -> dict[str, Any]:
     """Everything the game reads off the owned data, as `content.json`.
 
@@ -2139,7 +2161,8 @@ def extract(
     from civilization_profiles import shared_combat_specs
     spec = {**spec, "entities": [*spec["entities"], *shared_combat_specs(dat, spec)]}
     graphics = Graphics.of(graphics_dir, uhd_dir)
-    hashes: dict[str, str] = {"dat": sha256(dat_path)}
+    hashes = _SourceHashes(_sld_hashes)
+    hashes["dat"] = sha256(dat_path)
     constants_path = dat_path.parent.parent / "xs/Constants.xs"
     attribute_ids = player_attribute_ids(constants_path.read_text(encoding="utf-8-sig"))
     # Missing from Constants.xs's named subset, but conversion tasks reference
@@ -2369,7 +2392,7 @@ def extract(
             if key == civilization["key"]:
                 continue
             profile = extract(dat_path, graphics_dir, palettes_dir, profile_spec(spec, rows[key]),
-                              source, strings_path, uhd_dir, _dat=dat)
+                              source, strings_path, uhd_dir, _dat=dat, _sld_hashes=hashes.sld_hashes)
             profile["civilization"]["enabled"] = rows[key]["enabled"]
             result["civilizations"][key] = profile
             result["particles"].update(profile["particles"])
