@@ -25,7 +25,13 @@ require importer and rendered-pixel checks. A complete renderer receipt must nam
 that separate evidence.
 
 Review `.local/acceptance/scope-review.diff`: supplied ages/resources/buildings,
-removed assertions and altered clocks all matter. The explicit `known-gap`
+removed assertions and altered clocks all matter. The report includes tracked
+test/smoke/fixture changes, new untracked fixtures, and registry command changes.
+It exposes the diff for review; it does not automatically judge semantic weakening.
+The `acceptance-tooling` scenario executes the actual CLI in scratch repositories
+to test selection, fail-fast behavior, empty scenarios, receipt invalidation and
+scope reporting; its synthetic mode commands are not game-browser evidence.
+The explicit `known-gap`
 AI progression scenario currently fails; it is not silently waived or covered by
 the green Feudal-start component test. `check` will report it as missing a pass.
 The general gate remains the four existing stages. Feature and endurance checks
