@@ -1,6 +1,10 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { actionFor, unresolvedAsks } from './unattended_preflight.mjs';
+import { actionFor, unresolvedAsks, verifyHarnessReceipt } from './unattended_preflight.mjs';
+import { harnessFingerprint, harnessInputs } from './harness-safeguards.mjs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, resolve } from 'node:path';
 
 test('default external ask is superseded by deny with a narrow depot exception', () => {
   const rules = [
@@ -38,4 +42,25 @@ test('last matching rule wins and dotted filenames are literal', () => {
   assert.equal(actionFor(rules, 'read', '/repo/.env.local'), 'deny');
   assert.equal(actionFor(rules, 'read', '/repo/.env.example'), 'allow');
   assert.equal(actionFor(rules, 'read', '/repo/a-env-local'), 'allow');
+});
+
+test('enforcement evidence expires on guard, plugin, fixture, wait, preflight, config or CLI changes', () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'harness-receipt-'));
+  try {
+    for (const path of harnessInputs) {
+      mkdirSync(dirname(resolve(root, path)), { recursive: true });
+      copyFileSync(resolve(path), resolve(root, path));
+    }
+    const receipt = { fingerprint: harnessFingerprint(root), version: 'fixture-cli' };
+    verifyHarnessReceipt(receipt, root, 'fixture-cli');
+    assert.throws(() => verifyHarnessReceipt(undefined, root, 'fixture-cli'), /rerun/);
+    assert.throws(() => verifyHarnessReceipt(receipt, root, 'new-cli'), /CLI changed/);
+    for (const path of harnessInputs) {
+      const original = readFileSync(resolve(root, path));
+      writeFileSync(resolve(root, path), Buffer.concat([original, Buffer.from('\n// changed')]));
+      assert.throws(() => verifyHarnessReceipt(receipt, root, 'fixture-cli'), /Safeguards\/config changed/, path);
+      writeFileSync(resolve(root, path), original);
+    }
+    verifyHarnessReceipt(receipt, root, 'fixture-cli');
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

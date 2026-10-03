@@ -41,9 +41,21 @@ tool calls; do not bypass them with encoded commands or wrapper scripts.
 
 After plugin/config changes **restart OpenCode**. The current session does not
 hot-load plugins. `node tools/harness_smoke.mjs` uses the installed CLI, an isolated
-scratch Git repository and a local mock provider to verify actual refusals and a
-gated commit. No paid inference or real provider credentials are required. Unit
-tests alone are not proof of active-session enforcement.
+scratch Git repository and a local mock provider to verify eleven actual tool
+calls: bare/pattern/loop waits, missing/stale gate refusals, a gated commit,
+the Markdown-only exemption, and successful file/gone/PID handle waits. Git
+history is checked after each call; per-call results and raw CLI/provider output
+are retained. No global Git configuration, paid inference or real provider
+credentials are required. Unit tests alone are not proof of active-session
+enforcement.
+
+Preflight requires a current receipt bound to guards, plugin, fixture, wait helper,
+preflight implementation, project config and installed CLI version. A new failed
+probe removes the old receipt, and edits during a probe cannot earn a pass.
+`OPENCODE_PURE` is rejected because it disables external plugins. This controlled
+fresh-process fixture is not proof about arbitrary global config or an existing
+server: preflight also checks resolved permissions and explicitly reports that
+boundary. Use harmless live-session probes after a restart before an unattended run.
 
 ## Externally supervised unattended runs
 

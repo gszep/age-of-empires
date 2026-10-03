@@ -3,10 +3,13 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 
+export const harnessInputs = ['tools/harness-safeguards.mjs', 'tools/hooks/guard_bash.sh', 'tools/hooks/guard_commit.sh',
+  '.opencode/plugins/safeguards.js', 'tools/harness_smoke.mjs', 'tools/wait_for.sh',
+  'tools/unattended_preflight.mjs', 'opencode.jsonc'];
+
 export function harnessFingerprint(root) {
   const hash = createHash('sha256');
-  for (const path of ['tools/harness-safeguards.mjs', 'tools/hooks/guard_bash.sh', 'tools/hooks/guard_commit.sh',
-    '.opencode/plugins/safeguards.js', 'tools/harness_smoke.mjs']) hash.update(readFileSync(resolve(root, path)));
+  for (const path of harnessInputs) hash.update(path).update('\0').update(readFileSync(resolve(root, path))).update('\0');
   return hash.digest('hex');
 }
 

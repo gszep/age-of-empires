@@ -36,12 +36,17 @@ function run(command, args) {
   }).trim();
 }
 
+export function verifyHarnessReceipt(receipt, directory, version) {
+  assert.equal(receipt?.fingerprint, harnessFingerprint(directory), 'Safeguards/config changed; rerun node tools/harness_smoke.mjs');
+  assert.equal(receipt?.version, version, 'Installed CLI changed; rerun the harness smoke');
+}
+
 export function preflight() {
+  assert(!['1', 'true'].includes(process.env.OPENCODE_PURE), 'OPENCODE_PURE disables external safeguard plugins');
   const receiptPath = resolve(root, '.local/harness.ok.json');
   assert(existsSync(receiptPath), 'Run node tools/harness_smoke.mjs: actual installed-CLI safeguard evidence required');
   const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
-  assert.equal(receipt.fingerprint, harnessFingerprint(root), 'Safeguards changed; rerun node tools/harness_smoke.mjs');
-  assert.equal(receipt.version, run('opencode', ['--version']), 'Installed CLI changed; rerun the harness smoke');
+  verifyHarnessReceipt(receipt, root, run('opencode', ['--version']));
   const agent = JSON.parse(run('opencode', ['debug', 'agent', 'build']));
   assert(Array.isArray(agent.permission), 'OpenCode did not return resolved agent permissions');
   const asks = unresolvedAsks(agent.permission);
