@@ -14,7 +14,9 @@ const fallback = process.env.OPEN_FALLBACK === '1';
 const fixtures = mkdtempSync(`${root}.local/feedback-files-`);
 writeFileSync(`${fixtures}/malformed.json`, '{');
 writeFileSync(`${fixtures}/invalid-record.json`, '{}');
-writeFileSync(`${fixtures}/wrong-rules.json`, JSON.stringify({ version: 1, commands: [], checksums: [], rulesOrigin: 'different' }));
+// Reach the rules-origin error with a valid launch seed; an omitted seed is
+// rejected earlier as malformed setup and cannot exercise this distinct popup.
+writeFileSync(`${fixtures}/wrong-rules.json`, JSON.stringify({ version: 1, seed: 58, commands: [], checksums: [], rulesOrigin: 'different' }));
 const rules = fallback ? FALLBACK_RULES : rulesFromManifest(JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8')));
 const state = createGame(58, rules);
 const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
@@ -131,7 +133,8 @@ try {
     await page.click('[data-menu="load-replay"]');
     await (await chooser).accept([`${fixtures}/${file}`]);
     await page.waitForSelector('#popup-dialog[open]');
-    assert((await page.$eval('#popup-message', e => e.textContent!)).includes(expected));
+    const actualMessage = await page.$eval('#popup-message', e => e.textContent!);
+    assert(actualMessage.includes(expected), `${file}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actualMessage)}`);
     assert.equal(await page.$eval('[data-popup-ok]', e => e.textContent), 'OK');
     if (!fallback && file === 'malformed.json') {
       const boxes = await page.$eval('#popup-dialog', e => {

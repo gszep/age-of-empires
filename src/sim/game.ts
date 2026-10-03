@@ -15,6 +15,7 @@ import {
 } from './nav';
 import { random01, seedFrom } from './random';
 import { buildingLimitReached, buildingRulesFor, buildingRulesForEntity, combine, inheritConvertedUnit, playerAttributeFor, populationLimitFor, trainingAt, unitRulesFor, unitRulesForEntity } from './rules';
+import { validPopulationLimit } from './population';
 import { entitiesWithGarrison, garrisonCount } from './garrison';
 import { civilizationRules, rulesForPlayer } from './civilizations';
 import { researchCostFor, researchSecondsFor, technologyFor, technologyRequirementsMet } from './technologies';
@@ -101,8 +102,9 @@ function freeSpot(state: GameState, at: Point): boolean {
 export function createGame(
   seed = 42, rules: GameRules = FALLBACK_RULES,
   civilizations: Record<PlayerId, string> = { 1: rules.civilization.key, 2: rules.civilization.key },
-  map = 'arabia', mode: GameMode = 'random-map',
+  map = 'arabia', mode: GameMode = 'random-map', populationLimit?: number,
 ): GameState {
+  if (!validPopulationLimit(populationLimit)) throw new Error(`invalid population limit ${populationLimit}`);
   if (mode !== 'random-map' && mode !== 'regicide') throw new Error(`unknown game mode ${mode}`);
   // A civilisation label is not a ruleset; both players must resolve before
   // generating the map or spending any resources.
@@ -122,6 +124,7 @@ export function createGame(
     start.x = Math.round(width * (0.5 - (radius.min + Math.floor(random01(rng) * (radius.max - radius.min + 1))) / 100));
   }
   const state: GameState = {
+    ...(populationLimit !== undefined ? { populationLimit } : {}),
     ...(mode === 'regicide' ? { mode } : {}),
     rules, seed: seedFrom(seed || 1), matchSeed: seedFrom(seed || 1), tick: 0, nextId: 1, width, height,
     entities: [], projectiles: [], terrain: [], elevation: [],

@@ -13,6 +13,7 @@ import { Minimap } from './minimap';
 import { DiplomacyDialog, type TributeDraft } from './diplomacy';
 import { OptionsDialog } from './options';
 import type { Preferences } from './preferences';
+import { POPULATION_LIMITS } from '../sim/population';
 import type { GameState, PlayerId, Point, ReadonlyGameState } from '../sim/types';
 
 /**
@@ -306,6 +307,8 @@ export class Hud {
           <select id="map-choice" name="map"></select>
           <label for="regicide-mode" data-map-label="regicideMode">Regicide Mode</label>
           <input id="regicide-mode" name="regicide" type="checkbox">
+          <label for="population-limit" data-map-label="populationLimit">Population:</label>
+          <select id="population-limit" name="populationLimit"></select>
           <label for="map-seed" data-map-label="mapSeed">Seed</label>
           <div class="seed-row">
             <input id="map-seed" name="seed" type="number" min="1" max="4294967295" step="1" inputmode="numeric" placeholder="Random">
@@ -433,7 +436,9 @@ export class Hud {
       const second = this.root.querySelector<HTMLSelectElement>('#civilization-2');
       const civilizations = first && second ? { 1: first.value, 2: second.value } : undefined;
       const mode = this.root.querySelector<HTMLInputElement>('#regicide-mode')!.checked ? 'regicide' : 'random-map';
-      if (this.callbacks.onStartMatch({ map, seed, civilizations, mode })) this.toggleMenu(false);
+      const limit = this.root.querySelector<HTMLSelectElement>('#population-limit')!.value;
+      const populationLimit = limit === '' ? undefined : Number(limit);
+      if (this.callbacks.onStartMatch({ map, seed, civilizations, mode, populationLimit })) this.toggleMenu(false);
     });
 
     this.root.addEventListener('pointerdown', event => event.stopPropagation());
@@ -610,6 +615,11 @@ export class Hud {
     select.value = setup.map;
     const mode = this.root.querySelector<HTMLInputElement>('#regicide-mode')!;
     mode.checked = setup.mode === 'regicide'; mode.title = strings.regicideHelp ?? 'If you lose your King, you are defeated.';
+    const population = this.root.querySelector<HTMLSelectElement>('#population-limit')!;
+    population.replaceChildren(...POPULATION_LIMITS.map(value => new Option(String(value), String(value))));
+    if (setup.populationLimit === undefined) population.prepend(new Option('Default', ''));
+    population.value = setup.populationLimit === undefined ? '' : String(setup.populationLimit);
+    population.title = strings.populationLimitHelp ?? 'Select the maximum number of units each player can create.';
     const seed = this.root.querySelector<HTMLInputElement>('#map-seed')!;
     seed.value = setupKnown ? String(setup.seed) : '';
     seed.placeholder = strings.randomSeed ?? 'Random';

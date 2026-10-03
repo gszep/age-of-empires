@@ -22,8 +22,8 @@ describe('map setup', () => {
   it('remembers a valid choice and tolerates blocked or obsolete browser storage', () => {
     let value: string | null = null;
     vi.stubGlobal('localStorage', { getItem: () => value, setItem: (_key: string, next: string) => { value = next; } });
-    saveMapPreference({ map: 'windsor', seed: 7 });
-    expect(loadMapPreference()).toEqual({ map: 'windsor', seed: 7 });
+    saveMapPreference({ map: 'windsor', seed: 7, populationLimit: 250 });
+    expect(loadMapPreference()).toEqual({ map: 'windsor', seed: 7, populationLimit: 250 });
     value = '{"map":"removed-map","seed":7}';
     expect(loadMapPreference()).toBeUndefined();
     vi.stubGlobal('localStorage', { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } });

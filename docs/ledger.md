@@ -14,6 +14,34 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## Configurable population ceiling (#253)
+
+- **Owned:** `screensingleplayercreate.json` PopulationDropDown names label13516
+  ("Population:") and help93516 (maximum units each player can create). The
+  importer publishes both. Existing XS resource32/Gothic effect418 remains the
+  independent Imperial+10 modifier, not housing.
+- **Measured on installed DE,2026-10-03:** native selector offers25,50,75,100,
+  125,150,175,200,225,250,300,400,500. Full-resolution dropdown/min/max captures
+  are indexed privately under `native253-population-*`. The installed executable
+  is101.103.54800.0 (#185872), newer than the pinned DAT; these are not claimed
+  as recovered pinned-engine constants. Its saved choice was250, which does
+  **not** establish a factory default. The existing rules-bundle default200
+  remains a **chosen** application default.
+- **Implementation policy:** optional authoritative `state.populationLimit`
+  overrides every side's base ceiling; per-player resource32 is added afterwards.
+  Housing remains a separate bound. The menu uses these measured choices in the
+  existing compact setup form, not the native lobby's full layout. No mid-match
+  cap command is provided; Start Game applies the choice to a new match.
+- **Compatibility:** absent fields retain rules-bundle defaults, including old
+  uncapped rules, without inserting a new checksum field. Explicit limits travel
+  in v2 configs/records and JSON snapshots; v1 cannot carry one. Shared protocol3
+  rejects older simulators and incompatible checkpoints rather than silently
+  ignoring the ceiling. Installed services remain release-pinned on protocol2;
+  this change does not deploy or migrate their live state.
+- Native factory-default policy and Gothic bonus-versus-housing runtime checks
+  on a matching executable remain unverified. `src/sim/population.ts`,
+  `rules.ts`, `match-setup.ts`, `tools/map_menu_smoke.mts`.
+
 ## Persian Trade Cart unavailable audio (#271)
 
 - **Owned absence:** DAT8 unit128 and death graphic4862 reference Wwise events
@@ -306,9 +334,11 @@ off the reference; **measured** — fitted to a reference screenshot;
   food. Native fractional/last-unit rounding remains uncalibrated.
 - **Owned:** Imperial technology406/effect418 adds10 to unit-limit resource32,
   distinct from housing; help63208 describes200→210. **Chosen mode default:** new
-  rules bundles use a fixed200 population ceiling; missing legacy fields retain
+  rules bundles default to200 population; explicit match setup may override it,
+  while missing legacy fields retain
   uncapped behaviour. **Inferred:** cap is min(housing, ceiling+bonus), with no
-  free houses. Configurable setup and native default/bonus calibration are#253.
+  free houses. Configurable setup is implemented; native default/bonus calibration
+  remains#253 (see the population section above).
   This replaces the previous unlimited housing sum for new rule bundles.
 - **Owned graphics:** Gothic garrison composites include the fileless`E`
   placeholder (e.g.2416); its file-bearing children remain traversed. No missing

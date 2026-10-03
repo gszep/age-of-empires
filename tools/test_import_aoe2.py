@@ -1069,6 +1069,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
     def test_map_setup_labels_and_names_are_imported(self):
         expected = {
             "mapType": "Map Type", "mapSeed": "Seed", "startGame": "Start Game",
+            "populationLimit": "Population:",
             "gameSettings": "Game Settings", "randomSeed": "Random",
             "mapArabia": "Arabia", "mapBlackForest": "Black Forest", "mapIslands": "Islands",
         }

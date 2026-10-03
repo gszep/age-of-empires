@@ -17,6 +17,7 @@ import type { GameState } from './sim/types';
 import { validGameMode, validMatchSetup, type MatchSetup } from './match-setup';
 import { seedFrom } from './sim/random';
 import { civilizationRules } from './sim/civilizations';
+import { validPopulationLimit } from './sim/population';
 
 const KEY = 'open-empires-lab:dev-session';
 /**
@@ -62,6 +63,7 @@ export function loadSession(rules: GameRules): GameState | undefined {
     // taken under different content would resume against mismatched entities.
     if (!compatibleSnapshot(snapshot) || snapshot.rulesOrigin !== rules.origin) return undefined;
     if (!validGameMode(snapshot.state.mode)) return undefined;
+    if (!validPopulationLimit(snapshot.state.populationLimit)) return undefined;
     if (![1, 2].every(player => civilizationRules(rules, snapshot.state.players[player as 1 | 2]?.civilization))) return undefined;
     return { ...snapshot.state, rules };
   } catch {
@@ -82,6 +84,7 @@ export function loadSessionSetup(rules: GameRules): MatchSetup | undefined {
     const saved: Snapshot = JSON.parse(sessionStorage.getItem(KEY) ?? 'null');
     if (saved && compatibleSnapshot(saved) && saved.rulesOrigin === rules.origin && validMatchSetup(saved.setup)
       && seedFrom(saved.setup.seed) === saved.state.matchSeed
+      && saved.setup.populationLimit === saved.state.populationLimit
       && (saved.setup.mode ?? 'random-map') === (saved.state.mode ?? 'random-map')) return saved.setup;
   } catch { /* old or unavailable session */ }
   return;

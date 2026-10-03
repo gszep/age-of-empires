@@ -24,6 +24,7 @@ interface Job {
   p2: string;
   swapped: boolean;
   map?: string;
+  populationLimit?: string;
 }
 
 function parseArgs(argv: string[]): Record<string, string> {
@@ -47,6 +48,7 @@ function runJob(job: Job, outDir: string, maxTime: string, data: string): Promis
       '--out', join(outDir, `result-${job.id}.json`),
       '--replay', join(outDir, `replay-${job.id}.json`),
       ...(job.map ? ['--map', job.map] : []),
+      ...(job.populationLimit !== undefined ? ['--population-limit', job.populationLimit] : []),
     ], { stdio: ['ignore', 'ignore', 'inherit'] });
     child.on('exit', code => code === 0 ? resolve() : reject(new Error(`match ${job.id} exited ${code}`)));
   });
@@ -79,8 +81,8 @@ async function main(): Promise<void> {
   const seedCount = paired ? Math.ceil(matches / 2) : matches;
   for (let i = 0; i < seedCount; i++) {
     const seed = seedStart + i;
-    jobs.push({ id: `${seed}-a`, seed, p1, p2, swapped: false, map: args.map });
-    if (paired && jobs.length < matches) jobs.push({ id: `${seed}-b`, seed, p1: p2, p2: p1, swapped: true, map: args.map });
+    jobs.push({ id: `${seed}-a`, seed, p1, p2, swapped: false, map: args.map, populationLimit: args['population-limit'] });
+    if (paired && jobs.length < matches) jobs.push({ id: `${seed}-b`, seed, p1: p2, p2: p1, swapped: true, map: args.map, populationLimit: args['population-limit'] });
   }
   jobs.length = Math.min(jobs.length, matches);
 

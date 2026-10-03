@@ -2330,6 +2330,7 @@ def extract(
                 ("returnToMap", "IDS_RETURN_TO_MAP"), ("leaveMap", "IDS_LEAVE_MAP"), ("close", 10824),
                 # Map setup labels and the three shipped random-map names (#144).
                 ("mapType", 9691), ("mapSeed", 10658), ("startGame", 9472),
+                ("populationLimit", 13516), ("populationLimitHelp", 93516),
                 ("civilization", "IDS_MPS_CIVILIZATION"),
                 ("gameSettings", 9682), ("randomSeed", 10107),
                 ("regicideMode", 13078), ("regicideHelp", 13081), ("regicideObjective", 9846),

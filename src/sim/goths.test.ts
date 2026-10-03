@@ -13,8 +13,8 @@ import type { BuildingKind, Entity, GameState, PlayerId, UnitKind } from './type
 const path = process.env.CIV_PROFILE_CONTENT ?? 'public/imported/aoe2/manifest.json';
 const source = existsSync(path) ? rulesFromManifest(JSON.parse(readFileSync(path, 'utf8'))) : undefined;
 if (source?.civilizations?.goths) source.civilizations.goths.civilization.enabled = true; // pending-profile acceptance
-function arena(age = 2) {
-  const s = createGame(181, source!, { 1: 'goths', 2: 'franks' });
+function arena(age = 2, populationLimit?: number) {
+  const s = createGame(181, source!, { 1: 'goths', 2: 'franks' }, 'arabia', 'random-map', populationLimit);
   s.entities = s.entities.filter(e => e.kind === 'town-center');
   s.terrain.fill(0); s.elevation.fill(0);
   for (const owner of [1, 2] as const) Object.assign(s.players[owner], { age, food: 20000, wood: 20000, gold: 20000, stone: 20000 });
@@ -108,11 +108,9 @@ describe.skipIf(!source?.civilizations?.goths)('owned Gothic gameplay', () => {
   });
 
   it('Imperial raises the population ceiling without providing houses or reapplying after JSON reload', () => {
-    const s = arena(2), castle = building(s, 'castle', 1), tc = s.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
     // A small scenario ceiling exercises actual production without 200 actors.
     const limit = 25;
-    s.rules = { ...s.rules, civilizations: { ...s.rules.civilizations,
-      goths: { ...rulesForPlayer(s, 1), populationLimit: limit } } };
+    const s = arena(2, limit), castle = building(s, 'castle', 1), tc = s.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
     building(s, 'house', 1, 30, 25); building(s, 'house', 1, 35, 25);
     for (let i = 0; i < limit; i++) unit(s, 'villager', 1, 45 + i % 10, 60 + Math.floor(i / 10));
     const dummy = unit(s, 'villager', 1, 80, 20);

@@ -9,10 +9,21 @@ import { sharedMatchPlugin } from '../src/shared/server.ts';
 import { createGame } from '../src/sim/game.ts';
 import { FALLBACK_RULES, rulesFromManifest } from '../src/sim/data.ts';
 import { MAPS } from '../src/sim/mapgen.ts';
+import { POPULATION_LIMITS } from '../src/sim/population.ts';
+import { runMatch } from '../src/headless/runner.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const checkpoint = `${root}.local/map-menu-smoke-${process.pid}.json`;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [sharedMatchPlugin(root, checkpoint)],
+const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [sharedMatchPlugin(root, checkpoint), {
+  name: 'population-replay-observer', enforce: 'pre',
+  transform(code, id) {
+    if (!id.endsWith('/src/main.ts')) return;
+    const anchor = 'renderer.setAnimationLoop(now => {'; assert(code.includes(anchor));
+    return code.replace(anchor, `Object.assign(globalThis, {
+      __populationReplay: () => ({ verified: replay?.verified, failed: replay?.failed })
+    });\n${anchor}`);
+  },
+}],
   server: { host: '127.0.0.1', port: 5209, strictPort: true }, logLevel: 'error' });
 await server.listen();
 const base = 'http://127.0.0.1:5209';
@@ -71,6 +82,9 @@ try {
   await solo.keyboard.press('F10');
   assert.deepEqual(await solo.$$eval('#map-choice option', options => options.map(o => (o as HTMLOptionElement).value)), Object.keys(MAPS));
   const before = await query(solo, { type: 'sim' });
+  assert.deepEqual(await solo.$$eval('#population-limit option', options => options.map(o => Number((o as HTMLOptionElement).value))), POPULATION_LIMITS);
+  await solo.select('#population-limit', '25');
+  assert.equal((await query(solo, { type: 'sim' })).synchronizationHash, before.synchronizationHash, 'population edits do not change a live match');
   await solo.select('#map-choice', 'islands');
   await fillSeed(solo, '2');
   await solo.keyboard.press('ArrowUp');
@@ -82,6 +96,8 @@ try {
   assert.equal((await query(solo, { type: 'sim' })).synchronizationHash, before.synchronizationHash, 'invalid seed cannot replace the match');
   await choose(solo, 'islands', 2);
   const islands = await query(solo, { type: 'snapshot' });
+  assert.equal(islands.populationLimit, 25);
+  assert.equal((await query(solo, { type: 'sim' })).connection.setup.populationLimit, 25);
   assert.deepEqual(islands.terrain, createGame(2, rules, undefined, 'islands').terrain);
   assert.equal(new URL(solo.url()).searchParams.get('solo'), '1');
   assert.equal(new URL(solo.url()).searchParams.has('map'), false);
@@ -92,10 +108,13 @@ try {
   assert.equal(resumed.connection.setup.map, 'islands');
   assert.equal(resumed.connection.setup.seed, 2);
   assert.equal(resumed.connection.setup.mode ?? 'random-map', 'random-map');
+  assert.equal(resumed.connection.setup.populationLimit, 25);
+  assert.equal((await query(solo, { type: 'snapshot' })).populationLimit, 25);
   assert(resumed.tick >= tick, 'reload resumes rather than re-dealing the chosen board');
   console.log('Solo: six maps, safe text input, seed validation, Islands seed 2 and reload persistence');
 
   await choose(solo, 'windsor', 7);
+  assert.equal((await query(solo, { type: 'snapshot' })).populationLimit, 25, 'map changes retain the selected ceiling');
   assert.equal((await query(solo, { type: 'snapshot' })).width, 392);
   await solo.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   const ground = await query(solo, { type: 'pixels', rect: [440, 320, 100, 100], match: '#18140c', tolerance: 2 });
@@ -109,7 +128,26 @@ try {
   await until(solo, "s.connection.setup.seed !== 9");
   const random = (await query(solo, { type: 'sim' })).connection.setup;
   assert.equal(random.map, 'black-forest'); assert(Number.isInteger(random.seed) && random.seed > 0);
+  await solo.keyboard.press('F10'); await solo.select('#population-limit', '500');
+  await solo.click('#map-setup button[type="submit"]');
+  await until(solo, 's.connection.setup.populationLimit === 500');
+  await solo.keyboard.press('F10'); await solo.click('[data-menu="restart"]');
+  await until(solo, 's.connection.setup.populationLimit === 500');
+  assert.equal((await query(solo, { type: 'snapshot' })).populationLimit, 500, 'Restart uses the active ceiling');
+  assert.equal(await solo.evaluate(() => JSON.parse(localStorage.getItem('open-empires-lab:map-setup')!).populationLimit), 500);
+  console.log('Population menu: source-measured choices, no live mutation, chosen 25/500, reload/restart and preferences');
   console.log('Solo: large/small map transitions rebuild terrain; Random creates a new seed');
+  const replay = await runMatch({ version: 2, seed: 253, populationLimit: 25, maxTimeSeconds: 5 },
+    { 1: { decide: () => [] }, 2: { decide: () => [] } }, rules);
+  await solo.evaluate(record => {
+    const input = document.querySelector<HTMLInputElement>('#replay-file')!, transfer = new DataTransfer();
+    transfer.items.add(new File([JSON.stringify(record)], 'population25.json', { type: 'application/json' }));
+    input.files = transfer.files; input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, replay.record);
+  await solo.waitForFunction(() => (globalThis as any).__populationReplay().verified === 1, { timeout: 30_000 });
+  assert.equal(await solo.evaluate(() => (globalThis as any).__populationReplay().failed), false);
+  assert.equal((await query(solo, { type: 'snapshot' })).populationLimit, 25);
+  console.log('Population replay: actual file input restores 25 and verifies the real-clock headless checksum');
   await solo.close();
 
   const host = await open('/', 5);
@@ -119,6 +157,7 @@ try {
   assert.equal((await query(guest, { type: 'sim' })).connection.speed, 1);
   await guest.keyboard.press('F10');
   assert(await guest.$eval('#map-choice', e => (e as HTMLSelectElement).disabled));
+  assert(await guest.$eval('#population-limit', e => (e as HTMLSelectElement).disabled));
   assert(await guest.$eval('#map-setup button[type="submit"]', e => (e as HTMLButtonElement).disabled));
   await guest.click('#menu-dialog [data-options]');
   await guest.waitForSelector('#options-dialog[open]');
@@ -129,13 +168,21 @@ try {
   assert.equal((await query(guest, { type: 'sim' })).connection.speed, 4, 'reload preserves authoritative shared speed');
   assert.equal((await query(host, { type: 'sim' })).connection.speed, 4);
   console.log('Shared options: local saved speed never overwrites host on join/reload; explicit Apply uses shared settings');
+  await host.bringToFront(); await host.keyboard.press('F10'); await host.select('#population-limit', '50');
   await choose(host, 'islands', 2);
   await until(guest, "s.connection.setup.map === 'islands' && s.connection.setup.seed === 2");
   await host.keyboard.press('F3'); await until(host, 's.connection.paused'); await until(guest, 's.connection.paused');
   assert.equal((await query(host, { type: 'sim' })).synchronizationHash, (await query(guest, { type: 'sim' })).synchronizationHash);
+  assert.equal((await query(host, { type: 'snapshot' })).populationLimit, 50);
+  assert.equal((await query(guest, { type: 'snapshot' })).populationLimit, 50);
   const savedSetup = JSON.parse(readFileSync(checkpoint, 'utf8')).setup;
   assert.equal(savedSetup.map, 'islands'); assert.equal(savedSetup.seed, 2);
   assert.equal(savedSetup.mode ?? 'random-map', 'random-map');
+  assert.equal(savedSetup.populationLimit, 50);
+  assert.equal(JSON.parse(readFileSync(checkpoint, 'utf8')).state.populationLimit, 50);
+  await guest.reload({ waitUntil: 'domcontentloaded' }); await ready(guest);
+  assert.equal((await query(guest, { type: 'snapshot' })).populationLimit, 50, 'rejoin preserves the host ceiling');
+  assert.equal((await query(host, { type: 'sim' })).synchronizationHash, (await query(guest, { type: 'sim' })).synchronizationHash);
   console.log('Shared: host menu changes both clients; guest is read-only; setup is checkpointed');
   assert.deepEqual(errors, []);
   console.log('MAP MENU SMOKE GREEN');

@@ -90,6 +90,7 @@ export interface RejectedCommand {
 }
 
 export interface MatchConfig {
+  populationLimit?: number;
   version: 1 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   maxTimeSeconds?: number;
@@ -149,6 +150,7 @@ export interface RememberedEntityObservation {
 
 /** Everything needed to reproduce a match tick-for-tick. */
 export interface MatchRecord {
+  populationLimit?: number;
   mode?: import('../sim/types').GameMode;
   version: 1 | typeof MATCH_FORMAT_VERSION;
   seed: number;

@@ -1,8 +1,9 @@
 import { MAPS } from './sim/mapgen';
 import type { GameMode } from './sim/types';
+import { validPopulationLimit } from './sim/population';
 
 /** Match-launch metadata, separate from authoritative state and replay hashes. */
-export interface MatchSetup { map: string; seed: number; mode?: GameMode; civilizations?: { 1: string; 2: string } }
+export interface MatchSetup { map: string; seed: number; mode?: GameMode; populationLimit?: number; civilizations?: { 1: string; 2: string } }
 export const validGameMode = (mode: unknown): mode is GameMode | undefined => mode === undefined || mode === 'random-map' || mode === 'regicide';
 export const validRecordedMode = (version: unknown, mode: unknown): boolean => version === 1 ? mode === undefined
   : version === 2 && (mode === 'random-map' || mode === 'regicide');
@@ -13,6 +14,7 @@ export function validMatchSetup(value: unknown): value is MatchSetup {
   const setup = value as Partial<MatchSetup>;
   return typeof setup.map === 'string' && Object.hasOwn(MAPS, setup.map)
     && validGameMode(setup.mode)
+    && validPopulationLimit(setup.populationLimit)
     && typeof setup.seed === 'number' && Number.isInteger(setup.seed) && setup.seed > 0 && setup.seed <= MAX_MAP_SEED
     && (setup.civilizations === undefined || (!!setup.civilizations && typeof setup.civilizations === 'object'
       && [1, 2].every(player => typeof setup.civilizations![player as 1 | 2] === 'string'

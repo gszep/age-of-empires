@@ -35,7 +35,7 @@ resources. See [shared-play.md](shared-play.md).
 | Civilisations | Britons, Franks, Goths, Teutons, Japanese, Chinese and Byzantines with roster/research/bonus/art integration | [coverage](civilization-coverage.md), [bonus contract](civilization-bonuses.md); wider catalogue is inventory only |
 | Buildings/specialists | Additional TCs, fortifications with authoritative automatic gate state, monasteries/relics, siege, conversion snapshots, nested cargo capacity and owner-preserving mobile-carrier conversion | [buildings](civ-buildings-integration.md), [specialists](civ-specialists-integration.md), [conversion](conversion-reference-checklist.md); gate trigger distance/timing remain inferred under#133 |
 | Naval | Briton dock roster, transports, trade cogs and fish traps; enabled profiles' regional ships; distinct snapper/salmon/dorado and shore fish | Owned DAT/task/art imports; all four fish identities gather/deplete/bank in open and imported modes and retain original art in fog; no claim of every native exception |
-| Modes/shared play | Solo and household two-seat play, reconnect/checkpoints, Regicide/Treason, locked diplomacy/tribute | [shared play](shared-play.md), [source audit](shared-reference-audit.md); public multiplayer and general migration are not delivered |
+| Modes/shared play | Solo and household two-seat play, reconnect/checkpoints, Regicide/Treason, locked diplomacy/tribute, configurable population ceilings through menu/headless/replays | [shared play](shared-play.md), [source audit](shared-reference-audit.md); source protocol3 population support is verified privately; installed releases remain protocol2 |
 | Maps | Arabia, Black Forest, Islands, Windsor, Senlac and painted proof; RMS-inspired phases, surveys, elevation, relics and corrected spacing; global Islands fish reach both resource-islet coasts | [generation design](map-generation-design.md); home-land mirroring and native placement/slope semantics remain inferred; native Islands seasons/additional objects tracked in#274 |
 | Rendering | Owned x1/x2 sprites and ordinary A/B attack graphics, masks/contours/shadows, fog memory, source-backed water/foam, native blend families, terrain plants and their shadows | [blend coverage](terrain-blend-coverage.md), [decode contract](block-decode-contract.md); native compositor and exact calibration remain open |
 | UI | Native command cells/icons/cursors, garrison/training/production controls, notifications/confirmation/end screens, map menu and persistent options | [UI reference](ui-reference.md), [feedback review](reviews/2026-09-24-issue58.md); browser text rasterisation and some surfaces remain approximations |
@@ -88,7 +88,7 @@ the single controlled run saved31.03% atlas elapsed time and32.67% aggregate CPU
 See [cache verification](reviews/2026-10-02-atlas-cache.md) for inputs and limits.
 
 Owned files do not settle every engine rule. Conversion exceptions, volley/charge
-cadence, zero-time grants, population settings, RMS window/placement semantics and
+cadence, zero-time grants, population default/bonus calibration, RMS window/placement semantics and
 audio mixing remain explicitly qualified in the ledger. Closed scoped civilisation
 tickets are not a claim of complete native-DE equivalence.
 
@@ -109,6 +109,17 @@ explicit about known gaps and endurance tiers; it is not universal coverage.
 Review its generated scope diff for changes to assertions, supplied state and
 time limits. #124's Dark-Age-start acceptance remains opt-in and failing, separate
 from the green Feudal-start component fixture.
+
+Population setup (#253) is verified through real menu selection, solo reload and
+restart, a headless record loaded through the browser file input, CLI/batch
+replay and private host/guest checkpoint/rejoin. Paid production stays at100%
+when the chosen ceiling is full despite spare houses, then releases after a loss;
+Gothic Imperial+10 still requires housing. Native selector values were captured
+on the installed newer DE build; factory default and pinned-build bonus runtime
+calibration remain open. October3 checkpoint:1356 tests passed/8 skipped,
+build,192 owned import/tool tests and real-browser gate; six mapped acceptance
+scenarios passed. A stale wrong-rules replay fixture gained its missing seed to
+reach the original popup assertion; no assertion or clock was relaxed.
 
 Established historical measurements, with their original scope:
 

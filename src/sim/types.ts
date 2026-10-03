@@ -271,6 +271,8 @@ export interface Projectile {
 }
 
 export interface GameState {
+  /** Explicit match ceiling, before civilisation bonuses; absent uses legacy rules. */
+  populationLimit?: number;
   /** Absent in legacy saves/records means random map. */
   mode?: GameMode;
   /** Ended without a winner, e.g. both Regicide kings lost in one tick. */

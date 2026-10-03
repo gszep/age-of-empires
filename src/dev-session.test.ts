@@ -32,6 +32,18 @@ it('keeps older matches playable without inventing a seed for them', () => {
   expect(loadSessionSetup(state.rules)).toBeUndefined();
 });
 
+it('resumes an explicit population ceiling and rejects inconsistent setup and invalid saved ceilings', () => {
+  const state = createGame(253, FALLBACK_RULES, undefined, 'arabia', 'random-map', 25);
+  const setup = { map: 'arabia', seed: 253, populationLimit: 25 };
+  saveSession(state, setup);
+  expect(checksumState(loadSession(FALLBACK_RULES)!)).toBe(checksumState(state));
+  expect(loadSessionSetup(FALLBACK_RULES)).toEqual(setup);
+  saveSession(state, { ...setup, populationLimit: 500 });
+  expect(loadSessionSetup(FALLBACK_RULES)).toBeUndefined();
+  saveSession({ ...state, populationLimit: -1 }, setup);
+  expect(loadSession(FALLBACK_RULES)).toBeUndefined();
+});
+
 it('restores mixed selections only while both civilisation rulesets remain loaded', () => {
   const rules = structuredClone(FALLBACK_RULES);
   const other = structuredClone(FALLBACK_RULES);

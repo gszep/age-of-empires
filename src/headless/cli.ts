@@ -43,7 +43,7 @@ try {
   args = parseArgs(process.argv.slice(2));
 } catch (error) {
   console.error((error as Error).message);
-  console.error('usage: npm run match -- [--seed n] [--p1 builtin|idle|cmd:...] [--p2 ...] [--max-time s] [--interval s] [--out file] [--replay file]');
+  console.error('usage: npm run match -- [--seed n] [--population-limit 25..500] [--p1 builtin|idle|cmd:...] [--p2 ...] [--max-time s] [--interval s] [--out file] [--replay file]');
   process.exit(2);
 }
 const config: MatchConfig = { version: 2, seed: Number(args.seed ?? 1) };
@@ -51,6 +51,7 @@ if (args['max-time']) config.maxTimeSeconds = Number(args['max-time']);
 if (args.interval) config.decideIntervalSeconds = Number(args.interval);
 if (args.map) config.map = args.map;
 if (args.mode) config.mode = args.mode as MatchConfig['mode'];
+if (args['population-limit'] !== undefined) config.populationLimit = Number(args['population-limit']);
 if (!validateMatchConfig(config)) {
   console.error(`invalid match config ${explain(validateMatchConfig)}`);
   process.exit(2);

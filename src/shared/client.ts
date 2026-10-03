@@ -5,6 +5,7 @@ import type { Command, Entity, GameState, PlayerId, Point, Projectile } from '..
 import { SHARED_VERSION, type HostMessage, type MatchSettings } from './protocol';
 import { TickPlayback } from './playback';
 import { validGameMode, validMatchSetup, type MatchSetup } from '../match-setup';
+import { validPopulationLimit } from '../sim/population';
 
 const RECONNECT_DELAY_MS = 1500;
 
@@ -148,8 +149,10 @@ export class SharedClient {
           const message = JSON.parse(event.data) as HostMessage;
           if (message.type === 'snapshot') {
             if (!validGameMode(message.state.mode)) { this.onNotice?.('Invalid game mode in snapshot'); socket.close(); return; }
-            if (validMatchSetup(message.setup) && (message.setup.mode ?? 'random-map') !== (message.state.mode ?? 'random-map')) {
-              this.onNotice?.('Inconsistent game mode metadata'); socket.close(); return;
+            if (!validPopulationLimit(message.state.populationLimit)) { this.onNotice?.('Invalid population limit in snapshot'); socket.close(); return; }
+            if (validMatchSetup(message.setup) && ((message.setup.mode ?? 'random-map') !== (message.state.mode ?? 'random-map')
+              || message.setup.populationLimit !== message.state.populationLimit)) {
+              this.onNotice?.('Inconsistent game setup metadata'); socket.close(); return;
             }
             const changedMap = !this.state || !this.settings || this.settings.generation !== message.settings.generation
               || this.state.width !== message.state.width || this.state.height !== message.state.height

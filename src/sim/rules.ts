@@ -54,7 +54,7 @@ export function playerAttributeFor(
 }
 
 export function populationLimitFor(state: GameState, owner: PlayerId): number {
-  return (rulesForPlayer(state, owner).populationLimit ?? Infinity)
+  return (state.populationLimit ?? rulesForPlayer(state, owner).populationLimit ?? Infinity)
     + (playerAttributeFor(state, owner, 'unitLimit') ?? 0);
 }
 

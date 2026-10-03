@@ -3,6 +3,7 @@ import { FALLBACK_RULES, TICK_SECONDS, type GameRules } from '../sim/data';
 import { checksumState } from '../sim/checksum';
 import { matchOver } from '../sim/regicide';
 import { validRecordedMode } from '../match-setup';
+import { validPopulationLimit } from '../sim/population';
 import { describeObservation, observe } from '../sim/observe';
 import type { Command, PlayerId } from '../sim/types';
 import type { MatchConfig, MatchRecord, MatchResult, RejectedCommand, StrategyInputMessage } from '../protocol/types';
@@ -22,9 +23,10 @@ export async function runMatch(
 ): Promise<{ result: MatchResult; record: MatchRecord }> {
   if (config.version !== 1 && config.version !== 2) throw new Error('unknown match format');
   if (config.version === 1 && config.mode !== undefined) throw new Error('game mode requires match format v2');
+  if (config.version === 1 && config.populationLimit !== undefined) throw new Error('population limit requires match format v2');
   const maxTime = config.maxTimeSeconds ?? 1800;
   const decideInterval = config.decideIntervalSeconds ?? 0.5;
-  const state = createGame(config.seed, rules, config.civilizations, config.map ?? 'arabia', config.mode);
+  const state = createGame(config.seed, rules, config.civilizations, config.map ?? 'arabia', config.mode, config.populationLimit);
   const rejectedCommands: RejectedCommand[] = [];
   const pendingRejections: Record<PlayerId, RejectedCommand[]> = { 1: [], 2: [] };
   const recordedCommands: MatchRecord['commands'] = [];
@@ -84,6 +86,7 @@ export async function runMatch(
   if (state.winner) result.winner = state.winner;
   if (state.draw) result.draw = true;
   const record: MatchRecord = {
+    ...(config.populationLimit !== undefined ? { populationLimit: config.populationLimit } : {}),
     version: 2,
     seed: config.seed,
     rulesOrigin: rules.origin,
@@ -114,7 +117,10 @@ export function replayRecord(
   onTick?: (state: ReturnType<typeof createGame>) => void,
 ): ReplayOutcome {
   if (!validRecordedMode(record.version, record.mode)) return { ok: false, checked: 0, expected: 'valid record version/mode', actual: `${record.version}/${record.mode}` };
-  const state = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode);
+  if (!validPopulationLimit(record.populationLimit) || (record.version === 1 && record.populationLimit !== undefined)) {
+    return { ok: false, checked: 0, expected: 'valid population limit', actual: String(record.populationLimit) };
+  }
+  const state = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode, record.populationLimit);
   const commands = [...record.commands];
   const checksums = new Map(record.checksums.map(entry => [entry.tick, entry.hash]));
   const lastTick = record.checksums.at(-1)?.tick ?? 0;

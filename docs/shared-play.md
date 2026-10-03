@@ -58,6 +58,14 @@ and requires reloading matching client code.
 
 ## Match behaviour
 
+Current source uses **protocol3** for configurable population ceilings (#253).
+The installed release-pinned services described above remain on protocol2.
+A future rollout needs matching host/client code and an explicit checkpoint
+plan; no protocol2 checkpoint migration or deployment is part of this change.
+The host owns the population selection, includes it in authoritative snapshots
+and setup metadata, and preserves it across restart/checkpoint/rejoin. Guests
+see a disabled selector. Older clients are rejected before simulation.
+
 The server imports `src/sim/` and owns the clock, command order and AI.
 Clients receive the host's actual rules and current snapshot, then reproduce
 the accepted commands at each tick. A checksum every 100 ticks detects drift;
