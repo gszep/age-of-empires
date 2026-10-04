@@ -29,7 +29,11 @@ off the reference; **measured** — fitted to a reference screenshot;
   actions. Captured monks retain the researched aura with their conversion rules;
   its beneficiaries follow their current owner. The two-seat locked-enemy model
   means owner4 ally targeting currently reduces to same-owner recipients.
-  These are observable, tested policies, not native calibration; #285 tracks it.
+  Current-build185872 native editor observations support no self-healing and a
+  working relic-carrier aura: isolated monks stayed25/45, then both recovered
+  when brought together. Exact rates, overlap, boundaries and other policies
+  remain inferred; pinned-runtime acceptance is still open. See
+  [Bimaristan calibration](bimaristan-calibration.md) and #285.
 - **Source mismatch:** team409 adds class21 attack+3 to DAT class0, whereas owned
   English120158 says+2 versus buildings. Preserve DAT arithmetic and original
   localization rather than silently editing either. Native resolution is #285.
