@@ -31,8 +31,10 @@ off the reference; **measured** — fitted to a reference screenshot;
   means owner4 ally targeting currently reduces to same-owner recipients.
   Current-build185872 native editor observations support no self-healing and a
   working relic-carrier aura: isolated monks stayed25/45, then both recovered
-  when brought together. Exact rates, overlap, boundaries and other policies
-  remain inferred; pinned-runtime acceptance is still open. See
+  when brought together. Timed Knight controls with0/1/2 relic-carrier emitters
+  support75HP/minute and non-additive overlap: both healing runs recovered20HP
+  in about16game seconds; zero emitters left the wound intact. Exact boundaries,
+  scheduling and other policies remain inferred; pinned-runtime acceptance is still open. See
   [Bimaristan calibration](bimaristan-calibration.md) and #285.
 - **Source mismatch:** team409 adds class21 attack+3 to DAT class0, whereas owned
   English120158 says+2 versus buildings. Preserve DAT arithmetic and original
