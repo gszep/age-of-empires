@@ -49,11 +49,18 @@ Normal match left its F11 label **Normal1.7**. Therefore the reset preference an
 the active match speed must not be conflated. This is a pane-reset observation,
 not a clean-install or reset-lobby/new-match measurement.
 
-Our fresh local/pristine shared **Normal** default remains an explicit application
-policy, not a verified native factory default. Existing saved index semantics and
-the nominal Slow/Casual/Normal/Fast multipliers remain as delivered by70bda6c.
-The remaining #280 acceptance includes pinned-build timing and the relationship
-between reset preferences, lobby defaults and a newly started match.
+Follow-up: a newly launched editor test used **Casual1.5**, and returning to the
+single-player skirmish lobby also displayed **Casual**. However, the skirmish
+lobby's own **Reset** button changed its speed to **Normal**, population to200,
+map toCoastal and civilizations toRandom. Starting that reset lobby produced a
+real game-clock label **Normal1.7** (captured at00:24).
+
+Thus the Game-pane default and the skirmish-lobby default are demonstrably
+different in this current build. Our fresh **Normal** choice matches the observed
+reset skirmish/new-match path; it must not be described as the universal default
+of every native options pane. Existing saved index semantics and nominal
+Slow/Casual/Normal/Fast multipliers remain as delivered by70bda6c. Pinned-build
+timing/defaults and native multiplayer-lobby defaults remain unverified.
 
 ### Local evidence
 
@@ -68,6 +75,10 @@ Owned screenshots remain private under `.local/`:
   captured slider explicitly reads **56**, which is the value actually applied.
 - `native280-20261004-reset-{dialog,result,applied}.png`: reset confirmation,
   Casual selector, and continuing Normal match.
+- `native285-test-loaded.png`: newly launched editor test atCasual1.5.
+- `native280-new-lobby-after-reset.png`, `native280-lobby-reset.png`,
+  `native280-reset-lobby-match.png`: Casual inherited by skirmish, its Reset
+  switching toNormal, and the launched Normal1.7 match.
 
 No runtime value, replay state, fixture assertion or test timeout was changed for
 these observations.
