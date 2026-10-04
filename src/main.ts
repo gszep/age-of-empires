@@ -13,7 +13,7 @@ import type { MatchRecord } from './protocol/types';
 import type { BuildingKind, Entity, GameState, PlayerId, Point, ResourceKind, UnitKind } from './sim/types';
 import { isGateKind, isWallKind } from './sim/buildings';
 import { buildMenu, type BuildPage } from './view/build-menu';
-import { contextTargets, sameKindOnScreen } from './view/selection';
+import { contextTargets, pickTarget, sameKindOnScreen } from './view/selection';
 import { clearSession, loadSession, loadSessionSetup, saveSession } from './dev-session';
 import { loadMapPreference, saveMapPreference, mapChoices, validMatchSetup, validRecordedMode, MAX_MAP_SEED, type MatchSetup } from './match-setup';
 import { matchOver, TREASON_GOLD } from './sim/regicide';
@@ -808,26 +808,9 @@ function screenToWorld(clientX: number, clientY: number): Point {
   return point;
 }
 
-function pickEntity(point: Point): Entity | undefined {
-  let best: Entity | undefined;
-  let bestDistance = Infinity;
-  for (const candidate of contextTargets(game, localPlayer, revealMap)) {
-    const entity = candidate.entity as Entity;
-    // A carcass is still food, and a player is entitled to click it and read
-    // how much is left; a corpse with nothing on it stays unclickable, so a
-    // battlefield of dead soldiers never gets in the way of the living.
-    if (entity.dead && !isCarcass(entity)) continue;
-    // Nearest to the click wins, carcass or not. Preferring the living sounds
-    // reasonable and is not: villagers eating a carcass stand right on it, so
-    // any bias at all puts the corpse back out of reach, which is the bug.
-    const at = candidate.remembered ? entity.position : renderPosition(entity);
-    const d = Math.hypot(at.x - point.x, at.y - point.y) - entity.radius;
-    if (d < Math.min(bestDistance, 0.9)) {
-      best = entity;
-      bestDistance = d;
-    }
-  }
-  return best;
+function pickEntity(point: Point, intent: 'selection' | 'context' = 'context'): Entity | undefined {
+  return pickTarget(contextTargets(game, localPlayer, revealMap), point, intent,
+    entity => renderPosition(entity as Entity)) as Entity | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -995,7 +978,7 @@ addEventListener('pointerup', event => {
     });
     if (units.length) selectedIds = units.map(e => e.id);
   } else {
-    const target = pickEntity(screenToWorld(event.clientX, event.clientY));
+    const target = pickEntity(screenToWorld(event.clientX, event.clientY), 'selection');
     // The same thing clicked twice quickly takes every one of its kind that
     // can be seen, which is AoE2's rule and issue #6's request.
     const now = performance.now();

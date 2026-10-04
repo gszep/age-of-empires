@@ -5,15 +5,41 @@
  * to do with the answer.
  */
 import { isAnimal, isBuilding, isUnit, NODE_OF_RESOURCE } from '../sim/data';
+import { isCarcass } from '../sim/game';
 import type { DeepReadonly, Entity, PlayerId, Point, ReadonlyGameState, UnitKind } from '../sim/types';
+
+type ClickTarget = { entity: DeepReadonly<Entity>; remembered: boolean };
+
+/** Ground-distance picking shared by selection and context orders. Farms are
+ * ground art: a selectable unit over that field must win a left click (#289).
+ * Context orders keep choosing the crop, and carcasses keep their distance
+ * ranking so a worker does not make the food beneath it unreachable.
+ */
+export function pickTarget(
+  candidates: Iterable<ClickTarget>, point: Point,
+  intent: 'selection' | 'context' = 'context',
+  livePosition: (entity: DeepReadonly<Entity>) => Point = entity => entity.position,
+): DeepReadonly<Entity> | undefined {
+  let best: DeepReadonly<Entity> | undefined, unit: DeepReadonly<Entity> | undefined;
+  let bestDistance = 0.9, unitDistance = 0.9;
+  for (const { entity, remembered } of candidates) {
+    // isCarcass only reads dead/amount, including on last-seen snapshots.
+    if (entity.dead && !isCarcass(entity as Entity)) continue;
+    const at = remembered ? entity.position : livePosition(entity);
+    const distance = Math.hypot(at.x - point.x, at.y - point.y) - entity.radius;
+    if (distance < bestDistance) { best = entity; bestDistance = distance; }
+    if (intent === 'selection' && !entity.dead && isUnit(entity.kind) && distance < unitDistance) {
+      unit = entity; unitDistance = distance;
+    }
+  }
+  return intent === 'selection' && best?.kind === 'farm' && unit ? unit : best;
+}
 
 /** The same knowledge boundary as rendering: owned/visible live entities, or
  * last-seen Gaia snapshots. Unexplored resources must not leak via a cursor.
  * Snapshot positions must not be interpolated through a hidden live entity.
  */
-export function* contextTargets(state: ReadonlyGameState, player: PlayerId, reveal = false): Generator<{
-  entity: DeepReadonly<Entity>; remembered: boolean;
-}> {
+export function* contextTargets(state: ReadonlyGameState, player: PlayerId, reveal = false): Generator<ClickTarget> {
   const visibility = state.visibility[player];
   const visible = (at: Point) => visibility.visible[Math.floor(at.y) * state.width + Math.floor(at.x)] === 1;
   const live = new Set<number>();

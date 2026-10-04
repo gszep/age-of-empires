@@ -151,6 +151,12 @@ browser smoke and are maintained regression tools.
 - **`sprite_residency_smoke.mts`** — #152's repeated walk/idle/expiry/reload
   cycles, decoded-byte and GPU-texture release, unchanged paused pixels and
   synchronization hashes. A private transform advances only the cache clock.
+- **`sprite_first_appearance_smoke.mts`** — #287's cold first public move with
+  owned villager art. Holds page loads at the loader boundary and samples every
+  render frame: body and colour must remain visible until walk art arrives.
+  Checks real-renderer pixel readback and page errors after release. Unit tests
+  additionally cover partial first appearance, multi-page animation boundaries,
+  composite sails, retained-page residency, movement and depth ordering.
 - **`outline_residency_smoke.mts`** — #172's late occlusion after an old contour
   page expires. Missing current art stays hidden and the real renderer continues
   returning pixels without reviving the disposed binding.
@@ -189,6 +195,9 @@ browser smoke and are maintained regression tools.
   no hover/remote capture, preserved HP, new-owner food banking and reload.
   `OPEN_FALLBACK=1` runs without owned graphics. Opponent initial resources are
   zero so AI training cannot confound the stockpile comparison.
+- **`farm_selection_smoke.mts`** — #289's real left-click and Shift-click on a
+  villager over a farm, exposed-field selection, read-only selection hash, and
+  preserved gather cursor/right-click target. Run with `OPEN_FALLBACK=1` too.
 - **`resource_feedback_smoke.mts`** — #70's real unaffordable train/research/build
   clicks. Zero-resource fixture checks enabled buttons, food/gold/wood messages
   and unchanged simulation hash. `OPEN_FALLBACK=1` verifies fallback reasons;

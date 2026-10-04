@@ -59,8 +59,11 @@ try {
     await query({ type: 'command', command: { kind: 'order', player: 1, entityIds: [villager.id],
       target: { x: current.position.x + 10, y: current.position.y } } });
     await page.waitForFunction(id => {
-      const v = (window as any).__spriteViews.get(`e${id}`);
-      return v?.animationState?.endsWith('/walk') && v.body.mesh.visible && v.color.mesh.visible;
+      const w = window as any, v = w.__spriteViews.get(`e${id}`);
+      const key = v?.animationState?.slice(0, -'/walk'.length);
+      const atlas = w.__spriteAssets.entities[key]?.atlases.walk;
+      return v?.animationState?.endsWith('/walk') && v.body.mesh.visible && v.color.mesh.visible
+        && (atlas?.pages ?? [atlas]).some((p: any) => p?.image === v.body.textureImage);
     }, { timeout: 30_000, polling: 100 }, villager.id);
   };
   const sample = () => page.evaluate(() => ({
@@ -72,8 +75,11 @@ try {
     await move();
     await query({ type: 'command', command: { kind: 'stop', player: 1, entityIds: [villager.id] } });
     await page.waitForFunction(id => {
-      const v = (window as any).__spriteViews.get(`e${id}`);
-      return v?.animationState?.endsWith('/idle') && v.body.mesh.visible;
+      const w = window as any, v = w.__spriteViews.get(`e${id}`);
+      const key = v?.animationState?.slice(0, -'/idle'.length);
+      const atlas = w.__spriteAssets.entities[key]?.atlases.idle;
+      return v?.animationState?.endsWith('/idle') && v.body.mesh.visible && v.color.mesh.visible
+        && (atlas?.pages ?? [atlas]).some((p: any) => p?.image === v.body.textureImage);
     }, { timeout: 30_000, polling: 100 }, villager.id);
     await page.keyboard.press('F3');
     const before = await sample();

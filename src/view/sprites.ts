@@ -94,6 +94,8 @@ export interface EntityView {
   diedAt?: number;
   facing: number; // radians, world space
   lastPosition?: { x: number; y: number };
+  /** Screen anchor of the retained pose while a new unit frame is loading. */
+  poseAnchor?: Point;
 }
 
 /**
@@ -747,6 +749,13 @@ function directionIndex(facing: number, directions: number): number {
   return ((index % directions) + directions) % directions;
 }
 
+function layerFrameIndex(animation: AnimationInfo, atlas: Atlas, facing: number, elapsed: number, dead: boolean): number {
+  const directions = Math.max(1, Math.floor(atlas.framesInFile / Math.max(1, animation.frames)));
+  const phase = Math.floor(elapsed / (animation.frameSeconds || 0.1));
+  return (directionIndex(facing, animation.directions) % directions) * animation.frames
+    + (dead ? Math.min(phase, animation.frames - 1) : phase % Math.max(1, animation.frames));
+}
+
 /**
  * The gather-point flag. Like an arrow it is not simulation state, so it draws
  * from the order it marks rather than through the entity path — but it is the
@@ -1047,11 +1056,15 @@ export function updateEntityView(
   view.soundPose = undefined;
   // A new animation may have no contour. Do not leave the previous animation
   // eligible for updateOcclusion to revive after its texture expires.
-  for (const piece of [view.outline, ...(view.layerOutlines ?? [])]) {
-    piece.mesh.visible = false;
-    piece.textureImage = undefined;
-    piece.pendingTexture = undefined;
-  }
+  const clearOutlines = () => {
+    for (const piece of [view.outline, ...(view.layerOutlines ?? [])]) {
+      piece.mesh.visible = false;
+      piece.textureImage = undefined;
+      piece.pendingTexture = undefined;
+    }
+  };
+  const coherentUnit = !!assets && !view.fallback && isUnit(entity.kind) && !entity.dead;
+  if (!coherentUnit) clearOutlines();
   updateGarrisonFlags(view, assets, state, entity, time, hasGarrison);
   if (entity.kind === 'farm') {
     updateFarmView(view, assets, state, entity);
@@ -1170,7 +1183,7 @@ export function updateEntityView(
     animation = imported?.animations['idle'];
     atlas = imported?.atlases['idle'];
   }
-  if (!animation || !atlas) { view.body.mesh.visible = false; return; }
+  if (!animation || !atlas) { clearOutlines(); view.body.mesh.visible = false; return; }
 
   const stateKey = `${choice.key}/${choice.name}`;
   if (view.animationState !== stateKey) {
@@ -1229,6 +1242,57 @@ export function updateEntityView(
   // The imported player-colour mask carries ownership, so the body itself is
   // drawn untinted.
   const tint = 0xffffff;
+
+  // Cold pages used to hide each piece independently: the first idle -> walk
+  // transition blinked the body off, and the colour could arrive a frame later.
+  // Request every layer of this pose together and keep the previous complete
+  // pose until they all arrive. Continue following movement/elevation while
+  // waiting, and retain its pages in the residency cache (#287).
+  if (coherentUnit) {
+    let ready = true;
+    const request = (sheet: Atlas | undefined, index: number) => {
+      const frame = sheet?.frames[Math.min(index, sheet.frames.length - 1)];
+      if (sheet && frame && frame.w > 0 && frame.h > 0) {
+        if (!spriteTexture(assets, atlasPage(sheet, frame).image)) ready = false;
+      }
+    };
+    const requestLayers = (name: string, index: number) => {
+      request(imported?.atlases[name], index);
+      request(imported?.atlases[`${name}-shadow`], index);
+      if (entity.owner !== 0) request(imported?.atlases[`${name}-playercolor`], index);
+      // Contours are optional occlusion feedback; their pending/empty-frame
+      // lifecycle stays independent of the visible pose.
+    };
+    request(atlas, frameIndex);
+    requestLayers(choice.name, frameIndex);
+    for (const layer of imported?.animationLayers?.[choice.name]?.slice(1) ?? []) {
+      const anim = imported!.animations[layer.animation], sheet = imported!.atlases[layer.animation];
+      if (anim && sheet) requestLayers(layer.animation, layerFrameIndex(anim, sheet, view.facing, elapsed, false));
+    }
+    const anchor = elevatedWorldToIso(state, entity.position.x, entity.position.y);
+    if (!ready) {
+      refreshEntityTextures(view, assets);
+      if (view.poseAnchor) {
+        for (const piece of [view.body, view.color, view.shadow, view.outline,
+          ...view.annexes, ...view.annexColors, ...(view.layerShadows ?? []), ...(view.layerOutlines ?? [])]) {
+          piece.mesh.position.x += anchor.x - view.poseAnchor.x;
+          piece.mesh.position.y += anchor.y - view.poseAnchor.y;
+        }
+      }
+      view.body.mesh.renderOrder = spriteLayerOrder(depth);
+      view.color.mesh.renderOrder = spriteLayerOrder(depth, 1);
+      view.shadow.mesh.renderOrder = groundLayerOrder(500, depth);
+      view.outline.mesh.renderOrder = contourLayerOrder(depth);
+      for (const [index, piece] of view.annexes.entries()) piece.mesh.renderOrder = spriteLayerOrder(depth, 2 + index * 2);
+      for (const [index, piece] of view.annexColors.entries()) piece.mesh.renderOrder = spriteLayerOrder(depth, 3 + index * 2);
+      for (const piece of view.layerShadows ?? []) piece.mesh.renderOrder = groundLayerOrder(500, depth);
+      for (const piece of view.layerOutlines ?? []) piece.mesh.renderOrder = contourLayerOrder(depth);
+      view.poseAnchor = anchor;
+      return;
+    }
+    view.poseAnchor = anchor;
+    clearOutlines();
+  }
 
   // Imported shadow layer, anchored by its own hotspot like the body. Every
   // shadow draws below every body so entities never occlude each other's.
@@ -1317,10 +1381,7 @@ export function updateEntityView(
       const anim = layer && imported.animations[layer.animation];
       const sheet = layer && imported.atlases[layer.animation];
       if (!layer || !anim || !sheet) continue;
-      const directions = Math.max(1, Math.floor(sheet.framesInFile / Math.max(1, anim.frames)));
-      const phase = Math.floor(elapsed / (anim.frameSeconds || 0.1));
-      const frame = (directionIndex(view.facing, anim.directions) % directions) * anim.frames
-        + (entity.dead ? Math.min(phase, anim.frames - 1) : phase % Math.max(1, anim.frames));
+      const frame = layerFrameIndex(anim, sheet, view.facing, elapsed, !!entity.dead);
       const order = spriteLayerOrder(depth, 2 + index * 2);
       applyFrame(piece, assets, sheet, frame, entity.position, 0xffffff);
       piece.mesh.position.x += layer.x;

@@ -78,6 +78,11 @@ describe('naval composite sprites (#97)', () => {
     assets.entities.galleon = { ...imported, animationLayers: { idle: [...imported.animationLayers.idle,
       { animation: 'extra', x: -7, y: -23 }] } };
     const view = createEntityView(assets, entity);
+    const sailTexture = assets.textures.get('sail')!;
+    assets.textures.delete('sail');
+    updateEntityView(view, assets, state, entity, 0);
+    expect(view.body.mesh.visible || view.annexes[0].mesh.visible).toBe(false);
+    assets.textures.set('sail', sailTexture);
     updateEntityView(view, assets, state, entity, 0);
     expect(view.annexes[0].mesh.visible).toBe(true);
     expect(view.annexes[0].mesh.position.x - view.body.mesh.position.x).toBe(4);
@@ -273,10 +278,11 @@ describe('late textures on frozen fog snapshots (#88)', () => {
     const villager = state.entities.find(e => e.kind === 'villager' && e.owner === 1)!;
     const view = createEntityView(assets, villager);
     updateEntityView(view, assets, state, villager, 0);
-    expect(view.shadow.pendingTexture).toBe('empty-shadow.png');
+    expect(view.body.mesh.visible).toBe(false); // no partial first pose
     assets.entities.villager.atlases['idle-shadow'].frames[0].w = 0;
     assets.entities.villager.atlases['idle-shadow'].frames[0].h = 0;
     updateEntityView(view, assets, state, villager, 0);
+    expect(view.body.mesh.visible).toBe(true); // empty layers never block a pose
     assets.textures.set('empty-shadow.png', new THREE.Texture());
     refreshEntityTextures(view, assets);
     expect(view.shadow.mesh.visible).toBe(false);
@@ -314,6 +320,73 @@ describe('late textures on frozen fog snapshots (#88)', () => {
  * A minimal imported-content stand-in: one villager animation with its
  * player-colour sheet, and a two-step ramp whose middle entry is the hue.
  */
+describe('cold unit frames (#287)', () => {
+  it('keeps the complete old pose moving until every new page is ready, then swaps geometry and colour together', () => {
+    const state = createGame(), assets = fakeAssets();
+    const entity = state.entities.find(e => e.kind === 'villager' && e.owner === 1)!;
+    const art = assets.entities.villager;
+    art.animations.walk = { ...art.animations.idle };
+    art.atlases.walk = { image: 'walk', size: [8, 8], framesInFile: 1,
+      frames: [{ x: 0, y: 0, w: 8, h: 8, cx: 4, cy: 4 }] };
+    art.atlases['walk-playercolor'] = { ...art.atlases.walk, image: 'walk-color' };
+    const requested = new Set<string>();
+    assets.loadTexture = image => { requested.add(image); };
+    let now = 0;
+    assets.spriteResidency = new SpriteResidency(assets.textures, () => now);
+    for (const [image, texture] of assets.textures) assets.spriteResidency.add(image, texture);
+    const view = createEntityView(assets, entity);
+    updateEntityView(view, assets, state, entity, 0);
+    const before = view.body.mesh.position.clone(), order = view.body.mesh.renderOrder;
+    const from = worldToIso(entity.position.x, entity.position.y);
+    entity.activity = 'moving'; entity.position.x += 1;
+    const to = worldToIso(entity.position.x, entity.position.y);
+    now = 130_000;
+    updateEntityView(view, assets, state, entity, 1);
+    assets.spriteResidency.sweep();
+    expect(assets.spriteResidency.stats.evictions).toBe(0);
+    expect([...requested].sort()).toEqual(['walk', 'walk-color']);
+    expect(view.body.mesh.visible && view.color.mesh.visible).toBe(true);
+    expect(view.body.mesh.position.x - before.x).toBeCloseTo(to.x - from.x);
+    expect(view.body.mesh.position.y - before.y).toBeCloseTo(to.y - from.y);
+    expect(view.body.mesh.renderOrder).not.toBe(order);
+    assets.textures.set('walk', new THREE.Texture());
+    updateEntityView(view, assets, state, entity, 2);
+    expect(view.body.textureImage).toBe('villager/idle.png');
+    expect(view.body.mesh.scale.x).toBe(4);
+    assets.textures.set('walk-color', new THREE.Texture());
+    updateEntityView(view, assets, state, entity, 3);
+    expect(view.body.textureImage).toBe('walk');
+    expect(view.color.textureImage).toBe('walk-color');
+    expect(view.body.mesh.scale.x).toBe(8);
+    expect(view.body.mesh.visible && view.color.mesh.visible).toBe(true);
+  });
+
+  it('waits for colour on first appearance and retains the frame across a cold atlas-page boundary', () => {
+    const state = createGame(), assets = fakeAssets();
+    const entity = state.entities.find(e => e.kind === 'villager' && e.owner === 1)!;
+    const art = assets.entities.villager, color = assets.textures.get('villager/idle-playercolor.png')!;
+    assets.textures.delete('villager/idle-playercolor.png');
+    const view = createEntityView(assets, entity);
+    updateEntityView(view, assets, state, entity, 0);
+    expect(view.body.mesh.visible || view.color.mesh.visible).toBe(false);
+    assets.textures.set('villager/idle-playercolor.png', color);
+    updateEntityView(view, assets, state, entity, 0);
+    expect(view.body.mesh.visible && view.color.mesh.visible).toBe(true);
+    art.animations.idle.frames = 2;
+    const atlas = art.atlases.idle;
+    atlas.framesInFile = 2;
+    atlas.pages = [{ image: atlas.image, size: atlas.size }, { image: 'second-page', size: [4, 4] }];
+    atlas.frames = [atlas.frames[0], { ...atlas.frames[0], page: 1 }];
+    updateEntityView(view, assets, state, entity, .1);
+    expect(view.frameIndex).toBe(0);
+    expect(view.body.mesh.visible).toBe(true);
+    assets.textures.set('second-page', new THREE.Texture());
+    updateEntityView(view, assets, state, entity, .1);
+    expect(view.frameIndex).toBe(1);
+    expect(view.body.textureImage).toBe('second-page');
+  });
+});
+
 function fakeAssets(): ContentAssets {
   const frames = [{ x: 0, y: 0, w: 4, h: 4, cx: 2, cy: 2 }];
   const atlas = (image: string): Atlas => ({ image, size: [4, 4], framesInFile: 1, frames });

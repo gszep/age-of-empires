@@ -38,7 +38,7 @@ resources. See [shared-play.md](shared-play.md).
 | Modes/shared play | Solo and household two-seat play, reconnect/checkpoints, Regicide/Treason, locked diplomacy/tribute, configurable population ceilings and opt-in Wonder victory through menu/headless/replays | [shared play](shared-play.md), [Wonder evidence](wonder-victory.md); source protocol4 is verified privately; installed releases remain protocol2 |
 | Maps | Arabia, Black Forest, Islands, Windsor, Senlac and painted proof; RMS-inspired phases, surveys, elevation, relics and corrected spacing; global Islands fish reach both resource-islet coasts | [generation design](map-generation-design.md); home-land mirroring and native placement/slope semantics remain inferred; native Islands seasons/additional objects tracked in#274 |
 | Rendering | Owned x1/x2 sprites and ordinary A/B attack graphics, masks/contours/shadows, fog memory, source-backed water/foam, native blend families with shoreline tile-grid correction (#284), terrain plants and their shadows | [blend coverage and shoreline evidence](terrain-blend-coverage.md), [decode contract](block-decode-contract.md); native compositor and exact calibration remain open |
-| UI | Native command cells/icons/cursors, garrison/training/production controls, notifications/confirmation/end screens, map menu and persistent options | [UI reference](ui-reference.md), [feedback review](reviews/2026-09-24-issue58.md); browser text rasterisation and some surfaces remain approximations |
+| UI | Native command cells/icons/cursors, garrison/training/production controls, notifications/confirmation/end screens, map menu and persistent options; units selectable over farms while right-click retains crop targeting (#289) | [UI reference](ui-reference.md), [feedback review](reviews/2026-09-24-issue58.md), owned/fallback `tools/farm_selection_smoke.mts`; browser text rasterisation and some surfaces remain approximations |
 | Audio | Voices, combat/construction/ambient playback, layered action timing and27-track soundtrack | [audio reference](audio-reference.md); missing streams and native mix/spatial behaviour remain tracked |
 | AI | Observation-only economy/building/combat strategy, coastal fishing, public-command sheep return and bounded late-game castle/trebuchet production and attacks | [fishing](ai-fishing.md), [siege](trebuchet-automation.md), herding outcomes; staged siege chain passes, natural-start progression/balance remains#124 |
 | Agents/replays | Browser/Node share commands; versioned observations and records, subprocess/WebSocket/MCP agents, deterministic batch/replay tools | Provider-dependent tests opt-in; open fallback stops at Castle Age |
@@ -85,7 +85,11 @@ the measured allocation benefit and pixel-equivalence limits.
 
 Sprites load on demand. Scene-required pages may exceed the512MiB soft residency
 budget; it is not a hard total-memory cap. Eviction, warm grace and idle expiry
-are chosen application policies. First-use/expired art can be temporarily absent.
+are chosen application policies. Living units retain their last complete pose
+while a cold body/colour/shadow/composite page loads, following position and
+depth; first appearance waits for those layers together (#287). Other first-use
+or expired art can still be temporarily absent. The private-browser regression
+holds a first public move's pages:11/12 missing-body frames before,0/12 after.
 
 Asset manifest schema4 interns repeated frame arrays while retaining every
 hotspot/page/scale. Seven-profile metadata measured552→53MB; whole-manifest
