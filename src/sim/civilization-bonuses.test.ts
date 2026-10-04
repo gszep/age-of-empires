@@ -290,7 +290,6 @@ describe(`civilisation bonus outcomes (${extracted ? 'owned decoder' : 'source-c
 
   it('requires each farm age and predecessor even though all three research bills are zero', () => {
     const state = arena();
-    spawn(state, 'mill', 2, 80, 50);
     run(state, 1);
     expect(state.players[2].researched).not.toContain('horse-collar');
     age(state, 2, 1);
@@ -350,19 +349,14 @@ describe(`civilisation bonus outcomes (${extracted ? 'owned decoder' : 'source-c
     }
   });
 
-  it('grants only eligible free farm research once, after mill completion; new farms gain the food', () => {
+  it.each([[1, 250], [2, 375], [3, 550]])('grants age %s free farm food without a Mill, once and without payment', (value, food) => {
     const state = arena();
-    age(state, 2, 3);
-    expect(state.players[2].researched).not.toContain('horse-collar');
-    const mill = spawn(state, 'mill', 2, 80, 50);
-    mill.buildProgress = 0.5;
-    run(state, 1);
-    expect(state.players[2].researched).not.toContain('horse-collar');
     const before = { food: state.players[2].food, wood: state.players[2].wood };
-    mill.buildProgress = undefined;
+    age(state, 2, value);
     run(state, 1);
-    for (const key of ['horse-collar', 'heavy-plow', 'crop-rotation']) {
-      expect(state.players[2].researched.filter(k => k === key)).toHaveLength(1);
+    expect(state.entities.some(e => e.owner === 2 && e.kind === 'mill')).toBe(false);
+    for (const [i, key] of ['horse-collar', 'heavy-plow', 'crop-rotation'].entries()) {
+      expect(state.players[2].researched.filter(k => k === key)).toHaveLength(i < value ? 1 : 0);
       expect(state.players[1].researched).not.toContain(key);
     }
     expect(state.players[2].food).toBe(before.food);
@@ -374,9 +368,19 @@ describe(`civilisation bonus outcomes (${extracted ? 'owned decoder' : 'source-c
     const farm = state.entities.at(-1)!;
     for (let i = 0; i < 100 && farm.buildProgress !== undefined; i++) stepGame(state);
     expect(farm.buildProgress).toBeUndefined();
-    expect(farm.amount).toBe(550);
+    expect(farm.amount).toBe(food);
+    expect(applyCommand(state, { kind: 'stop', player: 2, entityIds: [worker.id] }).ok).toBe(true);
+    const mill = spawn(state, 'mill', 2, 80, 50);
+    mill.buildProgress = 0.5;
+    run(state, 1);
+    mill.buildProgress = undefined;
     run(state, 20);
     expect(state.players[2].researched.filter(k => k === 'horse-collar')).toHaveLength(1);
+    expect(farm.amount).toBe(food);
+    const restored = JSON.parse(JSON.stringify(state));
+    activateAutomaticTechnologies(restored);
+    expect(restored.players[2].researched).toEqual(state.players[2].researched);
+    expect(restored.entities.find((e: Entity) => e.id === farm.id).amount).toBe(food);
   });
 
   it.each(['shepherd', 'forager'] as const)('%s bonus accelerates actual collection and the first bank only for the source task/civ', task => {

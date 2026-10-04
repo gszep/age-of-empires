@@ -33,8 +33,10 @@ civilizationBonuses: {
 - Public `requiredTechs`/`requiredTechCount` supersede legacy prerequisites.
   Unknown, disabled and foreign nodes do not satisfy counts; positive counts
   with no matching prerequisite remain blocked.
-- `triggeredByBuildings` comes from `building.tech_id`. Automatic `researchedAt`
-  means free research still needs its completed research building.
+- `triggeredByBuildings` comes from `building.tech_id` and retains the completed
+  building requirement. Automatic `researchedAt` preserves the original button
+  location, not an additional prerequisite: zero-time bonuses activate from their
+  explicit technology/count gates without requiring that building (#254).
 - `Player.researched` is the ordered completion journal, including hidden nodes;
   saves preserve once-only activation without a second mutable rules table.
   Hidden nodes emit no research-button completion message/audio.
@@ -68,8 +70,10 @@ and `xs/Constants.xs` (cost attributes 100, 103–106, work 13).
 | Building 68 / 82 | `building.tech_id` 110 / 266 supplies mill/castle shadow completion |
 
 Unsupported commands/targets remain in `unmodelled`, including search radius 23
-and enable-unit effects. Rounding, activation order and free-research building
-semantics are **inferred** in `ledger.md`; not DE runtime measurements or claims
+and enable-unit effects. Current-build native Frankish farms verify free Horse
+Collar without a Mill; [free-research calibration](free-research-calibration.md)
+records the paid-farm/control evidence. Other zero-time technologies, exact
+activation ordering and rounding retain their qualifications in `ledger.md`; not claims
 that #128/#130 are complete. Building age stats (#126) have since been verified
 against the owned replacements and actual gameplay; see `docs/handoff.md`.
 
@@ -82,7 +86,8 @@ present, otherwise small source-command fixtures. Unit baselines and shortened
 age/train/construction clocks are diagnostic fixtures. Outcomes cover public
 gates, collection/banking, active/new/garrisoned cavalry HP, upgrades, captured
 exclusions, JSON continuation, range combat, paid Yeomen, fog sight, production,
-refunds, TC/castle payments and free farm research/new food. Before-Castle TC
+refunds, TC/castle payments and free farm research/new food before any Mill.
+Later Mill completion does not repeat bonuses or refill existing farms. Before-Castle TC
 payment deletes the old TC to respect #177.
 Training/research observation countdowns divide remaining work by the active
 building rate; tests compare those reported game-time seconds with completion.

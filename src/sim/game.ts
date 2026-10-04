@@ -3111,7 +3111,10 @@ export function activateAutomaticTechnologies(state: GameState): void {
         const triggered = node.triggeredByBuildings && hasBuilding(node.triggeredByBuildings);
         const aged = node.age !== undefined && player.age >= node.age;
         if (!triggered && !aged && (!node.automatic || !technologyRequirementsMet(state, owner, node))) continue;
-        if (node.researchedAt && !hasBuilding([node.researchedAt])) continue;
+        // A zero-time bonus follows its DAT prerequisites, not the location of
+        // its paid button. Native Franks receive Horse Collar without a Mill
+        // (#254); explicit building-trigger nodes above still require one.
+        if (!node.automatic && node.researchedAt && !hasBuilding([node.researchedAt])) continue;
         completeResearch(state, owner, node.key);
         changed = true;
       }

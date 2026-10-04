@@ -1598,7 +1598,7 @@ export interface BonusTechnology {
   age?: number;
   /** Building completion supplies otherwise unsatisfiable shadow techs. */
   triggeredByBuildings?: string[];
-  /** Free research still needs its completed research building. */
+  /** Original research location; automatic bonuses use their prerequisite gates. */
   researchedAt?: string;
   effects: TechEffect[];
   upgrades?: { from: string; to: string }[];

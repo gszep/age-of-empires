@@ -140,7 +140,7 @@ try {
     s = await snapshot();
     assert.equal(s.players[1].food, 20000, 'fixture resumed');
     assert.equal(s.players[1].age, 1);
-    assert(!s.players[1].researched.includes('horse-collar'), 'mill required for free farm research');
+    assert.equal(s.players[1].researched.includes('horse-collar'), civ === 'franks', 'free research follows age without a Mill');
     for (let i = 0; i < 6; i++) await page.keyboard.press('+');
 
     const build = async (kind: BuildingKind, target: { x: number; y: number }, worker = workers[0]) => {
@@ -173,14 +173,16 @@ try {
       await select(tc.id); await click(`research-${key}`);
       await runUntil((s, age) => s.players[1].age === age, age);
     };
-    await build('mill', { x: 40, y: 40 });
-    s = await snapshot();
-    assert.equal(s.players[1].researched.includes('horse-collar'), civ === 'franks');
-    assert.equal(s.players[1].food, 20000, 'free research did not charge food');
+    assert(!s.entities.some((e: any) => e.owner === 1 && e.kind === 'mill'));
     const early = await build('farm', { x: 40.5, y: 46.5 }, workers[1]);
     let earlyFarm = (await snapshot()).entities.find((e: any) => e.id === early.site.id);
     const earlyFood = earlyFarm.amount;
     assert(earlyFood <= (civ === 'franks' ? 250 : 175) && earlyFood > (civ === 'franks' ? 245 : 170));
+    assert(!(await snapshot()).entities.some((e: any) => e.owner === 1 && e.kind === 'mill'), 'paid farm completed before any Mill');
+    await build('mill', { x: 40, y: 40 });
+    s = await snapshot();
+    assert.equal(s.players[1].researched.filter((key: string) => key === 'horse-collar').length, civ === 'franks' ? 1 : 0);
+    assert.equal(s.players[1].food, 20000, 'free research did not charge food');
     await researchAge('castle-age', 2);
     const expansion = await build('town-center', { x: 49, y: 40 });
     assert.equal(expansion.before.players[1].wood - expansion.after.players[1].wood, civ === 'britons' ? 138 : 275);

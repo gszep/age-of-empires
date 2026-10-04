@@ -52,6 +52,12 @@ resources. See [shared-play.md](shared-play.md).
 Briton/Frank scoped completion includes fortifications, relics, Warwolf and unique
 research. [Civilisation evidence](civilization-coverage.md#briton-completion-pass-2026-09-26)
 and [terrain evidence](dat-field-audit.md) retain their source and fidelity limits.
+Zero-time bonuses follow their explicit prerequisites without an extra producer
+gate; a native paid Frankish farm without a Mill and a Briton control establish
+the Feudal case ([calibration](free-research-calibration.md), #254). Current-build
+Bimaristan rate/overlap/self/relic controls and speed/reset observations are in
+[Bimaristan](bimaristan-calibration.md) and [speed](speed-calibration.md); these
+do not close pinned-runtime acceptance.
 
 ## Imports and fidelity boundaries
 
