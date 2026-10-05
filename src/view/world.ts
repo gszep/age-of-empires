@@ -432,7 +432,7 @@ export function blendModeFor(here: number, there: number): number {
  * answer it.
  */
 export const FARM_TILES_PER_SPAN = 10;
-const FARM_SLOTS = new Set(['farm', 'farm-construction']);
+const FARM_SLOTS = new Set(['farm', 'farm-construction', 'farm-construction-2', 'farm-construction-3']);
 
 /**
  * Farms are terrain in AoE2DE, not sprites: the DAT points at terrain slots

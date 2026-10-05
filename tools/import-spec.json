@@ -2537,6 +2537,12 @@
     "farm-construction": {
       "terrainId": 29
     },
+    "farm-construction-2": {
+      "terrainId": 30
+    },
+    "farm-construction-3": {
+      "terrainId": 31
+    },
     "dirt-3": {
       "terrainId": 3
     },

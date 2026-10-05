@@ -972,6 +972,7 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Selection outline width and colour, scene background | 2.5 px, `0xf5f0dc`, `0x18140c` | chosen | `main.ts`, `world.ts` | — |
 | Damage soot curve | linear in hit points lost | chosen; the shader's curve is unread | `sprites.ts` | — |
 | Which build targets take the seed-sowing graphic | the farm | inferred (engine rule) | `sprites.ts` | — |
+| Farm construction stages | under construction a farm shows `Farm Cnst1/2/3` (terrains 29/30/31, `g_fc1-3`) for build progress below 1/3, below 2/3 and the rest, then `Farm1` (7) | terrains and textures **owned**; the farm's `foundation_terrain_id` is 7 and the DAT gives no stage thresholds, so equal thirds are **inferred** | `sprites.ts` `farmTerrainSlot`, `import-spec.json` | #296 |
 | Farm furrow pitch | `FARM_TILES_PER_SPAN = 10` (twelve furrows across) | **human** ("approx 12"); `terrain_dimensions` shown not to mean tiles per span | `world.ts` | — |
 | Farm furrow orientation | quarter turn | human ("amend by 90 degrees"), retired by the handedness flip | `world.ts` | — |
 | Fog edge softness | `FOG_EDGE_INNER/OUTER` 0.425/0.575 | chosen, then halved by eye | `world.ts` | — |

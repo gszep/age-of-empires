@@ -8,7 +8,7 @@ import { worldToIso } from './iso';
 import { SpriteResidency } from './sprite-residency';
 import { createFog, ELEVATION_PIXELS } from './world';
 import {
-  PLAYER_COLORS, chooseAnimation, createEntityView, createFlagView, decayFraction, playerColorHex,
+  PLAYER_COLORS, chooseAnimation, createEntityView, createFlagView, decayFraction, farmTerrainSlot, playerColorHex,
   gateBoxKey, treeIsFelled, updateEntityView, refreshEntityTextures, dimFogSnapshot, updateFlagView, updateOcclusion, wallShape,
   WALL_JOINT, WALL_POST, WALL_RUN_X, WALL_RUN_Y, type EntityView,
 } from './sprites';
@@ -58,6 +58,38 @@ describe('farm placement terrain families (#116)', () => {
     expect(disposed).toBe(true);
     expect(view.patch).not.toBe(previous);
     expect((view.patch!.material as THREE.MeshBasicMaterial).alphaMap).toBe(road);
+  });
+});
+
+describe('farm construction stages (#296)', () => {
+  const slot = (terrainId: number, image: string) => ({ terrainId, blendType: 1, image, texture: image, name: image,
+    blendPriority: 180, dimensions: [3, 3] as [number, number], minimapColor: [0, 0, 0] as [number, number, number] });
+  const farmAt = (buildProgress?: number): Entity => ({ id: 1, kind: 'farm', owner: 1, position: { x: 3.5, y: 3.5 },
+    hp: 100, maxHp: 100, radius: 1.5, activity: 'idle', order: { kind: 'idle' }, buildProgress });
+
+  it('steps through the three DAT construction terrains, then the grown farm', () => {
+    const state = createGame(296), assets = fakeAssets();
+    assets.terrain = {
+      farm: slot(7, 'g_fm1'), 'farm-construction': slot(29, 'g_fc1'),
+      'farm-construction-2': slot(30, 'g_fc2'), 'farm-construction-3': slot(31, 'g_fc3'),
+    };
+    for (const image of ['g_fm1', 'g_fc1', 'g_fc2', 'g_fc3']) assets.textures.set(image, new THREE.Texture());
+    const entity = farmAt(0), view = createEntityView(assets, entity);
+    const seen: (string | undefined)[] = [];
+    for (const progress of [0, .32, .34, .65, .67, .99, undefined]) {
+      entity.buildProgress = progress;
+      updateEntityView(view, assets, state, entity, 0);
+      expect(view.patch).toBeDefined();
+      seen.push(view.patchSlot);
+    }
+    expect(seen).toEqual(['farm-construction', 'farm-construction', 'farm-construction-2', 'farm-construction-2',
+      'farm-construction-3', 'farm-construction-3', 'farm']);
+  });
+
+  it('keeps the first construction terrain for imports without the later stages', () => {
+    expect(farmTerrainSlot(farmAt(.9), { 'farm-construction': slot(29, 'g_fc1') })).toBe('farm-construction');
+    expect(farmTerrainSlot(farmAt(.9), undefined)).toBe('farm-construction');
+    expect(farmTerrainSlot(farmAt(), undefined)).toBe('farm');
   });
 });
 

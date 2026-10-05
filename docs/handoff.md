@@ -16,6 +16,11 @@ reviews. Do not append old test counts here as if they describe the latest tree.
   occupancy probe passes. Browser evidence uses Chrome/SwiftShader; physical-GPU
   confirmation remains unverified. These fixes are committed and pushed but
   have not been deployed to the installed household release.
+- Farms under construction (#296) step through the DAT's `Farm Cnst1/2/3`
+  terrains (29-31) at equal thirds of build progress (inferred; ledger), then
+  `Farm1`. The import now publishes `farm-construction-2/3`; old imports keep
+  the first stage. `tools/farm_construction_smoke.mts` verifies a public build
+  shows all four textures in order.
 - The verification term "gate" is retired. `npm run verify:owned` is the
   owned checkpoint; it writes `.local/checkpoint.ok` (read by the commit guard)
   and `.local/checkpoint.latest.json` (read by `tools/session_start.sh`).

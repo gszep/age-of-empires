@@ -984,11 +984,28 @@ export function updateOcclusion(views: Map<string, EntityView>, state: ReadonlyG
   }
 }
 
-/** Farms swap between the construction and grown terrain slots. */
+const FARM_CONSTRUCTION_SLOTS = ['farm-construction', 'farm-construction-2', 'farm-construction-3'];
+
+/**
+ * A farm going up steps through the DAT's three `Farm Cnst` terrains (29-31)
+ * before its grown `Farm1`. The DAT does not say when each stage shows; equal
+ * thirds of build progress are inferred (ledger). Imports without the later
+ * stages keep the first.
+ */
+export function farmTerrainSlot(entity: Entity, terrain: ContentAssets['terrain'] | undefined): string {
+  if (entity.buildProgress === undefined) return 'farm';
+  const stage = Math.min(2, Math.max(0, Math.floor(entity.buildProgress * 3)));
+  for (let index = stage; index > 0; index--) {
+    if (terrain?.[FARM_CONSTRUCTION_SLOTS[index]]) return FARM_CONSTRUCTION_SLOTS[index];
+  }
+  return FARM_CONSTRUCTION_SLOTS[0];
+}
+
+/** Farms swap between the construction stages and the grown terrain slot. */
 function updateFarmView(
   view: EntityView, assets: ContentAssets | undefined, state: ReadonlyGameState, entity: Entity,
 ): void {
-  const slot = entity.buildProgress !== undefined ? 'farm-construction' : 'farm';
+  const slot = farmTerrainSlot(entity, assets?.terrain);
   const at = { x: entity.position.x - entity.radius, y: entity.position.y - entity.radius };
   const origin = `${at.x},${at.y}`;
   // Placement previews move between receiving terrain families. Rebuild their
