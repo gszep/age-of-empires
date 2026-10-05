@@ -16,6 +16,11 @@ reviews. Do not append old test counts here as if they describe the latest tree.
   occupancy probe passes. Browser evidence uses Chrome/SwiftShader; physical-GPU
   confirmation remains unverified. These fixes are committed and pushed but
   have not been deployed to the installed household release.
+- Town center annexes (#294) no longer borrow the Dark Age player-colour mask
+  when an aged piece has none. The Asian Castle/Imperial `front` SLDs have no
+  player-colour layer; the borrowed mask drew stray bands across the Japanese
+  TC's wings. `tools/tc_annex_color_smoke.mts` checks each visible annex mask
+  matches its own art in a real browser.
 - Farms under construction (#296) step through the DAT's `Farm Cnst1/2/3`
   terrains (29-31) at equal thirds of build progress (inferred; ledger), then
   `Farm1`. The import now publishes `farm-construction-2/3`; old imports keep

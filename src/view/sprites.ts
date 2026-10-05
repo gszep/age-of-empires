@@ -1467,8 +1467,10 @@ export function updateEntityView(
     const order = spriteLayerOrder(depth, 1 + index * 2);
     applyFrame(piece, assets, annexAtlas, 0, entity.position, 0xffffff);
     piece.mesh.renderOrder = order;
-    const annexColorAtlas = annex.atlases[`annex${index}-${annexName}-playercolor`]
-      ?? annex.atlases[`annex${index}-idle-playercolor`];
+    // A mask fits only the art it was decoded with. The Asian Castle/Imperial
+    // front pieces have no player-colour layer, and borrowing the Dark Age
+    // mask drew stray bands across their roofs (#294).
+    const annexColorAtlas = annex.atlases[`annex${index}-${annexName}-playercolor`];
     if (colorPiece && annexColorAtlas && entity.owner !== 0) {
       applyFrame(
         colorPiece, assets, annexColorAtlas, 0, entity.position,

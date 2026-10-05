@@ -1436,6 +1436,21 @@ describe('player colour through the imported ramp', () => {
     expect(view.annexColors[0].mesh.renderOrder).toBeGreaterThan(view.annexes[0].mesh.renderOrder);
   });
 
+  it('draws no player colour on an aged annex whose own art has none (#294)', () => {
+    const assets = annexedAssets();
+    const annex = assets.entities['town-center'].annexes![0];
+    annex.animations['annex0-idle-imperial'] = annex.animations['annex0-idle'];
+    annex.atlases['annex0-idle-imperial'] = { ...annex.atlases['annex0-idle'], image: 'tc/annex0-idle-imperial.png' };
+    assets.textures.set('tc/annex0-idle-imperial.png', assets.textures.get('tc/annex0-idle.png')!);
+    const state = createGame();
+    state.players[1].age = 4;
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const view = createEntityView(assets, tc);
+    updateEntityView(view, assets, state, tc, 0);
+    expect(view.annexes[0].textureImage).toBe('tc/annex0-idle-imperial.png');
+    expect(view.annexColors[0].mesh.visible).toBe(false); // not the Dark Age mask
+  });
+
   it('hides annex colour while a building is still going up', () => {
     const assets = annexedAssets();
     const state = createGame();
