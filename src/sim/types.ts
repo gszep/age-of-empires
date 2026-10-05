@@ -328,6 +328,10 @@ export type Command =
   | { kind: 'attack-ground'; player: PlayerId; entityIds: number[]; target: Point }
   | { kind: 'treason'; player: PlayerId; castleId: number }
   | { kind: 'exchange'; player: PlayerId; marketId: number; resource: 'wood' | 'food' | 'stone'; side: 'buy' | 'sell'; amount: 100 | 500 }
+  /** Local testing cheat: 1000 of each resource, as AoE2's four resource cheat
+   * codes give. Deliberately absent from the protocol schema, so shared-play
+   * servers and agents refuse it. */
+  | { kind: 'cheat-resources'; player: PlayerId }
   | { kind: 'tribute'; player: PlayerId; recipient: PlayerId; resource: ResourceKind; amount: number }
   | { kind: 'tribute-batch'; player: PlayerId; recipient: PlayerId; amounts: Partial<Record<ResourceKind, number | 'all'>> }
   | { kind: 'order'; player: PlayerId; entityIds: number[]; target: Point; targetId?: number;

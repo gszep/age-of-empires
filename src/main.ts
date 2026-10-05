@@ -1090,6 +1090,14 @@ addEventListener('keydown', event => {
     event.preventDefault();
     return;
   }
+  // Every AoE2 F-key and Alt+R are bound, so the testing cheat takes Ctrl+Alt+R.
+  if (event.ctrlKey && event.altKey && event.code === 'KeyR') {
+    event.preventDefault();
+    if (shared) { hud.showMessage('Resource cheat (debug): not available in shared play'); return; }
+    const result = applyCommand(game, { kind: 'cheat-resources', player: localPlayer });
+    hud.showMessage(result.ok ? 'Resource cheat (debug): +1000 food, wood, gold and stone' : `Resource cheat refused: ${result.reason}`);
+    return;
+  }
   // AoE2's own speed keys. `=` and `_` come along because `+` and `-` are the
   // shifted faces of those keys on most layouts, and the numpad sends the
   // signs directly. Ctrl and Cmd are left alone: that is the browser's zoom.

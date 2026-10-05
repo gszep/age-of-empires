@@ -94,6 +94,10 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
 - `F4` toggles a debug reveal of the whole map. It is strictly a view-side
   override — the simulation's fog, the AI's observation and every checksum are
   untouched, so a revealed match replays identically to a fogged one.
+- `Ctrl+Alt+R` is a testing cheat: it gives you 1000 food, wood, gold and stone
+  (AoE2's four resource cheat codes, in one key). Unlike `F4` it is a real
+  simulation command, so it changes the match. It works in solo play only;
+  shared-play servers and agents refuse it.
 - **F10 → Game Settings** selects any supported map. Enter a **Seed** to
   reproduce a board, or press **Random** for a fresh seed, then **Start Game**.
   Changing a field alone leaves the current match running. The chosen map and

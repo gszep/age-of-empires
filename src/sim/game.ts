@@ -730,6 +730,11 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
   }
   if (command.kind === 'exchange' || command.kind === 'tribute' || command.kind === 'tribute-batch') return applyMarketCommand(state, command);
   if (command.kind === 'treason') return applyTreason(state, command);
+  if (command.kind === 'cheat-resources') {
+    const player = state.players[command.player];
+    for (const resource of ['food', 'wood', 'gold', 'stone'] as const) player[resource] += 1000;
+    return { ok: true };
+  }
 
   if (command.kind === 'order' || command.kind === 'stop') {
     // A carcass is a thing orders may name: the gatherer loop has always been
