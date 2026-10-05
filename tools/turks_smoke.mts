@@ -30,8 +30,7 @@ try {
   assert.equal(janissary.maxHp, unitRulesFor({ ...(await b.snapshot()), rules: b.rules } as GameState, 1, 'dat-unit-46' as UnitKind).hp);
   await b.research(s.entities.find(e => e.owner === 1 && e.kind === 'town-center')!.id, 'imperial-age');
   assert((await b.snapshot()).players[1].researched.includes('chemistry'), 'free Chemistry in Imperial');
-  await b.research(castle.id, 'elite-janissary');
-  // Promoted existing units keep the old texture (#303); verify elite art on a fresh unit here.
+  await b.research(castle.id, 'elite-janissary'); await b.art(janissary.id, 'dat-unit-557');
   const elite = await b.train(castle.id, 'dat-unit-557'); await b.art(elite.id, 'dat-unit-557');
   await b.research(castle.id, 'sipahi');
   await b.research(castle.id, 'artillery');

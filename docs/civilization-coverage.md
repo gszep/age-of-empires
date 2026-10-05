@@ -690,10 +690,12 @@ paid Imperial age with free Chemistry and no opponent grant, paid
 Elite Janissary/Sipahi/Artillery) and `tools/vikings_smoke.mts` (menu/reload, SLAV
 HUD, free Wheelbarrow and Hand Cart on paid Castle age with no opponent grant,
 Berserk/Longboat and elite art, paid Chieftains/Bogsveigar/elite research). Run them
-with `npx tsx`. Elite art is checked on freshly trained elite units: existing units
-promoted by an elite upgrade keep drawing the pre-upgrade texture for every
-civilisation, so `tools/saracens_smoke.mts` currently fails its Elite Mameluke
-check; that regression is #303, not hidden here.
+with `npx tsx`. Elite art is checked on both promoted existing units and freshly
+trained ones. #303 (an apparent stale texture after promotion) was a race in the
+shared `tools/civ_browser.mts` art probe, not the renderer: the view deliberately
+keeps the loaded old pose until all new layers are ready (#287), about 1.4 s for
+Elite Mameluke, and the probe asserted before then. It now waits for the drawn
+atlas and every layer; the Saracens, Turks and Vikings smokes pass.
 
 The first owned checkpoint caught the shared per-profile Arrowslits test assuming
 11 Keep attack for every profile; Turks receive free Chemistry at Imperial,

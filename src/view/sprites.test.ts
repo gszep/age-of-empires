@@ -417,6 +417,55 @@ describe('cold unit frames (#287)', () => {
     expect(view.frameIndex).toBe(1);
     expect(view.body.textureImage).toBe('second-page');
   });
+
+  it('retains a complete pose across an in-place elite kind change, then binds all upgraded layers (#303)', () => {
+    const state = createGame(), assets = fakeAssets();
+    const entity = state.entities.find(e => e.kind === 'villager' && e.owner === 1)!;
+    assets.civilizationForOwner = () => 'saracens';
+    const layers = ['idle', 'idle-playercolor', 'idle-shadow', 'idle-outline'];
+    const image = (kind: string, layer: string) => `civilizations/byzantines/${kind}/${layer}.png`;
+    for (const kind of ['dat-unit-282', 'dat-unit-556']) {
+      assets.entities[`civilizations/saracens/${kind}`] = {
+        category: 'unit', animations: { ...assets.entities.villager.animations },
+        atlases: Object.fromEntries(layers.map(layer => [layer,
+          { ...assets.entities.villager.atlases.idle, image: image(kind, layer) }])),
+      };
+    }
+    for (const layer of layers) assets.textures.set(image('dat-unit-282', layer), new THREE.Texture());
+    const requested = new Set<string>();
+    assets.loadTexture = path => { requested.add(path); };
+    entity.kind = 'dat-unit-282';
+    const view = createEntityView(assets, entity);
+    const pieces = [view.body, view.color, view.shadow, view.outline];
+    updateEntityView(view, assets, state, entity, 0);
+    expect(pieces.map(p => p.textureImage)).toEqual(layers.map(layer => image('dat-unit-282', layer)));
+    // Paid research promotes the same entity id; its view is not rebuilt.
+    entity.kind = 'dat-unit-556';
+    updateEntityView(view, assets, state, entity, 1);
+    expect(view.animationState).toBe('civilizations/saracens/dat-unit-556/idle');
+    expect([...requested].sort()).toEqual(layers.slice(0, 3).map(layer => image('dat-unit-556', layer)).sort());
+    // Neither the chosen animation key nor pendingTexture proves the new pose
+    // is drawn: #287 deliberately retains the loaded, complete old pose.
+    expect(pieces.map(p => p.textureImage)).toEqual(layers.map(layer => image('dat-unit-282', layer)));
+    expect(pieces.every(p => !p.pendingTexture)).toBe(true);
+    for (const layer of layers.slice(0, 2)) assets.textures.set(image('dat-unit-556', layer), new THREE.Texture());
+    updateEntityView(view, assets, state, entity, 2);
+    expect(view.body.textureImage).toBe(image('dat-unit-282', 'idle'));
+    expect(pieces.slice(0, 3).every(p => p.mesh.visible)).toBe(true);
+    assets.textures.set(image('dat-unit-556', 'idle-shadow'), new THREE.Texture());
+    updateEntityView(view, assets, state, entity, 3);
+    expect(pieces.map(p => p.textureImage)).toEqual(layers.map(layer => image('dat-unit-556', layer)));
+    expect(pieces.slice(0, 3).every(p => p.mesh.visible)).toBe(true);
+    // The optional contour loads independently, without holding up the body.
+    expect(view.outline.pendingTexture).toBe(image('dat-unit-556', 'idle-outline'));
+    assets.textures.set(image('dat-unit-556', 'idle-outline'), new THREE.Texture());
+    updateEntityView(view, assets, state, entity, 4);
+    expect(pieces.every(p => !p.pendingTexture)).toBe(true);
+    for (const [index, piece] of pieces.entries()) {
+      const bound = piece.mapNode?.value ?? (piece.mesh.material as THREE.MeshBasicMaterial).map;
+      expect(bound).toBe(assets.textures.get(image('dat-unit-556', layers[index])));
+    }
+  });
 });
 
 function fakeAssets(): ContentAssets {

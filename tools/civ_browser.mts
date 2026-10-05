@@ -40,6 +40,7 @@ export async function civilizationBrowser(civ: string, port = 5269) {
               return{key:artKey(assets,e,chooseAnimation(game,e).key,game.matchSeed),name:nameOf(e),texture:v?.body.textureImage,
                 animation:v?.animationState,pieces:v?[v.body,...v.annexes].filter(p=>p.mesh.visible).map(p=>p.textureImage):[],
                 partsPending:v?[v.body,...v.annexes].some(p=>p.pendingTexture):false,
+                layers:v?[v.body,v.color,v.shadow,v.outline].map(p=>({image:p.textureImage,pending:p.pendingTexture})):[],
                 pending:v?.body.pendingTexture,fallback:v?.fallback};}}});`);
       },
     }] });
@@ -105,9 +106,15 @@ export async function civilizationBrowser(civ: string, port = 5269) {
     await query({type:'look',entity:id});await select(id);
     await page.waitForFunction(({id,key})=>{const a=(window as any).__civProbe.art(id);return a?.key===key&&a.texture&&!a.pending&&!a.fallback;},
       {timeout:120000},{id,key:`civilizations/${civ}/${kind}`});
-    const shown=await page.evaluate(id=>(window as any).__civProbe.art(id),id),entity=profile.entities[kind];
-    assert.equal(shown.name,displayName(kind,entity.text.name));
+    const entity=profile.entities[kind];
     const images=Object.values(entity.atlases).flatMap((a:any)=>[a.image,...(a.pages??[]).map((p:any)=>p.image)]);
+    // A new kind's key is set before its pages load; the view keeps the loaded old
+    // pose until every layer is ready (#287), so wait for the drawn atlas (#303).
+    await page.waitForFunction(({id,images})=>{const a=(window as any).__civProbe.art(id);
+      return images.includes(a.texture)&&a.pieces.every((p:string)=>images.includes(p))&&!a.partsPending&&a.layers.every((l:any)=>!l.pending);},
+      {timeout:120000},{id,images});
+    const shown=await page.evaluate(id=>(window as any).__civProbe.art(id),id);
+    assert.equal(shown.name,displayName(kind,entity.text.name));
     assert(images.includes(shown.texture),JSON.stringify({id,kind,shown,images}));
   };
   const build=async(worker:number,kind:BuildingKind,target:{x:number;y:number})=>{

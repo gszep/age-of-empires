@@ -33,8 +33,7 @@ try {
   const berserk = await b.train(castle.id, 'dat-unit-692'); await b.art(berserk.id, 'dat-unit-692');
   await b.research(castle.id, 'chieftains');
   await b.research(s.entities.find(e => e.owner === 1 && e.kind === 'town-center')!.id, 'imperial-age');
-  await b.research(castle.id, 'elite-berserk');
-  // Promoted existing units keep the old texture (#303); verify elite art on a fresh unit here.
+  await b.research(castle.id, 'elite-berserk'); await b.art(berserk.id, 'dat-unit-694');
   const elite = await b.train(castle.id, 'dat-unit-694'); await b.art(elite.id, 'dat-unit-694');
   await b.research(castle.id, 'bogsveigar');
   await b.reload(); const after = await b.snapshot();
@@ -49,7 +48,7 @@ try {
   await b.art(dock.id, 'dock');
   const longboat = await b.train(dock.id, 'dat-unit-250'); await b.art(longboat.id, 'dat-unit-250');
   await b.research(sea.entities.find(e => e.owner === 1 && e.kind === 'town-center')!.id, 'imperial-age');
-  await b.research(dock.id, 'elite-longboat');
+  await b.research(dock.id, 'elite-longboat'); await b.art(longboat.id, 'dat-unit-533');
   const eliteBoat = await b.train(dock.id, 'dat-unit-533'); await b.art(eliteBoat.id, 'dat-unit-533');
   void seaCastle;
   assert.deepEqual(b.errors, []);
