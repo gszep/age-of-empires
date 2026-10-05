@@ -21,9 +21,22 @@ and requires reloading matching client code.
   localhost:5173 behind the existing Tailscale route. Your usual link is unchanged.
 - Artemis: the same user-service name runs `tools/shared-join.mjs` on
   localhost:5174. Open **http://localhost:5174/** on Artemis.
-- Since October2's08:57UTC frontend update, Ysgramor serves
-  `.local/releases/autonomous-20261002-43e10ad`, fingerprint
-  `c54c2fd402804f6d9926edee17e7c9e665e91e5a909bc70402c57c7f545488f1`.
+- Since October 5, 12:11 BST, Ysgramor serves
+  `.local/releases/autonomous-20261005-c519be9` (source `c519be9`, protocol4),
+  fingerprint `d3673108ba99ba5e9e35c1e7aafe81097a58d4f13a9a2da77efc0db5c6759099`.
+  Before switching, the release's own `shared_smoke.mts` passed privately
+  (1546 ticks, zero unintended resyncs, guest reload, checkpoint restart) and
+  its real `shared-host.mts` entrypoint started on a private port. No shared
+  checkpoint existed and no client was connected. Afterwards the service was
+  active with zero restarts, served protocol4 locally and over Tailscale, and a
+  live solo page loaded the new code without page errors. The previous
+  `autonomous-20261002-43e10ad` release remains for rollback:
+  `node tools/install-shared.mjs host <that absolute path>`.
+- Artemis was unreachable over SSH on October 5 (timeout), so its gateway was
+  neither checked nor changed. It follows the host protocol and proxies the new
+  frontend, but serves its October 2 seven-profile x1 art: Saracen art is
+  absent there, and farm construction shows only its first stage until that
+  import is refreshed. A live Artemis join remains unverified.
   Artemis's gateway and isolated owned base-art runtime are under
   `/home/gszep/Documents/repos/age-of-empires/.local/owned-runtime-0d86953`;
   that candidate directory now contains source385da49 (recorded in its
@@ -60,9 +73,9 @@ and requires reloading matching client code.
 
 Current source uses **protocol4** for configurable population ceilings (#253)
 and optional Wonder countdowns (#110).
-The installed release-pinned services described above remain on protocol2.
-A future rollout needs matching host/client code and an explicit checkpoint
-plan; no protocol2 checkpoint migration or deployment is part of this change.
+The Ysgramor host and its frontend run protocol4 since October 5; the switch
+needed no checkpoint migration because none existed. Protocol2 checkpoints are
+not migrated.
 The host owns the population selection, includes it in authoritative snapshots
 and setup metadata, and preserves it across restart/checkpoint/rejoin. Guests
 see disabled setup controls. Wonder deadlines are authoritative state and travel
@@ -187,8 +200,8 @@ deleted or replaced during incompatible startup.
 
 `tools/session_start.sh` reports the managed service's active/substate, last
 exit status, result and restart counter even when no process is running. The
-gate records its actual redirected log and result in `.local/gate.latest.json`,
-so named issue logs are reported instead of a stale default log.
+owned checkpoint records its log and result in `.local/checkpoint.latest.json`,
+so named runs are reported instead of a stale default log.
 For a private host test, `MATCH_CHECKPOINT` overrides the saved path and
 `MATCH_PORT` overrides the listener port; normal household defaults are unchanged.
 

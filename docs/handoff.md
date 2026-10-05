@@ -10,8 +10,12 @@ reviews. Do not append old test counts here as if they describe the latest tree.
   Owned checkpoint `npm run verify:owned` is GREEN: 1561 tests/129 files, eight
   skipped, open-content build, 206 owned-import tests and real-browser debug
   smoke; 415s total (`.local/verification/1791191937139-157510/`). No timeout
-  widening. Browser evidence uses Chrome/SwiftShader. Neither these commits nor
-  yesterday's #287/#289 fixes are deployed to the installed household release.
+  widening. Browser evidence uses Chrome/SwiftShader.
+- Deployed October 5, 12:11 BST: the Ysgramor household host runs release
+  `autonomous-20261005-c519be9` (protocol4), carrying #287/#289 and today's
+  fixes; see [shared play](shared-play.md#installed-arrangement) for the
+  verification and rollback. Artemis was unreachable over SSH, so a live guest
+  join and its older local art remain unverified.
   Owned art was regenerated twice (full cached import, about 9 minutes each);
   reload open tabs to pick up the new terrains and strings.
 - October 5 fixes, each with a dedicated real-browser smoke under `tools/`:
@@ -37,8 +41,8 @@ reviews. Do not append old test counts here as if they describe the latest tree.
 - #287 (cold sprite flicker) and #289 (selecting units over farms), fixed in
   `7511606`, are closed after re-verification on `e6d5a9c`: first-appearance,
   sprite/outline residency, farm selection (owned and fallback) and farm
-  occupancy smokes pass. Deployment and a physical-GPU look at the flicker
-  remain; reopen if the symptom persists on the household release.
+  occupancy smokes pass. Both are deployed; a physical-GPU look at the flicker
+  remains, so reopen if the symptom persists on the household release.
 - #290 (Shift queueing) is parked at the human's request. Shift-queued
   waypoints, resources and foundations work in browser and sim probes. Two
   candidate gaps await the human's description: Shift-placing several
