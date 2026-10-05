@@ -91,6 +91,11 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   delta *with a file*; the fish is its `(Underwater)` delta through
   `n_alpha_underwater.palx`. An atlas of empty frames means the picture is in
   a delta.
+- **Every imported layer is part of the picture, and every mask belongs to its
+  own layer.** The Cannon Galleon shot's first layer is its shadow (an empty
+  1×1 main sheet), so drawing only that hid the ball (#297); borrowing the Dark
+  Age player-colour mask for Imperial art with none of its own drew bands across
+  the Japanese TC's roof (#294). A missing mask means no colour, not a fallback.
 - **Composite every arrangement before mapping frames to meaning.** The
   palisade corner was reasoned about instead of drawn and was wrong for
   weeks.
@@ -243,6 +248,10 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 - **A probe that stages state asserts the page resumed it**, and imports the
   snapshot version from the loader rather than copying it. A silently
   declined snapshot photographs an ordinary opening.
+- **A named function inside `page.evaluate` fails under tsx with
+  `__name is not defined`.** tsx wraps it in a helper the page lacks; install
+  `page.evaluateOnNewDocument('globalThis.__name = f => f')` first
+  (`tools/farm_construction_smoke.mts`).
 - **Serve large fixture manifests over private HTTP, not CDP interception.**
   The two-profile atlas manifest exceeded Chrome's 100 MiB DevTools message
   buffer after base64 encoding; the only surfaced error was “frame got detached”.
@@ -372,6 +381,9 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   (`git ls-files --error-unmatch`). Tooling worth a doc is worth committing.
 - **Read the checkpoint's status on the line after it, never through a pipe or a
   `:`** (`AGENTS.md`); the script exists because prose did not hold.
+- **The commit guard matches `git commit` anywhere in a shell command**,
+  including a heredoc's text, and refuses until the owned checkpoint is fresh.
+  Write a script that mentions it to a file and run the file.
 - **Never rebase published commits**; integrate worktrees by merge or
   cherry-pick, and check `git log origin/main..` before any history edit.
 - **A hand-off prunes.** Every consolidation that only appended left the next

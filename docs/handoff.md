@@ -6,41 +6,39 @@ reviews. Do not append old test counts here as if they describe the latest tree.
 
 ## Source and verification
 
-- Latest verified source: `7511606`, pushed to `origin/main`, fixes cold unit
-  sprite flicker (#287) and manual selection of units over farms (#289).
-  Owned checkpoint `.local/issues287-289-gate.log` is GREEN:1413 tests/111 files,
-  eight skipped, typecheck/open-content build,204 owned-import tests and
-  real-browser debug smoke;1061s total. No timeout widening.
-  Dedicated sprite first-appearance, residency/eviction and contour probes pass;
-  farm selection passes with owned and fallback content, and the existing farm
-  occupancy probe passes. Browser evidence uses Chrome/SwiftShader; physical-GPU
-  confirmation remains unverified. These fixes are committed and pushed but
-  have not been deployed to the installed household release.
-- Research in progress (#295) shows its owned tech icon in the selection
-  panel's active slot with "Researching N%" (owned strings 4309/42100); a click
-  sends the new public `cancel-research` command, which refunds the paid cost.
-  `tools/research_cancel_smoke.mts` covers the click path. #290 (Shift
-  queueing) is parked pending the human's description of the failing action.
-- Town center annexes (#294) no longer borrow the Dark Age player-colour mask
-  when an aged piece has none. The Asian Castle/Imperial `front` SLDs have no
-  player-colour layer; the borrowed mask drew stray bands across the Japanese
-  TC's wings. `tools/tc_annex_color_smoke.mts` checks each visible annex mask
-  matches its own art in a real browser.
-- Farms under construction (#296) step through the DAT's `Farm Cnst1/2/3`
-  terrains (29-31) at equal thirds of build progress (inferred; ledger), then
-  `Farm1`. The import now publishes `farm-construction-2/3`; old imports keep
-  the first stage. `tools/farm_construction_smoke.mts` verifies a public build
-  shows all four textures in order.
-- The verification term "gate" is retired. `npm run verify:owned` is the
-  owned checkpoint; it writes `.local/checkpoint.ok` (read by the commit guard)
-  and `.local/checkpoint.latest.json` (read by `tools/session_start.sh`).
-  `tools/gate.sh` is removed. Dated reviews and old `.local/*-gate.log`
-  evidence paths keep their original names.
-- Cannon Galleon shots (#297) now draw every imported projectile layer. The
-  DAT graphic's first layer is the shadow-only `p_ball_shadow` (an empty 1×1
-  main sheet); the ball is `idle-layer-1`, which the old single-sheet path
-  never drew. `tools/cannon_galleon_smoke.mts` fires a public attack and
-  measures 82 in-flight ball pixels (0 before the fix).
+- Latest verified source: `21f615b`, pushed to `origin/main` on October 5.
+  Owned checkpoint `npm run verify:owned` is GREEN: 1561 tests/129 files, eight
+  skipped, open-content build, 206 owned-import tests and real-browser debug
+  smoke; 415s total (`.local/verification/1791191937139-157510/`). No timeout
+  widening. Browser evidence uses Chrome/SwiftShader. Neither these commits nor
+  yesterday's #287/#289 fixes are deployed to the installed household release.
+  Owned art was regenerated twice (full cached import, about 9 minutes each);
+  reload open tabs to pick up the new terrains and strings.
+- October 5 fixes, each with a dedicated real-browser smoke under `tools/`:
+  - #297 Cannon Galleon shots draw every imported projectile layer; the ball
+    is `idle-layer-1` behind an empty shadow-only first layer
+    (`cannon_galleon_smoke.mts`: 82 ball pixels, 0 before).
+  - #296 farms under construction step through `Farm Cnst1/2/3` (terrains
+    29-31) at equal thirds of build progress (inferred; ledger), then `Farm1`
+    (`farm_construction_smoke.mts`). Older imports keep the first stage.
+  - #294 aged town center annexes no longer borrow the Dark Age player-colour
+    mask; the Asian Castle/Imperial `front` SLDs have none (`tc_annex_color_smoke.mts`).
+  - #295 research in progress shows its tech icon in the selection panel with
+    "Researching N%" (owned strings 4309/42100); clicking it sends the new public
+    `cancel-research` command, which refunds the paid cost (`research_cancel_smoke.mts`).
+  - `Ctrl+Alt+R` gives the local player 1000 of each resource in solo play
+    (`cheat-resources`, not in the protocol schema; ledger). It works in every
+    build, release included; restrict it to dev if the household should not have it.
+  - The verification term "gate" is retired: `npm run verify:owned` writes
+    `.local/checkpoint.ok` (commit guard) and `.local/checkpoint.latest.json`
+    (session start); `tools/gate.sh` is removed. The installed-CLI harness smoke
+    was re-run after the guard change. Dated reviews and old `.local/*-gate.log`
+    paths keep their names.
+- #290 (Shift queueing) is parked at the human's request. Shift-queued
+  waypoints, resources and foundations work in browser and sim probes. Two
+  candidate gaps await the human's description: Shift-placing several
+  buildings was never implemented, and orders queued behind a gather never run
+  because gathering does not finish.
 - Saracens (#187) are implemented as the eighth selectable
   owned profile. Full import and dedicated private-browser acceptance pass;
   [coverage](civilization-coverage.md#saracens-187) records outcomes;
