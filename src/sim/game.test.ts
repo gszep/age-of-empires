@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { exampleAiCommands } from './ai';
 import { observe } from './observe';
 import { applyCommand, computeDamage, createGame, stepGame } from './game';
+import { FALLBACK_RULES } from './data';
 
 function digest(state: ReturnType<typeof createGame>): string {
   return JSON.stringify(state);
@@ -12,6 +13,21 @@ const run = (state: ReturnType<typeof createGame>, ticks: number) => {
 };
 
 describe('simulation', () => {
+  it('removes a newly killed zero-lifetime corpse in the same tick', () => {
+    // #307: detecting expiry before kill() changes this ordering. Synthetic
+    // rules exercise the supported zero lifetime, not a new gameplay value.
+    const rules = structuredClone(FALLBACK_RULES);
+    rules.units.villager.corpseSeconds = 0;
+    rules.units.villager.deathSeconds = 0;
+    const state = createGame(123, rules);
+    const villager = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    villager.hp = 0;
+    stepGame(state);
+    expect(villager.dead).toBe(true);
+    expect(villager.decayTicks).toBe(0);
+    expect(state.entities.some(e => e.id === villager.id)).toBe(false);
+  });
+
   it('is deterministic for a seed and command stream', () => {
     const a = createGame(123);
     const b = createGame(123);

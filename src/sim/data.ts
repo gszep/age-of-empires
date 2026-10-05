@@ -267,6 +267,7 @@ export interface UnitRules {
 }
 
 export interface BuildingRules {
+  healingAura?: HealingAura;
   abilityFlags?: number;
   conversionImmune?: boolean;
   requires?: string[];
@@ -694,6 +695,7 @@ export interface HealingAura {
   range: number;
   hitPointsPerSecond: number;
   targetClasses: number[];
+  targetUnitIds?: number[];
   helpStringId: number;
 }
 
@@ -1604,6 +1606,8 @@ export interface BonusTechnology {
   key: string;
   automatic: boolean;
   disabled?: boolean;
+  /** DAT type-102: a completed branch disables this still-unresearched node. */
+  disabledByTechs?: number[];
   age?: number;
   /** Building completion supplies otherwise unsatisfiable shadow techs. */
   triggeredByBuildings?: string[];

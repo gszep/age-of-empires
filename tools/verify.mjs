@@ -87,11 +87,20 @@ async function step(script, extra = []) {
   return code === 0;
 }
 
+// Long fixed-window simulations near the 30 s test clock run alone after the
+// parallel stage, with unchanged assertions and timeout (#307, #299): under the
+// full suite's worker contention they took ~31 s versus ~17 s unloaded.
+const SERIAL_TESTS = ['src/sim/ai-herding-seeds.test.ts', 'src/sim/ai-herding.test.ts'];
+const serial = selection.full ? SERIAL_TESTS : selection.tests.filter(file => SERIAL_TESTS.includes(file));
+const parallel = selection.full ? SERIAL_TESTS.flatMap(file => ['--exclude', file])
+  : selection.tests.filter(file => !SERIAL_TESTS.includes(file));
+
 // Independent CPU work runs together; each status is retained and must pass.
 const checks = [];
-if (selection.full || selection.tests.length) checks.push(step('test', selection.full ? [] : selection.tests));
+if (selection.full || parallel.length) checks.push(step('test', parallel));
 if (!testsOnly) checks.push(step('build:public'));
 let passed = (await Promise.all(checks)).every(Boolean) && !interrupted;
+if (passed && serial.length) passed = await step('test:serial', serial);
 if (owned && passed) passed = await step('test:import');
 if (owned && passed) passed = await step('debug:smoke');
 passed &&= !interrupted;

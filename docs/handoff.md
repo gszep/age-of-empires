@@ -48,6 +48,11 @@ reviews. Do not append old test counts here as if they describe the latest tree.
   candidate gaps await the human's description: Shift-placing several
   buildings was never implemented, and orders queued behind a gather never run
   because gathering does not finish.
+- Mongols (#190) and Celts (#191) are the eleventh and twelfth selectable profiles
+  (October 5). Full import, `tools/{mongols,celts}_smoke.mts` and the owned
+  checkpoint pass; see the [integration receipt](civilization-coverage.md#mongols-and-celts-integration-receipt-october-5).
+  `verify:owned` now runs the herding comparisons serially after the parallel
+  stage (#307). Not deployed. Open: #304/#305/#306.
 - Turks (#188) and Vikings (#189) are the ninth and tenth selectable profiles
   (October 5, coordinator-integrated from two escalated worker trees). Full import,
   `tools/{turks,vikings}_smoke.mts` and the owned checkpoint pass; see the

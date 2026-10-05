@@ -11,6 +11,7 @@
     "build:public": "OPEN_CONTENT_ONLY=1 tsc --noEmit && OPEN_CONTENT_ONLY=1 vite build",
     "test": "vitest run",
     "test:changed": "node tools/verify.mjs --tests-only",
+    "test:serial": "vitest run --maxWorkers=1",
     "verify": "node tools/verify.mjs",
     "verify:full": "node tools/verify.mjs --full",
     "verify:owned": "node tools/verify.mjs --full --owned",

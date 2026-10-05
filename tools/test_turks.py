@@ -69,9 +69,11 @@ class TurksImportTest(unittest.TestCase):
         p = self.profile
         self.assertEqual(p['technologies']['sipahi']['techId'], 491)
         self.assertEqual(p['technologies']['sipahi']['cost'], {'food': 350, 'gold': 150})
+        # Source effect 546 targets class 36 (cavalry archers), so every rostered
+        # class-36 unit is covered, including captured Mangudai since Mongols (#190).
         self.assertEqual(p['technologies']['sipahi']['effects'], [
             {'unit': k, 'attribute': 'hitPoints', 'operation': 'add', 'amount': 20}
-            for k in ['cavalry-archer', 'heavy-cavalry-archer']])
+            for k in ['cavalry-archer', 'heavy-cavalry-archer', 'dat-unit-11', 'dat-unit-561']])
         t = p['technologies']['artillery']
         self.assertEqual(t['techId'], 10)
         self.assertEqual(t['cost'], {'food': 600, 'gold': 650})

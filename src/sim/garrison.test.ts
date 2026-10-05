@@ -5,6 +5,7 @@ import { applyCommand, canGarrison, createGame, placementLegal, stepGame, volley
 import { observe } from './observe';
 import { validateObservation, explain } from '../protocol/validate';
 import { checksumState } from './checksum';
+import { entitiesWithGarrison } from './garrison';
 import type { BuildingKind, Entity, GameState, UnitKind } from './types';
 
 const MANIFEST_PATH = 'public/imported/aoe2/manifest.json';
@@ -57,6 +58,23 @@ const order = (state: GameState, units: Entity[], target: Entity) => applyComman
 });
 
 describe('garrison', () => {
+  it('walks nested cargo in entity order, including empty leaves and foreign passengers', () => {
+    const state = createGame(95);
+    const carrier = spawn(state, 'transport-ship', 1, { x: 1, y: 1 });
+    const ram = spawn(state, 'battering-ram', 1, { x: 1, y: 1 });
+    const passenger = spawn(state, 'militia', 2, { x: 1, y: 1 });
+    const empty = spawn(state, 'villager', 1, { x: 1, y: 1 });
+    const leaf = spawn(state, 'villager', 1, { x: 1, y: 1 });
+    carrier.garrison = [ram, empty];
+    ram.garrison = [passenger];
+    empty.garrison = [];
+    const result = [...entitiesWithGarrison([carrier, leaf])];
+    expect(result.map(e => e.id)).toEqual([carrier.id, ram.id, passenger.id, empty.id, leaf.id]);
+    expect(result[2]).toBe(passenger);
+    expect(result[2].owner).toBe(2);
+    expect([...entitiesWithGarrison([])]).toEqual([]);
+  });
+
   it('reads the DAT: who fits where, how many, and what they add to the volley', () => {
     // Issue #75. `garrison_capacity` 15/20/5, `garrison_type` 11/15/11,
     // `total_projectiles` 1/5/1 to `max_total_projectiles` 11/21/5, and the

@@ -1344,7 +1344,7 @@ def effects_of(
                                         'killReward': aura})
                 continue
             for key, entity in entities.items():
-                if entity.get('class') in aura['sourceClasses'] and entity.get('id') not in aura['excludedSourceIds'] and 'skinOf' not in entity:
+                if (entity.get('class') in aura['sourceClasses'] or entity.get('id') in aura.get('sourceUnitIds', [])) and entity.get('id') not in aura['excludedSourceIds'] and 'skinOf' not in entity:
                     effects.append({'unit': key, 'attribute': 'healingAura', 'operation': 'set', 'amount': 1,
                                     'healingAura': aura})
             continue
@@ -1717,6 +1717,27 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
         if unmodelled or unreached:
             node["unmodelled"] = sorted(set(unmodelled + unreached))
         nodes[str(tid)] = node
+    # Reciprocal type-102 automatic branches (Mongol HP with/without
+    # Bloodlines) disable the alternative when they complete. Do not broaden
+    # this to arbitrary runtime exclusions: e.g. generic117's Spies exclusion
+    # needs a separate trigger audit. Unsupported commands remain unmodelled.
+    exclusions = {tid: {int(c.d) for c in dat.effects[dat.techs[tid].effect_id].effect_commands
+                        if c.type == 102} for tid in ids if dat.techs[tid].effect_id >= 0}
+    for tid in sorted(ids):
+        tech = dat.techs[tid]
+        if tech.effect_id < 0:
+            continue
+        for command in dat.effects[tech.effect_id].effect_commands:
+            target_id = int(command.d)
+            target = nodes.get(str(target_id)) if command.type == 102 else None
+            if target is None or target_id == tid or not nodes[str(tid)]['automatic'] \
+                    or not target['automatic'] or tid not in exclusions.get(target_id, set()):
+                continue
+            target.setdefault('disabledByTechs', []).append(tid)
+            reason = f"effect type {command.type}: a={command.a}, b={command.b}, c={command.c}, d={command.d}"
+            node = nodes[str(tid)]
+            if reason in node.get('unmodelled', []):
+                node['unmodelled'].remove(reason)
     for tid, eid in [(-1, civ.tech_tree_id), (-2, civ.team_bonus_id)]:
         effects, unmodelled, unreached = effects_of(dat, 0, entities, attribute_ids, effect_id=eid)
         if tid in (-1, -2):
@@ -1772,6 +1793,9 @@ def technologies_from_tree(
     if any(n.get('Node ID') == 28 and n.get('Node Status') != 'NotAvailable' for n in nodes):
         from scripted_effects import healing_aura
         scripted_effects[7] = healing_aura(dat_path.parent.parent, hashes)
+    if any(n.get('Node ID') == 482 and n.get('Node Status') != 'NotAvailable' for n in nodes):
+        from scripted_effects import stronghold_aura
+        scripted_effects[8] = stronghold_aura(dat_path.parent.parent, hashes)
     for node in nodes:
         # A `UnitUpgrade` node is a technology too -- it just replaces one unit
         # with another rather than adding to it, and the tree names the

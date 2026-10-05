@@ -412,6 +412,7 @@ function applyBuildingEffect(rules: BuildingRules, effect: TechEffect): void {
   if (applyCostEffect(rules, effect)) return;
   const armorClass = effect.armorClass ?? 0;
   switch (effect.attribute) {
+    case 'healingAura': rules.healingAura = effect.healingAura; break;
     case 'blastRadius':
       if (rules.attack) rules.attack.blastRadius = combine(effect.operation, rules.attack.blastRadius ?? 0, effect.amount);
       break;

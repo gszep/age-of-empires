@@ -3133,7 +3133,8 @@ export function activateAutomaticTechnologies(state: GameState): void {
     do {
       changed = false;
       for (const node of Object.values(nodes)) {
-        if (node.disabled || player.researched.includes(node.key) || !technologyFor(rules, node.key)) continue;
+        if (node.disabled || node.disabledByTechs?.some(id => player.researched.includes(nodes[id]?.key))
+          || player.researched.includes(node.key) || !technologyFor(rules, node.key)) continue;
         const triggered = node.triggeredByBuildings && hasBuilding(node.triggeredByBuildings);
         const aged = node.age !== undefined && player.age >= node.age;
         if (!triggered && !aged && (!node.automatic || !technologyRequirementsMet(state, owner, node))) continue;

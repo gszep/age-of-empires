@@ -1,5 +1,38 @@
 # Civilisation expansion: audit and first playable slice
 
+## Celts (#191)
+
+Pinned source: DAT civ 13, tree effect 275, team effect 401, `CELTS.json`,
+English help 120162 and XS `EffectFunction8`. The profile has an empty
+`missingRoster`, enables Woad Raider 232 / Elite 534, and retains foreign
+unique definitions for captured units while rejecting their ordinary training.
+The spec enables the profile for the coordinator's next full import; no assets
+have been published by this worker.
+
+| Source behaviour | Implementation / outcome coverage | Remaining boundary |
+| --- | --- | --- |
+| Lumberjacks +15%, tech 385 / effect 384, no age gate | .39 × 1.15 wood/s; Dark and Imperial extraction, first banked 10 wood before the equal-age opponent's 10 | Native gathering cadence remains shared calibration |
+| Infantry +5/10/15/20%, techs 393/898/899/900 | Public age research; per-tick movement on existing, new and ungarrisoned militia versus an equal-age Briton; source multiplier products | Source operands differ slightly from rounded help percentages |
+| Siege attack speed +25%, tech 386 / effect 385 | Mangonel and Scorpion actual projectile timestamps, including six-shot Mangonel volleys; reload ×.8 versus opponent | Shared tick quantization, not a native timing measurement |
+| Team effect 401: Siege Workshops work +20% | Mangonel completes at tick 767 versus 920 (46 seconds / 1.2); exact 160 wood / 135 gold payments and refunds; barracks remains 420 ticks | Owner-local in current locked 1v1; allied-team propagation not offered |
+| Woad Raider / Elite, tech 370 | Public castle training, 70/85 HP, payments, 10-second creation, wounded/garrison promotion, movement, foreign exclusion, monk capture and JSON continuation | Both source base speeds are 1.17; no invented Elite-only speed change |
+| Stronghold reload | Paid research; existing castles/towers and new Guard Towers/Keeps fire at 30 versus opponent 40 ticks | Bombard Tower definition is affected in source but unavailable to Celts |
+| Stronghold infantry healing | Shared aura consumer accepts completed building sources: 30 HP/min inside inclusive radius 7, class 6 plus unit ID 1831; exact HP, boundary 7/7.01, overlapping castles, enemy, foundation, zero-HP/destroyed sources, cargo and JSON controls | Centre-distance, strongest-overlap and deployed-only aura policy inferred (#306); 1831 is absent from the playable roster, so its ID mask uses an explicitly synthetic captured-rule fixture |
+| Furor Celtica | Public Imperial research; existing/new siege +40% HP, wounds preserved, opponent/infantry unaffected, packed trebuchet included | Foreign unimported target IDs remain reported |
+| Livestock in Celt LOS cannot be stolen, resource 97 | Explicitly deferred, not replaced by ordinary sheep capture | #304 tracks shared consumer and ownership/LOS precedence |
+| Art, voice, availability and metadata | Source Woad identities/animation files, unique techs, complete roster, foreign-unique exclusions; every consumed Celts audio graph resolves, zero missing-cue exemptions | Passed at integration; see the Mongols and Celts integration receipt |
+
+`tools/test_celts.py` contains the source contracts; `src/sim/celts.test.ts`
+contains 21 public-command/consumer outcome cases, mixed non-leakage, JSON
+continuation and a mixed opening replay. The Celts profile also passes all nine existing building
+outcome cases through `CIV_BUILDING_CONTENT`; Stronghold is paid, not automatic,
+so no per-profile tower assertion change is required. Targeted acceptance is
+green: 46 Celts/Turks/Vikings cases against private extracted content and 24
+Saracen/Byzantine regressions against the existing published manifest, including
+all existing aura-user tests. This is worker acceptance, not published profile
+completion. See the Celts ledger for source-versus-inferred distinctions; no
+native capture, private browser or owned checkpoint result is claimed.
+
 Tracking: [#122](https://github.com/gszep/age-of-empires/issues/122) is the parent
 of 59 individual civilisation issues, each with source-specific findings and an
 acceptance checklist. Start with [Britons #179](https://github.com/gszep/age-of-empires/issues/179)
@@ -731,3 +764,61 @@ Conversion deserves a separate reference check: changing owner must not silently
 recompute the captured unit using the wrong civilisation's base stats or bonuses.
 The audit inventories data; it does not establish the closed engine's conversion
   inheritance behavior, free-research timing or rounding of discounted integer costs.
+
+## Mongols (#190)
+
+Candidate verified October 5: DAT civ 12/tree 277/team 407, `MONGOLS.json`,
+English civilization help 120161, Nomads help 28280 and Drill help 28422.
+Mangudai 11/561 are unique; Steppe Lancer 1370/1372 is a regional line.
+The source roster audit reports `missingRoster == []`; this does not imply that
+every source mechanic is implemented.
+
+| Surface | Implemented / deferred and evidence |
+| --- | --- |
+| Hunters | Automatic tech 389/effect 388 multiplies hunter 122/216 work rate by 1.4. Public gather orders measure .574 vs .41 food/s and 35-food deposits, with greater Mongol income at the same clock. Not a forager or team bonus. |
+| Scout-line / Steppe HP | No Feudal bonus. Castle branches 286/288 give ×1.2; Imperial 287/388 multiply the preceding bonus. Type-102 mutual exclusions now prevent double application. Existing/wounded/new Scout → Light Cavalry → Hussar tested through paid upgrades at equal ages against Byzantines; Steppe Lancer → Elite likewise. Bloodlines before Castle, after Castle and after Imperial exercise both branches against equal-age Saracens, including JSON continuation. Fractional native rounding remains #305. |
+| Cavalry-archer fire rate | Automatic tech 394/effect 393 multiplies class-36 reload by .8 (25% faster firing). Tests count real projectiles/shot intervals on Cavalry Archer, Heavy Cavalry Archer and both Mangudai variants, with unbonused opposing scenario units and JSON continuation. |
+| Team effect 407 | +2 line of sight and search radius on Scout/Light Cavalry/Hussar (also source 1707, not a Mongol roster unit). Actual revealed tiles measured owner-locally. Neither armour nor a Steppe Lancer bonus; allied sharing awaits the shared team model. |
+| Mangudai | Castle training, paid Elite promotion including garrisoned/wounded troops, landed siege damage, foreign training rejection and captured-stat JSON continuation. Owned projectile 477, 95% accuracy, source idle/walk/attack/death/decay graphics. |
+| Drill | Tech 6, Imperial Castle research, 500 wood/450 gold/60 seconds. ×1.5 speed on source-addressed siege, excluding trebuchets. Real ram travel .6 → .9 tiles/second; opposing ram and packed trebuchet unchanged. Source targets unavailable to Mongols stay unavailable. |
+| Nomads | **Deferred, not offered**, #305. Tech 487/effect 542 upgrades houses 70/463/464 → 191; automatic 641 upgrades to 192 in Imperial. Replacement houses use population-storage flag 8 instead of 4. Persistent housing after destruction has no consumer; this is not a cavalry roster gap. |
+| Presentation/audio | CivNomad HUD metadata, source icons/names and Mongols audio switch use existing import paths. Eight Python contracts check roster, art, bonuses, explicit Nomads skip and every consumed audio graph; zero missing-event exceptions needed. Converted-art/browser acceptance remains coordinator-owned. |
+
+Worker checks: `CIV_PROFILE_CONTENT=.local/mongols-content.json npx vitest run
+src/sim/mongols.test.ts src/sim/turks.test.ts src/sim/vikings.test.ts` passes
+42 cases (17 Mongols); `test_mongols.py` passes 8, `test_audio.py` passes 13,
+and `npx tsc --noEmit` passes. The candidate JSON is a local extraction using
+`tools/test_import_aoe2.py`'s `extracted_content`, not a published manifest.
+An explicitly requested fixture without Mongols fails rather than skipping.
+Evidence: durable issue-190 worktree `.local/astra-{source,python,audio}.log`,
+`.local/astra-vitest-final.log`, `.local/astra-tsc-final.log`.
+
+The spec enables the candidate for acceptance. Full regeneration, private browser
+selection/art checks and the owned checkpoint remain coordinator gates; this
+receipt does not close #190 or claim rollout. Open fallback is unchanged.
+
+## Mongols and Celts integration receipt (October 5)
+
+Both trees were escalated to Astra after two Haiku attempts each, reviewed
+independently (approve with nits; nits closed with added tests) and merged by
+unioning the shared spec, importer, data, ledger and coverage hunks. Full
+`npm run import:aoe2` passed (`.local/orchestrator/import-r2.log`). Against the
+published manifest, the Celts/Mongols/Turks/Vikings/Saracens/Byzantines,
+per-profile building, bonus, conversion and garrison suites passed 227 with 8
+existing skips. Private-browser acceptance passed: `tools/celts_smoke.mts` (WEST
+HUD, castle/Woad Raider/promoted Elite Woad/mangonel art, paid Stronghold with a
+1-HP militia healed by the castle, Imperial age, Furor Celtica, elite research)
+and `tools/mongols_smoke.mts` (NOMAD HUD, Mangudai/Steppe Lancer/ram art with
+promoted elite art, paid Imperial age, Drill and elite research), both with
+menu/reload and no opponent grant. Run them with `npx tsx`.
+
+Integration found three timing/coverage issues, fixed without widening clocks:
+the slow new movement/HP cases were rebuilt with short fixture clocks (Celts
+21 cases in 14 s, Mongols 19 in 7.6 s); the Turks Sipahi contract now includes
+rostered Mangudai, which source effect 546 covers through class 36; and the
+existing herding comparisons (#307) now run alone after the parallel stage
+(`docs/TESTING.md`), with a 6–10% garrison-traversal speedup. The owned
+checkpoint is GREEN: 1656 parallel tests (9 skips), 9 serial herding tests,
+public build, 233 owned-import tests and real-browser smoke in 572 s
+(`.local/verification/1791236984355-317966/`). Open: #304 (livestock), #305
+(Nomads), #306 (aura calibration).

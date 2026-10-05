@@ -47,6 +47,13 @@ adding workers alone cannot accelerate a single serial test. Build and test use
 separate logs and both statuses must pass. Import and browser checks follow those
 stages.
 
+The two herding comparison files (`src/sim/ai-herding*.test.ts`) each run two
+four-minute AI games per case: ~17 s unloaded but ~31 s under full-suite worker
+contention, beyond the unchanged 30 s clock (#307). `tools/verify.mjs` therefore
+excludes them from the parallel `test` stage and runs them afterwards as
+`test:serial` (`vitest run --maxWorkers=1`), with the same seeds, assertions and
+timeout; the stage must pass. Plain `npm test` still runs them in parallel.
+
 Keep assertions, seeds, supported profiles and durations when restructuring.
 Measure a smaller fixture before claiming it establishes the same outcome.
 Module exports are not a shared-memory cache across isolated workers. Fix stale

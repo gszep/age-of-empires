@@ -5,7 +5,7 @@ import type { DeepReadonly, Entity } from './types';
 export function* entitiesWithGarrison(entities: Entity[]): Generator<Entity> {
   for (const entity of entities) {
     yield entity;
-    yield* entitiesWithGarrison(entity.garrison ?? []);
+    if (entity.garrison?.length) yield* entitiesWithGarrison(entity.garrison);
   }
 }
 

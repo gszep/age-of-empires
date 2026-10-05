@@ -1,8 +1,8 @@
 {
   "schemaVersion": 3,
   "civIndex": 1,
-  "profileCivilizations": ["franks", "goths", "teutons", "japanese", "chinese", "byzantines", "saracens", "turks", "vikings"],
-  "enabledCivilizations": ["franks", "goths", "teutons", "japanese", "chinese", "byzantines", "saracens", "turks", "vikings"],
+  "profileCivilizations": ["franks", "goths", "teutons", "japanese", "chinese", "byzantines", "saracens", "turks", "vikings", "celts", "mongols"],
+  "enabledCivilizations": ["franks", "goths", "teutons", "japanese", "chinese", "byzantines", "saracens", "turks", "vikings", "celts", "mongols"],
   "combatRoster": [
     { "unitId": 46 },
     { "unitId": 557 },
@@ -40,7 +40,13 @@
     { "unitId": 281 },
     { "unitId": 531 },
     { "unitId": 569 },
-    { "unitId": 2628, "composite": true, "decay": false }
+    { "unitId": 2628, "composite": true, "decay": false },
+    { "unitId": 232 },
+    { "unitId": 534 },
+    { "unitId": 11 },
+    { "unitId": 561 },
+    { "unitId": 1370 },
+    { "unitId": 1372 }
   ],
   "civilization": {
     "key": "britons",

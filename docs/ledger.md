@@ -1112,3 +1112,111 @@ when the result looks right. When a row is later read from a file, delete it
   12.695/19.0425 from 10; the unchanged integer gather loop therefore banks
   13/20 on a full forager trip. Native capacity rounding remains uncalibrated
   under #301; this is not silently rounded down to the remembered 12/19.
+
+## Celts unique unit and bonuses (#191)
+
+- **Owned:** DAT civ 13, tree effect 275, team effect 401, `CELTS.json`, HUD
+  family `CivWest`, English civilization help 120162. Woad Raider 232 / Elite
+  534 have 70/85 HP, both base speed 1.17 and cost 70 food / 25 gold, trained
+  at castle 82 in 10 seconds. Elite tech 370 costs 1000 food / 800 gold. Despite
+  the upgrade help saying "faster", the pinned unit speeds are equal; no speed
+  increase is invented beyond the age-gated infantry bonuses.
+- **Owned passives:** tech 385 / effect 384 multiplies lumberjack units 123/218
+  work by 1.15 from the start (not Castle Age). Tech 386 / effect 385 multiplies
+  siege classes 13/55/54 and named additional unit IDs' reload by .8, also with
+  no age prerequisite. These are siege weapons, not the workshop building's
+  fire rate. Team effect 401 multiplies workshop 49/150 work by 1.2.
+  Infantry techs 393/898/899/900 require Dark/Feudal/Castle/Imperial respectively
+  and multiply class 6 / unit 1831 speed by 1.05/1.04762/1.04545/1.04348.
+  Those source operands compound to approximately +5/10/15/20%; tests use the
+  imported operands, not exact help-text percentages.
+- **Owned unique research:** Stronghold tech 482 / effect 537 costs 250 food /
+  200 gold, 30 seconds, Castle Age; reload ×.75 targets castle 82 and tower
+  IDs 79/234/236/235 (including the unavailable Bombard Tower definition).
+  Resource 33 = 8 invokes `Effects.xs` EffectFunction8: castle 82 gets aura
+  task 155, work 30/1, range 7, owner 4, combat-level flag 4, search-wait 109,
+  gather-type 21, help 13405, targets infantry class 6 and unit 1831. The
+  adapter reads and guards this script's full statement order and count before
+  extracting values; reordered assignments and inserted resets/reassignments
+  are rejected by fixture tests. The shared `auras.ts` now admits living,
+  completed building sources and matches target classes or unit IDs without
+  civilization-name branches. The retained regression reaches 3 HP from 1 in
+  four seconds; radius 7 is included and 7.01 excluded. Foundations, zero-HP
+  and destroyed castles do not emanate healing; opponent infantry is excluded.
+  Unit 1831 is not in the playable roster: its independent ID-mask consumer
+  test uses a synthetic captured-rule identity (owned DAT class 43), not an
+  invented trainable/visible Warrior Priest.
+  A saved-scenario donor building-rule snapshot retains the aura after ownership
+  changes, heals the new owner's infantry rather than the former owner's, and
+  survives JSON continuation. This snapshot-consumer regression does not make
+  normally conversion-immune castles convertible by monks.
+  Furor Celtica tech 5 / effect 239 costs 750 food / 450 gold, 50 seconds,
+  Imperial Age; HP ×1.4 includes both trebuchet forms and siege classes
+  13/55/51/54 plus named additional IDs. Unimported foreign targets stay
+  explicitly unmodelled, not fabricated units.
+- **Deferred livestock protection (#304):** tech 405 / effect 417 **sets**
+  resource 97 (`dominantSheepControl`) to 1. Help 120162 says livestock in Celt
+  unit LOS cannot be stolen; it does not grant long-range ownership conversion.
+  The ordinary shared herd-range/contested-claim loop cannot represent that
+  precedence. Owner/Gaia/enemy livestock, competing protected owners, LOS
+  sources, garrisons and leaving sight need a bounded shared consumer and native
+  calibration. This command remains explicitly unmodelled.
+- **Inherited inference:** per-tick movement, reload rounding, production work
+  integration, damage-preserving HP increases and donor-stat capture remain
+  shared engine policies, not native calibration receipts. Stronghold reuses
+  the healing family's HP-per-minute / 60 interpretation, inclusive centre
+  distance and strongest-overlap policy. Only deployed entities source or
+  receive auras: garrisoned infantry gets ordinary castle healing (.2 HP/s,
+  accumulated as whole HP), with no extra aura; ungarrison restores .5 HP/s.
+  Tests measure 1 to 2 HP in six seconds inside, then 1 to 3 in four seconds
+  outside, including JSON continuation. These scheduling/geometry/stacking/cargo
+  choices are **inferred**. Its task flag differs from Bimaristan (4 versus 2),
+  so native flag semantics, geometry, stacking, garrison and allied behavior need
+  calibration under #306, not a claim that the script encodes our scheduler. Current locked
+  two-player opponents supply the owner filter; allied teams are not offered.
+- **Evidence boundary:** strict all-consumed-cue audit resolves every Celts cue
+  against both pinned audio packs, with zero reviewed gaps. Source animation
+  files and roster identities are tested; sprite publication, real UI/browser
+  acceptance and the owned checkpoint remain coordinator work. A private
+  extracted profile is not a published/playable-asset verification.
+
+## Mongols source reconciliation and remaining boundaries (#190, #305)
+
+- **Owned:** DAT civ 12/tree 277/team 407, `MONGOLS.json`, English 120161.
+  Mangudai 11/561 use projectile 477 at 95% accuracy, not Janissary projectile
+  380/75%. Source corpse 135 supplies decay art; no synthetic composite or decay
+  suppression is needed. Steppe Lancer 1370/1372 is a regional stable line.
+- **Owned bonuses:** tech 389/effect 388 multiplies hunter 122/216 work rate
+  by 1.4. Tech 394/effect 393 multiplies cavalry-archer class 36 reload by .8.
+  Team effect 407 adds 2 to XS attributes 1 (line of sight) and 23 (search
+  radius) for 448/546/441/1707, not armour and not Steppe Lancers. Owner-local
+  team effects follow the existing two-opponent model, not an implemented alliance.
+- **HP branch consumer:** Castle techs 286/288 and Imperial 287/388 each disable
+  the alternative with type 102. `disabledByTechs` derives reciprocal automatic
+  exclusions only (other runtime disables remain unmodelled under #128), preserving this relationship
+  from the DAT and checks completed research history, including after JSON reload.
+  Bloodlines 435 is the extra prerequisite of 286/287. Their ×100, −2000,
+  multiplier, +2000, ×.01 sequence excludes Bloodlines' additive 20 HP from the
+  multiplier; these are HP operations, not costs. There is no Feudal HP bonus.
+- **Inferred / uncalibrated:** existing deterministic float rounding and
+  fixed-point automatic-research ordering remain engine adapters. Imperial
+  no-Bloodlines tech 388 uses raw 1.083999991 → imported 1.084, whereas 287 uses
+  1.083330035 → 1.08333. Tests retain 78.048 Light Cavalry and 104.064 Elite
+  Steppe Lancer HP without Bloodlines, rather than silently forcing the nominal
+  30% help-text value. With Bloodlines before Imperial, Light Cavalry reaches
+  97.99976; afterward, 98.048. Native rounding/order calibration is #305
+  (native launch remains #279); no reference parity is claimed by these tests.
+- **Drill, owned:** tech 6/effect 457; Imperial Castle research (building 82),
+  500 wood/450 gold, 60 seconds; speed ×1.5. Targets include rams, mangonels,
+  scorpions and Siege Tower, not trebuchets. Imported definitions of foreign
+  siege targets do not grant Mongols permission to train them.
+- **Nomads deferred, #305:** tech 487/effect 542 upgrades houses 70/463/464 to
+  Castle house 191; automatic 641/effect 681 upgrades house variants to Imperial
+  house 192. Both use resource storage type 4, amount 5, flag 8; normal houses
+  use flag 4. English 28280 says lost houses do not decrease population space.
+  The current living-building housing sum has no persistent storage consumer,
+  and replacement-house rules are absent. Nomads stays explicitly skipped and
+  unresearchable. Implementing it requires completion/destruction/capture and
+  save-state semantics, not relabelling these houses as cavalry archers.
+- **Audio:** all consumed Mongols cue graphs resolve against both pinned base
+  packs. No new #271 exception, substitution or relaxed missing-event guard.
