@@ -848,11 +848,19 @@ export function updateProjectileView(
   impactEffect?: string,
 ): void {
   const arrow = assets?.entities[projectileKey] ?? assets?.entities['arrow'];
+  // A composite flight may become a one-piece impact effect. Retire all old
+  // layers, including pending pages, before choosing this frame's art.
+  for (const piece of view.annexes) {
+    piece.mesh.visible = false;
+    piece.pendingTexture = undefined;
+    piece.textureImage = undefined;
+  }
   const flame = impactEffect ? assets?.particles?.[impactEffect]
     : arrow?.particleEffect ? assets?.particles?.[arrow.particleEffect] : undefined;
   if (assets && flame) {
     const frame = Math.min(flame.atlas.framesInFile - 1, Math.floor(progress * flame.atlas.framesInFile));
     applyFrame(view.body, assets, flame.atlas, frame, position, 0xffffff);
+    (view.body.mesh.material as THREE.MeshBasicMaterial).opacity = 1;
     const height = !impactEffect && projectileKey.endsWith('fire-charge')
       ? launchHeight * (1 - progress) + 4 * Math.abs(arrow?.projectile?.arc ?? 0) * span * progress * (1 - progress)
       : launchHeight;
@@ -865,10 +873,6 @@ export function updateProjectileView(
   const atlas = arrow?.atlases['idle'];
   const animation = arrow?.animations['idle'];
   if (!assets || !atlas || !animation) { view.body.mesh.visible = false; return; }
-  // Same indexing as animated entities: whole direction blocks laid end to end.
-  const framesPerDirection = Math.max(1, animation.frames);
-  const directionsInFile = Math.max(1, Math.floor(atlas.framesInFile / framesPerDirection));
-  const direction = directionIndex(heading, animation.directions) % directionsInFile;
   // The frames within a direction are the shaft's pitch along the arc, from
   // steeply up through level to steeply down, so the frame tracks how far the
   // arrow has flown. Holding one frame is what made shots look rigid.
@@ -889,14 +893,36 @@ export function updateProjectileView(
   const groundScreen = Math.hypot(ground.x, ground.y);
   const angle = Math.atan2(climbPerFlight * HEIGHT_PIXELS, Math.max(1e-6, groundScreen));
   const normalized = Math.max(-1, Math.min(1, angle / (Math.PI / 2)));
-  const pitch = Math.round((1 - normalized) / 2 * (framesPerDirection - 1));
-  const frame = animation.frameSeconds > 0
-    ? Math.floor(timeSeconds / animation.frameSeconds) % framesPerDirection
-    : pitch;
-
-  applyFrame(view.body, assets, atlas, direction * framesPerDirection + frame, position, 0xffffff);
-  view.body.mesh.position.y += height * HEIGHT_PIXELS + groundHeightPixels;
-  view.body.mesh.renderOrder = projectileLayerOrder(isoDepth(position.x, position.y));
+  // The Cannon Galleon's DAT graphic3382 includes shadow graphic3383. The
+  // imported layer order starts with that shadow-only SLD (empty main frames);
+  // the ball itself is idle-layer-1. Draw every imported main layer, not just
+  // idle, using each layer's own timing/directions and native pixel offsets.
+  const layers = arrow?.animationLayers?.idle ?? [{ animation: 'idle', x: 0, y: 0 }];
+  while (view.annexes.length < layers.length - 1) {
+    const piece = makePiece();
+    view.annexes.push(piece); view.group.add(piece.mesh);
+  }
+  view.body.mesh.visible = false;
+  view.frameIndex = undefined;
+  view.animationState = `${projectileKey}/flight`;
+  for (const [index, layer] of layers.entries()) {
+    const sheet = arrow?.atlases[layer.animation], anim = arrow?.animations[layer.animation];
+    if (!sheet || !anim) continue;
+    const framesPerDirection = Math.max(1, anim.frames);
+    const directionsInFile = Math.max(1, Math.floor(sheet.framesInFile / framesPerDirection));
+    const direction = directionIndex(heading, anim.directions) % directionsInFile;
+    const pitch = Math.round((1 - normalized) / 2 * (framesPerDirection - 1));
+    const frame = anim.frameSeconds > 0
+      ? Math.floor(timeSeconds / anim.frameSeconds) % framesPerDirection : pitch;
+    const frameIndex = direction * framesPerDirection + frame;
+    const piece = index === 0 ? view.body : view.annexes[index - 1];
+    applyFrame(piece, assets, sheet, frameIndex, position, 0xffffff);
+    piece.mesh.position.x += layer.x;
+    piece.mesh.position.y += height * HEIGHT_PIXELS + groundHeightPixels - layer.y;
+    piece.mesh.renderOrder = projectileLayerOrder(isoDepth(position.x, position.y));
+    (piece.mesh.material as THREE.MeshBasicMaterial).opacity = anim.alpha ?? 1;
+    if (index === 0) view.frameIndex = frameIndex;
+  }
 }
 
 /**

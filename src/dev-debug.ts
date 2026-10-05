@@ -295,7 +295,8 @@ export function installDebug(context: DebugContext): void {
         projectiles: game.projectiles.length,
         projectileViews: game.projectiles.slice(0, 200).map(p => ({
           id: p.id, shooterId: p.shooterId, art: p.art,
-          rendered: !!context.views.get(`p${p.id}`)?.body?.mesh?.visible,
+          rendered: [context.views.get(`p${p.id}`)?.body, ...context.views.get(`p${p.id}`)?.annexes ?? []]
+            .some(piece => piece?.mesh?.visible),
           animation: context.views.get(`p${p.id}`)?.animationState,
           frame: context.views.get(`p${p.id}`)?.frameIndex,
         })),

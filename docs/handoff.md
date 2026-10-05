@@ -6,16 +6,28 @@ reviews. Do not append old test counts here as if they describe the latest tree.
 
 ## Source and verification
 
+- Latest verified source: `7511606`, pushed to `origin/main`, fixes cold unit
+  sprite flicker (#287) and manual selection of units over farms (#289).
+  Full gate `.local/issues287-289-gate.log` is GREEN:1413 tests/111 files,
+  eight skipped, typecheck/open-content build,204 owned-import tests and
+  real-browser debug smoke;1061s total. No timeout widening.
+  Dedicated sprite first-appearance, residency/eviction and contour probes pass;
+  farm selection passes with owned and fallback content, and the existing farm
+  occupancy probe passes. Browser evidence uses Chrome/SwiftShader; physical-GPU
+  confirmation remains unverified. These fixes are committed and pushed but
+  have not been deployed to the installed household release.
+- Cannon Galleon shots (#297) now draw every imported projectile layer. The
+  DAT graphic's first layer is the shadow-only `p_ball_shadow` (an empty 1×1
+  main sheet); the ball is `idle-layer-1`, which the old single-sheet path
+  never drew. `tools/cannon_galleon_smoke.mts` fires a public attack and
+  measures 82 in-flight ball pixels (0 before the fix).
 - Saracens (#187) are implemented as the eighth selectable
   owned profile. Full import and dedicated private-browser acceptance pass;
-  final gate `.local/saracens-final-gate.log` is GREEN:1403 tests/111 files (eight existing
-  skips), build,204 owned-import tests and general debug smoke. No timeout
-  widening. [Coverage](civilization-coverage.md#saracens-187) records outcomes;
+  [coverage](civilization-coverage.md#saracens-187) records outcomes;
   #285 tracks aura calibration/text discrepancy and #271 the three missing
   regional Trade Cart events shared with Persians. Duplicate#286 was consolidated
   into#271. This source change has not been deployed to the installed household release.
-  Final regeneration after consolidation passed (`.local/saracens-final-import.log`);
-  the complete gate ran865s, including the real-browser smoke.
+  Final regeneration after consolidation passed (`.local/saracens-final-import.log`).
 - Shoreline tile-grid correction (#284): `watershore` now uses complete
   96-pixel source windows with per-family UV layout metadata. The full import,
   shoreline/land/farm probes and checkpoint gate passed; see the
