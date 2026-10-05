@@ -625,6 +625,14 @@ off the reference; **measured** — fitted to a reference screenshot;
   This supports the existing constants but is not a pinned native-runtime
   measurement. Fresh actual-distance/HP/unload/browser checks pass; source links
   and the exact remaining boundary are in `docs/civ-specialists-integration.md`.
+- **#161 current-build native (2026-10-06):** **measured on current build 185872,
+  not pinned 48987**, **observed visually** in the native attack tooltip:
+  Teuton Battering Ram All Buildings attack 150/160/170/190 for 0/1/2/4 Militia;
+  unloading restores 150 and one Villager leaves 150. This supports the +10
+  crew attack addition and villager attack exclusion, not native speed parity.
+  Speed was not measured; +.05 and zero villager speed bonus remain inferred.
+  Capped Ram only has a valid empty baseline. Method, rejected attempts and
+  private capture paths: `docs/ram-crew-calibration.md`.
 - **Inferred petard semantics:** one blast on attack contact, none on interception/
   deletion. Reuses demolition owner immunity, full damage within radius, armour/
   elevation and centre-to-target-radius resolution. This is not established by
