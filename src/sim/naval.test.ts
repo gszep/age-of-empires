@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES, isFishKind, rulesFromManifest, terrainAllows } from './data';
 import {
@@ -10,7 +10,8 @@ import type { Entity, GameState, Point } from './types';
 
 /** An Islands board with player 1's villagers and town center to hand. */
 const islands = (seed = 2): GameState => createGame(seed, FALLBACK_RULES, undefined, 'islands');
-const imported = rulesFromManifest(JSON.parse(readFileSync('public/imported/aoe2/manifest.json', 'utf8')));
+const imported = existsSync('public/imported/aoe2/manifest.json')
+  ? rulesFromManifest(JSON.parse(readFileSync('public/imported/aoe2/manifest.json', 'utf8'))) : undefined;
 
 const tileAt = (state: GameState, p: Point): number =>
   state.terrain[Math.floor(p.y) * state.width + Math.floor(p.x)];
@@ -139,7 +140,7 @@ describe('W5, the fishing ship and the fish', () => {
   });
 
   it.each((['fish', 'fish-salmon', 'fish-dorado', 'shore-fish'] as const).flatMap(kind =>
-    ([['fallback', FALLBACK_RULES], ['imported', imported]] as const).map(([mode, rules]) => ({ kind, mode, rules }))
+    ([['fallback', FALLBACK_RULES], ...(imported ? [['imported', imported] as const] : [])] as const).map(([mode, rules]) => ({ kind, mode, rules }))
   ))('works $kind ($mode) to exhaustion, banks the food at the dock, and never leaves the water', ({ kind, rules }) => {
     const state = createGame(2, rules, undefined, 'islands');
     const dock = dockFor(state);

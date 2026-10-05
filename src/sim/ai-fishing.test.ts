@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { exampleAiCommands } from './ai';
 import { fishingWater, fishingDockSite, fishingOrders, FISHING_LIMIT } from './ai-fishing';
@@ -62,7 +62,8 @@ describe('example AI fishing', () => {
     expect(JSON.stringify(observation)).toBe(before);
   });
 
-  it.each(['fallback', 'imported'] as const)('builds, completes, trains and actually banks fish food (%s)', mode => {
+  it.for(['fallback', 'imported'] as const)('builds, completes, trains and actually banks fish food (%s)', (mode, context) => {
+    if (mode === 'imported' && !existsSync('public/imported/aoe2/manifest.json')) context.skip();
     const rules = mode === 'fallback' ? FALLBACK_RULES : rulesFromManifest(JSON.parse(readFileSync('public/imported/aoe2/manifest.json', 'utf8')));
     const { state } = fishingFixture(rules);
     let gathered = false, banked = false;

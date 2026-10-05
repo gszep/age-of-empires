@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES, isBuilding, rulesFromManifest, TICKS_PER_SECOND, type GameRules } from './data';
 import { activateAutomaticTechnologies, applyCommand, createGame, stepGame } from './game';
@@ -7,11 +7,13 @@ import { updateVisibility } from './visibility';
 import { synchronizationHash } from '../shared/checksum';
 import type { Entity, EntityKind, GameState, PlayerId, Point, UnitKind } from './types';
 
-const manifest = JSON.parse(readFileSync('public/imported/aoe2/manifest.json', 'utf8'));
-const owned = rulesFromManifest(manifest.civilizations.teutons);
+const manifest = existsSync('public/imported/aoe2/manifest.json')
+  ? JSON.parse(readFileSync('public/imported/aoe2/manifest.json', 'utf8')) : undefined;
+const owned = manifest !== undefined ? rulesFromManifest(manifest.civilizations.teutons) : undefined;
+const modes = [['fallback', FALLBACK_RULES], ...(owned ? [['owned', owned] as const] : [])] as const;
 const cases = [
   ...(['mangonel', 'onager'] as const).map(kind => ({ mode: 'fallback', kind, rules: FALLBACK_RULES })),
-  ...(['mangonel', 'onager', 'dat-unit-588'] as const).map(kind => ({ mode: 'owned', kind, rules: owned })),
+  ...(owned ? (['mangonel', 'onager', 'dat-unit-588'] as const).map(kind => ({ mode: 'owned', kind, rules: owned })) : []),
 ];
 
 function fixture(rules: GameRules, kind: UnitKind = 'mangonel') {
@@ -88,7 +90,7 @@ describe.each(cases)('$mode $kind friendly blast avoidance', ({ rules, kind }) =
   });
 });
 
-it.each([['fallback', FALLBACK_RULES], ['owned', owned]] as const)('rechecks acquired intent and preserves safe holding through JSON (%s)', (_, rules) => {
+it.each(modes)('rechecks acquired intent and preserves safe holding through JSON (%s)', (_, rules) => {
   const { state, siege, target, friend } = fixture(rules);
   siege.position.x = 39.5; friend.position.x = 50.5;
   stop(state, siege);
@@ -115,8 +117,8 @@ it.each([['fallback', FALLBACK_RULES], ['owned', owned]] as const)('rechecks acq
   expect(synchronizationHash(restored)).toBe(synchronizationHash(state));
 });
 
-it('does not let a dead friendly body block acquisition', () => {
-  const { state, siege, target, friend } = fixture(owned);
+it.skipIf(!owned)('does not let a dead friendly body block acquisition', () => {
+  const { state, siege, target, friend } = fixture(owned!);
   friend.hp = 0; friend.dead = true; friend.activity = 'dying'; friend.decayTicks = 1000;
   stop(state, siege); until(state, () => target.hp < target.maxHp);
 });
@@ -133,7 +135,7 @@ it('cancels an existing fallback windup when a friend walks into danger', () => 
   expect(friend.hp).toBe(friend.maxHp); expect(target.hp).toBe(target.maxHp);
 });
 
-it.each([['fallback', FALLBACK_RULES], ['owned', owned]] as const)('retargets an acquired unsafe enemy to a safe alternative (%s)', (_, rules) => {
+it.each(modes)('retargets an acquired unsafe enemy to a safe alternative (%s)', (_, rules) => {
   const { state, siege, target, friend, put } = fixture(rules);
   siege.position.x = 39.5; friend.position.x = 50.5;
   const safe = put('outpost', 48.5, 42.5, 2);
@@ -145,13 +147,13 @@ it.each([['fallback', FALLBACK_RULES], ['owned', owned]] as const)('retargets an
   expect(siege.order).toMatchObject({ targetId: safe.id, automatic: true });
 });
 
-it('retains ordinary non-splash autonomous attacks without the new marker', () => {
-  const { state, siege: archer, target, friend } = fixture(owned, 'archer');
+it.skipIf(!owned)('retains ordinary non-splash autonomous attacks without the new marker', () => {
+  const { state, siege: archer, target, friend } = fixture(owned!, 'archer');
   stop(state, archer); until(state, () => target.hp < target.maxHp);
   expect(friend.hp).toBe(friend.maxHp); expect('automatic' in archer.order).toBe(false);
 });
 
-it.each([['fallback', FALLBACK_RULES], ['owned', owned]] as const)('rechecks between shots and lets cooldown expire while holding (%s)', (_, rules) => {
+it.each(modes)('rechecks between shots and lets cooldown expire while holding (%s)', (_, rules) => {
   const { state, siege, target, friend } = fixture(rules);
   friend.position.x = 50.5;
   stop(state, siege);
@@ -168,8 +170,8 @@ it.each([['fallback', FALLBACK_RULES], ['owned', owned]] as const)('rechecks bet
   expect(friend.hp).toBe(friend.maxHp);
 });
 
-it('protects a friendly building that would actually take splash damage', () => {
-  const { state, siege, target, friend, put } = fixture(owned);
+it.skipIf(!owned)('protects a friendly building that would actually take splash damage', () => {
+  const { state, siege, target, friend, put } = fixture(owned!);
   friend.position = { x: 55.5, y: 40.5 };
   const house = put('house', 50, 40.5);
   stop(state, siege); run(state, 260);
@@ -180,8 +182,8 @@ it('protects a friendly building that would actually take splash damage', () => 
   expect(target.hp).toBeLessThan(target.maxHp);
 });
 
-it('retains unmarked legacy attack orders through JSON without inferring player intent', () => {
-  const { state, siege, target, friend } = fixture(owned);
+it.skipIf(!owned)('retains unmarked legacy attack orders through JSON without inferring player intent', () => {
+  const { state, siege, target, friend } = fixture(owned!);
   // A pre-marker saved attack is deliberately interpreted like an explicit order.
   siege.order = { kind: 'attack', targetId: target.id };
   const restored = JSON.parse(JSON.stringify(state)) as GameState;
@@ -190,9 +192,9 @@ it('retains unmarked legacy attack orders through JSON without inferring player 
   expect(restored.entities.find(e => e.id === siege.id)!.order).not.toHaveProperty('automatic');
 });
 
-it('checks the led impact area for a moving target, not only its current position', () => {
+it.skipIf(!owned)('checks the led impact area for a moving target, not only its current position', () => {
   const scene = (ballistics: boolean, explicit: boolean) => {
-    const { state, siege, target, friend, put } = fixture(owned);
+    const { state, siege, target, friend, put } = fixture(owned!);
     state.entities = state.entities.filter(e => e.id !== target.id);
     friend.position = { x: 48.5, y: 42.5 };
     const cart = put('trade-cart', 48.5, 40.5, 2);

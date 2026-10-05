@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { exampleAiCommands } from './ai';
 import { addNode, activateAutomaticTechnologies, applyCommand, createGame, stepGame } from './game';
@@ -8,7 +8,8 @@ import { observe } from './observe';
 import { updateVisibility } from './visibility';
 import type { Entity, EntityKind } from './types';
 
-const owned = rulesFromManifest(JSON.parse(readFileSync('public/imported/aoe2/manifest.json', 'utf8')));
+const owned = existsSync('public/imported/aoe2/manifest.json')
+  ? rulesFromManifest(JSON.parse(readFileSync('public/imported/aoe2/manifest.json', 'utf8'))) : undefined;
 function fixture(rules: GameRules = FALLBACK_RULES) {
   const state = createGame(131, structuredClone(rules));
   state.entities = []; state.terrain.fill(0); state.elevation.fill(0);
@@ -44,7 +45,7 @@ function fixture(rules: GameRules = FALLBACK_RULES) {
 }
 
 describe.each([{ mode: 'open', rules: FALLBACK_RULES }, { mode: 'owned', rules: owned }])('$mode example-AI siege', ({ rules }) => {
-  it('mines its missing castle stone, builds a paid castle, trains and bombards a known fortification', () => {
+  it.skipIf(!rules)('mines its missing castle stone, builds a paid castle, trains and bombards a known fortification', () => {
     const { state, commands, enemy, stone } = fixture(rules);
     const actions: string[] = [];
     let mined = false, built = false, trained = false, shot = false;

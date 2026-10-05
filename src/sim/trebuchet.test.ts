@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES, isBuilding, rulesFromManifest, TICKS_PER_SECOND, type GameRules } from './data';
 import { activateAutomaticTechnologies, applyCommand, createGame, resolveUnitOrder, stepGame } from './game';
@@ -7,9 +7,10 @@ import { updateVisibility } from './visibility';
 import { synchronizationHash } from '../shared/checksum';
 import type { Entity, EntityKind, GameState, Point } from './types';
 
-const manifest = JSON.parse(readFileSync('public/imported/aoe2/manifest.json', 'utf8'));
-const owned = rulesFromManifest(manifest);
-const cases = [{ mode: 'open', rules: FALLBACK_RULES }, { mode: 'owned', rules: owned }];
+const manifest = existsSync('public/imported/aoe2/manifest.json')
+  ? JSON.parse(readFileSync('public/imported/aoe2/manifest.json', 'utf8')) : undefined;
+const owned = manifest !== undefined ? rulesFromManifest(manifest) : undefined;
+const cases = [{ mode: 'open', rules: FALLBACK_RULES }, ...(owned ? [{ mode: 'owned', rules: owned }] : [])];
 
 function arena(rules: GameRules) {
   const state = createGame(131, structuredClone(rules));
@@ -131,7 +132,7 @@ describe.each(cases)('$mode trebuchet automation', ({ rules }) => {
   });
 });
 
-it('automatic deployment uses Japanese Kataparuto setup time', () => {
+it.skipIf(manifest === undefined)('automatic deployment uses Japanese Kataparuto setup time', () => {
   const { state, treb } = arena(rulesFromManifest(manifest.civilizations.japanese));
   state.players[1].researched.push('kataparuto');
   const setup = unitRulesForEntity(state, treb).unpacked!.seconds;
