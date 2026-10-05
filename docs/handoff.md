@@ -34,6 +34,11 @@ reviews. Do not append old test counts here as if they describe the latest tree.
     (session start); `tools/gate.sh` is removed. The installed-CLI harness smoke
     was re-run after the guard change. Dated reviews and old `.local/*-gate.log`
     paths keep their names.
+- #287 (cold sprite flicker) and #289 (selecting units over farms), fixed in
+  `7511606`, are closed after re-verification on `e6d5a9c`: first-appearance,
+  sprite/outline residency, farm selection (owned and fallback) and farm
+  occupancy smokes pass. Deployment and a physical-GPU look at the flicker
+  remain; reopen if the symptom persists on the household release.
 - #290 (Shift queueing) is parked at the human's request. Shift-queued
   waypoints, resources and foundations work in browser and sim probes. Two
   candidate gaps await the human's description: Shift-placing several
