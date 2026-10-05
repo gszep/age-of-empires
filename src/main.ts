@@ -463,6 +463,12 @@ function createHud(): Hud {
       applyCommand(game, { kind: 'cancel-train', player: localPlayer, buildingId, index });
       hud.setSelection(selectionInfo());
     },
+    onCancelResearch: buildingId => {
+      if (replay) return;
+      const result = applyCommand(game, { kind: 'cancel-research', player: localPlayer, buildingId });
+      if (!result.ok) reject(result.reason);
+      hud.setSelection(selectionInfo());
+    },
     onMenu: action => {
       if (action === 'pause') setPaused(!paused);
       if (action === 'resume') setPaused(false);
@@ -1685,9 +1691,11 @@ function selectionInfo(): SelectionInfo | undefined {
   } else if (entity.researching) {
     const tech = rules.technologies[entity.researching.tech as TechKey];
     const total = Math.max(1, researchSecondsFor(game, entity.owner as PlayerId, entity.researching.tech) / TICK_SECONDS);
+    const fraction = Math.max(0, Math.min(1, 1 - entity.researching.remainingTicks / total));
     progress = {
-      label: `Researching ${tech.name}`,
-      fraction: 1 - entity.researching.remainingTicks / total,
+      label: `${messages.researching ?? 'Researching'} ${Math.floor(fraction * 100)}%`,
+      name: tech.name,
+      fraction,
     };
   } else if (entity.training) {
     const unit = unitRulesFor(game, entity.owner, entity.training.kind);
@@ -1707,14 +1715,22 @@ function selectionInfo(): SelectionInfo | undefined {
   const category = isUnit(entity.kind) ? 'Units' : 'Buildings';
   return {
     members,
-    trainingQueue: entity.owner === localPlayer && entity.training && selection.length === 1 ? {
+    trainingQueue: entity.owner === localPlayer && (entity.training || entity.researching) && selection.length === 1 ? {
       buildingId: entity.id,
       cancelLabel: messages.stopCreating ?? 'Click to stop creating this unit.',
-      entries: [entity.training.kind, ...(entity.trainingQueue ?? [])].map(kind => ({
+      entries: (entity.training ? [entity.training.kind, ...(entity.trainingQueue ?? [])] : []).map(kind => ({
         kind,
         name: displayName(kind),
         icon: hud.iconFor('Units', importedEntity(kind, entity.owner)?.iconId, entity.owner),
       })),
+      ...(entity.researching ? { research: (() => {
+        const tech = rules.technologies[entity.researching.tech as TechKey];
+        return {
+          name: tech.name,
+          icon: hud.iconFor('Techs', tech.iconId, entity.owner),
+          cancelLabel: messages.stopResearching ?? 'Click to stop researching this item.',
+        };
+      })() } : {}),
     } : undefined,
     name,
     hpColor: preferences.palette !== 'default' && (entity.owner === 1 || entity.owner === 2)

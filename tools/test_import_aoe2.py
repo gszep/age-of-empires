@@ -1094,6 +1094,8 @@ class ContentImportIntegrationTest(unittest.TestCase):
     def test_names_and_tooltips_are_the_reference_strings(self):
         self.assertEqual(self.result["strings"]["creating"], "Creating")
         self.assertEqual(self.result["strings"]["stopCreating"], "Click to stop creating this unit.")
+        self.assertEqual(self.result["strings"]["researching"], "Researching")
+        self.assertEqual(self.result["strings"]["stopResearching"], "Click to stop researching this item.")
         # Issue #48: what the panel calls a thing is the DAT's own string,
         # not the slug spelled out. The rows are the ones the slug got wrong.
         entities = self.result["entities"]

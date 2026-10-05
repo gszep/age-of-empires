@@ -16,6 +16,11 @@ reviews. Do not append old test counts here as if they describe the latest tree.
   occupancy probe passes. Browser evidence uses Chrome/SwiftShader; physical-GPU
   confirmation remains unverified. These fixes are committed and pushed but
   have not been deployed to the installed household release.
+- Research in progress (#295) shows its owned tech icon in the selection
+  panel's active slot with "Researching N%" (owned strings 4309/42100); a click
+  sends the new public `cancel-research` command, which refunds the paid cost.
+  `tools/research_cancel_smoke.mts` covers the click path. #290 (Shift
+  queueing) is parked pending the human's description of the failing action.
 - Town center annexes (#294) no longer borrow the Dark Age player-colour mask
   when an aged piece has none. The Asian Castle/Imperial `front` SLDs have no
   player-colour layer; the borrowed mask drew stray bands across the Japanese

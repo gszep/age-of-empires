@@ -403,6 +403,30 @@
       "type": "object",
       "properties": {
         "kind": {
+          "const": "cancel-research"
+        },
+        "player": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "buildingId": {
+          "type": "integer",
+          "$comment": "Stops the building's research in progress and refunds what was paid for it."
+        }
+      },
+      "required": [
+        "kind",
+        "player",
+        "buildingId"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
           "const": "ungarrison"
         },
         "player": {

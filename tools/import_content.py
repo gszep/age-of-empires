@@ -2356,6 +2356,7 @@ def extract(
                 ("paletteTritanopia", "OPTIONS_PLAYER_COLOURS_TRITANOPIA"),
                 ("backToWork", 40015), ("backToWorkHelp", 41015),
                 ("creating", 4310), ("stopCreating", 42105),
+                ("researching", 4309), ("stopResearching", 42100),
                 ("confirmDelete", 10213), ("yes", 4003), ("no", 4004),
                 ("confirmDeleteMany", 10214),
                 ("researchComplete", 37157),

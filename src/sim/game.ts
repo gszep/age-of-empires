@@ -965,12 +965,26 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       return rejected(`${command.tech} needs ${player.age < tech.requiresAge ? 'a later age'
         : missing ? `${missing} first` : 'prerequisites first'}`);
     }
-    const paid = spendCost(state, command.player, researchCostFor(state, command.player, command.tech));
+    const cost = researchCostFor(state, command.player, command.tech);
+    const paid = spendCost(state, command.player, cost);
     if (!paid.ok) return paid;
     building.researching = {
       tech: command.tech,
       remainingTicks: Math.round(researchSecondsFor(state, command.player, command.tech) * TICKS_PER_SECOND),
+      paidCost: { ...cost },
     };
+    return { ok: true };
+  }
+
+  if (command.kind === 'cancel-research') {
+    const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
+    if (!building) return rejected(`building ${command.buildingId} is not owned`);
+    if (!building.researching) return rejected('nothing is being researched');
+    const cost = building.researching.paidCost ?? researchCostFor(state, command.player, building.researching.tech);
+    building.researching = undefined;
+    const player = state.players[command.player];
+    player.food += cost.food; player.wood += cost.wood;
+    player.gold += cost.gold; player.stone += cost.stone;
     return { ok: true };
   }
 

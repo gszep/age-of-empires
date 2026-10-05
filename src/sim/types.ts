@@ -156,7 +156,8 @@ export interface Entity {
   trainingQueue?: UnitKind[];
   /** Original paid prices, aligned with the waiting queue; legacy entries may be absent. */
   trainingQueueCosts?: (Cost | undefined)[];
-  researching?: { tech: string; remainingTicks: number };
+  /** `paidCost` is refunded on cancel; absent in legacy saves, which refund the current price. */
+  researching?: { tech: string; remainingTicks: number; paidCost?: Cost };
   rally?: { target: Point; targetId?: number };
   attackCooldown?: number; // ticks until a new swing may start
   attackWindup?: number; // ticks until the started swing releases damage
@@ -352,6 +353,7 @@ export type Command =
   | { kind: 'pack'; player: PlayerId; entityIds: number[]; unpacked: boolean }
   /** Take the last unit off a building's queue and refund it. */
   | { kind: 'cancel-train'; player: PlayerId; buildingId: number; index?: number }
+  | { kind: 'cancel-research'; player: PlayerId; buildingId: number }
   /** Everybody sheltering in this building comes out onto the ground round it. */
   | { kind: 'ungarrison'; player: PlayerId; buildingId: number; target?: Point }
   | { kind: 'town-bell'; player: PlayerId; buildingId: number; enabled: boolean }

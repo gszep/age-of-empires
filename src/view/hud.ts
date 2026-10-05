@@ -82,7 +82,11 @@ export interface SelectionInfo {
    */
   stats?: { icon: string; value: string; title: string }[];
   progress?: { label: string; name?: string; fraction: number };
-  trainingQueue?: { buildingId: number; cancelLabel: string; entries: { kind: string; name: string; icon?: string }[] };
+  trainingQueue?: {
+    buildingId: number; cancelLabel: string; entries: { kind: string; name: string; icon?: string }[];
+    /** The technology being researched; it takes the active slot, and a click cancels it. */
+    research?: { name: string; icon?: string; cancelLabel: string };
+  };
   /**
    * One entry per selected entity, when more than one is. AoE2 shows the
    * group as a grid of portraits rather than the first of them, and each is
@@ -101,6 +105,7 @@ export interface HudCallbacks {
   /** A portrait in the group grid was clicked: select that one entity. */
   onSelectMember(id: number): void;
   onCancelTraining(buildingId: number, index: number): void;
+  onCancelResearch?(buildingId: number): void;
   onMinimapNavigate(point: Point): void;
   /** The flare button, then a minimap click: signal that spot (canvas point). */
   onFlare(point: Point): void;
@@ -908,9 +913,11 @@ export class Hud {
     const active = this.root.querySelector<HTMLElement>('#training-active')!;
     row.replaceChildren();
     active.replaceChildren();
-    row.hidden = !queue || queue.entries.length <= 1;
-    active.hidden = !queue?.entries.length || !showActive;
-    if (!queue?.entries.length) return;
+    // Research holds the active slot, so every training entry waits in the row.
+    const firstWaiting = queue?.research ? 0 : 1;
+    row.hidden = !queue || queue.entries.length <= firstWaiting;
+    active.hidden = !queue || (!queue.entries.length && !queue.research) || !showActive;
+    if (!queue || (!queue.entries.length && !queue.research)) return;
     const layout = this.ui?.layouts.commandpanel;
     const anchor = widgetBox(layout, 'BackgroundRight', 'QueueButtons');
     const progress = widgetBox(layout, 'BackgroundRight', 'Progress');
@@ -927,12 +934,13 @@ export class Hud {
         active.style.top = `calc(${status.top}px * var(--ui-scale))`;
       }
     }
-    const portrait = (entry: typeof queue.entries[number], index: number, count = 1): HTMLButtonElement => {
+    const portrait = (entry: { kind: string; name: string; icon?: string }, index: number, count = 1,
+      cancelLabel = queue.cancelLabel, cancel = () => this.callbacks.onCancelTraining(queue.buildingId, index)): HTMLButtonElement => {
       const button = document.createElement('button');
       button.className = 'production-portrait command-button';
       button.dataset.index = String(index);
       button.dataset.kind = entry.kind;
-      button.title = `${entry.name}${count > 1 ? ` (${count})` : ''}\n${queue.cancelLabel}`;
+      button.title = `${entry.name}${count > 1 ? ` (${count})` : ''}\n${cancelLabel}`;
       button.setAttribute('aria-label', button.title);
       button.style.backgroundImage = entry.icon
         ? `${entry.icon}, ${this.texture('ButtonCmdIconNormal')}` : this.texture('ButtonCmdIconNormal');
@@ -945,20 +953,25 @@ export class Hud {
       }
       button.addEventListener('click', () => {
         this.callbacks.onSound('button_ui');
-        this.callbacks.onCancelTraining(queue.buildingId, index);
+        cancel();
       });
       return button;
     };
     if (showActive) {
-      const button = portrait(queue.entries[0], 0);
+      const research = queue.research;
+      const button = research
+        ? portrait({ kind: 'research', ...research }, -1, 1, research.cancelLabel,
+          () => this.callbacks.onCancelResearch?.(queue.buildingId))
+        : portrait(queue.entries[0], 0);
       const fill = document.createElement('span');
       fill.className = 'production-progress';
       button.appendChild(fill);
       active.appendChild(button);
     }
-    // Index 0 is already on the anvil and has its own portrait above.
-    // Batch counts and cancellation targets here describe waiting units only.
-    for (let index = 1; index < queue.entries.length;) {
+    // Without research, index 0 is already on the anvil and has its own
+    // portrait above. Batch counts and cancellation targets here describe the
+    // units in the row.
+    for (let index = firstWaiting; index < queue.entries.length;) {
       const entry = queue.entries[index];
       let end = index + 1;
       while (end < queue.entries.length && queue.entries[end].kind === entry.kind) end++;
