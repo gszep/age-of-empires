@@ -41,11 +41,8 @@ and unloading reversal agree with the implemented crew addition. No runtime or
 test change is warranted by these observations. Absolute native baseline stats
 are current-build observations, not replacements for patch-pinned DAT stats.
 
-**Speed was skipped:** this fixture had no surveyed tile-distance endpoints or
-synchronized movement sampling. The basic panel did not display speed, and the
-bounded run prioritized validated attack/passenger observations. No claim of a
-native +.05 tiles/s measurement, or of zero villager speed bonus, is made.
-Those constants remain inferred/secondarily corroborated. Capped Ram boarding
+Speed was initially skipped; the follow-up simultaneous-race measurement below
+now supports the implemented speed ratios. Capped Ram boarding
 did not succeed in the optional attempt (the counter stayed 0/6); its apparent
 160→160 is **not** evidence of a zero crew bonus. Siege Engineers, other infantry
 classes, exact timing and pinned-runtime numeric acceptance remain unverified.
@@ -65,4 +62,44 @@ Do not interpret filenames as state assertions. The prior worker's
   deployment, push or commit performed.
 - Tested local control recipe: `.local/native/RECIPES.md`. The scenario was not
   saved; recreate its seven units using that recipe. Native process PID 22012
-  was retained, with the game returned to the main menu.
+was retained, with the game returned to the main menu.
+
+## Speed — simultaneous native race, 2026-10-06
+
+**Measured on current build 185872, not pinned 48987.** Three Teuton Battering
+Rams on flat editor grass, no technologies, separately selected/ordered along
+three parallel horizontal screen lanes. Top empty, middle four Militia, bottom
+one female Villager. Occupancy and attack controls are observed visually in
+`s2-four-verified.png` (4/6, 190), `s2-vill-verified.png` (1/6, 150).
+F3 paused the game while issuing the three independent move commands (not a
+formation). `race-samples.ps1` unpaused and took nine simultaneous full-window
+captures, then paused again. All three continued moving before their goals.
+
+| Passenger state | Screen x at sample 1 | Screen x at sample 7 | Displacement | Ratio to empty |
+|---|---:|---:|---:|---:|
+| Empty | 1393 | 1759 | 366 px | 1.000 |
+| Four Militia | 1420 | 1906 | 486 px | 1.328 |
+| One Villager | 1393 | 1759 | 366 px | 1.000 |
+
+These are the rightmost blue body pixels, measured from original 2560×1440
+captures (not downscaled previews). Mask: B > 65, B > 1.3R, B > 1.2G;
+separate y bands 650:760, 830:955, 1020:1150 and x 1250:2400.
+The integer game clock reads 04:12→04:21 in these two frames; the shared six-wall-
+second interval at Casual 1.5 avoids assigning precision to integer clock edges.
+The nine-frame sequences and positional measurements are `race-{0..8}.png`,
+`race.json`, `race-positions.json`; `race-clocks.png` collects the visible clock.
+
+Allow roughly ±0.02 in the ratios for animation/edge and capture quantization;
+this is not a confidence interval from repeated trials. The observed 1.328 is
+consistent with (0.6 + 4×0.05)/0.6 = 1.333, and the villager agrees with 1.0.
+Base 0.6 and crew +0.05 are the existing `src/sim/data.ts` rules, not absolute
+tile speeds independently established by this screen-space experiment. No
+decisive disagreement; runtime and tests unchanged. This measures the four-
+passenger aggregate, not separate speed increments for every infantry count.
+
+The first attempt with two players admitted AI starting units; it was rejected
+before measuring. The accepted race reduced Number of Players to 1 and confirmed
+all eight staged units. The previous worker's infantry-only runs and failed
+navigation captures remain excluded. Settings were not changed or the game
+restarted. Follow-up specialist/garrison tests: 28/28; tsc exit 0, logs
+`s2-tests.log` / `s2-tsc.log`. Main-menu return: `s2-final-menu.png`.

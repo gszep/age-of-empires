@@ -629,8 +629,12 @@ off the reference; **measured** — fitted to a reference screenshot;
   not pinned 48987**, **observed visually** in the native attack tooltip:
   Teuton Battering Ram All Buildings attack 150/160/170/190 for 0/1/2/4 Militia;
   unloading restores 150 and one Villager leaves 150. This supports the +10
-  crew attack addition and villager attack exclusion, not native speed parity.
-  Speed was not measured; +.05 and zero villager speed bonus remain inferred.
+  crew attack addition and villager attack exclusion. A follow-up simultaneous
+  flat-ground race measured displacement 366/486/366 screen pixels for
+  empty/four-Militia/one-Villager rams over the same interval: ratios
+  1/1.328/1 (approximately ±.02), consistent with .6/.8/.6 tiles/s.
+  Absolute tile speed and individual speed increments were not independently
+  measured; this is current-build ratio corroboration, not a DAT import.
   Capped Ram only has a valid empty baseline. Method, rejected attempts and
   private capture paths: `docs/ram-crew-calibration.md`.
 - **Inferred petard semantics:** one blast on attack contact, none on interception/
