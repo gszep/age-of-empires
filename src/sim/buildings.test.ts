@@ -239,6 +239,14 @@ describe.each(Object.entries(profiles))('%s building outcomes', (_key, source) =
       research(state, 'keep', university); attack = 11;
       expect(state.players[1].researched.filter(k => k === 'automatic-611')).toHaveLength(1);
     }
+    // Profiles granted free Chemistry on reaching Imperial (Turks #188) add its
+    // source class-3 tower attack; read the amount from the profile's own effects.
+    if (state.players[1].researched.includes('chemistry')) {
+      const towerKind = state.rules.technologies.keep ? 'keep' : 'guard-tower';
+      attack += (state.rules.technologies.chemistry?.effects ?? [])
+        .filter(e => e.attribute === 'attack' && e.armorClass === 3 && e.unit === towerKind)
+        .reduce((sum, e) => sum + e.amount, 0);
+    }
     // Three occupants define this two-arrow fixture; openings can contain more.
     const crew = state.entities.filter(e => e.owner === 1 && e.kind === 'villager').slice(0, 3);
     expect(crew).toHaveLength(3);

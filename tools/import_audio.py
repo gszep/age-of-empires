@@ -38,6 +38,10 @@ REVIEWED_ABSENT_CUES = {
     ("civilizations/saracens/trade-cart-select", 3167914911, "Saracens"): 271,
     ("civilizations/saracens/trade-cart-train", 955679769, "Saracens"): 271,
     ("civilizations/saracens/events/2892846699", 2892846699, "Saracens"): 271,
+    # Turks independently audited against both pinned packs (2026-10-05).
+    ("civilizations/turks/trade-cart-select", 3167914911, "Turks"): 271,
+    ("civilizations/turks/trade-cart-train", 955679769, "Turks"): 271,
+    ("civilizations/turks/events/2892846699", 2892846699, "Turks"): 271,
 }
 
 

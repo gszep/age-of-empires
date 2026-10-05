@@ -2519,6 +2519,13 @@ function applyDamage(
   if (target.kind === 'relic') return;
   target.hp -= damageFrom(state, target, attacks, origin, ignoresArmor);
   if (target.hp <= 0) {
+    const attacker = state.entities.find(e => e.id === attackerId);
+    if (!target.dead && attacker && attacker.owner !== target.owner && attacker.owner !== 0 && isUnit(attacker.kind) && isUnit(target.kind)) {
+      const reward = unitRulesForEntity(state, attacker).killReward;
+      const targetRules = unitRulesForEntity(state, target);
+      const row = reward?.targets.find(t => t.unitId !== undefined ? t.unitId === targetRules.datId : t.classId === targetRules.datClass);
+      if (row) state.players[attacker.owner].gold += row.amount * (playerAttributeFor(state, attacker.owner, reward!.resource) ?? 0);
+    }
     kill(state, target);
     return;
   }
@@ -3433,6 +3440,13 @@ function stepGameBody(state: GameState): void {
     }
   }
   separateUnits(state, movable, gridFor);
+  // Passive regeneration also reaches transported/garrisoned units. A captured
+  // Berserk retains its source rule; the capturing player's civ is irrelevant.
+  for (const entity of entitiesWithGarrison(state.entities)) {
+    if (entity.dead || entity.hp <= 0 || entity.hp >= entity.maxHp || !isUnit(entity.kind)) continue;
+    const rate = unitRulesForEntity(state, entity).regenerationPerMinute ?? 0;
+    if (rate > 0) entity.hp = Math.min(entity.maxHp, entity.hp + rate * TICK_SECONDS / 60);
+  }
   updateHealingAuras(state);
   updateProjectiles(state);
   for (const site of state.entities) {

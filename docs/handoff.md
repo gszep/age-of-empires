@@ -48,6 +48,12 @@ reviews. Do not append old test counts here as if they describe the latest tree.
   candidate gaps await the human's description: Shift-placing several
   buildings was never implemented, and orders queued behind a gather never run
   because gathering does not finish.
+- Turks (#188) and Vikings (#189) are the ninth and tenth selectable profiles
+  (October 5, coordinator-integrated from two escalated worker trees). Full import,
+  `tools/{turks,vikings}_smoke.mts` and the owned checkpoint pass; see the
+  [integration receipt](civilization-coverage.md#turks-and-vikings-integration-receipt-october-5).
+  Not deployed to the household release. Open: #303 (promoted units keep their
+  pre-upgrade sprite; `saracens_smoke.mts` fails on it), #301/#302 calibration.
 - Saracens (#187) are implemented as the eighth selectable
   owned profile. Full import and dedicated private-browser acceptance pass;
   [coverage](civilization-coverage.md#saracens-187) records outcomes;

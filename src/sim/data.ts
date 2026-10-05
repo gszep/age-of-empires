@@ -129,6 +129,8 @@ export interface UnitRules {
   /** Monks: hit points restored a second, and how close they must come. */
   heal?: { hitPointsPerSecond: number; range: number };
   healingAura?: HealingAura;
+  regenerationPerMinute?: number;
+  killReward?: KillReward;
   /**
    * Villagers: hit points mended a second on a building, and the DAT's
    * factor for each class of unit they will mend at all -- siege and ships
@@ -452,7 +454,7 @@ export interface GarrisonRules {
 export const GARRISON_CATEGORY: Record<number, number> = {
   59: 1,                      // King: civilian garrison category (engine adapter)
   4: 1,                       // villagers
-  0: 2, 6: 2,                 // foot archers and infantry
+  0: 2, 6: 2, 44: 2,          // foot archers, infantry and foot gunners (Janissary/Hand Cannoneer)
   12: 4, 36: 4, 47: 4,        // cavalry, cavalry archers, scouts
   18: 8,                      // monks
   58: 16, 9: 16, 10: 16,      // herdables and game
@@ -680,6 +682,12 @@ export interface TechEffect {
    */
   resource?: PlayerAttribute;
   healingAura?: HealingAura;
+  killReward?: KillReward;
+}
+
+export interface KillReward {
+  resource: PlayerAttribute;
+  targets: { classId?: number; unitId?: number; amount: number }[];
 }
 
 export interface HealingAura {
@@ -713,7 +721,7 @@ export type PlayerAttribute = 'farmFoodAmount' | 'unitRepairCost' | 'buildingRep
   | 'relicRate' | 'convertResistMinAdj' | 'convertResistMaxAdj' | 'theocracy' | 'heresy'
   | 'spies' | 'tradeVigRate' | 'tributeInefficency' | 'huntingProductivity' | 'unitLimit'
   | 'convertBuilding' | 'convertPriest' | 'resource-29' | 'healRange' | 'healRateModifer'
-  | 'researchCostMod' | 'startingFood' | 'startingWood' | 'startingGold' | 'startingStone' | 'spawnCap' | 'resource-69';
+  | 'researchCostMod' | 'startingFood' | 'startingWood' | 'startingGold' | 'startingStone' | 'spawnCap' | 'resource-69' | 'infantryKillReward';
 
 export type TechAttribute =
   | 'hitPoints' | 'lineOfSight' | 'speed' | 'armor' | 'attack'
@@ -723,7 +731,7 @@ export type TechAttribute =
   | 'blastRadius' | 'searchRadius' | 'trainSeconds' | 'trainLocation' | 'researchSeconds' | 'deathExplosion' | 'garrisonFirepower'
   | 'workRate' | 'carryCapacity' | 'cost' | 'foodCost' | 'woodCost' | 'goldCost' | 'stoneCost'
   /** On a projectile: whether the shot leads a moving target. Ballistics. */
-  | 'leadsTarget' | 'healingAura';
+  | 'leadsTarget' | 'healingAura' | 'killReward';
 
 export const AGE_NAMES = ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'];
 
@@ -1510,6 +1518,7 @@ interface ManifestEntity {
   projectile?: { hitMode?: number; vanishMode?: number };
   placementSideTerrain?: number[];
   hitPoints: number;
+  regenerationPerMinute?: number;
   collision: [number, number];
   terrainRestriction?: number;
   /** Nothing walks round it: no collision height, no obstruction class, and
@@ -1712,6 +1721,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       conversionImmune: e[key].conversionImmune ?? fallback?.conversionImmune,
       confirmDelete: e[key].confirmDelete ?? fallback?.confirmDelete,
       hp: e[key].hitPoints,
+      regenerationPerMinute: e[key].regenerationPerMinute,
       abilityFlags: e[key].combat?.abilityFlags,
       fireCharge: e[key].fireCharge,
       attackApproach: e[key].attackApproach,

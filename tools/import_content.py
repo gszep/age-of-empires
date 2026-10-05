@@ -551,6 +551,10 @@ def extract_entity(
         entity["speedTilesPerSecond"] = rounded(unit.speed)
 
     if unit.creatable is not None:
+        # UGC attribute109 (XS cRegenerationRate) occupies this legacy field.
+        # Berserk/Elite Berserk both carry40 HP/minute, not hero-mode bit4.
+        if category == "unit" and unit.creatable.rear_attack_modifier > 0:
+            entity["regenerationPerMinute"] = rounded(unit.creatable.rear_attack_modifier)
         # `hero_mode` is a flag field: 1 full heal, 2 cannot be converted, 4
         # regenerates, 8 defensive stance, 16 protected formation, 32 asks
         # before Delete, 64 hero glow. Across this roster it reads 0, 32 or
@@ -1241,7 +1245,7 @@ SUPPORTED_PLAYER_ATTRIBUTES = {"farmFoodAmount", "unitRepairCost", "buildingRepa
     "spies", "tradeVigRate", "tributeInefficency", "huntingProductivity", "unitLimit",
     "convertBuilding", "convertPriest", "resource-29", "healRange", "researchCostMod",
     "startingFood", "startingWood", "startingGold", "startingStone", "spawnCap", "resource-69",
-    "healRateModifer"}
+    "healRateModifer", "infantryKillReward"}
 # `b` on a type 1 command: 0 writes the value, 1 adds to it.
 RESOURCE_OPERATIONS = {0: "set", 1: "add"}
 
@@ -1333,6 +1337,12 @@ def effects_of(
     for command in (dat.effects[effect_id].effect_commands if effect_id >= 0 else []):
         if command.type == 1 and command.a == 33 and command.b == 0 and scripted_effects and command.d in scripted_effects:
             aura = scripted_effects[command.d]
+            if command.d == 5:
+                for key, entity in entities.items():
+                    if entity.get('class') == aura['sourceClass'] and 'skinOf' not in entity:
+                        effects.append({'unit': key, 'attribute': 'killReward', 'operation': 'set', 'amount': 1,
+                                        'killReward': aura})
+                continue
             for key, entity in entities.items():
                 if entity.get('class') in aura['sourceClasses'] and entity.get('id') not in aura['excludedSourceIds'] and 'skinOf' not in entity:
                     effects.append({'unit': key, 'attribute': 'healingAura', 'operation': 'set', 'amount': 1,
@@ -1756,6 +1766,9 @@ def technologies_from_tree(
                       if c.type == 102}
     research_ids = {int(n["Node ID"]) for n in nodes if n.get("Node Type") == "Research"}
     scripted_effects = {}
+    if any(n.get('Node ID') == 463 and n.get('Node Status') != 'NotAvailable' for n in nodes):
+        from scripted_effects import infantry_loot
+        scripted_effects[5] = infantry_loot(dat_path.parent.parent, hashes)
     if any(n.get('Node ID') == 28 and n.get('Node Status') != 'NotAvailable' for n in nodes):
         from scripted_effects import healing_aura
         scripted_effects[7] = healing_aura(dat_path.parent.parent, hashes)

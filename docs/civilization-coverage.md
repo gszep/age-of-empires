@@ -593,6 +593,116 @@ skips remain (seven inapplicable Gothic building cases and the opt-in economy
 acceptance). No test/fixture clocks were widened. Native #285/#271 and shared
 fidelity gaps remain open; this receipt does not claim native calibration.
 
+## Turks (#188; worker acceptance, 2026-10-05)
+
+Source reconciliation uses civ 10/tree 263/team 410, `TURKS.json`, English
+120159, `civilizations.json` (CivOrie, emblem, unique icon and voice switch),
+DAT graphics/projectile/audio records and XS constants. The earlier September
+inventory is stale: shared gunpowder, naval, specialist and building work already
+provides all roster nodes except Janissary 46/557. Adding those two source units
+closes `missingRoster`; it does not require invented stats or weapon behavior.
+RMS/include search found the civilization constant and Gaia civilization draw,
+not a Turkish player-start override. Promisory `researches.per`'s Turks branch
+prioritizes Artillery/Sipahi; it does not define their effects. The generic
+profile pipeline supplies starting attributes, localized names, availability,
+namespaced flags/art/icons and CivOrie HUD identity.
+
+| Area | Implemented / deferred |
+| --- | --- |
+| Gold mining | Tech 300: gold work rate ×1.25, not stone; real extraction and banking tested against an opponent |
+| Gunpowder HP | Tech 301: ×1.25 on supported source targets, including trained Janissaries, Hand Cannoneers and Bombard Cannons |
+| Scout line | Tech 452: +1 pierce armor; real arrow damage, age-command free Light Cavalry/Hussar and wounded-unit upgrades tested |
+| Chemistry | Free through tree 263 cost/time commands; required-count automatic activation retained, paid age bills unchanged |
+| Gunpowder research discount | Source commands halve Bombard Tower and Elite Cannon Galleon research; Janissary elite and unique-tech costs are not arbitrarily halved |
+| Team bonus | Effect 410 attribute 101: ×.8 train time, unchanged unit prices/refunds; mixed Hand Cannoneer production/HP tested. Allied teams remain outside the two-enemy-seat model |
+| Unique units | Janissary/Elite imported with projectile 380, original graphics/audio and accuracy; castle training/garrison/elite promotion, combat and conversion/JSON continuation tested |
+| Unique techs | Sipahi HP reaches existing/garrisoned/new cavalry archers; Artillery adds range/sight/search radius to Bombard Tower, Bombard Cannon and both Cannon Galleons. Real long-range cannon impact tested |
+| Availability | Complete current tree inventory; explicit unavailable Elite Skirmisher and absent foreign unique units remain rejected; captured definitions are retained |
+| Source gaps | Three original Trade Cart audio events unavailable (#271), no substitutions; foreign/scenario bonus targets and unsupported source commands stay diagnostic |
+| Calibration | Fractional HP, half-resource payment rounding and foot-gunner garrison adapter need native checks; shared #128/#178/#254/#260/#267 and Chemistry projectile-art limitations remain |
+| Integration | Enabled. Coordinator integration (October 5) passed full regeneration, `tools/turks_smoke.mts` private-browser acceptance and the owned checkpoint; see the integration receipt below |
+
+Reproduction: `tools/test_turks.py` extracts the source contract (six tests),
+`src/sim/turks.test.ts` has eleven public-outcome cases. Set `CIV_PROFILE_CONTENT`
+to a private extracted content fixture to run before full regeneration; an
+explicit fixture lacking Turks fails rather than silently skipping. Without
+owned content, the existing open fallback remains unchanged. Worker evidence
+lives in the durable issue-188 worktree under `.local/turks-*` and
+`.local/astra-reconciliation.log`; no owned content is committed.
+No smoke or checkpoint result is implied by an extraction-only fixture.
+
+## Vikings (#189)
+
+Worker implementation (October 5): DAT civ11/tree276/team411, owned
+`CivTechTrees/VIKINGS.json`, localization120160/28312/28431, `Effects.xs`
+function5 and the original graphic/audio records are reconciled. HUD metadata
+is **CivSlav**, not CivNorse. Unique units are Longboat250/533 and Berserk692/694;
+583/683 from the abandoned worker attempt are unrelated and removed. Both
+Longboats use the existing composite-ship/no-decay spec, not invented corpses.
+The imported roster has no missing available tree nodes.
+
+| Surface | Worker status |
+| --- | --- |
+| Infantry HP | Shared automatic416 gives +20% at Feudal;391/415 have no effects, not additional age bonuses. Existing/new/garrisoned infantry compared against Britons after both players publicly research each age. |
+| Warship and Dock costs | Age-gated395/501/502 source multipliers; team411 targets Dock IDs with attribute100. Galley/Longboat wood and gold payments/refunds, fishing-ship prices, unavailable Longboat rejection, Dock payments and enemy isolation tested. |
+| Free Wheelbarrow/Hand Cart | Tree276 zeros213/249 cost/time; required-count automatic research supplies Feudal/Castle gates. Paid public age completion grants each only to Vikings, charging only the age price; movement and banked loads tested.392/400 are empty markers. |
+| Unique units | Both lines train/upgrade; Berserks regenerate from owned40 HP/minute field; Longboats use shared four-projectile ship attacks. Converted Berserk regeneration, Chieftains lethal attacks/loot and in-flight Longboat shots have JSON-continuation checks. The mixed opening command replay covers villager training only. |
+| Unique research | Chieftains463 cavalry/camel attacks plus XS loot tasks; loot tests include pre-research, same-owner non-infantry and enemy-killer negative controls. Bogsveigar49 archer-line/Longboat attack. Obsolete Berserkergang is not offered. |
+| Presentation | Source art, names, icons, CivSlav HUD and Vikings audio switch flow through existing import machinery;542/542 consumed audio aliases resolve to media in both pinned packs, without new exceptions. |
+| Integration | Enabled. Coordinator integration (October 5) passed full regeneration, `tools/vikings_smoke.mts` private-browser acceptance and the owned checkpoint; see the integration receipt below |
+
+Promisory references Viking training/research and the legacy Berserk heal timer;
+the searched common XS/AI and gamedata_x2 RMS/include files supply no replacement
+runtime scheduling rule. Native fidelity boundaries are explicit in the ledger
+and **#301**: Chieftains' XS differs from its tooltip, regeneration cadence and
+garrison/conversion semantics need native calibration, and ship price rounding
+and volley geometry retain shared engine inferences. #254 tracks zero-time
+research ordering, #178 conversion, #260/#272 projectile timing.
+
+The selectable spec is enabled only after the implemented supported gameplay
+passed metadata-driven outcomes. This is a worker receipt, not a claim that
+Vikings has passed the final browser/checkpoint gate. Reproduce with
+`tools/test_vikings.py`, the Vikings art test in `tools/test_import_aoe2.py`, and
+`CIV_PROFILE_CONTENT=.local/vikings-content.json npx vitest run src/sim/vikings.test.ts src/sim/saracens.test.ts`.
+Local source/audit evidence is `.local/vikings-source.log`,
+`.local/vikings-scripts.log`, `.local/vikings-audio.log`; the earlier
+`.local/vikings-reconciliation.md` is preserved but superseded, not trusted.
+Final worker checks: 10 Vikings and 10 Saracen outcomes pass without skips;
+the expanded eight-file run passes 90 tests with 6 existing manifest-dependent
+skips (conversion/naval suites read the absent published manifest, not the
+metadata fixture). Six Vikings Python contracts, nine selected import
+regressions, `tsc --noEmit` and `git diff --check` pass. No timeout was widened.
+Logs: `.local/vikings-{sim-final,python-final,import-regression-final,tsc-final}.log`.
+Review follow-up strengthened the existing tests without changing runtime code:
+20/20 Vikings/Saracens tests (no skips, 26.73s), six Python contracts (25.164s),
+typecheck and diff checks pass. Logs: `.local/vikings-followup-{sim,python,tsc}.log`.
+
+## Turks and Vikings integration receipt (October 5)
+
+Both worker trees were reviewed independently (approve with nits; nits closed by
+added tests) and merged together; shared `import-spec.json` arrays and these
+sections were unioned. Full `npm run import:aoe2` passed
+(`.local/orchestrator/import.log`). Against the published manifest the Turks,
+Vikings, Saracens, garrison, conversion, transport and naval suites pass 110/110
+without skips. Private-browser acceptance passed: `tools/turks_smoke.mts`
+(menu/reload, ORIE HUD, castle/Janissary/elite/Hand Cannoneer/Bombard Cannon art,
+paid Imperial age with free Chemistry and no opponent grant, paid
+Elite Janissary/Sipahi/Artillery) and `tools/vikings_smoke.mts` (menu/reload, SLAV
+HUD, free Wheelbarrow and Hand Cart on paid Castle age with no opponent grant,
+Berserk/Longboat and elite art, paid Chieftains/Bogsveigar/elite research). Run them
+with `npx tsx`. Elite art is checked on freshly trained elite units: existing units
+promoted by an elite upgrade keep drawing the pre-upgrade texture for every
+civilisation, so `tools/saracens_smoke.mts` currently fails its Elite Mameluke
+check; that regression is #303, not hidden here.
+
+The first owned checkpoint caught the shared per-profile Arrowslits test assuming
+11 Keep attack for every profile; Turks receive free Chemistry at Imperial,
+whose source class-3 tower effect adds 1. The test now reads that amount from the
+profile's own Chemistry effects. The rerun owned checkpoint is GREEN: 1604 tests/131
+files with 8 existing skips, public build, 219 owned-import tests and real-browser
+smoke in 458s (`.local/verification/1791204915172-217224/`). Native calibration
+remains #302 (Turks) and #301 (Vikings); Trade Cart audio gaps #271.
+
 ## Implementation checklist
 
 - [x] Reproducible all-civilisation coverage inventory with source provenance.

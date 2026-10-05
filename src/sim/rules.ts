@@ -242,6 +242,7 @@ function applyEffect(rules: UnitRules, effect: TechEffect): void {
   const armorClass = effect.armorClass ?? 0;
   switch (effect.attribute) {
     case 'healingAura': rules.healingAura = effect.healingAura; break;
+    case 'killReward': rules.killReward = effect.killReward; break;
     case 'garrisonCapacity':
       if (rules.transportCapacity !== undefined) rules.transportCapacity = combine(effect.operation, rules.transportCapacity, effect.amount);
       if (rules.infantryCapacity !== undefined) rules.infantryCapacity = combine(effect.operation, rules.infantryCapacity, effect.amount);

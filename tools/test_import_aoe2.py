@@ -214,6 +214,22 @@ class ContentImportIntegrationTest(unittest.TestCase):
     def setUpClass(cls):
         cls.result = extracted_content()
 
+    def test_vikings_unique_art_and_regeneration_follow_owned_records(self):
+        profile = self.result['civilizations']['vikings']
+        dat = _dat()
+        for uid in (250, 533, 692, 694):
+            entity = profile['entities'][f'dat-unit-{uid}']
+            unit = dat.civs[11].units[uid]
+            self.assertEqual(entity['hitPoints'], unit.hit_points)
+            self.assertEqual(entity['sounds']['select'] & 0xffffffff, unit.wwise_selection_sound_id & 0xffffffff)
+            self.assertIn('longboat' if uid in (250, 533) else 'berserk', entity['animations']['idle']['source'])
+            if uid in (692, 694):
+                self.assertEqual(entity['regenerationPerMinute'], unit.creatable.rear_attack_modifier)
+            else:
+                self.assertEqual(unit.dead_unit_id, -1)
+                self.assertNotIn('decay', entity['animations'])
+        self.assertEqual(profile['audio']['switch'], 'Vikings')
+
     def test_civilization_audit_covers_every_owned_tree_and_reports_foreign_metadata(self):
         common = DAT.parent.parent
         report = audit_civilizations(_dat(), common, SPEC)

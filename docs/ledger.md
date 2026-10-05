@@ -14,6 +14,52 @@ references, unverified against a file; **human** — a number the human read
 off the reference; **measured** — fitted to a reference screenshot;
 **chosen** — the agent's own number.
 
+## Turks profile and shared foot-gunner garrison adapter (#188)
+
+- **Owned:** pinned DAT civ 10, tree effect 263, team effect 410, `TURKS.json`,
+  English help 120159 and civilization metadata define this profile. Janissaries
+  46/557 use the existing single-projectile model (projectile 380, accuracy
+  50/65%, dispersion .75), not a new approximated gunpowder attack. Mining tech
+  300 addresses gold workers 579/581 only; skins share one simulation worker.
+  Team attribute 101 multiplies **train time** by .8; it does not reduce unit
+  costs. Sipahi 491 adds 20 HP and Artillery 10 adds 2 range/sight/search radius
+  to source-addressed targets. No new civilization-specific runtime branch.
+- **Inferred engine adapter:** class 44 (`cHandCannoneerClass` in Constants.xs)
+  now joins foot archers/infantry in garrison mask bit 2. DAT Janissaries and
+  Hand Cannoneers share class 44 and creatable type 4 (ordinary Archer is
+  class 0/type 3); original unit help calls Janissaries Foot Gunners. Mapping
+  that class to bit 2 is inferred, not a claim that these fields encode it.
+  The existing hand-maintained garrison table
+  omitted this class entirely. Public castle admission/elite-upgrade coverage
+  now exercises it; native admission/arrow-contribution calibration is not
+  established by these fields. No mask or capacity has been changed.
+- **Inherited inferences, not new native measurements:** zero-time research
+  follows required-count gates, without requiring its paid research building
+  (#254). Empty effects 95/285 are not substitute upgrade implementations:
+  tree 263 sets Chemistry/Light Cavalry/Hussar prices and times to zero.
+  HP remains fractional (Janissary 35 × 1.25 = 43.75); research payment uses
+  the shared whole-resource rounding (Elite Cannon Galleon 525 × .5 = 262.5
+  source wood, charged 263). Native HP/half-cost rounding still needs calibration
+  as in #260/#267. The regression asserts this adapter policy, not DE parity.
+  The 1v1 locked-enemy model applies the team bonus to its owner only; there is
+  no allied-seat propagation claim. Conversion snapshots remain the #178 policy.
+- **Scope retained:** foreign/scenario targets (e.g. Sipahi 1738/1740, Artillery
+  1709) remain explicit `unmodelled` diagnostics, not extra trainable units.
+  Tree type-8 commands `(a=235/236, b=12, c=-1, d=1)` address **technologies**
+  Make Camels Available/Heavy Camel, not tower unit IDs: XS names the operation
+  `cModifyTech` and attribute 12 `cTechStackingEnabled`. Repeat/stack activation
+  is not implemented; the existing one-time camel availability/upgrade pipeline
+  remains in use. These commands stay diagnostic. General
+  Chemistry projectile-art replacements and shared specialist limitations are
+  not solved by making Chemistry free. Full native calibration, imported
+  browser acceptance and rollout remain coordinator work.
+- **Owned audio gap / explicit silence:** an independent audit of all 534 Turks
+  cues against Base.pck and Base.1.pck found exactly three absent event objects:
+  Trade Cart selection 3167914911, training 955679769 and graphic 2892846699.
+  Only these exact Turks aliases publish as unavailable under #271; all other
+  graphs resolve with the original Turks switch. No borrowed voice, ignored
+  malformed graph or asset is introduced. Extend #271 to include these aliases.
+
 ## Saracen healing aura and source discrepancy (#187/#285)
 
 - **Owned:** DAT civ9/tree261/team409, current tree research28/454/368,
@@ -1029,3 +1075,40 @@ A row is added in the same commit as the value. "Where" is a file and a
 symbol; "Source" is one of the classes above; an inferred rule says so even
 when the result looks right. When a row is later read from a file, delete it
 — `git log` keeps the record.
+
+## Vikings source-backed runtime boundaries (#189, #301)
+
+- **Regeneration:** Berserk 692/Elite 694 `creatable.rear_attack_modifier=40`,
+  the legacy field corresponding to UGC/XS attribute 109 `cRegenerationRate`;
+  hero_mode is 0. Owned help 26574/26576 explicitly says they regenerate HP.
+  Import 40 HP/minute, rather than guessing a hero-mode constant. Continuous
+  per-tick healing, max-HP clamping, healing while garrisoned in addition to
+  building healing, and conversion-snapshot retention are **inferred scheduling
+  semantics**, tested but not native-calibrated. Dead units never regenerate.
+- **Chieftains:** tech 463/effect 517 adds 5 cavalry/+4 camel attack, increments
+  resource 274 and invokes `Effects.xs` function 5. The reviewed adapter preserves
+  its 20-gold Loot tasks on TradeBoat 2/Monk 18/RelicMonk 43/WarriorPriest 1831 and
+  5 on Villager 4. It deduplicates the repeated RelicMonk task. Contrary to
+  help 28312/120160, the script does not add a TradeCart 23 task, nor 5 gold for
+  monks. Killer credit at a direct lethal attack, once per victim, no deletion
+  reward, and productivity from the killer owner's live resource 274 are
+  **inferred task semantics**. Converted infantry retain the task snapshot but
+  read their current owner's resource. General splash/delayed-dead-shooter loot
+  is not implemented (the supported Vikings infantry are melee, without blast).
+  No blanket resource 33 support or invented tooltip-based reward is enabled.
+- **Warships:** retain DAT 395=.9 then 501/502=.94117, not a hand-written exact
+  10/15/20-percent discount from localization. Existing shared rounding occurs
+  at payment/refund; native rounding is unmeasured. Team 411 is Dock cost×.85,
+  not five resource attributes: 45/133/47/51/1189 are unit IDs, 100 the attribute.
+- **Longboats:** 250/533 have dead_unit_id −1 and four total projectiles. Use
+  existing ship composite art/death and simultaneous multi-projectile attacks;
+  spread and per-projectile native damage/cadence remain shared inferred naval
+  semantics (#260/#272). Bogsveigar 49 adds 1 attack to each line's shooter.
+- **Free economy:** tree 276 sets 213/249 price and time to zero. Existing
+  required-count activation, not empty automatic 392/400 effects, supplies the
+  grant. Free research venue/order policy remains #254. Infantry 416 multiplies
+  HP×1.2 from Feudal; 391/415 are inert, despite their old names.
+  Wheelbarrow capacity×1.2695 then Hand Cart×1.5 yields fractional thresholds
+  12.695/19.0425 from 10; the unchanged integer gather loop therefore banks
+  13/20 on a full forager trip. Native capacity rounding remains uncalibrated
+  under #301; this is not silently rounded down to the remembered 12/19.

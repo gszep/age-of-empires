@@ -210,7 +210,7 @@ class ReviewedAudioGapTest(unittest.TestCase):
         self.source()
         for sounds, key, switch in [({'select': 123}, 'persians', 'Persians'),
                                     ({'move': 3167914911}, 'persians', 'Persians'),
-                                    ({'select': 3167914911}, 'turks', 'Turks'),
+                                    ({'select': 3167914911}, 'unreviewed-civ', 'UnreviewedCiv'),
                                     ({'select': 3167914911}, 'saracens', 'Persians'),
                                     ({'select': 3167914911}, 'persians', 'Britons')]:
             with self.subTest(sounds=sounds, key=key, switch=switch):
