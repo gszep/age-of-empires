@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The gate's browser step: a private dev server, the game in headless Chrome,
+ * The owned checkpoint's browser step: a private dev server, the game in headless Chrome,
  * and the player's own input path -- a real click on a building, a real click
  * on a command button, a real key, a real right-click on the ground -- read
  * back through /__debug. `src/main.ts` holds every button's enablement and

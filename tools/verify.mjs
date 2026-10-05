@@ -23,8 +23,8 @@ const directory = resolve('.local/verification', `${started}-${process.pid}`);
 mkdirSync(directory, { recursive: true });
 rmSync('.local/verify.ok.json', { force: true });
 if (owned) {
-  rmSync('.local/gate.ok', { force: true });
-  const record = status => writeFileSync('.local/gate.latest.json', JSON.stringify({ status, pid: process.pid,
+  rmSync('.local/checkpoint.ok', { force: true });
+  const record = status => writeFileSync('.local/checkpoint.latest.json', JSON.stringify({ status, pid: process.pid,
     started: started / 1000, updated: Date.now() / 1000, log: resolve(directory, 'result.json') }));
   record('running');
   // Fail before long simulations when this checkout has an incomplete old import.
@@ -100,11 +100,11 @@ const receipt = { passed, started, seconds, full: selection.full, owned, base, s
 writeFileSync(resolve(directory, 'result.json'), JSON.stringify(receipt, null, 2));
 if (passed) writeFileSync('.local/verify.ok.json', JSON.stringify(receipt, null, 2));
 if (owned) {
-  writeFileSync('.local/gate.latest.json', JSON.stringify({ status: passed ? 'green' : 'failed: npm verification',
+  writeFileSync('.local/checkpoint.latest.json', JSON.stringify({ status: passed ? 'green' : 'failed: npm verification',
     pid: process.pid, started: started / 1000, updated: Date.now() / 1000, log: resolve(directory, 'result.json') }));
   if (passed) {
-    writeFileSync('.local/gate.ok', '');
-    utimesSync('.local/gate.ok', started / 1000, started / 1000);
+    writeFileSync('.local/checkpoint.ok', '');
+    utimesSync('.local/checkpoint.ok', started / 1000, started / 1000);
   }
 }
 console.log(`VERIFICATION ${passed ? 'GREEN' : 'FAILED'}: ${seconds.toFixed(1)}s elapsed; ${directory}`);

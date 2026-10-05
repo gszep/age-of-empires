@@ -66,7 +66,7 @@ Black Forest, Windsor, Senlac and Painted Proof. Islands changes because its
 owned resource-islet blocks omit clumping; their gold/stone quotas remain intact.
 Six natural browser map cases and fresh reloads pass, with reviewed Islands
 minimaps (`.local/rms56-browser.log`, `.local/rms56-after-*`).
-The full gate is GREEN (`.local/rms56-gate.log`, exit0):1055 Vitest tests/86 files,
+The owned checkpoint is GREEN (`.local/rms56-gate.log`, exit0):1055 Vitest tests/86 files,
 build,150 Python/owned-source tests and real-browser debug smoke. No test timeout
 was widened and no owned asset regeneration was needed.
 

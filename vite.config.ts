@@ -82,7 +82,7 @@ export default defineConfig({
     testTimeout: 30_000,
     setupFiles: ['./src/test-setup.ts'],
     // About one worker per physical core (at least four), capped at eight to
-    // leave room for play and build. On the 6-core/12-thread gate host, 8 SMT
+    // leave room for play and build. On the 6-core/12-thread verification host, 8 SMT
     // workers made 18 s owned simulations take ~25 s of their 30 s clock; 6
     // workers kept them at 17-20 s for +20 s suite wall time (#299).
     // File isolation remains enabled; CLI/env worker overrides still work.

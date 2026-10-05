@@ -81,9 +81,9 @@ fixtures both pass real-browser A/B checks over the native TC occluder:
   unchanged simulation hash. Logs: `.local/monk119-{idle,attack}-browser.log`.
 - Existing Galley and villager contour probes also pass against the normal x2
   installation (`.local/monk119-{galley,villager}-regression.log`).
-- Full checkpoint gate is GREEN (`.local/monk119-gate.log`, exit0):997 Vitest
+- Owned checkpoint is GREEN (`.local/monk119-gate.log`, exit0):997 Vitest
   tests/81 files, build,149 Python/owned-source tests and real-browser debug
-  smoke. Three workers, unchanged timeouts; only Markdown edits after gate start.
+  smoke. Three workers, unchanged timeouts; only Markdown edits after checkpoint start.
 
 These are render fixtures for both recovered atlases, not a new claim about
 monk conversion gameplay animation. Import decoding covers the complete masks;

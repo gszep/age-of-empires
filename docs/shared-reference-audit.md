@@ -14,7 +14,7 @@ on2026-09-28; see [manual-audit.md](manual-audit.md) for page-level findings and
 explicit negative results for elevation multipliers and route-profit formulas.
 The source-reading task #60 is complete; the runtime questions below remain.
 
-The tooling/evidence follow-up passed the full one-worker gate on
+The tooling/evidence follow-up passed the full one-worker owned checkpoint on
 2026-09-27 after the host became idle: **960 Vitest tests /73 files**, build,
 **130 Python/owned-content tests**, and real-browser debug smoke. Exit0 and
 `GATE GREEN` are recorded in `.local/shared-reference-audit-gate.log`. The two

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # What a session needs to know before it touches anything, read from the
-# things that cannot go stale: git, the issue tracker, the gate's last run,
+# things that cannot go stale: git, the issue tracker, the last owned checkpoint,
 # the manifest on disk and the process table. The prose queues used to carry
 # this and were wrong within a day (docs/reviews/2026-09-19.md, §7).
 #
@@ -34,8 +34,8 @@ dirty=$(git status --porcelain | wc -l)
 [ "$dirty" -gt 0 ] && echo "working tree has $dirty changed path(s):" && git status --short | head -10
 [ "$behind" != "0" ] && [ "$behind" != "?" ] && echo "-> git pull before starting; another session has pushed."
 
-section "gate"
-node tools/report-data.mjs gate
+section "checkpoint"
+node tools/report-data.mjs checkpoint
 
 section "imported content"
 m=public/imported/aoe2/manifest.json
@@ -57,7 +57,7 @@ if command -v systemctl >/dev/null; then
     echo "managed shared service unavailable or not installed"
   fi
 fi
-procs=$(ps -eo pid,etime,args | grep -E 'vite|chrome|convert_sld|import_aoe2|gate\.sh|tsx .*probes|shared-host\.mts|shared-join\.mjs' | grep -v grep | grep -v session_start || true)
+procs=$(ps -eo pid,etime,args | grep -E 'vite|chrome|convert_sld|import_aoe2|verify\.mjs|tsx .*probes|shared-host\.mts|shared-join\.mjs' | grep -v grep | grep -v session_start || true)
 if [ -n "$procs" ]; then echo "$procs" | cut -c1-120; else echo "nothing of ours"; fi
 
 section "issues (bugs first — anything tagged bug outranks every queue)"
@@ -89,6 +89,6 @@ section "next"
 cat <<'EOF'
 1. Read AGENTS.md, then docs/overnight.md's standing rules, then docs/lessons.md.
 2. Bugs first, in issue order; then decisions the human has answered; then enhancements.
-3. Run tools/gate.sh before every commit; push after every commit.
+3. Run npm run verify:owned before every code commit; push after every commit.
 4. Before an unattended OpenCode run: tools/session_start.sh --unattended, then the live-session probes in docs/overnight.md.
 EOF

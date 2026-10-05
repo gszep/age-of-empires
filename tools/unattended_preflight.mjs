@@ -54,7 +54,7 @@ export function preflight() {
   const asks = unresolvedAsks(agent.permissions);
   assert.equal(asks.length, 0, `approval rules remain: ${JSON.stringify(asks)}`);
   for (const [permission, pattern] of [
-    ['shell', 'npm test'], ['shell', 'tools/gate.sh'], ['shell', 'git push'],
+    ['shell', 'npm test'], ['shell', 'npm run verify:owned'], ['shell', 'git push'],
     ['shell', 'gh issue comment 79 --body evidence'], ['edit', `${root}src/sim/game.ts`],
     ['read', `${root}docs/overnight.md`], ['glob', '**/*.json'], ['grep', 'gather'],
     ['webfetch', 'https://opencode.ai/v2/docs/permissions/'],

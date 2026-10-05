@@ -73,7 +73,7 @@ After a result distinguishes policies:
    or provenance changes, cross a JSON save during conversion and after capture,
    then compare continuation and synchronization hashes; retain replay coverage.
 4. Update the ledger and affected status/coverage text. Run relevant simulation
-   tests, browser acceptance for affected player actions, and the full gate before
+   tests, browser acceptance for affected player actions, and the owned checkpoint before
    any commit. Close #178 only when its acceptance questions are resolved or its
    scope is explicitly revised by the user.
 
@@ -114,9 +114,9 @@ deadlines after transformation; #255 tracks the unnecessary owned-asset copying
 on verification builds. An initial one-worker full `npm test` also exceeded its
 600-second invocation deadline while still progressing.
 
-The subsequent optimized full gate completed **GREEN** in14m50s:
+The subsequent optimized owned checkpoint completed **GREEN** in14m50s:
 **1108 Vitest tests /89 files** (7 existing inapplicable cases skipped), public
 bundle build, **159 import tests**, and real-browser debug smoke. Receipt:
 `.local/gate-optimization.log`, exit0. No test timeout was widened; tests run at
-two workers/nice10, and the gate build omits redundant owned-asset copies while
+two workers/nice10, and the checkpoint build omits redundant owned-asset copies while
 the import tests/browser still consume owned content.

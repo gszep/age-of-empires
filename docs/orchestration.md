@@ -59,7 +59,7 @@ general/explore agents. Direct implementation by the coordinator is reserved for
 integration glue and conflict resolution, not an entire backlog in one context.
 Delegation is authorized for the requested scope. Start with two implementation
 workers; increase only for disjoint work and available CPU.
-One coordinator owns integration, source regeneration, the full gate and rollout.
+One coordinator owns integration, source regeneration, the owned checkpoint and rollout.
 Multiple orchestrators may coordinate separate issues, but must agree on one
 integration owner before publishing to main.
 
@@ -72,7 +72,7 @@ Base SHA / branch / absolute worktree:
 Owned paths and excluded shared interfaces:
 Dependencies / acceptance / targeted checks:
 Return: diff summary, exact checks, evidence paths, unresolved questions,
-        commit SHA (if gated) or working-tree status, remaining processes.
+        commit SHA (if checkpointed) or working-tree status, remaining processes.
 ```
 
 Create each worker with `node tools/worktree.mjs create issue-N-topic origin/main`
@@ -89,10 +89,10 @@ from a running checkout. Owned depots are read-only inputs. Workers needing new
 imports coordinate a single import slot and private output; never mutate the
 household release's assets. `.local/**` remains excluded from suite discovery.
 
-Do not run multiple full gates/imports concurrently. Workers run targeted checks
+Do not run multiple owned checkpoints/imports concurrently. Workers run targeted checks
 and return bounded changes. Under this repository's green-before-commit rule,
 an ungated worker returns its intact worktree to the coordinator rather than
-bypassing the commit guard. The coordinator schedules its gate/commit, then
+bypassing the commit guard. The coordinator schedules its checkpoint/commit, then
 integrates the branch normally and verifies the combined tree. Push completed
 worker commits to their named branches; only the coordinator pushes main.
 
@@ -132,13 +132,13 @@ preflight first. A completed routing probe is not an unattended endurance test.
 
 1. Use the read-only Astra `reviewer` on returned changes and evidence. Check the
    reported symptom and public outcomes, not only implementation assertions.
-   Reviews do not replace the coordinator's executed acceptance/gate checks.
+   Reviews do not replace the coordinator's executed acceptance/checkpoint checks.
 2. Fetch main, inspect divergence, merge published history normally. Never rebase
    or force-push published commits. Integrate one branch at a time; resolve shared
    interface conflicts with the owning worker before moving to the next.
-3. Freeze the combined tree. Run mapped acceptance and `tools/gate.sh` directly
-   with output redirected to a unique log. Record skips and gate-stage timings.
-   CI is additional evidence, not a replacement for the local owned-content gate.
+3. Freeze the combined tree. Run mapped acceptance and `npm run verify:owned` directly
+   with output redirected to a unique log. Record skips and checkpoint stage timings.
+   CI is additional evidence, not a replacement for the local owned-content checkpoint.
 4. Commit/push the verified result, attach SHA/checks to the issue, then update
    the Project. Done means integrated and verified, not merely worker-finished.
 5. Retire with `node tools/worktree.mjs retire issue-N-topic` only after integration.
@@ -170,7 +170,7 @@ during a rollout.
   live acceptance. Do not remove assertions, widen clocks or replace behavioral
   tests with constant checks to make CI faster. A no-op is a valid audit result.
 - Measure after with the same tool and `git diff --numstat <base>`; report added,
-  deleted and net lines, plus before/after build and full-gate stage seconds on
+  deleted and net lines, plus before/after build and owned-checkpoint stage seconds on
   comparable idle runs. Say when timing is unavailable; line savings are not a
   speed measurement. Keep logs in ignored `.local/` and summarize on the issue.
 - Commit verified reductions as `refactor:` or `docs:` and push. Record retained

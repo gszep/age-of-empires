@@ -23,8 +23,8 @@ echo
 if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then
   node tools/report-data.mjs issues "$since"
 fi
-echo "## Tests and gate"
-node tools/report-data.mjs gate
+echo "## Tests and owned checkpoint"
+node tools/report-data.mjs checkpoint
 echo "- test files changed: $(git diff --name-only "$start"..HEAD | grep -cE '\.test\.ts$|test_import' )"
 echo "- timeout/clock-related added diff lines (review candidates, not a count of widened clocks): $(git diff "$start"..HEAD -- 'src/**/*.test.ts' vite.config.ts | grep -cE '^\+.*(timeout|maxTimeSeconds|maxTicks|Ticks\b.*[0-9]{4,})' )"
 echo

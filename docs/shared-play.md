@@ -188,7 +188,7 @@ deleted or replaced during incompatible startup.
 `tools/session_start.sh` reports the managed service's active/substate, last
 exit status, result and restart counter even when no process is running. The
 gate records its actual redirected log and result in `.local/gate.latest.json`,
-so named issue logs are reported instead of a stale default `gate.log`.
+so named issue logs are reported instead of a stale default log.
 For a private host test, `MATCH_CHECKPOINT` overrides the saved path and
 `MATCH_PORT` overrides the listener port; normal household defaults are unchanged.
 
@@ -256,7 +256,7 @@ interrupted response is terminated without crashing the gateway.
 npx vitest run src/shared/match.test.ts
 npx tsx tools/shared_smoke.mts
 npx tsx tools/map_menu_smoke.mts
-tools/gate.sh > .local/gate.log 2>&1
+npm run verify:owned > .local/verify-owned.log 2>&1
 ```
 
 The shared smoke starts private servers on 5201/5202 and drives two real

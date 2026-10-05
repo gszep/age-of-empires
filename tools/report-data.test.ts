@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { fetchIssues, gateReport, instant, issueReport } from './report-data.mjs';
+import { checkpointReport, fetchIssues, instant, issueReport } from './report-data.mjs';
 
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn(), spawnSync: vi.fn() }));
 const directories: string[] = [];
@@ -38,42 +38,39 @@ describe('run report evidence (#159)', () => {
     const root = mkdtempSync(join(tmpdir(), 'empires-report-'));
     directories.push(root);
     mkdirSync(join(root, '.local'));
-    writeFileSync(join(root, '.local/gate.log'), 'GATE GREEN\n');
-    const record = (status: string) => writeFileSync(join(root, '.local/gate.latest.json'), JSON.stringify({
-      status, pid: 123, started: 1_000, log: '/repo/.local/named-issue-gate.log',
+    const record = (status: string) => writeFileSync(join(root, '.local/checkpoint.latest.json'), JSON.stringify({
+      status, pid: 123, started: 1_000, log: '/repo/.local/verification/run/result.json',
     }));
     return { root, record };
   }
 
-  it('reports named failures and interruptions rather than a stale green default log', () => {
+  it('reports named failures and interruptions rather than a stale green', () => {
     const { root, record } = fixture();
     record('failed: npm run build');
-    expect(gateReport(root)).toContain('failed: npm run build; log /repo/.local/named-issue-gate.log');
+    expect(checkpointReport(root)).toContain('failed: npm run build; log /repo/.local/verification/run/result.json');
     record('running');
-    expect(gateReport(root, () => false)).toContain('interrupted (gate process is gone)');
-    expect(gateReport(root, () => true)).toContain(': running;');
+    expect(checkpointReport(root, () => false)).toContain('interrupted (verification process is gone)');
+    expect(checkpointReport(root, () => true)).toContain(': running;');
     record('green');
-    expect(gateReport(root)).toContain('green run has no gate sentinel');
-    writeFileSync(join(root, '.local/gate.ok'), '');
-    expect(gateReport(root)).not.toContain('no gate sentinel');
+    expect(checkpointReport(root)).toContain('green run has no checkpoint sentinel');
+    writeFileSync(join(root, '.local/checkpoint.ok'), '');
+    expect(checkpointReport(root)).not.toContain('no checkpoint sentinel');
   });
 
-  it('does not fall back to stale success when the latest record is malformed', () => {
+  it('does not report success when the latest record is missing or malformed', () => {
     const { root } = fixture();
-    expect(gateReport(root)).toContain('legacy default log only');
-    writeFileSync(join(root, '.local/gate.latest.json'), '{broken');
-    expect(gateReport(root)).toContain('cannot read latest gate record');
-    expect(gateReport(root)).not.toContain('GATE GREEN');
+    expect(checkpointReport(root)).toContain('no owned checkpoint record');
+    writeFileSync(join(root, '.local/checkpoint.latest.json'), '{broken');
+    expect(checkpointReport(root)).toContain('cannot read latest checkpoint record');
+    expect(checkpointReport(root)).not.toContain('green');
   });
 
-  it('recognizes the npm verifier PID as a live gate, but not an unrelated process', () => {
+  it('recognizes the npm verifier PID as a live checkpoint, but not an unrelated process', () => {
     const { root, record } = fixture();
     record('running');
-    for (const args of ['node tools/verify.mjs --full --owned', 'bash /repo/tools/gate.sh']) {
-      vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: args } as never);
-      expect(gateReport(root)).toContain(': running;');
-    }
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'node tools/verify.mjs --full --owned' } as never);
+    expect(checkpointReport(root)).toContain(': running;');
     vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'node unrelated.mjs' } as never);
-    expect(gateReport(root)).toContain('interrupted');
+    expect(checkpointReport(root)).toContain('interrupted');
   });
 });

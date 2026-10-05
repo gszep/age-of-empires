@@ -17,7 +17,7 @@ changes and verify the installed-CLI mock-provider smoke before promising readin
 1. `git pull`, then `tools/session_start.sh`. It says whether the manifest is
    stale (re-run `tools/import_aoe2.sh` if so — about three minutes with a
    warm atlas cache, an hour if a decoder file changed), what is running, and
-   what the gate last said.
+   what the last owned checkpoint said.
 2. Read `AGENTS.md` and `docs/lessons.md`. The lessons are grouped by the
    moment they apply; read the group before you reach that moment, not after.
 3. **Ask the human before starting.** Every overnight run that opened with
@@ -53,7 +53,7 @@ changes and verify the installed-CLI mock-provider smoke before promising readin
 - **One integration at a time, in the tracker's order**: bugs, then decisions
   the human has answered, then enhancements. Independent implementation may run
   in bounded worker worktrees under [orchestration.md](orchestration.md). An item
-  is done only when its acceptance and the combined tree's gate pass; commit and
+  is done only when its acceptance and the combined tree's owned checkpoint pass; commit and
   push before integrating the next. Preserve blocked work in its durable tree,
   record why on the issue, and keep main at a verified checkpoint.
 - **The clock is `date`, not memory.** Run it before every progress note;
@@ -80,7 +80,7 @@ changes and verify the installed-CLI mock-provider smoke before promising readin
   two and a half hours and three tries.
 - **Compression follows a substantial integrated batch**, before the next:
   safe-point dead-code/documentation audit, retained regression coverage,
-  measured source delta and build/gate timing. Never during an active rollout.
+  measured source delta and build/checkpoint timing. Never during an active rollout.
 - **Tuning has a budget.** Two batches without movement means the variable
   is wrong: instrument the state over time, do not try a third value. Ship
   the best measured configuration and record the curve.
@@ -98,7 +98,7 @@ changes and verify the installed-CLI mock-provider smoke before promising readin
   not by memory; kill the litter; name what deliberately survives.
 - **The morning report is generated, not recalled**:
   `tools/morning_report.sh <start-commit> [since-ISO-time]` prints the commits, the issues
-  closed and opened, the gate, the ledger rows added and a *not verified*
+  closed and opened, the owned checkpoint, the ledger rows added and a *not verified*
   section to fill in by hand — every claim the run could not check, every
   approximation, every fixture clock widened. Pass the recorded run-start time
   when it differs from the start commit's timestamp. Counts recalled from memory

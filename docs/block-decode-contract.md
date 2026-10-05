@@ -119,10 +119,10 @@ Regenerated-content evidence:
   records3,886,724,288 versus879,238,400 decoded sprite bytes. Its265MB manifest
   now travels over private gzip HTTP rather than CDP interception, avoiding the
   protocol's response-body size limit without reducing fixture content.
-- Full gate **GREEN**, `.local/bc256-gate.log`, exit0,14m00s:1108 Vitest tests
+- Owned checkpoint **GREEN**, `.local/bc256-gate.log`, exit0,14m00s:1108 Vitest tests
   across89 files (the same7 inapplicable cases skipped), public bundle build,
   164 Python/owned-content tests, and real-browser debug smoke. No test timeouts
-  were widened. Only Markdown edits followed the gate start.
+  were widened. Only Markdown edits followed the checkpoint start.
 
 Native compression rollout remains separate under#163. The earlier requirement
 of zero differences between one8-bit PNG and every legacy hardware BC decoder

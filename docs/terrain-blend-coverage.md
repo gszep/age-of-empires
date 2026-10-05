@@ -100,9 +100,9 @@ in `.local/land116-browser{,-r2}.log`; no tolerance or timeout was widened.
 A real-texture overview is `.local/land116-crossings.png`. It supplements the
 numbers and is **our renderer**, not a DE reference capture.
 
-Full gate **GREEN**, `.local/land116-gate.log`, exit0,13m52s:1117 Vitest tests
+Owned checkpoint **GREEN**, `.local/land116-gate.log`, exit0,13m52s:1117 Vitest tests
 across89 files (the same7 inapplicable cases skipped), build,164 Python/import
-tests and real-browser debug smoke. Only Markdown edits followed gate start.
+tests and real-browser debug smoke. Only Markdown edits followed checkpoint start.
 
 ```bash
 npx tsx tools/land_blend_smoke.mts
@@ -159,7 +159,7 @@ the50 land-crossing and450 farm checks also pass. The full import reused4898
 sprite/layer atlases and completed all stages. Same-camera seed2 captures are
 `.local/shore284-all.png` and `.local/shore284-after-all.png`; foam/surface-off
 controls are retained beside them. No simulation-state changes were observed.
-Full gate GREEN: `.local/shore284-gate.log`, exit0,790s;1384 Vitest passes with
+Owned checkpoint GREEN: `.local/shore284-gate.log`, exit0,790s;1384 Vitest passes with
 the same8 skips,200 Python passes, typecheck/build and real-browser debug smoke.
 The focused view suite passed39 tests and the two new owned-source window tests
 passed. Existing orientation/contour and deterministic-publication checks also

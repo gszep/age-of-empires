@@ -1,4 +1,4 @@
-/** Explicit feature acceptance receipts. The ordinary gate is not a substitute. */
+/** Explicit feature acceptance receipts. The ordinary owned checkpoint is not a substitute. */
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';

@@ -17,13 +17,13 @@ simulation; Three.js is only a view.
   cases need not prevent play; never hide known failures to make a check green.
 - Target 1–5 minute normal verification. Measure before adding machinery; retain
   expensive checks only where they establish an outcome cheaper checks cannot.
-  Do not block a playable preview on unrelated gates or full asset regeneration.
+  Do not block a playable preview on unrelated checks or full asset regeneration.
 - Preserve a seed/replay/tick/view context for useful human reports; ask humans
   for perceptual judgement, not work the protocol can answer automatically.
 
 ## Start Here
 
-- Run `tools/session_start.sh` first. It reports git divergence, gate/import
+- Run `tools/session_start.sh` first. It reports git divergence, checkpoint/import
   freshness, relevant processes, and the GitHub issue queue. The tracker is the
   work queue: human-filed bugs first, then answered `decision` issues, then
   enhancements. File newly discovered gaps with evidence instead of leaving
@@ -65,7 +65,7 @@ npm run dev
 npx vitest run src/sim/naval.test.ts
 npx vitest run src/sim/naval.test.ts -t "works a fish"
 uv run --locked python -m unittest discover -s tools -p 'test_import_aoe2.py' -k test_a_sheet_that_fits_keeps_the_one_page_shape -v
-tools/gate.sh > .local/gate.log 2>&1
+npm run verify:owned > .local/verify-owned.log 2>&1
 ```
 
 - `npm run build` is the typecheck (`tsc --noEmit`) plus Vite build; there is no
@@ -73,11 +73,10 @@ tools/gate.sh > .local/gate.log 2>&1
   `uv run --locked`, never ad-hoc `pip` installs.
 - `npm run verify` runs conservative selected tests alongside public typecheck/build;
   `verify:full` runs all public tests/build. The checkpoint `npm run verify:owned`
-  additionally runs owned import tests and real-browser smoke; `tools/gate.sh` is
-  its compatibility wrapper. Redirect output to a file, never through a pipe.
-  `.local/gate.ok` is written only after the owned checkpoint passes, stamped at
+  additionally runs owned import tests and real-browser smoke. Redirect output to
+  a file, never through a pipe. `.local/checkpoint.ok` is written only after the owned checkpoint passes, stamped at
   start; any later non-Markdown edit invalidates it. See `docs/TESTING.md`.
-  Markdown-only commits need no gate. Commit only green work and push each
+  Markdown-only commits need no checkpoint. Commit only green work and push each
   commit; model-provider tests remain opt-in.
 - Verification builds with `OPEN_CONTENT_ONLY=1`: do not copy the local owned
   asset tree into `dist` on every check. Owned checks still read source depots and
@@ -85,8 +84,8 @@ tools/gate.sh > .local/gate.log 2>&1
 - Vitest uses about one worker per physical core (4–8), a 30 s test timeout, and a
   macrotask yield after each test. CPU contention can otherwise report a worker
   RPC failure after every assertion passed. `--maxWorkers=1` now overrides the
-  default; `VITEST_MAX_FORKS`/`VITEST_MAX_THREADS` still work for gate runs.
-  Run the full gate on an idle host.
+  default; `VITEST_MAX_FORKS`/`VITEST_MAX_THREADS` still work for checkpoint runs.
+  Run the owned checkpoint on an idle host.
 - For long jobs, keep a PID/file handle and wait with
   `tools/wait_for.sh pid|file|gone <target> [timeout]`; do not use `pgrep -f`,
   `pkill -f`, bare `sleep`, or sleep loops. After starting or killing work,
@@ -97,14 +96,14 @@ tools/gate.sh > .local/gate.log 2>&1
 - For requested multi-item work, use the issue-backed coordinator/worker contract
   in `docs/orchestration.md`. Independent workers may
   use separate durable worktrees; one coordinator serializes integration, imports,
-  full gates and rollout. No two workers edit the same checkout.
+  owned checkpoints and rollout. No two workers edit the same checkout.
 - The default coordinator is Opus 5.5; bounded workers use Haiku 4.5, with one
   focused retry before Astra escalation. Writable children first acknowledge an
   initialization-only prompt, then the parent moves their session into the worktree
   before resuming the assignment. Prompt paths alone do not relocate patch tools.
 - After a substantial integrated batch, run a safe-point compression round:
   remove demonstrated dead code/stale prose, consolidate duplicates,
-  retain behavioral coverage, and report source-line and build/gate timing deltas.
+  retain behavioral coverage, and report source-line and build/checkpoint timing deltas.
   Never trim during a rollout or competing edits; a justified no-op is acceptable.
 
 - Complete one playable behaviour end to end before broadening content. A
@@ -113,7 +112,7 @@ tools/gate.sh > .local/gate.log 2>&1
 - Turn broad mandates into an explicit checklist with verification per item,
   and report unmet items at handoff.
 - Before an interactive handoff, run the checks relevant to the changed code,
-  even when no commit is being made. The full gate still applies at commit time.
+  even when no commit is being made. The owned checkpoint still applies at commit time.
 - Prefer narrow maintained libraries over custom commodity infrastructure,
   fixture-tested before adoption (`docs/library-strategy.md`).
 

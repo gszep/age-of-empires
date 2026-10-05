@@ -76,7 +76,7 @@ other missing events and broken audio still fail. The isolated eight-profile
 audio fixture passes with4321 playable cues and exactly3 gaps; the regular audio
 browser acceptance passes. Persians itself is not enabled: its preserved profile
 still needs integration, full regeneration, civilisation-specific browser checks
-and the checkpoint gate. See [handoff](handoff.md) and
+and the owned checkpoint. See [handoff](handoff.md) and
 [audio evidence](audio-reference.md#reviewed-persian-trade-cart-source-gaps-271).
 
 `npm run import:aoe2` is the only full publication entrypoint. It resolves pinned
@@ -123,7 +123,7 @@ evidence. Do not reuse one incident's diagnosis for every later failure.
 
 Verification is exposed through npm: selected/full tests alongside public build,
 then owned import tests and real-browser smoke for the complete checkpoint.
-`tools/gate.sh` delegates to `npm run verify:owned`; [testing](TESTING.md) records the policy;
+`npm run verify:owned` is the commit checkpoint; [testing](TESTING.md) records the policy;
 `tools/session_start.sh` reports the actual latest run, not a recalled count.
 
 The [orchestration workflow](orchestration.md) adds issue-backed Project helpers,
@@ -157,7 +157,7 @@ when the chosen ceiling is full despite spare houses, then releases after a loss
 Gothic Imperial+10 still requires housing. Native selector values were captured
 on the installed newer DE build; factory default and pinned-build bonus runtime
 calibration remain open. [Population/Wonder evidence](wonder-victory.md) records
-the checkpoint verification; latest gate results come from session startup.
+the checkpoint verification; latest checkpoint results come from session startup.
 
 Established historical measurements, with their original scope:
 

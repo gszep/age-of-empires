@@ -29,19 +29,19 @@ writeFileSync(resolve(work, '.gitignore'), '.local/\ntools/\n.opencode/\nopencod
 writeFileSync(resolve(work, 'app.ts'), 'fixture');
 execFileSync('git', ['add', '.gitignore', 'app.ts'], { cwd: work });
 const commit = 'git -c user.name=Fixture -c user.email=fixture@example.invalid commit -m fixture';
-const gate = resolve(work, '.local/gate.ok');
+const stamp = resolve(work, '.local/checkpoint.ok');
 const cases = [
   { id: 'bare-wait', command: 'sleep 0', refusal: 'bare sleep', commits: 0 },
   { id: 'pattern-wait', command: 'pgrep -f "^OEL_NONEXISTENT_FIXTURE_PROCESS$"', refusal: 'pgrep -f / pkill -f', commits: 0 },
   { id: 'pattern-kill', command: 'pkill -f "^OEL_NONEXISTENT_FIXTURE_PROCESS$"', refusal: 'pgrep -f / pkill -f', commits: 0 },
   { id: 'loop-wait', command: 'while false; do sleep 0; done', refusal: 'sleep loop', commits: 0 },
-  { id: 'missing-gate', command: commit, refusal: 'no green gate', commits: 0 },
-  { id: 'stale-gate', command: commit, refusal: 'changed since', commits: 0, prepare() {
-    mkdirSync(resolve(work, '.local')); writeFileSync(gate, ''); utimesSync(gate, 1, 1);
+  { id: 'missing-checkpoint', command: commit, refusal: 'no green owned checkpoint', commits: 0 },
+  { id: 'stale-checkpoint', command: commit, refusal: 'changed since', commits: 0, prepare() {
+    mkdirSync(resolve(work, '.local')); writeFileSync(stamp, ''); utimesSync(stamp, 1, 1);
   } },
-  { id: 'fresh-gate', command: commit, commits: 1, prepare() { writeFileSync(gate, ''); } },
+  { id: 'fresh-checkpoint', command: commit, commits: 1, prepare() { writeFileSync(stamp, ''); } },
   { id: 'markdown-exemption', command: commit.replace('-m fixture', '-m markdown'), commits: 2, prepare() {
-    rmSync(gate); writeFileSync(resolve(work, 'README.md'), 'Markdown-only fixture\n');
+    rmSync(stamp); writeFileSync(resolve(work, 'README.md'), 'Markdown-only fixture\n');
     execFileSync('git', ['add', 'README.md'], { cwd: work });
   } },
   { id: 'file-handle', command: 'bash tools/wait_for.sh file .local/job.exit 0 && node -p "\'file-handle-ok\'"', output: 'file-handle-ok', commits: 2, prepare() {
@@ -126,7 +126,7 @@ try {
    writeFileSync(resolve('.local/harness.ok.json'), JSON.stringify({ fingerprint,
       version: execFileSync('opencode', ['--version'], { encoding: 'utf8' }).trim(), at: new Date().toISOString(), evidence,
      cases: outcomes.map(outcome => outcome.id) }));
-    console.log(`HARNESS SMOKE GREEN: ${cases.length} real CLI cases; wait/missing/stale refusals, gated and Markdown commits, file/gone/PID handles; ${evidence}`);
+    console.log(`HARNESS SMOKE GREEN: ${cases.length} real CLI cases; wait/missing/stale refusals, checkpointed and Markdown commits, file/gone/PID handles; ${evidence}`);
 } finally {
   clearTimeout(watchdog); server.closeAllConnections(); await new Promise(resolveDone => server.close(resolveDone));
   if (existsSync(resolve(root, 'data/opencode/log'))) cpSync(resolve(root, 'data/opencode/log'), resolve(evidence, 'cli-log'), { recursive: true });

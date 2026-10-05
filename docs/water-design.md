@@ -117,7 +117,7 @@ fisherman art to import.
 ## What has to be built
 
 In dependency order. Each stage is meant to be shippable on its own, with the
-gate green, and to leave the game playable if the next stage never happens.
+checkpoint green, and to leave the game playable if the next stage never happens.
 
 **W1. A terrain grid in the simulation.** Done -- see above.
 

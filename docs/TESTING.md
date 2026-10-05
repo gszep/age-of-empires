@@ -16,12 +16,11 @@ named machine; report failures and skips separately. Human play is part of the
 | `npm run verify:full` | All Vitest tests and public typecheck/build, in parallel |
 | `npm run test:import` | Locked Python importer/source tests; needs owned inputs for fidelity coverage |
 | `npm run debug:smoke` | Real-browser gameplay checks on a private server |
-| `npm run verify:owned` | Full test/build, then importer tests and browser checks; stamps the commit gate only on success |
+| `npm run verify:owned` | Full test/build, then importer tests and browser checks; stamps the commit checkpoint only on success |
 
-`tools/gate.sh` is a compatibility wrapper for `npm run verify:owned`, not another
-implementation. Logs, per-stage statuses and elapsed time are under
+Logs, per-stage statuses and elapsed time are under
 `.local/verification/`; `.local/verify.ok.json` is only written on success. The
-owned gate retains its start-time `.local/gate.ok` stamp so later edits invalidate
+owned checkpoint retains its start-time `.local/checkpoint.ok` stamp so later edits invalidate
 it. Normal verification does not pretend to have checked owned assets or pixels.
 
 ## Selection policy
@@ -41,7 +40,7 @@ iteration optimization, not permission to suppress a known failure.
 
 Vitest uses about one worker per physical core (at least four, at most eight; half
 the logical CPUs, since SMT workers slowed 18 s simulations to ~25 s on the 6-core
-gate host) with file isolation intact. Explicit `--maxWorkers` and Vitest
+verification host) with file isolation intact. Explicit `--maxWorkers` and Vitest
 environment overrides remain available. Vitest schedules by file, so the economy
 suite, the headless victory match and the herding seeds live in separate files;
 adding workers alone cannot accelerate a single serial test. Build and test use

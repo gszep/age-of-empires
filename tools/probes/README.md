@@ -1,7 +1,7 @@
 # Probes
 
 Scripts that ask the game a question. They are not tests — nothing here runs in
-the gate — but they are how most rendering, UI and movement questions in this
+the owned checkpoint — but they are how most rendering, UI and movement questions in this
 project get answered without a human looking at a screen. Some are meant to be
 copied and thrown away; `pathing.ts` and `farm_mapping.py` are meant to be
 re-run, because a doc cites their numbers.
@@ -51,7 +51,7 @@ handles and per-stage timeouts. Logs, GNU-time metrics and a final `report.json`
 stay under the new `.local` directory; an existing directory is never overwritten.
 Atlas-stage timing is separate from whole-pipeline timing so cold audio/UI work
 is not counted as an atlas-cache speedup. A single x1 measurement is not an x2,
-physical-GPU or universal throughput claim. This long probe is outside the gate.
+physical-GPU or universal throughput claim. This long probe is outside the owned checkpoint.
 
 **Hardware block-compression evaluation (#163):**
 `uv run --locked python tools/probes/block_compression_fixture.py`, then
@@ -77,7 +77,7 @@ disassembler on owned `.so` shader resources only. See
 the corrected endpoint bug and permitted hardware interpolation differences.
 
 These scripts live directly under `tools/` and start private Vite/browser
-fixtures. Run `npx tsx tools/<name>.mts`; they supplement the gate's general
+fixtures. Run `npx tsx tools/<name>.mts`; they supplement the owned checkpoint's general
 browser smoke and are maintained regression tools.
 
 - **`audio_smoke.mts`** — #114's real select/move/attack and paid house-build

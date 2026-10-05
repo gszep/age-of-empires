@@ -267,7 +267,7 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 - **Parallel workers need a shared canonical registry, not a cwd-relative one.**
   Worktree operations invoked from a linked tree must resolve the primary checkout
   before acquiring their operation lock or choosing a retirement base. Independent
-  edits can run concurrently; imports, full gates and main integration stay under
+  edits can run concurrently; imports, owned checkpoints and main integration stay under
   one coordinator. Temporary-Git tests cover nested invocation and dirty/unmerged
   retirement (`tools/worktree.test.ts`).
 
@@ -281,7 +281,7 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   with the shell the harness times out; a job meant to outlive its command is
   started with `setsid` writing an exit file and waited on from a separate
   command.
-- **A monitoring timeout is not a job failure.** The six-plus-minute gate
+- **A monitoring timeout is not a job failure.** The six-plus-minute checkpoint
   repeatedly outlived 120-second sentinel waits while every stage passed. Use
   a 600-second wait with a longer tool timeout, and a fresh exit-file name so
   a previous run cannot satisfy the new wait.
@@ -291,18 +291,18 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 - **Decoder edits cost the hour; batch them and run them first, alone.**
 - **`convert_sld.py --terrain-only` for a terrain slot**; the full pipeline
   for everything else, and always the pipeline, never one step.
-- **The gate runs on an idle machine.**
+- **The owned checkpoint runs on an idle machine.**
 - **WSL idle CPU is not host idle CPU.** On 2026-09-22 Linux reported 85–87%
-  idle while Windows reported Cyberpunk at 584% CPU. Two gate runs timed out
+  idle while Windows reported Cyberpunk at 584% CPU. Two checkpoint runs timed out
   in different existing long tests; the sheep test passed alone at 21 s against
   its unchanged 30 s limit. Once the human freed the host, all 658 tests and the
-  full gate passed with unchanged limits. Inspect host load before retrying or
+  owned checkpoint passed with unchanged limits. Inspect host load before retrying or
   widening clocks.
 - **Reduce workers before widening a test clock.** On 2026-09-21 two six-worker
-  gates timed out in the existing full-match tests; the same tree passed with
-  `VITEST_MAX_FORKS=3 VITEST_MAX_THREADS=3 tools/gate.sh`. Vitest's environment
+  checkpoints timed out in the existing full-match tests; the same tree passed with
+  `VITEST_MAX_FORKS=3 VITEST_MAX_THREADS=3 npm run verify:owned`. Vitest's environment
   overrides the configured ceiling. #85's full JSONL match subsequently needed
-  one worker for a contention-free gate. No fixture timeout needed changing.
+  one worker for a contention-free checkpoint. No fixture timeout needed changing.
 - **Managed restart loops are workload too.** Inspect `systemctl --user`
   state and `NRestarts`, not just a momentary process list: the shared host
   retried an incompatible checkpoint thousands of times while session-start
@@ -313,13 +313,13 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   Linux does not necessarily shrink the VHD immediately. This establishes
   storage pressure, not the cause of a machine-check panic.
 - **After a disconnect or reboot, recheck the job handle before waiting.**
-  An interrupted gate left a NUL-filled log and no process; an old tool wait
+  An interrupted checkpoint left a NUL-filled log and no process; an old tool wait
   was not evidence of a live job. Use a new named log/exit file when restarting.
 - **An asset set that grows fourfold breaks whatever loaded it all at
   once.** The pack's 5.5 GB of sprite pages, fetched up front as the x1
-  set had been, took the WSL VM down inside the gate's browser step (the
+  set had been, took the WSL VM down inside the checkpoint's browser step (the
   "core dump" of 2026-09-20). After an import that changes the art's size,
-  sample `free` during `debug:smoke` before running the gate.
+  sample `free` during `debug:smoke` before running the checkpoint.
 - **A single-threaded hour on twelve cores is a loop to parallelise, not
   a wait.** The x2 conversion paced at five hours on one worker; four
   workers took 57 minutes, and the change was outside the decoder's
@@ -328,17 +328,17 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   `import_aoe2.sh`'s PID left `convert_sld.py` converting at full speed;
   read the table after a kill and kill the child by its own PID.
 - **Never edit a shell script while it is running.** Bash reads a script
-  incrementally, so an edit to `tools/gate.sh` mid-run hands the running
+  incrementally, so an edit to a running shell script mid-run hands the running
   copy a different file from the offset it had reached; kill the run,
   edit, restart. The sentinel guards against the other half: anything
-  edited after a gate *started* counts as untested.
+  edited after a checkpoint *started* counts as untested.
 - **Freeze app code during private-browser acceptance.** A live simulation edit
   during#184 caused a full reload and restored the fixture paused halfway through
   research. The wait correctly timed out; repeating with frozen code passed.
   Finish edits before measuring, or stop and restart the probe explicitly.
 - **More than two or three DAT questions is a one-shot script.**
   `tools/datq.py` reloads the DAT per call; fourteen calls beside a running
-  gate hit the tool timeout.
+  checkpoint hit the tool timeout.
 
 ## Before declaring something done
 
@@ -357,7 +357,7 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   claimed to wire `accuracyPercent` and did not.
 - **A zero-context patch places an insertion by line number and says
   nothing.** Stage a subset by rebuilding the file from the index with
-  content anchors; gate it from a tarball of the tree, never a stash.
+  content anchors; verify it from a tarball of the tree, never a stash.
 - **Counts in a report come from commands** (`git rev-list --count`,
   `grep -c`), and the clock from `date`. Four of five morning reports
   miscounted; one wrapped a nineteen-hour run at dawn on a narrated clock.
@@ -370,7 +370,7 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 
 - **A doc that names a path checks the path is tracked**
   (`git ls-files --error-unmatch`). Tooling worth a doc is worth committing.
-- **Read the gate's status on the line after it, never through a pipe or a
+- **Read the checkpoint's status on the line after it, never through a pipe or a
   `:`** (`AGENTS.md`); the script exists because prose did not hold.
 - **Never rebase published commits**; integrate worktrees by merge or
   cherry-pick, and check `git log origin/main..` before any history edit.

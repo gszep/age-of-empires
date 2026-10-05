@@ -65,7 +65,7 @@ Private published-asset browser clicks cover all five, including a live Spies
 price change, actual resource transfers and 729 changed sRGB impact pixels
 (`.local/britons-final-research-browser.log`). Focused outcomes cover owner
 isolation and JSON continuation. This is gameplay evidence, not an inference from
-the empty `missingRoster` array. Final gate **GREEN**: 906 tests / 70 files,
+the empty `missingRoster` array. Final owned checkpoint **GREEN**: 906 tests / 70 files,
 build, 124 owned-import tests and general browser smoke
 (`.local/britons-final-gate-r1.log`), with no timeout widening.
 Shared follow-ups add the locked two-player diplomacy/tribute dialog (ec26a02)
@@ -140,7 +140,7 @@ No civilisation bonuses or roster expansion are included in this checkpoint.
 
 ### Supported Britons/Franks integration verification (2026-09-25)
 
-The subsequent bonus/roster integration gate is **GREEN: 820 Vitest tests / 64
+The subsequent bonus/roster integration checkpoint is **GREEN: 820 Vitest tests / 64
 files, build, 114 Python/import tests and real-browser debug smoke**
 (`.local/civ-profiles-checkpoint-gate.log`, one Vitest worker, unchanged timeouts).
 `npm run import:aoe2` repeated byte-identically for content, UI and audio manifests
@@ -158,7 +158,7 @@ are real and unmodified. The refreshed TC smoke passes too
 
 Integration fixes include disabled naval child filtering, ram/gate tree aliases,
 preserving conversion snapshots during bonuses, and work-rate-aware observation
-countdowns. Earlier gate failures exposed old root-only atlas assertions,
+countdowns. Earlier checkpoint failures exposed old root-only atlas assertions,
 all-definitions-are-trainable assumptions and omitted scenario prerequisites.
 Those fixtures were corrected explicitly; the AI spending fixture now supplies
 its two required completed Dark-Age buildings rather than widening its clock.
@@ -205,7 +205,7 @@ Initial fixture corrections used source50HP fishing ships, TC garrison admission
 Euclidean movement distance and the missing-type naval upgrade row, without
 widening any test clock.
 
-Final full gate **GREEN** (`.local/japanese183-gate.log`),14m47s:
+Final owned checkpoint **GREEN** (`.local/japanese183-gate.log`),14m47s:
 1150 Vitest tests/90 files,7 inapplicable Gothic fortification cases skipped,
 public build,168 owned/Python tests and real-browser smoke. Full enabled import
 completed (`.local/japanese183-enabled-import.log`), reusing3907 atlas groups.
@@ -257,7 +257,7 @@ probe failure exposed its pages-as-strings assumption: the correctly rendered
 actual page URL. Another attempt was interrupted by an agent edit causing a full
 reload/pause; the complete run was repeated with code frozen. No clock widened.
 
-The broader gate exposed old fixture assumptions: every civilisation paying200
+The broader checkpoint exposed old fixture assumptions: every civilisation paying200
 food for Fortified Wall, every opening containing three villagers, an effect mock
 omitting its real `c` field, a shooter-dispersion assertion applied to projectile
 definitions, and an Incendiaries target inventory predating the captured Dragon
@@ -271,7 +271,7 @@ The complete enabled import (`.local/chinese184-enabled-import.log`) reused4101
 atlas groups. The first import's canonical-namespace cache misses took about80
 minutes; concrete evidence is recorded on#257, not hidden as a stalled job.
 
-Final gate **GREEN**, exit0,19m27s (`.local/chinese184-gate-r3.log`):
+Final owned checkpoint **GREEN**, exit0,19m27s (`.local/chinese184-gate-r3.log`):
 1186 Vitest tests/91 files,7 existing inapplicable Gothic fortification cases
 skipped, public bundle build,172 Python/owned-content tests and real-browser
 debug smoke. No test timeout or fixture clock was widened.
@@ -321,7 +321,7 @@ per-use scale/pages; malformed references fail and legacy inline metadata works.
 Published-enabled acceptance, frame-metadata/general-browser and owned/fallback
 cargo receipts all pass (`.local/byzantines-published-acceptance.log`,
 `.local/atlas268-acceptance.log`, `.local/byzantines-cargo-acceptance.log`). Final
-gate **GREEN**,13m05s:1218 TypeScript tests/100 files,8existing skips, build,
+owned checkpoint **GREEN**,13m05s:1218 TypeScript tests/100 files,8existing skips, build,
 184 owned/Python tests and real-browser smoke (`.local/byzantines-gate.log`).
 Live household deployment remains separately versioned in the current handoff.
 
@@ -331,10 +331,10 @@ Current scoped acceptance and remaining shared work:
 
 | Civilisation | Remaining coverage beyond the enabled supported profile |
 |---|---|
-| Britons (#179) | Reviewed random-map gameplay scope accepted in db2c9c0/605f7f7 with full gates and actual browser outcomes; the shared limitations below remain explicit |
-| Franks (#180) | Paid Bearded Axe/Chivalry/elite axeman acceptance and Heresy conversion-death implemented and browser-verified on2026-09-28; full gate GREEN. Shared native conversion/cargo calibration remains#178 |
-| Goths (#181) | Enabled and verified through published-profile browser acceptance and a GREEN full checkpoint gate. Shared population-setting/native Incendiaries calibration remains#253/#252 |
-| Teutons (#182) | Enabled and verified through published-profile browser acceptance and a GREEN full gate. Conversion queue/cargo/probability and zero-time grant calibration remain#178/#254 |
+| Britons (#179) | Reviewed random-map gameplay scope accepted in db2c9c0/605f7f7 with owned checkpoints and actual browser outcomes; the shared limitations below remain explicit |
+| Franks (#180) | Paid Bearded Axe/Chivalry/elite axeman acceptance and Heresy conversion-death implemented and browser-verified on2026-09-28; owned checkpoint GREEN. Shared native conversion/cargo calibration remains#178 |
+| Goths (#181) | Enabled and verified through published-profile browser acceptance and a GREEN owned checkpoint. Shared population-setting/native Incendiaries calibration remains#253/#252 |
+| Teutons (#182) | Enabled and verified through published-profile browser acceptance and a GREEN owned checkpoint. Conversion queue/cargo/probability and zero-time grant calibration remain#178/#254 |
 | Japanese (#183) | Source-backed roster, bonuses, both unique technologies, Samurai/elite and Elite Cannon Galleon; native approach/packing calibration is#259, shared conversion is#178 |
 | Chinese (#184) | Source-backed complete available roster, starting/economy/fortification bonuses and regional/unique weapons; native timing, projectile ordering and rounding calibration is#260 |
 | Byzantines (#185) | Source-backed roster, age/price/sight/naval/healing bonuses, Cataphracts/elite, Camel Riders/elite, Logistica and Greek Fire; native healing/blast/HP calibration is#267 |
@@ -418,9 +418,9 @@ tests pass. Native conversion odds, cargo and other shared engine calibration
 limitations remain separately tracked; these checks do not establish native
 runtime parity.
 
-Checkpoint gate GREEN (`.local/franks-gate-r2.log`):1061 Vitest tests/87 files,
+Owned checkpoint GREEN (`.local/franks-gate-r2.log`):1061 Vitest tests/87 files,
 build,151 owned-import tests and browser debug smoke. Three workers, unchanged
-timeouts. The first gate found a missing TypeScript player-attribute union member;
+timeouts. The first checkpoint found a missing TypeScript player-attribute union member;
 it was added before the passing run. No fixture clocks were widened.
 
 Choose **Britons versus Franks** for #122/#123. Both use the owned `CivWest`
@@ -482,14 +482,14 @@ unchanged-source rerun and subsequent published run both pass. No timeout was
 widened. The Castle-Age confirmation test was updated to include independently
 researched tower types rather than assuming every tower is an upgrade descendant.
 
-The first full gate also exposed a definition/availability mismatch: unavailable
+The first owned checkpoint also exposed a definition/availability mismatch: unavailable
 building definitions remain available for captured/scenario entities, but their
 `buildable` flag now respects the civilisation's tree. The page invariant tests
 all loaded profiles and their full research sets. Mapping capacity attribute2
 also activates the owned standard transport bonuses1163/1164:20/20/25/35 by age.
 Four public group-boarding checks verify the exact limits; the old base-20 test
 now explicitly uses Dark Age. Long AI/relic tests pass focused reruns; host Windows
-game/Steam CPU contention motivated a one-worker gate, without changing timeouts.
+game/Steam CPU contention motivated a one-worker checkpoint, without changing timeouts.
 Redundant full-stat lookups for unchanged drop-site categories/attack presence
 were also removed. Before/after whole-state hashes match for three seeds through
 12000 ticks with both example AIs and a captured defensive structure
@@ -505,7 +505,7 @@ The owned DAT provides the new permission gates and error strings. Source-define
 windows do not establish native random odds; queue cancellation, cargo inheritance,
 normal healing's zero-range sentinel and zero-time research venue/ordering remain
 explicit ledger inferences. #178 and#254 retain those reference questions. Full
-import completed (`.local/teutons-enabled-import.log`). Final checkpoint gate
+import completed (`.local/teutons-enabled-import.log`). Final owned checkpoint
 **GREEN** (`.local/teutons-gate-r4.log`):1105 Vitest tests/89 files,7 inapplicable
 Gothic fortification cases skipped, build,159 owned-import tests and real-browser
 debug smoke. One worker, unchanged timeouts. Only Markdown changed afterwards.
@@ -546,9 +546,9 @@ profile's available tech tree: seven inapplicable Gothic stone/tower tests skip,
 and public rejection is verified separately. Briton/Frank cases remain exercised.
 No test or fixture clocks were widened.
 
-Full gate GREEN (`.local/goths-gate-r2.log`):1076 Vitest tests/88 files,7 explicitly
+Owned checkpoint GREEN (`.local/goths-gate-r2.log`):1076 Vitest tests/88 files,7 explicitly
 inapplicable Gothic fortification cases skipped, build,156 owned-import tests,
-and real-browser debug smoke. The first gate exposed an availability-path
+and real-browser debug smoke. The first checkpoint exposed an availability-path
 performance regression: resolving all units' combat effects was unnecessary.
 Only changed training-location units now need full resolution. The affected
 isolated AI test measured28.4→13.1s; three seeds through12000 ticks have identical
@@ -585,7 +585,7 @@ acceptance (`.local/saracens-browser-r2.log`): selection/restart/reload, ORIE HU
 castle/Mameluke/elite/camel/monk/market/ship art, paid age and unique research,
 passive healing, Mameluke damage, discounted market construction/exchange and
 naval upgrades. Detailed source exports stay local under `.local/saracens-*`.
-Final checkpoint gate **GREEN** (`.local/saracens-final-gate.log`):1403 Vitest tests across111
+Final owned checkpoint **GREEN** (`.local/saracens-final-gate.log`):1403 Vitest tests across111
 files, build,204 owned-import tests and general real-browser debug smoke.
 Ten Saracen-specific outcomes pass; generic profile building tests additionally
 exercise Saracen age stats, armour damage and JSON continuation. Eight existing
@@ -613,7 +613,7 @@ fidelity gaps remain open; this receipt does not claim native calibration.
   Teutons, Japanese, Chinese, Byzantines and Saracens, retaining the listed shared engine/reference gaps.
 - [x] Verify mixed matches, age changes, already-paid queues/refunds, conversions,
   garrisons, JSON save/reload and deterministic replay through public actions.
-- [x] Verify the actual selection/command UI in a private browser and run the gate.
+- [x] Verify the actual selection/command UI in a private browser and run the owned checkpoint.
 
 Conversion deserves a separate reference check: changing owner must not silently
 recompute the captured unit using the wrong civilisation's base stats or bonuses.

@@ -9,7 +9,7 @@ async function run(fail = '', owned = false, stale = false) {
   mkdirSync('/tmp/opencode', { recursive: true });
   const root = mkdtempSync('/tmp/opencode/verify-'); roots.push(root);
   mkdirSync(join(root, '.local'));
-  writeFileSync(join(root, '.local/gate.latest.json'), JSON.stringify({ status: 'green', started: 1, log: 'old' }));
+  writeFileSync(join(root, '.local/checkpoint.latest.json'), JSON.stringify({ status: 'green', started: 1, log: 'old' }));
   mkdirSync(join(root, 'bin'));
   mkdirSync(join(root, 'public/imported/aoe2'), { recursive: true });
   writeFileSync(join(root, 'public/imported/aoe2/manifest.json'), JSON.stringify(stale ? {} : {
@@ -46,22 +46,22 @@ it('runs test/build concurrently and records each successful outcome', async () 
   const receipt = JSON.parse(readFileSync(join(root, '.local/verify.ok.json'), 'utf8'));
   expect(receipt.timings.map((step: { script: string }) => step.script).sort()).toEqual(['build:public', 'test']);
   expect(events.slice(0, 2).map(event => event.event)).toEqual(['start', 'start']);
-  expect(existsSync(join(root, '.local/gate.ok'))).toBe(false);
+  expect(existsSync(join(root, '.local/checkpoint.ok'))).toBe(false);
 });
 
 it.each(['test', 'build:public', 'test:import', 'debug:smoke'])('never stamps a pass when %s fails', async fail => {
   const { root, code, events } = await run(fail, true);
   expect(code).toBe(1);
   expect(existsSync(join(root, '.local/verify.ok.json'))).toBe(false);
-  expect(existsSync(join(root, '.local/gate.ok'))).toBe(false);
+  expect(existsSync(join(root, '.local/checkpoint.ok'))).toBe(false);
   if (fail === 'test' || fail === 'build:public') expect(events.some(event => event.script === 'test:import')).toBe(false);
   if (fail === 'test:import') expect(events.some(event => event.script === 'debug:smoke')).toBe(false);
 });
 
-it('only stamps the owned gate after every stage passes', async () => {
+it('only stamps the owned checkpoint after every stage passes', async () => {
   const { root, code, events } = await run('', true);
   expect(code).toBe(0);
-  expect(existsSync(join(root, '.local/gate.ok'))).toBe(true);
+  expect(existsSync(join(root, '.local/checkpoint.ok'))).toBe(true);
   expect(events.filter(event => event.event === 'end').map(event => event.script).slice(-2)).toEqual(['test:import', 'debug:smoke']);
   expect(events.filter(event => event.event === 'start').map(event => [event.script, event.open]).sort()).toEqual([
     ['build:public', '1'], ['debug:smoke', '0'], ['test', '0'], ['test:import', '0'],
@@ -72,8 +72,8 @@ it('rejects a stale owned manifest before starting expensive checks', async () =
   const { root, code, events } = await run('', true, true);
   expect(code).toBe(1);
   expect(events).toEqual([]);
-  expect(existsSync(join(root, '.local/gate.ok'))).toBe(false);
-  const latest = JSON.parse(readFileSync(join(root, '.local/gate.latest.json'), 'utf8'));
+  expect(existsSync(join(root, '.local/checkpoint.ok'))).toBe(false);
+  const latest = JSON.parse(readFileSync(join(root, '.local/checkpoint.latest.json'), 'utf8'));
   expect(latest.status).toBe('failed: owned manifest preflight');
   expect(latest.started).toBeGreaterThan(1);
 });

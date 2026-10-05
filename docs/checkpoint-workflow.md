@@ -34,7 +34,7 @@ scope reporting; its synthetic mode commands are not game-browser evidence.
 The explicit `known-gap`
 AI progression scenario currently fails; it is not silently waived or covered by
 the green Feudal-start component test. `check` will report it as missing a pass.
-The general gate remains the four existing stages. Feature and endurance checks
+The general owned checkpoint remains the four existing stages. Feature and endurance checks
 are separate required evidence for their affected boundaries; do not blindly run
 every expensive soak for every documentation/tooling edit.
 
@@ -48,7 +48,7 @@ tool calls; do not bypass them with encoded commands or wrapper scripts.
 After plugin/config changes **restart OpenCode**. The current session does not
 hot-load plugins. `node tools/harness_smoke.mjs` uses the installed CLI, an isolated
 scratch Git repository and a local mock provider to verify eleven actual tool
-calls: bare/pattern/loop waits, missing/stale gate refusals, a gated commit,
+calls: bare/pattern/loop waits, missing/stale checkpoint refusals, a checkpointed commit,
 the Markdown-only exemption, and successful file/gone/PID handle waits. Git
 history is checked after each call; per-call results and raw CLI/provider output
 are retained. No global Git configuration, paid inference or real provider
@@ -78,7 +78,7 @@ Provider heartbeat bytes are not progress. Fifteen minutes without a completed
 tool stops the run; the total deadline applies even if tools keep completing.
 The values above are chosen run policy, not native game or provider constants.
 
-For a healthy longer import/gate, start it with a retained job handle and register
+For a healthy longer import/checkpoint, start it with a retained job handle and register
 a finite lease before waiting:
 
 ```bash
@@ -103,7 +103,7 @@ node tools/worktree.mjs retire issue-name
 ```
 
 The helper permits distinct durable worker worktrees and refuses retirement of
-dirty or unmerged work. One coordinator serializes integration and full gates;
+dirty or unmerged work. One coordinator serializes integration and owned checkpoints;
 workers use disjoint scopes and targeted checks. The assignment, review, Projects
 and compression contract is in [orchestration.md](orchestration.md). Implementation
 patches/worktrees never belong under `/tmp`. `.local/**` stays excluded from

@@ -56,7 +56,7 @@ clocks through simulation ticks; no production rule is shortened by the browser
 fixture. The separate unit fixture uses fast construction but retains the full
 200-year victory clock. Shared JSON followers reproduce the final ticks/winner.
 
-Full checkpoint gate GREEN on October3:1363 tests passed/8existing skips,
+Owned checkpoint GREEN on October3:1363 tests passed/8existing skips,
 build,193 owned import/tool tests and real-browser debug smoke (810seconds).
 All six selected feature receipts pass on the same non-Markdown tree; no
 existing assertion or clock was relaxed.

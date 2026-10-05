@@ -14,7 +14,7 @@ process started at2026-10-01T15:15:11Z, after the config edit at15:13:53Z, and
 actual Read-tool access to the log directory succeeded after restart.
 
 Verification before commit: merged-config deadline check, resolved log read/edit
-permission checks and unattended preflight all passed. The full checkpoint gate
+permission checks and unattended preflight all passed. The owned checkpoint
 passed in17m28s (`.local/timeout261-gate.log`, exit0):1186 Vitest tests across91
 files,7 existing inapplicable skips, build,172 Python/import tests and real-browser
 debug smoke. No application rules or test timeouts changed for this safeguard.

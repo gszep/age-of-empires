@@ -18,7 +18,7 @@ board generated from the real ridge at Senlac.
 These are the reasons this can be attempted without supervision. Everything else
 is negotiable.
 
-- **The gate is green at every commit.** `tools/gate.sh`, not by hand.
+- **The owned checkpoint is green at every commit.** `npm run verify:owned`, not by hand.
 - **Determinism holds.** Same seed and same inputs, same checksum, on any
   machine. Every stage here changes the map, so every stage needs a determinism
   test, and any float that reaches `GameState` is a bug waiting for a different

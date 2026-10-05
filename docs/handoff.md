@@ -8,7 +8,7 @@ reviews. Do not append old test counts here as if they describe the latest tree.
 
 - Latest verified source: `7511606`, pushed to `origin/main`, fixes cold unit
   sprite flicker (#287) and manual selection of units over farms (#289).
-  Full gate `.local/issues287-289-gate.log` is GREEN:1413 tests/111 files,
+  Owned checkpoint `.local/issues287-289-gate.log` is GREEN:1413 tests/111 files,
   eight skipped, typecheck/open-content build,204 owned-import tests and
   real-browser debug smoke;1061s total. No timeout widening.
   Dedicated sprite first-appearance, residency/eviction and contour probes pass;
@@ -16,6 +16,11 @@ reviews. Do not append old test counts here as if they describe the latest tree.
   occupancy probe passes. Browser evidence uses Chrome/SwiftShader; physical-GPU
   confirmation remains unverified. These fixes are committed and pushed but
   have not been deployed to the installed household release.
+- The verification term "gate" is retired. `npm run verify:owned` is the
+  owned checkpoint; it writes `.local/checkpoint.ok` (read by the commit guard)
+  and `.local/checkpoint.latest.json` (read by `tools/session_start.sh`).
+  `tools/gate.sh` is removed. Dated reviews and old `.local/*-gate.log`
+  evidence paths keep their original names.
 - Cannon Galleon shots (#297) now draw every imported projectile layer. The
   DAT graphic's first layer is the shadow-only `p_ball_shadow` (an empty 1×1
   main sheet); the ball is `idle-layer-1`, which the old single-sheet path
@@ -30,7 +35,7 @@ reviews. Do not append old test counts here as if they describe the latest tree.
   Final regeneration after consolidation passed (`.local/saracens-final-import.log`).
 - Shoreline tile-grid correction (#284): `watershore` now uses complete
   96-pixel source windows with per-family UV layout metadata. The full import,
-  shoreline/land/farm probes and checkpoint gate passed; see the
+  shoreline/land/farm probes and owned checkpoint passed; see the
   [correction evidence](terrain-blend-coverage.md#shoreline-tile-grid-correction-284-october3).
   Regenerated shore assets need the updated viewer. Exact native UV and
   crossing-width calibration remains #116; broader visual acceptance is #113.
@@ -38,13 +43,13 @@ reviews. Do not append old test counts here as if they describe the latest tree.
   names are Slow/Casual/Normal/Fast; new preferences and pristine shared hosts
   default to Normal (1.7). Existing saved indices retain their multipliers.
   [Issue evidence](https://github.com/gszep/age-of-empires/issues/280#issuecomment-5966448309)
-  records the full import, feature receipts and green gate. Sustained wall-clock,
+  records the full import, feature receipts and green owned checkpoint. Sustained wall-clock,
   factory-reset and pinned-runtime calibration remain open.
 - Population ceilings (`bea4e91`, #253) and opt-in Wonder victory (`66bee0a`,
   #110) are implemented across solo/shared/replay flows. See
   [Wonder evidence](wonder-victory.md) and the ledger for native calibration and
   automatic map-size-default limits. Public agent exposure is tracked in #281.
-- Run `tools/session_start.sh` for the actual latest gate and local process
+- Run `tools/session_start.sh` for the actual latest owned checkpoint and local process
   state. Feature receipts bind to code/imported metadata; an earlier green
   receipt is not fresh verification after later edits.
 - Earlier siege, gate, import, audio and deployment receipts are preserved in
@@ -76,7 +81,7 @@ installed protocol 2 are distinct. [Shared play](shared-play.md) describes use.
   in `.local/worktrees/persians186-blocked`, branch `work/persians186-blocked`,
   base `f94b18e`, with `.local/persians186-blocked.patch`. Recheck that worktree
   before integrating with current main; full regeneration, integration outcomes,
-  Persian browser acceptance and gate remain required. See
+  Persian browser acceptance and owned checkpoint remain required. See
   [source-gap evidence](audio-reference.md#reviewed-persian-trade-cart-source-gaps-271)
   and the historical snapshot for diagnostic logs; aura/payout calibration is #269.
 - **Owned source #277:** recovered Slavic monk x1 validates, but default-depot

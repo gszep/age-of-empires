@@ -115,20 +115,20 @@ describe('real shell guards through V2 callbacks', () => {
     await expect(before('shell', { command })).rejects.toThrow(reason);
   });
 
-  it('rejects missing/stale gates and permits a fresh gate in the shell workdir', async () => {
+  it('rejects missing/stale checkpoints and permits a fresh checkpoint in the shell workdir', async () => {
     const { before } = await registered(source);
     const run = () => before('shell', { command: 'git commit -m fixture', workdir: root });
-    await expect(run()).rejects.toThrow('no green gate');
-    const gate = resolve(root, '.local/gate.ok');
-    writeFileSync(gate, '');
-    utimesSync(gate, 1, 1);
+    await expect(run()).rejects.toThrow('no green owned checkpoint');
+    const stamp = resolve(root, '.local/checkpoint.ok');
+    writeFileSync(stamp, '');
+    utimesSync(stamp, 1, 1);
     await expect(run()).rejects.toThrow('changed since');
     const future = new Date(Date.now() + 1000);
-    utimesSync(gate, future, future);
+    utimesSync(stamp, future, future);
     await expect(run()).resolves.toBeUndefined();
   });
 
-  it('permits Markdown-only commits without a gate', async () => {
+  it('permits Markdown-only commits without a checkpoint', async () => {
     execFileSync('git', ['rm', '-f', 'app.ts'], { cwd: root });
     writeFileSync(resolve(root, 'README.md'), 'fixture');
     execFileSync('git', ['add', 'README.md'], { cwd: root });

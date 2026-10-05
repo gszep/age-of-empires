@@ -1,5 +1,5 @@
-/** Shared, instant-based tracker/gate reporting for unattended runs (#159). */
-import { existsSync, readFileSync, statSync } from 'node:fs';
+/** Shared, instant-based tracker/checkpoint reporting for unattended runs (#159). */
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -41,42 +41,35 @@ export function issueReport(since, fetch = fetchIssues) {
   ].join('\n');
 }
 
-function gateRunning(pid) {
+function checkpointRunning(pid) {
   if (!Number.isSafeInteger(pid) || pid <= 0) return false;
   const process = spawnSync('ps', ['-p', String(pid), '-o', 'args='], { encoding: 'utf8' });
-  return process.status === 0 && /(?:^|[\s/])(?:gate\.sh|verify\.mjs)(?:\s|$)/.test(process.stdout);
+  return process.status === 0 && /(?:^|[\s/])verify\.mjs(?:\s|$)/.test(process.stdout);
 }
 
-export function gateReport(root = '.', running = gateRunning) {
-  const record = join(root, '.local/gate.latest.json');
-  if (existsSync(record)) {
-    try {
-      const run = JSON.parse(readFileSync(record, 'utf8'));
-      if (typeof run.started !== 'number' || typeof run.status !== 'string' || typeof run.log !== 'string') {
-        throw new Error('missing gate record fields');
-      }
-      const status = run.status === 'running' && !running(run.pid) ? 'interrupted (gate process is gone)' : run.status;
-      const lines = [`latest run started ${instant(run.started * 1000).toISOString()}: ${status}; log ${run.log}`];
-      if (status === 'green' && !existsSync(join(root, '.local/gate.ok'))) lines.push('-> green run has no gate sentinel; rerun before committing code');
-      return lines.join('\n');
-    } catch (error) {
-      return `cannot read latest gate record: ${error.message}; run tools/gate.sh`;
+export function checkpointReport(root = '.', running = checkpointRunning) {
+  const record = join(root, '.local/checkpoint.latest.json');
+  if (!existsSync(record)) return 'no owned checkpoint record in .local/ — run npm run verify:owned before the first code commit';
+  try {
+    const run = JSON.parse(readFileSync(record, 'utf8'));
+    if (typeof run.started !== 'number' || typeof run.status !== 'string' || typeof run.log !== 'string') {
+      throw new Error('missing checkpoint record fields');
     }
+    const status = run.status === 'running' && !running(run.pid) ? 'interrupted (verification process is gone)' : run.status;
+    const lines = [`latest run started ${instant(run.started * 1000).toISOString()}: ${status}; log ${run.log}`];
+    if (status === 'green' && !existsSync(join(root, '.local/checkpoint.ok'))) lines.push('-> green run has no checkpoint sentinel; rerun before committing code');
+    return lines.join('\n');
+  } catch (error) {
+    return `cannot read latest checkpoint record: ${error.message}; run npm run verify:owned`;
   }
-  const legacy = join(root, '.local/gate.log');
-  if (existsSync(legacy)) {
-    const status = readFileSync(legacy, 'utf8').split('\n').reverse().find(line => /GATE (GREEN|FAILED)/.test(line)) ?? 'no terminal result';
-    return `legacy default log only (named runs may be newer): ${statSync(legacy).mtime.toISOString()}: ${status}`;
-  }
-  return 'no gate log in .local/ — run tools/gate.sh before the first commit';
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     const mode = process.argv[2];
-    if (mode === 'gate') console.log(gateReport());
+    if (mode === 'checkpoint') console.log(checkpointReport());
     else if (mode === 'issues') console.log(issueReport(process.argv[3]));
-    else throw new Error('usage: node tools/report-data.mjs gate|issues <since-ISO-time>');
+    else throw new Error('usage: node tools/report-data.mjs checkpoint|issues <since-ISO-time>');
   } catch (error) {
     console.error(`Report data unavailable (not verified): ${error.message}`);
     process.exitCode = 1;
