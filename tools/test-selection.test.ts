@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { criticalTests, getChangedFiles, selectTests } from './test-selection.mjs';
 
@@ -20,7 +21,9 @@ async function expectFull(changed: string[], reason: RegExp) {
   expect(result).toEqual({ full: true, tests: [], reason: expect.stringMatching(reason) });
 }
 beforeEach(() => {
-  root = mkdtempSync('/tmp/opencode/test-selection-');
+  const scratch = resolve(tmpdir(), 'opencode');
+  mkdirSync(scratch, { recursive: true });
+  root = mkdtempSync(resolve(scratch, 'test-selection-'));
   git('init', '-q');
   git('config', 'user.name', 'Fixture');
   git('config', 'user.email', 'fixture@example.invalid');
@@ -37,7 +40,7 @@ beforeEach(() => {
   commit();
   git('update-ref', 'refs/remotes/origin/main', 'HEAD');
 });
-afterEach(() => rmSync(root, { recursive: true, force: true }));
+afterEach(() => { if (root) rmSync(root, { recursive: true, force: true }); });
 
 describe('git uncertainty and change union', () => {
   it('unions committed, staged, unstaged and untracked paths, excluding ignored files', () => {
