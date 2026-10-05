@@ -1,7 +1,25 @@
 # Agent Brief
 
-Open Empires Lab is a deterministic TypeScript AoE2-compatible RTS slice. The
-browser and Node runners import the same simulation; Three.js is only a view.
+Open Empires Lab is a playable AoE2-compatible game and agent experimentation
+environment. Browser and Node runners share one authoritative TypeScript
+simulation; Three.js is only a view.
+
+## Product priorities
+
+- Read `docs/product.md`: human play and agent experimentation reinforce each
+  other. Faithful, engaging play on **Ysgramor and Artemis** enables rapid human
+  feedback; agents use faster-than-realtime headless/protocol/metadata checks.
+- The north star is generated historical co-op campaigns from battle accounts
+  and real geography, followed by open-ended strategy discovery/self-play as the
+  environment hardens. Current 1v1 play is groundwork, not delivered co-op.
+- Choose a coherent playable subset before exhaustive AoE2 parity. Prioritize
+  shared play, controls, readable visuals and meaningful interactions. Rare edge
+  cases need not prevent play; never hide known failures to make a check green.
+- Target 1–5 minute normal verification. Measure before adding machinery; retain
+  expensive checks only where they establish an outcome cheaper checks cannot.
+  Do not block a playable preview on unrelated gates or full asset regeneration.
+- Preserve a seed/replay/tick/view context for useful human reports; ask humans
+  for perceptual judgement, not work the protocol can answer automatically.
 
 ## Start Here
 
@@ -13,7 +31,7 @@ browser and Node runners import the same simulation; Three.js is only a view.
 - Read `docs/lessons.md` before working; its rules are grouped by the moment
   they apply. Autonomous runs also follow `docs/overnight.md`, one verified and
   pushed item at a time.
-- Use `README.md` for play and command coverage, `docs/architecture.md` for
+- Use `README.md` for the human overview, `docs/play.md` for controls, `docs/architecture.md` for
   boundaries, `docs/status.md` for delivered scope/evidence, and
   `docs/ledger.md` for every approximation. Prune stale status/lessons at
   handoff rather than only appending.
@@ -53,18 +71,18 @@ tools/gate.sh > .local/gate.log 2>&1
 - `npm run build` is the typecheck (`tsc --noEmit`) plus Vite build; there is no
   separate lint or formatter task. Python dependencies are locked by `uv`; use
   `uv run --locked`, never ad-hoc `pip` installs.
-- The checkpoint gate is exactly `npm test`, build, owned-content import tests,
-  then the real-browser debug smoke. Run `tools/gate.sh` directly with output
-  redirected to a file, never through a pipe. It writes `.local/gate.ok` only
-  on GREEN, stamped at gate start; any later non-Markdown edit invalidates it.
+- `npm run verify` runs conservative selected tests alongside public typecheck/build;
+  `verify:full` runs all public tests/build. The checkpoint `npm run verify:owned`
+  additionally runs owned import tests and real-browser smoke; `tools/gate.sh` is
+  its compatibility wrapper. Redirect output to a file, never through a pipe.
+  `.local/gate.ok` is written only after the owned checkpoint passes, stamped at
+  start; any later non-Markdown edit invalidates it. See `docs/TESTING.md`.
   Markdown-only commits need no gate. Commit only green work and push each
   commit; model-provider tests remain opt-in.
-- The gate builds with `OPEN_CONTENT_ONLY=1`: do not copy the local owned asset
-  tree into `dist` on every verification. Import tests still read owned sources
-  and the private browser smoke still serves owned assets from `public/`.
-  Stage timings and separate `.local/gate-step-npm-*.log` files preserve evidence.
-  Gate children run at nice10 by default (`GATE_NICE=0` overrides).
-- Vitest defaults to at most two workers, a 30 s test timeout, and a
+- Verification builds with `OPEN_CONTENT_ONLY=1`: do not copy the local owned
+  asset tree into `dist` on every check. Owned checks still read source depots and
+  `public/`. Per-stage logs/timings are under `.local/verification/`.
+- Vitest uses about one worker per physical core (4–8), a 30 s test timeout, and a
   macrotask yield after each test. CPU contention can otherwise report a worker
   RPC failure after every assertion passed. `--maxWorkers=1` now overrides the
   default; `VITEST_MAX_FORKS`/`VITEST_MAX_THREADS` still work for gate runs.
@@ -75,6 +93,19 @@ tools/gate.sh > .local/gate.log 2>&1
   inspect the process table because wrapper termination can leave children.
 
 ## Working Style
+
+- For requested multi-item work, use the issue-backed coordinator/worker contract
+  in `docs/orchestration.md`. Independent workers may
+  use separate durable worktrees; one coordinator serializes integration, imports,
+  full gates and rollout. No two workers edit the same checkout.
+- The default coordinator is Opus 5.5; bounded workers use Haiku 4.5, with one
+  focused retry before Astra escalation. Writable children first acknowledge an
+  initialization-only prompt, then the parent moves their session into the worktree
+  before resuming the assignment. Prompt paths alone do not relocate patch tools.
+- After a substantial integrated batch, run a safe-point compression round:
+  remove demonstrated dead code/stale prose, consolidate duplicates,
+  retain behavioral coverage, and report source-line and build/gate timing deltas.
+  Never trim during a rollout or competing edits; a justified no-op is acceptable.
 
 - Complete one playable behaviour end to end before broadening content. A
   production building needs its trainable unit, and a mechanic needs its
@@ -101,15 +132,16 @@ tools/gate.sh > .local/gate.log 2>&1
   `datq.py` call reloads the DAT.
 - Decoder cache fingerprints are layer-dependent (`tools/atlas_cache.py`):
   shared geometry/packing and `convert`/`convert_mask`/`page_path`/`save_pages`
-  edits invalidate all layers; BC1 edits invalidate main/player-colour. A full
-  rebuild costs about57 minutes with four workers. Batch edits; never restart before
+  edits invalidate all layers; BC1 edits invalidate main/player-colour. Batch
+  decoder edits; full rebuild cost grows with the enabled profiles. Never restart before
   checking the process table. `convert_sld.py --terrain-only` is only for a
   terrain-slot change; otherwise run the full pipeline.
 - With depot `1039811` present, sprites use `_x2.sld` at manifest `scale: 2`
   and draw at half size; sheets above 8192 px continue in `pages`. Probes must
   divide frame boxes by `atlas.scale`, and source-name tests use the suite's
-  `sld(stem)` helper. The x2 import is about 5.5 GB, so watch memory during the
-  first browser smoke after art-size changes.
+  `sld(stem)` helper. Measure current disk/residency sizes rather than relying on
+  an old single-profile estimate. Watch memory after art-size changes. Conversion
+  concurrency is CPU/memory-aware; `AOE2_IMPORT_JOBS` overrides it explicitly.
 - Tint masks must remain white/neutral RGB plus alpha because the renderer
   multiplies material colour through them. Re-imported manifests are fetched
   once per page load, so reload tester tabs before investigating stale art.

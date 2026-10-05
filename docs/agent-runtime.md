@@ -1,220 +1,75 @@
-# Agent-native runtime and strategy execution
+# Agent runtime: the implemented boundary and the next experiments
 
-These are first-class project-owned layers, not features delegated to the renderer or a generic RTS engine.
+Human play and agent experimentation share one environment; see
+[product priorities](product.md). Headless checks should shorten the feedback
+loop, not become a separate game that only passes its own tests.
 
-**Status:** the observation/command contracts, JSONL/deadline/WebSocket/MCP
-strategy adapters, timing modes, replay records, and paired headless batches
-are implemented (see `status.md`). The search coordinator, capability
-sandboxing, and evolutionary machinery described below are design intent, not
-built.
-
-## Product boundary
+## One simulation, several clients
 
 ```text
-                     authoritative simulation kernel
-                    commands ↓              ↑ observations
-                              agent gateway
-              ┌──────────────────┼──────────────────┐
-         human/browser      strategy workers      replay driver
-                                  │
-                   ┌──────────────┼──────────────┐
-                TypeScript      Python       any subprocess
-                                  │
-                         search coordinator
-                    seeds × matchups × candidates
+human/browser ─┐
+strategy      ─┼─ public commands → authoritative simulation → observations
+replay driver ─┘
 ```
 
-The simulation owns state transitions. The agent gateway owns the stable public observation/action contract. A strategy can never mutate world state directly.
+`src/sim/observe.ts` is the canonical player-filtered observation. Enemy orders,
+production and hidden state are not strategy inputs. Text descriptions derive
+from structured observations, not from a second interpretation of the world.
 
-## Structured realtime visibility
+`src/protocol/types.ts` is authoritative for versions: observations are **v8**;
+new match configs/results/records are **v2**. Legacy v1 records mean random map
+and cannot carry newer mode/population/Wonder settings. Explored terrain is
+run-length encoded with unknown cells retained as unknown. Shared-network and
+dev-snapshot versions are separate contracts, not observation versions.
 
-The canonical observation is structured and versioned. Screenshots are optional presentation evidence, never the primary input.
+## What runs today
 
-The current **observation version is 6** (`PROTOCOL_VERSION`). Version 2 added
-`buildTargetId` for the player's own units with a build order, including while
-walking to the foundation. Enemy and remembered entities never expose that
-assignment. Strategies can therefore distinguish an abandoned house from one
-with a builder on the way. Version 3 adds the naval unit kinds, `fish-trap`, and
-the `unload` order. `ungarrison` accepts an optional `target` for a transport's
-destination shore; `buildingId` names the carrier as well as ordinary buildings.
-Version 4 added own `gatherTargetId` and visible edible carcasses with zero HP
-and remaining food. Version 5 adds the `town-bell` command
-(`player`, `buildingId`, `enabled`), own town-center `townBell` state, and the
-public `hasGarrison` flag on visible entities and last-seen memory. Opponents
-can see the flag but cannot read the passenger count, identities or bell state.
-Match-config, result and recording formats remain version 1 (`MATCH_FORMAT_VERSION`).
-Version 6 adds own market buy/sell quotes and tribute fee, available Spies
-`researchCosts`, and own Fire Ship `charge` state. Its new commands are
-`exchange {player, marketId, resource: wood|food|stone, side: buy|sell, amount: 100|500}`
-and `tribute {player, recipient, resource, amount}`. Both validate and refuse
-atomically. Market base prices are shared authoritative state; fees follow the
-acting player's completed research. Spies' publicly quoted price intentionally
-reveals its enemy-villager-based cost, while enemy orders/queues remain private.
-`buildProgress` being present means a foundation is unfinished, even when its
-rounded display value is 1.
+`src/headless/runner.ts` accepts a strategy with `decide(input)` returning public
+commands and an optional `stop()`. It passes observations and rejected-command
+feedback to each player, validates commands through the simulation, and records
+commands plus periodic checksums. Replay runs those commands without calling
+the original model or strategy again.
 
-An observation includes only information legitimately observable by that player unless the caller has an explicit evaluator/debug capability:
+`src/headless/strategies.ts` supplies trusted in-process, JSONL subprocess,
+deadline subprocess, WebSocket and MCP adapters. They return the same commands;
+MCP is an adapter, not the core protocol. Ordinary subprocess strategies can be
+written in any language. Trusted in-process strategies are not a sandbox.
 
-- simulation time, tick, player, civilization, age, and population;
-- resources, gather rates, queues, capacity, idle time, and alerts;
-- own entities with stable IDs, positions, health, tasks, queues, and orders;
-- visible enemy entities plus remembered entities with `lastSeenAt`;
-- known terrain, resource clusters, visibility, and spatial summaries;
-- legal actions and reasons rejected actions would be illegal;
-- deltas since the previous observation;
-- optional event history and derived strategic summaries.
-
-One canonical schema produces several encodings:
-
-- compact typed/MessagePack representation for batch execution;
-- JSON for SDKs and debugging;
-- deterministic concise text for language-model agents;
-- tensor/spatial-plane adapters for conventional ML;
-- browser overlays and trace viewers.
-
-The text representation is derived from structured state, so it cannot become a second source of truth.
-
-Current JSON observation **v8** includes compact `terrain` rows of
-`[runLength, terrainId, elevation]`, with−1 for unexplored values. The canonical
-observer always emits it; `src/protocol/terrain.ts` decodes and validates row
-coverage for in-process strategies. This is static explored ground, not hidden
-map truth. The fishing adapter and its evidence are in `docs/ai-fishing.md`.
-
-## Universal strategy contract
-
-A strategy is a stateful program implementing the conceptual contract:
-
-```ts
-interface Strategy {
-  initialize(context: MatchContext): Promise<void> | void;
-  observe(observation: PlayerObservation): Promise<Command[]> | Command[];
-  finish(result: MatchResult): Promise<void> | void;
-}
+```bash
+npm run match -- --seed 7 --p1 builtin --p2 idle --replay .local/match.json
+npm run batch -- --matches 16 --concurrency 8 --out .local/batches/run
+npm run test:live-agent # explicit opt-in; uses existing machine authentication
 ```
 
-Strategies may maintain arbitrary private state, planners, databases, behavior trees, learned models, or call other services where the selected security profile permits it.
+The browser can load a headless replay. `src/headless/batch.ts` provides concurrent
+paired evaluation. Map, seed, rules/profile and decision cadence belong in the
+experiment's description; comparing unlike conditions is not a strategy gain.
 
-The language-neutral process protocol is the foundation. JSON Lines is the initial transparent transport; a binary encoding can be negotiated later. TypeScript and Python SDKs are conveniences over that protocol, not privileged implementations. Any language capable of reading stdin and writing stdout can be a strategy.
+## Timing and feedback
 
-Supported execution profiles should be:
+- **Synchronous:** a match waits at decision boundaries for the strategy.
+- **Deadline:** a bounded external response window keeps a slow strategy from
+  controlling wall-clock progress indefinitely; inspect the adapter's diagnostics.
+- **Accelerated:** deterministic policies run without rendering or realtime waits.
 
-1. **Trusted in-process:** fastest; TypeScript initially, suitable for built-in policies and parameter search.
-2. **Local subprocess:** arbitrary language and dependencies; isolated stdout protocol and resource limits.
-3. **Sandboxed portable module:** WASI/component model if tournament portability becomes valuable.
-4. **Remote agent:** WebSocket or RPC adapter for coding agents and model services.
-5. **Recorded command source:** replay exactly what a nondeterministic strategy previously produced.
+Use these existing modes before inventing a training framework. For a player
+report, capture the map/seed, tick or replay, relevant commands, asset/code
+revision and camera settings. Headless state can establish that a projectile
+exists and impacts correctly; a person may still be the fastest judge of whether
+its animation looks right. Neither result substitutes for the other.
 
-“Arbitrary complexity” belongs in external strategy processes. The core should not invent another constrained AoE scripting language.
+## Later, when the environment is dependable
 
-## Agentic coding tools
+Historical co-op scenarios need teams, objectives and a scenario contract before
+an account-to-campaign generator. Their asymmetry can be intentional: paired
+competitive win-rate symmetry is not the acceptance criterion for a siege.
 
-Coding agents participate in two ways.
+For strategy discovery, start with a small versioned opponent pool, paired seeds,
+held-out seeds and a matchup table. Keep the existing command/replay boundary.
+Only then consider counter-strategy generation, program evolution, leagues or
+learned policies. [Research choices](research-directions.md) explains the sources.
 
-### Agent as strategy author
-
-The agent can:
-
-1. inspect the strategy SDK, semantic game content, traces, and evaluation reports;
-2. create or edit unrestricted TypeScript, Python, Rust, or other strategy code;
-3. run focused matches and tests;
-4. inspect structured failures, rejected commands, and event traces;
-5. iterate with hot reload;
-6. submit a content-hashed strategy artifact for seeded evaluation.
-
-A strategy package can contain arbitrary modules and tests. Its manifest declares entry point, runtime, observation version, requested capabilities, and decision budget.
-
-### Agent as live strategy
-
-The coding/model agent itself can join the action-observation loop:
-
-```text
-observe → reason/tool calls → commands → advance simulation → observe
-```
-
-Adapters:
-
-- a CLI/JSONL protocol as the durable universal interface;
-- an MCP server exposing `reset`, `observe`, `act`, `step`, `runUntil`, `snapshot`, and `fork` tools;
-- WebSocket streaming for remote agents and the browser;
-- SDK wrappers for direct model/API integrations.
-
-MCP is an adapter, not the core protocol, because coding tools and MCP implementations vary. This also lets ordinary shell-capable coding agents participate without custom integration.
-
-## Timing modes
-
-Language-model latency requires explicit semantics:
-
-- **Synchronous research:** simulation pauses at a decision boundary until the agent answers. Best for reasoning and debugging.
-- **Realtime deadline:** observations stream while the strategy has a wall-clock deadline; timeout yields no-op or a configured fallback command.
-- **Accelerated headless:** deterministic code policies run as fast as possible; external LLMs normally make coarse macro-decisions rather than every low-level action.
-- **Hybrid:** a language model updates goals, production priorities, or plans at coarse intervals while deterministic strategy code handles micro and legality between calls.
-
-Decision cadence is part of the match configuration and result. An LLM must not receive extra simulation time invisibly.
-
-## Batched evolutionary exploration
-
-The search coordinator is also project-owned. It treats a strategy artifact—not only a numeric vector—as a candidate:
-
-```text
-candidate source/content hash
-  × opponents
-  × paired train seeds
-  × held-out evaluation seeds
-  × civilizations/maps
-  → match outcomes, traces, confidence intervals, fitness/Pareto metrics
-```
-
-It provides:
-
-- N independent headless worlds across workers/processes;
-- no rendering or wall-clock sleep;
-- fixed paired seeds/common random numbers;
-- compile/build caching by strategy hash;
-- deterministic strategy RNG streams;
-- early elimination/racing and confidence intervals;
-- leagues and competitive coevolution;
-- snapshot/fork evaluation from shared mid-game states;
-- machine-readable traces and concise agent-readable failure summaries;
-- resource limits so pathological candidates cannot stall a generation.
-
-Genetic operators can act on parameters, policy graphs, source modules, or whole strategy packages. Coding agents can serve as semantic mutation/crossover operators: generate a candidate, run evaluations, inspect traces, and revise code.
-
-## Reproducibility
-
-A match record contains:
-
-- game-content and rules hashes;
-- observation/action protocol version;
-- strategy source/artifact hashes;
-- seed and independent RNG stream states;
-- accepted command stream and rejected-command diagnostics;
-- periodic canonical state checksums;
-- runtime/model metadata where available.
-
-External LLM strategies are not assumed reproducible when rerun. Their accepted command stream is authoritative for replay, allowing the resulting match to be reproduced without calling the model again.
-
-## Security and fairness
-
-Strategy manifests request capabilities such as filesystem, network, model API, and wall-clock access. Batch and tournament defaults deny them. Subprocesses receive:
-
-- player-filtered observations, never hidden world state;
-- CPU, memory, output, and decision-time budgets;
-- isolated working directories;
-- deterministic environment metadata where practical;
-- protocol validation and command legality checks.
-
-Trusted in-process policies are a performance optimization and must not be used for untrusted submissions.
-
-## Ownership decision
-
-We own:
-
-1. observation and action schemas;
-2. player visibility/filtering and deterministic text rendering;
-3. the process protocol and SDK conformance suite;
-4. live-agent/MCP/WebSocket adapters;
-5. strategy packaging, capability declarations, and diagnostics;
-6. the headless batch runner and evolutionary/search coordinator;
-7. snapshots, forks, traces, checksums, and replay records.
-
-External libraries may provide serialization, process isolation, worker pools, optimization algorithms, or model clients. They do not define gameplay state, visibility, legal actions, strategy semantics, or evaluation methodology.
+Not implemented: an evolutionary/search coordinator, tournament-grade capability
+sandbox, general snapshot-fork evaluator, tensor/MessagePack observation adapters,
+or automatic historical campaign generation. These are possible extensions, not
+requirements to build pre-emptively or claims about current isolation.

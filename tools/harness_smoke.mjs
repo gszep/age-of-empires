@@ -2,24 +2,30 @@
 import { createServer } from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
-import { harnessFingerprint } from './harness-safeguards.mjs';
+import { harnessFingerprint, harnessInputs } from './harness-safeguards.mjs';
 
 mkdirSync('.local/harness-probes', { recursive: true });
 // A failed new probe must not leave an older pass advertised as current.
 rmSync('.local/harness.ok.json', { force: true });
 const fingerprint = harnessFingerprint(process.cwd());
-const root = mkdtempSync(resolve('.local/harness-probes/run-'));
+const evidence = mkdtempSync(resolve('.local/harness-probes/run-'));
+// A child under the repository inherits its ancestor config/plugins. Keep the
+// synthetic execution root outside that chain; retain receipts in durable .local.
+mkdirSync('/tmp/opencode', { recursive: true });
+const root = mkdtempSync('/tmp/opencode/empires-harness-');
 const work = resolve(root, 'work'); mkdirSync(resolve(work, 'tools/hooks'), { recursive: true });
 for (const name of ['guard_bash.sh', 'guard_commit.sh']) copyFileSync(resolve('tools/hooks', name), resolve(work, 'tools/hooks', name));
 copyFileSync(resolve('tools/wait_for.sh'), resolve(work, 'tools/wait_for.sh'));
 mkdirSync(resolve(work, '.opencode/plugins'), { recursive: true });
 copyFileSync(resolve('tools/harness-safeguards.mjs'), resolve(work, 'tools/harness-safeguards.mjs'));
-copyFileSync(resolve('.opencode/plugins/safeguards.js'), resolve(work, '.opencode/plugins/safeguards.js'));
+for (const plugin of harnessInputs.filter(path => path.startsWith('.opencode/plugins/'))) {
+  copyFileSync(resolve(plugin), resolve(work, plugin));
+}
 execFileSync('git', ['init', '-q', work]);
-writeFileSync(resolve(work, '.gitignore'), '.local/\ntools/\n.opencode/\n');
+writeFileSync(resolve(work, '.gitignore'), '.local/\ntools/\n.opencode/\nopencode.json\n');
 writeFileSync(resolve(work, 'app.ts'), 'fixture');
 execFileSync('git', ['add', '.gitignore', 'app.ts'], { cwd: work });
 const commit = 'git -c user.name=Fixture -c user.email=fixture@example.invalid commit -m fixture';
@@ -68,22 +74,28 @@ const server = createServer(async (req, res) => {
   }
   if (index < cases.length) {
     cases[index].prepare?.();
-    event({ role: 'assistant', tool_calls: [{ index: 0, id: `call_${index}`, type: 'function', function: { name: 'bash',
-      arguments: JSON.stringify({ command: cases[index].command, workdir: work, description: `Isolated hook fixture: ${cases[index].id}` }) } }] });
+    event({ role: 'assistant', tool_calls: [{ index: 0, id: `call_${index}`, type: 'function', function: { name: 'shell',
+      arguments: JSON.stringify({ command: cases[index].command, workdir: work }) } }] });
     event({}, 'tool_calls');
   } else { event({ content: 'Fixture complete.' }); event({}, 'stop'); }
   res.end('data: [DONE]\n\n');
 });
 server.listen(0, '127.0.0.1'); await once(server, 'listening');
-const config = { snapshot: false, autoupdate: false, formatter: false, lsp: false, enabled_providers: ['harness-fixture'],
-  permission: { '*': 'allow' },
-  provider: { 'harness-fixture': { npm: '@ai-sdk/openai-compatible', env: [],
-    options: { apiKey: 'dummy', baseURL: `http://127.0.0.1:${server.address().port}/v1`, timeout: 10000 },
-    models: { probe: { name: 'Local fixture', tool_call: true, limit: { context: 100000, output: 10000 } } } } } };
-const child = spawn('opencode', ['run', '--model', 'harness-fixture/probe', '--format', 'json', 'Execute local hook fixtures.'], {
-  cwd: work, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, HOME: root,
+const config = { snapshots: false, update: 'disable', formatter: false, default_agent: 'build',
+  model: 'harness-fixture/probe', permissions: [{ action: '*', resource: '*', effect: 'allow' }],
+  experimental: { policies: [
+    { action: 'provider.use', resource: '*', effect: 'deny' },
+    { action: 'provider.use', resource: 'harness-fixture', effect: 'allow' },
+  ] },
+  providers: { 'harness-fixture': { package: '@opencode/ai/providers/openai-compatible', env: ['HARNESS_FIXTURE_API_KEY'],
+    settings: { apiKey: 'dummy', baseURL: `http://127.0.0.1:${server.address().port}/v1`, timeout: 10000 },
+    models: { probe: { name: 'Local fixture', capabilities: { tools: true, input: ['text'], output: ['text'] }, limit: { context: 100000, output: 10000 } } } } } };
+writeFileSync(resolve(work, 'opencode.json'), JSON.stringify(config));
+const child = spawn('opencode', ['run', '--standalone', '--agent', 'build', '--model', 'harness-fixture/probe', '--format', 'json', 'Execute local hook fixtures.'], {
+  cwd: work, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, HOME: root, PWD: work,
     XDG_DATA_HOME: resolve(root, 'data'), XDG_CONFIG_HOME: resolve(root, 'config'), XDG_CACHE_HOME: resolve(root, 'cache'),
     XDG_STATE_HOME: resolve(root, 'state'), OPENCODE_DISABLE_DEFAULT_PLUGINS: '1', OPENCODE_DISABLE_EXTERNAL_SKILLS: '1',
+    OPENCODE_LOG_LEVEL: 'DEBUG', HARNESS_FIXTURE_API_KEY: 'dummy', EMPIRES_RUN_DIR: resolve(root, 'progress'),
     OPENCODE_AUTH_CONTENT: '{}', OPENCODE_CONFIG_CONTENT: JSON.stringify(config) },
 });
 let output = '', errors = '';
@@ -91,9 +103,9 @@ child.stdout.on('data', bytes => output += bytes); child.stderr.on('data', bytes
 const watchdog = setTimeout(() => { try { process.kill(-child.pid, 'SIGTERM'); } catch {} }, 60000);
 try {
   const [code] = await once(child, 'exit');
-  writeFileSync(resolve(root, 'stdout.jsonl'), output); writeFileSync(resolve(root, 'stderr.log'), errors);
-   writeFileSync(resolve(root, 'provider-messages.json'), JSON.stringify(responses, null, 2));
-   writeFileSync(resolve(root, 'outcomes.json'), JSON.stringify(outcomes, null, 2));
+   writeFileSync(resolve(evidence, 'stdout.jsonl'), output); writeFileSync(resolve(evidence, 'stderr.log'), errors);
+   writeFileSync(resolve(evidence, 'provider-messages.json'), JSON.stringify(responses, null, 2));
+   writeFileSync(resolve(evidence, 'outcomes.json'), JSON.stringify(outcomes, null, 2));
    assert.equal(code, 0, errors);
    assert.equal(outcomes.length, cases.length, 'every fixture must execute through the installed CLI');
    for (const [index, fixture] of cases.entries()) {
@@ -106,10 +118,17 @@ try {
      if (fixture.output) assert(text.includes(fixture.output), `${fixture.id}: handle wait really completed`);
    }
    assert.equal(execFileSync('git', ['log', '-1', '--format=%s'], { cwd: work, encoding: 'utf8' }).trim(), 'markdown');
-   assert.equal(readFileSync(resolve(work, 'app.ts'), 'utf8'), 'fixture');
+    assert.equal(readFileSync(resolve(work, 'app.ts'), 'utf8'), 'fixture');
+    const progress = JSON.parse(readFileSync(resolve(root, 'progress/tool-progress.json'), 'utf8'));
+    assert(Number.isFinite(progress.at) && progress.at > 0 && progress.pid > 0, 'completed tools must record supervisor progress');
+    writeFileSync(resolve(evidence, 'tool-progress.json'), JSON.stringify(progress));
    assert.equal(harnessFingerprint(process.cwd()), fingerprint, 'safeguards/config changed during the probe');
    writeFileSync(resolve('.local/harness.ok.json'), JSON.stringify({ fingerprint,
-     version: execFileSync('opencode', ['--version'], { encoding: 'utf8' }).trim(), at: new Date().toISOString(), evidence: root,
+      version: execFileSync('opencode', ['--version'], { encoding: 'utf8' }).trim(), at: new Date().toISOString(), evidence,
      cases: outcomes.map(outcome => outcome.id) }));
-   console.log(`HARNESS SMOKE GREEN: ${cases.length} real CLI cases; wait/missing/stale refusals, gated and Markdown commits, file/gone/PID handles; ${root}`);
-} finally { clearTimeout(watchdog); server.closeAllConnections(); await new Promise(resolveDone => server.close(resolveDone)); }
+    console.log(`HARNESS SMOKE GREEN: ${cases.length} real CLI cases; wait/missing/stale refusals, gated and Markdown commits, file/gone/PID handles; ${evidence}`);
+} finally {
+  clearTimeout(watchdog); server.closeAllConnections(); await new Promise(resolveDone => server.close(resolveDone));
+  if (existsSync(resolve(root, 'data/opencode/log'))) cpSync(resolve(root, 'data/opencode/log'), resolve(evidence, 'cli-log'), { recursive: true });
+  rmSync(root, { recursive: true, force: true });
+}

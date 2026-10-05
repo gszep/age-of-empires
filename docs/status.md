@@ -5,6 +5,15 @@ verification receipt live in [handoff.md](handoff.md); inferred or chosen rules
 live in [ledger.md](ledger.md). The issue tracker is the work queue. Historical
 checkpoint counts remain in git and [reviews](reviews/2026-10-01.md).
 
+## Product direction
+
+Human play and agent experimentation reinforce each other. The immediate target
+is engaging shared play on Ysgramor and Artemis; the north star is historical
+co-op campaigns generated from accounts and geography, then open-ended strategic
+experimentation as the environment hardens. Current two-seat competitive play
+does not yet deliver co-op teams or generated campaigns. [Priorities](product.md)
+and [research decisions](research-directions.md) guide the next playable subset.
+
 ## Play
 
 - Ysgramor: <http://localhost:5173/>; independent solo: <http://localhost:5173/?solo=1>.
@@ -15,7 +24,7 @@ checkpoint counts remain in git and [reviews](reviews/2026-10-01.md).
   host occupies 5173, use `npm run dev -- --port 5175`.
 - Solo `?map=islands&seed=3` (plus `solo=1` on the shared host) selects a board;
   F10 settings select map/seed/civilisations/mode without editing the URL.
-  Shared setup is controlled by player one. Controls are in [README](../README.md).
+   Shared setup is controlled by player one. Controls are in [play](play.md).
 
 On October2 the authorised deployment switched both services to the verified
 seven-profile setup, then added distinct Islands fish, gateway socket recovery
@@ -112,9 +121,25 @@ evidence. Do not reuse one incident's diagnosis for every later failure.
 
 ## Verification
 
-The checkpoint gate is exactly unit tests, build, owned import tests and general
-real-browser smoke. `tools/gate.sh` records its current result and stage logs;
+Verification is exposed through npm: selected/full tests alongside public build,
+then owned import tests and real-browser smoke for the complete checkpoint.
+`tools/gate.sh` delegates to `npm run verify:owned`; [testing](TESTING.md) records the policy;
 `tools/session_start.sh` reports the actual latest run, not a recalled count.
+
+The [orchestration workflow](orchestration.md) adds issue-backed Project helpers,
+parallel durable worker worktrees, compression checkpoints and tracked-text
+footprint measurements. Public GitHub Actions uses conservative PR selection
+and full main/nightly checks, with a documentation-only PR fast path; it does not
+replace the owned checkpoint. The linked `gszep` Project #1 has live helper
+read/write/readback verification and the open backlog (#292). No automatic
+distributed task claims or compression threshold service is claimed.
+
+The harness targets OpenCode V2: Opus 5.5 coordinates bounded Haiku 4.5 workers,
+with Astra escalation and independent review. Live role routing and resolved
+permissions were verified on October 4, 2026. The installed-CLI safeguard smoke
+passed eleven native-shell cases and completed-tool heartbeat recording; fixture
+tests are supplementary, not a substitute for that execution evidence. Writable
+children use an initialization/session-move handshake before implementation.
 
 Feature-specific browser acceptance is additional. `node tools/acceptance.mjs plan
 HEAD` lists mapped scenarios and unmapped changed paths; `run <scenario>

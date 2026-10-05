@@ -1,4 +1,5 @@
 import type { Plugin } from 'vite';
+import { availableParallelism } from 'node:os';
 import { configDefaults, defineConfig } from 'vitest/config';
 import { gameCompression } from './tools/vite-compression';
 import { gameWatchScope } from './tools/vite-watch';
@@ -80,11 +81,13 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, '.claude/**', '.local/**'],
     testTimeout: 30_000,
     setupFiles: ['./src/test-setup.ts'],
-    // Bound CPU/memory by default. Keep this at the top level so an explicit
-    // --maxWorkers=1 works; pool-specific maxima override that CLI option.
-    // VITEST_MAX_FORKS / VITEST_MAX_THREADS remain supported by Vitest.
+    // About one worker per physical core (at least four), capped at eight to
+    // leave room for play and build. On the 6-core/12-thread gate host, 8 SMT
+    // workers made 18 s owned simulations take ~25 s of their 30 s clock; 6
+    // workers kept them at 17-20 s for +20 s suite wall time (#299).
+    // File isolation remains enabled; CLI/env worker overrides still work.
     minWorkers: 1,
-    maxWorkers: 2,
+    maxWorkers: Math.min(8, availableParallelism(), Math.max(4, Math.ceil(availableParallelism() / 2))),
   },
   // Public deployments must never package locally converted Microsoft assets.
   // The viewer automatically uses its open fallback when this directory is absent.

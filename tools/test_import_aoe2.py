@@ -1679,7 +1679,12 @@ class ContentImportIntegrationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             out = Path(directory)
             hashes: dict[str, str] = {}
-            converted = convert_terrain(self.result["terrain"], TERRAIN, out, hashes)
+            # Ground plus one masked slot covers both conversion branches; the
+            # full set is published by the import itself (it took ~2 minutes here).
+            terrain = self.result["terrain"]
+            masked = next(key for key, slot in terrain.items() if slot.get("overlayMask"))
+            converted = convert_terrain({key: terrain[key] for key in ("ground", masked)}, TERRAIN, out, hashes)
+            self.assertTrue((out / converted[masked]["overlayMask"]).is_file())
             image_path = out / converted["ground"]["image"]
             self.assertTrue(image_path.is_file())
             with Image.open(image_path) as image:

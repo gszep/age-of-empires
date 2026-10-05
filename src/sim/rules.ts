@@ -10,6 +10,20 @@ import { rulesForPlayer } from './civilizations';
 import { technologyFor } from './technologies';
 import type { BuildingKind, DeepReadonly, Entity, GameState, PlayerId, ReadonlyGameState, UnitKind } from './types';
 
+/** Rules cache state: active only during stepGame execution. Cleared after each step. */
+let stepCache: Map<string, { researched: readonly string[]; source: object; rules: UnitRules | BuildingRules }> | undefined;
+
+/** Wraps function execution with an active rules cache for the duration. Nesting-safe. */
+export function withRulesCache<T>(fn: () => T): T {
+  if (stepCache) return fn();
+  stepCache = new Map();
+  try {
+    return fn();
+  } finally {
+    stepCache = undefined;
+  }
+}
+
 /** Shared by the build menu, placement preview and public build command. */
 export function buildingLimitReached(state: GameState, owner: PlayerId, kind: BuildingKind): boolean {
   const age = buildingRulesFor(state, owner, kind).additionalAge;
@@ -104,6 +118,17 @@ export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: Uni
   if (owner === 0) return base;
   const researched = state.players[owner as PlayerId].researched;
   if (!researched.length) return base;
+
+  // Check cache if active.
+  if (stepCache) {
+    const age = state.players[owner as PlayerId].age;
+    const cacheKey = `u|${owner}|${kind}|${age}|${researched.length}`;
+    const entry = stepCache.get(cacheKey);
+    if (entry && entry.researched === researched && entry.source === source) {
+      return entry.rules as UnitRules;
+    }
+  }
+
   let rules = base;
   let replacesPrimaryProjectile = false;
   for (const key of researched) {
@@ -166,6 +191,14 @@ export function unitRulesFor(state: GameState, owner: Entity['owner'], kind: Uni
   // corroborated by the owned +100% healing description (120156).
   if (rules.heal && healRate !== undefined && healRate > 0) rules = { ...rules,
     heal: { ...rules.heal, hitPointsPerSecond: rules.heal.hitPointsPerSecond * healRate } };
+
+  // Store in cache if active.
+  if (stepCache) {
+    const age = state.players[owner as PlayerId].age;
+    const cacheKey = `u|${owner}|${kind}|${age}|${researched.length}`;
+    stepCache.set(cacheKey, { researched, source, rules });
+  }
+
   return rules;
 }
 
@@ -294,6 +327,16 @@ export function buildingRulesFor(
   if (owner === 0) return base;
   const researched = state.players[owner as PlayerId].researched;
   if (!researched.length) return base;
+
+  // Check cache if active.
+  if (stepCache) {
+    const cacheKey = `b|${owner}|${kind}|${age}|${researched.length}`;
+    const entry = stepCache.get(cacheKey);
+    if (entry && entry.researched === researched && entry.source === source) {
+      return entry.rules as BuildingRules;
+    }
+  }
+
   let rules = base;
   let replacesProjectile = false;
   for (const key of researched) {
@@ -329,6 +372,13 @@ export function buildingRulesFor(
     if (projectile.key !== art) rules = { ...rules, attack: { ...rules.attack!,
       projectileArt: projectile.key, projectileSpeed: projectile.speed } };
   }
+
+  // Store in cache if active.
+  if (stepCache) {
+    const cacheKey = `b|${owner}|${kind}|${age}|${researched.length}`;
+    stepCache.set(cacheKey, { researched, source, rules });
+  }
+
   return rules;
 }
 

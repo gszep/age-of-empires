@@ -102,7 +102,7 @@ The current TypeScript fixed-point/lockstep packages found are young and lightly
 
 We will not:
 
-- write our own DAT or SLD binary decoder;
+- write another DAT parser or replace the validated SLD decoder without evidence;
 - embed Microsoft assets in Git or deployment artifacts;
 - fork a complete GPL RTS engine into the MIT browser project;
 - add a general physics engine for RTS collision;

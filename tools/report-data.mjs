@@ -44,7 +44,7 @@ export function issueReport(since, fetch = fetchIssues) {
 function gateRunning(pid) {
   if (!Number.isSafeInteger(pid) || pid <= 0) return false;
   const process = spawnSync('ps', ['-p', String(pid), '-o', 'args='], { encoding: 'utf8' });
-  return process.status === 0 && process.stdout.includes('gate.sh');
+  return process.status === 0 && /(?:^|[\s/])(?:gate\.sh|verify\.mjs)(?:\s|$)/.test(process.stdout);
 }
 
 export function gateReport(root = '.', running = gateRunning) {

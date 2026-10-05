@@ -14,7 +14,7 @@ import {
   buildNavGrid, distance, entityGrid, findPath, halfExtent, isBlocked, separateUnits, terrainLayer, tileOf, type NavGrid,
 } from './nav';
 import { random01, seedFrom } from './random';
-import { buildingLimitReached, buildingRulesFor, buildingRulesForEntity, combine, inheritConvertedUnit, playerAttributeFor, populationLimitFor, trainingAt, unitRulesFor, unitRulesForEntity } from './rules';
+import { buildingLimitReached, buildingRulesFor, buildingRulesForEntity, combine, inheritConvertedUnit, playerAttributeFor, populationLimitFor, trainingAt, unitRulesFor, unitRulesForEntity, withRulesCache } from './rules';
 import { validPopulationLimit } from './population';
 import { completeWonder, updateWonderVictory, validWonderVictory } from './wonder';
 import { entitiesWithGarrison, garrisonCount } from './garrison';
@@ -3354,7 +3354,7 @@ function updateAnimals(state: GameState): void {
   }
 }
 
-export function stepGame(state: GameState): void {
+function stepGameBody(state: GameState): void {
   if (matchOver(state)) return;
   activateAutomaticTechnologies(state);
   state.tick += 1;
@@ -3513,4 +3513,8 @@ export function stepGame(state: GameState): void {
     else state.winner = 2; // legacy conquest tie policy
   }
   updateWonderVictory(state);
+}
+
+export function stepGame(state: GameState): void {
+  withRulesCache(() => stepGameBody(state));
 }

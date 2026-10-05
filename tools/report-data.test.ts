@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fetchIssues, gateReport, instant, issueReport } from './report-data.mjs';
 
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn(), spawnSync: vi.fn() }));
@@ -64,5 +64,16 @@ describe('run report evidence (#159)', () => {
     writeFileSync(join(root, '.local/gate.latest.json'), '{broken');
     expect(gateReport(root)).toContain('cannot read latest gate record');
     expect(gateReport(root)).not.toContain('GATE GREEN');
+  });
+
+  it('recognizes the npm verifier PID as a live gate, but not an unrelated process', () => {
+    const { root, record } = fixture();
+    record('running');
+    for (const args of ['node tools/verify.mjs --full --owned', 'bash /repo/tools/gate.sh']) {
+      vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: args } as never);
+      expect(gateReport(root)).toContain(': running;');
+    }
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'node unrelated.mjs' } as never);
+    expect(gateReport(root)).toContain('interrupted');
   });
 });

@@ -1,4 +1,10 @@
-# Architecture decision: optimize for learning first
+# Architecture: one simulation for play and experimentation
+
+The product purpose is [human play feeding agent-assisted improvement](product.md),
+leading toward generated historical co-op scenarios and open-ended strategy
+discovery. Ysgramor and Artemis are the immediate deployment target. Real-geography
+maps serve that purpose; exhaustive native parity and broad hosting are not
+prerequisites for the next playable experience.
 
 ## Decision
 

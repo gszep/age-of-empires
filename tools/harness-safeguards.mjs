@@ -22,19 +22,12 @@ export function checkShell(root, command, cwd = root) {
   }
 }
 
-export default async function safeguards({ directory }) {
-  return {
-    'tool.execute.before': async (input, output) => {
-      if (input.tool === 'bash') checkShell(directory, output.args.command ?? '', output.args.workdir ?? directory);
-    },
-    'tool.execute.after': async () => {
-      const run = process.env.EMPIRES_RUN_DIR;
-      if (!run) return;
-      mkdirSync(run, { recursive: true });
-      const target = resolve(run, 'tool-progress.json');
-      const temporary = `${target}.${process.pid}.tmp`;
-      writeFileSync(temporary, JSON.stringify({ at: Date.now(), pid: process.pid }));
-      renameSync(temporary, target);
-    },
-  };
+export function recordToolProgress() {
+  const run = process.env.EMPIRES_RUN_DIR;
+  if (!run) return;
+  mkdirSync(run, { recursive: true });
+  const target = resolve(run, 'tool-progress.json');
+  const temporary = `${target}.${process.pid}.tmp`;
+  writeFileSync(temporary, JSON.stringify({ at: Date.now(), pid: process.pid }));
+  renameSync(temporary, target);
 }

@@ -41,7 +41,7 @@ every expensive soak for every documentation/tooling edit.
 ## Harness enforcement
 
 `.opencode/plugins/safeguards.js` invokes the maintained shell/commit guards before
-Bash tools. Claude retains its existing wiring. The guards are policy checks, not
+native OpenCode `shell` tools. Claude retains its existing wiring. The guards are policy checks, not
 a security sandbox or a complete shell parser. They enforce supported normal
 tool calls; do not bypass them with encoded commands or wrapper scripts.
 
@@ -66,11 +66,14 @@ boundary. Use harmless live-session probes after a restart before an unattended 
 ## Externally supervised unattended runs
 
 ```bash
-node tools/run-supervised.mjs overnight-unique-name 480 15 opencode run "<agreed task and stopping rule>"
+node tools/run-supervised.mjs overnight-unique-name 480 15 opencode run --standalone --agent orchestrator --model anthropic/claude-opus-5-5#high "<agreed task and stopping rule>"
 ```
 
 The external process records `.local/runs/<name>/status.json`, a fixed wall-clock
 deadline and child process group. The plugin records completed-tool timestamps.
+Use `--standalone` so the tool-executing V2 server inherits this run's heartbeat
+environment and belongs to the supervised process group. A shared background
+server is not controlled by terminating its CLI client.
 Provider heartbeat bytes are not progress. Fifteen minutes without a completed
 tool stops the run; the total deadline applies even if tools keep completing.
 The values above are chosen run policy, not native game or provider constants.
@@ -99,12 +102,13 @@ node tools/worktree.mjs create issue-name HEAD
 node tools/worktree.mjs retire issue-name
 ```
 
-The helper permits one managed integration worktree, refuses a second, and refuses
-retirement of dirty or unmerged work. Main-tree work is the coordinating slice;
-keep any additional parallel task bounded and read-only until integration catches
-up. Implementation patches/worktrees never belong under `/tmp`. `.local/**` stays
-excluded from main-tree test discovery. These are recoverability constraints,
-not permission to create agents or commits without the task's authorisation.
+The helper permits distinct durable worker worktrees and refuses retirement of
+dirty or unmerged work. One coordinator serializes integration and full gates;
+workers use disjoint scopes and targeted checks. The assignment, review, Projects
+and compression contract is in [orchestration.md](orchestration.md). Implementation
+patches/worktrees never belong under `/tmp`. `.local/**` stays excluded from
+main-tree test discovery. These are recoverability constraints, not permission
+to expand beyond the requested task.
 
 ## Shared deployment
 

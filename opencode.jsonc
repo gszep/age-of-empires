@@ -1,13 +1,12 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "default_agent": "build",
-  "provider": {
-    "openai": {
-      "options": {
-        // Bound incomplete streams even when heartbeat bytes prevent idle expiry.
-        "timeout": 600000
-      }
-    }
+  "default_agent": "orchestrator",
+  "model": "anthropic/claude-opus-5-5",
+  "worktree": { "directory": ".local/worktrees" },
+  "providers": {
+    // Total stream deadlines also cover heartbeats that defeat idle timeouts.
+    "openai": { "settings": { "timeout": 600000 } },
+    "anthropic": { "settings": { "timeout": 600000 } }
   },
   "references": {
     "aoe2-owned": {
@@ -15,41 +14,72 @@
       "description": "Owned AoE2DE depots: read-only source DAT, scripts, localization, UI, graphics and audio. Resolve the actual root with tools/depot.py before searching. Never commit these assets."
     }
   },
-  "agent": {
-    "build": {
-      // A pending approval suspends the entire turn, including parallel calls.
-      // Permit the project's inputs; return an error for other external paths.
-      // These are tool permissions, not authorization for an unrequested task.
-      "permission": {
-        "external_directory": {
-          "*": "deny",
-          "~/Steam/steamapps/content/app_813780/*": "allow",
-          "~/.local/share/Steam/steamcmd/linux32/steamapps/content/app_813780/*": "allow",
-          "~/.local/share/Steam/steamapps/content/app_813780/*": "allow",
-          "~/.steam/steam/steamapps/content/app_813780/*": "allow",
-          "~/.claude/skills/*": "allow",
-          "~/.agents/skills/*": "allow",
-          "~/.claude/projects/*": "allow",
-          "~/.codex/sessions/*": "allow",
-          "~/.local/share/opencode/log": "allow",
-          "~/.local/share/opencode/log/*": "allow",
-          "/tmp/opencode/*": "allow"
-        },
-        "read": {
-          "*": "allow",
-          "*.env": "deny",
-          "*.env.*": "deny",
-          "*.env.example": "allow"
-        },
-        "edit": {
-          "*": "allow",
-          "*/steamapps/content/app_813780/*": "deny",
-          "~/.local/share/opencode/log": "deny",
-          "~/.local/share/opencode/log/*": "deny"
-        },
-        "doom_loop": "deny",
-        "question": "deny"
-      }
+  // Shared across the coordinator and every worker; changing model never drops
+  // the owned-source, credential-file or unattended permission boundaries.
+  "permissions": [
+    { "action": "external_directory", "resource": "*", "effect": "deny" },
+    { "action": "external_directory", "resource": "~/Steam/steamapps/content/app_813780/*", "effect": "allow" },
+    { "action": "external_directory", "resource": "~/.local/share/Steam/steamcmd/linux32/steamapps/content/app_813780/*", "effect": "allow" },
+    { "action": "external_directory", "resource": "~/.local/share/Steam/steamapps/content/app_813780/*", "effect": "allow" },
+    { "action": "external_directory", "resource": "~/.steam/steam/steamapps/content/app_813780/*", "effect": "allow" },
+    { "action": "external_directory", "resource": "~/.claude/skills/*", "effect": "allow" },
+    { "action": "external_directory", "resource": "~/.agents/skills/*", "effect": "allow" },
+    { "action": "external_directory", "resource": "~/.claude/projects/*", "effect": "allow" },
+    { "action": "external_directory", "resource": "~/.codex/sessions/*", "effect": "allow" },
+    { "action": "external_directory", "resource": "~/.local/share/opencode/log", "effect": "allow" },
+    { "action": "external_directory", "resource": "~/.local/share/opencode/log/*", "effect": "allow" },
+    { "action": "external_directory", "resource": "/tmp/opencode/*", "effect": "allow" },
+    { "action": "read", "resource": "*", "effect": "allow" },
+    { "action": "read", "resource": "*.env", "effect": "deny" },
+    { "action": "read", "resource": "*.env.*", "effect": "deny" },
+    { "action": "read", "resource": "*.env.example", "effect": "allow" },
+    { "action": "edit", "resource": "*", "effect": "allow" },
+    { "action": "edit", "resource": "*/steamapps/content/app_813780/*", "effect": "deny" },
+    { "action": "edit", "resource": "~/.local/share/opencode/log", "effect": "deny" },
+    { "action": "edit", "resource": "~/.local/share/opencode/log/*", "effect": "deny" },
+    { "action": "doom_loop", "resource": "*", "effect": "deny" },
+    { "action": "question", "resource": "*", "effect": "deny" }
+  ],
+  "agents": {
+    "orchestrator": {
+      "description": "Long-lived Opus coordinator: decompose, dispatch cheap workers, escalate and integrate",
+      "mode": "primary",
+      "model": "anthropic/claude-opus-5-5#high",
+      "system": "You coordinate this repository's requested work. Read AGENTS.md and docs/orchestration.md. Retain the issue/dependency map, decisions and compact worker receipts in this long-lived session; delegate implementation and narrow research instead of absorbing every file or doing all issues yourself. Use worker by default with an exact issue, base SHA, distinct durable worktree, owned paths, acceptance, attempt budget and return contract. For writable tasks, FIRST spawn an initialization-only child with no tools/work, then move its returned session ID to the worktree using tools.opencode.session_move, THEN resume the child with its assignment. A path in a prompt does not relocate patch tools. Start at most two implementation workers. On a genuine unresolved task after one focused retry (two attempts total), stop that worker and dispatch escalation through the same initialization/move handshake to its preserved worktree; include exact failures and do not reset work or silently choose another expensive model. Authentication/service failures are blockers, not complexity evidence. Use reviewer independently before integration. Only you own main integration, full gates, imports, Project status and rollout. Keep one such lane, maintain a durable compact handoff before context compaction, and perform safe-point codebase compression rounds after substantial batches. Honour the user's scope/deadline and tools/run-supervised.mjs for unattended runs. Report actual checks, escalations, remaining work and surviving jobs; never imply a running job passed.",
+      "permissions": [
+        { "action": "subagent", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "worker", "effect": "allow" },
+        { "action": "subagent", "resource": "escalation", "effect": "allow" },
+        { "action": "subagent", "resource": "reviewer", "effect": "allow" }
+      ]
+    },
+    "worker": {
+      "description": "Economical Haiku worker for bounded implementation or investigation",
+      "mode": "subagent",
+      "model": "anthropic/claude-haiku-4-5#high",
+      "steps": 32,
+      "system": "Complete only the coordinator's assigned task in its absolute worktree and owned paths. Read that tree's AGENTS.md. Do not integrate main, deploy, start a full gate/import, or delegate. Run targeted outcome checks. You have one implementation attempt and one focused corrective retry, within 32 steps. If still failing or out of budget, stop with NEEDS_ESCALATION; do not weaken tests, widen clocks or invent reference rules. Report PASS, NEEDS_ESCALATION or BLOCKED, exact commands/results, diagnosis, changed paths, worktree/base/branch, evidence locations and remaining processes. Credentials or unavailable services are BLOCKED. Leave all partial work intact for Astra. Commit only after the coordinator schedules the required gate; otherwise return the intact working tree.",
+      "permissions": [{ "action": "subagent", "resource": "*", "effect": "deny" }]
+    },
+    "escalation": {
+      "description": "GPT-6 Astra escalation for unresolved or complex worker tasks",
+      "mode": "subagent",
+      "model": "openai/gpt-6-astra#high",
+      "steps": 64,
+      "system": "Resolve the coordinator's escalated task in the provided durable worktree. Read AGENTS.md and the cheap worker's exact attempts, failing checks and partial diff before changing anything. Diagnose the cause independently; preserve useful work and acceptance coverage. Stay within assigned paths and 64 steps. Do not delegate, integrate main, deploy or run a full gate/import without the coordinator's slot. Return PASS or BLOCKED with exact outcome checks, diff summary, evidence, unresolved gaps and process handles. Escalation is not permission to approximate source behavior or hide failures. Leave an intact worktree and bounded handoff when blocked.",
+      "permissions": [{ "action": "subagent", "resource": "*", "effect": "deny" }]
+    },
+    "reviewer": {
+      "description": "Read-only Astra review of worker outcomes and integration risk",
+      "mode": "subagent",
+      "model": "openai/gpt-6-astra#high",
+      "steps": 24,
+      "system": "Read-only independent review of the coordinator's bounded diff and evidence. Read AGENTS.md. Check actual acceptance outcomes, hidden information, determinism, source fidelity, regressions and lost work. Report concrete findings with file/line references and distinguish inspected evidence from tests you ran. Do not edit, execute shell commands, delegate or expand into implementation.",
+      "permissions": [
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "*", "effect": "deny" }
+      ]
     }
   }
 }

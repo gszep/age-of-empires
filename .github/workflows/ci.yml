@@ -1,0 +1,90 @@
+name: Public CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-ci-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  scope:
+    runs-on: ubuntu-latest
+    outputs:
+      scope: ${{ steps.scope.outputs.scope }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: scope
+        env:
+          CI_SCOPE_BASE: ${{ github.event.pull_request.base.sha }}
+          # Checkout's merge commit is what the PR will actually integrate.
+          CI_SCOPE_HEAD: ${{ github.sha }}
+        run: node tools/ci-scope.mjs
+
+  verify:
+    name: Tests and build
+    needs: scope
+    if: needs.scope.outputs.scope != 'docs' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+      CI_SCOPE_BASE: ${{ github.event.pull_request.base.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      # Cache downloads only. PRs restore; only successful main pushes publish.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: npm-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json') }}-
+      - run: npm ci
+      - name: Conservative PR selection
+        if: github.event_name == 'pull_request'
+        run: npm run verify -- --base "$CI_SCOPE_BASE"
+      - name: Full main and scheduled backstop
+        if: github.event_name != 'pull_request'
+        run: npm run verify:full
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+
+  public-ci:
+    name: Public checks
+    if: always()
+    needs: [scope, verify]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stable required result
+        env:
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          SCOPE: ${{ needs.scope.outputs.scope }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          test "$SCOPE_RESULT" = success
+          if [ "$SCOPE" = docs ] || [ "$DRAFT" = true ]; then
+            echo 'Heavy checks deferred for an ordinary docs-only PR or draft.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            test "$VERIFY_RESULT" = success
+          fi

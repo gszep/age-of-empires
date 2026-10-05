@@ -1,11 +1,11 @@
-import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { exampleAiCommands } from './ai';
 import { applyCommand, createGame, stepGame } from './game';
-import { FALLBACK_RULES, rulesFromManifest, TICK_SECONDS, type GameRules } from './data';
+import { TICK_SECONDS } from './data';
 import { observe } from './observe';
 import { synchronizationHash } from '../shared/checksum';
 import type { Entity, GameState } from './types';
+import { herdingComparison } from './test-helpers/herding';
 
 function fixture() {
   const state = createGame(136);
@@ -64,24 +64,5 @@ describe('AI livestock return (#136)', () => {
   });
 });
 
-const modes: [string, GameRules][] = [['fallback', FALLBACK_RULES]];
-if (existsSync('public/imported/aoe2/manifest.json')) modes.push(['owned', rulesFromManifest(JSON.parse(readFileSync('public/imported/aoe2/manifest.json', 'utf8')))]);
-describe.each(modes)('%s four-minute herding comparison', (_mode, rules) => {
-  it.each([1, 7, 42])('banks more food on seed %i than the otherwise identical no-herding strategy', seed => {
-    const play = (herding: boolean) => {
-      const state = createGame(seed, rules);
-      let banked = 0, clock = 0;
-      for (let tick = 0; tick < 240 / TICK_SECONDS; tick++) {
-        const before = state.players[2].food;
-        stepGame(state); banked += Math.max(0, state.players[2].food - before);
-        clock += TICK_SECONDS;
-        if (clock >= 0.5) {
-          for (const command of exampleAiCommands(observe(state, 2), { herding })) applyCommand(state, command);
-          clock = 0;
-        }
-      }
-      return banked;
-    };
-    expect(play(true)).toBeGreaterThan(play(false));
-  });
-});
+// Seeds 7 and 42 run in ai-herding-seeds.test.ts: Vitest parallelises by file.
+herdingComparison([1]);

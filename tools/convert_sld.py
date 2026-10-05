@@ -7,10 +7,14 @@ import argparse
 import hashlib
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any
 
 from depot import Graphics
+
+# Checkpoint the cache this often during conversion (seconds).
+CHECKPOINT_SECONDS = 30
 
 
 def sha256(path: Path) -> str:
@@ -197,6 +201,27 @@ def convert_foam(foam: dict[str, Any], terrain_dir: Path, out_dir: Path, hashes:
     return converted
 
 
+def conversion_workers(cpus: int | None = None, available_bytes: int | None = None) -> int:
+    """Bound independent decodes by CPU allocation and half of available memory.
+
+    Large x2 sheets can use about 2 GiB per worker. This is a scheduling estimate,
+    not a hard memory limit; --jobs/AOE2_IMPORT_JOBS provides an explicit override.
+    Scheduling is deliberately outside the decoder/cache fingerprint.
+    """
+    if cpus is None:
+        cpus = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
+    if available_bytes is None:
+        try:
+            available_bytes = os.sysconf("SC_AVPHYS_PAGES") * os.sysconf("SC_PAGE_SIZE")
+            limit = Path("/sys/fs/cgroup/memory.max")
+            current = Path("/sys/fs/cgroup/memory.current")
+            if limit.is_file() and current.is_file() and limit.read_text().strip() != "max":
+                available_bytes = min(available_bytes, max(0, int(limit.read_text()) - int(current.read_text())))
+        except (AttributeError, OSError, ValueError):
+            return max(1, min(4, cpus))
+    return max(1, min(16, max(1, cpus - 2), available_bytes // (4 * 1024 ** 3)))
+
+
 def decoder_fingerprint() -> str:
     """What the conversion code itself would produce, in one hash.
 
@@ -350,6 +375,31 @@ def _convert_one(work: tuple[str, str, str, int, str | None]) -> tuple[str, dict
         return identifier, None, f"{type(error).__name__}: {error}"
 
 
+def write_cache(path: Path, fingerprint: str, cache: dict[str, Any]) -> None:
+    """Atomically replace the cache, so an interruption leaves the old or new file."""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.parent.mkdir(parents=True, exist_ok=True)
+    tmp.write_text(json.dumps({"schema": 2, "decoder": fingerprint, "atlases": cache},
+                               separators=(",", ":"), sort_keys=True) + "\n")
+    os.replace(tmp, path)
+
+
+def drain(start, publish, save, interval: float | None = None, clock=time.monotonic) -> None:
+    """Start the jobs, publish each completed one, and persist progress at most
+    every `interval` seconds. Kept outside the decoder fingerprint."""
+    interval = CHECKPOINT_SECONDS if interval is None else interval
+    # Persist first: the on-disk cache then names only reused or completed
+    # sheets, never a page a pending job is about to overwrite (or --fresh).
+    save()
+    due = clock() + interval
+    for item in start():
+        publish(item)
+        now = clock()
+        if now >= due:
+            save()
+            due = now + interval
+
+
 def main() -> None:
     root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser()
@@ -369,11 +419,13 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=root / "public/imported/aoe2")
     parser.add_argument("--cache", type=Path, default=root / ".local/aoe2de/atlas-cache.json")
     parser.add_argument("--fresh", action="store_true", help="ignore the atlas cache")
-    parser.add_argument("--jobs", type=int, default=max(1, min(4, (os.cpu_count() or 1) // 2)),
+    parser.add_argument("--jobs", type=int, default=os.environ.get("AOE2_IMPORT_JOBS", conversion_workers()),
                         help="sheets converted at once; a worker on a large x2 sheet can hold two gigabytes")
     parser.add_argument("--terrain-only", action="store_true",
                         help="update terrain textures in an existing manifest without decoding SLDs")
     args = parser.parse_args()
+    if args.jobs < 1:
+        parser.error("--jobs / AOE2_IMPORT_JOBS must be a positive integer")
 
     imported = json.loads(args.content.read_text())
     source_hashes = imported["source"]["sha256"]
@@ -457,7 +509,8 @@ def main() -> None:
             for group in pending for identifier, job, image, layer in [group[0]]]
     by_identifier = {group[0][0]: group for group in pending}
     with Pool(processes=args.jobs) as pool:
-        for identifier, atlas, error in pool.imap_unordered(_convert_one, work):
+        def publish(item):
+            identifier, atlas, error = item
             group = by_identifier[identifier]
             layer = group[0][3]
             if error is not None:
@@ -465,10 +518,12 @@ def main() -> None:
                     raise RuntimeError(f"{identifier}: {error}")
                 mask_skipped.extend(member[0] for member in group)
                 print(f"skipped {identifier}: {error}")
-                continue
+                return
             assert atlas is not None
             publish_group(group, atlas)
             print(identifier)
+        drain(lambda: pool.imap_unordered(_convert_one, work), publish,
+              lambda: write_cache(cache_path, fingerprint, cache))
 
     from civilization_profiles import art_entities
     entities: dict[str, Any] = {}
@@ -550,9 +605,7 @@ def main() -> None:
     manifest["schemaVersion"] = 4
     intern_atlas_frames(manifest)
     manifest_path.write_text(json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n")
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    cache_path.write_text(json.dumps({"schema": 2, "decoder": fingerprint, "atlases": cache},
-                                     separators=(",", ":"), sort_keys=True) + "\n")
+    write_cache(cache_path, fingerprint, cache)
     print(f"{reused} atlases reused from {cache_path.name}")
     print(f"{sum(len(group) - 1 for group in groups)} identical source/layer aliases share atlas URLs")
     print(manifest_path)

@@ -91,6 +91,10 @@ try {
 
   // --- the protocol itself -------------------------------------------------
   const sim = await query({ type: 'sim' });
+  if (existsSync(join(ROOT, 'public/imported/aoe2/manifest.json'))) {
+    const origin = await page.evaluate(async () => (await window.__empiresDebug({ type: 'snapshot' })).rules.origin);
+    check('owned rules loaded in the browser', origin === 'imported', `rules origin=${origin}`);
+  }
   check('sim query', Number.isInteger(sim.tick) && sim.players?.['1'] !== undefined,
     `tick ${sim.tick}, p1 food ${sim.players?.['1']?.food}`);
 

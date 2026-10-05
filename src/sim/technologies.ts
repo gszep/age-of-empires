@@ -3,6 +3,9 @@ import { rulesForPlayer } from './civilizations';
 import { playerAttributeFor } from './rules';
 import type { Entity, GameState, PlayerId } from './types';
 
+/** Disabled automatic technologies. Legacy imports lost these live relic-count prerequisites. */
+const DISABLED = new Set(['automatic-699', 'automatic-700', 'automatic-701', 'automatic-702']);
+
 /** Automatic research-time bonuses preserve their own activation gates. */
 export function researchSecondsFor(state: GameState, owner: PlayerId, key: string): number {
   const rules = rulesForPlayer(state, owner), tech = rules.technologies[key];
@@ -32,7 +35,7 @@ export function researchCostFor(state: GameState, owner: PlayerId, key: string):
 /** Hidden nodes share the same ordered research history and effect consumers. */
 export function technologyFor(rules: GameRules, key: string) {
   // Legacy imports lost these live relic-count prerequisites. Fail closed.
-  if (/^automatic-(699|700|701|702)$/.test(key)) return undefined;
+  if (DISABLED.has(key)) return undefined;
   return rules.technologies[key] ?? (key.startsWith('automatic-')
     ? rules.civilizationBonuses?.nodes[key.slice('automatic-'.length)] : undefined);
 }

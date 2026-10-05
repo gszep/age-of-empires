@@ -28,3 +28,7 @@ session does not have to infer it.
 - **What lives elsewhere.** Design notes with a home (`docs/*-design.md`),
   the ledger of approximations (`docs/ledger.md`), and the rules that bit
   (`docs/lessons.md`).
+- **Projects and parallel work.** Projects is a status view of these issues,
+  not another backlog. The coordinator records bounded worker assignments and
+  verification on the issue; only integrated, verified work moves to Done.
+  See [orchestration.md](orchestration.md) for setup and compression checkpoints.

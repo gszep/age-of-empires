@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -6,6 +7,16 @@ from atlas_cache import AtlasCache, LAYERS, fingerprints
 
 
 class AtlasCacheTest(unittest.TestCase):
+    def test_conversion_budget_uses_cpu_and_memory_without_changing_decoder_identity(self):
+        from convert_sld import conversion_workers, decoder_fingerprint
+        gib = 1024 ** 3
+        identity = decoder_fingerprint()
+        self.assertEqual(conversion_workers(32, 65 * gib), 16)
+        self.assertEqual(conversion_workers(32, 12 * gib), 3)
+        self.assertEqual(conversion_workers(4, 65 * gib), 2)
+        self.assertEqual(conversion_workers(1, 0), 1)
+        self.assertEqual(decoder_fingerprint(), identity)
+
     def test_cached_conversion_matches_clean_decode_bytes_and_manifest_entries(self):
         from convert_sld import convert, convert_mask, published
         from test_sld_integrity import container
@@ -93,3 +104,104 @@ class AtlasCacheTest(unittest.TestCase):
             cache = AtlasCache(stored, {**fps, 'main': 'changed'}, 'ignored', out)
             self.assertIsNone(cache.reuse('sha', 1, 'main', 'body.png'))
             self.assertEqual(cache.reuse('sha', 1, 'shadow', 'body.png'), atlas)
+
+    def test_interrupted_conversion_checkpoints_completed_jobs_for_reuse(self):
+        """Verify drain() checkpoints completed jobs and resumes from cache."""
+        from convert_sld import convert, drain, write_cache
+        from test_sld_integrity import container
+        import hashlib
+
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            source = out / 'fixture.sld'
+            source.write_bytes(container())
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            fps = dict.fromkeys(LAYERS, 'decoder')
+            cache_path = out / 'atlas-cache.json'
+
+            # Part 1: Simulate interrupted conversion with drain()
+            cache = {}
+
+            def publish(item):
+                identifier, atlas, error = item
+                if error is None and atlas is not None:
+                    # Store with image path relative to out
+                    image_path = 'a/main.png'
+                    cache[identifier] = {
+                        'source': digest, 'expected': 1, 'image': image_path,
+                        'layer': 'main', 'decoder': 'decoder', 'atlas': atlas
+                    }
+
+            def results_with_interrupt():
+                # First job completes and gets published
+                path_a = out / 'a/main.png'
+                atlas_a = convert(source, path_a, 1)
+                yield ('a:idle', atlas_a, None)
+                # Second job would complete, but we interrupt before it yields
+                raise KeyboardInterrupt()
+
+            # Run drain with interval=0 so every publish triggers a checkpoint
+            with self.assertRaises(KeyboardInterrupt):
+                drain(results_with_interrupt, publish,
+                      lambda: write_cache(cache_path, 'decoder', cache), interval=0)
+
+            # Part 2: Verify checkpoint persisted the first job
+            self.assertTrue(cache_path.exists(), "Cache file should exist after checkpoint")
+            saved = json.loads(cache_path.read_text())
+            self.assertEqual(saved['schema'], 2)
+            self.assertEqual(saved['decoder'], 'decoder')
+            self.assertEqual(len(saved['atlases']), 1)
+            self.assertIn('a:idle', saved['atlases'])
+            self.assertFalse(cache_path.with_suffix(cache_path.suffix + '.tmp').exists(),
+                           "Temp file should be cleaned up")
+
+            # Part 3: Resume from checkpoint and verify reuse
+            restored_cache = AtlasCache(saved, fps, 'decoder', out)
+            reused = restored_cache.reuse(digest, 1, 'main', 'a/main.png')
+            self.assertIsNotNone(reused, "Checkpointed job should be reusable")
+
+            # Verify pages are byte-identical to fresh conversion in a different location
+            clean_dir = Path(directory) / 'clean'
+            clean_dir.mkdir()
+            clean_path = clean_dir / 'fresh.png'
+            clean_atlas = convert(source, clean_path, 1)
+            self.assertEqual((out / 'a/main.png').read_bytes(), clean_path.read_bytes())
+
+    def test_drain_checkpoint_interval_respects_clock(self):
+        """Verify drain() checkpoints only at configured intervals."""
+        from convert_sld import drain
+
+        # Simulate publish events at these times
+        times = [0, 10, 20, 31, 40, 62]
+        clock_state = [0]  # Mutable holder for clock value
+
+        def fake_clock():
+            return clock_state[0]
+
+        save_calls = []
+
+        def publish(item):
+            pass  # No-op
+
+        def save():
+            save_calls.append(clock_state[0])
+
+        def results():
+            # Yield 6 items, advancing time before each publish
+            for i, t in enumerate(times):
+                clock_state[0] = t
+                yield (f'item{i}', None, None)
+
+        # interval=30: one save before the first job, then whenever now >= due
+        # Initial due = 0 + 30 = 30
+        # Item 0 at t=0: now < due, no save
+        # Item 1 at t=10: now < due, no save
+        # Item 2 at t=20: now < due, no save
+        # Item 3 at t=31: now >= due, save. due = 31 + 30 = 61
+        # Item 4 at t=40: now < due, no save
+        # Item 5 at t=62: now >= due, save. due = 62 + 30 = 92
+        drain(results, publish, save, interval=30, clock=fake_clock)
+
+        # The first save precedes any conversion, so a stale entry for a page
+        # that is about to be rewritten never survives an interruption.
+        self.assertEqual(save_calls, [0, 31, 62])

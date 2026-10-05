@@ -66,6 +66,12 @@ if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then
     list=$(gh issue list --state open --label "$label" --limit 100 --json number,title --jq '.[] | "  #\(.number) \(.title)"' 2>/dev/null)
     [ -n "$list" ] && printf '%s:\n%s\n' "$label" "$list"
   done
+  section "Project #1 (scheduling view; issues remain authoritative)"
+  gh project item-list 1 --owner gszep --format json --limit 1000 --jq '
+    "https://github.com/users/gszep/projects/1 — \(.totalCount) items",
+    (if .totalCount != (.items | length) then "-> Project list truncated; inspect the board before claiming work"
+     else .items[] | select(.status == "In Progress") | "  In Progress: #\(.content.number) \(.title)"
+     end)' || echo "-> Project unavailable; use the issue queue (Projects access: gh auth refresh -s project)"
   section "closed-issue wording candidates (overnight.md and backlog.md only; not a full documentation audit)"
   closed=$(gh issue list --state closed --limit 300 --json number --jq '.[].number' 2>/dev/null)
   stale=0

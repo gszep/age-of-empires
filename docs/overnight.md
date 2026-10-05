@@ -28,7 +28,7 @@ changes and verify the installed-CLI mock-provider smoke before promising readin
 4. **Verify unattended permissions before promising readiness.** For OpenCode,
    run `tools/session_start.sh --unattended` (or
    `node tools/unattended_preflight.mjs` on its own). It checks the installed binary's
-   merged `build` permissions, the resolved owned depot, and noninteractive
+   merged `orchestrator` permissions, the resolved owned depot, and noninteractive
    GitHub/repository access. Any remaining approval rule fails preflight.
    `opencode.jsonc` permits the known depot paths and returns errors instead of
    prompting for unknown external paths, secret-file reads or repeated calls.
@@ -36,7 +36,7 @@ changes and verify the installed-CLI mock-provider smoke before promising readin
    a Steam directory and start an external search there.
 5. **Configuration on disk is not the running session.** After permission edits,
    restart OpenCode (or recreate/restart its hosting server/session) and use
-   the `build` agent. Before the clock starts, use the actual Read tool on the
+   the `orchestrator` agent. Before the clock starts, use the actual Read tool on the
    `dropsites.json` path printed by preflight, and verify a scratch edit and a
    shell command in that session. Resolve any approvals while the human is
    still present. Check selected-provider authentication too; the CLI permission
@@ -50,11 +50,12 @@ changes and verify the installed-CLI mock-provider smoke before promising readin
 
 ## During the run
 
-- **One item at a time, in the tracker's order**: bugs, then decisions the
-  human has answered, then enhancements. An item is done only when its own
-  check passes and `tools/gate.sh` is green; then commit and push before the
-  next. If it cannot be finished, revert to the last green state, say why on
-  the issue, and move on — a half-shipped feature is worse than an honest gap.
+- **One integration at a time, in the tracker's order**: bugs, then decisions
+  the human has answered, then enhancements. Independent implementation may run
+  in bounded worker worktrees under [orchestration.md](orchestration.md). An item
+  is done only when its acceptance and the combined tree's gate pass; commit and
+  push before integrating the next. Preserve blocked work in its durable tree,
+  record why on the issue, and keep main at a verified checkpoint.
 - **The clock is `date`, not memory.** Run it before every progress note;
   `tools/hooks/clock.sh` also prints the time every twenty-five tool calls.
   A run once wrapped up at dawn believing it was mid-afternoon because it
@@ -77,6 +78,9 @@ changes and verify the installed-CLI mock-provider smoke before promising readin
 - **Concurrent items go in worktrees**, never in one tree. The last time six
   features shared a tree during an import, splitting them into commits took
   two and a half hours and three tries.
+- **Compression follows a substantial integrated batch**, before the next:
+  safe-point dead-code/documentation audit, retained regression coverage,
+  measured source delta and build/gate timing. Never during an active rollout.
 - **Tuning has a budget.** Two batches without movement means the variable
   is wrong: instrument the state over time, do not try a third value. Ship
   the best measured configuration and record the curve.

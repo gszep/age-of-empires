@@ -258,6 +258,19 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 
 ## Before starting, waiting on, or restarting a job
 
+- **A worktree path in a worker prompt does not move its tools.** A Haiku worker
+  used relative patch paths in the coordinator checkout despite an absolute-path
+  assignment. Start an initialization-only child, move its session to the worker
+  tree through the harness, then resume with implementation. Preserve its partial
+  patch before escalating; model choice does not establish filesystem isolation.
+
+- **Parallel workers need a shared canonical registry, not a cwd-relative one.**
+  Worktree operations invoked from a linked tree must resolve the primary checkout
+  before acquiring their operation lock or choosing a retirement base. Independent
+  edits can run concurrently; imports, full gates and main integration stay under
+  one coordinator. Temporary-Git tests cover nested invocation and dirty/unmerged
+  retirement (`tools/worktree.test.ts`).
+
 - **Uncommitted worktrees must survive a reboot.** The civilisation run's
   `/tmp/opencode` patches disappeared; only the already integrated main-tree
   work survived. Keep implementation worktrees/patches in persistent ignored
