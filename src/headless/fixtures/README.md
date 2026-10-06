@@ -35,3 +35,31 @@ not mutate the caller's current rules.
 
 Existing pre-Mongols recording; retained unchanged. Its separate regression in
 `headless.test.ts` protects absence of later feature state.
+
+## `pre-siphons-v6.json` (#242)
+
+Generated from untouched commit
+`98979f65bd3ad49ab98bd663361e6555c27a7bbb`, using its `runMatch` and
+`FALLBACK_RULES`, before the Siphons building exclusion or recording-v7 adapter.
+That engine independently replayed all four checksums before freezing the file.
+SHA-256:
+`be9408917c8763c572ac20c6aa88e0af6f19a8f5beab4c6b5e4c65c4b9666262`.
+
+Controlled **open-content fixture**, not an owned recording or balance preset:
+`../siphons-replay.fixture.ts` supplies the inspected, researched Siphons charge
+tuple to a Fire Galley, with free zero-time TC training, land passability and
+enlarged sight/range so it can attack the enemy TC without a navigation fixture.
+Automatic search is disabled. These test-only overrides do not override charge
+eligibility, release or consumption; the engine decides those. Pass the old
+engine's fallback to the factory when reproducing provenance, as with packing.
+
+Seed242, Arabia, v6 launch,20 game seconds, decision interval0.05. Public
+commands train at tick0 and attack enemy TC6 at tick20 with Fire Galley1242.
+The first charged projectile is released at tick21 and charge becomes0.
+No direct game-state staging or snapshot occurs in the recorded command stream.
+
+Against the building exclusion without compatibility, the frozen regression
+failed at tick100: expected `983ee1bb`, actual `0305327d`. The v7 adapter must
+restore those historical checksums, not replace them. Coverage also asserts the
+old projectile/charge result, rejects relabelling as v7, checks current v7
+recordings, and continues marker-less/current snapshots before and after release.

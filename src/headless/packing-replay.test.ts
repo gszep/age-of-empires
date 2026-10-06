@@ -31,10 +31,10 @@ it('replays frozen pre-change v5 pack/unpack and Kataparuto checksums', () => {
   expect(replayRecord({ ...record, version: MATCH_FORMAT_VERSION }, rules).ok).toBe(false);
 });
 
-it('writes v6 even for a v5 launch config and replays calibrated pack/unpack through JSON', async () => {
-  expect(MATCH_FORMAT_VERSION).toBe(6);
-  for (const version of [1, 2, 3, 4, 5, 6]) expect(validateMatchConfig({ version, seed: 259 })).toBe(true);
-  expect(validateMatchConfig({ version: 7, seed: 259 })).toBe(false);
+it('writes the current format even for a v5 launch config and replays calibrated pack/unpack through JSON', async () => {
+  expect(MATCH_FORMAT_VERSION).toBeGreaterThanOrEqual(6);
+  for (const version of [1, 2, 3, 4, 5, 6, 7]) expect(validateMatchConfig({ version, seed: 259 })).toBe(true);
+  expect(validateMatchConfig({ version: MATCH_FORMAT_VERSION + 1, seed: 259 })).toBe(false);
   const rules = packingReplayRules();
   const { record, result } = await runMatch({ version: 5, seed: 259, maxTimeSeconds: 45, decideIntervalSeconds: .05 }, {
     1: { decide: ({ observation: o }) => {
@@ -47,7 +47,7 @@ it('writes v6 even for a v5 launch config and replays calibrated pack/unpack thr
       return [{ kind: 'pack', player: 1, entityIds: [treb.id], unpacked: tick === 20 || tick === 620 }];
     } }, 2: { decide: () => [] },
   }, rules);
-  expect(record.version).toBe(6); expect(result.version).toBe(6);
+  expect(record.version).toBe(MATCH_FORMAT_VERSION); expect(result.version).toBe(MATCH_FORMAT_VERSION);
   expect(result.rejectedCommands).toEqual([]);
   expect(validateMatchResult(result)).toBe(true);
   const wire = JSON.parse(JSON.stringify(record));

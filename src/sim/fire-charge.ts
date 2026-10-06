@@ -1,6 +1,11 @@
-import { isUnit, TICK_SECONDS, TICKS_PER_SECOND } from './data';
+import { isBuilding, isUnit, TICK_SECONDS, TICKS_PER_SECOND } from './data';
 import { unitRulesForEntity } from './rules';
 import type { Entity, GameState, Point, Projectile } from './types';
+
+/** Replay initialization only. Marker-less snapshots already select this policy. */
+export function useLegacySiphons(state: GameState): void {
+  delete state.siphonsVersion;
+}
 
 export function fireChargeOf(state: GameState, unit: Entity) {
   if (!isUnit(unit.kind)) return;
@@ -17,7 +22,14 @@ export function rechargeFireCharge(state: GameState, unit: Entity): void {
 /** Inferred bounded policy: an extra aimed projectile on a ready normal swing. */
 export function releaseFireCharge(state: GameState, unit: Entity, target: Entity, aim: Point): void {
   const rules = fireChargeOf(state, unit);
-  if (!rules || unit.owner === 0 || target.owner === 0 || target.owner === unit.owner
+  // Native #242: a researched Fire Ship keeps charge while damaging a Dock,
+  // but spends it against a Transport. Use the generic building category, not
+  // a Dock exception or a guessed decoding of charge-target64/task133 flags.
+  // This is confined to the Siphons tuple accepted by fireChargeOf above.
+  // Pre-v7 recordings/marker-less snapshots retain the old building projectile
+  // and charge expenditure, including subsequent recharges and releases.
+  if (!rules || (state.siphonsVersion === 1 && isBuilding(target.kind))
+    || unit.owner === 0 || target.owner === 0 || target.owner === unit.owner
     || (unit.charge ?? rules.maximum) + 1e-9 < 1) return;
   const shot = rules.projectile;
   unit.charge = Math.max(0, (unit.charge ?? rules.maximum) - 1);

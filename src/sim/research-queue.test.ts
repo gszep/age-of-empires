@@ -6,6 +6,7 @@ import { observe } from './observe';
 import { checksumState } from './checksum';
 import { useLegacyScore } from './score';
 import { useLegacyPacking } from './packing';
+import { useLegacySiphons } from './fire-charge';
 import { MATCH_FORMAT_VERSION } from '../protocol/types';
 import { FALLBACK_RULES } from './data';
 import { validateCommand, validateObservation, validateMatchRecord } from '../protocol/validate';
@@ -190,6 +191,7 @@ describe('research queueing (#293)', () => {
     const legacyState = createGame(record.seed, rules, undefined, 'arabia', undefined, undefined, undefined, 0);
     useLegacyScore(legacyState);
     useLegacyPacking(legacyState);
+    useLegacySiphons(legacyState);
     delete legacyState.researchQueueVersion;
     // Original semantics: the first research is paid; busy second command is rejected.
     expect(applyCommand(legacyState, record.commands[0].command).ok).toBe(true);

@@ -1,0 +1,85 @@
+{
+  "version": 6,
+  "seed": 242,
+  "rulesOrigin": "fallback",
+  "civilizations": {
+    "1": "open",
+    "2": "open"
+  },
+  "mode": "random-map",
+  "decideIntervalSeconds": 0.05,
+  "maxTimeSeconds": 20,
+  "commands": [
+    {
+      "tick": 0,
+      "command": {
+        "kind": "train",
+        "player": 1,
+        "buildingId": 1,
+        "unit": "fire-galley"
+      }
+    },
+    {
+      "tick": 20,
+      "command": {
+        "kind": "order",
+        "player": 1,
+        "entityIds": [
+          1242
+        ],
+        "targetId": 6,
+        "target": {
+          "x": 101,
+          "y": 60
+        }
+      }
+    }
+  ],
+  "checksums": [
+    {
+      "tick": 100,
+      "hash": "983ee1bb"
+    },
+    {
+      "tick": 200,
+      "hash": "fdf81847"
+    },
+    {
+      "tick": 300,
+      "hash": "5301b67d"
+    },
+    {
+      "tick": 400,
+      "hash": "bd19997e"
+    }
+  ],
+  "result": {
+    "version": 6,
+    "mode": "random-map",
+    "seed": 242,
+    "timeSeconds": 20,
+    "players": {
+      "1": {
+        "food": 200,
+        "wood": 200,
+        "gold": 100,
+        "stone": 0,
+        "population": 5,
+        "entities": 6,
+        "age": 0,
+        "researched": []
+      },
+      "2": {
+        "food": 200,
+        "wood": 200,
+        "gold": 100,
+        "stone": 0,
+        "population": 4,
+        "entities": 5,
+        "age": 0,
+        "researched": []
+      }
+    },
+    "rejectedCommands": []
+  }
+}
