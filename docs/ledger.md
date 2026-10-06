@@ -547,7 +547,17 @@ comes from untouched1c316d8; see `src/headless/fixtures/README.md` and
   **Partial native185872 observation (#260):** stationary Siege Ram loses3HP
   per sampled normal Chu Ko Nu cycle,4HP per sampled Elite cycle,64HP in one
   Rocket Cart burst. High pierce armor and unseparated misses prevent a primary/
-  secondary split or cadence conclusion; no combat rule was changed. Fire Lancer
+  secondary split or cadence conclusion from those ram samples. **Later current
+  build185872 follow-up:** Chinese Castle attack9/11 versus a zero-armour farm
+  yielded full cycles15/23, supporting primary shooter damage plus secondary3,
+  not full-strength or Fletching-boosted secondary arrows. Shorter cycles12/20
+  also occurred; all-hit arithmetic is not a native hit-rate guarantee. Elite
+  versus pierce2 War Elephant yielded four13HP cycles while the nearby elephant
+  stayed450/450. This establishes no observed collateral at that placement,
+  not a universal no-collateral rule. Pinned/installed spawning-area fields agree
+  at normal `(0,0,1)` / Elite `(1,1,1)`; they are not currently consumed and their
+  spatial semantics remain uncalibrated. See the per-volley table and rejected
+  fixtures in [calibration](chinese-calibration.md). No combat rule was changed. Fire Lancer
   produced no verified strike in the attempted window; Lou Chuan was not measured.
   Editor one-villager/TC start yielded4 villagers/15 housing, but custom resources
   do not establish the normal opening deductions. Remaining gaps stay on#260.
