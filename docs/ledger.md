@@ -1264,3 +1264,27 @@ when the result looks right. When a row is later read from a file, delete it
   save-state semantics, not relabelling these houses as cavalry archers.
 - **Audio:** all consumed Mongols cue graphs resolve against both pinned base
   packs. No new #271 exception, substitution or relaxed missing-event guard.
+
+## Relic storage garrison flags (#291)
+
+- **Read:** pinned Briton monastery104 has capacity10 and
+  `creatable.garrison_graphic=4786` (`CRCH3GW`), whose file-bearing layer11385
+  is `GarrisonFlag WEST`, `b_west_garrison_flag_x1`, offset(-74,-221),90 frames
+  at ~0.033333s. The existing import selects its owned x2 counterpart at scale2.
+- **Owner-reported / inferred trigger:** stored building relics raise that same
+  occupancy flag; carried monk relics do not. No distinct relic-only art or
+  newly invented placement/timing is introduced. Exact native trigger semantics
+  have not been calibrated in the live reference game. Open content retains the
+  existing geometric player-colour flag.
+- **Published coverage (2026-10-06 root manifest):** building entries with
+  `garrisonFlags` are archery-range, barracks, bombard-tower, castle, dock,
+  guard-tower, keep, market, monastery, siege-workshop, stable, town-center and
+  watch-tower. Other flagged keys are battering-ram, capped-ram, dat-unit-548,
+  siege-tower and transport-ship. Imported entries without `garrisonFlags`
+  still draw zero flags; this change does not invent missing art or claim every
+  profile/building is covered.
+- **Visibility / protocol:** the existing `hasGarrison` public occupancy flag
+  now includes stored relics, while private counts/contents remain owner-only.
+  Fog uses the last-seen bit, never hidden live contents. No additional protocol-version bump is needed:
+  no wire field/type changed and the documented occupancy-indicator contract is
+  unchanged; this corrects the relic case of that contract.

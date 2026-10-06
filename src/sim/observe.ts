@@ -11,7 +11,7 @@ import { fireChargeOf } from './fire-charge';
 import type { ObservedEntity, PlayerObservation, RememberedEntityObservation } from '../protocol/types';
 import { PROTOCOL_VERSION } from '../protocol/types';
 import { observedTerrain } from '../protocol/terrain';
-import { garrisonCount } from './garrison';
+import { garrisonCount, hasGarrisonFlag } from './garrison';
 
 function observeEntity(state: GameState, entity: Entity, player: PlayerId): ObservedEntity {
   const observed: ObservedEntity = {
@@ -27,7 +27,7 @@ function observeEntity(state: GameState, entity: Entity, player: PlayerId): Obse
   if (entity.node) observed.node = entity.node;
   if (entity.amount !== undefined) observed.amount = Math.floor(entity.amount);
   if (entity.buildProgress !== undefined) observed.buildProgress = Math.round(entity.buildProgress * 1000) / 1000;
-  if (entity.garrison?.length) observed.hasGarrison = true;
+  if (hasGarrisonFlag(entity)) observed.hasGarrison = true;
   if (isUnit(entity.kind) && entity.relics?.length) observed.carryingRelic = true;
   if (entity.owner === player) {
     // Orders, activities, carried loads, and production stay hidden from opponents.

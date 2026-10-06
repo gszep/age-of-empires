@@ -1,4 +1,11 @@
 import type { DeepReadonly, Entity } from './types';
+import { isBuilding } from './data';
+
+/** Public occupancy indicator, not a passenger/relic count. Carried relics
+ * change a monk's art; only stored building relics raise a garrison flag. */
+export function hasGarrisonFlag(entity: DeepReadonly<Entity>): boolean {
+  return !!entity.garrison?.length || (isBuilding(entity.kind) && !!entity.relics?.length);
+}
 
 /** Research follows each entity's owner even inside an enemy mobile carrier,
  * including infantry inside a transported ram. */

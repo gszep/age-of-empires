@@ -6,6 +6,7 @@
 import { isBuilding, isUnit, lingersInFog } from './data';
 import { buildingRulesForEntity, playerAttributeFor, unitRulesForEntity } from './rules';
 import { rulesForPlayer } from './civilizations';
+import { hasGarrisonFlag } from './garrison';
 import type { BuildingKind, Entity, GameState, PlayerId } from './types';
 
 export interface RememberedEntity {
@@ -21,6 +22,7 @@ export interface RememberedEntity {
   amount?: number;
   buildProgress?: number;
   lastSeenAt: number; // tick
+  /** Last-seen occupancy flag, including stored relics; never live hidden contents. */
   hasGarrison?: boolean;
 }
 
@@ -73,7 +75,7 @@ function remember(state: GameState, player: PlayerId, entity: Entity): void {
   if (entity.node) snapshot.node = entity.node;
   if (entity.amount !== undefined) snapshot.amount = Math.floor(entity.amount);
   if (entity.buildProgress !== undefined) snapshot.buildProgress = Math.round(entity.buildProgress * 1000) / 1000;
-  if (entity.garrison?.length) snapshot.hasGarrison = true;
+  if (hasGarrisonFlag(entity)) snapshot.hasGarrison = true;
   state.visibility[player].memory[entity.id] = snapshot;
 }
 

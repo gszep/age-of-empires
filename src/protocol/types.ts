@@ -38,7 +38,8 @@ export interface ObservedEntity {
   /** Own carriers/buildings only: all occupants, including nested passengers.
    * They are not separate entries in the visible entity list. */
   garrisoned?: number;
-  /** A visible flag reveals occupancy, not the private count or passengers. */
+  /** A visible flag reveals occupancy (units or stored building relics),
+   * not private counts or contents. */
   hasGarrison?: boolean;
   /** Own town centers only. */
   townBell?: boolean;
@@ -148,6 +149,7 @@ export interface RememberedEntityObservation {
   buildProgress?: number;
   /** Seconds of game time when this entity was last seen. */
   lastSeenAt: number;
+  /** Last-seen occupancy flag, on the same terms as ObservedEntity.hasGarrison. */
   hasGarrison?: boolean;
 }
 

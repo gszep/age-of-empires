@@ -7,6 +7,7 @@ import type { SoundPose } from './world-sounds';
 import { isGateKind, isWallKind, isWallLineKind } from '../sim/buildings';
 import { rulesForPlayer } from '../sim/civilizations';
 import { unitRulesForEntity } from '../sim/rules';
+import { hasGarrisonFlag } from '../sim/garrison';
 import { corpseAgeSeconds, swingSeconds } from '../sim/game';
 import { createTerrainPatch, elevationAt, ELEVATION_PIXELS, elevatedWorldToIso, FOG_EXPLORED } from './world';
 import { contourLayerOrder, groundLayerOrder, projectileLayerOrder, rallyLayerOrder, spriteLayerOrder } from './render-order';
@@ -1101,7 +1102,7 @@ export function updateEntityView(
   state: ReadonlyGameState,
   entity: Entity,
   time: number,
-  hasGarrison = !!entity.garrison?.length,
+  hasGarrison = hasGarrisonFlag(entity),
 ): void {
   const depth = isoDepth(entity.position.x, entity.position.y);
   view.soundPose = undefined;

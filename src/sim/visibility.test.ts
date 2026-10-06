@@ -1,6 +1,59 @@
 import { describe, expect, it } from 'vitest';
 import { createGame } from './game';
 import { createVisibility, updateVisibility } from './visibility';
+import { observe } from './observe';
+import type { Entity } from './types';
+
+describe('last-seen building occupancy (#291)', () => {
+  it.each(['relics', 'garrison'] as const)('remembers %s without exposing hidden changes or contents', storage => {
+    const state = createGame(291);
+    const scout = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const payload: Entity = { id: state.nextId++, kind: storage === 'relics' ? 'relic' : 'monk',
+      owner: storage === 'relics' ? 0 : 2, position: { x: 40, y: 40 }, hp: 30, maxHp: 30,
+      radius: .5, activity: 'idle', order: { kind: 'idle' } };
+    const monastery: Entity = { ...payload, id: state.nextId++, kind: 'monastery', owner: 2, radius: 1.5 };
+    state.entities = [scout, monastery];
+    state.visibility = createVisibility(state);
+    scout.position = { x: 40, y: 40 };
+    const refresh = () => { state.tick++; updateVisibility(state); };
+    const visible = () => observe(state, 1).entities.find(e => e.id === monastery.id)!;
+    const remembered = () => observe(state, 1).memory.find(e => e.id === monastery.id)!;
+    refresh();
+    expect(visible().hasGarrison).toBeUndefined();
+    monastery[storage] = [payload];
+    refresh();
+    expect(visible().hasGarrison).toBe(true);
+    expect(visible()).not.toHaveProperty('relics');
+    expect(visible()).not.toHaveProperty('garrisoned');
+    expect(observe(state, 2).entities.find(e => e.id === monastery.id))
+      .toHaveProperty(storage === 'relics' ? 'relics' : 'garrisoned', 1);
+    expect(state.visibility[1].memory[monastery.id].hasGarrison).toBe(true);
+    scout.position = { x: 90, y: 90 };
+    refresh();
+    const lastSeen = structuredClone(remembered());
+    expect(lastSeen.hasGarrison).toBe(true);
+    monastery[storage] = [];
+    refresh();
+    expect(visible()).toBeUndefined();
+    expect(remembered()).toEqual(lastSeen);
+    expect(remembered()).not.toHaveProperty('relics');
+    expect(remembered()).not.toHaveProperty('garrison');
+    scout.position = { x: 40, y: 40 };
+    refresh();
+    expect(visible().hasGarrison).toBeUndefined();
+    expect(state.visibility[1].memory[monastery.id].hasGarrison).toBeUndefined();
+    scout.position = { x: 90, y: 90 };
+    refresh();
+    const empty = structuredClone(remembered());
+    monastery[storage] = [payload];
+    refresh();
+    expect(remembered()).toEqual(empty);
+    expect(remembered().hasGarrison).toBeUndefined();
+    scout.position = { x: 40, y: 40 };
+    refresh();
+    expect(visible().hasGarrison).toBe(true);
+  });
+});
 
 describe('fog-memory lookup lifetime (#165)', () => {
   function fixture() {

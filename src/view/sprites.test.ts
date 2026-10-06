@@ -1050,6 +1050,59 @@ describe('garrison flag overlays (#137)', () => {
     updateEntityView(view, assets, state, tc, 3, true);
     expect(view.garrisonFlags!.every(p => !p.mesh.visible)).toBe(true);
   });
+
+  it.each([true, false])('shows stored relic occupancy with imported assets=%s (#291)', imported => {
+    const assets = annexedAssets();
+    const state = createGame();
+    const relic: Entity = { id: state.nextId++, kind: 'relic', owner: 0, position: { x: 40, y: 40 },
+      hp: 100, maxHp: 100, radius: .5, activity: 'idle', order: { kind: 'idle' } };
+    const monastery: Entity = { ...relic, id: state.nextId++, kind: 'monastery', owner: 1,
+      radius: 1.5, relics: [relic] };
+    state.entities.push(monastery);
+    // A real monastery asset entry, not the TC-only annex fixture.
+    const source = assets.entities.monastery = { ...assets.entities['town-center'], annexes: undefined };
+    source.animations.flag = { frames: 1, directions: 1, frameSeconds: 0.1, mirroringMode: 0 };
+    const atlas: Atlas = { image: 'flag.png', scale: 2, size: [8, 8], framesInFile: 1,
+      frames: [{ x: 0, y: 0, w: 8, h: 8, cx: 4, cy: 4 }] };
+    source.atlases.flag = atlas;
+    source.atlases['flag-playercolor'] = { ...atlas, image: 'flag-color.png' };
+    assets.textures.set('flag.png', new THREE.Texture());
+    assets.textures.set('flag-color.png', new THREE.Texture());
+    source.garrisonFlags = { idle: [{ animation: 'flag', x: -74, y: -221 }] };
+    const content = imported ? assets : undefined;
+    const view = createEntityView(content, monastery);
+    const before = JSON.stringify(state);
+    updateEntityView(view, content, state, monastery, 0);
+    expect(view.garrisonFlags?.filter(p => p.mesh.visible)).toHaveLength(1);
+    expect(JSON.stringify(state)).toBe(before);
+    if (imported) {
+      const iso = worldToIso(monastery.position.x, monastery.position.y);
+      expect(view.garrisonFlags![0].mesh.position.x).toBe(iso.x - 74);
+      expect(view.garrisonFlags![0].mesh.position.y).toBe(iso.y + 221);
+      expect(view.garrisonColors![0].mesh.visible).toBe(true);
+    }
+    // Explicit fog memory must override even live stored relics.
+    updateEntityView(view, content, state, monastery, 0, false);
+    expect(view.garrisonFlags!.every(p => !p.mesh.visible)).toBe(true);
+    monastery.relics = [];
+    updateEntityView(view, content, state, monastery, 1, true);
+    expect(view.garrisonFlags!.filter(p => p.mesh.visible)).toHaveLength(1);
+    updateEntityView(view, content, state, monastery, 2);
+    expect(view.garrisonFlags!.every(p => !p.mesh.visible)).toBe(true);
+    expect(view.garrisonColors!.every(p => !p.mesh.visible)).toBe(true);
+    monastery.relics = [relic];
+    monastery.buildProgress = .5;
+    updateEntityView(view, content, state, monastery, 3);
+    expect(view.garrisonFlags!.every(p => !p.mesh.visible)).toBe(true);
+    monastery.buildProgress = undefined;
+    monastery.dead = true;
+    updateEntityView(view, content, state, monastery, 4);
+    expect(view.garrisonFlags!.every(p => !p.mesh.visible)).toBe(true);
+    const monk: Entity = { ...monastery, kind: 'monk', dead: false };
+    const monkView = createEntityView(undefined, monk);
+    updateEntityView(monkView, undefined, state, monk, 0);
+    expect(monkView.garrisonFlags ?? []).toHaveLength(0);
+  });
 });
 
 describe('what a death leaves behind', () => {
