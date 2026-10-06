@@ -396,20 +396,36 @@ off the reference; **measured** — fitted to a reference screenshot;
   resource 0 means the ordinary rate and a positive resource multiplies it. This
   corrects the old task-amount omission for all imported monks. Fractional progress
   uses the existing integer-HP accumulator. Captured monks freeze this resolved
-  unit-local rate under the shared conversion policy. Native cadence/stacking and
-  sentinel semantics remain#267.
+  unit-local rate under the shared conversion policy. **Native current-build
+  calibration (#267):** visually observed on185872, not pinned48987, one/two/three
+  Byzantine monks support approximately5/7.5/10HP/s; Teuton one/two support
+  2.5/3.75. The runtime now gives the first actual healer per patient/tick full
+  rate and later healers half. Equal-rate aggregate stacking is measured;
+  traversal-order priority for mixed-rate/captured monks and extension beyond
+  three are inferred integration policies. Subsecond cadence/sentinel semantics
+  remain open. See [measurements, failures and limits](byzantines-calibration.md).
 - **Owned + documented interpretation:** Cataphract blast_damage=-5 and Logistica
   radius+.5/+6 infantry attack; UGC attribute115 describes negative area damage as
   fixed HP. **Inferred geometry:** use the existing target-centred radius plus
   bystander hitbox, exclude owner/direct target, respect blast defense classes and
-  deal exactly 5 collateral HP without armour/elevation scaling. Positive melee
+  deal exactly 5 collateral HP without armour/elevation scaling. Installed185872
+  effect493 lacks pinned493's +6 infantry commands; installed40/553 instead have
+  base infantry attack13/18 versus pinned9/12. Paid current-build Logistica and
+  a direct24HP strike were observed; a nearby Militia took0, but unsettled geometry
+  and failed positive collateral controls do not establish a radius rule. The
+  candidate disagreement remains#267; the pinned bonus is preserved. Positive melee
   blast damage scales the ordinary damage calculation. No native boundary/hill
   calibration is claimed. Greek Fire's source radius/range changes and projectile
   replacements506→537/508→1798 reach building and unit shots; shared ranged splash
   assumptions remain unchanged.
 - **Inferred numeric policy:** building HP retains the source's fractional chained
   factors 1.1/1.0909/1.0833/1.0769, with existing wound/foundation handling rather than
-  substituting exact10/20/30/40% values. Native rounding remains#267.
+  substituting exact10/20/30/40% values. Current185872 House panels read
+  605/900/1170/1260, but cannot distinguish fractional internal HP from display
+  rounding; no runtime change follows. Ordinary Palisade165/300/325/350 and
+  Watch935/1020/1326→Guard2100 also fit exact staged bonuses, nearest-per-command,
+  nearest-final and float32-chain/ceiling-display models. Final-floor and naive
+  double-ceiling models do not fit all panels. Native internal rounding remains#267.
 - **Owned graphic composition:** MEDI garrison parents retain legacy 2260/2263
   names (`I`, `R`, `B`, `RTWC2GI`, `MRKT2GI`, `ARRG2GI`, `STBL2GI`, `DOCK2GI`,
   `BRKS2GI`) without corresponding SLD files. Their delta11380 supplies the DE

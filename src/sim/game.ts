@@ -364,12 +364,6 @@ const GATHER_TASK: Record<ResourceKind, VillagerGatherTask> = {
   food: 'forager', wood: 'lumberjack', gold: 'goldminer', stone: 'stonemason',
 };
 
-export function gatherRateFor(
-  state: GameState, owner: Entity['owner'], resource: ResourceKind,
-): number {
-  const task = GATHER_TASK[resource];
-  return researchedAttribute(state, owner, `villager-${task}`, 'workRate', rulesForPlayer(state, owner).villagerGather[task].ratePerSecond);
-}
 
 export function carryCapacityFor(state: GameState, owner: Entity['owner'], task: VillagerGatherTask = 'forager'): number {
   return researchedAttribute(state, owner, `villager-${task}`, 'carryCapacity', rulesForPlayer(state, owner).villagerGather[task].capacity);
@@ -2184,7 +2178,7 @@ function updateAttacker(state: GameState, grid: NavGrid, entity: Entity): void {
  * A monk mends a wounded ally within its resolved healing range. The importer
  * combines task105's HP amount and work rate; owner modifiers are in rules.ts.
  */
-function updateHealer(state: GameState, grid: NavGrid, entity: Entity): void {
+function updateHealer(state: GameState, grid: NavGrid, entity: Entity, healedTargets: Set<number>): void {
   if (entity.order.kind !== 'heal') return;
   const rules = unitRulesForEntity(state, entity);
   const heal = rules.heal;
@@ -2200,7 +2194,11 @@ function updateHealer(state: GameState, grid: NavGrid, entity: Entity): void {
   }
   clearPath(entity);
   entity.activity = 'healing';
-  entity.gatherProgress = (entity.gatherProgress ?? 0) + heal.hitPointsPerSecond * TICK_SECONDS;
+  // Native #267: equal-rate pairs/triples heal at 1.5x/2x a lone monk.
+  // Only an in-range healer consumes the full-rate slot for this tick.
+  const factor = healedTargets.has(target.id) ? 0.5 : 1;
+  healedTargets.add(target.id);
+  entity.gatherProgress = (entity.gatherProgress ?? 0) + heal.hitPointsPerSecond * factor * TICK_SECONDS;
   const whole = Math.floor(entity.gatherProgress);
   if (whole >= 1) {
     entity.gatherProgress -= whole;
@@ -3029,7 +3027,7 @@ function updateTower(state: GameState, entity: Entity): void {
   }
 }
 
-function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCounts: Map<number, number>): void {
+function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCounts: Map<number, number>, healedTargets: Set<number>): void {
   rechargeFireCharge(state, entity);
   if (entity.charge !== undefined) {
     const alternate = unitRulesForEntity(state, entity).alternateAttack;
@@ -3097,7 +3095,7 @@ function updateUnit(state: GameState, grid: NavGrid, entity: Entity, builderCoun
     case 'build': return updateBuilder(state, grid, entity, builderCounts);
     case 'attack':
     case 'attack-ground': return updateAttacker(state, grid, entity);
-    case 'heal': return updateHealer(state, grid, entity);
+    case 'heal': return updateHealer(state, grid, entity, healedTargets);
     case 'repair': return updateRepairer(state, grid, entity);
     case 'garrison': return updateGarrisoner(state, grid, entity);
     case 'cross-wall': return updateWallUnloader(state, grid, entity);
@@ -3521,6 +3519,7 @@ function stepGameBody(state: GameState): void {
     return built;
   };
   const builderCounts = new Map<number, number>();
+  const healedTargets = new Set<number>();
   const movable: Entity[] = [];
   for (const entity of [...state.entities]) {
     if (entity.dead) {
@@ -3535,7 +3534,7 @@ function stepGameBody(state: GameState): void {
       continue;
     }
     if (isUnit(entity.kind)) {
-      updateUnit(state, gridFor(entity), entity, builderCounts);
+      updateUnit(state, gridFor(entity), entity, builderCounts, healedTargets);
       movable.push(entity);
     } else if (isBuilding(entity.kind) && entity.buildProgress === undefined) {
       updateBuildingProduction(state, entity);

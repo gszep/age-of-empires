@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FALLBACK_RULES, type TechEffect } from './data';
+import { FALLBACK_RULES, TICKS_PER_SECOND, type TechEffect } from './data';
 import { activateAutomaticTechnologies, applyCommand, createGame, stepGame } from './game';
 import { checksumState } from './checksum';
 import { addRelic } from './relics';
@@ -42,6 +42,42 @@ function research(state: GameState, owner: PlayerId, key: string, effects: TechE
   expect(applyCommand(state, { kind: 'research', player: owner, buildingId: home.id, tech: key }).ok).toBe(true);
   stepGame(state); expect(state.players[owner].researched).toContain(key);
 }
+
+describe('native monk healing calibration (#267)', () => {
+  it.each([2.5, 5])('one/two/three monks at %s HP/s contribute full/half/half rates', rate => {
+    for (const count of [1, 2, 3]) {
+      const s = fixture();
+      s.rules.units.monk.heal = { range: 4, hitPointsPerSecond: rate };
+      const patient = spawn(s, 'knight', 1, 54); patient.hp = 1;
+      const monks = Array.from({ length: count }, (_, i) => spawn(s, 'monk', 1, 50, 49 + i));
+      for (const monk of monks) { order(s, monk, patient); expect(monk.order.kind).toBe('heal'); }
+      run(s, 4 * TICKS_PER_SECOND);
+      expect(patient.hp - 1).toBe(rate * 4 * (1 + (count - 1) / 2));
+      // A stopped/dead/distant monk must not reserve the full-rate slot.
+      for (const monk of monks.slice(0, -1)) {
+        expect(applyCommand(s, { kind: 'stop', player: 1, entityIds: [monk.id] }).ok).toBe(true);
+      }
+      const before = patient.hp, saved = JSON.parse(JSON.stringify(s)) as GameState;
+      run(s, 4 * TICKS_PER_SECOND); run(saved, 4 * TICKS_PER_SECOND);
+      expect(patient.hp - before).toBe(rate * 4);
+      expect(checksumState(saved)).toBe(checksumState(s));
+    }
+  });
+
+  it('counts only active in-range healers, separately for each patient', () => {
+    const s = fixture();
+    s.rules.units.monk.heal = { range: 4, hitPointsPerSecond: 5 };
+    const a = spawn(s, 'knight', 1, 54), b = spawn(s, 'knight', 1, 54, 70);
+    a.hp = b.hp = 1;
+    const distant = spawn(s, 'monk', 1, 10), dead = spawn(s, 'monk', 1, 50);
+    order(s, distant, a); order(s, dead, a);
+    expect(applyCommand(s, { kind: 'delete', player: 1, entityIds: [dead.id] }).ok).toBe(true);
+    order(s, spawn(s, 'monk', 1, 50), a);
+    order(s, spawn(s, 'monk', 1, 50, 70), b);
+    run(s, 4 * TICKS_PER_SECOND);
+    expect(a.hp).toBe(21); expect(b.hp).toBe(21);
+  });
+});
 
 describe('Briton relic lifecycle', () => {
   it('walks, carries owned art, deposits, banks 30 gold/minute and releases the same relic on destruction', () => {

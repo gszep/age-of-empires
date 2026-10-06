@@ -2217,12 +2217,3 @@ export const isUnit = (kind: EntityKind): kind is UnitKind => kind !== 'resource
 export const isBuilding = (kind: EntityKind): kind is BuildingKind => kind !== 'resource' && (BUILDING_KINDS.has(kind) || kind === 'fish-trap');
 const ANIMAL_KINDS = new Set<string>(['sheep', 'deer', 'boar']);
 export const isAnimal = (kind: EntityKind): kind is AnimalKind => ANIMAL_KINDS.has(kind);
-
-/**
- * Units that fight on their own initiative; workers only fight when told. A
- * monk is excluded by having no attack at all rather than by name — it would
- * otherwise walk at the nearest enemy it could never hurt.
- */
-export const isMilitary = (kind: EntityKind, rules: GameRules = FALLBACK_RULES): boolean =>
-  isUnit(kind) && kind !== 'villager' && kind !== 'trade-cart' && kind !== 'king' && !isAnimal(kind)
-  && !!rules.units[kind as UnitKind]?.attacks.some(attack => attack.amount > 0);
