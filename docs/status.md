@@ -40,17 +40,17 @@ resources. See [shared-play.md](shared-play.md).
 
 | Area | Working scope | Evidence and limits |
 | --- | --- | --- |
-| Simulation | Fixed20Hz deterministic economy, construction/repair, production/refunds, gathering/hunting/farms, combat/projectiles/armour/elevation, garrisons/transports, research and fog memory; Mangonel-family automatic friendly-blast avoidance | `src/sim/`; public-command outcome tests and deterministic replay; targeting prediction/legacy-order boundaries in ledger |
-| Civilisations | Britons, Franks, Goths, Teutons, Japanese, Chinese, Byzantines, Saracens, Turks, Vikings, Mongols and Celts with roster/research/bonus/art integration | [coverage](civilization-coverage.md), [bonus contract](civilization-bonuses.md); Saracen aura calibration/text mismatch#285, Celts livestock#304, aura calibration#306, shared Trade Cart audio gaps#271; wider catalogue is inventory only |
-| Buildings/specialists | Additional TCs, fortifications with authoritative automatic gate state, monasteries/relics, siege, conversion snapshots, nested cargo capacity and owner-preserving mobile-carrier conversion | [buildings](civ-buildings-integration.md), [specialists](civ-specialists-integration.md), [conversion](conversion-reference-checklist.md); gate trigger distance/timing remain inferred under#133 |
+| Simulation | Fixed20Hz deterministic economy, construction/repair, production/refunds, gathering/hunting/farms, combat/projectiles/armour/elevation, garrisons/transports, research (queued per building, paid at queue time, #293) and fog memory; manual-derived player score (#139); per-step cost-effect rounding (#301) and floored discounted research (#302/#260); DAT-derived trebuchet packing (#259); packed idle trebuchets no longer auto-deploy (#131); Siphons charge kept vs buildings (#242); first-full/half-extra monk healing stacking (#267); Mangonel-family automatic friendly-blast avoidance; cached blocked-endpoint path queries (#175) | `src/sim/`; public-command outcome tests and deterministic replay; behaviour changes are recording-version gated (legacy recordings replay unchanged); targeting prediction/legacy-order boundaries in ledger |
+| Civilisations | Britons, Franks, Goths, Teutons, Japanese, Chinese, Byzantines, Saracens, Turks, Vikings, Mongols and Celts with roster/research/bonus/art integration | [coverage](civilization-coverage.md), [bonus contract](civilization-bonuses.md); October 5–6 current-build (185872) calibrations: Turks #302, Vikings #301, Mongols #305 (Nomads persistent housing), Byzantines #267, Chinese #260, Saracen Bimaristan #285, conversion stats #178; Celts livestock#304 and Stronghold geometry#306 remain open, shared Trade Cart audio gaps#271; wider catalogue is inventory only |
+| Buildings/specialists | Additional TCs, fortifications with authoritative automatic gate state, monasteries/relics (stored relics raise the building flag, #291), siege, ram foot-gunner crews (#302), conversion snapshots, nested cargo capacity and owner-preserving mobile-carrier conversion | [buildings](civ-buildings-integration.md), [specialists](civ-specialists-integration.md), [conversion](conversion-reference-checklist.md); gate trigger distance/timing remain inferred under#133 |
 | Naval | Briton dock roster, transports, trade cogs and fish traps; enabled profiles' regional ships; distinct snapper/salmon/dorado and shore fish | Owned DAT/task/art imports; all four fish identities gather/deplete/bank in open and imported modes and retain original art in fog; no claim of every native exception |
 | Modes/shared play | Solo and household two-seat play, reconnect/checkpoints, Regicide/Treason, locked diplomacy/tribute, configurable population ceilings and opt-in Wonder victory through menu/headless/replays | [shared play](shared-play.md), [Wonder evidence](wonder-victory.md); the Ysgramor host runs protocol 4 since October 5; a live Artemis join is unverified |
-| Maps | Arabia, Black Forest, Islands, Windsor, Senlac and painted proof; RMS-inspired phases, surveys, elevation, relics and corrected spacing; global Islands fish reach both resource-islet coasts | [generation design](map-generation-design.md); home-land mirroring and native placement/slope semantics remain inferred; native Islands seasons/additional objects tracked in#274 |
-| Rendering | Owned x1/x2 sprites and ordinary A/B attack graphics, masks/contours/shadows, fog memory, source-backed water/foam, native blend families with shoreline tile-grid correction (#284), terrain plants and their shadows; multi-layer projectiles (#297), staged farm construction terrains (#296) and per-age annex player colour (#294) | [blend coverage and shoreline evidence](terrain-blend-coverage.md), [decode contract](block-decode-contract.md), October 5 smokes in [handoff](handoff.md); farm stage thresholds are inferred; native compositor and exact calibration remain open |
-| UI | Native command cells/icons/cursors, garrison/training/production controls, notifications/confirmation/end screens, map menu and persistent options; units selectable over farms while right-click retains crop targeting (#289); research shown in the production slot and cancelled with a refund (#295); `Ctrl+Alt+R` solo resource cheat for testing | [UI reference](ui-reference.md), [feedback review](reviews/2026-09-24-issue 58.md), owned/fallback `tools/farm_selection_smoke.mts`, `tools/research_cancel_smoke.mts`; browser text rasterisation and some surfaces remain approximations |
+| Maps | Arabia, Black Forest, Islands, Windsor, Senlac and painted proof; RMS-inspired phases, surveys, elevation, relics and corrected spacing; global Islands fish reach both resource-islet coasts; new matches deal all eleven Arabia biomes (#118) and place Islands deep-water fish offshore per RMS zone clearance (#95) | [generation design](map-generation-design.md); home-land mirroring and native placement/slope semantics remain inferred; native Islands seasons/additional objects tracked in#274; Arabia snow dusting (#118), native fish counts/water mask (#95) and relic masks (#130) remain open; legacy seeds unchanged via map markers |
+| Rendering | Owned x1/x2 sprites and ordinary A/B attack graphics, masks/contours/shadows, fog memory, source-backed water/foam, native blend families with shoreline tile-grid correction (#284), terrain plants and their shadows, Town Center DAT cast-shadow deltas and annex shadows (#288); multi-layer projectiles (#297), staged farm construction terrains (#296) and per-age annex player colour (#294) | [blend coverage and shoreline evidence](terrain-blend-coverage.md), [decode contract](block-decode-contract.md), October 5 smokes in [handoff](handoff.md); farm stage thresholds are inferred; native compositor and exact calibration remain open |
+| UI | Native command cells/icons/cursors, garrison/training/production controls, notifications/confirmation/end screens, map menu and persistent options; units selectable over farms while right-click retains crop targeting (#289); research shown in the production slot and cancelled with a refund (#295), with queued research icons and indexed cancel (#293); score panel totals (#139); owned-mode technology tree from CivTechTrees (#138); top-bar labels from the owned distance-font atlas (#92); `Ctrl+Alt+R` solo resource cheat for testing | [UI reference](ui-reference.md), [feedback review](reviews/2026-09-24-issue 58.md), owned/fallback `tools/farm_selection_smoke.mts`, `tools/research_cancel_smoke.mts`; browser text rasterisation and some surfaces remain approximations |
 | Audio | Voices, combat/construction/ambient playback, layered action timing and 27-track soundtrack | [audio reference](audio-reference.md); missing streams and native mix/spatial behaviour remain tracked |
-| AI | Observation-only economy/building/combat strategy, coastal fishing, public-command sheep return and bounded late-game castle/trebuchet production and attacks | [fishing](ai-fishing.md), [siege](trebuchet-automation.md), herding outcomes; staged siege chain passes, natural-start progression/balance remains#124 |
-| Agents/replays | Browser/Node share commands; versioned observations and records, subprocess/WebSocket/MCP agents, deterministic batch/replay tools | Provider-dependent tests opt-in; open fallback stops at Castle Age |
+| AI | Observation-only economy/building/combat strategy, coastal fishing, public-command sheep return and bounded late-game castle/trebuchet production and attacks | [fishing](ai-fishing.md), [siege](trebuchet-automation.md), herding outcomes; staged siege chain passes, AI stops housing at the effective population ceiling and answers announced enemy Wonder deadlines (#281) | natural-start progression/balance remains#124 (a queue/Market slice was measured and not merged) |
+| Agents/replays | Browser/Node share commands; versioned observations (protocol 11: research queues, scores, own effective ceiling and announced Wonder timers) and records (format 9), subprocess/WebSocket/MCP agents, deterministic batch/replay tools | Provider-dependent tests opt-in; open fallback stops at Castle Age |
 
 <!-- current-claims:start -->
 - #179 (CLOSED): Briton scoped roster/research completion; native conversion exceptions remain separate.
@@ -65,8 +65,20 @@ Zero-time bonuses follow their explicit prerequisites without an extra producer
 gate; a native paid Frankish farm without a Mill and a Briton control establish
 the Feudal case ([calibration](free-research-calibration.md), #254). Current-build
 Bimaristan rate/overlap/self/relic controls and speed/reset observations are in
-[Bimaristan](bimaristan-calibration.md) and [speed](speed-calibration.md); these
-do not close pinned-runtime acceptance.
+[Bimaristan](bimaristan-calibration.md) and [speed](speed-calibration.md). The
+October 5–6 run used the installed build 185872 as evidence by owner decision;
+results are in [ram crew](ram-crew-calibration.md), [population](population-calibration.md),
+[Turks](turks-calibration.md), [Vikings](vikings-calibration.md),
+[Mongols](mongols-calibration.md), [Byzantines](byzantines-calibration.md),
+[Chinese](chinese-calibration.md), [Samurai/Kataparuto](samurai-kataparuto-calibration.md),
+[siege targeting](siege-targeting-calibration.md), [Siphons](siphons-calibration.md),
+[conversion stats](conversion-stats-calibration.md), [Islands](islands-calibration.md),
+[relics](relic-placement-calibration.md), [shadow overlap](shadow-overlap-calibration.md)
+and partial [Caravanserai](caravanserai-calibration.md), [Stronghold](stronghold-calibration.md),
+[Celtic livestock](celts-livestock-calibration.md), [Incendiaries](incendiaries-calibration.md),
+[gates](gate-calibration.md), [fog animation](fog-animation-reference.md) and
+[Arabia snow](arabia-snow-calibration.md) references. None closes pinned-runtime
+acceptance (#279).
 
 ## Imports and fidelity boundaries
 
@@ -128,7 +140,7 @@ the single controlled run saved 31.03% atlas elapsed time and 32.67% aggregate C
 See [cache verification](reviews/2026-10-02-atlas-cache.md) for inputs and limits.
 
 Owned files do not settle every engine rule. Conversion exceptions, volley/charge
-cadence, zero-time grants, population default/bonus calibration, RMS window/placement semantics and
+cadence, zero-time activation order, RMS window/placement semantics and
 audio mixing remain explicitly qualified in the ledger. Closed scoped civilisation
 tickets are not a claim of complete native-DE equivalence.
 
@@ -170,9 +182,10 @@ Population setup (#253) is verified through real menu selection, solo reload and
 restart, a headless record loaded through the browser file input, CLI/batch
 replay and private host/guest checkpoint/rejoin. Paid production stays at100%
 when the chosen ceiling is full despite spare houses, then releases after a loss;
-Gothic Imperial+10 still requires housing. Native selector values were captured
-on the installed newer DE build; factory default and pinned-build bonus runtime
-calibration remain open. [Population/Wonder evidence](wonder-victory.md) records
+Gothic Imperial+10 still requires housing. On the installed build 185872 the
+reset-lobby default is 200 and Goths reach 210 only in Imperial with surplus
+housing ([population calibration](population-calibration.md)); pinned-build
+runtime remains unverified. [Population/Wonder evidence](wonder-victory.md) records
 the checkpoint verification; latest checkpoint results come from session startup.
 
 Established historical measurements, with their original scope:
@@ -180,7 +193,7 @@ Established historical measurements, with their original scope:
 - Three12,000-tick simulation runs:50.087→34.025s with checked state equivalence.
 - Ten-ship estimated RGBA residency:3.88GB→0.875GB, identical rendered pixels.
 -156.67-minute browser soak: no invalid bindings; peak estimated sprite data
-  3,329.88MiB; remaining Windsor10× spike. See [performance report](reviews/2026-09-23-performance.md).
+  3,329.88MiB; the Windsor10× spike was later traced to repeated blocked-endpoint path searches and reduced (p95 131→42ms, #175). See [performance report](reviews/2026-09-23-performance.md).
 -27-track natural music cycle and 39-minute combined audio/browser soak; the latter
   completed 19 tick-limit rounds. These are not physical-GPU FPS or AI victory claims.
 
