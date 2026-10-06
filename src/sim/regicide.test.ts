@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyCommand, canGarrison, createGame, stepGame, trainableUnitsAt } from './game';
+import { applyCommand, canGarrison, createGame, stepGame, trainableUnitsAt, useLegacyTrebuchetTargeting } from './game';
 import { FALLBACK_RULES } from './data';
 import { checksumState } from './checksum';
 import { useLegacyScore } from './score';
@@ -174,6 +174,7 @@ describe('King survival and temporary Treason', () => {
     useLegacyScore(legacyState);
     useLegacyPacking(legacyState);
     useLegacySiphons(legacyState);
+    useLegacyTrebuchetTargeting(legacyState);
     delete legacyState.researchQueueVersion;
     legacy.checksums = record.checksums.map(({ tick }) => {
       while (legacyState.tick < tick) stepGame(legacyState);

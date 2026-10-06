@@ -1,0 +1,102 @@
+{
+  "version": 7,
+  "seed": 131,
+  "rulesOrigin": "fallback",
+  "civilizations": {
+    "1": "open",
+    "2": "open"
+  },
+  "mode": "random-map",
+  "decideIntervalSeconds": 0.05,
+  "maxTimeSeconds": 60,
+  "commands": [
+    {
+      "tick": 0,
+      "command": {
+        "kind": "train",
+        "player": 1,
+        "buildingId": 1,
+        "unit": "trebuchet"
+      }
+    }
+  ],
+  "checksums": [
+    {
+      "tick": 100,
+      "hash": "15f2d14b"
+    },
+    {
+      "tick": 200,
+      "hash": "16eda717"
+    },
+    {
+      "tick": 300,
+      "hash": "d996b919"
+    },
+    {
+      "tick": 400,
+      "hash": "a041d0a2"
+    },
+    {
+      "tick": 500,
+      "hash": "6dfb9c03"
+    },
+    {
+      "tick": 600,
+      "hash": "57376d28"
+    },
+    {
+      "tick": 700,
+      "hash": "ce05818d"
+    },
+    {
+      "tick": 800,
+      "hash": "505c03c0"
+    },
+    {
+      "tick": 900,
+      "hash": "a0cf8238"
+    },
+    {
+      "tick": 1000,
+      "hash": "71bb5372"
+    },
+    {
+      "tick": 1100,
+      "hash": "e54d8a4d"
+    },
+    {
+      "tick": 1200,
+      "hash": "553b424f"
+    }
+  ],
+  "result": {
+    "version": 7,
+    "mode": "random-map",
+    "seed": 131,
+    "timeSeconds": 60,
+    "players": {
+      "1": {
+        "food": 200,
+        "wood": 200,
+        "gold": 100,
+        "stone": 0,
+        "population": 5,
+        "entities": 6,
+        "age": 0,
+        "researched": []
+      },
+      "2": {
+        "food": 200,
+        "wood": 200,
+        "gold": 100,
+        "stone": 0,
+        "population": 4,
+        "entities": 5,
+        "age": 0,
+        "researched": []
+      }
+    },
+    "rejectedCommands": []
+  }
+}

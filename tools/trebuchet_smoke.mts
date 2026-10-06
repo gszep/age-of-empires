@@ -103,19 +103,24 @@ const art = async (id: number, unpacked: boolean) => {
   }, { timeout: 30_000 }, { id, key, images });
 };
 try {
-  // No attack order: actual Stop lets normal idle acquisition deploy the engine.
+  // Stop leaves a packed engine idle; public Unpack enables automatic fire.
   {
     const { state, put } = fixture();
     const treb = put('trebuchet', 40.5, 40.5), target = put('house', 52.5, 40.5, 2);
     await stage(state); await query({ type: 'select', ids: [treb.id] }); await art(treb.id, false);
     await page.locator('[data-command="stop"]').click();
-    await until((s, id) => s.entities.find((e: any) => e.id === id)?.packingTicks > 0, treb.id);
+    await until(s => s.tick >= 1200, null);
     let s = await snapshot();
-    assert.equal(s.entities.find((e: any) => e.id === treb.id).order.automatic, true);
+    const idle = s.entities.find((e: any) => e.id === treb.id);
+    assert.equal(idle.order.kind, 'idle'); assert(!idle.unpacked);
+    assert.equal(idle.packingTicks, undefined); assert.deepEqual(idle.position, treb.position);
     assert.equal(s.entities.find((e: any) => e.id === target.id).hp, target.hp);
     assert.equal(s.projectiles.length, 0);
+    await page.locator('[data-command="unpack"]').click();
+    assert((await snapshot()).entities.find((e: any) => e.id === treb.id).packingTicks > 0);
     await until((s, id) => s.entities.find((e: any) => e.id === id)?.hp < s.entities.find((e: any) => e.id === id)?.maxHp, target.id);
     s = await snapshot(); assert.deepEqual(s.entities.find((e: any) => e.id === treb.id).position, treb.position);
+    assert.equal(s.entities.find((e: any) => e.id === treb.id).order.automatic, true);
     await art(treb.id, true);
     await query({ type: 'select', ids: [treb.id] }); await page.locator('[data-command="pack"]').click();
     await until((s, id) => { const e = s.entities.find((e: any) => e.id === id); return e && !e.unpacked && e.packingTicks === undefined; }, treb.id);
@@ -123,7 +128,7 @@ try {
     await until((s, tick) => s.tick >= tick + 200, tick);
     assert.equal((await snapshot()).entities.find((e: any) => e.id === treb.id).unpacked, false);
     await art(treb.id, false);
-    console.log('automatic visible-building deployment, setup, actual damage and manual Pack hold: GREEN');
+    console.log('packed idle, public Unpack, automatic actual damage and manual Pack hold: GREEN');
   }
   // A paid fresh engine must obey a real right-click without a separate Unpack.
   {
