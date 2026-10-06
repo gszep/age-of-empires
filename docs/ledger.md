@@ -558,6 +558,13 @@ off the reference; **measured** — fitted to a reference screenshot;
 
 ## Gothic shared mechanics (#181)
 
+- **Cost rounding (#301):** current-build185872, not pinned48987, Castle
+  Spearman/Pikeman tooltip **and debit** are27F/19W; Huskarl57F/27G. Dark→Imperial
+  militia-line debits43/17,40/16,38/15,35/14; Feudal spear28F/20W, Imperial
+  pike25F/18W and Huskarl53F/25G. Both DATs have the same inspected costs and
+  multipliers. This supports shared per-effect rounding rather than final-only
+  rounding (which gives Castle spear26F and Huskarl26G). Separate editor starts,
+  not live age-ups; see [capture table](vikings-calibration.md#goth-review-follow-up).
 - **Owned:** Anarchy16 selects train-location entry 1 with attribute158 and
   writes barracks 12 through attribute 42. Huskarl41/555 preserve castle 13s/button 1
   and secondary16s/button 4/hotkey 16748. **Inferred integration:** tree 759/761 are
@@ -1112,9 +1119,9 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Corpse window, fallback rules only | 3 s | chosen | `game.ts` | — |
 | Animal think interval | 5 ticks | chosen | `game.ts` `ANIMAL_INTERVAL` | — |
 | Engagement tolerances | `radius + 1.6`, margins 0.15-0.4, spawn ring +0.2, node pop ≤ 0.12 | chosen | `game.ts` | — |
-| Villager task gathering | hunter 0.41/35, farmer 0.53/10, shepherd 0.33/10, forager 0.31/10, fisher 0.43/10, lumberjack 0.39/10, gold miner 0.38/10, stone miner 0.36/10 (rate/capacity); each variant's technology effects | **owned** DAT `bird.work_rate`/`resource_capacity` on 122/259/592/120/56/123/579/124, already published as `villager-*.gather`; open fallback copies these numbers. Heavy Plow gives farmer +1 capacity; Wheel Barrow's patch-specific class-4 multiplier is **1.2695**, Hand Cart's 1.5. Existing whole-resource collection rounds fractional capacity upward (**inferred**, not reference-measured); switching tasks uses the new target's capacity and banks an overfull load first (**inferred**). A carried load remembers its task if its source disappears; legacy loads lacking both source and task default to forager | `data.ts` `villagerGather`, `game.ts` `rateOn`/`holdOf` | #132 |
+| Villager task gathering | hunter 0.41/35, farmer 0.53/10, shepherd 0.33/10, forager 0.31/10, fisher 0.43/10, lumberjack 0.39/10, gold miner 0.38/10, stone miner 0.36/10 (rate/capacity); each variant's technology effects | **owned** DAT `bird.work_rate`/`resource_capacity` on 122/259/592/120/56/123/579/124, already published as `villager-*.gather`; open fallback copies these numbers. Heavy Plow gives farmer +1 capacity; Wheel Barrow's patch-specific class-4 multiplier is **1.2695**, Hand Cart's 1.5. Whole-resource collection rounds fractional capacity upward: Viking forager full-load/first-bank13/20 **observed visually on current185872, not pinned48987** ([evidence](vikings-calibration.md#optional-forager-check)); generalized integer storage remains **inferred**. Switching tasks uses the new target's capacity and banks an overfull load first (**inferred**). A carried load remembers its task if its source disappears; legacy loads lacking both source and task default to forager | `data.ts` `villagerGather`, `game.ts` `rateOn`/`holdOf` | #132/#301 |
 | Technology prerequisites and automatic bonuses | full nonnegative DAT prerequisite IDs plus `required_tech_count`; foreign/disabled alternatives remain unsatisfied. Completed buildings supply `building.tech_id`. Initial tree/team effects and eligible locationless/free research activate once in completion order, without an extra research-location building gate | gates, IDs, costs, amounts and triggers **owned**. **Measured current185872, not pinned48987:** newly paid Feudal Frankish farm without a Mill retains243food, versus Briton165+10 carried=175; Castle Teutons fire at an adjacent ram without University and heal faster without Monastery than Dark controls, with no editor-start food deduction. Applying this to remaining zero-time technologies, fixed-point activation order and historical building-trigger persistence remain **inferred engine semantics**; live age-up accounting and pinned confirmation remain open. Positive counts with empty lists remain blocked. Legacy manifests retain their former all-listed path | `import_content.py`, `technologies.ts`, `game.ts`; [contract](civilization-bonuses.md), [native evidence](free-research-calibration.md) | #123/#129/#179/#180/#254 |
-| Bonus prices and production | cost multipliers in completion order, then nearest whole resource (half up); production/research advances by building work rate | multipliers **owned**: TC wood ×0.5; castle ×0.85 then ×0.882353; range work ×1.1. Rounding/tick quantization **inferred**: TC wood 138, castle stone 553/488 are implementation outcomes, not DE measurements. Existing HP policy adds max-HP delta preserving absolute damage; converted entities skip bulk HP/upgrades | `rules.ts`, `game.ts` | #123/#178 |
+| Bonus prices and production | cost effects in completion order, each rounded from its float32 result to nearest whole resource (half up); production/research advances by building work rate | multipliers **owned**: TC wood ×0.5; castle ×0.85 then ×0.882353; range work ×1.1. **Measured current185872, not pinned48987:** Viking ship and Gothic infantry payments support per-effect rather than final-only rounding ([evidence](vikings-calibration.md)). Float32/internal arithmetic, other combinations and tick quantization remain **inferred**. TC wood138 and castle stone553/488 remain implementation outcomes, not native measurements. Existing HP policy adds max-HP delta preserving absolute damage; converted entities skip bulk HP/upgrades | `rules.ts`, `game.ts` | #123/#178/#301 |
 | Bonus scope and remaining effects | current 1v1 applies each player's own team effect; unsupported commands/attributes remain diagnostic. No allied teams, timed locationless research or general enable/disable-unit effect execution | **owned** commands retained; range/sight, gathering, production, prices, cavalry HP, building age baselines, relic income and the documented monastery/market/Spies resources have consumers. This is not a general all-civilisation effect engine | `civilizationBonuses.nodes`, `import_content.py` | #123/#128/#126/#130/#180 |
 | Remaining attribute coverage | 23 limits combat acquisition and 130 modifies actual garrison firepower; generic 48/49 and noncombat automatic-search semantics remain diagnostic or outside the implemented consumers | owned fields; consumer scope explicit rather than treating decoder recognition as completeness | `rules.ts`, `game.ts`, manifest `unmodelled` | #128 |
 | Named player-attribute coverage | all named DAT initial values plus resource 29 imported; research consumers include farm food, repair, relic gold, conversion permissions/resistance/Heresy/Theocracy, healing range, hunting productivity, population ceiling, Spies, market and tribute fees. Other resource effects remain unmodelled; initial food/population/score entries are not live counters | names/indices **owned** from XS, with29 identified by owned localization15029; values **owned** from configured civ. Lower-first-letter keys, legacy `FarmFood` → `farmFoodAmount` and numeric `resource-29` are schema conventions | `import_content.py`, `rules.ts`, `monastery.ts`, `relics.ts`, `market.ts` | #53/#128/#130/#182 |
@@ -1228,7 +1235,10 @@ when the result looks right. When a row is later read from a file, delete it
   Import 40 HP/minute, rather than guessing a hero-mode constant. Continuous
   per-tick healing, max-HP clamping, healing while garrisoned in addition to
   building healing, and conversion-snapshot retention are **inferred scheduling
-  semantics**, tested but not native-calibrated. Dead units never regenerate.
+  semantics**. Current-build 185872 outdoor observation (not pinned 48987)
+  gave +19 displayed HP over29 game seconds, consistent with40 HP/minute;
+  it does not establish cadence/garrison/conversion behavior. Dead units never
+  regenerate. Evidence and limits: [Vikings calibration](vikings-calibration.md).
 - **Chieftains:** tech 463/effect 517 adds 5 cavalry/+4 camel attack, increments
   resource 274 and invokes `Effects.xs` function 5. The reviewed adapter preserves
   its 20-gold Loot tasks on TradeBoat 2/Monk 18/RelicMonk 43/WarriorPriest 1831 and
@@ -1240,10 +1250,29 @@ when the result looks right. When a row is later read from a file, delete it
   read their current owner's resource. General splash/delayed-dead-shooter loot
   is not implemented (the supported Vikings infantry are melee, without blast).
   No blanket resource 33 support or invented tooltip-based reward is enabled.
+  Current-build185872 effect517 removes both resource274 and the XS invocation;
+  retained XS text alone is not activation. No accepted native kill deltas were
+  obtained; pinned loot behavior is not contradicted by this different effect.
 - **Warships:** retain DAT 395=.9 then 501/502=.94117, not a hand-written exact
-  10/15/20-percent discount from localization. Existing shared rounding occurs
-  at payment/refund; native rounding is unmeasured. Team 411 is Dock cost×.85,
+  10/15/20-percent discount from localization. Current-build185872 payments,
+  using matching source base costs/multipliers, establish Fire-line prices
+  68W/41G,64W/39G,60W/37G across Feudal/Castle/Imperial. Cost effects now round
+  each float32 result, not only the final cumulative product. This arithmetic
+  model is **inferred from native outcomes**, corroborated by Gothic infantry;
+  other cost-effect combinations,
+  native refunds and live age transitions remain uncalibrated. Team 411 is Dock cost×.85,
   not five resource attributes: 45/133/47/51/1189 are unit IDs, 100 the attribute.
+- **Shared rounding scope:** price changes demonstrated natively are Vikings
+  and Goths. The same consumer also handles Briton TC wood, Frank castles,
+  Byzantine trash/camels, Japanese economic buildings, Saracen Market and
+  Teuton farms; their existing single-effect prices are not newly native-calibrated
+  here. The extracted Shipwright wood-cost effect is present for Britons,
+  Byzantines, Celts, Chinese, Goths, Japanese, Mongols and Turks, so those paths
+  also traverse the policy (presence alone is not an availability claim).
+  Chinese/Byzantine player-wide research discounts and Turkish gunpowder-tech
+  costs use separate research-price consumers and were not changed. Scope audit:
+  local `review-cost-scope.txt`; published six-decimal amounts are covered, not
+  just raw DAT float constants.
 - **Longboats:** 250/533 have dead_unit_id −1 and four total projectiles. Use
   existing ship composite art/death and simultaneous multi-projectile attacks;
   spread and per-projectile native damage/cadence remain shared inferred naval
@@ -1254,8 +1283,10 @@ when the result looks right. When a row is later read from a file, delete it
   HP×1.2 from Feudal; 391/415 are inert, despite their old names.
   Wheelbarrow capacity×1.2695 then Hand Cart×1.5 yields fractional thresholds
   12.695/19.0425 from 10; the unchanged integer gather loop therefore banks
-  13/20 on a full forager trip. Native capacity rounding remains uncalibrated
-  under #301; this is not silently rounded down to the remembered 12/19.
+  13/20 on a full forager trip. Current-build185872 screenshots show full loads
+  13/20 and first-trip food banks5000→5013/5020, agreeing with this path. These
+  are **visually observed integer readouts**, not proof of internal fractional
+  storage or long-run accumulation; pinned execution remains unmeasured.
 
 ## Celts unique unit and bonuses (#191)
 

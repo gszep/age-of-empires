@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { rulesFromManifest, TICKS_PER_SECOND } from './data';
+import { FALLBACK_RULES, rulesFromManifest, TICKS_PER_SECOND } from './data';
 import { activateAutomaticTechnologies, addNode, applyCommand, createGame, stepGame } from './game';
 import { buildingRulesFor, unitRulesFor } from './rules';
 import { updateVisibility } from './visibility';
@@ -47,6 +47,49 @@ function train(s: GameState, building: Entity, kind: UnitKind) {
   until(s, () => s.entities.some(e => e.id >= first && e.owner === building.owner && e.kind === kind));
   return s.entities.find(e => e.id >= first && e.owner === building.owner && e.kind === kind)!;
 }
+
+describe('native Vikings cost calibration (#301)', () => {
+  it.each(['imported', 'raw DAT'] as const)('charges and refunds each rounded discount stage (%s amounts)', representation => {
+    // Same base costs/multipliers in pinned and installed DAT. Current-build
+    // paid Fire-line observations: 68/41, 64/39, 60/37; see calibration doc.
+    // Use the fallback galley as a trainable carrier for both source cost rows;
+    // this tests arithmetic, not imported Fire-line availability.
+    for (const [wood, gold, payments] of [
+      [75, 45, [[68, 41], [64, 39], [60, 37]]],
+      [90, 30, [[81, 27], [76, 25], [72, 24]]],
+    ] as const) {
+      const source = structuredClone(FALLBACK_RULES);
+      source.units.galley.cost = { food: 0, wood, gold, stone: 0 };
+      // import_content.rounded emits six decimal places. Castle/Imperial
+      // gold (39/37, not 38/36) discriminates even on that imported path.
+      const amounts = representation === 'imported' ? [.9, .94117, .94117]
+        : [0.8999999761581421, 0.9411699771881104, 0.9411699771881104];
+      for (const [i, amount] of amounts.entries()) {
+        source.technologies[`native-discount-${i}`] = {
+          ...source.technologies.loom,
+          effects: [{ unit: 'galley', attribute: 'cost', operation: 'multiply', amount }],
+        };
+      }
+      const s = createGame(301, source);
+      s.players[1].age = s.players[2].age = 3;
+      const dock = home(s, 'dock'), control = home(s, 'dock', 2, 80, 80);
+      for (const [i, payment] of payments.entries()) {
+        s.players[1].researched.push(`native-discount-${i}`);
+        for (const [building, expected] of [[dock, payment], [control, [wood, gold]]] as const) {
+          const p = s.players[building.owner as PlayerId];
+          p.wood = 5000; p.gold = 5000;
+          expect(applyCommand(s, { kind: 'train', player: building.owner as PlayerId,
+            buildingId: building.id, unit: 'galley' })).toEqual({ ok: true });
+          expect([5000 - p.wood, 5000 - p.gold]).toEqual(expected);
+          expect(applyCommand(s, { kind: 'cancel-train', player: building.owner as PlayerId,
+            buildingId: building.id })).toEqual({ ok: true });
+          expect([p.wood, p.gold]).toEqual([5000, 5000]);
+        }
+      }
+      expect(source.units.galley.cost).toEqual({ food: 0, wood, gold, stone: 0 });
+    }
+  });
+});
 
 describe.skipIf(!rules?.civilizations?.vikings)('owned Vikings gameplay', () => {
   it('banks the larger age-gated villager load, without granting it to the opponent', () => {

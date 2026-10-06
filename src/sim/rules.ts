@@ -417,7 +417,10 @@ function applyCostEffect(rules: Pick<UnitRules, 'cost'>, effect: TechEffect): bo
     rules.cost = { ...rules.cost };
     for (const resource of ['food', 'wood', 'gold', 'stone'] as const) {
       if (effect.attribute === 'cost' || effect.attribute === `${resource}Cost`) {
-        rules.cost[resource] = combine(effect.operation, rules.cost[resource], effect.amount);
+        // Native #301 payments round each DAT cost effect, not the final
+        // product. Float32 arithmetic matters: 75 * DAT(.9) is 67.5, not
+        // JS's 67.499998... . See docs/vikings-calibration.md for scope.
+        rules.cost[resource] = Math.round(Math.fround(combine(effect.operation, rules.cost[resource], effect.amount)));
       }
     }
     return true;

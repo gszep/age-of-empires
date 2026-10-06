@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { rulesFromManifest, TICK_SECONDS } from './data';
+import { FALLBACK_RULES, rulesFromManifest, TICK_SECONDS } from './data';
 import { activateAutomaticTechnologies, applyCommand, createGame, stepGame, trainableUnitsAt } from './game';
 import { buildingRulesFor, unitRulesFor, trainingAt } from './rules';
 import { rulesForPlayer } from './civilizations';
@@ -42,7 +42,53 @@ function train(s: GameState, home: Entity, kind: UnitKind) {
   expect(applyCommand(s, { kind: 'train', player: home.owner as PlayerId, buildingId: home.id, unit: kind }).ok).toBe(true);
 }
 
+describe('native Gothic cost rounding (#301)', () => {
+  it('pays each imported discount stage, not a cumulative fractional price', () => {
+    // Native build185872: Castle spear/pike27F/19W and Huskarl57F/27G.
+    // Both inspected DATs agree; these are the importer-rounded multipliers.
+    // Militia is a public trainable carrier for all three source cost rows,
+    // not a claim about fallback unit availability.
+    for (const [food, wood, gold, prices] of [
+      [35, 25, 0, [[30,21,0], [28,20,0], [27,19,0], [25,18,0]]],
+      [50, 0, 20, [[43,0,17], [40,0,16], [38,0,15], [35,0,14]]],
+      [75, 0, 35, [[64,0,30], [60,0,28], [57,0,27], [53,0,25]]],
+    ] as const) {
+      const rules = structuredClone(FALLBACK_RULES);
+      rules.units.militia.cost = { food, wood, gold, stone: 0 };
+      const s = createGame(301, rules), home = building(s, 'barracks', 1);
+      for (const [i, amount] of [.85, .9375, .9465, .928571].entries()) {
+        const key = `native-goth-discount-${i}`;
+        rules.technologies[key] = { ...rules.technologies.loom,
+          effects: [{ unit: 'militia', attribute: 'cost', operation: 'multiply', amount }] };
+        s.players[1].researched.push(key);
+        Object.assign(s.players[1], { food: 5000, wood: 5000, gold: 5000 });
+        train(s, home, 'militia');
+        const p = s.players[1];
+        expect([5000-p.food, 5000-p.wood, 5000-p.gold]).toEqual(prices[i]);
+        expect(applyCommand(s, { kind: 'cancel-train', player: 1, buildingId: home.id }).ok).toBe(true);
+        expect([p.food, p.wood, p.gold]).toEqual([5000,5000,5000]);
+      }
+      expect(rules.units.militia.cost).toEqual({ food, wood, gold, stone: 0 });
+    }
+  });
+});
+
 describe.skipIf(!source?.civilizations?.goths)('owned Gothic gameplay', () => {
+  it.each([
+    [1, 'spearman', 'barracks', 28, 20, 0],
+    [2, 'spearman', 'barracks', 27, 19, 0],
+    [2, 'dat-unit-41', 'castle', 57, 0, 27],
+    [3, 'spearman', 'barracks', 25, 18, 0],
+    [3, 'dat-unit-41', 'castle', 53, 0, 25],
+  ] as const)('age%s %s pays the native rounded price', (age, kind, venue, food, wood, gold) => {
+    const s = arena(age), home = building(s, venue, 1), before = { ...s.players[1] };
+    train(s, home, kind);
+    expect([before.food-s.players[1].food, before.wood-s.players[1].wood, before.gold-s.players[1].gold])
+      .toEqual([food, wood, gold]);
+    expect(applyCommand(s, { kind: 'cancel-train', player: 1, buildingId: home.id }).ok).toBe(true);
+    expect([s.players[1].food, s.players[1].wood, s.players[1].gold])
+      .toEqual([before.food, before.wood, before.gold]);
+  });
   it('Loom is paid and completes in its one-second bonus clock, only for Goths', () => {
     const s = arena(0), homes = [1, 2].map(p => s.entities.find(e => e.owner === p && e.kind === 'town-center')!);
     for (const home of homes) {
