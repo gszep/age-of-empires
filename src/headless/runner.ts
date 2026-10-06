@@ -1,6 +1,8 @@
 import { applyCommand, createGame, gameTimeSeconds, stepGame } from '../sim/game';
 import { FALLBACK_RULES, TICK_SECONDS, type GameRules } from '../sim/data';
 import { checksumState } from '../sim/checksum';
+import { useLegacyScore } from '../sim/score';
+import { MATCH_FORMAT_VERSION } from '../protocol/types';
 import { matchOver } from '../sim/regicide';
 import { validRecordedMode } from '../match-setup';
 import { validPopulationLimit } from '../sim/population';
@@ -22,7 +24,7 @@ export async function runMatch(
   strategies: Record<PlayerId, Strategy>,
   rules: GameRules = FALLBACK_RULES,
 ): Promise<{ result: MatchResult; record: MatchRecord }> {
-  if (![1, 2, 3].includes(config.version)) throw new Error('unknown match format');
+  if (![1, 2, 3, MATCH_FORMAT_VERSION].includes(config.version)) throw new Error('unknown match format');
   if (config.version === 1 && config.mode !== undefined) throw new Error('game mode requires match format v2');
   if (config.version === 1 && config.populationLimit !== undefined) throw new Error('population limit requires match format v2');
   if (config.version === 1 && config.wonderVictory !== undefined) throw new Error('Wonder victory requires match format v2');
@@ -75,7 +77,7 @@ export async function runMatch(
   }
 
   const result: MatchResult = {
-    version: 3,
+    version: MATCH_FORMAT_VERSION,
     mode: config.mode ?? 'random-map',
     seed: config.seed,
     timeSeconds: Math.round(gameTimeSeconds(state) * 100) / 100,
@@ -90,7 +92,7 @@ export async function runMatch(
   const record: MatchRecord = {
     ...(config.wonderVictory !== undefined ? { wonderVictory: config.wonderVictory } : {}),
     ...(config.populationLimit !== undefined ? { populationLimit: config.populationLimit } : {}),
-    version: 3,
+    version: MATCH_FORMAT_VERSION,
     seed: config.seed,
     rulesOrigin: rules.origin,
     civilizations: { 1: state.players[1].civilization, 2: state.players[2].civilization },
@@ -128,6 +130,7 @@ export function replayRecord(
   }
   const state = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode, record.populationLimit, record.wonderVictory);
   if (record.version < 3) delete state.researchQueueVersion;
+  if (record.version < 4) useLegacyScore(state);
   const commands = [...record.commands];
   const checksums = new Map(record.checksums.map(entry => [entry.tick, entry.hash]));
   const lastTick = record.checksums.at(-1)?.tick ?? 0;

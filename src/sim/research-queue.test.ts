@@ -4,6 +4,8 @@ import { inheritConvertedUnit } from './rules';
 import { researchCostFor } from './technologies';
 import { observe } from './observe';
 import { checksumState } from './checksum';
+import { useLegacyScore } from './score';
+import { MATCH_FORMAT_VERSION } from '../protocol/types';
 import { FALLBACK_RULES } from './data';
 import { validateCommand, validateObservation, validateMatchRecord } from '../protocol/validate';
 import { replayRecord, runMatch } from '../headless/runner';
@@ -179,12 +181,13 @@ describe('research queueing (#293)', () => {
         ...['loom', 'feudal-age'].map(tech => ({ kind: 'research' as const, player: 1 as const, buildingId: o.entities.find(e => e.kind === 'town-center' && e.owner === 1)!.id, tech })),
       ] }, 2: { decide: () => [] },
     }, rules);
-    expect(record.version).toBe(3); expect(validateMatchRecord(record)).toBe(true);
+    expect(record.version).toBe(MATCH_FORMAT_VERSION); expect(validateMatchRecord(record)).toBe(true);
     expect(record.result.rejectedCommands).toEqual([]);
     let lastQueue: string[] | undefined;
     expect(replayRecord(record, rules, s => { lastQueue = townCenter(s).researchQueue; }).ok).toBe(true);
     expect(lastQueue).toEqual(['feudal-age']);
     const legacyState = createGame(record.seed, rules);
+    useLegacyScore(legacyState);
     delete legacyState.researchQueueVersion;
     // Original semantics: the first research is paid; busy second command is rejected.
     expect(applyCommand(legacyState, record.commands[0].command).ok).toBe(true);

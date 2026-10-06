@@ -9,6 +9,9 @@
       "stone": { "type": "integer", "minimum": 0 } }, "required": ["wood", "food", "stone"]
   } },
   "properties": {
+    "scores": { "type": "object", "additionalProperties": false,
+      "properties": { "1": { "type": "integer" }, "2": { "type": "integer" } },
+      "required": ["1", "2"] },
     "terrain": { "type": "array", "items": { "type": "array", "items": {
       "type": "array", "minItems": 3, "maxItems": 3, "additionalItems": false,
       "items": [{ "type": "integer", "minimum": 1 }, { "type": "integer", "minimum": -1 }, { "type": "number" }]
@@ -31,7 +34,7 @@
       "properties": { "buy": { "$ref": "#/definitions/commodityPrices" }, "sell": { "$ref": "#/definitions/commodityPrices" },
         "tributeFee": { "type": "integer", "minimum": 0 } }, "required": ["buy", "sell", "tributeFee"] },
     "version": {
-      "const": 9
+      "const": 10
     },
     "time": {
       "type": "number",

@@ -9,8 +9,11 @@ import type { Socket } from 'node:net';
 import { EventEmitter, once } from 'node:events';
 import { WebSocket } from 'ws';
 import { createServer } from 'vite';
-import { applyCommand, createGame } from '../sim/game';
+import { applyCommand, createGame, stepGame } from '../sim/game';
 import { checksumState } from '../sim/checksum';
+import { useLegacyScore } from '../sim/score';
+import { entitiesWithGarrison } from '../sim/garrison';
+import type { GameState } from '../sim/types';
 import { FALLBACK_RULES } from '../sim/data';
 import { sharedMatchPlugin } from './server';
 import { SHARED_CHECKPOINT_VERSION, SHARED_VERSION } from './protocol';
@@ -79,6 +82,23 @@ it('rejects v4 simulators while preserving a marker-less v4 checkpoint and its l
   const { directory, checkpoint } = fixture();
   const original = createGame(293);
   delete original.researchQueueVersion;
+  useLegacyScore(original);
+  for (const player of Object.values(original.players)) {
+    delete player.scoreSpentOnResearch;
+    delete player.scoreKilledValue;
+  }
+  const expectScoreless = (state: GameState) => {
+    expect(state).not.toHaveProperty('scoreVersion');
+    for (const player of Object.values(state.players)) {
+      expect(player).not.toHaveProperty('scoreSpentOnResearch');
+      expect(player).not.toHaveProperty('scoreKilledValue');
+    }
+    for (const entity of entitiesWithGarrison(state.entities)) {
+      expect(entity).not.toHaveProperty('scorePaidCost');
+      expect(entity).not.toHaveProperty('scoreConverted');
+    }
+  };
+  expectScoreless(original);
   original.tick = 123;
   original.players[1].food = 2000;
   const buildingId = original.entities.find(e => e.owner === 1 && e.kind === 'town-center')!.id;
@@ -100,7 +120,7 @@ it('rejects v4 simulators while preserving a marker-less v4 checkpoint and its l
       if (!address || typeof address === 'string') throw new Error('Missing HTTP address');
       const url = `ws://127.0.0.1:${address.port}/__match/socket?player=1`;
       const config = await fetch(`http://127.0.0.1:${address.port}/__match/config`).then(r => r.json());
-      expect(config.version).toBe(5);
+      expect(config.version).toBe(SHARED_VERSION);
       if (!reopen) {
         const stale = new WebSocket(url), received: string[] = [];
         stale.on('message', bytes => received.push(JSON.parse(String(bytes)).type));
@@ -122,12 +142,26 @@ it('rejects v4 simulators while preserving a marker-less v4 checkpoint and its l
         const snapshot = JSON.parse(String((await response)[0]));
         expect(snapshot.type).toBe('snapshot');
         expect(snapshot.state).not.toHaveProperty('researchQueueVersion');
+        expectScoreless(snapshot.state);
         expect(checksumState(snapshot.state)).toBe(checksumState(original));
         expect(snapshot.settings).toEqual(saved.settings); expect(snapshot.setup).toEqual(saved.setup);
         const beforeCommand = checksumState(snapshot.state);
         expect(applyCommand(snapshot.state, { kind: 'research', player: 1, buildingId, tech: 'feudal-age' }))
           .toEqual({ ok: false, reason: 'building is already researching' });
         expect(checksumState(snapshot.state)).toBe(beforeCommand);
+        // Continue the actual wire-decoded legacy state through completion,
+        // not just startup: neither research nor production injects counters.
+        const resumed: GameState = snapshot.state;
+        const building = resumed.entities.find(e => e.id === buildingId)!;
+        const trainedId = resumed.nextId;
+        expect(applyCommand(resumed, { kind: 'train', player: 1, buildingId, unit: 'villager' }).ok).toBe(true);
+        for (let i = 0; i < 1000 && (building.researching || building.training); i++) stepGame(resumed);
+        expect(resumed.players[1].researched).toContain('loom');
+        expect(building.researching).toBeUndefined();
+        expect(building.training).toBeUndefined();
+        expect(resumed.entities.find(e => e.id === trainedId)?.kind).toBe('villager');
+        expectScoreless(resumed);
+        expectScoreless(JSON.parse(JSON.stringify(resumed)));
       } finally { client.close(); await once(client, 'close'); }
     } finally { await server.close(); }
     expect(JSON.parse(readFileSync(checkpoint, 'utf8'))).toEqual(JSON.parse(JSON.stringify({ ...saved, version: SHARED_CHECKPOINT_VERSION })));

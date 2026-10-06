@@ -225,7 +225,6 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 /* FontsHolder: 48 Normal with a 0.1 em outline. */
 .score-name { font-size: calc(48px * var(--text-scale)); white-space: nowrap; text-shadow: 0.1em 0 0 #000, -0.1em 0 0 #000, 0 0.1em 0 #000, 0 -0.1em 0 #000; }
 .score-civ, .score-age { width: calc(48px * var(--ui-scale)); height: calc(48px * var(--ui-scale)); background-size: contain; background-repeat: no-repeat; background-position: center; }
-#hud.fallback #score-panel { display: none; }
 #map-panel {
   right: 0; bottom: 0;
   width: calc(860px * var(--ui-scale)); height: calc(413px * var(--ui-scale));

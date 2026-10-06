@@ -7,7 +7,7 @@
     "mode": { "enum": ["random-map", "regicide"] },
     "draw": { "type": "boolean" },
     "version": {
-      "enum": [1, 2, 3]
+      "enum": [1, 2, 3, 4]
     },
     "seed": {
       "type": "integer"

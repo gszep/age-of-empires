@@ -9,6 +9,7 @@ import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, 
 import { MAPS } from './sim/mapgen';
 import { isTileVisible } from './sim/visibility';
 import { checksumState } from './sim/checksum';
+import { calculateScore, useLegacyScore } from './sim/score';
 import type { MatchRecord } from './protocol/types';
 import type { BuildingKind, Entity, GameState, PlayerId, Point, ResourceKind, UnitKind } from './sim/types';
 import { isGateKind, isWallKind } from './sim/buildings';
@@ -234,6 +235,7 @@ function startReplay(raw: unknown): void {
   // the content is for, which is what it was played as.
   game = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode, record.populationLimit, record.wonderVictory);
   if (record.version < 3) delete game.researchQueueVersion;
+  if (record.version < 4) useLegacyScore(game);
   activeSetup = { map: record.map ?? 'arabia', seed: record.seed, mode: record.mode, civilizations: record.civilizations,
     ...(record.populationLimit !== undefined ? { populationLimit: record.populationLimit } : {}),
     ...(record.wonderVictory ? { wonderVictory: true } : {}) };
@@ -1562,9 +1564,8 @@ function selectionStats(entity: Entity): SelectionInfo['stats'] {
  * "Player 1", having no profile here; the computer takes one of the names
  * the reference gives a computer player of its civilisation
  * (`civilizations.json`'s table, "Henry V" ... "Richard the Lionheart"),
- * dealt by the match seed so it holds for the match. No score yet: the
- * reference's is military + economy + technology + society, which nothing
- * here computes, so the row ends at the name rather than inventing one.
+ * dealt by the match seed so it holds for the match. Both players' totals
+ * come from the authoritative military/economy/technology/society score.
  */
 /** The reference's name for a player's colour ("Blue", "Red"), as `UIColors.json` keys it. */
 function playerColorName(player: PlayerId): string | undefined {
@@ -1587,6 +1588,7 @@ function scoreRows(): ScoreRow[] {
     civIcon: assets && (rules.civilization.internalName ?? rules.civilization.displayName)
       ? `${rules.civilization.internalName ?? rules.civilization.displayName}Icon` : undefined,
     age: game.players[player].age,
+    score: calculateScore(game, player).total,
     };
   });
 }

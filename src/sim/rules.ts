@@ -107,6 +107,13 @@ export function inheritConvertedUnit(state: GameState, entity: Entity, owner: Pl
     // Snapshot both forms, not the active form's temporary armour/sight view.
     entity.convertedRules = structuredClone(unitRulesFor(state, entity.owner, entity.kind));
   }
+  if (state.scoreVersion && entity.owner !== owner) {
+    // Preserve the donor's price even for legacy captures without receipts.
+    // Building recursion below also transfers the score of converted cargo.
+    const cost = (entity.convertedBuildingRules ?? entity.convertedRules)?.cost;
+    if (cost) entity.scorePaidCost ??= cost.food + cost.wood + cost.gold + cost.stone;
+    entity.scoreConverted = true;
+  }
   if (isBuilding(entity.kind)) {
     for (const passenger of entity.garrison ?? []) inheritConvertedUnit(state, passenger, owner);
   }

@@ -12,6 +12,7 @@ import type { ObservedEntity, PlayerObservation, RememberedEntityObservation } f
 import { PROTOCOL_VERSION } from '../protocol/types';
 import { observedTerrain } from '../protocol/terrain';
 import { garrisonCount, hasGarrisonFlag } from './garrison';
+import { calculateScore } from './score';
 
 function observeEntity(state: GameState, entity: Entity, player: PlayerId): ObservedEntity {
   const observed: ObservedEntity = {
@@ -101,6 +102,7 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
   }
   const observation: PlayerObservation = {
     version: PROTOCOL_VERSION,
+    scores: { 1: calculateScore(state, 1).total, 2: calculateScore(state, 2).total },
     mode: state.mode ?? 'random-map',
     time: Math.round(state.tick * TICK_SECONDS * 100) / 100,
     player,

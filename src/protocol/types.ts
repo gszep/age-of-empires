@@ -1,10 +1,10 @@
 import type { Activity, Command, EntityKind, Order, PlayerId, ResourceKind, UnitKind } from '../sim/types';
 import type { NodeKind } from '../sim/data';
 
-/** v9 adds own-building waiting research and indexed research cancellation. */
-export const PROTOCOL_VERSION = 9;
-/** v3 enables research queues; v1/v2 replays retain busy-building rejection. */
-export const MATCH_FORMAT_VERSION = 3;
+/** v10 adds public totals for both players; v9 added waiting research. */
+export const PROTOCOL_VERSION = 10;
+/** v4 records score receipts; v3 enables research queues. */
+export const MATCH_FORMAT_VERSION = 4;
 
 export interface ObservedEntity {
   id: number;
@@ -55,6 +55,8 @@ export interface PlayerObservation {
   draw?: boolean;
   treason?: { goldCost: number; available: boolean; untilTick: number; kings: { owner: PlayerId; x: number; y: number }[] };
   version: typeof PROTOCOL_VERSION;
+  /** Public scoreboard totals, even for unseen opponents. Optional in older fixtures. */
+  scores?: Record<PlayerId, number>;
   time: number;
   player: PlayerId;
   /** Which civilisation this player is; public knowledge in AoE2. */
@@ -95,7 +97,7 @@ export interface RejectedCommand {
 export interface MatchConfig {
   wonderVictory?: boolean;
   populationLimit?: number;
-  version: 1 | 2 | typeof MATCH_FORMAT_VERSION;
+  version: 1 | 2 | 3 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   maxTimeSeconds?: number;
   decideIntervalSeconds?: number;
@@ -127,7 +129,7 @@ export interface PlayerSummary {
 export interface MatchResult {
   mode?: import('../sim/types').GameMode;
   draw?: boolean;
-  version: 1 | 2 | typeof MATCH_FORMAT_VERSION;
+  version: 1 | 2 | 3 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   timeSeconds: number;
   winner?: PlayerId;
@@ -158,7 +160,7 @@ export interface MatchRecord {
   wonderVictory?: boolean;
   populationLimit?: number;
   mode?: import('../sim/types').GameMode;
-  version: 1 | 2 | typeof MATCH_FORMAT_VERSION;
+  version: 1 | 2 | 3 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   rulesOrigin: 'fallback' | 'imported';
   /**

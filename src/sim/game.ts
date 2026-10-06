@@ -21,6 +21,7 @@ import { entitiesWithGarrison, garrisonCount } from './garrison';
 import { civilizationRules, rulesForPlayer } from './civilizations';
 import { researchCostFor, researchSecondsFor, technologyFor, technologyRequirementsMet } from './technologies';
 import { applyMarketCommand } from './market';
+import { assetScore, resourceValue } from './score';
 import { beginProjectileImpact, fireChargeOf, rechargeFireCharge, releaseFireCharge } from './fire-charge';
 import { relicOrder, transferRelic, releaseRelics, updateRelicIncome } from './relics';
 import { updateHealingAuras } from './auras';
@@ -40,11 +41,12 @@ const rejected = (reason: string): CommandResult => ({ ok: false, reason });
 
 function addEntity(
   state: GameState, kind: Entity['kind'], owner: Entity['owner'], position: Point,
-  base: { hp: number; radius: number }, extra: Partial<Entity> = {},
+  base: { hp: number; radius: number; cost?: Cost }, extra: Partial<Entity> = {},
 ): Entity {
   const entity: Entity = {
     id: state.nextId++, kind, owner, position: { ...position }, hp: base.hp,
-    maxHp: base.hp, radius: base.radius, activity: 'idle', order: { kind: 'idle' }, ...extra,
+    maxHp: base.hp, radius: base.radius, activity: 'idle', order: { kind: 'idle' },
+    ...(state.scoreVersion && owner !== 0 && base.cost ? { scorePaidCost: resourceValue(base.cost) } : {}), ...extra,
   };
   state.entities.push(entity);
   return entity;
@@ -127,6 +129,7 @@ export function createGame(
     start.x = Math.round(width * (0.5 - (radius.min + Math.floor(random01(rng) * (radius.max - radius.min + 1))) / 100));
   }
   const state: GameState = {
+    scoreVersion: 1,
     researchQueueVersion: 1,
     ...(wonderVictory ? { wonderVictory: true } : {}),
     ...(populationLimit !== undefined ? { populationLimit } : {}),
@@ -1629,10 +1632,15 @@ export function corpseAgeSeconds(state: ReadonlyGameState, entity: DeepReadonly<
   return Math.max(0, corpseLifetimeTicks(state, entity) - entity.decayTicks) * TICK_SECONDS;
 }
 
-function kill(state: GameState, entity: Entity): void {
+function kill(state: GameState, entity: Entity, killer: Entity['owner'] = 0): void {
   // Whoever was sheltering inside comes out as it falls, as the reference's
   // do from a razed town center or castle.
   if (entity.dead) return;
+  if (state.scoreVersion && killer !== 0 && entity.owner !== 0 && killer !== entity.owner) {
+    const player = state.players[killer];
+    const value = assetScore(state, entity);
+    if (value) player.scoreKilledValue = (player.scoreKilledValue ?? 0) + value;
+  }
   const explosion = isUnit(entity.kind) && entity.hp <= 0 ? unitRulesForEntity(state, entity).deathExplosion : undefined;
   if (explosion) entity.deathReplacement = { art: explosion.art, seconds: explosion.seconds };
   if (entity.relics?.length) releaseRelics(state, entity,
@@ -1640,7 +1648,17 @@ function kill(state: GameState, entity: Entity): void {
   if (entity.bellReturn) entity.bellReturn = undefined;
   if (entity.kind === 'town-center' && entity.townBell) releaseTownBell(state, entity);
   const transport = isUnit(entity.kind) && unitRulesForEntity(state, entity).transportCapacity;
-  if (transport) entity.garrison = undefined; // a sinking transport loses its passengers
+  if (transport) {
+    // A sinking transport loses every nested passenger. They disappear rather
+    // than escaping, so transfer their value along with the hull's.
+    if (state.scoreVersion && killer !== 0) for (const passenger of entitiesWithGarrison(entity.garrison ?? [])) {
+      if (passenger.owner !== killer && passenger.owner !== 0) {
+        const value = assetScore(state, passenger);
+        if (value) state.players[killer].scoreKilledValue = (state.players[killer].scoreKilledValue ?? 0) + value;
+      }
+    }
+    entity.garrison = undefined;
+  }
   else if (entity.garrison?.length) ungarrisonAll(state, entity);
   entity.dead = true;
   entity.activity = 'dying';
@@ -2542,7 +2560,7 @@ function updateConverter(state: GameState, grid: NavGrid, entity: Entity): void 
   // Resolve the defending player's attribute before any ownership transition.
   if ((playerAttributeFor(state, target.owner, 'heresy') ?? 0) > 0) {
     target.hp = 0;
-    kill(state, target);
+    kill(state, target, entity.owner);
   } else {
     inheritConvertedUnit(state, target, entity.owner as PlayerId);
     becomeIdle(target);
@@ -2560,19 +2578,20 @@ function updateConverter(state: GameState, grid: NavGrid, entity: Entity): void 
  */
 function applyDamage(
   state: GameState, target: Entity, attacks: AttackValue[], attackerId: number,
-  origin: Point, ignoresArmor = false,
+  origin: Point, ignoresArmor = false, attackerOwner?: Entity['owner'],
 ): void {
   if (target.kind === 'relic') return;
   target.hp -= damageFrom(state, target, attacks, origin, ignoresArmor);
   if (target.hp <= 0) {
     const attacker = state.entities.find(e => e.id === attackerId);
     if (!target.dead && attacker && attacker.owner !== target.owner && attacker.owner !== 0 && isUnit(attacker.kind) && isUnit(target.kind)) {
-      const reward = unitRulesForEntity(state, attacker).killReward;
       const targetRules = unitRulesForEntity(state, target);
+      // Gold reward from DAT kill bounties.
+      const reward = unitRulesForEntity(state, attacker).killReward;
       const row = reward?.targets.find(t => t.unitId !== undefined ? t.unitId === targetRules.datId : t.classId === targetRules.datClass);
       if (row) state.players[attacker.owner].gold += row.amount * (playerAttributeFor(state, attacker.owner, reward!.resource) ?? 0);
     }
-    kill(state, target);
+    kill(state, target, attackerOwner ?? attacker?.owner);
     return;
   }
   // A wounded boar turns on whoever wounded it, which is what makes luring one
@@ -2644,7 +2663,7 @@ function releaseAttack(
   if (!projectileSpeed) {
     applyDamage(state, target, attacks, shooter.id, shooter.position, shot.ignoresArmor);
     if (shot.blastRadius) applyBlast(state, target.position, shot.blastRadius,
-      shot.blastAttackLevel ?? 2, attacks, target.id, shooter.owner, shooter.position, shot.ignoresArmor, shot.blastDamage);
+      shot.blastAttackLevel ?? 2, attacks, target.id, shooter.owner, shooter.position, shot.ignoresArmor, shot.blastDamage, shooter.owner);
     return;
   }
   // A shot is aimed once and then flies. Without Ballistics it goes to where
@@ -2727,7 +2746,7 @@ function shooterLeadsTarget(state: GameState, shooter: Entity): boolean {
 function applyBlast(
   state: GameState, at: Point, radius: number, attackLevel: number, attacks: AttackValue[],
   directHitId: number, excludeOwner?: Entity['owner'], origin: Point = at, ignoresArmor = false,
-  blastDamage = 1,
+  blastDamage = 1, killer: Entity['owner'] = excludeOwner ?? 0,
 ): void {
   for (const other of [...state.entities]) {
     if (other.dead || other.kind === 'relic' || other.id === directHitId) continue;
@@ -2741,7 +2760,7 @@ function applyBlast(
       continue;
     }
     other.hp -= blastDamage < 0 ? -blastDamage : damageFrom(state, other, attacks, origin, ignoresArmor) * blastDamage;
-    if (other.hp <= 0) kill(state, other);
+    if (other.hp <= 0) kill(state, other, killer);
   }
 }
 
@@ -2807,7 +2826,7 @@ function updateProjectiles(state: GameState): void {
         if (other.dead || other.kind === 'resource' || other.owner === projectile.owner || bolt.hitIds.includes(other.id)) continue;
         if (pointToSegment(other.position, projectile.position, next) > other.radius + bolt.radius) continue;
         bolt.hitIds.push(other.id);
-        applyDamage(state, other, other.id === projectile.targetId ? projectile.attacks : bolt.attacks, projectile.shooterId, projectile.origin);
+        applyDamage(state, other, other.id === projectile.targetId ? projectile.attacks : bolt.attacks, projectile.shooterId, projectile.origin, false, projectile.owner);
       }
       if (!landing) {
         projectile.position = next;
@@ -2825,10 +2844,10 @@ function updateProjectiles(state: GameState): void {
       : state.entities.find(e => e.id === projectile.targetId && !e.dead && e.owner !== projectile.owner);
     if (intended && pointToSegment(intended.position, projectile.position, next) <= intended.radius + (projectile.interceptRadius ?? 0)) {
       const at = { ...intended.position };
-      applyDamage(state, intended, projectile.attacks, projectile.shooterId, projectile.origin, projectile.ignoresArmor);
+      applyDamage(state, intended, projectile.attacks, projectile.shooterId, projectile.origin, projectile.ignoresArmor, projectile.owner);
       if (projectile.blastRadius) {
         applyBlast(state, at, projectile.blastRadius, projectile.blastAttackLevel ?? 0,
-          projectile.attacks, intended.id, undefined, projectile.origin, projectile.ignoresArmor);
+          projectile.attacks, intended.id, undefined, projectile.origin, projectile.ignoresArmor, 1, projectile.owner);
       }
       if (beginProjectileImpact(projectile, at)) remaining.push(projectile);
       continue;
@@ -2840,10 +2859,10 @@ function updateProjectiles(state: GameState): void {
     }
     const at = { ...projectile.aim };
     const struck = struckBy(state, projectile, at);
-    if (struck) applyDamage(state, struck, projectile.attacks, projectile.shooterId, projectile.origin, projectile.ignoresArmor);
+    if (struck) applyDamage(state, struck, projectile.attacks, projectile.shooterId, projectile.origin, projectile.ignoresArmor, projectile.owner);
     if (projectile.blastRadius) {
       applyBlast(state, at, projectile.blastRadius, projectile.blastAttackLevel ?? 0,
-        projectile.attacks, struck?.id ?? -1, undefined, projectile.origin, projectile.ignoresArmor);
+        projectile.attacks, struck?.id ?? -1, undefined, projectile.origin, projectile.ignoresArmor, 1, projectile.owner);
     }
     if (beginProjectileImpact(projectile, at)) remaining.push(projectile);
   }
@@ -3137,10 +3156,11 @@ function spawnPoint(
   return { ...building.position };
 }
 
-function spawnTrainedUnit(state: GameState, building: Entity, kind: UnitKind): void {
+function spawnTrainedUnit(state: GameState, building: Entity, kind: UnitKind, paidCost?: Cost): void {
   const rules = unitRulesFor(state, building.owner, kind);
   const spawn = spawnPoint(state, building, rules.radius, rules.terrainRestriction ?? LAND_RESTRICTION);
   const unit = addEntity(state, kind, building.owner, spawn, rules);
+  if (state.scoreVersion) unit.scorePaidCost = resourceValue(paidCost ?? rules.cost);
   const capacity = buildingRulesForEntity(state, building).garrison?.capacity ?? 0;
   if ((building.rally?.targetId === building.id || (building.townBell && kind === 'villager'))
     && (building.garrison?.length ?? 0) < capacity) {
@@ -3212,7 +3232,7 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
       const homes = state.entities.filter(e => e.owner === owner && !e.dead && e.kind === spawn.building && e.buildProgress === undefined);
       const cap = playerAttributeFor(state, owner, 'spawnCap') ?? 0;
       for (const home of cap > 0 ? homes.slice(0, cap) : homes) {
-        for (let i = 0; i < spawn.count; i++) spawnTrainedUnit(state, home, spawn.unit);
+        for (let i = 0; i < spawn.count; i++) spawnTrainedUnit(state, home, spawn.unit, { food: 0, wood: 0, gold: 0, stone: 0 });
       }
     }
   }
@@ -3279,7 +3299,11 @@ function updateBuildingResearch(state: GameState, entity: Entity): void {
   entity.researching.remainingTicks -= buildingRulesForEntity(state, entity).workRate ?? 1;
   if (entity.researching.remainingTicks > 0) return;
   const key = entity.researching.tech;
+  const researching = entity.researching;
   entity.researching = undefined;
+  const player = state.players[entity.owner as PlayerId];
+  const cost = researching.paidCost ?? researchCostFor(state, entity.owner as PlayerId, key);
+  if (state.scoreVersion) player.scoreSpentOnResearch = (player.scoreSpentOnResearch ?? 0) + resourceValue(cost);
   completeResearch(state, entity.owner as PlayerId, key);
   activateAutomaticTechnologies(state);
   startNextResearch(state, entity);
@@ -3306,8 +3330,9 @@ function updateBuildingProduction(state: GameState, entity: Entity): void {
     // Keep the finished unit at 100%, with the rest of the queue untouched.
     return;
   }
+  const paidCost = entity.training.paidCost;
   entity.training = undefined;
-  spawnTrainedUnit(state, entity, kind);
+  spawnTrainedUnit(state, entity, kind, paidCost);
   recalculatePopulation(state);
   startNextTraining(state, entity);
 }

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { applyCommand, canGarrison, createGame, stepGame, trainableUnitsAt } from './game';
 import { FALLBACK_RULES } from './data';
 import { checksumState } from './checksum';
+import { useLegacyScore } from './score';
+import { MATCH_FORMAT_VERSION } from '../protocol/types';
 import { livingKings, matchOver, TREASON_TICKS, treasonMarkers } from './regicide';
 import { observe } from './observe';
 import { updateVisibility } from './visibility';
@@ -147,7 +149,7 @@ describe('King survival and temporary Treason', () => {
       [{ kind: 'delete' as const, player: observation.player, entityIds: observation.entities.filter(e => e.owner === observation.player && e.kind === 'king').map(e => e.id) }] };
     const { record, result } = await runMatch({ version: 2, seed: 130, mode: 'regicide', maxTimeSeconds: 1 }, { 1: suicide, 2: suicide });
     expect(result.draw).toBe(true); expect(result.winner).toBeUndefined(); expect(result.timeSeconds).toBe(0.05);
-    expect(record.mode).toBe('regicide'); expect(record.version).toBe(3);
+    expect(record.mode).toBe('regicide'); expect(record.version).toBe(MATCH_FORMAT_VERSION);
     expect(validateMatchRecord(record)).toBe(true); expect(validateMatchResult(result)).toBe(true);
     expect(replayRecord(JSON.parse(JSON.stringify(record))).ok).toBe(true);
     expect(validateMatchRecord({ ...record, version: 1 })).toBe(false);
@@ -167,6 +169,7 @@ describe('King survival and temporary Treason', () => {
     // A v3 recording cannot be made legacy by relabelling its checksum: the
     // new research-rule marker is authoritative state. Rebuild the v1 fixture.
     const legacyState = createGame(42);
+    useLegacyScore(legacyState);
     delete legacyState.researchQueueVersion;
     legacy.checksums = record.checksums.map(({ tick }) => {
       while (legacyState.tick < tick) stepGame(legacyState);

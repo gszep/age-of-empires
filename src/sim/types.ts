@@ -72,6 +72,10 @@ export interface Entity {
    * owner. Plain data so saves and replays preserve the same inheritance. */
   convertedRules?: UnitRules;
   convertedBuildingRules?: BuildingRules;
+  /** Sum of resources actually paid; absent legacy/starting assets use DAT cost. */
+  scorePaidCost?: number;
+  /** Held conversion value belongs to military rather than economy/society. */
+  scoreConverted?: true;
   /** Intact off-map relics: one on a monk, up to capacity in a monastery. */
   relics?: Entity[];
   relicGoldProgress?: number;
@@ -233,6 +237,10 @@ export interface PlayerState {
    * about an existing match changes until it is asked for (issue #24).
    */
   autoReseedFarms?: boolean;
+  /** Raw resources spent on completed research; absent legacy counters = 0. */
+  scoreSpentOnResearch?: number;
+  /** Points from destroyed enemy assets (0.2 × paid resources), not bounties. */
+  scoreKilledValue?: number;
 }
 
 /**
@@ -280,6 +288,8 @@ export interface Projectile {
 }
 
 export interface GameState {
+  /** Absent in old snapshots/replays: retain pre-score checksum behavior. */
+  scoreVersion?: 1;
   /** Absent in legacy saves/replays: busy-building research is rejected. */
   researchQueueVersion?: 1;
   /** Opt-in fixed200-year Wonder victory. Absent preserves legacy conquest. */

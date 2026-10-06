@@ -1,8 +1,8 @@
 import type { Command, GameState } from '../sim/types';
 import type { MatchSetup } from '../match-setup';
 
-/** v5: research queues; v4 simulators reject or fail to advance queued research. */
-export const SHARED_VERSION = 5;
+/** v6: authoritative score receipts/counters; older peers hash different state. */
+export const SHARED_VERSION = 6;
 /** Persisted format is separate from client admission. The host also reads v4
  * checkpoints without adding the new research-rule marker to their state. */
 export const SHARED_CHECKPOINT_VERSION = 5;

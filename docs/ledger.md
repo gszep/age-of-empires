@@ -1,5 +1,52 @@
 # Ledger of approximations
 
+## Public score (#139)
+
+**Owned:** `depot_813781/Docs/en/AoK Manual.pdf`, printed p18 / PDF21,
+values stockpiles at 0.1/resource, completed construction/units/research at
+0.2/resource, transfers **that same 0.2 value** on kills/conversions (not 0.4),
+and awards 10 points per 1% explored. `depot_813782/widgetui/commandpanel.json`
+`ScoreStatsAnchor` names Military/Economy/Technology/Society (English labels
+9886–9889). English help 42300–42304 places exploration under Technology,
+Castles/Wonders under Society, other surviving assets/stockpiles under Economy,
+and destroyed/converted enemy value under Military.
+
+**Inferred from the AoK manual, not DE-calibrated:** `sim/score.ts` uses those
+four columns with current actual paid prices captured at enqueue/foundation,
+not the manual's obsolete House price. Surviving completed assets carry their
+value; death, Delete, farm depletion and self-destruction remove it. Enemy kills
+bank it for the killer, including buildings, splash and sunk cargo; Gaia and
+friendly kills give no military award. Held conversions move into Military,
+not also Economy: recapture or death removes that held value, preserving the
+manual's single transfer. Foundations/unfinished queues have no asset value;
+cancels only restore stockpile, and completion credits once. Starting assets
+use their initial DAT prices; automatic free unit grants carry zero paid cost.
+Garrisoned assets are counted recursively. Research is accumulated in raw paid
+resources, scaled only when read. Missing legacy history counters mean zero;
+missing legacy asset receipts use entity-local current prices, not reconstructed
+historic discounts. Past research/kill history cannot be recovered from old saves.
+
+The sources are not a modern engine calibration: DE help 42301 includes paid
+tribute whereas the manual explicitly removes it from the sender. This change
+follows the manual (tribute affects stockpiles only). Literal DE help could also
+imply cumulative conversions/Society construction rather than the manual's
+transferable held assets. A later native DE post-game score-table comparison
+must settle those differences, starting/free assets, upgrades, foundations,
+Heresy, demolition and rounding. Fractions are retained internally and the
+displayed total is floored once, an inferred integer display policy.
+
+HUD and observation share totals for **both** players regardless of fog; category
+details/private receipts are not exposed to opponents. Observation v10 adds
+`scores` to v9; shared admission v6 rejects older score-unaware simulators whose
+hashes would differ. Match format v4 enables score accounting; v1–v3 replay
+strips initial receipts and omits `scoreVersion`, preserving pre-score hashes.
+Checkpoint/snapshot envelopes are unchanged and accept old JSON without
+injecting counters. Old snapshots likewise retain pre-score accounting: their
+display derives living assets/stockpiles/exploration, but cannot accumulate
+research/kill history without starting a new score-enabled match.
+The open fallback now retains the existing score-panel layout instead of hiding
+the entire panel; unavailable owned textures/icons remain empty as before.
+
 ## Research queues (#293)
 
 Owned `depot_813782/widgetui/commandpanel.json` supplies the `QueueButtons`

@@ -101,14 +101,16 @@ implementation policy, not a substitute for the reference compositor (#149).
 Game mode (`random-map` / `regicide`) is authoritative match input. Regicide
 starting actors, King survival through nested carriers, repeatable Treason and
 draw outcomes live in `src/sim/regicide.ts`/`game.ts`; minimap markers consume a
-read-only King-position channel, never mutate fog. Observation v9 exposes mode,
+read-only King-position channel, never mutate fog. Observation v10 adds public
+score totals for both players to v9's mode,
 draw, temporary positions and run-length encoded explored terrain/elevation for
 fog-safe coastal planning, plus own-building waiting research. New records/results
-are v3 with research queue rules; v1/v2 replay retains busy-building research
+are v4 with score accounting (v3 introduced research queue rules); v1–v3
+replay retains pre-score hashes and v1/v2 replay retains busy-building research
 rejection through an absent `researchQueueVersion` state marker. Legacy v1
 recordings are accepted only without a mode field and mean random map. Shared
-protocol5 additionally carries the authoritative match population ceiling and
-opt-in Wonder completion deadlines/win state, and rejects pre-queue simulation
+protocol6 additionally carries the authoritative match population ceiling and
+opt-in Wonder completion deadlines/win state, and rejects pre-score simulation
 clients. Persisted shared checkpoints v4 remain loadable without changing their
 state or legacy research rules; subsequent saves write a v5 envelope.
 Dev snapshot3 admits mode-less v2
