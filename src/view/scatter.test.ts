@@ -81,7 +81,9 @@ describe('the aesthetic scatter', () => {
   });
 
   it('strews the biome\'s own objects, off the water, the woods and the players', () => {
-    for (const seed of [3, 7, 20]) {
+    // All eleven biomes and both blend variants, including the four that
+    // share base100. The picture must not disappear or borrow another biome.
+    for (const seed of [1, 2, 3, 4, 6, 7, 10, 17, 22, 23, 30, 37, 40]) {
       const state = createGame(seed);
       const biome = biomeOf(state)!;
       const placed = scatterPlacements(state);

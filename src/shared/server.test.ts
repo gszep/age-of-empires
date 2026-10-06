@@ -80,7 +80,7 @@ it('carries Regicide/Treason over the real wire, rejects old clients and bad mod
 
 it('rejects v4 simulators while preserving a marker-less v4 checkpoint and its legacy research rules (#293)', async () => {
   const { directory, checkpoint } = fixture();
-  const original = createGame(293);
+  const original = createGame(293, undefined, undefined, 'arabia', undefined, undefined, undefined, 0);
   delete original.researchQueueVersion;
   useLegacyScore(original);
   for (const player of Object.values(original.players)) {
@@ -142,6 +142,7 @@ it('rejects v4 simulators while preserving a marker-less v4 checkpoint and its l
         const snapshot = JSON.parse(String((await response)[0]));
         expect(snapshot.type).toBe('snapshot');
         expect(snapshot.state).not.toHaveProperty('researchQueueVersion');
+        expect(snapshot.state).not.toHaveProperty('mapgenVersion');
         expectScoreless(snapshot.state);
         expect(checksumState(snapshot.state)).toBe(checksumState(original));
         expect(snapshot.settings).toEqual(saved.settings); expect(snapshot.setup).toEqual(saved.setup);
@@ -168,18 +169,22 @@ it('rejects v4 simulators while preserving a marker-less v4 checkpoint and its l
   }
 });
 
-it('rejects pre-Mongols v6 peers without discarding or upgrading their compatible v5 checkpoint (#305)', async () => {
+it.each([0, 1] as const)('rejects old peers and resumes a v5 checkpoint with Arabia generation %s intact (#305/#118)', async mapgenVersion => {
   const { directory, checkpoint } = fixture();
-  const original = createGame(305);
+  const original = createGame(305, undefined, undefined, 'arabia', undefined, undefined, undefined, mapgenVersion);
   const buildingId = original.entities.find(e => e.owner === 1 && e.kind === 'town-center')!.id;
   expect(applyCommand(original, { kind: 'research', player: 1, buildingId, tech: 'loom' })).toEqual({ ok: true });
   expect(applyCommand(original, { kind: 'train', player: 1, buildingId, unit: 'villager' })).toEqual({ ok: true });
   const { rules, ...state } = original;
   const saved = { version: 5, rulesHash: createHash('sha256').update(JSON.stringify(rules)).digest('hex'), state,
     settings: { paused: true, speed: 1, generation: 3 }, humanTwo: true, setup: { map: 'arabia', seed: 305 } };
-  const bytes = JSON.stringify(saved);
+  const currentRulesHash = saved.rulesHash;
+  // Actual FALLBACK_RULES hash from unmodified037b7dd, before the seventeen
+  // terrain additions. Test the real prior hash, not a self-consistent fiction.
+  if (mapgenVersion === 0) saved.rulesHash = '6468a1958aed242623b46f3a31b50152f8db42696df2c3bc841a7980cae6da40';
+  let bytes = JSON.stringify(saved);
   writeFileSync(checkpoint, bytes);
-  expect(SHARED_VERSION).toBeGreaterThan(6);
+  expect(SHARED_VERSION).toBeGreaterThan(7);
   expect(SHARED_CHECKPOINT_VERSION).toBe(5);
   for (const reopen of [false, true]) {
     const server = await createServer({ root: directory, configFile: false, logLevel: 'silent',
@@ -190,13 +195,13 @@ it('rejects pre-Mongols v6 peers without discarding or upgrading their compatibl
       const address = server.httpServer!.address();
       if (!address || typeof address === 'string') throw new Error('Missing HTTP address');
       const url = `ws://127.0.0.1:${address.port}/__match/socket?player=1`;
-      if (!reopen) {
+      if (!reopen) for (const version of [6, 7]) {
         const stale = new WebSocket(url), packets: unknown[] = [];
         stale.on('message', raw => packets.push(JSON.parse(String(raw))));
         try {
           await once(stale, 'open', { signal: AbortSignal.timeout(10_000) });
           const closed = once(stale, 'close', { signal: AbortSignal.timeout(10_000) });
-          stale.send(JSON.stringify({ type: 'join', version: 6 }));
+          stale.send(JSON.stringify({ type: 'join', version }));
           await closed;
           expect(packets).toEqual([{ type: 'error', reason: 'Match protocol version mismatch' }]);
         } finally { stale.terminate(); }
@@ -213,6 +218,7 @@ it('rejects pre-Mongols v6 peers without discarding or upgrading their compatibl
         expect(checksumState(snapshot.state)).toBe(checksumState(original));
         const expected: GameState = JSON.parse(JSON.stringify(original));
         const resumed: GameState = snapshot.state;
+        expect(resumed.mapgenVersion).toBe(mapgenVersion || undefined);
         for (let i = 0; i < 600; i++) { stepGame(expected); stepGame(resumed); }
         expect(resumed.players[1].researched).toContain('loom');
         expect(resumed.entities.filter(e => e.owner === 1 && e.kind === 'villager')).toHaveLength(4);
@@ -220,6 +226,9 @@ it('rejects pre-Mongols v6 peers without discarding or upgrading their compatibl
         expect(checksumState(resumed)).toBe(checksumState(expected));
       } finally { client.close(); await once(client, 'close'); }
     } finally { await server.close(); }
+    // Saving adopts the equivalent terrain-table extension, never upgrades the
+    // generated map/marker or any simulation state. Reopen this saved file too.
+    bytes = JSON.stringify({ ...saved, rulesHash: currentRulesHash });
     expect(readFileSync(checkpoint, 'utf8')).toBe(bytes);
   }
 });

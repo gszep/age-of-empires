@@ -234,7 +234,7 @@ function startReplay(raw: unknown): void {
   clearSession();
   // A record from before civilisations were written down replays as whatever
   // the content is for, which is what it was played as.
-  game = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode, record.populationLimit, record.wonderVictory);
+  game = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode, record.populationLimit, record.wonderVictory, record.version >= 5 ? 1 : 0);
   if (record.version < 3) delete game.researchQueueVersion;
   if (record.version < 4) useLegacyScore(game);
   activeSetup = { map: record.map ?? 'arabia', seed: record.seed, mode: record.mode, civilizations: record.civilizations,

@@ -186,7 +186,7 @@ describe('research queueing (#293)', () => {
     let lastQueue: string[] | undefined;
     expect(replayRecord(record, rules, s => { lastQueue = townCenter(s).researchQueue; }).ok).toBe(true);
     expect(lastQueue).toEqual(['feudal-age']);
-    const legacyState = createGame(record.seed, rules);
+    const legacyState = createGame(record.seed, rules, undefined, 'arabia', undefined, undefined, undefined, 0);
     useLegacyScore(legacyState);
     delete legacyState.researchQueueVersion;
     // Original semantics: the first research is paid; busy second command is rejected.

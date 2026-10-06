@@ -168,7 +168,7 @@ describe('King survival and temporary Treason', () => {
     legacy.result = { ...legacyResult, version: 1 };
     // A v3 recording cannot be made legacy by relabelling its checksum: the
     // new research-rule marker is authoritative state. Rebuild the v1 fixture.
-    const legacyState = createGame(42);
+    const legacyState = createGame(42, undefined, undefined, 'arabia', undefined, undefined, undefined, 0);
     useLegacyScore(legacyState);
     delete legacyState.researchQueueVersion;
     legacy.checksums = record.checksums.map(({ tick }) => {

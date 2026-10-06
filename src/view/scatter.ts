@@ -17,7 +17,7 @@
  */
 import * as THREE from 'three/webgpu';
 import { groundLayerOrder, spriteLayerOrder } from './render-order';
-import { ARABIA_BIOMES, TERRAIN_BEACH, isOpenWater, type BiomeSpec } from '../sim/mapgen';
+import { ARABIA_BIOMES_LEGACY, selectArabiaBiome, TERRAIN_BEACH, isOpenWater, type BiomeSpec } from '../sim/mapgen';
 import { random01, seedFrom } from '../sim/random';
 import { isBuilding } from '../sim/data';
 import { rulesForPlayer } from '../sim/civilizations';
@@ -52,11 +52,14 @@ const FROM_OTHERS = 5;
 
 /** The biome a dealt board is dressed in, from its most common ground. */
 export function biomeOf(state: ReadonlyGameState): BiomeSpec | undefined {
+  // Several new biomes share base100: frequency cannot identify them. The
+  // marker is Arabia-only, and matchSeed is the immutable pre-generation seed.
+  if (state.mapgenVersion === 1) return selectArabiaBiome({ seed: seedFrom(state.matchSeed ^ 0x5ee_d1) });
   const counts = new Map<number, number>();
   for (const id of state.terrain) counts.set(id, (counts.get(id) ?? 0) + 1);
   const ranked = [...counts].sort((a, b) => b[1] - a[1]).map(([id]) => id);
   for (const id of ranked) {
-    const biome = ARABIA_BIOMES.find(b => b.base === id);
+    const biome = ARABIA_BIOMES_LEGACY.find(b => b.base === id);
     if (biome) return biome;
   }
   return undefined;

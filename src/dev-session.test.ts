@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { loadSession, loadSessionSetup, saveSession, SNAPSHOT_VERSION } from './dev-session';
-import { applyCommand, createGame } from './sim/game';
+import { applyCommand, createGame, stepGame } from './sim/game';
 import { checksumState } from './sim/checksum';
 import { FALLBACK_RULES } from './sim/data';
 
@@ -13,6 +13,16 @@ beforeEach(() => {
   });
 });
 afterEach(() => vi.unstubAllGlobals());
+
+it.each([0, 1] as const)('resumes Arabia generation %s without upgrading legacy terrain or markers', version => {
+  const state = createGame(30, undefined, undefined, 'arabia', undefined, undefined, undefined, version);
+  saveSession(state, { map: 'arabia', seed: 30 });
+  const resumed = loadSession(FALLBACK_RULES)!;
+  expect(resumed.mapgenVersion).toBe(version || undefined);
+  expect(checksumState(resumed)).toBe(checksumState(state));
+  for (let i = 0; i < 20; i++) { stepGame(state); stepGame(resumed); }
+  expect(checksumState(resumed)).toBe(checksumState(state));
+});
 
 it('resumes a chosen map and seed without adding launch metadata to game/replay state', () => {
   const state = createGame(2, undefined, undefined, 'islands');
