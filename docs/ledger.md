@@ -1387,3 +1387,58 @@ when the result looks right. When a row is later read from a file, delete it
   Fog uses the last-seen bit, never hidden live contents. No additional protocol-version bump is needed:
   no wire field/type changed and the documented occupancy-indicator contract is
   unchanged; this corrects the relic case of that contract.
+
+## In-game technology tree, first read-only slice (#138)
+
+- **Read:** pinned `CivTechTrees/*.json` supplies every shipped civilisation's
+  typed node IDs, production-building columns, ages, links, prerequisites,
+  icon indices and `NotAvailable` flags. `ResearchedCompleted` is static source
+  metadata, **not** live player research. The root Britons profile is included.
+  Original names/help use localization (help IDs minus the existing 79000
+  offset); `stringreference.json` resolves the screen's title and Back button.
+  `eras.json` supplies age names; `screentechtree.json` supplies 3840×2160,
+  256-wide age labels and 380/430/400/410 row proportions. Missing native
+  `Node Type` on some Elite Cannon Galleon rows stays missing, not invented.
+- **Identity:** sim technologies match numeric tech IDs; units/buildings match
+  DAT/tree/availability IDs. Construction heads use imported `build.sourceId`;
+  the Goth barracks Huskarls use the already reviewed `combatRoster.rosterAliases`
+  and their Anarchy gate, not English-name guesses. Unmapped native nodes remain
+  visible as unsupported; Nomads remains the explicit #305 simulation gap.
+- **Project adapter / inferred presentation:** this is a current-player modal,
+  not the native full-screen civ selector. Two compact cards per building/age
+  cell, responsive scrolling, plain parchment, status colours/borders, legend,
+  and a bottom text preview are project CSS. Hardcoded English status labels,
+  legend, preview prompts and accessibility copy are project presentation, not
+  imported localization. Native node icons reuse existing
+  HUD lookups where imported. Names flatten native line breaks. Help markup,
+  unresolved cost/stat placeholders and empty parentheses are stripped; this
+  first tree is not a live stat/cost calculator. Native background/path art,
+  dependency connectors, age illustrations and civ-switching are not delivered.
+  `techtreepreviewpanel.json` was inspected; its full category/civ-bonus preview
+  is not reproduced by this compact node-description panel.
+- **Column grouping:** preserve native `Building in new column` and
+  `Building upgraded from ID`. Explicit false joins its upgrade, construction
+  identity or building-link target; unlinked auxiliaries follow the preceding
+  building. Forward links (Market/Mill) are grouped without dropping nodes.
+  Construction TC621 shares TC109's column but retains its Castle Age gate;
+  tower upgrade nodes share a column. This is a compact column adapter, not a
+  claim of pixel-matched native node placement.
+- **Live state:** researched highlighting reads only the current player's sim
+  history. Available means unlocked in the tree, using sim research/build/train
+  gates, not affordable or command-ready: stockpile, producer presence, queues,
+  placement/count limits and current research-in-progress remain the command
+  grid's responsibility. The modal is informational, never issues research or
+  mutates state, and does not pause the match. Escape/Back restore focus.
+- **Open fallback / publication:** the visible button is disabled with an owned
+  data requirement, rather than inventing a second tree. Older owned manifests
+  without the new fields behave likewise. Only UI-stage output changes
+  (`ui/manifest.json`: `techTrees`, shared `techTreeStrings`, `techTreeLayout`, source hashes); coordinator
+  publication still requires the complete `npm run import:aoe2` pipeline, never
+  a standalone UI-stage publish. Private extraction/browser evidence does not
+  replace that integration/import/checkpoint slot.
+- **Measured UI-manifest budget (12 civs, 2061 nodes):** pre-feature publication
+  1,063,776 bytes raw / 133,862 gzip; reviewed v1 2,080,178 / 258,224;
+  revised shared-localization publication 1,603,293 / 182,095. Gzip is level 9
+  with mtime 0 over complete manifest bytes. The 452-entry string table saves
+  476,885 raw / 76,129 gzip bytes versus v1, even with column metadata retained.
+  Every node's localized name/help round-trips in the owned extraction test.

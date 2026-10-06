@@ -10,6 +10,16 @@ Run them from the repo root: `npx tsx tools/probes/snapshot.ts`.
 
 ## Maintained issue-acceptance checks
 
+- **`tools/techtree_smoke.mts`** — private-server #138 menu click, complete owned
+  node count, age rows, native icon reuse/localization, Escape/Back/focus, and
+  real public Loom research → computed green border/background. It also checks
+  source-grouped tower/TC columns, all card text-line bounds at 1280×800
+  (including Crossbowman/Wheelbarrow), and the sticky header corner. Run with
+  `npx tsx tools/techtree_smoke.mts`; `OWNED_PUBLIC` and `TECHTREE_UI` may select
+  read-only existing/private publications. `OPEN_FALLBACK=1` verifies the visible
+  disabled button and reason. Screenshots/log evidence live under `.local/`;
+  browser and private server close in `finally`. This never runs an import.
+
 - **`browser_startup_diagnostics_smoke.mjs`** — run with `node` for #265's
   intentional startup-failure fixture. Asserts retained pending/failed/HTTP
   requests, console/init errors, loading DOM, canvas/debug readiness and GPU

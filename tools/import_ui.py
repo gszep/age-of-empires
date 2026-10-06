@@ -276,6 +276,79 @@ def extract_hotkey_profiles(path: Path, wanted: dict, content: dict) -> dict:
     return profiles
 
 
+def extract_techtrees(techs_dir: Path, content: dict[str, Any], strings: dict | None = None,
+                      hashes: dict | None = None, aliases: dict | None = None) -> dict[str, dict[str, Any]]:
+    """Keep the native typed IDs: Building ID is the column, NOT the unit ID.
+
+    ResearchedCompleted is static roster metadata, not a player's history.
+    Include the root profile as well as enabled imported profiles; fail loudly
+    on a broken owned source rather than publishing an incomplete tree.
+    """
+    from import_content import HELP_STRING_OFFSET
+    strings = strings or {}
+    result = {}
+    profiles = [content, *content.get("civilizations", {}).values()]
+    for profile in sorted(profiles, key=lambda p: p.get("civilization", {}).get("key", "")):
+        civ = profile.get("civilization", {})
+        if not civ.get("treeFile") or civ.get("enabled") is False:
+            continue
+        path = techs_dir / civ["treeFile"]
+        data = json.loads(path.read_text())
+        if hashes is not None:
+            hashes[f"CivTechTrees/{path.name}"] = sha256(path)
+        nodes = []
+        for node in data["civ_techs_buildings"] + data["civ_techs_units"]:
+            entry = {key: node[source] for key, source in {
+                "nodeId": "Node ID", "buildingId": "Building ID", "ageId": "Age ID",
+                "nodeStatus": "Node Status", "useType": "Use Type",
+                "iconId": "Picture Index", "nameStringId": "Name String ID",
+                "helpStringId": "Help String ID",
+            }.items()}
+            # Some shipped Elite Cannon Galleon rows omit Node Type. Preserve
+            # the omission; Use Type still identifies the numeric namespace.
+            for key, source in {"nodeType": "Node Type", "linkId": "Link ID", "linkType": "Link Node Type",
+                                "newColumn": "Building in new column", "upgradedFromId": "Building upgraded from ID",
+                                "triggerTechId": "Trigger Tech ID"}.items():
+                if source in node:
+                    entry[key] = node[source]
+            entry["prerequisites"] = [
+                {"id": pid, "type": kind}
+                for pid, kind in zip(node.get("Prerequisite IDs", []), node.get("Prerequisite Types", []))
+                if kind != "None"
+            ]
+            entry["name"] = strings.get(node["Name String ID"], node["Name"])
+            entry["help"] = strings.get(node["Help String ID"] - HELP_STRING_OFFSET, "")
+            # Reviewed roster aliases and reciprocal construction heads are
+            # identities already used by the content importer, not name matches.
+            if node["Use Type"] == "Unit" and node["Node ID"] in (aliases or {}):
+                entry["simId"] = aliases[node["Node ID"]]
+            if node["Use Type"] == "Building":
+                entity = next((e for e in profile.get("entities", {}).values()
+                               if e.get("build", {}).get("sourceId") == node["Node ID"]), None)
+                if entity:
+                    entry["simId"] = entity["id"]
+            nodes.append(entry)
+        result[civ["key"]] = {"civId": data["civ_id"], "nodes": nodes}
+    return result
+
+
+def compact_techtrees(trees: dict) -> dict:
+    """Publish localization once across civs, retaining native string IDs."""
+    strings, result = {}, {}
+    for civ, tree in trees.items():
+        nodes = []
+        for source in tree["nodes"]:
+            node = dict(source)
+            for field in ("name", "help"):
+                identifier, text = str(node[field + "StringId"]), node.pop(field)
+                if identifier in strings and strings[identifier] != text:
+                    raise ValueError(f"conflicting tech tree localization for {identifier}")
+                strings[identifier] = text
+            nodes.append(node)
+        result[civ] = {**tree, "nodes": nodes}
+    return {"techTrees": result, "techTreeStrings": strings}
+
+
 def import_cursors(directory: Path, names: list[str], out_root: Path, hashes: dict[str, str]) -> dict[str, Any]:
     """Copy native CUR bytes and read their actual dimensions/hotspot.
 
@@ -310,8 +383,48 @@ def extract_ui(
     hotkeys_path: Path | None = None,
     fonts_dir: Path | None = None,
     cursors_dir: Path | None = None,
+    techs_dir: Path | None = None,
 ) -> dict[str, Any]:
     ui_spec = spec["ui"]
+    # Derive from the pipeline's resolved DAT directory, not a second hardcoded depot.
+    techs_dir = techs_dir or sounds_path.parent / "CivTechTrees"
+    declared_trees = any(p.get("civilization", {}).get("treeFile")
+                         and p["civilization"].get("enabled") is not False
+                         for p in [content, *content.get("civilizations", {}).values()])
+    if declared_trees and not techs_dir.is_dir():
+        raise FileNotFoundError(f"shipped civilizations require CivTechTrees directory: {techs_dir}")
+    tech_trees, tree_layout = {}, None
+    tree_hashes = {}
+    if techs_dir.is_dir():
+        from import_content import read_strings
+        strings_path = sounds_path.parents[2] / "en/strings/key-value/key-value-strings-utf8.txt"
+        strings = read_strings(strings_path)
+        references_path = widgetui / "stringreference.json"
+        references = json.loads(references_path.read_text())
+        tree_hashes[references_path.name] = sha256(references_path)
+        tree_hashes["techTreeStrings"] = sha256(strings_path)
+        aliases = {alias: e["unitId"] for e in spec["entities"] + spec.get("combatRoster", [])
+                   for alias in e.get("rosterAliases", [])}
+        tech_trees = extract_techtrees(techs_dir, content, strings, tree_hashes, aliases)
+        screen_path = widgetui / "screentechtree.json"
+        screen = json.loads(screen_path.read_text())["Collection"]
+        def widgets(rows):
+            for row in rows:
+                w = row["Widget"]
+                yield w
+                yield from widgets(w.get("ChildWidgets", []))
+        boxes = {w["Name"]: w for w in widgets(screen["Widgets"])}
+        eras_path = techs_dir.parent / "eras.json"
+        ages = next(e["Ages"] for e in json.loads(eras_path.read_text()) if e["Name"] == "base")
+        tree_layout = {"width": screen["ViewPort"]["width"], "height": screen["ViewPort"]["height"],
+                       "ageWidth": boxes["Age1Icon"]["ViewPort"]["width"],
+                       "ages": [{"name": strings[a["NameId"]],
+                                 "height": boxes[f"Age{i+1}Icon"]["ViewPort"]["height"]}
+                                for i, a in enumerate(ages[:4])],
+                       "title": strings[references["IDS_MPS_TECHTREE_INFO"]],
+                       "close": strings[references["IDS_BACK"]]}
+        tree_hashes[screen_path.name] = sha256(screen_path)
+        tree_hashes[eras_path.name] = sha256(eras_path)
     from civilization_profiles import art_entities
     profiles = [content, *content.get("civilizations", {}).values()]
     hotkey_profiles = extract_hotkey_profiles(hotkeys_path, ui_spec.get('hotkeys', {}), content) if hotkeys_path else {}
@@ -327,6 +440,7 @@ def extract_ui(
         for entry in json.loads(sounds_path.read_text())["sound_list"]
     }
     hashes = {
+        **tree_hashes,
         "materials.json": sha256(widgetui / "materials.json"),
         "icons.json": sha256(widgetui / "icons.json"),
         "sounds.json": sha256(sounds_path),
@@ -522,6 +636,8 @@ def extract_ui(
         "missingCues": sorted(alias for alias in spec.get("ui", {}).get("cues", []) if alias not in sounds),
         "hotkeys": extract_hotkeys(hotkeys_path, ui_spec["hotkeys"])
         if hotkeys_path and ui_spec.get("hotkeys") else {},
+        **compact_techtrees(tech_trees),
+        "techTreeLayout": tree_layout,
         "source": {"sha256": hashes},
     }
 
@@ -552,6 +668,7 @@ def main() -> None:
     )
     parser.add_argument("--spec", type=Path, default=Path(__file__).with_name("import-spec.json"))
     parser.add_argument("--cursors", type=Path, help="owned native CUR directory (defaults beside dat)")
+    parser.add_argument("--techs", type=Path, help="owned CivTechTrees directory (defaults beside sounds)")
     parser.add_argument("--content", type=Path, default=root / ".local/aoe2de/content.json")
     parser.add_argument("--out", type=Path, default=root / "public/imported/aoe2/ui")
     args = parser.parse_args()
@@ -565,6 +682,7 @@ def main() -> None:
         args.hotkeys if args.hotkeys.is_file() else None,
         args.fonts if args.fonts.is_dir() else None,
         args.cursors,
+        args.techs,
     )
     args.out.mkdir(parents=True, exist_ok=True)
     manifest_path = args.out / "manifest.json"

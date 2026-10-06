@@ -11,6 +11,8 @@ import { installUiColors, placeFeedback } from './feedback';
 import { animateEmbers, buttonText, placeEndScreen } from './native-feedback';
 import { Minimap } from './minimap';
 import { DiplomacyDialog, type TributeDraft } from './diplomacy';
+import { TechTreeDialog } from './techtree';
+import './techtree.css';
 import { OptionsDialog } from './options';
 import type { Preferences } from './preferences';
 import { POPULATION_LIMITS } from '../sim/population';
@@ -131,6 +133,7 @@ export class Hud {
   root: HTMLElement;
   minimap: Minimap;
   diplomacy: DiplomacyDialog;
+  techtree: TechTreeDialog;
   options: OptionsDialog;
   private palette = 'default';
   private commandGrid!: HTMLElement;
@@ -168,6 +171,7 @@ export class Hud {
     parent.appendChild(this.root);
     this.installFonts();
     this.build();
+    if (!ui) this.root.querySelector('[data-command="techtree"]')!.textContent = 'Tech Tree';
     this.wonders = new WonderPanel(this.root, ui, strings, text => this.showMessage(text), id => this.callbacks.onWonderFocus?.(id));
     installUiColors(this.root, ui, new URLSearchParams(location.search).get('uiPalette') ?? 'default');
     placeFeedback(this.root, ui);
@@ -176,6 +180,8 @@ export class Hud {
       () => this.callbacks.onSound('button_ui'));
     this.options = new OptionsDialog(this.root, ui, strings,
       preferences => this.callbacks.onPreferences?.(preferences), () => this.callbacks.onSound('button_ui'));
+    this.techtree = new TechTreeDialog(this.root, ui, (category, index) => this.iconFor(category, index),
+      () => this.callbacks.onSound('button_ui'));
     const canvas = this.root.querySelector<HTMLCanvasElement>('#minimap-canvas')!;
     this.minimap = new Minimap(canvas);
     this.minimap.playerColor = owner => this.uiColor(this.colorName(owner), 'MiniMap');
@@ -240,6 +246,7 @@ export class Hud {
   destroy(): void {
     this.options.close();
     this.diplomacy.close();
+    this.techtree.close();
     this.resolveConfirmation?.('aborted');
     for (const timer of this.messageTimers.values()) window.clearTimeout(timer);
     window.clearTimeout(this.defeatTimer);
@@ -274,7 +281,7 @@ export class Hud {
         <div id="population-flash" hidden></div>
       </div>
       <div id="menu-panel" class="panel">
-        <button class="menu-button" data-icon="techtree" data-widget="Techtree" title="Technology tree (not yet available)" disabled></button>
+        <button class="menu-button" data-command="techtree" data-icon="techtree" data-widget="Techtree" title="Technology tree — requires imported owned tech-tree data" disabled></button>
         <button class="menu-button" data-icon="objectives" data-widget="Objectives" title="Objectives (not yet available)" disabled></button>
         <button class="menu-button" data-icon="chat" data-widget="Chat" title="Chat (not yet available)" disabled></button>
         <button class="menu-button" data-command="diplomacy" data-icon="diplomacy" data-widget="Diplomacy" title="Diplomacy"></button>
@@ -714,7 +721,7 @@ export class Hud {
   get confirmationOpen(): boolean { return this.root.querySelector<HTMLDialogElement>('#confirm-dialog')!.open; }
 
   get modalOpen(): boolean {
-    return this.options.element.open || this.diplomacy.open || this.confirmationOpen || this.root.querySelector<HTMLDialogElement>('#popup-dialog')!.open || this.endOpen;
+    return this.options.element.open || this.diplomacy.open || this.techtree.open || this.confirmationOpen || this.root.querySelector<HTMLDialogElement>('#popup-dialog')!.open || this.endOpen;
   }
 
   /** Errors that need acknowledgement use the owned generic OK modal. */

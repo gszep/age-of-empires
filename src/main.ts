@@ -24,6 +24,7 @@ import { buildingLimitReached, buildingRulesFor, buildingRulesForEntity, populat
 import { researchCostFor, researchSecondsFor, technologyRequirementsMet } from './sim/technologies';
 import { COMMODITIES, hasMarket, marketQuote, maximumTribute, tributeFee, type Commodity } from './sim/market';
 import type { DiplomacyModel } from './view/diplomacy';
+import { techTreeModel } from './view/techtree';
 import { civilizationRules } from './sim/civilizations';
 import { profileArtKey } from './view/sprites';
 import { gridKey, placeCommands } from './view/command-grid';
@@ -656,6 +657,11 @@ function diplomacyModel(): DiplomacyModel {
       color: hud.uiColor(playerColorName(id), 'Icons', playerColorHex(assets, id) ?? (id === 1 ? '#3b64ff' : '#ff3b3b'))! })) };
 }
 function runUiCommand(id: string, shift = false): void {
+  if (id === 'techtree') {
+    const tree = uiAssets?.techTrees?.[game.players[localPlayer].civilization];
+    if (tree && uiAssets?.techTreeLayout) hud.techtree.show(techTreeModel(tree, game, localPlayer, uiAssets.techTreeStrings));
+    return;
+  }
   if (id === 'market-tribute' || id === 'diplomacy') {
     hud.diplomacy.show(diplomacyModel());
     return;
@@ -2143,6 +2149,11 @@ renderer.setAnimationLoop(now => {
     hudClock = 0;
     hud.updateResources(game, localPlayer, resourceStatus());
     if (hud.diplomacy.open) hud.diplomacy.update(diplomacyModel());
+    const tree = uiAssets?.techTrees?.[game.players[localPlayer].civilization];
+    const treeButton = hud.root.querySelector<HTMLButtonElement>('[data-command="techtree"]')!;
+    treeButton.disabled = !tree || !uiAssets?.techTreeLayout;
+    treeButton.title = treeButton.disabled ? 'Technology tree — requires imported owned tech-tree data' : 'Technology Tree';
+    if (hud.techtree.open && tree) hud.techtree.update(techTreeModel(tree, game, localPlayer, uiAssets?.techTreeStrings));
     hud.updateProduction(productionItems());
     hud.updateScore(scoreRows());
     hud.wonders.update(game, localPlayer, { 1: scoreRows()[0].name, 2: scoreRows()[1].name });
@@ -2155,11 +2166,13 @@ renderer.setAnimationLoop(now => {
     if (game.draw && !ended) {
       ended = true;
       hud.diplomacy.close();
+      hud.techtree.close();
       hud.showPopup(`${(messages.gameOver ?? 'Game over.').split('.')[0]}.\n${game.wonderDraw ? 'Draw: both Wonder countdowns expired together.' : 'Draw: both Kings were lost in the same tick.'}`);
     }
     if (game.winner && !ended) {
       ended = true;
       hud.diplomacy.close();
+      hud.techtree.close();
       const defeated = scoreRows().find(row => row.number !== game.winner)!;
       hud.showDefeat(defeated);
       hud.showEnd(game.winner === localPlayer);

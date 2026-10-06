@@ -307,6 +307,9 @@ export interface HotkeyProfile {
 }
 
 export interface UiAssets {
+  techTrees?: Record<string, import('./techtree').TechTreeData>;
+  techTreeStrings?: Record<string, string>;
+  techTreeLayout?: import('./techtree').TechTreeLayout;
   base: string;
   commandButtons?: Record<string, { name: string; slot: number; iconId: number; helpId?: number; moreHelpId?: number }>;
   hotkeyProfiles?: Record<string, HotkeyProfile>;

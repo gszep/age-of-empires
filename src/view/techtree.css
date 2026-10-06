@@ -1,0 +1,25 @@
+#techtree-dialog { position: fixed; inset: 0; margin: auto; width: 94vw; height: 90vh; max-width: 1800px; max-height: 94vh; padding: 16px; box-sizing: border-box; background: #ead4ad; color: rgb(57,28,27); border: 2px solid #776345; pointer-events: auto; }
+#techtree-dialog[open] { display: flex; flex-direction: column; gap: 8px; }
+#techtree-dialog::backdrop { background: #0009; }
+#techtree-dialog header { display: flex; justify-content: space-between; align-items: center; }
+#techtree-dialog h2, #techtree-dialog p { margin: 0; }
+#techtree-dialog button { font: inherit; cursor: pointer; color: inherit; }
+.techtree-legend { font-size: 12px; }
+.techtree-scroll { overflow: auto; flex: 1; min-height: 0; }
+.techtree-scroll table { border-collapse: separate; border-spacing: 0; }
+.techtree-scroll td { vertical-align: top; border: 1px solid #baa782; padding: 4px; }
+.techtree-group { display: grid; grid-template-columns: repeat(2, 150px); gap: 3px; }
+.techtree-scroll th { position: sticky; top: 0; background: #ead4ad; z-index: 1; padding: 8px; }
+.techtree-scroll tbody th { left: 0; min-width: 85px; }
+.techtree-scroll thead th:first-child { left: 0; z-index: 2; }
+#hud .techtree-node { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 46px; padding: 3px; text-align: left; background: #f3e8cf; border: 2px solid #a6987d; font-size: 12px; }
+.techtree-icon { display: block; width: 38px; height: 38px; flex-shrink: 0; background-size: contain; background-repeat: no-repeat; background-position: center; }
+.techtree-name { min-width: 0; overflow-wrap: break-word; hyphens: auto; white-space: normal; }
+#hud .techtree-node[data-status="disabled"] { filter: grayscale(1); opacity: .5; text-decoration: line-through; }
+#hud .techtree-node[data-status="unsupported"] { border-style: dashed; opacity: .65; }
+#hud .techtree-node[data-status="researched"] { border-color: #397239; background: #c5dfb1; }
+#hud .techtree-node[data-status="available"] { border-color: #26799e; }
+.techtree-node:focus-visible, .techtree-node:hover { outline: 2px solid #572d20; outline-offset: 1px; }
+.techtree-preview { white-space: pre-line; overflow: auto; height: 120px; flex-shrink: 0; border-top: 1px solid #776345; padding-top: 8px; font-size: 14px; }
+#hud.fallback #menu-panel .menu-button[data-command="techtree"]:disabled { display: block; width: auto; padding: 0 8px; border: 1px solid #776345; opacity: .6; }
+#hud [data-techtree-close] { padding: 6px 24px; border: 1px solid #776345; background: #f3e8cf; }

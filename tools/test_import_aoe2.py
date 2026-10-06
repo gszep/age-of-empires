@@ -2397,6 +2397,28 @@ class UiImportIntegrationTest(unittest.TestCase):
     def tearDownClass(cls):
         cls.directory.cleanup()
 
+    def test_tech_tree_publication_includes_root_localization_and_native_age_proportions(self):
+        trees = self.result['techTrees']
+        self.assertEqual(set(trees), {SPEC['civilization']['key'], *SPEC['enabledCivilizations']})
+        layout = self.result['techTreeLayout']
+        self.assertEqual((layout['width'], layout['height'], layout['ageWidth']), (3840, 2160, 256))
+        self.assertEqual([a['height'] for a in layout['ages']], [380, 430, 400, 410])
+        self.assertEqual([a['name'] for a in layout['ages']], ['Dark Age', 'Feudal Age', 'Castle Age', 'Imperial Age'])
+        self.assertEqual(layout['title'], 'Technology Tree')
+        self.assertEqual(layout['close'], 'Back')
+        loom = next(n for n in trees['britons']['nodes'] if n['useType'] == 'Tech' and n['nodeId'] == 22)
+        self.assertIn('Villagers +15 HP', self.result['techTreeStrings'][str(loom['helpStringId'])])
+        self.assertNotIn('help', loom)
+        self.assertIn('CivTechTrees/BRITONS.json', self.result['source']['sha256'])
+        tc = next(n for n in trees['britons']['nodes'] if n['useType'] == 'Building' and n['nodeId'] == 621)
+        self.assertEqual(tc['simId'], 109)
+        self.assertIs(tc['newColumn'], False)
+        guard = next(n for n in trees['britons']['nodes'] if n['useType'] == 'Building' and n['nodeId'] == 234)
+        self.assertIs(guard['newColumn'], False)
+        self.assertEqual(guard['upgradedFromId'], 79)
+        huskarl = next(n for n in trees['goths']['nodes'] if n['useType'] == 'Unit' and n['nodeId'] == 759)
+        self.assertEqual(huskarl['simId'], 41)
+
     def test_gather_point_uses_native_action_icon_zero_based_sequence_and_strings(self):
         buttons = json.loads(SOUNDS.with_name('buttons.json').read_text())['command_button_list']
         for action in (51, 78, 163, 165):
