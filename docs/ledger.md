@@ -636,10 +636,19 @@ comes from untouched1c316d8; see `src/headless/fixtures/README.md` and
   **Known native disagreement (2026-10-06):** build185872 visually showed normal
   and Elite charge bars depleting during ram combat, with displayed attack bonus
   dropping by1. A normal Samurai's bar stayed full during the house-attack trace.
-  Partial recharge was visible, but victory interrupted full recharge measurement.
+  The afternoon isolated follow-up measured three complete recharges at about
+  **30 game seconds** (F11 endpoint uncertainty roughly1–2s), consistent with
+  max1/recharge`.03333330154418945`. Stationary Teuton Dark Militia with0 melee
+  armour lost **12HP both on the full-charge hit and the following normal hit**;
+  a fresh full-charge hit independently lost12HP. The displayed10+3→10+2 does
+  **not** establish +1 damage. An isolated House again left the meter full;
+  a confirmed Battering Ram hit depleted it (175→160HP, not a paired damage
+  control). See the [accepted/rejected traces](samurai-kataparuto-calibration.md#charge-follow-up-current-build-185872-afternoon).
   The inspected installed/pinned charge fields agree; engine equivalence does not
   follow. Non-depletion is therefore not native-verified and the missing charge
-  contract remains unresolved; no speculative damage/cooldown fix was added.
+  movement/consumption contract remains unresolved; no speculative damage or
+  timer-only fix was added. These are current-build visual observations, not
+  pinned parity or exact tick calibration.
 - **Owned graphic placeholders:** Japanese `F` graphics reference legacy
   SLP2220 (including garrison-flag parents and ship composites), with no F.sld.
   Treat F like existing W/X/M/E placeholder parents and traverse its deltas;

@@ -5,6 +5,10 @@ current build **185872, not pinned 48987**, with the owner's explicit approval.
 All screenshot readings below were **observed visually**, not extracted from
 native simulation state. Packing is corrected below; this is not full #259 parity.
 
+The [afternoon charge follow-up](#charge-follow-up-current-build-185872-afternoon)
+now measures complete recharge and isolated hit damage. The earlier interrupted
+Samurai attempts below remain historical evidence, not the latest outcome.
+
 ## Provenance and setup
 
 - Live Windows PID **22012**, executable
@@ -285,7 +289,7 @@ Establish tile positions and compare move versus attack on the same path before
 fitting trigger distances or speed. The packing-only continuation does not close
 those Samurai gaps.
 
-Still unverified: exact transition/tick rounding; research during packing;
+Still unverified at that handoff: exact transition/tick rounding; research during packing;
 full recharge; exact consumption event and charge damage; movement thresholds,
 pursuit/cancellation; paid Elite upgrade; conversion; native save/reload;
 pinned-build engine equivalence. #259 remains open.
@@ -334,3 +338,125 @@ pinned-build engine equivalence. #259 remains open.
  2560×1440 rectangle. No scenario explicitly saved. No capture/controller
   process remains; no background job was launched. The earlier
   `sam-final-main-menu` capture is retained as the initial pass's endpoint.
+
+## Charge follow-up: current build 185872, afternoon
+
+**Native measurements obtained; runtime reconciliation remains BLOCKED.** This
+is the owner's authorized **current build185872, not pinned48987**. Readouts
+were observed visually. New evidence root:
+`/home/fraser/repos/age-of-empires/.local/worktrees/issue-259-charge/.local/native/`.
+The new worktree started clean at `d1e43fd`; no partial patch or new failing
+checks were present. The prior worker's exact issue comments, failed setup and
+packing/replay checks above were reviewed before gameplay. No prior coverage
+was removed. Only this document and the ledger are changed.
+
+### Fixture and measurement method
+
+Same Windows PID22012, fullscreen2560×1440, F11 **Casual1.5/Standard**;
+graphics were not changed or reopened (UHD-unchecked is the inherited setting).
+Blank editor only: P1 Japanese Imperial, P2 Teutons Dark/None. No Castle,
+trebuchet, research or damage triggers. Each player retained a spare villager.
+The normal Samurai has70HP and depleted-charge displayed attack10+2. The enemy Militia
+panel verifies40HP and **0 melee/1 pierce armour**. No Elite comparison here.
+
+Editor P2 regards P1 as Ally. P1 also starts Ally; after pausing Test with F3,
+only P1 is switched to Enemy in the in-game diplomacy pane. This avoids the
+pre-pause automatic kill. The target remains stationary through the accepted
+hit samples, and the Samurai remains70/70. `charge-dip-p1-ally`,
+`charge-controlled-target`, `charge-controlled-sam`, `charge-hostile` and
+`charge-third-hostile` preserve setup. The Diplomacy editor selector differs
+from the Units selector: **HOME reliably selected P1**, whereas the copied
+numeric row selected P2. The first two tests killed the target before sampling
+and are rejected (`charge-fresh-*`, `charge-ally-*`).
+
+`charge-sample.ps1` resumes a paused game, captures clock/panel/combat-region
+crops, and pauses in `finally`. Each numbered PNG combines unscaled regions:
+clock `(1120,0,800,45)`, panel `(0,1210,1180,210)`, field
+`(1200,580,1180,280)`. JSON retains actual monotonic capture times and PID.
+Requested150/250ms intervals are **not** elapsed game time; screenshot work
+adds overhead, and the game runs briefly between the last capture and F3.
+Integer F11 readings bound, rather than exactly time, each transition. Paused
+full PNG/JSON captures bracket orders and HP inspection. Generated `*-detail`,
+`*-sheet` and `*-endpoint` images are review aids, not independent samples.
+
+### Empty-to-full recharge
+
+White meter completion is checked together with displayed attack returning
+from10+2 to10+3; a nearly full raster alone is not classified as complete.
+After the hit, No Attack Stance (tooltip-verified) and a move-away order prevent
+further fighting during accepted recharge traces.
+
+| Sample | Depletion / charged strike | Last not-full → first full | Result, game seconds |
+| --- | --- | --- | --- |
+| Militia A | `charge-contact-002→003`: first HP loss at00:19; `charge-contact-sam` has depleted meter at00:20 | `charge-recharge1-051→052`:00:48→00:49 | ≈30; one charged hit followed by one normal hit before withdrawal |
+| Militia B, fresh Test | `charge-third-hit-003→004`: full at00:18, depleted at00:19; target40→28 | `charge-recharge3-053→054`:00:48→00:49 | ≈30; one hit before withdrawal |
+| Battering Ram | `charge-ram-strike-002→003`: full then depleted within01:07; target175→160 | `charge-recharge5-052→053`:01:37 (still10+2)→01:38 (10+3) | ≈30–31; one hit before withdrawal |
+
+Conservatively these establish **about30 game seconds, with roughly1–2 seconds
+of endpoint uncertainty**, not an exact native tick threshold or30.000-second
+timer. They are consistent with the previously inspected max1 / recharge
+`0.03333330154418945` reciprocal (≈30.00003s). No wall-time multiplier is applied
+to the already game-time F11 clock. The first sample also shows that a following
+ordinary strike did not visibly postpone full recharge by a whole attack cycle;
+it is not a precise test of timer-reset semantics.
+
+### Hit damage and target class
+
+| Check | Visually accepted outcome | Evidence |
+| --- | --- | --- |
+| Full-charge hit on stationary zero-melee-armour Militia | **40→28, 12 damage**, at00:19 | `charge-contact-002/003`; full Samurai meter before the strike in `charge-stop-hover`; depleted afterwards in `charge-contact-sam` |
+| Following normal hit, same target | **28→16, 12 damage**, by00:20; no recharge in between | Last sampled `charge-contact-005` still28; paused `charge-contact-hp` shows16; depleted Samurai panel at the same clock |
+| Independent full-charge Militia hit | **40→28, 12 damage**; only one hit before withdrawal | `charge-third-hit-*`, `charge-third-after`, `charge-third-target-hp` (28/40 after the safe recharge) |
+| House | **Meter stayed full** during approach/attacks; isolated target ends478/550 at01:08 | `charge-house-trace-*`, `charge-house-after`, `charge-house-hp` |
+| Battering Ram, confirmed by selected name | **Meter depleted** and attack10+3→10+2; ram175→160 | `charge-ram-before`, `charge-ram-strike-*`, `charge-ram-strike-after`, `charge-ram-final-hp` |
+
+The measured charged-minus-normal damage difference is **0 HP in this Militia
+fixture**, not +1. Do not convert the UI's10+3 into13 damage: the isolated HP
+outcome contradicts that inference. The ram's15 damage is not a charge-bonus
+measurement: its panel has−3 melee armour and no paired normal-hit control was
+made. The house starts as an undamaged editor placement, but its pre-attack HP
+click was in fog and selected nothing; do not present a captured550→478 pair.
+No unrelated attacker was present, and the trace/478HP establish actual combat
+rather than merely a move order. This repeats the earlier house non-consumption
+observation, not a proof for all buildings.
+
+The House readback shows10+2 **despite the full white meter**; attack display
+must not be treated as a target-independent charge-state oracle. Final
+`*-readback.png` crops retain original-size clock/HP panels. Reviewing these
+corrected provisional downscaled-preview misreadings of the House HP (443) and
+ram HP (144) to **478 and160** respectively before handoff.
+
+Rejected additional attempts are retained: `charge-repeat-*` selected Militia
+instead of Samurai for withdrawal, so `charge-recharge2` is **not** an accepted
+recharge trace. The first ram placement did not create a verified ram; the
+category/owner/search was re-established and `charge-realram-list/place` plus
+the175/175 selected panel establish the accepted one. `charge-ram-hit` and
+`charge-recharge4` never reached contact (ram remained175/175, meter full), so
+they are **not** consumption/recharge evidence. The subsequent eight-second
+no-attack approach, visually confirmed in `charge-ram-near-ready`, reached the
+target before `charge-ram-strike`. None of these rejected traces is silently
+counted toward the three samples above.
+
+### Runtime comparison, checks and final state
+
+`src/sim/game.ts` still latches `attackApproachTarget` by centre distance and
+multiplies pursuit speed, without a Samurai-specific consumable meter/recharge.
+Its `updateUnit` charge path is for `alternateAttack` (plus the separate fire
+charge handler), not Samurai task133. Thus the native **depletion/recharge gap
+is real**, while these HP observations do not justify adding charge damage.
+The current non-depleting approach boost cannot be declared faithful merely
+because its Japanese tests pass. How charge gates that movement boost, exact
+initiation/contact geometry, consumption before versus at impact, retargeting,
+Elite/upgrade/conversion/save behavior and pinned-engine equivalence remain
+unresolved. Adding a30-second timer alone would approximate an incomplete
+contract. **No runtime or test change**, hence no recording-version change or
+tsc run; a later behavior correction still requires versioned replay coverage.
+
+Native interaction ended at **16:26:40 BST**, before the45-minute stop deadline.
+`charge-final-main-menu.png/json` visually verifies **MAIN MENU**, build185872,
+PID22012 and2560×1440 rectangle. No scenario was explicitly saved. No restart,
+import, checkpoint, deployment, integration, commit or push was performed.
+Post-run Linux/Windows process inspection found no remaining native controller;
+all capture commands were synchronous and no background job was launched.
+Documentation validation: `git diff --check` and tracked-path checks passed.
+The unresolved contract is already tracked by open#259; this is not issue closure.
