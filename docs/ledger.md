@@ -160,8 +160,10 @@ off the reference; **measured** — fitted to a reference screenshot;
   are indexed privately under `native253-population-*`. The installed executable
   is101.103.54800.0 (#185872), newer than the pinned DAT; these are not claimed
   as recovered pinned-engine constants. Its saved choice was250, which does
-  **not** establish a factory default. The existing rules-bundle default200
-  remains a **chosen** application default.
+  **not** establish a factory default. **Observed on current build 185872:**
+  the skirmish lobby Reset sets 200 (#280, [speed calibration](speed-calibration.md)).
+  The rules-bundle default 200 matches that reset-lobby path, not a claimed
+  universal clean-install or pinned-build default.
 - **Implementation policy:** optional authoritative `state.populationLimit`
   overrides every side's base ceiling; per-player resource32 is added afterwards.
   Housing remains a separate bound. The menu uses these measured choices in the
@@ -173,8 +175,13 @@ off the reference; **measured** — fitted to a reference screenshot;
   rejects older simulators and incompatible checkpoints rather than silently
   ignoring the ceiling (subsequently protocol4 for Wonder victory). Installed services remain release-pinned on protocol2;
   this change does not deploy or migrate their live state.
-- Native factory-default policy and Gothic bonus-versus-housing runtime checks
-  on a matching executable remain unverified. `src/sim/population.ts`,
+- **Observed visually on current build 185872, not pinned 48987, 2026-10-06:**
+  with the same 225 housing and limit 200, Goths Imperial shows 1/210,
+  Goths Castle 1/200, and Teutons Imperial 1/200. Goths Imperial with no houses
+  shows 1/0; Teutons at limit 300 confirms 1/225. These separate editor Test starts
+  support a ceiling bonus, not free housing; they do not measure an in-match
+  research transition. [Method, crops and failed setups](population-calibration.md).
+  Pinned-runtime parity remains unverified (#279). `src/sim/population.ts`,
   `rules.ts`, `match-setup.ts`, `tools/map_menu_smoke.mts`.
 
 ## Persian Trade Cart unavailable audio (#271)
@@ -471,9 +478,11 @@ off the reference; **measured** — fitted to a reference screenshot;
   distinct from housing; help63208 describes200→210. **Chosen mode default:** new
   rules bundles default to200 population; explicit match setup may override it,
   while missing legacy fields retain
-  uncapped behaviour. **Inferred:** cap is min(housing, ceiling+bonus), with no
-  free houses. Configurable setup is implemented; native default/bonus calibration
-  remains#253 (see the population section above).
+  uncapped behaviour. **Implementation, supported by current-build native
+  observations:** cap is min(housing, ceiling+bonus), with no free houses.
+  Configurable setup is implemented; #253's reset-lobby default and Gothic
+  bonus/housing calibration are recorded above and in
+  [population calibration](population-calibration.md), not pinned-runtime parity.
   This replaces the previous unlimited housing sum for new rule bundles.
 - **Owned graphics:** Gothic garrison composites include the fileless`E`
   placeholder (e.g.2416); its file-bearing children remain traversed. No missing
