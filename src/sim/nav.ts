@@ -182,57 +182,77 @@ const SQRT2 = Math.SQRT2;
  * pathfinder, and what a heap keyed on f alone would not give.
  */
 class Heap {
-  private nodes: number[] = [];
-  private f: number[] = [];
-  private h: number[] = [];
+  private nodes = new Uint32Array(1024);
+  private f = new Float64Array(1024);
+  private h = new Float64Array(1024);
+  private count = 0;
 
-  get size(): number { return this.nodes.length; }
+  get size(): number { return this.count; }
+  clear(): void { this.count = 0; }
 
-  private before(a: number, b: number): boolean {
-    if (this.f[a] < this.f[b] - 1e-9) return true;
-    if (this.f[a] > this.f[b] + 1e-9) return false;
-    if (this.h[a] < this.h[b] - 1e-9) return true;
-    if (this.h[a] > this.h[b] + 1e-9) return false;
-    return this.nodes[a] < this.nodes[b];
+  private before(an: number, af: number, ah: number, bn: number, bf: number, bh: number): boolean {
+    if (af < bf - 1e-9) return true;
+    if (af > bf + 1e-9) return false;
+    if (ah < bh - 1e-9) return true;
+    if (ah > bh + 1e-9) return false;
+    return an < bn;
   }
 
-  private swap(a: number, b: number): void {
-    [this.nodes[a], this.nodes[b]] = [this.nodes[b], this.nodes[a]];
-    [this.f[a], this.f[b]] = [this.f[b], this.f[a]];
-    [this.h[a], this.h[b]] = [this.h[b], this.h[a]];
+  private grow(): void {
+    // Improved scores leave stale entries in the frontier, so capacity must
+    // grow by entries rather than being capped at the number of grid tiles.
+    const capacity = this.nodes.length * 2;
+    const nodes = new Uint32Array(capacity); nodes.set(this.nodes); this.nodes = nodes;
+    const f = new Float64Array(capacity); f.set(this.f); this.f = f;
+    const h = new Float64Array(capacity); h.set(this.h); this.h = h;
   }
 
   push(node: number, f: number, h: number): void {
-    this.nodes.push(node);
-    this.f.push(f);
-    this.h.push(h);
-    for (let at = this.nodes.length - 1; at > 0;) {
+    if (this.count === this.nodes.length) this.grow();
+    let at = this.count++;
+    // Move a hole up instead of swapping all three fields at every level.
+    // Compare the same entries in the same order, including the old epsilon.
+    while (at > 0) {
       const parent = (at - 1) >> 1;
-      if (!this.before(at, parent)) break;
-      this.swap(at, parent);
+      if (!this.before(node, f, h, this.nodes[parent], this.f[parent], this.h[parent])) break;
+      this.nodes[at] = this.nodes[parent];
+      this.f[at] = this.f[parent];
+      this.h[at] = this.h[parent];
       at = parent;
     }
+    this.nodes[at] = node;
+    this.f[at] = f;
+    this.h[at] = h;
   }
 
   pop(): number {
     const top = this.nodes[0];
-    const last = this.nodes.length - 1;
-    this.swap(0, last);
-    this.nodes.pop();
-    this.f.pop();
-    this.h.pop();
-    for (let at = 0;;) {
+    const last = --this.count;
+    if (last === 0) return top;
+    const node = this.nodes[last], f = this.f[last], h = this.h[last];
+    let at = 0;
+    for (;;) {
       const left = at * 2 + 1;
-      if (left >= this.nodes.length) break;
+      if (left >= this.count) break;
       const right = left + 1;
-      const child = right < this.nodes.length && this.before(right, left) ? right : left;
-      if (!this.before(child, at)) break;
-      this.swap(at, child);
+      const child = right < this.count && this.before(
+        this.nodes[right], this.f[right], this.h[right], this.nodes[left], this.f[left], this.h[left],
+      ) ? right : left;
+      if (!this.before(this.nodes[child], this.f[child], this.h[child], node, f, h)) break;
+      this.nodes[at] = this.nodes[child];
+      this.f[at] = this.f[child];
+      this.h[at] = this.h[child];
       at = child;
     }
+    this.nodes[at] = node;
+    this.f[at] = f;
+    this.h[at] = h;
     return top;
   }
 }
+
+// Like the search workspace, retain only the largest synchronous frontier.
+const searchHeap = new Heap();
 
 /**
  * 8-connected A* from a start tile to a goal tile. Diagonal moves may not cut
@@ -251,11 +271,12 @@ class Heap {
  * answer is the same whenever both ends reduce to the same tiles -- the search
  * is over tiles and nothing else.
  *
- * Only used when both the start tile and the goal tile are free. When either
- * is blocked, `nearestFreeTile` breaks its ties on the *fractional* position,
- * so two units in one tile can legitimately get different answers, and the
- * cache would be wrong rather than slow. A `WeakMap` on the grid means the
- * entries go when the tick's grid does, with nothing to invalidate.
+ * Resolve blocked endpoints with `nearestFreeTile` BEFORE forming the key:
+ * its ties depend on fractional positions, but the subsequent search depends
+ * only on the resolved tiles. This also shares failed searches to blocked
+ * goals without conflating positions on opposite sides of an obstruction.
+ * A `WeakMap` on the grid means entries go when the tick's grid does, with
+ * nothing to invalidate across changing buildings, gates or terrain rules.
  */
 const pathCache = new WeakMap<NavGrid, Map<string, Point[] | undefined>>();
 
@@ -263,16 +284,15 @@ const pathCache = new WeakMap<NavGrid, Map<string, Point[] | undefined>>();
 const copyPath = (path: Point[] | undefined) => path?.map(point => ({ ...point }));
 
 export function findPath(grid: NavGrid, from: Point, to: Point): Point[] | undefined {
-  const startTile = tileOf(from);
-  const goalTile = tileOf(to);
-  const cacheable = !isBlocked(grid, startTile.x, startTile.y)
-    && !isBlocked(grid, goalTile.x, goalTile.y);
-  if (!cacheable) return searchPath(grid, from, to);
+  const goalTile = nearestFreeTile(grid, to);
+  if (!goalTile) return undefined;
+  const startTile = nearestFreeTile(grid, from);
+  if (!startTile) return undefined;
   let cache = pathCache.get(grid);
   if (!cache) { cache = new Map(); pathCache.set(grid, cache); }
   const key = `${startTile.x},${startTile.y}|${goalTile.x},${goalTile.y}`;
   if (cache.has(key)) return copyPath(cache.get(key));
-  const path = searchPath(grid, from, to);
+  const path = searchPath(grid, startTile, goalTile);
   cache.set(key, path);
   return copyPath(path);
 }
@@ -312,16 +332,7 @@ function prepareSearch(size: number): SearchWorkspace {
   return workspace;
 }
 
-function searchPath(grid: NavGrid, from: Point, to: Point): Point[] | undefined {
-  const startTile = tileOf(from);
-  const goal = nearestFreeTile(grid, to);
-  if (!goal) return undefined;
-  if (isBlocked(grid, startTile.x, startTile.y)) {
-    const freeStart = nearestFreeTile(grid, from);
-    if (!freeStart) return undefined;
-    startTile.x = freeStart.x;
-    startTile.y = freeStart.y;
-  }
+function searchPath(grid: NavGrid, startTile: Point, goal: Point): Point[] | undefined {
   const size = grid.width * grid.height;
   const scratch = prepareSearch(size);
   const { gScore, parent, closed, touched } = scratch;
@@ -341,7 +352,8 @@ function searchPath(grid: NavGrid, from: Point, to: Point): Point[] | undefined 
   // to do, and what made the search quadratic in the size of its own frontier.
   // On a 32x18 board nobody could tell; on 120x120 one villager looking for a
   // way into a wood could cost a whole tick.
-  const open = new Heap();
+  const open = searchHeap;
+  open.clear();
   touched[scratch.used++] = startIndex;
   gScore[startIndex] = 0;
   open.push(startIndex, heuristic(startIndex), heuristic(startIndex));

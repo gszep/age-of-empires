@@ -575,13 +575,29 @@ describe('asking the same question twice in one tick', () => {
 
   it('answers per position when the goal tile is blocked', () => {
     // `nearestFreeTile` breaks its ties on the fractional target, so two goals
-    // inside one blocked tile can legitimately differ. The cache stands aside
-    // for those rather than being wrong.
+    // inside one blocked tile can legitimately differ. Resolve the positions
+    // before caching rather than merging those different answers.
     const grid: NavGrid = { width: 12, height: 12, blocked: new Uint8Array(144) };
     grid.blocked[6 * 12 + 6] = 1;
     const fromNorth = findPath(grid, { x: 1.5, y: 1.5 }, { x: 6.1, y: 6.1 })!;
     const fromSouth = findPath(grid, { x: 1.5, y: 1.5 }, { x: 6.9, y: 6.9 })!;
     expect(fromNorth[fromNorth.length - 1]).not.toEqual(fromSouth[fromSouth.length - 1]);
+  });
+
+  it('resolves blocked starts before caching and keeps resolved paths caller-owned', () => {
+    const grid: NavGrid = { width: 12, height: 12, blocked: new Uint8Array(144) };
+    grid.blocked[6 * 12 + 6] = 1;
+    const to = { x: 1.5, y: 1.5 };
+    const north = findPath(grid, { x: 6.1, y: 6.1 }, to)!;
+    const south = findPath(grid, { x: 6.9, y: 6.9 }, to)!;
+    expect(north).not.toEqual(south);
+    const expected = structuredClone(north);
+    // The northern fractional start resolves to (6,5), a free endpoint that
+    // can safely share this answer, but never the returned waypoint objects.
+    north[0].x = -999;
+    north.shift();
+    expect(findPath(grid, { x: 6.5, y: 5.5 }, to)).toEqual(expected);
+    expect(findPath(grid, { x: 6.1, y: 6.1 }, to)).toEqual(expected);
   });
 
   it('separates one grid\'s answers from another\'s', () => {
