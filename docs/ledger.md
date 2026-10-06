@@ -195,12 +195,25 @@ off the reference; **measured** — fitted to a reference screenshot;
   working relic-carrier aura: isolated monks stayed 25/45, then both recovered
   when brought together. Timed Knight controls with0/1/2 relic-carrier emitters
   support 75HP/minute and non-additive overlap: both healing runs recovered20HP
-  in about 16 game seconds; zero emitters left the wound intact. Exact boundaries,
-  scheduling and other policies remain inferred; pinned-runtime acceptance is still open. See
+  in about 16 game seconds; zero emitters left the wound intact. October6
+  current-build Guard Tower controls show an exterior Crossbowman staying15/35
+  while an ordinary or relic-carrying Monk is garrisoned, then reaching35/35
+  after unloading. The relic carrier excludes direct-healing confounding.
+  Research activated while the source was inside; already-active aura entry,
+  garrisoned recipients, exact boundaries, scheduling and captured-aura rules
+  remain unmeasured. The conversion attempt was rejected for unverified
+  selection/ownership and disappearance of the intended monk, not interpreted
+  as aura loss. Pinned-runtime acceptance is still open. See
   [Bimaristan calibration](bimaristan-calibration.md) and #285.
 - **Source mismatch:** team 409 adds class 21 attack+3 to DAT class 0, whereas owned
   English120158 says+2 versus buildings. Preserve DAT arithmetic and original
-  localization rather than silently editing either. Native resolution is #285.
+  localization rather than silently editing either. Current-build185872 attack
+  tooltips (observed visually) show Standard Buildings3 for both Saracen Archer
+  and Skirmisher, absent in Teuton controls: this supports DAT+3, not text+2.
+  Both installed and pinned DATs have the same effect409 and base attacks;
+  both descriptions say+2. Allied recipients and actual native building damage
+  were not measured. Installed Bimaristan XS uses a class-removal target mask
+  instead of the pinned explicit class list; do not infer full target equivalence.
 - Feedback currently uses recipient health and original research text. The
   original aura overlay/tooltip marker remains part of particle-feedback #49.
   Existing market curve, conversion inheritance and projectile timing inferences
