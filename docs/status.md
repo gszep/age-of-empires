@@ -70,6 +70,22 @@ do not close pinned-runtime acceptance.
 
 ## Imports and fidelity boundaries
 
+### HUD distance-font first surfaces (#92)
+
+Owned resource values, population and age now use the reference's RGB distance
+glyph atlas, losslessly subsetted by the UI importer. Accessible DOM text and
+CSS fallback remain; other HUD text still uses the composite TTF face. The
+private HUD browser probe covers nonblank pixels, unchanged-label caching,
+DPR1/2 and fallback. A supplied build185872 capture now calibrates counter/age
+weight and black outlines: all six matching labels meet the ledger's fixed
+coverage/core/outline tolerances, including an estimated-native-background
+outline control. White tint is widget-sourced; weight/edge/halo settings are
+**fitted**, not native uniforms. Exact geometry, other scales and the modern
+multi-page shader remain unverified; this is **not** native pixel parity or
+completion of #92. See the
+[ledger](ledger.md#92-first-owned-distance-font-surfaces-2026-10-06). Requires
+coordinated full import before rollout; private output is not published.
+
 The Persian audio publication blocker (#271) has a narrowly scoped, owner-approved
 resolution: three absent Trade Cart events are explicitly `unavailable`, while
 other missing events and broken audio still fail. The isolated eight-profile

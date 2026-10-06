@@ -2390,12 +2390,26 @@ class UiImportIntegrationTest(unittest.TestCase):
     def setUpClass(cls):
         cls.directory = tempfile.TemporaryDirectory()
         cls.result = extract_ui(
-            WIDGETUI, SOUNDS, SPEC, extracted_content(), Path(cls.directory.name), HOTKEYS
+            WIDGETUI, SOUNDS, SPEC, extracted_content(), Path(cls.directory.name), HOTKEYS,
+            (ROOT / 'depot_813781/resources/_common/fonts')
+            if (ROOT / 'depot_813781/resources/_common/fonts/combined.txt').is_file() else None
         )
 
     @classmethod
     def tearDownClass(cls):
         cls.directory.cleanup()
+
+    @unittest.skipUnless((ROOT / 'depot_813781/resources/_common/fonts/combined.txt').is_file(),
+                         'owned distance font unavailable')
+    def test_ui_stage_publishes_distance_font_and_all_display_characters(self):
+        from sdf_font import hud_characters
+        font = self.result['sdfFont']
+        required = hud_characters(extracted_content(), self.result['layouts'], self.result['techTreeStrings'])
+        self.assertTrue(set(map(ord, required)) <= set(map(int, font['glyphs'])))
+        self.assertEqual(font['sourceSize'], 64)
+        self.assertEqual(len(font['pages']), 1)
+        self.assertTrue((Path(self.directory.name) / font['pages'][0]).is_file())
+        self.assertIn('fonts/combined.txt', self.result['source']['sha256'])
 
     def test_tech_tree_publication_includes_root_localization_and_native_age_proportions(self):
         trees = self.result['techTrees']

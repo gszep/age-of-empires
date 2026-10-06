@@ -19,6 +19,7 @@ from typing import Any
 
 from PIL import Image
 from import_feedback import extract_feedback
+from sdf_font import extract_sdf_font, hud_characters
 
 WIDGET_KEYS = (
     "Type",
@@ -581,6 +582,7 @@ def extract_ui(
     # not, and the shipped face whose digits measure as the atlas's is the
     # menus' Palatino Linotype under `wpfg/fonts`.
     fonts: dict[str, str] = {}
+    sdf_font = None
     if fonts_dir is not None:
         for name in ui_spec.get("fonts", []):
             source = (fonts_dir / name).resolve()
@@ -591,6 +593,8 @@ def extract_ui(
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(source.read_bytes())
             fonts[source.name] = f"fonts/{source.name}"
+        sdf_font = extract_sdf_font(fonts_dir, hud_characters(content, layouts,
+                                    compact_techtrees(tech_trees)["techTreeStrings"]), out_root, hashes)
 
     # The reference's own UI colours: per player colour, the tint its text
     # and health bars use (`UIColors.json`), which is lighter than the
@@ -621,6 +625,7 @@ def extract_ui(
         "hotkeyProfiles": hotkey_profiles,
         "style": style,
         "fonts": fonts,
+        "sdfFont": sdf_font,
         "colors": colors,
         "colorPalettes": color_palettes,
         "colorTags": color_tags,

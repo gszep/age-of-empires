@@ -7,7 +7,7 @@
 import { materialUrl, iconUrl, ownedIconUrl, type ImportedHotkey, type PlayerColors, type UiAssets } from './assets';
 import { placeCommands } from './command-grid';
 import { widgetBox } from './layout';
-import { installUiColors, placeFeedback } from './feedback';
+import { findWidget, installUiColors, placeFeedback } from './feedback';
 import { animateEmbers, buttonText, placeEndScreen } from './native-feedback';
 import { Minimap } from './minimap';
 import { DiplomacyDialog, type TributeDraft } from './diplomacy';
@@ -17,6 +17,7 @@ import { OptionsDialog } from './options';
 import type { Preferences } from './preferences';
 import { POPULATION_LIMITS } from '../sim/population';
 import { WONDER_YEARS } from '../sim/wonder';
+import { AGE_SDF_TREATMENT, COUNTER_SDF_TREATMENT, SDFLabels, type SDFTreatment, type Tint } from './sdf-text';
 import { WonderPanel } from './wonder';
 import type { GameState, PlayerId, Point, ReadonlyGameState } from '../sim/types';
 
@@ -139,6 +140,9 @@ export class Hud {
   private commandGrid!: HTMLElement;
   private selectionPanel!: HTMLElement;
   private resourceValues: Record<string, HTMLElement> = {};
+  private sdfLabels: SDFLabels;
+  private sdfStyles = new Map<HTMLElement, { size: number; outline: number; color?: Tint;
+    treatment: Readonly<SDFTreatment> }>();
   private messageBox!: HTMLElement;
   private messageTimers = new Map<HTMLElement, number>();
   private defeatTimer?: number;
@@ -171,6 +175,24 @@ export class Hud {
     parent.appendChild(this.root);
     this.installFonts();
     this.build();
+    this.sdfLabels = new SDFLabels(ui?.sdfFont, ui?.base ?? '');
+    for (const [selector, widget, fallback] of [
+      ['[data-value="wood"]', 'WoodStorage', 34], ['[data-value="food"]', 'FoodStorage', 34],
+      ['[data-value="gold"]', 'GoldStorage', 34], ['[data-value="stone"]', 'StoneStorage', 34],
+      ['[data-value="population"]', 'PopulationCount', 34], ['[data-age-text]', 'AgeTextLabel', 44],
+    ] as const) {
+      const states = findWidget(ui?.layouts.resourcepanel?.widgets ?? [], widget)?.StateMaterials;
+      const font = (states?.StateNormal ?? states?.UserState0)?.Font;
+      const color = font?.TextColor;
+      // Widget fonts use both normalized and byte RGBA (even in this panel).
+      const rgbScale = color && Math.max(color.r, color.g, color.b) <= 1 ? 255 : 1;
+      this.sdfStyles.set(this.root.querySelector<HTMLElement>(selector)!,
+        { size: font?.PointSize ?? fallback,
+          // Age outline multiplier is fitted, not a claim about native uniforms.
+          outline: widget === 'AgeTextLabel' ? (font?.TextOutlineWidth ?? 0) * 2 : .025,
+          color: color ? [color.r*rgbScale, color.g*rgbScale, color.b*rgbScale, color.a > 1 ? color.a/255 : color.a] : undefined,
+          treatment: widget === 'AgeTextLabel' ? AGE_SDF_TREATMENT : COUNTER_SDF_TREATMENT });
+    }
     if (!ui) this.root.querySelector('[data-command="techtree"]')!.textContent = 'Tech Tree';
     this.wonders = new WonderPanel(this.root, ui, strings, text => this.showMessage(text), id => this.callbacks.onWonderFocus?.(id));
     installUiColors(this.root, ui, new URLSearchParams(location.search).get('uiPalette') ?? 'default');
@@ -244,6 +266,7 @@ export class Hud {
 
   /** Detach every DOM node and listener this HUD owns (hot reload rebuilds it). */
   destroy(): void {
+    this.sdfLabels.destroy();
     this.options.close();
     this.diplomacy.close();
     this.techtree.close();
@@ -624,6 +647,7 @@ export class Hud {
   private applyScale(): void {
     const scale = Math.max(0.24, Math.min(innerHeight / 2160, innerWidth / REFERENCE_WIDTH));
     this.root.style.setProperty('--ui-scale', String(scale));
+    this.sdfLabels.resize(scale, devicePixelRatio);
   }
 
   configureMapMenu(
@@ -1020,13 +1044,19 @@ export class Hud {
       </div>`).join('');
   }
 
+  private setResourceText(element: HTMLElement, text: string): void {
+    const style = this.sdfStyles.get(element)!;
+    this.sdfLabels.set(element, text, style.size, style.outline, style.color, style.treatment);
+  }
+
   updateResources(state: ReadonlyGameState, player: PlayerId, status?: ResourceStatus): void {
     const p = state.players[player];
-    this.resourceValues.wood.textContent = String(p.wood);
-    this.resourceValues.food.textContent = String(p.food);
-    this.resourceValues.gold.textContent = String(p.gold);
-    this.resourceValues.stone.textContent = String(p.stone);
-    this.resourceValues.population.textContent = `${p.population}/${p.populationCap}`;
+    // A DPR change can occur when moving the window between screens, without resize.
+    this.sdfLabels.resize(Math.max(0.24, Math.min(innerHeight / 2160, innerWidth / REFERENCE_WIDTH)), devicePixelRatio);
+    for (const resource of ['wood', 'food', 'gold', 'stone'] as const) {
+      this.setResourceText(this.resourceValues[resource], String(p[resource]));
+    }
+    this.setResourceText(this.resourceValues.population, `${p.population}/${p.populationCap}`);
     if (!status) return;
     // The reference writes a 0 rather than leaving the corner blank, and
     // under the population icon it writes how many villagers there are.
@@ -1041,7 +1071,7 @@ export class Hud {
     const shield = this.root.querySelector<HTMLElement>('[data-age-shield]');
     if (shield) shield.style.backgroundImage = this.texture(status.ageShield);
     const text = this.root.querySelector<HTMLElement>('[data-age-text]');
-    if (text) text.textContent = status.ageName;
+    if (text) this.setResourceText(text, status.ageName);
     const fill = this.root.querySelector<HTMLElement>('.age-fill');
     if (fill) fill.style.width = `${(Math.max(0, Math.min(1, status.ageProgress)) * 100).toFixed(1)}%`;
   }

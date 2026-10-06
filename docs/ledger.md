@@ -1200,7 +1200,7 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Fogged minimap dim | `REMEMBERED_FACTOR` 0.55 | chosen | `minimap.ts` | — |
 | Minimap flare | 4 s pulsing ring | chosen; `sounds.json` names the cue only | `minimap.ts` `FLARE_MS` | — |
 | Double-click window | 350 ms | chosen | `main.ts` | — |
-| HUD text | Georgia Bold at 0.70 × PointSize, Palatino's lining digits | measured against the SDF atlas (`combined.txt`); the atlas itself is the face | `hud.ts`, CSS | #92 |
+| HUD text | Owned resource values, population and age use the packed RGB distance atlas; other labels and missing-data fallback retain Georgia Bold at 0.70 × PointSize and Palatino digits | Glyph pixels, advances and offsets are **owned**; distance/size/outline limits below. Not a claim of native pixel parity | `sdf-text.ts`, `hud.ts`, `sdf_font.py` | #92 |
 | Font index → face mapping | inferred | inferred | `import_ui.py` | — |
 | Names drop a trailing parenthetical qualifier | rule | chosen; the file's own buildable gate argues for it | `names.ts` | — |
 | Stop / Back / Cancel / pack / unpack / build-page cells | the cells the layout leaves | chosen | `main.ts` | — |
@@ -1219,6 +1219,122 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Shared-match presentation pacing | 100 ms wall-clock input buffer; yield after a 4 ms work batch (or 32 messages); linear position interpolation between adjacent simulated ticks | chosen engineering policy for household play, not read DE networking behaviour; fixed-timestep and lockstep sources in `docs/shared-play.md` | `src/shared/playback.ts`, `src/shared/client.ts`, `main.ts` | #153 |
 | Shared snapshot compression | negotiate permessage-deflate for snapshots ≥1 KiB, no context takeover; ordinary server ticks/settings/errors stay plain | **chosen** transport policy using the existing `ws` implementation and its default compression level, not DE networking behaviour; extension opt-out preserves the same raw JSON protocol | `src/shared/snapshot-compression.ts`, `server.ts` | #174 |
 | Map selection UI | compact native map/seed controls in the existing menu, rather than the full reference catalogue; positive uint32 seeds, blank for a clock-generated seed | chosen project layout/policy after inspecting `screenmapselection.json` and `editorbottommappanel.json`; labels and standard map names imported from strings 9472, 9682, 9691, 10107, 10658, 10875, 10878, 10885; surveyed/proof names are project names | `hud.ts`, `match-setup.ts`, `import_content.py` | #144 |
+
+### #92: first owned distance-font surfaces (2026-10-06)
+
+`fonts/combined.txt` declares 7,697 glyphs at source size64. Its pages are
+**RGB multi-channel** distance fields, not a red-channel grayscale SDF; the
+abandoned PoC's spread6 was not sourced. UI import now derives coverage from the
+published content's localized strings, ages, names/help, all civilization
+profiles, tech-tree text and widget Text, plus printable ASCII for dynamic
+numbers/punctuation/project labels. Missing source characters fail extraction;
+unknown runtime text falls back as a whole label rather than losing characters.
+It packs exact source pixels with two-texel gutters, preserves floating metrics,
+and records source hashes. The private English fixture needs95 glyphs from5
+pages: 14,744,283 source PNG bytes become a512×462 RGB PNG of99,412 bytes plus
+9,775 bytes of font metadata (not six full2048² pages). No owned bytes are tracked.
+
+**Read:** `mdsf_font_ps.so`'s SM2 build, inspected with `sm2dis.py`, bilinearly
+samples RGB, takes `max(min(r,g), min(max(r,g),b))`, sums the absolute difference
+from two offset samples, and smoothsteps around **0.5** for fill. The outer
+threshold is uniform `outlineWidth`; it blends `outlineColor` to `fontColor`,
+then multiplies alpha by outer coverage and font alpha. The vertex shader
+forwards `srcTextureWidth` as both offset components. No spread or emboldening
+constant appears. `mdsf_font_multiple_ps.so` has no Aon9/SM2 chunk; strings name
+the same uniforms plus `filtering`. The installed Windows disassembler was
+blocked by script execution policy; this was not bypassed. Modern multi-page
+shader equivalence is **unverified**.
+
+**Remaining inference:** the CPU path uses one source texel for that uniform's
+offset and source-size scaling at widget PointSize×UI scale. Native uniform
+values/FontIndex mapping are not stated in the inspected widget data. No font
+style/weight/shadow definitions were found in the inspected widgetui JSON or
+the common resource JSON/INI/XML. `combined.txt` has advances but no kerning
+pairs; no extra kerning is invented. The shader's literal0.5 fill cutoff is
+retained as the unfitted renderer default, not claimed to match native HUD
+weight. The initial0.5/peach rendering failed the coordinator's visual review.
+
+**Fitted to native capture (coordinator retry):** build185872,2560×1440,
+Imperial Age, `.local/native-topbar-reference-2560.png`, SHA256
+`aea8a15bcd3298c369eca409035004253326074e0bee01d3a3d59affc8be008d`.
+Widget TextColor is white (mixed0–1/0–255 encoding), now read for SDF labels
+rather than inheriting the old peach CSS approximation. Counters use fill
+threshold0.06 (bias−0.44), forward-difference edge multiplier2.25, black outline
+distance0.025. Age uses threshold0.12 (bias−0.38), edge multiplier1.75, twice
+the widget's0.05 outline distance, plus black alpha-dilated halo radius
+`round(fontSize × DPR × 3/88)` (1physical pixel at this capture scale, padded
+rather than clipped). All of these treatment settings, including that outline
+multiplier/halo, are **fitted**, not discovered native uniforms. Two surface
+classes, no per-string adjustments. Distance cutoff must remain positive;
+an early rejected outline candidate would have drawn opaque glyph-box
+backgrounds. Tests now enforce transparent zero-distance pixels and halo padding.
+
+`tools/sdf_metrics.py --check` compares matching strings at the same2560×1440
+scale. Bright masks use display/sRGB luminance≥180 and RGB spread≤10 to reject
+beige panel art. Glyphs normalize to64px bright height by nearest sampling,
+without added smoothing. Core luminance is measured in that mask; outline
+darkness is the mean in the adjacent1-native-pixel ring. Fixed per-label
+tolerances, selected before the browser sweep: bright occupied fraction±0.05,
+core luminance±10/255, ring luminance±25/255, actual bright height±1px.
+Because native Byzantine art is lighter than our Western panel, a second
+outline control composites the exported RGBA on the native patch's median
+clean top3-row background; its ring must also be within25/255. This exposed
+an otherwise hidden age-outline miss during fitting. After the crop/segmentation
+correction below, the fitted halo's age error is+15.80/255, within the unchanged
+25/255 limit. This is an estimated-background control, not recovery of native
+per-pixel background/alpha.
+
+| Label | Native / ours bright fraction | Native / ours core sRGB luminance | Native / ours ring luminance |
+| --- | --- | --- | --- |
+| 5000 | .4809 / .4533 | 236.65 / 242.39 | 78.48 / 72.33 |
+| 4700 | .4473 / .4151 | 236.89 / 239.51 | 77.74 / 70.18 |
+| 4800 | .4616 / .4742 | 236.29 / 239.34 | 87.94 / 67.96 |
+| 0 | .4988 / .5130 | 238.35 / 234.41 | 88.70 / 68.88 |
+| 4/20 | .4173 / .3886 | 234.14 / 237.75 | 89.30 / 70.58 |
+| Imperial Age | .3015 / .3165 | 245.07 / 243.85 | 44.76 / 59.56 |
+
+All six pass. Maximum absolute errors:3.22percentage points,5.75core levels,
+19.98ring levels; estimated-native-background ring error≤15.81levels. Old
+5000/Imperial Age fractions were.3922/.2251 (old peach white-balanced only for
+segmentation, not for reported luminance). Actual counter glyphs remain14px
+versus native13px; height-normalized weight passing is not exact geometry or
+native shader equivalence. The supplied capture is a newer native build than
+the pinned assets. Other sizes/settings/scripts/surfaces remain uncalibrated.
+
+**Reviewer correction:** the original age crop ended at the descender's bright
+bound and truncated its bottom outline ring. It is now(889,26)–(1034,56), with
+native bright margins(left,top,right,bottom)=(4,3,5,4)px. Every measured crop
+must retain at least the1px dilation radius on all four sides. Expanding the
+crop exposed bright beige trim admitted by the former spread≤30 mask; spread≤10
+rejects that trim consistently for every label. No renderer setting was retuned
+and no acceptance tolerance was widened. Input and result lists require exactly
+the six expected nonempty labels, and strict zip rejects truncation. The unused
+TypeScript descriptor parser and its copied-owned-row tests were removed;
+synthetic renderer tests and the Python parser/import coverage remain.
+
+**Initial private acceptance (before the native weight fit):** `tools/sdf_text_smoke.mts` instantiates the real HUD at
+2000×1125, DPR1/2, from `.local/sdf-ui`, with no live game/service access. Owned
+before/after top-bar crops differ in3,013 display/sRGB pixels, confined to
+(54,21)–(789,42); fallback before/after PNGs are byte-identical. All six canvas
+labels have nonzero coverage, real DOM text (Dark Age present in Chrome's full
+accessibility tree), broken-page/unknown-glyph CSS fallbacks, and DPR-sized
+backing stores. Changing one resource causes one rasterisation;1,000 unchanged
+updates cause zero. Initial cold raster work was7.2ms/10 cache misses; full
+unchanged updateResources averaged0.0121ms, versus0.0111ms with the owned CSS
+face (not an isolated raster cost). These are local measurements, not a native
+reference pixel comparison or a full-game rendering benchmark.
+
+The calibrated rerun retains the same accessibility, missing-data/character,
+DPR and unchanged-label coverage, and adds a matching2560×1440 fixture. Initial
+raster work15.7ms/10misses;1,000unchanged updates still cause zero rasterisations
+and averaged0.0217ms per full updateResources call in that run. Side-by-side
+native/current crops, original-scale and estimated-background controls, and
+machine-readable metrics are under `.local/sdf-browser/native-metrics*`.
+
+Regeneration: the coordinator's normal `npm run import:aoe2` must run its UI
+stage to publish `ui/manifest.json`'s `sdfFont` and `ui/fonts/hud-msdf.png`.
+Existing TTF fallback files remain. No DAT/content schema or sprite/terrain
+decoder/cache change is required; never publish just this private UI fixture.
 
 ## Adding a row
 

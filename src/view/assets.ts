@@ -287,6 +287,7 @@ export interface UiLayoutWidget {
   Anchor?: { xorigin: number; yorigin: number };
   StateMaterials?: Record<string, { Material?: string; Color?: { r: number; g: number; b: number; a: number }; Font?: {
     PointSize: number; Style?: string; TextColor?: { r: number; g: number; b: number; a: number };
+    TextOutlineWidth?: number;
   } }>;
   Box?: { gridstep: number };
   TextBox?: { linesize: number; linespacer: number };
@@ -317,6 +318,8 @@ export interface UiAssets {
   cursors?: Record<string, { image: string; size: [number, number]; hotspot: [number, number] }>;
   /** The reference's faces, copied as they ship: file name -> path under `base`. */
   fonts?: Record<string, string>;
+  /** Losslessly packed RGB distance glyphs; absent in open/older imports. */
+  sdfFont?: import('./sdf-text').SDFFont | null;
   /** `UIColors.json`: per player colour name, the tints its text and bars use. */
   colors?: { PresetColors?: Record<string, number[]>; ColorTables?: Record<string, Record<string, number[]>> };
   colorPalettes?: Record<string, NonNullable<UiAssets['colors']>>;
