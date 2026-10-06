@@ -1,5 +1,27 @@
 # Ledger of approximations
 
+## Caravanserai native evidence, not a shipped adapter (#269)
+
+At base `b43eae1`, Persians are absent from the import profile allow-list and
+Caravanserai is absent from the simulation entity kinds. The issue's earlier
+description of a centre-square/strongest-aura integration is not delivered in
+this tree. No substitute adapter was introduced by this calibration.
+
+**Observed visually on installed DE185872, not pinned48987:** a damaged Persian
+Trade Cart healed1HP/game-second with either of two Caravanserais independently
+and with both together; removing both stopped healing. Movement captures support
+a speed increase near one source and loss farther away, without establishing
+the exact multiplier or square/circle, centre/edge and boundary semantics.
+The same short market route displayed bank0→3→7 with and without a source;
+fractional payout and individual arrivals were not resolved. Native trade
+formula parity is not claimed; existing travel-time income remains approximate.
+
+Pinned/installed DAT hashes differ, while inspected Persian units1754/128/204
+and opening tech223/259 effect records agree. Equal records do not prove equal
+engine behavior. Full provenance, accepted/rejected captures, reproduction and
+unmet checks: [Caravanserai calibration](caravanserai-calibration.md). Speed
+stacking and opening/Regicide lifecycle remain unmeasured; #186/#269 stay open.
+
 ## Public score (#139)
 
 **Owned:** `depot_813781/Docs/en/AoK Manual.pdf`, printed p18 / PDF21,
