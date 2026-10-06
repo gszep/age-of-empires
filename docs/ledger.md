@@ -658,6 +658,14 @@ off the reference; **measured** — fitted to a reference screenshot;
   The explosion particle uses the existing single-feedback renderer rather than
   native simultaneous sinking/explosion/water-splash compositing. Native delay,
   death-reason/friendly-fire exceptions and exact layering remain#252.
+- **Partial current-build observation (2026-10-06):** [native calibration](incendiaries-calibration.md)
+  on185872 (not pinned48987) confirms identical parsed tech910/effect916/unit2624.
+  Delete showed flame/smoke by the next captured game-clock second; a nearby own
+  Fishing Ship remained50/50. Neither proves damaging-payload timing or exclusion
+  without a positive enemy control. Lethal-trigger attempts were inconclusive
+  (moving targets/research ordering); no integration inference above is promoted
+  to calibrated behavior. Enemy/land/building damage, radius, conversion and
+  killed-versus-deleted payload comparison remain open.
 
 ## Audio pack boundary (#57)
 
