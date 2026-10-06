@@ -385,6 +385,12 @@ off the reference; **measured** — fitted to a reference screenshot;
   dorado/snapper. The borrowed Nearctic-temperate dressing uses the spring pair as
   an explicit inference. Native weighted Islands seasons and additional object
   passes remain#274; grown water-mask clumps remain#95/#130 calibration scope.
+- **Native counterexample (current185872, not pinned48987):** the partial
+  [five-map survey](islands-calibration.md) selected Snapper/Dorado approximately
+  28.8/18.7 tiles from land. The adapter's four-box-tile near-land restriction
+  is therefore contradicted, not calibrated. No replacement zone rule was
+  guessed; runtime/tests remain unchanged. Full native fish counts, island
+  allocation, spacing and narrow-pocket/depth-mask measurements remain blocked.
 
 ## Ordinary second attack graphics (#270; native cadence #272)
 
