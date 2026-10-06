@@ -52,13 +52,13 @@ reviews. Do not append old test counts here as if they describe the latest tree.
   (October 5). Full import, `tools/{mongols,celts}_smoke.mts` and the owned
   checkpoint pass; see the [integration receipt](civilization-coverage.md#mongols-and-celts-integration-receipt-october-5).
   `verify:owned` now runs the herding comparisons serially after the parallel
-  stage (#307). Not deployed. Open: #304/#305/#306.
+  stage (#307). Not deployed. Open: #304/#306.
 - Turks (#188) and Vikings (#189) are the ninth and tenth selectable profiles
   (October 5, coordinator-integrated from two escalated worker trees). Full import,
   `tools/{turks,vikings}_smoke.mts` and the owned checkpoint pass; see the
   [integration receipt](civilization-coverage.md#turks-and-vikings-integration-receipt-october-5).
   Not deployed to the household release. #303 was an art-probe race in
-  `tools/civ_browser.mts` (fixed; renderer unchanged). Open: #301/#302 calibration.
+  `tools/civ_browser.mts` (fixed; renderer unchanged).
 - Saracens (#187) are implemented as the eighth selectable
   owned profile. Full import and dedicated private-browser acceptance pass;
   [coverage](civilization-coverage.md#saracens-187) records outcomes;

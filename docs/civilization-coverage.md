@@ -820,5 +820,4 @@ existing herding comparisons (#307) now run alone after the parallel stage
 (`docs/TESTING.md`), with a 6–10% garrison-traversal speedup. The owned
 checkpoint is GREEN: 1656 parallel tests (9 skips), 9 serial herding tests,
 public build, 233 owned-import tests and real-browser smoke in 572 s
-(`.local/verification/1791236984355-317966/`). Open: #304 (livestock), #305
-(Nomads), #306 (aura calibration).
+(`.local/verification/1791236984355-317966/`). Open: #304 (livestock), #306 (aura calibration).
