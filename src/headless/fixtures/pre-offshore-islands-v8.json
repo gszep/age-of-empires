@@ -1,0 +1,53 @@
+{
+  "version": 8,
+  "seed": 95,
+  "rulesOrigin": "fallback",
+  "civilizations": {
+    "1": "open",
+    "2": "open"
+  },
+  "map": "islands",
+  "mode": "random-map",
+  "decideIntervalSeconds": 0.5,
+  "maxTimeSeconds": 10,
+  "commands": [],
+  "checksums": [
+    {
+      "tick": 100,
+      "hash": "7def6270"
+    },
+    {
+      "tick": 200,
+      "hash": "729f623f"
+    }
+  ],
+  "result": {
+    "version": 8,
+    "mode": "random-map",
+    "seed": 95,
+    "timeSeconds": 10,
+    "players": {
+      "1": {
+        "food": 200,
+        "wood": 200,
+        "gold": 100,
+        "stone": 0,
+        "population": 4,
+        "entities": 5,
+        "age": 0,
+        "researched": []
+      },
+      "2": {
+        "food": 200,
+        "wood": 200,
+        "gold": 100,
+        "stone": 0,
+        "population": 4,
+        "entities": 5,
+        "age": 0,
+        "researched": []
+      }
+    },
+    "rejectedCommands": []
+  }
+}

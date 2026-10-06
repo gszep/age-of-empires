@@ -24,11 +24,12 @@ it.each([0, 1] as const)('resumes Arabia generation %s without upgrading legacy 
   expect(checksumState(resumed)).toBe(checksumState(state));
 });
 
-it('resumes a chosen map and seed without adding launch metadata to game/replay state', () => {
-  const state = createGame(2, undefined, undefined, 'islands');
+it.each([0, 2] as const)('resumes Islands generation %s without upgrading saved state or adding setup metadata', version => {
+  const state = createGame(2, undefined, undefined, 'islands', undefined, undefined, undefined, version);
   saveSession(state, { map: 'islands', seed: 2 });
   expect(loadSessionSetup(state.rules)).toEqual({ map: 'islands', seed: 2 });
   const resumed = loadSession(state.rules)!;
+  expect(resumed.mapgenVersion).toBe(version || undefined);
   expect(checksumState(resumed)).toBe(checksumState(state));
   expect(resumed).not.toHaveProperty('setup');
 });

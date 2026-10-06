@@ -349,12 +349,13 @@ export interface MapDescriptor {
    * DE's fish (`GeneratingObjects.inc`, `GNR_STANDARDFISH`, which Islands
    * defines): `MELKARYBA`, the shore fish (69), as many as fit along
    * the shore at a group spacing; and the big fish `FISH_A`/`FISH_B`
-   * (456/458) at counts that scale with the map, each within `nearLand`
-   * tiles of a land zone (`max_distance_to_other_zones`).
+   * (456/458) at counts that scale with the map, keeping `zoneDistance`
+   * tiles clear of other zones (`max_distance_to_other_zones`, owned guide).
+   * Marker-less Islands retain the old, inverted near-land constraint.
    */
   fish?: {
     shore: { tiles?: number; spacing: number };
-    deep: { kind: NodeKind; desertKind?: NodeKind; tiles: number; spacing: number; nearLand: number }[];
+    deep: { kind: NodeKind; desertKind?: NodeKind; tiles: number; spacing: number; zoneDistance: number }[];
   };
   /** The connection between the two clearings, cut through the wood. */
   road?: { width: number };
@@ -541,8 +542,8 @@ export interface MapgenContext {
   rng: { seed: number };
   width: number;
   height: number;
-  /** Absent retains the four-biome adapter. Only new Arabia matches set this. */
-  mapgenVersion?: 1;
+  /** 1 selects Arabia's eleven biomes; 2 corrects Islands fish zone clearance. */
+  mapgenVersion?: 1 | 2;
   /** Tile centre free of the edge and of every footprint already placed.
    * The board has no terrain yet when this is asked, so a water node is the
    * generator's own business: it reads its terrain before asking. */
@@ -1358,13 +1359,17 @@ export function generateMap(
     };
     dealFish('shore-fish', descriptor.fish.shore.tiles ?? Infinity, descriptor.fish.shore.spacing, () => true);
     for (const school of descriptor.fish.deep) {
-      const coast = nearNonWater(terrain, ctx.width, ctx.height, school.nearLand);
+      // The guide defines this as clearance from other zones, not a maximum
+      // distance FROM land. Keep the existing full-square stencil (an adapter,
+      // not calibrated native zone rasterization) and legacy candidate order.
+      const coast = nearNonWater(terrain, ctx.width, ctx.height, school.zoneDistance);
       // F_seasons.inc PH_DESERT uses dorado455 for FISH_A; spring and
       // Mediterranean use salmon456. Borrowed Nearctic dressing uses spring's
       // pair until Islands has its native season roll (ledger).
       const kind = biome?.name === 'PALAEARCTIC_MIDDLE_EAST_DESERT'
         ? school.desertKind ?? school.kind : school.kind;
-      dealFish(kind, Math.round(school.tiles * scale), school.spacing, tile => coast[tile] === 1);
+      dealFish(kind, Math.round(school.tiles * scale), school.spacing,
+        tile => coast[tile] === (ctx.mapgenVersion === 2 ? 0 : 1));
     }
   }
 

@@ -1,6 +1,129 @@
-# Islands: partial native calibration, 2026-10-06
+# Islands: offshore fish correction and partial native calibration, 2026-10-06
 
-## Outcome
+## Runtime correction after the survey
+
+**PASS for the bounded, versioned offshore-placement correction and requested
+checks.** The complete native census and water-mask calibration remain blocked.
+
+The coordinator authorized correcting the demonstrated coastal restriction,
+without further native game work. New Islands matches now carry
+**`mapgenVersion: 2`** and keep deep fish **away from** land rather than requiring
+them to be near it. Arabia retains marker1 and its existing eleven-biome map;
+other maps are unchanged. Record format9 selects the new Islands generation;
+formats1–8 and marker-less saved Islands states retain the old map byte-for-byte.
+Shared admission is9 so older clients must reload; checkpoint format stays5.
+No saved state is regenerated or upgraded on resume. These changes are left
+uncommitted for coordinator integration.
+
+### What the source actually constrains
+
+`tools/depot.py` resolved the owned root. `Islands.rms` defines
+`GNR_STANDARDFISH` and includes `GeneratingObjects.inc`; its normal branch is:
+
+| Constraint | Shore/MELKARYBA | FISH_A | FISH_B |
+| --- | --- | --- | --- |
+| Requested objects | 9999 | 6 | 170 |
+| Scale to map size | No | Yes | Yes |
+| Gaia only | Yes | Yes | Yes |
+| Per-player pass/minimum/maximum player distance | None | None | None |
+| Group spacing | Temporary6 | 4 | 8 |
+| `max_distance_to_other_zones` | Absent | 4 | 4 |
+| `terrain_to_place_on`, forest/cliff exclusion | Absent | Absent | Absent |
+| DAT placement-side terrain | Beach2/35 | None | None |
+
+The **owned TC Random Map Scripting Guide**, command
+`max_distance_to_other_zones`, says it specifies how close objects can be to
+other zones and is useful for keeping them away from shore/enemy ships. Its
+SHA256 is `413b05469c3109ec9f287d80cf105ec9e916e2529f4223c4657c908105a50d5c`.
+This independent source establishes the direction of the constraint, beyond
+what the screenshots alone could prove. The bug was the `nearLand` name and
+`coast[tile] === 1` acceptance in `mapgen.ts`, copied into the reference JSON,
+extractor and coastal tests. The field is now named `zoneDistance`.
+
+Pinned DAT69/455/456/458 all use terrain restriction19, allowing IDs
+1/15/22/23/26/57/58/95/96/97/98/99/114/116/130. The generated Islands sea uses
+1 and23, both permitted. There is **no source justification to require only
+medium/deep terrain23**: shallow water may be valid if the zone clearance holds.
+No invented TC-distance, forest, cliff or deep-water-only filter was added.
+
+This is a **source-backed direction correction within the existing adapter**,
+not exact native zone rasterization. It retains the full-square, four-tile
+near-non-water mask, accepting its complement only for marker2. Samples outside
+the board are ignored by that existing mask. Full-square versus eight compass
+samples, land-zone versus final coast boundaries, native retry/RNG and count
+rounding remain uncalibrated. The fish RNG, shuffled candidates, area/10000
+nearest-integer quotas and per-species square spacing are unchanged. The
+higher deep-fish count is a side effect of more offshore candidates filling the
+existing quota (owned scaled request 6/170; adapter requests 9/245 on 120×120),
+not a native count target; the area/10000 denominator itself is unvalidated
+(the RMS guide scales relative to Large maps). Shore
+fish and preceding terrain/resources are unchanged. Relic positions can change
+in new maps: relics run later, and moving fish footprints away from land changes
+the nav-grid candidate sequence. Their existing50-seed count/distance/path
+contract and fifth-relic transport/deposit acceptance remain intact.
+
+### Before/after distribution: identical generated seeds1–50
+
+Euclidean distances are fish-centre to nearest non-water tile centre. Quantiles
+pool all deep fish, not per-map summaries. Native statistics are **partial,
+unpaired observations**, not an equivalent census; do not compare their censored
+range as though it were a full native distribution.
+
+| Measure | Legacy Islands | Corrected Islands | Native evidence |
+| --- | --- | --- | --- |
+| Deep fish/map | 58–67 | 82–99 | Placement-capacity side effect, not a native count target; complete native count unmeasured |
+| Shore fish/map | 60–72 | 60–72, identical positions | Complete count unmeasured |
+| All deep fish across50 seeds | 3096 | 4456 | Not comparable to marker subset |
+| Land-distance range | 1–5.66 | **5–31.89** | Retained offshore subset7.5–38.6, roughly±2 |
+| Distance p10 / median / p90 | 1 / 2.83 / 5 | **5.39 / 10.82 / 20.62** | Not measured |
+| Per-map maximum distance | 5.10–5.66 | **22.47–31.89** | Subset maxima25.5–38.6 |
+| Fraction farther than10 /20 /30 tiles | 0 /0 /0% | **54.53 /11.65 /0.067%** | Not measured |
+| Deep fish beyond7 box tiles/map | 0 | 51–68 | Retained marker components26–34, not totals |
+| Minimum per-species box spacing | FISH_A≥4, Snapper8 | FISH_A≥4, Snapper8 | Exact metric not calibrated |
+
+The near-coast-only discrepancy is removed. The correction is **not tuned to
+make the maximum equal38**: native rotated/grown islands and our mirrored land
+adapter differ. Native full distance/count distributions and the water-mask
+fit remain open under#95; native seasons/Whale/Gaia Dock remain#274.
+
+### Correction verification
+
+- Focused fish/mapgen/legacy/relic/naval, browser/headless replay initialization,
+  headless replay suites, shared suites and dev-session: **191/191 passed**,
+  20 files,76.83s. Includes the existing50-seed Islands relic constraints and
+  public-command fifth-relic transport/deposit with JSON parity.
+- Eight frozen pre-change whole-state digests at tick0/tick20 remain unchanged.
+  `pre-offshore-islands-v8.json` was generated and independently replayed by
+  untouched `94dc0ff` before editing; both periodic hashes still pass. Its
+  checked-in bytes equal the pre-edit receipt. Relabeling old/new recordings
+  across the v8/v9 boundary fails as intended. Both clients' JSON/rejoin and
+  restart select the appropriate old/current policy.
+- `npx tsc --noEmit -p .`: exit0. Read-only owned fish-reference comparison:
+  1/1 passed. `npx vitest run --maxWorkers=4 > .local/full-vitest.log 2>&1`:
+  **1319 passed,302 skipped**,136 passed/11 skipped files (147 total),
+  **306.26s**, exit0. Skipped/opt-in tests are not claimed as exercised.
+- All50 before/after receipts independently confirm identical shore objects,
+  corrected deep-fish box clearance and per-species spacing; aggregate
+  quantiles/checks are saved in `.local/native/comparison-summary.json`.
+- Initial new-test failures were investigated, not waived: a proposed equality
+  of new/old relic positions ignored nav-grid candidate changes, and equality
+  of all entity fields across record versions ignored pre-v4 score receipts.
+  Their corrected assertions retain relic outcome coverage and normalize only
+  the historical score field. A second run found the native Euclidean offshore
+  threshold incorrectly applied to box distance (seed7: box20, Euclidean26.25);
+  the final test uses Euclidean distance for that comparison and box distance
+  for zone clearance. No existing frozen hash, timeout or source threshold
+  was changed.
+- No further native game actions, import, owned checkpoint, deployment,
+  restart, push or main integration. Runtime/reference/tests are uncommitted.
+  Local receipts: `.local/islands-focused{,-r2,-r3}.log`, `islands-tsc.log`,
+  `islands-source-test.log`, `full-vitest.log`; under `.local/native/`,
+  `generated-{before,after}-50.json`, corresponding summaries,
+  `frozen-islands-digests.txt`, `freeze-islands.mts`, `owned-rms-guide.txt`.
+  Full-run handles are `.local/full-vitest.{pid,started,finished,exit}`;
+  shell PID1810761 and Vitest PID1810783 exited. No correction worker job remains.
+
+## Initial native survey outcome (before the correction)
 
 **BLOCKED for the requested complete five-map fish census and water-mask fit.**
 Five fresh native maps and a 50-seed generator sweep were obtained, with a
@@ -10,15 +133,15 @@ spacing and sub-three-tile channels were **not** fully measured. The partial
 comparison below must not be presented as completion of #95.
 
 Selected native **Snapper and Dorado** in sample N1 are approximately **28.8
-and 18.7 tiles from land**, respectively. Our generator puts every deep fish
+and 18.7 tiles from land**, respectively. The pre-correction generator put every deep fish
 within **four Chebyshev tiles**, at most **5.66 Euclidean tiles**, of non-water.
 Even generous screenshot uncertainty cannot reconcile these observations.
-The current near-land proxy is contradicted on owner-authorized build185872.
+The old near-land proxy was contradicted on owner-authorized build185872.
 
-No runtime, reference-data or test changes were made. The observation rejects
-the existing proxy; it does not establish the exact replacement zone predicate,
-spacing metric, scaling/rounding, phase order or RNG. In particular, merely
-inverting `nearNonWater(..., 4)` would introduce another uncalibrated rule.
+The initial survey made no runtime, reference-data or test changes. Its
+observation alone did not establish the replacement zone predicate. The later
+owned-guide read above establishes clearance direction, while leaving exact
+rasterization, spacing metric, scaling/rounding, phase order and RNG open.
 
 ## Setup and provenance
 
@@ -93,7 +216,7 @@ guessed from a nearby sprite. Nearest flat land/forest pixels give:
 | --- | --- | --- | --- |
 | N1 Snapper | 11.13,11.13 | 28.8 | 26.1 |
 | N1 Dorado | 21.85,18.80 | 18.7 | 18.4 |
-| Generator, all deep fish, seeds1–50 | Full coordinates retained locally | 1–5.66 | 1–4 |
+| Pre-correction generator, all deep fish, seeds1–50 | Full coordinates retained locally | 1–5.66 | 1–4 |
 
 The selected N1 Whale panel is separately retained; it is not counted as a
 fish species. Installed Gaia DAT69/455/456/457/458/459 share minimap colour169
@@ -118,14 +241,14 @@ nearest-land distances in `native-marker-measurements.json`.
 | N3 | 00:06 | 34 | 8.0–38.1 | 4.31 |
 | N4 | 00:06 | 26 | 8.8–29.6 | 4.03 |
 | N5 | 00:05 | 29 | 7.5–25.5 | 4.48 |
-| Generator1–50 | tick0 | **0** beyond seven box tiles | All deep fish1–5.66 | All deep fish2–3.61 |
+| Pre-correction generator1–50 | tick0 | **0** beyond seven box tiles | All deep fish1–5.66 | All deep fish2–3.61 |
 
 Native subset minima are **not global minima**, and species are mixed. They
 cannot settle spacing4 versus8 or square versus circular exclusion. N1's
 selected panels establish Dorado/Snapper; other sample species and exact season
 IDs were not selected/read back. Vegetation appearance is not a season census.
 
-### Exact generator statistics
+### Exact pre-correction generator statistics
 
 Sequential `createGame(seed, undefined, undefined, 'islands')`, seeds1…50,
 against this worktree's source and fallback rules. All boards120×120;6,479
@@ -176,7 +299,7 @@ native fish; per-player-island totals; whole-map minimum spacing; calibrated
 sub-three-tile pocket/channel detection; numerical grown-mask comparison.
 Do not fill these with the source's requested counts or the offshore subset.
 
-## Checks, evidence and bounded handoff
+## Initial survey checks and evidence
 
 - `vitest run src/sim/islands-fish.test.ts src/sim/mapgen.test.ts --maxWorkers=1`:
   **45/45 passed**,2 files,28.37s. No assertions, thresholds or clocks changed.
@@ -211,10 +334,10 @@ leaving Options without changes. No running match, saved scenario, background
 probe or controller remains. PID22012 is the owner's game and was not stopped.
 The unrelated coordinator checkpoint observed at session start was untouched.
 
-The next useful step is a complete native object/terrain coordinate census or
+The remaining calibration needs a complete native object/terrain coordinate census or
 an exhaustive, indexed world survey with species selections, then controlled
 zone-clearance boundary fixtures. Preserve the offshore positive controls.
-Replace the known-false near-land assertion only alongside a source-supported
-rule and new outcome coverage; retain determinism, species, non-fish stability,
-resource-islet shore coverage and spacing checks. Do not silently reinterpret
+The versioned correction above preserves the old near-land assertion for
+legacy maps and adds current clearance/spacing/offshore outcome coverage.
+Do not silently reinterpret
 this partial survey as a successful census or close #95/#274.

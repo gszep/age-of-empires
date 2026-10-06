@@ -390,12 +390,24 @@ comes from untouched1c316d8; see `src/headless/fixtures/README.md` and
 
 - **Owned:** `GeneratingObjects.inc` GNR_STANDARDFISH requests global Gaia shore
   fish (9999, temporary spacing 6), then scaled FISH_A/FISH_B (6/170, spacing 4/8,
-  maximum land-zone distance 4). DAT69/455/456/458 provide shore/dorado/salmon/snapper
+  `max_distance_to_other_zones 4`). The owned TC RMS Guide defines this as
+  keeping objects **away from** other zones/shore, not requiring proximity.
+  These blocks have no player-distance band, terrain override or forest/cliff
+  exclusion. DAT row19 permits both generated sea terrains1/23, not just23.
+  DAT69/455/456/458 provide shore/dorado/salmon/snapper
   food, classes, placement restrictions, original underwater/leap graphics and
   localization. `tools/fish_reference.py` checks the numeric map reference.
 - **Inferred adapter:** global shuffled tile candidates use the existing isolated
   fish RNG, area/10000 scaling with nearest-integer counts, square spacing and the
-  existing near-non-water mask as a proxy for native land-zone distance. Removing
+  existing full-square near-non-water mask as a proxy for native zone clearance.
+  New Islands `mapgenVersion:2` accepts the mask's complement (clear of land
+  within4); exact native zone boundaries/eight-point versus full-square sampling
+  remain uncalibrated. Recordv9 selects it; records1–8 and marker-less saved
+  Islands retain the old inverted near-land predicate and exact old digests.
+  Shared admission9 excludes old peers; checkpoint format5 is unchanged.
+  Moving deep-fish footprints can change the later relic candidate sequence in
+  new maps, while shore fish/earlier terrain and resources remain unchanged.
+  Removing
   compulsory fish mirroring permits the two unpaired resource-islet coasts; it
   does not reproduce native placement order, random draws or distance semantics.
 - **Season boundary:** PH_SPRING/PH_MEDISOUTH supply salmon/snapper and PH_DESERT
@@ -404,10 +416,11 @@ comes from untouched1c316d8; see `src/headless/fixtures/README.md` and
   passes remain#274; grown water-mask clumps remain#95/#130 calibration scope.
 - **Native counterexample (current185872, not pinned48987):** the partial
   [five-map survey](islands-calibration.md) selected Snapper/Dorado approximately
-  28.8/18.7 tiles from land. The adapter's four-box-tile near-land restriction
-  is therefore contradicted, not calibrated. No replacement zone rule was
-  guessed; runtime/tests remain unchanged. Full native fish counts, island
-  allocation, spacing and narrow-pocket/depth-mask measurements remain blocked.
+  28.8/18.7 tiles from land. This contradicted the old four-box-tile near-land
+  restriction. The owned-guide-backed direction correction moves the50-seed
+  generated deep-fish Euclidean range from1–5.66 to5–31.89 tiles; this is not
+  native distribution parity. Full native counts, island allocation, exact
+  spacing and narrow-pocket/depth-mask measurements remain blocked.
 
 ## Ordinary second attack graphics (#270; native cadence #272)
 

@@ -27,8 +27,13 @@ def extract(root: Path | None = None) -> dict:
         if len(candidates) != 1 or 'set_gaia_object_only' not in candidates[0] or 'set_place_for_every_player' in candidates[0]:
             raise ValueError(f'{symbol} global default branch changed')
         block = candidates[0]
+        # These global passes have no player band or terrain/forest/cliff
+        # override. A new directive needs an explicit adapter decision.
+        if any(field in block for field in ('min_distance_to_players', 'max_distance_to_players',
+                                            'terrain_to_place_on', 'avoid_forest_zone', 'min_distance_to_cliff')):
+            raise ValueError(f'{symbol} placement constraints changed')
         deep.append(dict(tiles=number(block, 'number_of_objects'), spacing=number(block, 'min_distance_group_placement'),
-                         nearLand=number(block, 'max_distance_to_other_zones')))
+                         zoneDistance=number(block, 'max_distance_to_other_zones')))
     seasons = (root / 'F_seasons.inc').read_text()
     pairs = {}
     for season in ('PH_SPRING', 'PH_MEDISOUTH', 'PH_DESERT'):

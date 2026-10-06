@@ -108,7 +108,7 @@ export function createGame(
   civilizations: Record<PlayerId, string> = { 1: rules.civilization.key, 2: rules.civilization.key },
   map = 'arabia', mode: GameMode = 'random-map', populationLimit?: number, wonderVictory?: boolean,
   // Replay callers must choose before generating, not delete a marker afterwards.
-  mapgenVersion: 0 | 1 = 1,
+  mapgenVersion: 0 | 1 | 2 = 2,
 ): GameState {
   if (!validWonderVictory(wonderVictory)) throw new Error(`invalid Wonder victory setting ${wonderVictory}`);
   if (!validPopulationLimit(populationLimit)) throw new Error(`invalid population limit ${populationLimit}`);
@@ -136,7 +136,8 @@ export function createGame(
     packingVersion: 1,
     siphonsVersion: 1,
     trebuchetTargetingVersion: 1,
-    ...(map === 'arabia' && mapgenVersion === 1 ? { mapgenVersion: 1 as const } : {}),
+    ...(map === 'arabia' && mapgenVersion >= 1 ? { mapgenVersion: 1 as const }
+      : map === 'islands' && mapgenVersion >= 2 ? { mapgenVersion: 2 as const } : {}),
     ...(wonderVictory ? { wonderVictory: true } : {}),
     ...(populationLimit !== undefined ? { populationLimit } : {}),
     ...(mode === 'regicide' ? { mode } : {}),

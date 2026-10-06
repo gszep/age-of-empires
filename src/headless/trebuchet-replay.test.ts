@@ -27,22 +27,22 @@ it('replays frozen pre-change v7 idle packed acquisition, setup and actual damag
   expect(replayRecord({ ...record, version: MATCH_FORMAT_VERSION }, rules).ok).toBe(false);
 });
 
-it('writes v8 for a v7 launch and replays packed idle without damage', async () => {
-  expect(MATCH_FORMAT_VERSION).toBe(8);
-  for (const version of [1, 2, 3, 4, 5, 6, 7, 8]) expect(validateMatchConfig({ version, seed: 131 })).toBe(true);
-  expect(validateMatchConfig({ version: 9, seed: 131 })).toBe(false);
+it('writes the current format for a v7 launch and replays packed idle without damage', async () => {
+  expect(MATCH_FORMAT_VERSION).toBeGreaterThanOrEqual(8);
+  for (const version of [1, 2, 3, 4, 5, 6, 7, 8, MATCH_FORMAT_VERSION]) expect(validateMatchConfig({ version, seed: 131 })).toBe(true);
+  expect(validateMatchConfig({ version: MATCH_FORMAT_VERSION + 1, seed: 131 })).toBe(false);
   const prior = preTargetingRecord as MatchRecord, rules = trebuchetReplayRules();
   const { record, result } = await runMatch({ version: 7, seed: 131, maxTimeSeconds: 60, decideIntervalSeconds: .05 }, {
     1: { decide: ({ observation: o }) => prior.commands.filter(c => c.tick === Math.round(o.time * 20)).map(c => c.command) },
     2: { decide: () => [] },
   }, rules);
-  expect(record.version).toBe(8); expect(result.version).toBe(8);
+  expect(record.version).toBe(MATCH_FORMAT_VERSION); expect(result.version).toBe(MATCH_FORMAT_VERSION);
   expect(result.rejectedCommands).toEqual([]);
   expect(validateMatchResult(result)).toBe(true);
   const wire = JSON.parse(JSON.stringify(record));
   expect(validateMatchRecord(wire)).toBe(true);
-  expect(validateMatchRecord({ ...wire, version: 9 })).toBe(false);
-  expect(validateMatchResult({ ...result, version: 9 })).toBe(false);
+  expect(validateMatchRecord({ ...wire, version: MATCH_FORMAT_VERSION + 1 })).toBe(false);
+  expect(validateMatchResult({ ...result, version: MATCH_FORMAT_VERSION + 1 })).toBe(false);
   expect(replayRecord(wire, rules, state => {
     expect(state.trebuchetTargetingVersion).toBe(1);
     const treb = state.entities.find(e => e.kind === 'trebuchet');
@@ -55,7 +55,7 @@ it('writes v8 for a v7 launch and replays packed idle without damage', async () 
       .toBe(state.entities.find(e => e.owner === 2 && e.kind === 'town-center')!.maxHp);
   })).toEqual({ ok: true, checked: 12 });
   expect(replayRecord({ ...wire, version: 7 }, rules).ok).toBe(false);
-  expect(replayRecord({ ...wire, version: 9 }, rules).ok).toBe(false);
+  expect(replayRecord({ ...wire, version: MATCH_FORMAT_VERSION + 1 }, rules).ok).toBe(false);
 });
 
 it.each([
