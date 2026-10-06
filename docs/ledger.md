@@ -37,8 +37,9 @@ displayed total is floored once, an inferred integer display policy.
 
 HUD and observation share totals for **both** players regardless of fog; category
 details/private receipts are not exposed to opponents. Observation v10 adds
-`scores` to v9; shared admission v6 rejects older score-unaware simulators whose
-hashes would differ. Match format v4 enables score accounting; v1–v3 replay
+`scores` to v9; shared admission v6 introduced rejection of score-unaware
+simulators whose hashes would differ (retained by v7's additional #305 admission
+boundary). Match format v4 enables score accounting; v1–v3 replay
 strips initial receipts and omits `scoreVersion`, preserving pre-score hashes.
 Checkpoint/snapshot envelopes are unchanged and accept old JSON without
 injecting counters. Old snapshots likewise retain pre-score accounting: their
@@ -1341,26 +1342,42 @@ when the result looks right. When a row is later read from a file, delete it
   Bloodlines 435 is the extra prerequisite of 286/287. Their ×100, −2000,
   multiplier, +2000, ×.01 sequence excludes Bloodlines' additive 20 HP from the
   multiplier; these are HP operations, not costs. There is no Feudal HP bonus.
-- **Inferred / uncalibrated:** existing deterministic float rounding and
-  fixed-point automatic-research ordering remain engine adapters. Imperial
+- **HP branch calibration, current build185872 (not pinned48987):** Imperial
   no-Bloodlines tech 388 uses raw 1.083999991 → imported 1.084, whereas 287 uses
-  1.083330035 → 1.08333. Tests retain 78.048 Light Cavalry and 104.064 Elite
-  Steppe Lancer HP without Bloodlines, rather than silently forcing the nominal
-  30% help-text value. With Bloodlines before Imperial, Light Cavalry reaches
-  97.99976; afterward, 98.048. Native rounding/order calibration is #305
-  (native launch remains #279); no reference parity is claimed by these tests.
+  1.083330035 → 1.08333. Preserve those source multipliers, but round each marked
+  HP command to nearest integer. Light Cavalry without Bloodlines survived77
+  Damage Object damage at1/78 and died at78, rejecting retained78.048. Native
+  Hussar118 and Scout79 with paid Bloodlines before Castle or before Imperial
+  reject rounding only the final117.4997/78.49982 values. Paid Bloodlines after
+  Imperial also gave118/79, from98/59. Installed and pinned DAT branch commands
+  and base HP match exactly. Source effect lists remain in order; only these
+  four calibrated branches carry the integer-write marker. This yields
+  no-Bloodlines Light/Steppe78, Elite Steppe104, and Bloodlines Light98 in every
+  tested order. Other civilisations and fractional combat/current-HP display
+  rules are not generalized. All native readings are **observed visually**;
+  [the calibration](mongols-calibration.md) records controls, rejected setup,
+  arithmetic candidates, captures and remaining capture gaps. Pinned native
+  execution remains #279; current-build measurements do not claim a pinned run.
 - **Drill, owned:** tech 6/effect 457; Imperial Castle research (building 82),
   500 wood/450 gold, 60 seconds; speed ×1.5. Targets include rams, mangonels,
   scorpions and Siege Tower, not trebuchets. Imported definitions of foreign
   siege targets do not grant Mongols permission to train them.
-- **Nomads deferred, #305:** tech 487/effect 542 upgrades houses 70/463/464 to
+- **Nomads, #305 (capture policy inferred):** tech 487/effect 542 upgrades houses 70/463/464 to
   Castle house 191; automatic 641/effect 681 upgrades house variants to Imperial
   house 192. Both use resource storage type 4, amount 5, flag 8; normal houses
   use flag 4. English 28280 says lost houses do not decrease population space.
-  The current living-building housing sum has no persistent storage consumer,
-  and replacement-house rules are absent. Nomads stays explicitly skipped and
-  unresearchable. Implementing it requires completion/destruction/capture and
-  save-state semantics, not relabelling these houses as cavalry archers.
+  The replacement storage is adapted to the existing age-skinned House rule.
+  Completed destruction/delete adds five unclipped support to an optional
+  owner counter; no corpse retention, retroactive lost-house grant or second
+  Imperial grant. Missing legacy counters mean zero. Current-build 185872
+  deletion/rebuilding/cap observations support this behavior (not pinned-build
+  parity). Native capture remains unmeasured: the existing converted-building
+  snapshot carries persistence with the building and credits its current owner
+  on death. This is an **inferred policy, not native-validated**; capture/recapture
+  remains an explicit fidelity gap, not a gate requiring further native work
+  before integration. Native
+  foundation/combat timing also remains unmeasured. See
+  [observations and gaps](mongols-calibration.md).
 - **Audio:** all consumed Mongols cue graphs resolve against both pinned base
   packs. No new #271 exception, substitution or relaxed missing-event guard.
 

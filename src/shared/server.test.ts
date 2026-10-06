@@ -168,6 +168,62 @@ it('rejects v4 simulators while preserving a marker-less v4 checkpoint and its l
   }
 });
 
+it('rejects pre-Mongols v6 peers without discarding or upgrading their compatible v5 checkpoint (#305)', async () => {
+  const { directory, checkpoint } = fixture();
+  const original = createGame(305);
+  const buildingId = original.entities.find(e => e.owner === 1 && e.kind === 'town-center')!.id;
+  expect(applyCommand(original, { kind: 'research', player: 1, buildingId, tech: 'loom' })).toEqual({ ok: true });
+  expect(applyCommand(original, { kind: 'train', player: 1, buildingId, unit: 'villager' })).toEqual({ ok: true });
+  const { rules, ...state } = original;
+  const saved = { version: 5, rulesHash: createHash('sha256').update(JSON.stringify(rules)).digest('hex'), state,
+    settings: { paused: true, speed: 1, generation: 3 }, humanTwo: true, setup: { map: 'arabia', seed: 305 } };
+  const bytes = JSON.stringify(saved);
+  writeFileSync(checkpoint, bytes);
+  expect(SHARED_VERSION).toBeGreaterThan(6);
+  expect(SHARED_CHECKPOINT_VERSION).toBe(5);
+  for (const reopen of [false, true]) {
+    const server = await createServer({ root: directory, configFile: false, logLevel: 'silent',
+      server: { host: '127.0.0.1', port: 0 }, plugins: [sharedMatchPlugin(directory, checkpoint)] });
+    try {
+      await server.listen();
+      expect(readFileSync(checkpoint, 'utf8')).toBe(bytes);
+      const address = server.httpServer!.address();
+      if (!address || typeof address === 'string') throw new Error('Missing HTTP address');
+      const url = `ws://127.0.0.1:${address.port}/__match/socket?player=1`;
+      if (!reopen) {
+        const stale = new WebSocket(url), packets: unknown[] = [];
+        stale.on('message', raw => packets.push(JSON.parse(String(raw))));
+        try {
+          await once(stale, 'open', { signal: AbortSignal.timeout(10_000) });
+          const closed = once(stale, 'close', { signal: AbortSignal.timeout(10_000) });
+          stale.send(JSON.stringify({ type: 'join', version: 6 }));
+          await closed;
+          expect(packets).toEqual([{ type: 'error', reason: 'Match protocol version mismatch' }]);
+        } finally { stale.terminate(); }
+      }
+      const client = new WebSocket(url);
+      try {
+        await once(client, 'open', { signal: AbortSignal.timeout(10_000) });
+        const response = once(client, 'message', { signal: AbortSignal.timeout(10_000) });
+        client.send(JSON.stringify({ type: 'join', version: SHARED_VERSION }));
+        const snapshot = JSON.parse(String((await response)[0]));
+        expect(snapshot.type).toBe('snapshot');
+        expect(snapshot.settings).toEqual(saved.settings);
+        expect(snapshot.setup).toEqual(saved.setup);
+        expect(checksumState(snapshot.state)).toBe(checksumState(original));
+        const expected: GameState = JSON.parse(JSON.stringify(original));
+        const resumed: GameState = snapshot.state;
+        for (let i = 0; i < 600; i++) { stepGame(expected); stepGame(resumed); }
+        expect(resumed.players[1].researched).toContain('loom');
+        expect(resumed.entities.filter(e => e.owner === 1 && e.kind === 'villager')).toHaveLength(4);
+        for (const p of Object.values(resumed.players)) expect(p).not.toHaveProperty('retainedHousing');
+        expect(checksumState(resumed)).toBe(checksumState(expected));
+      } finally { client.close(); await once(client, 'close'); }
+    } finally { await server.close(); }
+    expect(readFileSync(checkpoint, 'utf8')).toBe(bytes);
+  }
+});
+
 function host(checkpoint: string, port = 0) {
   return spawnSync(process.execPath, ['node_modules/tsx/dist/cli.mjs', 'tools/shared-host.mts'], {
     env: { ...process.env, MATCH_CHECKPOINT: checkpoint, MATCH_PORT: String(port) },

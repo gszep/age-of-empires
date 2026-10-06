@@ -1,8 +1,9 @@
 import type { Command, GameState } from '../sim/types';
 import type { MatchSetup } from '../match-setup';
 
-/** v6: authoritative score receipts/counters; older peers hash different state. */
-export const SHARED_VERSION = 6;
+/** v7: Nomads retained housing and per-command Mongol HP rounding; v6 peers
+ * simulate different outcomes even when they receive the same rule metadata. */
+export const SHARED_VERSION = 7;
 /** Persisted format is separate from client admission. The host also reads v4
  * checkpoints without adding the new research-rule marker to their state. */
 export const SHARED_CHECKPOINT_VERSION = 5;

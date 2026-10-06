@@ -32,6 +32,12 @@ export function buildingLimitReached(state: GameState, owner: PlayerId, kind: Bu
 }
 
 /** Apply one number to one attribute, in the way the DAT's command says. */
+/** Shared by rule lookup/new units and research completion on existing units. */
+export function hitPointsAfterEffect(current: number, effect: TechEffect): number {
+  const hp = combine(effect.operation, current, effect.amount);
+  return effect.integerHitPoints ? Math.round(hp) : hp;
+}
+
 export function combine(operation: TechEffect['operation'], current: number, amount: number): number {
   if (operation === 'set') return amount;
   if (operation === 'multiply') return current * amount;
@@ -274,7 +280,9 @@ function applyEffect(rules: UnitRules, effect: TechEffect): void {
     case 'chargeType':
       if (rules.fireCharge) rules.fireCharge = { ...rules.fireCharge, type: combine(effect.operation, rules.fireCharge.type, effect.amount) };
       break;
-    case 'hitPoints': rules.hp = combine(effect.operation, rules.hp, effect.amount); break;
+    case 'hitPoints':
+      rules.hp = hitPointsAfterEffect(rules.hp, effect);
+      break;
     case 'lineOfSight':
       rules.lineOfSight = combine(effect.operation, rules.lineOfSight, effect.amount); break;
     case 'speed': rules.speed = combine(effect.operation, rules.speed, effect.amount); break;
@@ -426,6 +434,7 @@ function applyBuildingEffect(rules: BuildingRules, effect: TechEffect): void {
       if (rules.attack) rules.attack.blastRadius = combine(effect.operation, rules.attack.blastRadius ?? 0, effect.amount);
       break;
     case 'populationSupport': rules.popSupport = combine(effect.operation, rules.popSupport, effect.amount); break;
+    case 'persistentPopulationSupport': rules.persistentPopSupport = combine(effect.operation, rules.persistentPopSupport ?? 0, effect.amount); break;
     case 'garrisonCapacity':
       if (rules.garrison) rules.garrison = { ...rules.garrison, capacity: combine(effect.operation, rules.garrison.capacity, effect.amount) };
       break;

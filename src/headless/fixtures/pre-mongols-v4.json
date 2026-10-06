@@ -1,0 +1,32 @@
+{
+  "version": 4,
+  "seed": 305,
+  "rulesOrigin": "fallback",
+  "civilizations": { "1": "open", "2": "open" },
+  "mode": "random-map",
+  "decideIntervalSeconds": 1,
+  "maxTimeSeconds": 30,
+  "commands": [
+    { "tick": 0, "command": { "kind": "research", "player": 1, "buildingId": 1, "tech": "loom" } },
+    { "tick": 0, "command": { "kind": "train", "player": 1, "buildingId": 1, "unit": "villager" } }
+  ],
+  "checksums": [
+    { "tick": 100, "hash": "1ce5aedf" },
+    { "tick": 200, "hash": "a42fc8f0" },
+    { "tick": 300, "hash": "f5fdb645" },
+    { "tick": 400, "hash": "bec7cad6" },
+    { "tick": 500, "hash": "2a36a1fe" },
+    { "tick": 600, "hash": "ec17c9e7" }
+  ],
+  "result": {
+    "version": 4,
+    "mode": "random-map",
+    "seed": 305,
+    "timeSeconds": 30,
+    "players": {
+      "1": { "food": 150, "wood": 200, "gold": 50, "stone": 0, "population": 5, "entities": 6, "age": 0, "researched": ["loom"] },
+      "2": { "food": 200, "wood": 200, "gold": 100, "stone": 0, "population": 4, "entities": 5, "age": 0, "researched": [] }
+    },
+    "rejectedCommands": []
+  }
+}

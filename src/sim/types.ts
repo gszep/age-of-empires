@@ -229,6 +229,9 @@ export interface PlayerState {
   stone: number;
   population: number;
   populationCap: number;
+  /** Completed flag-8 housing lost after research; absent in legacy saves = 0.
+   * Unclipped storage: the match ceiling applies only to the displayed cap. */
+  retainedHousing?: number;
   /**
    * Whether a villager whose farm goes fallow sows it again on the spot,
    * paying the farm's wood. Off unless the player turns it on at a mill: the

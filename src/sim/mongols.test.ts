@@ -1,13 +1,16 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { rulesFromManifest, TICKS_PER_SECOND } from './data';
-import { activateAutomaticTechnologies, addNode, applyCommand, createGame, stepGame } from './game';
+import { activateAutomaticTechnologies, addNode, applyCommand, buildingFootprint, createGame, placementLegal, stepGame } from './game';
 import { buildingRulesFor, unitRulesFor } from './rules';
 import { observe } from './observe';
 import { isTileVisible, updateVisibility } from './visibility';
 import { synchronizationHash } from '../shared/checksum';
 import { replayRecord, runMatch, type Strategy } from '../headless/runner';
-import type { BuildingKind, Entity, GameState, PlayerId, UnitKind } from './types';
+import { checksumState } from './checksum';
+import { MATCH_FORMAT_VERSION, type MatchConfig, type MatchRecord } from '../protocol/types';
+import { validateMatchRecord } from '../protocol/validate';
+import type { BuildingKind, Command, Entity, GameState, PlayerId, Point, UnitKind } from './types';
 
 const path = process.env.CIV_PROFILE_CONTENT ?? 'public/imported/aoe2/manifest.json';
 const rules = existsSync(path) ? rulesFromManifest(JSON.parse(readFileSync(path, 'utf8'))) : undefined;
@@ -84,6 +87,21 @@ function ageHomes(s: GameState, owner: PlayerId) {
   return s.entities.find(e => e.owner === owner && e.kind === 'town-center')!;
 }
 
+function buildHouse(s: GameState, x: number, y = 55, owner: PlayerId = 1, complete = true) {
+  const worker = unit(s, 'villager', owner, x - 2, y);
+  updateVisibility(s);
+  const first = s.nextId;
+  expect(applyCommand(s, { kind: 'build', player: owner, builderIds: [worker.id], building: 'house', target: { x, y } })).toEqual({ ok: true });
+  const house = s.entities.find(e => e.id >= first && e.kind === 'house')!;
+  expect(house).toBeDefined();
+  if (complete) until(s, () => house.buildProgress === undefined);
+  return house;
+}
+
+function deleteOwned(s: GameState, entity: Entity) {
+  expect(applyCommand(s, { kind: 'delete', player: entity.owner as PlayerId, entityIds: [entity.id] })).toEqual({ ok: true });
+}
+
 describe.skipIf(!rules?.civilizations?.mongols)('owned Mongols gameplay', () => {
   it('hunters extract at the source 1.4 rate and bank more food at the same clock, owner-locally', () => {
     const s = arena(0), workers: Entity[] = [], foragers: Entity[] = [];
@@ -131,7 +149,7 @@ describe.skipIf(!rules?.civilizations?.mongols)('owned Mongols gameplay', () => 
       const factor = index === 0 ? 1 : index === 1 ? 1.2 : 1.2 * 1.084;
       for (const { owner, scout, stable } of sides) {
         if (index > 0) research(s, stable, index === 1 ? 'light-cavalry' : 'hussar');
-        const base = [45, 60, 75][index], hp = base * (owner === 1 ? factor : 1);
+        const base = [45, 60, 75][index], hp = Math.round(base * (owner === 1 ? factor : 1));
         expect(scout.maxHp).toBeCloseTo(hp, 5); expect(scout.maxHp - scout.hp).toBeCloseTo(7, 5);
         expect(train(s, stable, scout.kind as UnitKind).maxHp).toBeCloseTo(hp, 5);
       }
@@ -147,6 +165,9 @@ describe.skipIf(!rules?.civilizations?.mongols)('owned Mongols gameplay', () => 
     const s = arena(1, 'saracens'), tc = ageHomes(s, 1), rivalTc = ageHomes(s, 2);
     const stable = home(s, 'stable'), other = home(s, 'stable', 2, 80, 20);
     const a = train(s, stable, 'scout-cavalry'), b = train(s, other, 'scout-cavalry');
+    // Native editor-preserved Hussar and non-promoted Scout discriminate
+    // per-command rounding from rounding the final117.4997/78.4998 result.
+    const hussar = unit(s, 'dat-unit-441', 1, 40, 80), scout = unit(s, 'scout-cavalry', 1, 45, 80);
     a.hp -= 7;
     let resumed: GameState;
     const bloodlines = () => { resumed = researchPendingJSON(s, stable, 'bloodlines'); research(s, other, 'bloodlines'); };
@@ -158,7 +179,10 @@ describe.skipIf(!rules?.civilizations?.mongols)('owned Mongols gameplay', () => 
     expect(b.maxHp).toBe(60 + (when === 'after-imperial' ? 0 : 20));
     resumed = researchPendingJSON(s, tc, 'imperial-age'); research(s, rivalTc, 'imperial-age');
     if (when === 'after-imperial') bloodlines();
-    const hp = 72 * (when === 'after-imperial' ? 1.084 : 1.08333) + 20;
+    const hp = 98;
+    expect(hussar.maxHp).toBe(118);
+    // The stable Light Cavalry upgrade also promotes this placed Scout.
+    expect(scout.maxHp).toBe(98);
     expect(a.maxHp).toBeCloseTo(hp, 5); expect(a.maxHp - a.hp).toBeCloseTo(7, 5);
     expect(resumed.entities.find(e => e.id === a.id)!.maxHp).toBeCloseTo(hp, 5);
     expect(resumed.players[1].researched).toContain(when === 'after-imperial' ? 'automatic-388' : 'automatic-287');
@@ -175,12 +199,39 @@ describe.skipIf(!rules?.civilizations?.mongols)('owned Mongols gameplay', () => 
     const other = home(s, 'stable', 2, 80, 20);
     expect(applyCommand(s, { kind: 'train', player: 2, buildingId: other.id, unit: 'dat-unit-1370' }).ok).toBe(false);
     research(s, tc, 'imperial-age'); research(s, rivalTc, 'imperial-age');
-    expect(lancer.maxHp).toBeCloseTo(78.048); expect(rival.maxHp).toBe(60);
+    expect(lancer.maxHp).toBe(78); expect(rival.maxHp).toBe(60);
     const bank = { ...s.players[1] }; research(s, stable, 'elite-steppe-lancer');
     expect(bank.food - s.players[1].food).toBe(600); expect(bank.gold - s.players[1].gold).toBe(550);
-    expect(lancer.kind).toBe('dat-unit-1372'); expect(lancer.maxHp).toBeCloseTo(104.064);
+    expect(lancer.kind).toBe('dat-unit-1372'); expect(lancer.maxHp).toBe(104);
     expect(lancer.maxHp - lancer.hp).toBeCloseTo(9);
-    expect(train(s, stable, 'dat-unit-1372').maxHp).toBeCloseTo(104.064);
+    expect(train(s, stable, 'dat-unit-1372').maxHp).toBe(104);
+    continueJSON(s);
+  });
+
+  it('native no-Bloodlines Light Cavalry has no hidden fraction past78: the final public one-damage shot kills', () => {
+    const s = arena(3), target = unit(s, 'light-cavalry', 1, 50, 50);
+    expect(target.maxHp).toBe(78);
+    target.hp -= 77; // Staged Damage Object equivalent; final damage is real combat.
+    target.attackCooldown = 100000;
+    const shooter = unit(s, 'skirmisher', 2, 53, 50);
+    order(s, shooter, target);
+    until(s, () => !!target.dead, 100);
+    expect(target.hp).toBe(0);
+    continueJSON(s);
+  });
+
+  it.each(['before-castle', 'after-castle', 'after-imperial'] as const)('native non-promoted Scout reaches79 with Bloodlines %s, not final-rounded78', when => {
+    const s = arena(1), tc = ageHomes(s, 1), stable = home(s, 'stable');
+    const scout = train(s, stable, 'scout-cavalry');
+    if (when === 'before-castle') research(s, stable, 'bloodlines');
+    research(s, tc, 'castle-age');
+    expect(scout.maxHp).toBe(when === 'before-castle' ? 74 : 54);
+    if (when === 'after-castle') research(s, stable, 'bloodlines');
+    research(s, tc, 'imperial-age');
+    expect(scout.maxHp).toBe(when === 'after-imperial' ? 59 : 79);
+    if (when === 'after-imperial') research(s, stable, 'bloodlines');
+    expect(scout.maxHp).toBe(79);
+    expect(train(s, stable, 'scout-cavalry').maxHp).toBe(79);
     continueJSON(s);
   });
 
@@ -291,10 +342,154 @@ describe.skipIf(!rules?.civilizations?.mongols)('owned Mongols gameplay', () => 
     expect(b.order).toEqual({ kind: 'attack', targetId: near.id });
   });
 
-  it('Nomads fails closed until house storage flag-8 persistence has a consumer', () => {
+  it('Nomads retains prior/future completed Houses, not earlier losses, foundations or rival housing; survives rubble expiry and legacy JSON', () => {
     const s = arena(), castle = home(s, 'castle');
-    expect(applyCommand(s, { kind: 'research', player: 1, buildingId: castle.id, tech: 'nomads' }).ok).toBe(false);
-    expect(s.players[1].researched).not.toContain('automatic-641');
+    const lost = buildHouse(s, 35), prior = buildHouse(s, 45);
+    const initial = s.players[1].populationCap;
+    deleteOwned(s, lost);
+    expect(s.players[1].populationCap).toBe(initial - 5);
+    expect(s.players[1].retainedHousing).toBeUndefined();
+    const bank = { ...s.players[1] };
+    researchPendingJSON(s, castle, 'nomads');
+    expect(bank.wood - s.players[1].wood).toBe(300);
+    expect(bank.gold - s.players[1].gold).toBe(150);
+    expect(s.players[1].populationCap).toBe(initial - 5);
+    // A pre-feature JSON save has neither a counter nor new per-house fields.
+    const legacy: GameState = JSON.parse(JSON.stringify(s));
+    expect(legacy.players[1].retainedHousing).toBeUndefined();
+    deleteOwned(legacy, legacy.entities.find(e => e.id === prior.id)!);
+    expect(legacy.players[1].populationCap).toBe(initial - 5);
+    expect(legacy.players[1].retainedHousing).toBe(5);
+    const fresh = buildHouse(legacy, 55);
+    expect(legacy.players[1].populationCap).toBe(initial);
+    deleteOwned(legacy, fresh);
+    expect(legacy.players[1].populationCap).toBe(initial);
+    const unfinished = buildHouse(legacy, 65, 55, 1, false);
+    deleteOwned(legacy, unfinished);
+    expect(legacy.players[1].retainedHousing).toBe(10);
+    const rival = buildHouse(legacy, 85, 55, 2), rivalCap = legacy.players[2].populationCap;
+    deleteOwned(legacy, rival);
+    expect(legacy.players[2].populationCap).toBe(rivalCap - 5);
+    expect(legacy.players[2].retainedHousing).toBeUndefined();
+    until(legacy, () => !legacy.entities.some(e => e.id === prior.id || e.id === fresh.id), 8000);
+    expect(legacy.players[1].populationCap).toBe(initial);
+    continueJSON(legacy);
+  });
+
+  it('Nomads retains unclipped support at the cap and does not grant it twice across Imperial research', () => {
+    const s = arena(), tc = ageHomes(s, 1), castle = s.entities.find(e => e.owner === 1 && e.kind === 'castle')!;
+    s.populationLimit = 25;
+    const a = buildHouse(s, 35), b = buildHouse(s, 45);
+    expect(s.players[1].populationCap).toBe(25);
+    research(s, castle, 'nomads');
+    deleteOwned(s, a); deleteOwned(s, b);
+    expect(s.players[1].populationCap).toBe(25);
+    expect(s.players[1].retainedHousing).toBe(10);
+    researchPendingJSON(s, tc, 'imperial-age');
+    expect(s.players[1].researched).toContain('automatic-641');
+    expect(s.players[1].retainedHousing).toBe(10);
+    deleteOwned(s, castle);
+    expect(s.players[1].populationCap).toBe(15); // TC 5 + retained Houses 10.
+    const fresh = buildHouse(s, 55);
+    deleteOwned(s, fresh);
+    expect(s.players[1].retainedHousing).toBe(15);
+    // Losing the TC ends this simulator's match on the next tick: complete
+    // all construction first, then expose only the retained population.
+    deleteOwned(s, tc);
+    expect(s.players[1].populationCap).toBe(15);
+    continueJSON(s);
+  });
+
+  it('Nomads destruction through public combat retains support only once and does not reward the attacker', () => {
+    const s = arena(), castle = home(s, 'castle'), house = buildHouse(s, 45);
+    research(s, castle, 'nomads');
+    const cap = s.players[1].populationCap;
+    const ram = unit(s, 'battering-ram', 2, 47, 55);
+    order(s, ram, house);
+    until(s, () => !!house.dead);
+    expect(s.players[1].populationCap).toBe(cap);
+    expect(s.players[1].retainedHousing).toBe(5);
+    expect(s.players[2].retainedHousing).toBeUndefined();
+    expect(applyCommand(s, { kind: 'delete', player: 1, entityIds: [house.id] }).ok).toBe(false);
+    continueJSON(s);
+    expect(s.players[1].retainedHousing).toBe(5);
+  });
+
+  it('records and JSON-replays paid Nomads, house deletion and Bloodlines/age HP branches with matching outcome checksums', async () => {
+    const replayRules = structuredClone(fixtureRules!);
+    // Bounded fixture inputs, shared by planning, the real recorder and replay.
+    // Costs/prerequisites/effects, movement and the generated board are intact.
+    for (const profile of [replayRules, ...Object.values(replayRules.civilizations ?? {})]) {
+      profile.startingResources = { food: 30000, wood: 30000, gold: 30000, stone: 30000 };
+      for (const building of Object.values(profile.buildings)) building.buildSeconds = .1;
+    }
+    const config = { version: MATCH_FORMAT_VERSION, seed: 305, mode: 'regicide' as const,
+      civilizations: { 1: 'mongols', 2: 'britons' }, decideIntervalSeconds: 1 / TICKS_PER_SECOND } satisfies MatchConfig;
+    const planned = createGame(config.seed, replayRules, config.civilizations, 'arabia', config.mode);
+    const commands: MatchRecord['commands'] = [];
+    const issue = (command: Command) => {
+      commands.push({ tick: planned.tick, command: structuredClone(command) });
+      expect(applyCommand(planned, command), JSON.stringify(command)).toEqual({ ok: true });
+    };
+    const tc = planned.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const worker = planned.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    const scout = planned.entities.find(e => e.owner === 1 && e.kind === 'scout-cavalry')!;
+    const castle = planned.entities.find(e => e.owner === 1 && e.kind === 'castle')!;
+    const build = (kind: BuildingKind) => {
+      const half = buildingFootprint(planned, kind, 'x', 1), candidates: Point[] = [];
+      for (let y = Math.floor(tc.position.y) - 16; y <= tc.position.y + 16; y++) {
+        for (let x = Math.floor(tc.position.x) - 16; x <= tc.position.x + 16; x++) {
+          const at = { x: x + half.x % 1, y: y + half.y % 1 };
+          if (isTileVisible(planned, 1, Math.floor(at.x), Math.floor(at.y)) && placementLegal(planned, kind, at, 'x', 1).ok) candidates.push(at);
+        }
+      }
+      candidates.sort((a, b) => Math.hypot(a.x - worker.position.x, a.y - worker.position.y)
+        - Math.hypot(b.x - worker.position.x, b.y - worker.position.y));
+      expect(candidates.length, `visible legal ${kind} plot`).toBeGreaterThan(0);
+      const id = planned.nextId;
+      issue({ kind: 'build', player: 1, builderIds: [worker.id], building: kind, target: candidates[0] });
+      const site = planned.entities.find(e => e.id === id)!;
+      until(planned, () => site.buildProgress === undefined);
+      return site;
+    };
+    const paid = (building: Entity, tech: string) => {
+      issue({ kind: 'research', player: 1, buildingId: building.id, tech });
+      until(planned, () => planned.players[1].researched.includes(tech));
+    };
+    build('mill'); build('lumber-camp'); build('barracks');
+    const house = build('house');
+    paid(tc, 'feudal-age');
+    const stable = build('stable'); build('market');
+    paid(stable, 'bloodlines'); paid(tc, 'castle-age'); paid(castle, 'nomads');
+    const housing = planned.players[1].populationCap;
+    issue({ kind: 'delete', player: 1, entityIds: [house.id] });
+    expect(planned.players[1].retainedHousing).toBe(5);
+    expect(planned.players[1].populationCap).toBe(housing);
+    paid(tc, 'imperial-age');
+    expect(scout.maxHp).toBe(79);
+    const endTick = (Math.ceil(planned.tick / 100) + 1) * 100;
+    until(planned, () => planned.tick === endTick);
+    const script: Strategy = { decide: ({ observation }) => commands
+      .filter(entry => entry.tick === Math.round(observation.time * TICKS_PER_SECOND)).map(entry => structuredClone(entry.command)) };
+    const { record, result } = await runMatch({ ...config, maxTimeSeconds: endTick / TICKS_PER_SECOND },
+      { 1: script, 2: { decide: () => [] } }, replayRules);
+    expect(result.rejectedCommands).toEqual([]);
+    expect(record.commands).toEqual(commands);
+    expect(record.checksums.length).toBeGreaterThan(1);
+    expect(record.checksums.at(-1)).toEqual({ tick: endTick, hash: checksumState(planned) });
+    const wire: MatchRecord = JSON.parse(JSON.stringify(record));
+    expect(validateMatchRecord(wire)).toBe(true);
+    let resumed: GameState | undefined;
+    expect(replayRecord(wire, replayRules, state => { resumed = state; }))
+      .toEqual({ ok: true, checked: record.checksums.length });
+    expect(resumed!.players[1].retainedHousing).toBe(5);
+    expect(resumed!.players[1].populationCap).toBe(housing);
+    expect(resumed!.entities.find(e => e.id === house.id)?.dead).toBe(true);
+    expect(resumed!.entities.find(e => e.id === scout.id)!.maxHp).toBe(79);
+    expect(resumed!.players[1].researched).toEqual(expect.arrayContaining(['nomads', 'bloodlines', 'automatic-286', 'automatic-287', 'automatic-641']));
+    expect(resumed!.players[1].researched).not.toContain('automatic-288');
+    expect(resumed!.players[1].researched).not.toContain('automatic-388');
+    expect(checksumState(resumed!)).toBe(checksumState(planned));
   });
 
   it('enabled mixed opening replays with accepted public commands', async () => {

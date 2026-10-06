@@ -14,7 +14,7 @@ import {
   buildNavGrid, distance, entityGrid, findPath, halfExtent, isBlocked, separateUnits, terrainLayer, tileOf, type NavGrid,
 } from './nav';
 import { random01, seedFrom } from './random';
-import { buildingLimitReached, buildingRulesFor, buildingRulesForEntity, combine, inheritConvertedUnit, playerAttributeFor, populationLimitFor, trainingAt, unitRulesFor, unitRulesForEntity, withRulesCache } from './rules';
+import { buildingLimitReached, buildingRulesFor, buildingRulesForEntity, combine, hitPointsAfterEffect, inheritConvertedUnit, playerAttributeFor, populationLimitFor, trainingAt, unitRulesFor, unitRulesForEntity, withRulesCache } from './rules';
 import { validPopulationLimit } from './population';
 import { completeWonder, updateWonderVictory, validWonderVictory } from './wonder';
 import { entitiesWithGarrison, garrisonCount } from './garrison';
@@ -231,7 +231,7 @@ function recalculatePopulation(state: GameState): void {
   for (const player of [1, 2] as PlayerId[]) {
     const rules = rulesForPlayer(state, player);
     state.players[player].population = population[player];
-    const housing = rules.startingPopulationCap + state.entities
+    const housing = rules.startingPopulationCap + (state.players[player].retainedHousing ?? 0) + state.entities
       .filter(e => !e.dead && e.owner === player && isBuilding(e.kind) && e.buildProgress === undefined)
       .reduce((sum, e) => sum + buildingRulesForEntity(state, e).popSupport, 0);
     state.players[player].populationCap = Math.min(housing, populationLimitFor(state, player));
@@ -1636,6 +1636,13 @@ function kill(state: GameState, entity: Entity, killer: Entity['owner'] = 0): vo
   // Whoever was sheltering inside comes out as it falls, as the reference's
   // do from a razed town center or castle.
   if (entity.dead) return;
+  if (entity.owner !== 0 && isBuilding(entity.kind) && entity.buildProgress === undefined) {
+    const retained = buildingRulesForEntity(state, entity).persistentPopSupport ?? 0;
+    if (retained > 0) {
+      const player = state.players[entity.owner];
+      player.retainedHousing = (player.retainedHousing ?? 0) + retained;
+    }
+  }
   if (state.scoreVersion && killer !== 0 && entity.owner !== 0 && killer !== entity.owner) {
     const player = state.players[killer];
     const value = assetScore(state, entity);
@@ -3288,7 +3295,7 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
     for (const entity of entitiesWithGarrison(state.entities)) {
       if (entity.convertedRules || promotedIds.has(entity.id) || isBuilding(entity.kind)
         || entity.dead || entity.owner !== owner || entity.kind !== effect.unit) continue;
-      const raised = combine(effect.operation, entity.maxHp, effect.amount);
+      const raised = hitPointsAfterEffect(entity.maxHp, effect);
       const gained = raised - entity.maxHp;
       entity.maxHp = raised;
       entity.hp = Math.min(raised, entity.hp + gained);

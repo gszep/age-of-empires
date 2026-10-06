@@ -6,7 +6,9 @@ import { parseStrategyLine } from '../protocol/validate';
 import { validateMatchRecord, explain } from '../protocol/validate';
 import { publicWonderFixture } from '../sim/agent-public.fixture';
 import { describeObservation, observe } from '../sim/observe';
-import type { StrategyInputMessage } from '../protocol/types';
+import type { MatchRecord, StrategyInputMessage } from '../protocol/types';
+import type { GameState } from '../sim/types';
+import preMongolsRecord from './fixtures/pre-mongols-v4.json';
 
 describe('headless matches', () => {
   it('sends effective ceilings and an actually hidden Wonder timer identically on the strategy wire', async () => {
@@ -86,6 +88,20 @@ describe('headless matches', () => {
     const tampered = structuredClone(record);
     tampered.checksums[0].hash = '00000000';
     expect(replayRecord(tampered)).toMatchObject({ ok: false, mismatchTick: tampered.checksums[0].tick });
+  });
+
+  it('replays a frozen pre-Mongols v4 recording without injecting feature state (#305)', () => {
+    // Captured by runMatch against git archive5a7db664e0978d968afa28f9e0e389a3f4301edd,
+    // before #305. These hashes are not regenerated from the candidate runtime.
+    const record: MatchRecord = JSON.parse(JSON.stringify(preMongolsRecord));
+    expect(validateMatchRecord(record), explain(validateMatchRecord)).toBe(true);
+    let last: GameState | undefined;
+    expect(replayRecord(record, undefined, state => { last = state; }))
+      .toEqual({ ok: true, checked: 6 });
+    expect(last!.tick).toBe(600);
+    expect(last!.players[1].researched).toEqual(['loom']);
+    expect(last!.entities.filter(e => e.owner === 1 && e.kind === 'villager')).toHaveLength(4);
+    for (const player of Object.values(last!.players)) expect(player).not.toHaveProperty('retainedHousing');
   });
 
   it('proceeds without late commands in deadline mode', async () => {

@@ -302,6 +302,8 @@ export interface BuildingRules {
   cost: Cost;
   buildSeconds: number;
   popSupport: number;
+  /** Nomads replacement house resource 4/flag 8: retained on completed loss. */
+  persistentPopSupport?: number;
   buildable: boolean;
   /** Before this age, only a replacement may be placed; foundations count. */
   additionalAge?: number;
@@ -670,6 +672,9 @@ export interface TechEffect {
   amount: number;
   /** For `armor` and `attack`, which armour class the amount is against. */
   armorClass?: number;
+  /** Calibrated per-command HP writes (Mongol branches286/288/287/388 only).
+   * Absent for uncalibrated effects and legacy manifests. */
+  integerHitPoints?: boolean;
   trainingIndex?: number;
   trainingBuilding?: BuildingKind;
   technologyId?: number;
@@ -728,7 +733,7 @@ export type PlayerAttribute = 'farmFoodAmount' | 'unitRepairCost' | 'buildingRep
 export type TechAttribute =
   | 'hitPoints' | 'lineOfSight' | 'speed' | 'armor' | 'attack'
   | 'reloadSeconds' | 'accuracyPercent' | 'range' | 'minRange'
-  | 'garrisonHealRate' | 'garrisonCapacity' | 'garrisonMaxProjectiles' | 'totalProjectiles' | 'populationSupport'
+  | 'garrisonHealRate' | 'garrisonCapacity' | 'garrisonMaxProjectiles' | 'totalProjectiles' | 'populationSupport' | 'persistentPopulationSupport'
   | 'maxCharge' | 'chargeType' | 'chargeRangeModifier'
   | 'blastRadius' | 'searchRadius' | 'trainSeconds' | 'trainLocation' | 'researchSeconds' | 'deathExplosion' | 'garrisonFirepower'
   | 'workRate' | 'carryCapacity' | 'cost' | 'foodCost' | 'woodCost' | 'goldCost' | 'stoneCost'

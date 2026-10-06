@@ -3,10 +3,11 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from test_import_aoe2 import extracted_content, _dat, AUDIO_PACK, SOURCES
+from test_import_aoe2 import extracted_content, _dat, AUDIO_PACK, SOURCES, DAT
 from import_audio import consumed_cues, read_audio_packs, resolve_event_id, reviewed_unavailable_cue
 
 
+@unittest.skipUnless(DAT.exists(), 'owned DAT unavailable')
 class MongolsImportTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -32,7 +33,7 @@ class MongolsImportTest(unittest.TestCase):
         # Foreign uniques must be unavailable
         self.assertIn(46, p['civilization']['unavailable']['units'])  # Turks Janissary
         self.assertIn(692, p['civilization']['unavailable']['units'])  # Vikings Berserk
-        self.assertTrue(all(t['name'] == 'Nomads' or 'do not have it' in t['reason'] for t in p['skippedTechnologies']))
+        self.assertTrue(all('do not have it' in t['reason'] for t in p['skippedTechnologies']))
 
     def test_mangudai_and_steppe_lancer_art_is_owned_not_fallback(self):
         p = self.profile
@@ -89,12 +90,15 @@ class MongolsImportTest(unittest.TestCase):
             self.assertEqual(node['requiredTechCount'], len(requires))
             self.assertEqual(node['disabledByTechs'], [counterpart])
             self.assertTrue(all(e['attribute'] == 'hitPoints' for e in node['effects']))
+            self.assertTrue(all(e.get('integerHitPoints') is True for e in node['effects']))
             self.assertEqual([e['unit'] for e in node['effects'] if e['operation'] == 'multiply' and e['amount'] < 2],
                 ['scout-cavalry', 'light-cavalry', 'dat-unit-441', 'dat-unit-1370', 'dat-unit-1372'] * (2 if tid in (286, 287) else 1))
         self.assertEqual(nodes['288']['effects'][0]['amount'], 1.2)
         self.assertEqual(nodes['388']['effects'][0]['amount'], 1.084)
         self.assertEqual([(e['operation'], e['amount']) for e in nodes['287']['effects'] if e['unit'] == 'light-cavalry'],
                          [('multiply', 100), ('add', -2000), ('multiply', 1.08333), ('add', 2000), ('multiply', .01)])
+        self.assertEqual({int(tid) for tid, n in nodes.items()
+                          if any(e.get('integerHitPoints') for e in n['effects'])}, {286, 288, 287, 388})
 
     def test_hunter_work_rate_bonus(self):
         nodes = self.profile['civilizationBonuses']['nodes']
@@ -112,7 +116,7 @@ class MongolsImportTest(unittest.TestCase):
             {'unit': k, 'attribute': a, 'operation': 'add', 'amount': 2}
             for a in ['lineOfSight', 'searchRadius'] for k in ['scout-cavalry', 'light-cavalry', 'dat-unit-441']])
 
-    def test_nomads_is_explicitly_deferred_house_storage_not_cavalry_archers(self):
+    def test_nomads_adapts_replacement_house_storage_not_cavalry_archers(self):
         d = _dat()
         for uid in [70, 463, 464, 465, 191, 192]:
             self.assertEqual(d.civs[12].units[uid].class_, 3)
@@ -121,10 +125,14 @@ class MongolsImportTest(unittest.TestCase):
         self.assertEqual([(c.type, c.a, c.b, c.d) for c in d.effects[542].effect_commands],
                          [(3, 70, 191, 5), (3, 463, 191, 5), (3, 464, 191, 5)])
         self.assertEqual(self.profile['civilizationBonuses']['nodes']['641']['requiredTechs'], [487, 103])
-        self.assertNotIn('nomads', self.profile['technologies'])
-        nomads = [t for t in self.profile['skippedTechnologies'] if t['name'] == 'Nomads']
-        self.assertEqual(len(nomads), 1)
-        self.assertIn('none of its effects reach anything imported', nomads[0]['reason'])
+        nomads = self.profile['technologies']['nomads']
+        self.assertEqual(nomads['cost'], {'wood': 300, 'gold': 150})
+        self.assertEqual(nomads['researchSeconds'], 40)
+        expected = [{'unit': 'house', 'attribute': 'persistentPopulationSupport', 'operation': 'set', 'amount': 5}]
+        self.assertEqual(nomads['effects'], expected)
+        self.assertEqual(self.profile['civilizationBonuses']['nodes']['641']['effects'], expected)
+        self.assertNotIn('upgrades', nomads)
+        self.assertFalse(any(t['name'] == 'Nomads' for t in self.profile['skippedTechnologies']))
 
     def test_every_mongol_audio_graph_resolves_or_is_an_exact_reviewed_source_gap(self):
         banks = read_audio_packs([AUDIO_PACK, AUDIO_PACK.with_name('Base.1.pck')])

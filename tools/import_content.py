@@ -1392,6 +1392,20 @@ def effects_of(
                 effects.append({"spawn": {"unit": spawned, "building": homes[0], "count": int(command.c)}, "operation": "set", "amount": int(command.c)})
                 continue
         if command.type == 3:
+            # Nomads replaces age-skinned houses with storage-flag-8 houses.
+            # Runtime house identity/art already follows age; carry the storage
+            # rule, not a bogus cavalry upgrade or a second population grant.
+            if tech_id in (487, 641):
+                replacement = dat.civs[dat.techs[tech_id].civ].units[int(command.b)]
+                storage = next((s for s in replacement.resource_storages
+                                if s.type == 4 and s.flag == 8 and s.amount > 0), None)
+                if replacement.class_ != 3 or storage is None:
+                    raise ValueError(f"Nomads {tech_id}: unexpected replacement house storage")
+                for key in by_id.get(int(command.a), []):
+                    if entities[key].get("category") == "building" and entities[key].get("class") == 3:
+                        effects.append({"unit": key, "attribute": "persistentPopulationSupport",
+                                        "operation": "set", "amount": rounded(storage.amount)})
+                continue
             before = next((k for k in by_id.get(int(command.a), []) if entities.get(k, {}).get("category") == "projectile"), None)
             after = next((k for k in by_id.get(int(command.b), []) if entities.get(k, {}).get("category") == "projectile"), None)
             if before and after:
@@ -1494,6 +1508,11 @@ def effects_of(
                 effect["amount"] = rounded(low / 100) if operation == "multiply" else low
             else:
                 effect["amount"] = rounded(amount)
+            if tech_id in (286, 288, 287, 388) and attribute == "hitPoints":
+                # Build185872 calibration: keep the fixed-point command chain,
+                # rounding each HP write, not just the final bonus. In particular
+                # Bloodlines Hussar is118, not round(117.4997)=117 (#305).
+                effect["integerHitPoints"] = True
             effects.append(effect)
     return effects, sorted(unmodelled), sorted(unreached)
 
