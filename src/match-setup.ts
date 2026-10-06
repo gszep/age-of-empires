@@ -7,7 +7,7 @@ import { validWonderVictory } from './sim/wonder';
 export interface MatchSetup { map: string; seed: number; mode?: GameMode; populationLimit?: number; wonderVictory?: boolean; civilizations?: { 1: string; 2: string } }
 export const validGameMode = (mode: unknown): mode is GameMode | undefined => mode === undefined || mode === 'random-map' || mode === 'regicide';
 export const validRecordedMode = (version: unknown, mode: unknown): boolean => version === 1 ? mode === undefined
-  : (version === 2 || version === 3 || version === 4) && (mode === 'random-map' || mode === 'regicide');
+  : (version === 2 || version === 3 || version === 4 || version === 5) && (mode === 'random-map' || mode === 'regicide');
 export const MAX_MAP_SEED = 0xffffffff;
 
 export function validMatchSetup(value: unknown): value is MatchSetup {

@@ -1507,6 +1507,27 @@
       }
     },
     {
+      "key": "plant-weeds",
+      "unitId": 1364,
+      "civ": "gaia",
+      "category": "decoration",
+      "animations": { "idle": { "slot": "standing" } }
+    },
+    {
+      "key": "grave",
+      "unitId": 820,
+      "civ": "gaia",
+      "category": "decoration",
+      "animations": { "idle": { "slot": "standing" } }
+    },
+    {
+      "key": "flower-bed",
+      "unitId": 859,
+      "civ": "gaia",
+      "category": "decoration",
+      "animations": { "idle": { "slot": "standing" } }
+    },
+    {
       "key": "plant-bush",
       "unitId": 1360,
       "civ": "gaia",
@@ -2608,6 +2629,23 @@
     },
     "underbrush-leaves": {
       "terrainId": 71
-    }
+    },
+    "jungle": { "terrainId": 17 },
+    "bamboo": { "terrainId": 18 },
+    "forest-oak-bush": { "terrainId": 20 },
+    "snow-forest": { "terrainId": 21 },
+    "savannah": { "terrainId": 41 },
+    "quicksand": { "terrainId": 46 },
+    "rainforest": { "terrainId": 56 },
+    "jungle-grass": { "terrainId": 60 },
+    "dirt-mud": { "terrainId": 76 },
+    "jungle-leaves": { "terrainId": 77 },
+    "rainforest-grass": { "terrainId": 83 },
+    "desert-gravel": { "terrainId": 102 },
+    "forest-snow-autumn": { "terrainId": 105 },
+    "forest-dead": { "terrainId": 106 },
+    "forest-lush-bamboo": { "terrainId": 113 },
+    "grass-flowers": { "terrainId": 122 },
+    "forest-dry-south-american": { "terrainId": 128 }
   }
 }

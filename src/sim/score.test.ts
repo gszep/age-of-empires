@@ -8,6 +8,7 @@ import { checksumState } from './checksum';
 import { synchronizationHash } from '../shared/checksum';
 import { validateObservation } from '../protocol/validate';
 import { replayRecord, runMatch } from '../headless/runner';
+import { MATCH_FORMAT_VERSION } from '../protocol/types';
 import type { BuildingKind, Command, Entity, GameState, PlayerId, UnitKind } from './types';
 
 function fixture() {
@@ -57,11 +58,11 @@ function attack(s: GameState, attacker: Entity, victim: Entity) {
 }
 
 describe('manual-derived public score (#139)', () => {
-  it('preserves actual pre-score v3 hashes through paid training/research, while new v4 records replay score state', async () => {
+  it('preserves actual pre-score v3 hashes through paid training/research, while new records replay score state', async () => {
     const rules = structuredClone(FALLBACK_RULES);
     rules.units.villager.trainSeconds = .1;
     rules.technologies.loom.researchSeconds = .1;
-    const s = createGame(139, rules); useLegacyScore(s);
+    const s = createGame(139, rules, undefined, 'arabia', undefined, undefined, undefined, 0); useLegacyScore(s);
     const commands: Command[] = [
       { kind: 'train', player: 1, buildingId: tc(s).id, unit: 'villager' },
       { kind: 'research', player: 1, buildingId: tc(s).id, tech: 'loom' },
@@ -77,7 +78,7 @@ describe('manual-derived public score (#139)', () => {
     const { record } = await runMatch({ version: 4, seed: 139, maxTimeSeconds: 5 }, {
       1: { decide: ({ observation }) => observation.time === 0 ? commands : [] }, 2: { decide: () => [] },
     }, rules);
-    expect(record.version).toBe(4);
+    expect(record.version).toBe(MATCH_FORMAT_VERSION);
     expect(record.checksums.length).toBeGreaterThan(0);
     let replayed: GameState | undefined;
     const replay = replayRecord(record, rules, state => { replayed = state; });

@@ -47,10 +47,10 @@ describe('example AI public ceilings and deadlines', () => {
     expect(observation.memory).toEqual([]);
     const first = observation.wonderCountdowns![0];
     observation.wonderCountdowns = [
-      { ...first, owner: 2, remainingSeconds: 1 },
-      { ...first, entityId: state.nextId + 2, remainingSeconds: 100 },
-      { ...first, entityId: state.nextId + 1, remainingSeconds: 100 },
-      first,
+      { ...first, owner: 2, remainingSeconds: 1, x: 10, y: 10 },
+      { ...first, entityId: state.nextId + 2, remainingSeconds: 100, x: 20, y: 20 },
+      { ...first, entityId: state.nextId + 1, remainingSeconds: 100, x: 30, y: 30 },
+      { ...first, x: 40, y: 40 },
     ];
     const expected = observation.wonderCountdowns[2];
     expect(enemyWonderDeadline(observation)).toEqual(expected);

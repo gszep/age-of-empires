@@ -24,12 +24,14 @@ export async function runMatch(
   strategies: Record<PlayerId, Strategy>,
   rules: GameRules = FALLBACK_RULES,
 ): Promise<{ result: MatchResult; record: MatchRecord }> {
-  if (![1, 2, 3, MATCH_FORMAT_VERSION].includes(config.version)) throw new Error('unknown match format');
+  if (![1, 2, 3, 4, MATCH_FORMAT_VERSION].includes(config.version)) throw new Error('unknown match format');
   if (config.version === 1 && config.mode !== undefined) throw new Error('game mode requires match format v2');
   if (config.version === 1 && config.populationLimit !== undefined) throw new Error('population limit requires match format v2');
   if (config.version === 1 && config.wonderVictory !== undefined) throw new Error('Wonder victory requires match format v2');
   const maxTime = config.maxTimeSeconds ?? 1800;
   const decideInterval = config.decideIntervalSeconds ?? 0.5;
+  // Config versions describe accepted launch input, not historical simulation:
+  // new runs always write the current recording version (including its map).
   const state = createGame(config.seed, rules, config.civilizations, config.map ?? 'arabia', config.mode, config.populationLimit, config.wonderVictory);
   const rejectedCommands: RejectedCommand[] = [];
   const pendingRejections: Record<PlayerId, RejectedCommand[]> = { 1: [], 2: [] };
@@ -128,7 +130,7 @@ export function replayRecord(
   if (!validWonderVictory(record.wonderVictory) || (record.version === 1 && record.wonderVictory !== undefined)) {
     return { ok: false, checked: 0, expected: 'valid Wonder victory setting', actual: String(record.wonderVictory) };
   }
-  const state = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode, record.populationLimit, record.wonderVictory);
+  const state = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode, record.populationLimit, record.wonderVictory, record.version >= 5 ? 1 : 0);
   if (record.version < 3) delete state.researchQueueVersion;
   if (record.version < 4) useLegacyScore(state);
   const commands = [...record.commands];

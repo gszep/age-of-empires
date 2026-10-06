@@ -107,6 +107,8 @@ export function createGame(
   seed = 42, rules: GameRules = FALLBACK_RULES,
   civilizations: Record<PlayerId, string> = { 1: rules.civilization.key, 2: rules.civilization.key },
   map = 'arabia', mode: GameMode = 'random-map', populationLimit?: number, wonderVictory?: boolean,
+  // Replay callers must choose before generating, not delete a marker afterwards.
+  mapgenVersion: 0 | 1 = 1,
 ): GameState {
   if (!validWonderVictory(wonderVictory)) throw new Error(`invalid Wonder victory setting ${wonderVictory}`);
   if (!validPopulationLimit(populationLimit)) throw new Error(`invalid population limit ${populationLimit}`);
@@ -131,6 +133,7 @@ export function createGame(
   const state: GameState = {
     scoreVersion: 1,
     researchQueueVersion: 1,
+    ...(map === 'arabia' && mapgenVersion === 1 ? { mapgenVersion: 1 as const } : {}),
     ...(wonderVictory ? { wonderVictory: true } : {}),
     ...(populationLimit !== undefined ? { populationLimit } : {}),
     ...(mode === 'regicide' ? { mode } : {}),
@@ -178,6 +181,7 @@ export function createGame(
   const { terrain, elevation, landIds } = generateMap(
     {
       rng: state, width: state.width, height: state.height,
+      mapgenVersion: state.mapgenVersion,
       nodes: rules.nodes,
       beforeObjects: mode === 'regicide' ? layers => {
         Object.assign(state, layers);

@@ -559,10 +559,15 @@ export function restrictionOf(rules: GameRules, entity: Pick<Entity, 'kind' | 'c
  * fallback rows are the DAT's over this set and the shore: a walker (7, 20,
  * 28) and a wall (10) cross the beach, a building (4) and row 1 do not.
  */
+/** Terrain slots added with Arabia mapgenVersion1; also bounds checkpoint compatibility. */
+export const ARABIA_ADDED_TERRAINS = [17, 18, 20, 21, 41, 46, 56, 60, 76, 77, 83, 102, 105, 106, 113, 122, 128];
 const FALLBACK_LAND_TERRAINS = [
   0, 3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 19, 24, 29, 48, 71, 88, 89, 100, 104, 110, 117, 121,
+  ...ARABIA_ADDED_TERRAINS.filter(id => id !== 46),
 ];
 const FALLBACK_SHORE_TERRAINS = [...FALLBACK_LAND_TERRAINS, 2];
+// DAT46 Quicksand: walkers 7/20/28 may cross, buildings 1/4 and walls10 may not.
+const FALLBACK_WALK_TERRAINS = [...FALLBACK_SHORE_TERRAINS, 46];
 /** Shallow and medium water, and the beach between them and the land. */
 const FALLBACK_WATER_TERRAINS = [1, 23, 2];
 
@@ -1463,8 +1468,8 @@ export const FALLBACK_RULES: GameRules = {
   playerAttributes: { spies: 0, tradeVigRate: 0.3, tributeInefficency: 0.3 },
   terrainRestrictions: {
     3: [1, 2, 4, 22, 23, 35, 59], 15: [1, 2, 4, 22, 23, 35, 59], 30: [1, 2, 4, 22, 23, 35, 59],
-    1: FALLBACK_LAND_TERRAINS, 4: FALLBACK_LAND_TERRAINS, 7: FALLBACK_SHORE_TERRAINS,
-    10: FALLBACK_SHORE_TERRAINS, 20: FALLBACK_SHORE_TERRAINS, 28: FALLBACK_SHORE_TERRAINS,
+    1: FALLBACK_LAND_TERRAINS, 4: FALLBACK_LAND_TERRAINS, 7: FALLBACK_WALK_TERRAINS,
+    10: FALLBACK_SHORE_TERRAINS, 20: FALLBACK_WALK_TERRAINS, 28: FALLBACK_WALK_TERRAINS,
     // The water rows: 6 the dock and 13 the fishing ship take the sea and
     // the beach, 19 the fish the sea alone.
     6: FALLBACK_WATER_TERRAINS, 13: FALLBACK_WATER_TERRAINS, 19: [1, 23],

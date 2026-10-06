@@ -119,13 +119,10 @@ const BIOME_PASSES: {
 ];
 
 /**
- * Four of the eleven biomes `Arabia.rms` rolls between, chosen to span its
- * range: the desert everyone pictures, two temperate greens and a
- * Mediterranean. The other seven are a data addition — each is twelve terrain
- * ids out of the same block — and are left out only so the import does not
- * carry textures no board deals; see `docs/backlog.md`.
+ * Frozen four-biome adapter for recordings through v4 and Islands (#274).
+ * Keep its order, fixed blend choices and RNG consumption unchanged.
  */
-export const ARABIA_BIOMES: BiomeSpec[] = [
+export const ARABIA_BIOMES_LEGACY: BiomeSpec[] = [
   {
     name: 'PALAEARCTIC_MIDDLE_EAST_DESERT',
     stragglerForest: 48, stragglerForestVariation: 110,
@@ -155,6 +152,113 @@ export const ARABIA_BIOMES: BiomeSpec[] = [
     forest: 88, forestEdge: 89, forestVariationA: 19, forestVariationB: 104, forestBlend: 0,
   },
 ];
+
+/**
+ * Arabia.rms MAP_CONSTANTS (320–750) and normal THEME_SELECTION (35–50).
+ * The two alternate blends each have a 50% chance. Seasons/snow remain #118.
+ */
+export const ARABIA_BIOMES: (BiomeSpec & {
+  percentChance: number;
+  alternate?: Partial<Pick<BiomeSpec, 'blendA' | 'blendB' | 'blendC'>>;
+})[] = [
+  {
+    name: 'AFROTROPICAL_TROPICAL',
+    percentChance: 9,
+    alternate: { blendB: 3, blendC: 11 },
+    aesthetics: { flat: 'plant-dead', grouped: 'cactus', scatter: 'animal-skeleton' },
+    stragglerForest: 13, stragglerForestVariation: 110,
+    base: 6, blendA: 6, blendB: 46, blendC: 14, blendD: 41,
+    forest: 48, forestEdge: 89, forestVariationA: 48, forestVariationB: 110, forestBlend: 3,
+  },
+  {
+    name: 'AUSTRALASIAN_TEMPERATE',
+    percentChance: 9,
+    aesthetics: { flat: 'plant-shrub', grouped: 'plant-flower', scatter: 'plant-bush' },
+    stragglerForest: 89, stragglerForestVariation: 20,
+    base: 100, blendA: 76, blendB: 3, blendC: 5, blendD: 102,
+    forest: 110, forestEdge: 89, forestVariationA: 10, forestVariationB: 10, forestBlend: 100,
+  },
+  {
+    name: 'INDOMALAYAN_TROPICAL',
+    percentChance: 9,
+    aesthetics: { flat: 'plant-shrub', grouped: 'grave', scatter: 'flower-bed' },
+    stragglerForest: 18, stragglerForestVariation: 113,
+    base: 100, blendA: 60, blendB: 0, blendC: 9, blendD: 83,
+    forest: 113, forestEdge: 89, forestVariationA: 18, forestVariationB: 113, forestBlend: 9,
+  },
+  {
+    name: 'NEARCTIC_TEMPERATE',
+    percentChance: 9,
+    aesthetics: { flat: 'plant-bush', grouped: 'plant-flower', scatter: 'plant-shrub' },
+    stragglerForest: 89, stragglerForestVariation: 110,
+    base: 3, blendA: 0, blendB: 9, blendC: 12, blendD: 3,
+    forest: 19, forestEdge: 89, forestVariationA: 10, forestVariationB: 19, forestBlend: 0,
+  },
+  {
+    name: 'NEOTROPICAL_TEMPERATE',
+    percentChance: 9,
+    aesthetics: { flat: 'plant-weeds', grouped: 'plant-flower', scatter: 'plant-shrub' },
+    stragglerForest: 17, stragglerForestVariation: 89,
+    base: 0, blendA: 60, blendB: 100, blendC: 122, blendD: 5,
+    forest: 128, forestEdge: 89, forestVariationA: 128, forestVariationB: 89, forestBlend: 3,
+  },
+  {
+    name: 'NEOTROPICAL_TROPICAL',
+    percentChance: 9,
+    aesthetics: { flat: 'plant-weeds', grouped: 'plant-flower', scatter: 'plant-shrub' },
+    stragglerForest: 56, stragglerForestVariation: 56,
+    base: 60, blendA: 77, blendB: 100, blendC: 9, blendD: 5,
+    forest: 17, forestEdge: 89, forestVariationA: 56, forestVariationB: 17, forestBlend: 76,
+  },
+  {
+    name: 'PALAEARCTIC_ASIA_TEMPERATE',
+    percentChance: 10,
+    aesthetics: { flat: 'plant-shrub', grouped: 'plant-flower', scatter: 'plant-bush' },
+    stragglerForest: 18, stragglerForestVariation: 113,
+    base: 100, blendA: 76, blendB: 3, blendC: 100, blendD: 76,
+    forest: 104, forestEdge: 89, forestVariationA: 18, forestVariationB: 10, forestBlend: 100,
+  },
+  {
+    name: 'PALAEARCTIC_EUROPE_MEDITERRANEAN',
+    percentChance: 9,
+    aesthetics: { flat: 'plant-flower', grouped: 'stump', scatter: 'plant-flower' },
+    stragglerForest: 19, stragglerForestVariation: 71,
+    base: 9, blendA: 100, blendB: 117, blendC: 121, blendD: 3,
+    forest: 88, forestEdge: 89, forestVariationA: 19, forestVariationB: 104, forestBlend: 0,
+  },
+  {
+    name: 'PALAEARCTIC_EUROPE_TAIGA',
+    percentChance: 9,
+    aesthetics: { flat: 'plant-flower', grouped: 'stump', scatter: 'plant-flower' },
+    stragglerForest: 19, stragglerForestVariation: 21,
+    base: 100, blendA: 12, blendB: 76, blendC: 5, blendD: 0,
+    forest: 106, forestEdge: 89, forestVariationA: 105, forestVariationB: 104, forestBlend: 12,
+  },
+  {
+    name: 'PALAEARCTIC_EUROPE_TEMPERATE',
+    percentChance: 9,
+    aesthetics: { flat: 'plant-flower', grouped: 'stump', scatter: 'plant-flower' },
+    stragglerForest: 19, stragglerForestVariation: 71,
+    base: 12, blendA: 5, blendB: 9, blendC: 12, blendD: 12,
+    forest: 10, forestEdge: 89, forestVariationA: 19, forestVariationB: 104, forestBlend: 12,
+  },
+  {
+    name: 'PALAEARCTIC_MIDDLE_EAST_DESERT',
+    percentChance: 9,
+    alternate: { blendA: 6, blendB: 46 },
+    aesthetics: { flat: 'plant-dead', grouped: 'cactus', scatter: 'animal-skeleton' },
+    stragglerForest: 48, stragglerForestVariation: 110,
+    base: 14, blendA: 11, blendB: 6, blendC: 14, blendD: 14,
+    forest: 13, forestEdge: 13, forestVariationA: 110, forestVariationB: 13, forestBlend: 3,
+  },
+];
+
+/** Consumes only the independent dressing stream, never the object RNG. */
+export function selectArabiaBiome(dressing: { seed: number }): BiomeSpec {
+  let roll = random01(dressing) * 100;
+  const biome = ARABIA_BIOMES.find(b => (roll -= b.percentChance) < 0)!;
+  return biome.alternate && random01(dressing) >= 0.5 ? { ...biome, ...biome.alternate } : biome;
+}
 
 export interface ObjectGroupSpec {
   kind: NodeKind | AnimalKind;
@@ -296,7 +400,7 @@ export interface MapDescriptor {
  */
 export const ARABIA: MapDescriptor = {
   base: 'grass',
-  biomes: ARABIA_BIOMES,
+  biomes: ARABIA_BIOMES_LEGACY,
   // Arabia.rms 265-278, 897-925: non-extreme global elevation roll.
   // Flat editor level is 2 (owned help 30534); our flat baseline is zero.
   hills: [{ ground: 'land', levels: [
@@ -378,7 +482,7 @@ export const BLACK_FOREST: MapDescriptor = {
  */
 export const ISLANDS: MapDescriptor = {
   base: 'water',
-  biomes: ARABIA_BIOMES,
+  biomes: ARABIA_BIOMES_LEGACY,
   land: { percent: 35, baseSize: 15, clearance: 11, clumping: 22, border: 7, fuzziness: 11 },
   resourceIslets: relicReference.islands.islets,
   woodShoreSpacing: 3,
@@ -437,6 +541,8 @@ export interface MapgenContext {
   rng: { seed: number };
   width: number;
   height: number;
+  /** Absent retains the four-biome adapter. Only new Arabia matches set this. */
+  mapgenVersion?: 1;
   /** Tile centre free of the edge and of every footprint already placed.
    * The board has no terrain yet when this is asked, so a water node is the
    * generator's own business: it reads its terrain before asking. */
@@ -736,9 +842,9 @@ export function generateMap(
   // the match seed, so it is still the same dressing every time.
   const dressing = { seed: seedFrom(ctx.rng.seed ^ 0x5ee_d1) };
   const relief = { ...ctx, rng: { seed: seedFrom(ctx.rng.seed ^ 0xe1e_4) } };
-  const biome = descriptor.biomes?.length
-    ? descriptor.biomes[randInt(dressing, descriptor.biomes.length)]
-    : undefined;
+  const biome = descriptor === ARABIA && ctx.mapgenVersion === 1
+    ? selectArabiaBiome(dressing)
+    : descriptor.biomes?.length ? descriptor.biomes[randInt(dressing, descriptor.biomes.length)] : undefined;
   const terrain = new Array<number>(ctx.width * ctx.height).fill(
     descriptor.base === 'water' ? TERRAIN_WATER : biome?.base ?? TERRAIN_GRASS);
   const elevation = new Array<number>(ctx.width * ctx.height).fill(0);

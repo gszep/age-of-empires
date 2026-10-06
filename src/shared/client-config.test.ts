@@ -49,7 +49,7 @@ it.each(['502', 'network', 'malformed', 'missing-fields', 'invalid-player', 'une
   expect(fetch).toHaveBeenCalledTimes(2);
 });
 
-it.each([4, 6, SHARED_VERSION + 1])('rejects incompatible host version %s instead of joining or silently starting solo', async version => {
+it.each([4, 6, 7, SHARED_VERSION + 1])('rejects incompatible host version %s instead of joining or silently starting solo', async version => {
   vi.stubGlobal('location', { search: '' });
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ enabled: true, version, player: 1 })));
   const notice = vi.fn(), resume = vi.fn();

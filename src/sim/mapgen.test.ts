@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { checksumState } from './checksum';
 import { FALLBACK_RULES } from './data';
 import { createGame, stepGame } from './game';
-import { TERRAIN_BEACH, TERRAIN_WATER, TERRAIN_WATER_MEDIUM, beachify, isOpenWater } from './mapgen';
+import { ARABIA_BIOMES, selectArabiaBiome, TERRAIN_BEACH, TERRAIN_WATER, TERRAIN_WATER_MEDIUM, beachify, isOpenWater } from './mapgen';
+import { random01, seedFrom } from './random';
+import { biomeOf } from '../view/scatter';
 import { buildNavGrid, findPath } from './nav';
 import type { Entity, GameState } from './types';
 
@@ -251,6 +253,58 @@ describe('the grown map', () => {
       return checksumState(state);
     };
     expect(play()).toBe(play());
+  });
+
+  it('dresses each biome with only its own terrain ids', () => {
+    // Covers all eleven plus BOTH 50/50 blend branches, not a base-terrain
+    // guess (four biomes share base100). No silent skip or grass exemption.
+    const dealt = new Set<string>();
+    const variants = new Set<string>();
+    for (const seed of [1, 2, 3, 4, 6, 7, 10, 17, 22, 23, 30, 37, 40]) {
+      const state = createGame(seed, FALLBACK_RULES);
+      expect(state.mapgenVersion).toBe(1);
+      const biome = selectArabiaBiome({ seed: seedFrom(state.matchSeed ^ 0x5ee_d1) });
+      dealt.add(biome.name);
+      variants.add(`${biome.name}:${biome.blendA}:${biome.blendB}:${biome.blendC}`);
+      expect(biomeOf(state)).toEqual(biome);
+      const allowed = new Set([
+        1, 2, biome.base, biome.blendA, biome.blendB, biome.blendC, biome.blendD,
+        biome.forest, biome.forestEdge, biome.forestVariationA, biome.forestVariationB,
+        biome.forestBlend, biome.stragglerForest, biome.stragglerForestVariation,
+      ]);
+      for (const id of new Set(state.terrain)) expect(allowed.has(id), `${seed}: ${biome.name} terrain ${id}`).toBe(true);
+      expect(state.terrain).toContain(biome.base);
+      expect(state.entities.filter(e => e.kind === 'relic')).toHaveLength(5);
+    }
+    expect([...dealt].sort()).toEqual(ARABIA_BIOMES.map(b => b.name).sort());
+    expect(variants.size).toBe(13);
+  });
+
+  it('biome selection is deterministic per seed', () => {
+    for (const seed of [1, 7, 17, 23, 30, 37, 40]) {
+      const a = createGame(seed, FALLBACK_RULES);
+      const b = createGame(seed, FALLBACK_RULES);
+      expect(checksumState(a)).toBe(checksumState(b));
+      const restored: GameState = JSON.parse(JSON.stringify(a));
+      for (let i = 0; i < 20; i++) { stepGame(a); stepGame(restored); }
+      expect(checksumState(restored)).toBe(checksumState(a));
+    }
+  });
+
+  it('uses the RMS 9/10-percent weights and both half-probability blend choices', () => {
+    expect(ARABIA_BIOMES.map(b => b.percentChance)).toEqual([9, 9, 9, 9, 9, 9, 10, 9, 9, 9, 9]);
+    const buckets = new Set<number>();
+    for (let seed = 1; seed <= 4096; seed++) {
+      const rng = { seed: seedFrom(seed) }, expectedRng = { ...rng };
+      const bucket = Math.floor(random01(expectedRng) * 100);
+      buckets.add(bucket);
+      let end = 0;
+      const expected = ARABIA_BIOMES.find(b => bucket < (end += b.percentChance))!;
+      const alternate = expected.alternate && random01(expectedRng) >= 0.5;
+      expect(selectArabiaBiome(rng)).toEqual(alternate ? { ...expected, ...expected.alternate } : expected);
+      expect(rng).toEqual(expectedRng);
+    }
+    expect(buckets.size).toBe(100);
   });
 });
 
