@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyCommand, createGame, stepGame } from './game';
+import { applyCommand, createGame, stepGame, useLegacyTrebuchetTargeting } from './game';
 import { inheritConvertedUnit } from './rules';
 import { researchCostFor } from './technologies';
 import { observe } from './observe';
@@ -192,6 +192,7 @@ describe('research queueing (#293)', () => {
     useLegacyScore(legacyState);
     useLegacyPacking(legacyState);
     useLegacySiphons(legacyState);
+    useLegacyTrebuchetTargeting(legacyState);
     delete legacyState.researchQueueVersion;
     // Original semantics: the first research is paid; busy second command is rejected.
     expect(applyCommand(legacyState, record.commands[0].command).ok).toBe(true);

@@ -3,9 +3,10 @@ import type { NodeKind } from '../sim/data';
 
 /** v11 adds public population ceilings and Wonder countdowns; v10 added public scores; v9 added waiting research. */
 export const PROTOCOL_VERSION = 11;
-/** v7 excludes buildings from Siphons charge; v6 calibrates packing work/time; v5 deals all Arabia biomes;
+/** v8 leaves idle trebuchets packed; v7 excludes buildings from Siphons charge;
+ * v6 calibrates packing work/time; v5 deals all Arabia biomes;
  * v4 records score receipts; v3 enables research queues. */
-export const MATCH_FORMAT_VERSION = 7;
+export const MATCH_FORMAT_VERSION = 8;
 
 export interface ObservedEntity {
   id: number;
@@ -105,7 +106,7 @@ export interface RejectedCommand {
 export interface MatchConfig {
   wonderVictory?: boolean;
   populationLimit?: number;
-  version: 1 | 2 | 3 | 4 | 5 | 6 | typeof MATCH_FORMAT_VERSION;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   maxTimeSeconds?: number;
   decideIntervalSeconds?: number;
@@ -137,7 +138,7 @@ export interface PlayerSummary {
 export interface MatchResult {
   mode?: import('../sim/types').GameMode;
   draw?: boolean;
-  version: 1 | 2 | 3 | 4 | 5 | 6 | typeof MATCH_FORMAT_VERSION;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   timeSeconds: number;
   winner?: PlayerId;
@@ -168,7 +169,7 @@ export interface MatchRecord {
   wonderVictory?: boolean;
   populationLimit?: number;
   mode?: import('../sim/types').GameMode;
-  version: 1 | 2 | 3 | 4 | 5 | 6 | typeof MATCH_FORMAT_VERSION;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   rulesOrigin: 'fallback' | 'imported';
   /**

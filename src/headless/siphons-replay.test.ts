@@ -28,16 +28,16 @@ it('replays frozen pre-change v6 charged Fire Galley building attacks', () => {
   expect(replayRecord({ ...record, version: MATCH_FORMAT_VERSION }, rules).ok).toBe(false);
 });
 
-it('writes v7 for a v6 launch and replays building attacks without charge expenditure', async () => {
-  expect(MATCH_FORMAT_VERSION).toBe(7);
-  for (const version of [1, 2, 3, 4, 5, 6, 7]) expect(validateMatchConfig({ version, seed: 242 })).toBe(true);
-  expect(validateMatchConfig({ version: 8, seed: 242 })).toBe(false);
+it('writes the current format for a v6 launch and replays building attacks without charge expenditure', async () => {
+  expect(MATCH_FORMAT_VERSION).toBeGreaterThanOrEqual(7);
+  for (const version of [1, 2, 3, 4, 5, 6, 7, 8]) expect(validateMatchConfig({ version, seed: 242 })).toBe(true);
+  expect(validateMatchConfig({ version: MATCH_FORMAT_VERSION + 1, seed: 242 })).toBe(false);
   const prior = preSiphonsRecord as MatchRecord, rules = siphonsReplayRules();
   const { record, result } = await runMatch({ version: 6, seed: 242, maxTimeSeconds: 20, decideIntervalSeconds: .05 }, {
     1: { decide: ({ observation: o }) => prior.commands.filter(c => c.tick === Math.round(o.time * 20)).map(c => c.command) },
     2: { decide: () => [] },
   }, rules);
-  expect(record.version).toBe(7); expect(result.version).toBe(7);
+  expect(record.version).toBe(MATCH_FORMAT_VERSION); expect(result.version).toBe(MATCH_FORMAT_VERSION);
   expect(result.rejectedCommands).toEqual([]);
   expect(validateMatchResult(result)).toBe(true);
   const wire = JSON.parse(JSON.stringify(record));

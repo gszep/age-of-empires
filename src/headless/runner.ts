@@ -1,9 +1,7 @@
 import { applyCommand, createGame, gameTimeSeconds, stepGame } from '../sim/game';
 import { FALLBACK_RULES, TICK_SECONDS, type GameRules } from '../sim/data';
 import { checksumState } from '../sim/checksum';
-import { useLegacyScore } from '../sim/score';
-import { useLegacyPacking } from '../sim/packing';
-import { useLegacySiphons } from '../sim/fire-charge';
+import { createReplayGame } from '../sim/replay';
 import { MATCH_FORMAT_VERSION } from '../protocol/types';
 import { matchOver } from '../sim/regicide';
 import { validRecordedMode } from '../match-setup';
@@ -26,7 +24,7 @@ export async function runMatch(
   strategies: Record<PlayerId, Strategy>,
   rules: GameRules = FALLBACK_RULES,
 ): Promise<{ result: MatchResult; record: MatchRecord }> {
-  if (![1, 2, 3, 4, 5, 6, MATCH_FORMAT_VERSION].includes(config.version)) throw new Error('unknown match format');
+  if (![1, 2, 3, 4, 5, 6, 7, MATCH_FORMAT_VERSION].includes(config.version)) throw new Error('unknown match format');
   if (config.version === 1 && config.mode !== undefined) throw new Error('game mode requires match format v2');
   if (config.version === 1 && config.populationLimit !== undefined) throw new Error('population limit requires match format v2');
   if (config.version === 1 && config.wonderVictory !== undefined) throw new Error('Wonder victory requires match format v2');
@@ -132,11 +130,7 @@ export function replayRecord(
   if (!validWonderVictory(record.wonderVictory) || (record.version === 1 && record.wonderVictory !== undefined)) {
     return { ok: false, checked: 0, expected: 'valid Wonder victory setting', actual: String(record.wonderVictory) };
   }
-  const state = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode, record.populationLimit, record.wonderVictory, record.version >= 5 ? 1 : 0);
-  if (record.version < 3) delete state.researchQueueVersion;
-  if (record.version < 4) useLegacyScore(state);
-  if (record.version < 6) useLegacyPacking(state);
-  if (record.version < 7) useLegacySiphons(state);
+  const state = createReplayGame(record, rules);
   const commands = [...record.commands];
   const checksums = new Map(record.checksums.map(entry => [entry.tick, entry.hash]));
   const lastTick = record.checksums.at(-1)?.tick ?? 0;

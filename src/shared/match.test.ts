@@ -5,6 +5,7 @@ import { synchronizationHash } from './checksum';
 import type { GameState } from '../sim/types';
 import { completeWonder, WONDER_VICTORY_TICKS } from '../sim/wonder';
 import { siphonsReplayRules } from '../headless/siphons-replay.fixture';
+import { trebuchetReplayRules } from '../headless/trebuchet-replay.fixture';
 
 function follow(host: SharedMatch, ...clients: GameState[]): void {
   const message = JSON.parse(JSON.stringify(host.advance())) as ReturnType<SharedMatch['advance']>;
@@ -18,6 +19,30 @@ function follow(host: SharedMatch, ...clients: GameState[]): void {
 }
 
 describe('one household match', () => {
+  it.each([false, true])('preserves idle trebuchet policy through two-client JSON/rejoin, but restarts current (legacy=%s)', legacy => {
+    const state = createGame(131, trebuchetReplayRules());
+    if (legacy) delete state.trebuchetTargetingVersion;
+    const host = new SharedMatch(JSON.parse(JSON.stringify(state))); host.humanTwo = true;
+    const clients: GameState[] = [1, 2].map(() => JSON.parse(JSON.stringify(host.snapshot())).state);
+    const rejected: string[] = [];
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    host.enqueue(1, { kind: 'train', player: 1, buildingId: tc.id, unit: 'trebuchet' }, reason => rejected.push(reason));
+    for (let i = 0; i < 700; i++) {
+      follow(host, ...clients);
+      if (i === 100) clients[1] = JSON.parse(JSON.stringify(host.snapshot())).state;
+    }
+    expect(rejected).toEqual([]);
+    for (const game of [host.state, ...clients]) {
+      expect(game.trebuchetTargetingVersion).toBe(legacy ? undefined : 1);
+      expect(game.entities.find(e => e.kind === 'trebuchet')!.unpacked === true).toBe(legacy);
+      const target = game.entities.find(e => e.owner === 2 && e.kind === 'town-center')!;
+      expect(target.hp < target.maxHp).toBe(legacy);
+      expect(synchronizationHash(game)).toBe(synchronizationHash(host.state));
+    }
+    host.restart(131, 'arabia');
+    expect(host.state.trebuchetTargetingVersion).toBe(1);
+  });
+
   it.each([false, true])('preserves the Siphons snapshot policy on both clients and uses current rules after restart (legacy=%s)', legacy => {
     const state = createGame(242, siphonsReplayRules());
     if (legacy) delete state.siphonsVersion;

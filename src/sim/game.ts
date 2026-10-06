@@ -135,6 +135,7 @@ export function createGame(
     researchQueueVersion: 1,
     packingVersion: 1,
     siphonsVersion: 1,
+    trebuchetTargetingVersion: 1,
     ...(map === 'arabia' && mapgenVersion === 1 ? { mapgenVersion: 1 as const } : {}),
     ...(wonderVictory ? { wonderVictory: true } : {}),
     ...(populationLimit !== undefined ? { populationLimit } : {}),
@@ -2917,6 +2918,11 @@ function automaticBlastRisk(state: GameState, entity: Entity, target: Entity, ru
     && points.some(at => distance(other.position, at) - other.radius <= rules.blastRadius!));
 }
 
+/** Replay initialization only. Marker-less snapshots already select this policy. */
+export function useLegacyTrebuchetTargeting(state: GameState): void {
+  delete state.trebuchetTargetingVersion;
+}
+
 /** Idle military units acquire the nearest living enemy in line of sight. */
 function autoAcquire(state: GameState, entity: Entity): void {
   if (entity.order.kind !== 'idle' || !isUnit(entity.kind) || entity.kind === 'villager'
@@ -2929,7 +2935,11 @@ function autoAcquire(state: GameState, entity: Entity): void {
 function acquireAutomaticTarget(state: GameState, entity: Entity): void {
   const rules = unitRulesForEntity(state, entity);
   if (!(rules.unpacked?.attacks ?? rules.attacks).some(attack => attack.amount > 0)) return;
-  if (rules.unpacked && !entity.unpacked && entity.autoUnpackSuppressed) return;
+  // Native build185872: idle packed engines do not deploy even for a visible
+  // in-range building. Public attack orders still approach and unpack normally.
+  // Pre-v8 recordings/marker-less snapshots retain suppression-aware deployment.
+  if (rules.unpacked && !entity.unpacked
+    && (state.trebuchetTargetingVersion === 1 || entity.autoUnpackSuppressed)) return;
   const los = Math.min(rules.lineOfSight, rules.searchRadius ?? rules.lineOfSight);
   let best: Entity | undefined;
   let bestDistance = Infinity;

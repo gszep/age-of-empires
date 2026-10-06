@@ -72,10 +72,21 @@ it.each([
 });
 
 describe.each(cases)('$mode trebuchet automation', ({ rules }) => {
-  it('automatically deploys for a visible building and really damages it without moving', () => {
+  it('stays packed beside a visible building after Stop, but an explicit attack deploys and damages it', () => {
     const { state, treb, target } = arena(rules), origin = { ...treb.position };
-    until(state, () => treb.packingTicks !== undefined);
-    expect(treb.order).toEqual({ kind: 'attack', targetId: target.id, automatic: true });
+    expect(applyCommand(state, { kind: 'stop', player: 1, entityIds: [treb.id] }).ok).toBe(true);
+    run(state, 60 * TICKS_PER_SECOND);
+    expect(treb.order.kind).toBe('idle'); expect(treb.unpacked).toBeFalsy();
+    expect(treb.packingTicks).toBeUndefined(); expect(state.projectiles).toHaveLength(0);
+    expect(target.hp).toBe(target.maxHp); expect(treb.position).toEqual(origin);
+    order(state, treb, target);
+    until(state, () => target.hp < target.maxHp);
+    expect(treb.unpacked).toBe(true); expect(treb.position).toEqual(origin);
+  });
+
+  it('automatically damages a visible building without moving after public Unpack', () => {
+    const { state, treb, target } = arena(rules), origin = { ...treb.position };
+    expect(applyCommand(state, { kind: 'pack', player: 1, entityIds: [treb.id], unpacked: true }).ok).toBe(true);
     const ticks = Math.round(unitRulesForEntity(state, treb).unpacked!.seconds * TICKS_PER_SECOND);
     expect(treb.packingTicks).toBe(ticks);
     run(state, ticks - 1);
@@ -83,28 +94,35 @@ describe.each(cases)('$mode trebuchet automation', ({ rules }) => {
     expect(state.projectiles).toHaveLength(0);
     stepGame(state); expect(treb.unpacked).toBe(true);
     until(state, () => target.hp < target.maxHp);
+    expect(treb.order).toEqual({ kind: 'attack', targetId: target.id, automatic: true });
     expect(treb.position).toEqual(origin);
   });
 
-  it.each(['too-close', 'too-far', 'unit', 'friendly', 'dead'] as const)('does not automatically deploy for %s targets', reason => {
+  it.each(['too-close', 'too-far', 'unit', 'friendly', 'dead'] as const)('does not automatically attack %s targets after Unpack', reason => {
     const { state, treb, target, put } = arena(rules);
     if (reason === 'too-close') target.position.x = treb.position.x + 3;
     if (reason === 'too-far') target.position.x = treb.position.x + 25;
     if (reason === 'unit') { target.dead = true; put('villager', 52, 40, 2); }
     if (reason === 'friendly') target.owner = 1;
     if (reason === 'dead') target.dead = true;
+    expect(applyCommand(state, { kind: 'pack', player: 1, entityIds: [treb.id], unpacked: true }).ok).toBe(true);
+    until(state, () => !!treb.unpacked);
     updateVisibility(state); run(state, 160);
     expect(treb.order.kind).toBe('idle'); expect(treb.packingTicks).toBeUndefined();
-    expect(treb.unpacked).toBeFalsy(); expect(state.projectiles).toHaveLength(0);
+    expect(treb.unpacked).toBe(true); expect(state.projectiles).toHaveLength(0);
   });
 
   it('uses actual sight for acquisition and preserves an explicit move past a building', () => {
     const { state, treb, target } = arena(rules);
-    state.tick = 9; state.visibility[1].visible.fill(0);
+    target.owner = 1;
+    expect(applyCommand(state, { kind: 'pack', player: 1, entityIds: [treb.id], unpacked: true }).ok).toBe(true);
+    until(state, () => !!treb.unpacked);
+    target.owner = 2;
+    state.tick = Math.ceil(state.tick / 10) * 10 - 1; state.visibility[1].visible.fill(0);
     stepGame(state);
     expect(treb.order.kind).toBe('idle');
     order(state, treb, { x: 40.5, y: 30.5 });
-    run(state, 100);
+    until(state, () => treb.position.y < 40);
     expect(treb.position.y).toBeLessThan(40);
     expect(treb.packingTicks).toBeUndefined(); expect(treb.unpacked).toBeFalsy();
     expect(target.hp).toBe(target.maxHp);
@@ -133,6 +151,7 @@ describe.each(cases)('$mode trebuchet automation', ({ rules }) => {
 
   it('honours manual Pack, cancels setup on move, and does not restart a pack on repeated moves', () => {
     const { state, treb, target } = arena(rules);
+    order(state, treb, target);
     until(state, () => treb.packingTicks !== undefined);
     order(state, treb, { x: 40.5, y: 30.5 });
     expect(treb.packingTicks).toBeUndefined(); run(state, 20);
@@ -151,6 +170,7 @@ describe.each(cases)('$mode trebuchet automation', ({ rules }) => {
 
   it('finishes a saved setup deterministically and reacquires after its target is destroyed', () => {
     const { state, treb, target, put } = arena(rules);
+    order(state, treb, target);
     until(state, () => treb.packingTicks !== undefined);
     run(state, 20);
     const resumed: GameState = JSON.parse(JSON.stringify(state));
@@ -167,13 +187,28 @@ describe.each(cases)('$mode trebuchet automation', ({ rules }) => {
     until(state, () => next.hp < next.maxHp);
     expect(treb.order).toMatchObject({ kind: 'attack', targetId: next.id, automatic: true });
   });
+
+  it('chooses a building over a nearer unit and remains deployed after destroying it', () => {
+    const { state, treb, target, put } = arena(rules), origin = { ...treb.position };
+    const unit = put('villager', 49.5, 40.5, 2);
+    expect(applyCommand(state, { kind: 'pack', player: 1, entityIds: [treb.id], unpacked: true }).ok).toBe(true);
+    until(state, () => target.hp < target.maxHp);
+    expect(treb.order).toMatchObject({ kind: 'attack', targetId: target.id, automatic: true });
+    expect(unit.hp).toBe(unit.maxHp);
+    until(state, () => !!target.dead);
+    run(state, 120 * TICKS_PER_SECOND);
+    expect(treb.order.kind).toBe('idle'); expect(treb.unpacked).toBe(true);
+    expect(treb.packingTicks).toBeUndefined(); expect(treb.position).toEqual(origin);
+    expect(unit.hp).toBe(unit.maxHp);
+  });
 });
 
-it.skipIf(manifest === undefined)('automatic deployment uses Japanese Kataparuto setup time', () => {
-  const { state, treb } = arena(rulesFromManifest(manifest.civilizations.japanese));
+it.skipIf(manifest === undefined)('ordered deployment uses Japanese Kataparuto setup time', () => {
+  const { state, treb, target } = arena(rulesFromManifest(manifest.civilizations.japanese));
   state.players[1].researched.push('kataparuto');
   const setup = unitRulesForEntity(state, treb).unpacked!.seconds;
   expect(setup).toBeCloseTo(50 / 18);
+  order(state, treb, target);
   until(state, () => treb.packingTicks !== undefined);
   expect(treb.packingTicks).toBe(Math.round(setup * TICKS_PER_SECOND));
   run(state, Math.round(setup * TICKS_PER_SECOND));
