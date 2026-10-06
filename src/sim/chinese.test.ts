@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { rulesFromManifest, TICKS_PER_SECOND } from './data';
+import { FALLBACK_RULES, rulesFromManifest, TICKS_PER_SECOND } from './data';
 import { activateAutomaticTechnologies, applyCommand, createGame, farmFoodAmountFor, stepGame } from './game';
 import { buildingRulesFor, unitRulesFor } from './rules';
 import { researchCostFor } from './technologies';
@@ -58,7 +58,43 @@ function remove(s: GameState, e: Entity) {
   expect(applyCommand(s, { kind: 'delete', player: e.owner as PlayerId, entityIds: [e.id] }).ok).toBe(true);
 }
 
+describe('Chinese native research-price arithmetic (#260)', () => {
+  it.each([
+    [0.95, 100, 50, 95, 47],
+    [0.9, 200, 100, 180, 90],
+    [0.85, 300, 150, 255, 127],
+  ])('pays and refunds the measured price at factor %s', (factor, food, gold, paidFood, paidGold) => {
+    // Public arithmetic fixture: put the native smith prices on an available
+    // TC technology. The owned cases below exercise the actual technologies.
+    const fixture = structuredClone(FALLBACK_RULES);
+    fixture.playerAttributes = { ...fixture.playerAttributes, researchCostMod: factor };
+    fixture.technologies.loom.cost = { food, wood: 0, gold, stone: 0 };
+    const s = createGame(260, fixture), tc = s.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    Object.assign(s.players[1], { food: paidFood, gold: paidGold });
+    expect(observe(s, 1).researchCosts?.loom).toMatchObject({ food: paidFood, gold: paidGold });
+    expect(applyCommand(s, { kind: 'research', player: 1, buildingId: tc.id, tech: 'loom' })).toEqual({ ok: true });
+    expect(s.players[1]).toMatchObject({ food: 0, gold: 0 });
+    const saved = JSON.parse(JSON.stringify(s));
+    expect(applyCommand(saved, { kind: 'cancel-research', player: 1, buildingId: tc.id }).ok).toBe(true);
+    expect(saved.players[1]).toMatchObject({ food: paidFood, gold: paidGold });
+  });
+});
+
 describe.skipIf(!rules?.civilizations?.chinese)('owned Chinese gameplay', () => {
+  it.each([
+    [1, 'fletching', 95, 47],
+    [2, 'bodkin-arrow', 180, 90],
+    [3, 'plate-mail-armor', 255, 127],
+  ] as const)('matches native age%s %s payment', (age, tech, food, gold) => {
+    const s = arena(age), smith = home(s, 'blacksmith');
+    for (const prerequisite of s.rules.civilizations!.chinese.technologies[tech].requires ?? []) {
+      if (!s.players[1].researched.includes(prerequisite)) s.players[1].researched.push(prerequisite);
+    }
+    Object.assign(s.players[1], { food, gold });
+    expect(observe(s, 1).researchCosts?.[tech]).toMatchObject({ food, gold });
+    research(s, smith, tech);
+    expect(s.players[1]).toMatchObject({ food: 0, gold: 0 });
+  });
   it.each(['arabia', 'islands', 'black-forest'])('%s starts with six villagers, reduced resources and fifteen TC housing exactly once', map => {
     const s = createGame(184, rules!, { 1: 'chinese', 2: 'britons' }, map);
     expect(s.entities.filter(e => e.owner === 1 && e.kind === 'villager')).toHaveLength(6);
@@ -82,7 +118,7 @@ describe.skipIf(!rules?.civilizations?.chinese)('owned Chinese gameplay', () => 
 
   it.each([0, 1, 2, 3])('age%s pays the current source research discount and exposes the same price to agents', age => {
     const s = arena(age), tc = s.entities.find(e => e.owner === 1)!;
-    const expected = [50, 48, 45, 43][age], gold = s.players[1].gold;
+    const expected = [50, 47, 45, 42][age], gold = s.players[1].gold;
     expect(observe(s, 1).researchCosts?.loom.gold).toBe(expected);
     research(s, tc, 'loom'); expect(gold - s.players[1].gold).toBe(expected);
     expect(researchCostFor(s, 2, 'loom').gold).toBe(50);
@@ -95,7 +131,7 @@ describe.skipIf(!rules?.civilizations?.chinese)('owned Chinese gameplay', () => 
     for (const [tech, food] of [['feudal-age', 500], ['castle-age', 760], ['imperial-age', 900]] as const) {
       const before = s.players[1].food; research(s, tc, tech); expect(before - s.players[1].food).toBe(food);
     }
-    expect(researchCostFor(s, 1, 'loom').gold).toBe(43);
+    expect(researchCostFor(s, 1, 'loom').gold).toBe(42);
   });
 
   it('the farm team bonus reapplies to new crops after Horse Collar and Heavy Plow without changing old food', () => {

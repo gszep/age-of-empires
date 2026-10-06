@@ -209,6 +209,40 @@ extern const int cAttributeSet = 0;
 
 
 @unittest.skipUnless(DAT.is_file(), "owned AoE2DE fixture is not installed")
+class TrebuchetPackingImportTest(unittest.TestCase):
+    def test_packing_work_is_task125_not_training_or_graphic_time(self):
+        from copy import deepcopy
+        from import_content import extract_entity
+        dat = _dat()
+        specs = {s['key']: s for s in SPEC['entities']}
+        for civ in (1, 5):
+            units = dat.civs[civ].units
+            packed = extract_entity(dat, units, specs['trebuchet'], GRAPHICS, {})
+            deployed = extract_entity(dat, units, specs['trebuchet-unpacked'], GRAPHICS, {})
+            task = next(t for t in units[331].bird.tasks if t.action_type == 125)
+            self.assertEqual((task.unit_id, task.work_value_1, task.work_value_2, task.gather_type), (-1, 0, 0, 0))
+            self.assertNotIn('packingWork', packed)  # legacy DAT does not state50
+            self.assertEqual(deployed['workRate'], 4.5)
+            self.assertEqual(units[331].building.transform_unit, 42)
+            self.assertEqual(units[42].building.transform_unit, 331)
+        # Current-build work and training time both happen to be50. Distinguish
+        # their consumers so changing train time cannot silently change packing.
+        units = list(dat.civs[5].units)
+        units[331] = deepcopy(units[331])
+        units[331].creatable.train_locations[0].train_time = 999
+        task = next(t for t in units[331].bird.tasks if t.action_type == 125)
+        task.unit_id = 42
+        task.work_value_2 = task.gather_type = 1
+        task.work_value_1 = 72
+        packed = extract_entity(dat, units, specs['trebuchet'], GRAPHICS, {})
+        self.assertEqual(packed['packingWork'], 72)
+        self.assertEqual(packed['train']['seconds'], 999)
+        task.unit_id = 123
+        with self.assertRaisesRegex(ValueError, 'unreviewed trebuchet packing task'):
+            extract_entity(dat, units, specs['trebuchet'], GRAPHICS, {})
+
+
+@unittest.skipUnless(DAT.is_file(), "owned AoE2DE fixture is not installed")
 class ContentImportIntegrationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -818,6 +852,8 @@ class ContentImportIntegrationTest(unittest.TestCase):
             self.skipTest("no published manifest to check")
         published = json.loads(manifest.read_text())
         self.assertIn("technologies", published)
+        self.assertEqual(published['entities']['trebuchet'].get('packingWork'),
+                         self.result['entities']['trebuchet'].get('packingWork'))
         for animal in ("sheep", "deer", "boar"):
             self.assertEqual(published["entities"][animal]["foodDecayPerSecond"],
                              self.result["entities"][animal]["foodDecayPerSecond"])
@@ -839,6 +875,8 @@ class ContentImportIntegrationTest(unittest.TestCase):
                 converted = published["civilizations"][civ]["entities"][key]
                 self.assertIn("atlases", converted, f"{civ}/{key}")
                 self.assertEqual(converted.get("id"), entity.get("id"))
+                if key == 'trebuchet':
+                    self.assertEqual(converted.get('packingWork'), entity.get('packingWork'), civ)
         self.assertEqual(published["shadows"], {"profile": "Default", "strength": 1.0, "color": [0.0, 0.0, 0.0]})
         self.assertIn("terrain/colorcorrection.json", published["source"]["sha256"])
         self.assertEqual(published["source"]["sha256"]["xs/Constants.xs"],

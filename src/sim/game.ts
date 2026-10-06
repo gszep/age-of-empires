@@ -133,6 +133,7 @@ export function createGame(
   const state: GameState = {
     scoreVersion: 1,
     researchQueueVersion: 1,
+    packingVersion: 1,
     ...(map === 'arabia' && mapgenVersion === 1 ? { mapgenVersion: 1 as const } : {}),
     ...(wonderVictory ? { wonderVictory: true } : {}),
     ...(populationLimit !== undefined ? { populationLimit } : {}),

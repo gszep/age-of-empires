@@ -32,7 +32,11 @@ search radius 18, work rate 4.5, projectile371 and attack/reload/graphic clocks.
 unit;42's attack and pack tasks also have automatic search enabled. These fields
 support automatic transformation/search but do not establish the exact runtime
 meaning of its wait or target selection. Japanese Kataparuto uses the existing
-resolved work-rate modifier, including for automatic setup.
+resolved work-rate modifier, including for automatic setup. The #259 packing
+continuation corrects the old rate-as-seconds baseline to work/rate:50/4.5 game
+seconds normally and50/18 after Kataparuto. That50-work default is explicit in
+the installed185872 task125, but inferred for the pinned legacy task. See the
+[native cycle table](samurai-kataparuto-calibration.md) for precision and limits.
 
 **Inferred integration:** idle building-only acquisition, nearest-target/id
 tie-break, existing 10-tick acquisition cadence, existing circular target/radius
@@ -40,8 +44,8 @@ range tolerances, no automatic pursuit, completion of setup if its target
 disappears midway, immediate cancellation of unfinished unpack on a move, and
 manual Pack holding until the next command. The packed/unpacked unit pairing
 remains explicitly named 331↔42. Native stance, retarget, interruption and task
-wait semantics remain calibration under#131/#259. There is no new native-DE
-runtime capture or claim of exact modern engine parity.
+wait semantics remain calibration under#131/#259. The later #259 captures measure
+packing duration only, not this targeting policy or exact engine-tick parity.
 
 ## Example-AI finishing policy
 

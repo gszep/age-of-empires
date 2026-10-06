@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { expect, it } from 'vitest';
 import { ARABIA_ADDED_TERRAINS, FALLBACK_RULES } from '../sim/data';
+import { createGame } from '../sim/game';
+import { useLegacyPacking } from '../sim/packing';
 import { compatibleArabiaTerrainExtension } from './checkpoint-compat';
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -8,15 +10,19 @@ const legacyHash = '6468a1958aed242623b46f3a31b50152f8db42696df2c3bc841a7980cae6
 
 it('accepts only the exact terrain extension for a marker-less board that cannot observe it', () => {
   const saved = { rulesHash: legacyHash, state: { terrain: [0, 1, 2, 10, 14, 110] } };
-  const before = JSON.stringify(FALLBACK_RULES);
-  expect(compatibleArabiaTerrainExtension(saved, FALLBACK_RULES)).toBe(true);
-  expect(JSON.stringify(FALLBACK_RULES)).toBe(before);
+  // Keep the actual frozen pre-118 hash: it is compatible only when packing
+  // also matches. #259 deliberately does NOT expand this admission exception.
+  const legacy = createGame(259); useLegacyPacking(legacy);
+  const rules = legacy.rules, before = JSON.stringify(rules);
+  expect(compatibleArabiaTerrainExtension(saved, rules)).toBe(true);
+  expect(compatibleArabiaTerrainExtension(saved, FALLBACK_RULES)).toBe(false);
+  expect(JSON.stringify(rules)).toBe(before);
   for (const id of ARABIA_ADDED_TERRAINS) {
-    expect(compatibleArabiaTerrainExtension({ ...saved, state: { terrain: [id] } }, FALLBACK_RULES)).toBe(false);
+    expect(compatibleArabiaTerrainExtension({ ...saved, state: { terrain: [id] } }, rules)).toBe(false);
   }
-  expect(compatibleArabiaTerrainExtension({ ...saved, state: { ...saved.state, mapgenVersion: 1 } }, FALLBACK_RULES)).toBe(false);
-  expect(compatibleArabiaTerrainExtension({ rulesHash: legacyHash }, FALLBACK_RULES)).toBe(false);
-  const unrelated = structuredClone(FALLBACK_RULES);
+  expect(compatibleArabiaTerrainExtension({ ...saved, state: { ...saved.state, mapgenVersion: 1 } }, rules)).toBe(false);
+  expect(compatibleArabiaTerrainExtension({ rulesHash: legacyHash }, rules)).toBe(false);
+  const unrelated = structuredClone(rules);
   unrelated.units.villager.hp++;
   expect(compatibleArabiaTerrainExtension(saved, unrelated)).toBe(false);
   unrelated.units.villager.hp--;

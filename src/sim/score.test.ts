@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES, isBuilding } from './data';
 import { applyCommand, createGame, stepGame, unitRulesFor, buildingRulesFor } from './game';
 import { calculateScore, resourceValue, assetScore, useLegacyScore } from './score';
+import { useLegacyPacking } from './packing';
 import { observe } from './observe';
 import { updateVisibility } from './visibility';
 import { checksumState } from './checksum';
@@ -63,6 +64,7 @@ describe('manual-derived public score (#139)', () => {
     rules.units.villager.trainSeconds = .1;
     rules.technologies.loom.researchSeconds = .1;
     const s = createGame(139, rules, undefined, 'arabia', undefined, undefined, undefined, 0); useLegacyScore(s);
+    useLegacyPacking(s);
     const commands: Command[] = [
       { kind: 'train', player: 1, buildingId: tc(s).id, unit: 'villager' },
       { kind: 'research', player: 1, buildingId: tc(s).id, tech: 'loom' },

@@ -156,7 +156,17 @@ describe('converted unit inheritance (#178)', () => {
     const monk = spawn(state, 'monk', 1, 59.5, 50.5);
     convert(state, monk, target);
     command(state, { kind: 'pack', player: 1, entityIds: [target.id], unpacked: false });
-    until(state, () => !target.unpacked);
+    // The old generic220-tick wait ends two ticks before calibrated packing.
+    // Exercise the captured engine's resolved duration without widening every
+    // conversion/combat wait or skipping the final pose/armour outcome.
+    const packTicks = Math.round(unitRulesForEntity(state, target).unpacked!.seconds / TICK_SECONDS);
+    expect(target.packingTicks).toBe(packTicks);
+    run(state, packTicks - 1);
+    expect(target.unpacked).toBe(true);
+    expect(target.packingTicks).toBe(1);
+    stepGame(state);
+    expect(target.unpacked).toBe(false);
+    expect(target.packingTicks).toBeUndefined();
     const attacker = spawn(state, 'longbowman', 2, 63.5, 50.5);
     command(state, { kind: 'order', player: 2, entityIds: [attacker.id], target: target.position, targetId: target.id });
     const hp = target.hp;

@@ -943,6 +943,16 @@ def extract_entity(
         second = dat.graphics[unit.type_50.attack_graphic_2]
         entity["combat"]["secondAttackReleaseSeconds"] = rounded(unit.type_50.frame_delay * second.frame_duration)
 
+    if spec["key"] == "trebuchet":
+        # Current-build #259 has explicit work50/target42. Pinned task125 has
+        # work0/target-1: keep the field absent, not a fabricated source value.
+        # The runtime documents its current-native compatibility default.
+        task = find_task(unit, {"actionType": 125})
+        if (task.unit_id == unit.building.transform_unit == 42 and task.work_value_1 > 0
+                and task.work_value_2 == 1 and task.gather_type == 1):
+            entity["packingWork"] = rounded(task.work_value_1)
+        elif not (task.unit_id == -1 and task.work_value_1 == 0 and task.work_value_2 == 0 and task.gather_type == 0):
+            raise ValueError(f"unreviewed trebuchet packing task on {unit.id}")
     if spec["key"] == "trebuchet-unpacked":
         entity["workRate"] = rounded(unit.bird.work_rate)
     if spec["key"] == "fish-trap":

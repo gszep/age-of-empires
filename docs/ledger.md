@@ -477,9 +477,12 @@ off the reference; **measured** — fitted to a reference screenshot;
   adjustments apply once to the current opening bank, including Regicide's preset.
 - **Owned:** researchCostMod85 is1/.95/.9/.85 through304/350/351/352. The price
   at command acceptance uses the current factor, including age advances and Spies.
-  **Inferred integer policy:** nearest-integer per resource, consistent with the
-  existing cost consumer; pending accepted research is not repriced. Dynamic prices
-  are visible to the HUD and agents. Native half-resource rounding remains#260.
+  **Measured current185872, not pinned48987 (#260):** Chinese Fletching pays
+  95F/47G, Bodkin180F/90G, Plate Mail255F/127G. Fixed research prices now truncate
+  after the player modifier, rather than rounding47.5/127.5 up. Float32 product
+  evaluation and generalization beyond these prices remain **inferred**; Spies'
+  dynamic-price branch is unchanged/unmeasured. Pending accepted research is not
+  repriced; prices remain visible to HUD/agents. See [calibration](chinese-calibration.md).
 - **Owned:** team 402 makes repeatable232 free/zero-time;232 copies resource 36
   multiplied by1.1 and multiplies resource 69 (localization15069: Farm Food
   Multiplier, initial 1). **Inferred reapplication:** use that multiplier once on the final additive farm
@@ -495,6 +498,13 @@ off the reference; **measured** — fitted to a reference screenshot;
   saves. Source counts/stats are not proof of native cadence/spread;#260 retains it.
   Their embedded aura task 155 templates are dormant: Combat Ability is0, without
   the enabling 32 bit documented by UGC. They are not unconditional Chinese buffs.
+  **Partial native185872 observation (#260):** stationary Siege Ram loses3HP
+  per sampled normal Chu Ko Nu cycle,4HP per sampled Elite cycle,64HP in one
+  Rocket Cart burst. High pierce armor and unseparated misses prevent a primary/
+  secondary split or cadence conclusion; no combat rule was changed. Fire Lancer
+  produced no verified strike in the attempted window; Lou Chuan was not measured.
+  Editor one-villager/TC start yielded4 villagers/15 housing, but custom resources
+  do not establish the normal opening deductions. Remaining gaps stay on#260.
 - **Owned + documented interpretation:** Fire Lancers1901/1903 use type 6,
   target 127, range modifier 4/5, special graphics13031/13067 and three1925 bullets;
   raw recharge precision preserves the 30-second threshold. Lou Chuan1948 uses
@@ -538,13 +548,26 @@ off the reference; **measured** — fitted to a reference screenshot;
   and maximum 107 on Watch Tower/Guard Tower/Keep. The existing secondary-arrow
   damage/scatter model supplies those extra shots; native volley calibration
   remains part of the shared garrison boundary.
-- **Inferred engine interpretation:** Kataparuto59 multiplies deployed
-  trebuchet 42 work rate by4 and reload duration by.75. Preserve the existing
- 4.5-second packing baseline (now read from its work-rate field), scaling
-  duration inversely with the researched work-rate change. New pack/unpack
-  orders take 1.125 seconds rounded to23 simulation ticks; already running
-  transitions retain their accepted duration. Native work-rate/time conversion
-  and tick rounding are not established by the DAT; tracked in#259.
+- **Owned + measured current-build packing (#259):** Kataparuto59 multiplies
+  deployed42 work rate4.5 by4 and reload duration by.75. Installed build185872
+  (not pinned48987) packed331 task125 specifies target42/work50/value2=1/gather1;
+  the pinned task instead has target−1/work0/value2=0/gather0. Twelve native
+  transitions support **work/rate**, about11.1±.3 game seconds normally and
+ 2.8±.3 after paid Kataparuto. The construction graphic137 has3 frames/duration0,
+  so cannot establish a clock. Runtime now uses50/4.5 and50/18, rounded to222/56
+  simulation ticks (11.10/2.80 game seconds). **Explicit compatibility inference:**
+  pinned legacy tasks and older manifests use the current-build50-work default;
+  imported explicit task work takes precedence. This is not measured pinned
+  engine parity. Native sub-tick rounding remains unknown; in-progress research
+  still leaves accepted transitions unchanged and is uncalibrated. See
+  [cycle table, source difference and failed attempts](samurai-kataparuto-calibration.md).
+- **Recording compatibility (#259 review):** v6/new matches carry
+  `packingVersion:1` and use222/56 ticks. v1–v5 replay reconstructs the pre-change
+  packing rules, including civilisation profiles, removes the marker, and retains
+ 90/23 ticks; a frozen pre-change v5 recording protects original checksums. JSON
+  snapshots retain their embedded rules/timers without that replay adapter. Shared
+  admission stays unchanged: old packing rules hashes are rejected on checkpoint
+  startup with EX_CONFIG78, not silently migrated. Coordinate any future rollout.
 - **Owned + community interpretation:** Samurai task 133 carries initiation
   distances 2–6 (elite 2–7) and speed multiplier 1.25, with flag 2001, ability 3,
   type 1/event 0. UGC's task 133/attribute 61 documentation describes attack
@@ -554,6 +577,13 @@ off the reference; **measured** — fitted to a reference screenshot;
   speculative charge damage or cooldown. Both running/task graphic slots are
   absent, so the owned walking animation remains the visual. Exact native
   boundary/pursuit/damage semantics require#259, not a claim of measured parity.
+  **Known native disagreement (2026-10-06):** build185872 visually showed normal
+  and Elite charge bars depleting during ram combat, with displayed attack bonus
+  dropping by1. A normal Samurai's bar stayed full during the house-attack trace.
+  Partial recharge was visible, but victory interrupted full recharge measurement.
+  The inspected installed/pinned charge fields agree; engine equivalence does not
+  follow. Non-depletion is therefore not native-verified and the missing charge
+  contract remains unresolved; no speculative damage/cooldown fix was added.
 - **Owned graphic placeholders:** Japanese `F` graphics reference legacy
   SLP2220 (including garrison-flag parents and ship composites), with no F.sld.
   Treat F like existing W/X/M/E placeholder parents and traverse its deltas;

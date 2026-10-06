@@ -7,8 +7,9 @@ import { updateVisibility } from './visibility';
 import { synchronizationHash } from '../shared/checksum';
 import type { Entity, EntityKind, GameState, PlayerId, Point, UnitKind } from './types';
 
-const manifest = existsSync('public/imported/aoe2/manifest.json')
-  ? JSON.parse(readFileSync('public/imported/aoe2/manifest.json', 'utf8')) : undefined;
+const manifestPath = process.env.CIV_PROFILE_CONTENT ?? 'public/imported/aoe2/manifest.json';
+const manifest = existsSync(manifestPath)
+  ? JSON.parse(readFileSync(manifestPath, 'utf8')) : undefined;
 const owned = manifest !== undefined ? rulesFromManifest(manifest.civilizations.teutons) : undefined;
 const modes = [['fallback', FALLBACK_RULES], ...(owned ? [['owned', owned] as const] : [])] as const;
 const cases = [

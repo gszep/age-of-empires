@@ -149,7 +149,7 @@ export interface UnitRules {
   /**
    * A siege engine that travels packed and shoots unpacked. The DAT keeps the
    * two as separate units -- the trebuchet is 331 packed and 42 unpacked --
-   * and states everything about each except which is the other, so the pairing
+   * linked by building.transform_unit and packed task125. The supported pairing
    * is named here and the numbers are imported. Packed it has no attack at
    * all; unpacked it cannot move.
    */
@@ -174,7 +174,7 @@ export interface UnitRules {
      * that shoots. */
     accuracyPercent?: number;
     accuracyDispersion?: number;
-    /** Seconds to set up or pack away. The DAT's own work rate for the pair. */
+    /** Game seconds: packed task125 work / deployed unit's work rate (#259). */
     seconds: number;
   };
   /** Monks: the DAT's window for a conversion — the earliest second it can
@@ -782,6 +782,11 @@ export const NAVAL_RULES: Record<NavalUnitKind, UnitRules> = {
 for (const kind of ['galley', 'war-galley', 'galleon', 'cannon-galleon'] as const) NAVAL_RULES[kind].armors.push({ class: 60, amount: 0 });
 for (const kind of ['fire-galley', 'fire-ship', 'fast-fire-ship'] as const) NAVAL_RULES[kind].armors.push({ class: 41, amount: 0 });
 
+// Current-build331 task125 work_value_1, calibrated on DE185872 (#259),
+// not train time or animation duration. Legacy pinned task125 has work0:
+// this explicit compatibility default also supports older manifests.
+const TREBUCHET_PACKING_WORK = 50;
+
 /**
  * Open fallback rules for users without the owned game. Values approximate the
  * AoE2DE Dark Age slice; when the imported manifest is available,
@@ -1034,7 +1039,8 @@ export const FALLBACK_RULES: GameRules = {
         attackReloadSeconds: 10, attackReleaseSeconds: 0.88,
         projectileSpeed: 3.5, projectileArt: 'trebuchet-rock', launchHeight: 1.5,
         accuracyPercent: 15, accuracyDispersion: 0.2,
-        seconds: 4.5,
+        workRate: 4.5,
+        seconds: TREBUCHET_PACKING_WORK / 4.5,
       },
     },
     'capped-ram': {
@@ -1515,6 +1521,7 @@ export const FALLBACK_RULES: GameRules = {
 };
 
 interface ManifestEntity {
+  packingWork?: number;
   volley?: { count: number; intervalSeconds: number; secondaryId?: number };
   alternateAttack?: Omit<AlternateAttack, 'projectile'> & { projectileId: number };
   fireCharge?: FireChargeRules;
@@ -2009,16 +2016,18 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       scorpion: unit('scorpion', 'siege-workshop'),
       'heavy-scorpion': unit('heavy-scorpion', 'siege-workshop'),
       monk: unit('monk', 'monastery'),
-      // Packed and unpacked are two DAT units and the pairing is not stated,
-      // so it is named here; every number on both sides is imported.
+      // Current-build task125 names deployed42 and supplies the work for both
+      // transitions; legacy tasks use the calibrated compatibility default.
+      // Kataparuto modifies the deployed rate, not this work.
       trebuchet: {
         ...unit('trebuchet', 'castle'),
         attacks: [],
         unpacked: {
           ...FALLBACK_RULES.units.trebuchet.unpacked!,
           unit: 'trebuchet-unpacked',
-          seconds: e['trebuchet-unpacked']?.workRate ?? FALLBACK_RULES.units.trebuchet.unpacked!.seconds,
-          workRate: e['trebuchet-unpacked']?.workRate,
+          seconds: (e.trebuchet?.packingWork ?? TREBUCHET_PACKING_WORK)
+            / (e['trebuchet-unpacked']?.workRate ?? FALLBACK_RULES.units.trebuchet.unpacked!.workRate!),
+          workRate: e['trebuchet-unpacked']?.workRate ?? FALLBACK_RULES.units.trebuchet.unpacked!.workRate,
           lineOfSight: e['trebuchet-unpacked']?.lineOfSight,
           searchRadius: e['trebuchet-unpacked']?.searchRadius,
           armors: e['trebuchet-unpacked']?.combat?.armors

@@ -8,8 +8,9 @@ import { observe } from './observe';
 import { updateVisibility } from './visibility';
 import type { Entity, EntityKind } from './types';
 
-const owned = existsSync('public/imported/aoe2/manifest.json')
-  ? rulesFromManifest(JSON.parse(readFileSync('public/imported/aoe2/manifest.json', 'utf8'))) : undefined;
+const manifestPath = process.env.CIV_PROFILE_CONTENT ?? 'public/imported/aoe2/manifest.json';
+const owned = existsSync(manifestPath)
+  ? rulesFromManifest(JSON.parse(readFileSync(manifestPath, 'utf8'))) : undefined;
 function fixture(rules: GameRules = FALLBACK_RULES) {
   const state = createGame(131, structuredClone(rules));
   state.entities = []; state.terrain.fill(0); state.elevation.fill(0);

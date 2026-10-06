@@ -4,6 +4,7 @@ import { rulesFromManifest, TICKS_PER_SECOND } from './data';
 import { activateAutomaticTechnologies, applyCommand, createGame, stepGame } from './game';
 import { buildingRulesFor, unitRulesFor, unitRulesForEntity } from './rules';
 import { rulesForPlayer } from './civilizations';
+import { useLegacyPacking } from './packing';
 import { updateVisibility } from './visibility';
 import { synchronizationHash } from '../shared/checksum';
 import { replayRecord, runMatch, type Strategy } from '../headless/runner';
@@ -219,17 +220,24 @@ describe.skipIf(!imported?.civilizations?.japanese)('owned Japanese gameplay', (
     expect(buildingRulesFor(s, 2, 'watch-tower').garrison?.volley?.base).toBe(1);
   });
 
-  it('Kataparuto quarters real pack/unpack time and reduces live shot intervals', () => {
-    const s = arena(3), castle = building(s, 'castle', 1), treb = train(s, castle, 'trebuchet');
+  it.each([false, true])('Kataparuto quarters real pack/unpack time and reduces live shot intervals (legacy=%s)', legacy => {
+    const s = arena(3);
+    if (legacy) useLegacyPacking(s);
+    const castle = building(s, 'castle', 1), treb = train(s, castle, 'trebuchet');
+    const normalTicks = legacy ? 90 : 222, researchedTicks = legacy ? 23 : 56;
     treb.position = { x: 50, y: 50 };
     const pack = (unpacked: boolean) => {
       expect(applyCommand(s, { kind: 'pack', player: 1, entityIds: [treb.id], unpacked }).ok).toBe(true);
       const start = s.tick; until(s, () => treb.packingTicks === undefined); return s.tick - start;
     };
-    const normal = pack(true); expect(pack(false)).toBe(normal);
+    const normal = pack(true); expect(normal).toBe(normalTicks); expect(pack(false)).toBe(normal);
+    for (let cycle = 0; cycle < 2; cycle++) {
+      expect(pack(true)).toBe(normalTicks); expect(pack(false)).toBe(normalTicks);
+    }
     research(s, castle, 'kataparuto');
-    expect(pack(true)).toBe(Math.round(normal / 4));
-    expect(pack(false)).toBe(Math.round(normal / 4));
+    for (let cycle = 0; cycle < 3; cycle++) {
+      expect(pack(true)).toBe(researchedTicks); expect(pack(false)).toBe(researchedTicks);
+    }
     pack(true);
     const target = building(s, 'house', 2, 62, 50); target.hp = target.maxHp = 10000;
     order(s, treb, target);
@@ -241,8 +249,8 @@ describe.skipIf(!imported?.civilizations?.japanese)('owned Japanese gameplay', (
     });
     expect(releases[1] - releases[0]).toBe(Math.round(7.5 * TICKS_PER_SECOND));
     const fresh = train(s, castle, 'trebuchet');
-    expect(unitRulesForEntity(s, fresh).unpacked!.seconds).toBeCloseTo(1.125);
-    expect(unitRulesFor(s, 2, 'trebuchet').unpacked!.seconds).toBe(4.5);
+    expect(unitRulesForEntity(s, fresh).unpacked!.seconds).toBeCloseTo(legacy ? 1.125 : 50 / 18);
+    expect(unitRulesFor(s, 2, 'trebuchet').unpacked!.seconds).toBeCloseTo(legacy ? 4.5 : 50 / 4.5);
   });
 
   it('captures a Samurai with its charge and wounds and does not retroactively give it the donor Elite upgrade', () => {

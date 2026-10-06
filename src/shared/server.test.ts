@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { createServer as createTcpServer } from 'node:net';
 import type { Socket } from 'node:net';
 import { EventEmitter, once } from 'node:events';
@@ -12,9 +13,10 @@ import { createServer } from 'vite';
 import { applyCommand, createGame, stepGame } from '../sim/game';
 import { checksumState } from '../sim/checksum';
 import { useLegacyScore } from '../sim/score';
+import { useLegacyPacking } from '../sim/packing';
 import { entitiesWithGarrison } from '../sim/garrison';
 import type { GameState } from '../sim/types';
-import { FALLBACK_RULES } from '../sim/data';
+import { ARABIA_ADDED_TERRAINS, FALLBACK_RULES } from '../sim/data';
 import { sharedMatchPlugin } from './server';
 import { SHARED_CHECKPOINT_VERSION, SHARED_VERSION } from './protocol';
 
@@ -179,9 +181,15 @@ it.each([0, 1] as const)('rejects old peers and resumes a v5 checkpoint with Ara
   const saved = { version: 5, rulesHash: createHash('sha256').update(JSON.stringify(rules)).digest('hex'), state,
     settings: { paused: true, speed: 1, generation: 3 }, humanTwo: true, setup: { map: 'arabia', seed: 305 } };
   const currentRulesHash = saved.rulesHash;
-  // Actual FALLBACK_RULES hash from unmodified037b7dd, before the seventeen
-  // terrain additions. Test the real prior hash, not a self-consistent fiction.
-  if (mapgenVersion === 0) saved.rulesHash = '6468a1958aed242623b46f3a31b50152f8db42696df2c3bc841a7980cae6da40';
+  // Isolate the terrain-only exception with current packing rules. The actual
+  // frozen pre-118 hash now also differs in packing and is refused below.
+  if (mapgenVersion === 0) {
+    const prior = structuredClone(rules);
+    for (const row in prior.terrainRestrictions) {
+      prior.terrainRestrictions[row] = prior.terrainRestrictions[row].filter(id => !ARABIA_ADDED_TERRAINS.includes(id));
+    }
+    saved.rulesHash = createHash('sha256').update(JSON.stringify(prior)).digest('hex');
+  }
   let bytes = JSON.stringify(saved);
   writeFileSync(checkpoint, bytes);
   expect(SHARED_VERSION).toBeGreaterThan(7);
@@ -234,13 +242,31 @@ it.each([0, 1] as const)('rejects old peers and resumes a v5 checkpoint with Ara
 });
 
 function host(checkpoint: string, port = 0) {
-  return spawnSync(process.execPath, ['node_modules/tsx/dist/cli.mjs', 'tools/shared-host.mts'], {
+  return spawnSync(process.execPath, [createRequire(import.meta.url).resolve('tsx/cli'), 'tools/shared-host.mts'], {
     env: { ...process.env, MATCH_CHECKPOINT: checkpoint, MATCH_PORT: String(port) },
     encoding: 'utf8', timeout: 20_000,
   });
 }
 
 describe('shared host startup failure policy', () => {
+  it.each([false, true])('refuses a pre-calibration packing hash without rewriting the checkpoint (pre-biomes=%s)', preBiomes => {
+    const { checkpoint } = fixture();
+    const original = createGame(259);
+    useLegacyPacking(original);
+    const { rules, ...state } = original;
+    if (preBiomes) delete state.mapgenVersion;
+    const rulesHash = preBiomes ? '6468a1958aed242623b46f3a31b50152f8db42696df2c3bc841a7980cae6da40'
+      : createHash('sha256').update(JSON.stringify(rules)).digest('hex');
+    expect(rulesHash).not.toBe(createHash('sha256').update(JSON.stringify(FALLBACK_RULES)).digest('hex'));
+    const bytes = JSON.stringify({ version: SHARED_CHECKPOINT_VERSION, rulesHash, state,
+      settings: { paused: true, speed: 1, generation: 0 }, humanTwo: true });
+    writeFileSync(checkpoint, bytes);
+    const result = host(checkpoint);
+    expect(result.error).toBeUndefined(); expect(result.status).toBe(78);
+    expect(result.stderr).toContain('different rules/version');
+    expect(readFileSync(checkpoint, 'utf8')).toBe(bytes);
+  });
+
   it.each([
     JSON.stringify({ version: -1, rulesHash: 'old-rules', state: { tick: 123 } }),
     JSON.stringify({ version: SHARED_CHECKPOINT_VERSION, rulesHash: 'old-rules', state: { tick: 123 } }),

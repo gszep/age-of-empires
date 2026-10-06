@@ -1,14 +1,15 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { FALLBACK_RULES, isBuilding, rulesFromManifest, TICKS_PER_SECOND, type GameRules } from './data';
+import { FALLBACK_RULES, isBuilding, rulesFromManifest, TICKS_PER_SECOND, type ContentManifest, type GameRules } from './data';
 import { activateAutomaticTechnologies, applyCommand, createGame, resolveUnitOrder, stepGame } from './game';
 import { buildingRulesFor, unitRulesFor, unitRulesForEntity } from './rules';
 import { updateVisibility } from './visibility';
 import { synchronizationHash } from '../shared/checksum';
 import type { Entity, EntityKind, GameState, Point } from './types';
 
-const manifest = existsSync('public/imported/aoe2/manifest.json')
-  ? JSON.parse(readFileSync('public/imported/aoe2/manifest.json', 'utf8')) : undefined;
+const manifestPath = process.env.CIV_PROFILE_CONTENT ?? 'public/imported/aoe2/manifest.json';
+const manifest = existsSync(manifestPath)
+  ? JSON.parse(readFileSync(manifestPath, 'utf8')) : undefined;
 const owned = manifest !== undefined ? rulesFromManifest(manifest) : undefined;
 const cases = [{ mode: 'open', rules: FALLBACK_RULES }, ...(owned ? [{ mode: 'owned', rules: owned }] : [])];
 
@@ -39,6 +40,36 @@ function order(s: GameState, treb: Entity, target: Entity | Point) {
   expect(applyCommand(s, { kind: 'order', player: 1, entityIds: [treb.id],
     target: 'position' in target ? target.position : target, ...('id' in target ? { targetId: target.id } : {}) }).ok).toBe(true);
 }
+
+// Deliberately vary the two source inputs independently: neither a hard-coded
+// native duration nor the coincidentally equal train time may replace task125.
+function packingManifest(packingWork: number | undefined, workRate: number) {
+  const entity: ContentManifest['entities'][string] = { hitPoints: 150, collision: [0.5, 0.5], lineOfSight: 19 };
+  return rulesFromManifest({ entities: {
+    trebuchet: { ...entity, packingWork, train: { seconds: 999, buildingId: 82 } },
+    'trebuchet-unpacked': { ...entity, workRate },
+  } });
+}
+
+it.each([
+  { mode: 'open native baseline', rules: FALLBACK_RULES, ticks: 222 },
+  { mode: 'task125 native baseline', rules: packingManifest(50, 4.5), ticks: 222 },
+  { mode: 'older manifest missing task125', rules: packingManifest(undefined, 4.5), ticks: 222 },
+  { mode: 'different work', rules: packingManifest(72, 4.5), ticks: 320 },
+  { mode: 'different rate', rules: packingManifest(50, 5), ticks: 200 },
+])('$mode: public pack/unpack completes at work/rate, not work-rate seconds', ({ rules, ticks }) => {
+  const { state, treb, target } = arena(rules);
+  target.owner = 1; // no automatic deployment between manual cycles
+  for (let cycle = 0; cycle < 3; cycle++) for (const unpacked of [true, false]) {
+    expect(applyCommand(state, { kind: 'pack', player: 1, entityIds: [treb.id], unpacked }).ok).toBe(true);
+    run(state, ticks - 1);
+    expect(treb.unpacked === true).toBe(!unpacked);
+    expect(treb.packingTicks).toBe(1);
+    stepGame(state);
+    expect(treb.unpacked).toBe(unpacked);
+    expect(treb.packingTicks).toBeUndefined();
+  }
+});
 
 describe.each(cases)('$mode trebuchet automation', ({ rules }) => {
   it('automatically deploys for a visible building and really damages it without moving', () => {
@@ -123,7 +154,13 @@ describe.each(cases)('$mode trebuchet automation', ({ rules }) => {
     until(state, () => treb.packingTicks !== undefined);
     run(state, 20);
     const resumed: GameState = JSON.parse(JSON.stringify(state));
-    run(state, 200); run(resumed, 200);
+    const remaining = treb.packingTicks!;
+    expect(remaining).toBeGreaterThan(0);
+    run(state, remaining); run(resumed, remaining);
+    for (const completed of [treb, resumed.entities.find(e => e.id === treb.id)!]) {
+      expect(completed.unpacked).toBe(true);
+      expect(completed.packingTicks).toBeUndefined();
+    }
     expect(synchronizationHash(resumed)).toBe(synchronizationHash(state));
     const next = put('house', 52.5, 43.5, 2);
     target.hp = 0;
@@ -136,7 +173,7 @@ it.skipIf(manifest === undefined)('automatic deployment uses Japanese Kataparuto
   const { state, treb } = arena(rulesFromManifest(manifest.civilizations.japanese));
   state.players[1].researched.push('kataparuto');
   const setup = unitRulesForEntity(state, treb).unpacked!.seconds;
-  expect(setup).toBeLessThan(4.5);
+  expect(setup).toBeCloseTo(50 / 18);
   until(state, () => treb.packingTicks !== undefined);
   expect(treb.packingTicks).toBe(Math.round(setup * TICKS_PER_SECOND));
   run(state, Math.round(setup * TICKS_PER_SECOND));

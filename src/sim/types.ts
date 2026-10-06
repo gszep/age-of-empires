@@ -295,6 +295,8 @@ export interface GameState {
   scoreVersion?: 1;
   /** Absent in legacy saves/replays: busy-building research is rejected. */
   researchQueueVersion?: 1;
+  /** New matches use work/rate packing; absent in pre-v6 recordings/snapshots. */
+  packingVersion?: 1;
   /** Arabia's eleven weighted biomes. Absent means the frozen four-biome map. */
   mapgenVersion?: 1;
   /** Opt-in fixed200-year Wonder victory. Absent preserves legacy conquest. */

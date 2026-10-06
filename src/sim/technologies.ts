@@ -26,9 +26,11 @@ export function researchCostFor(state: GameState, owner: PlayerId, key: string):
   const factor = playerAttributeFor(state, owner, 'researchCostMod') || 1;
   const price = { ...tech.cost };
   // DAT technology-cost edits feed an integer price: native Turks Elite Cannon
-  // Galleon accepts exactly 262 wood (525 * .5), not 263 (#302). Keep this
-  // distinct from the existing player researchCostMod rounding policy.
-  for (const resource of ['food', 'wood', 'gold', 'stone'] as const) price[resource] = Math.max(0, Math.round(Math.trunc(price[resource]) * factor));
+  // Galleon accepts exactly 262 wood (525 * .5), not 263 (#302). Native
+  // Chinese Fletching/Plate Mail then pay 47/127 gold, not 48/128 (#260).
+  // Truncate the discounted price too; float32 multiplication preserves whole
+  // results such as 200 * the DAT's .899999976 research-cost factor.
+  for (const resource of ['food', 'wood', 'gold', 'stone'] as const) price[resource] = Math.max(0, Math.trunc(Math.fround(Math.trunc(price[resource]) * factor)));
   if (!tech.effects.some(e => e.resource === 'spies')) return price;
   const count = (entities: Entity[]): number => entities.reduce((n, e) => e.dead ? n : n
     + (e.owner !== 0 && e.owner !== owner && e.kind === 'villager' ? 1 : 0) + count(e.garrison ?? []), 0);

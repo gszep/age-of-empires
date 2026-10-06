@@ -1,0 +1,167 @@
+{
+  "version": 5,
+  "seed": 259,
+  "rulesOrigin": "fallback",
+  "civilizations": {
+    "1": "open",
+    "2": "open"
+  },
+  "mode": "random-map",
+  "decideIntervalSeconds": 0.05,
+  "maxTimeSeconds": 45,
+  "commands": [
+    {
+      "tick": 0,
+      "command": {
+        "kind": "train",
+        "player": 1,
+        "buildingId": 1,
+        "unit": "trebuchet"
+      }
+    },
+    {
+      "tick": 20,
+      "command": {
+        "kind": "pack",
+        "player": 1,
+        "entityIds": [
+          1304
+        ],
+        "unpacked": true
+      }
+    },
+    {
+      "tick": 140,
+      "command": {
+        "kind": "pack",
+        "player": 1,
+        "entityIds": [
+          1304
+        ],
+        "unpacked": false
+      }
+    },
+    {
+      "tick": 260,
+      "command": {
+        "kind": "pack",
+        "player": 1,
+        "entityIds": [
+          1304
+        ],
+        "unpacked": true
+      }
+    },
+    {
+      "tick": 360,
+      "command": {
+        "kind": "research",
+        "player": 1,
+        "buildingId": 1,
+        "tech": "kataparuto"
+      }
+    },
+    {
+      "tick": 400,
+      "command": {
+        "kind": "pack",
+        "player": 1,
+        "entityIds": [
+          1304
+        ],
+        "unpacked": false
+      }
+    },
+    {
+      "tick": 460,
+      "command": {
+        "kind": "pack",
+        "player": 1,
+        "entityIds": [
+          1304
+        ],
+        "unpacked": true
+      }
+    },
+    {
+      "tick": 520,
+      "command": {
+        "kind": "pack",
+        "player": 1,
+        "entityIds": [
+          1304
+        ],
+        "unpacked": false
+      }
+    }
+  ],
+  "checksums": [
+    {
+      "tick": 100,
+      "hash": "5b79f6ae"
+    },
+    {
+      "tick": 200,
+      "hash": "5791398d"
+    },
+    {
+      "tick": 300,
+      "hash": "38c54b2a"
+    },
+    {
+      "tick": 400,
+      "hash": "818cfa6e"
+    },
+    {
+      "tick": 500,
+      "hash": "d9a86aad"
+    },
+    {
+      "tick": 600,
+      "hash": "31a64790"
+    },
+    {
+      "tick": 700,
+      "hash": "39f6f44d"
+    },
+    {
+      "tick": 800,
+      "hash": "2865ea26"
+    },
+    {
+      "tick": 900,
+      "hash": "0041ebdb"
+    }
+  ],
+  "result": {
+    "version": 5,
+    "mode": "random-map",
+    "seed": 259,
+    "timeSeconds": 45,
+    "players": {
+      "1": {
+        "food": 200,
+        "wood": 200,
+        "gold": 100,
+        "stone": 0,
+        "population": 5,
+        "entities": 6,
+        "age": 0,
+        "researched": [
+          "kataparuto"
+        ]
+      },
+      "2": {
+        "food": 200,
+        "wood": 200,
+        "gold": 100,
+        "stone": 0,
+        "population": 4,
+        "entities": 5,
+        "age": 0,
+        "researched": []
+      }
+    },
+    "rejectedCommands": []
+  }
+}
