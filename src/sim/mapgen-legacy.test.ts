@@ -47,6 +47,6 @@ for (const [map, expected] of Object.entries(hashes)) it(`${map}: legacy seeds a
     expect(checksumState(restored)).toBe(continued);
     expect(restored).not.toHaveProperty('mapgenVersion');
     expectSameDynamicState();
-    if (map !== 'arabia') expect(checksumState(createGame(seed, undefined, undefined, map))).toBe(currentInitial);
+    if (map !== 'arabia' && map !== 'islands') expect(checksumState(createGame(seed, undefined, undefined, map))).toBe(currentInitial);
   }
 });

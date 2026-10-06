@@ -1,8 +1,8 @@
 {
   "shore": { "tiles": 9999, "spacing": 6 },
   "deep": [
-    { "tiles": 6, "spacing": 4, "nearLand": 4 },
-    { "tiles": 170, "spacing": 8, "nearLand": 4 }
+    { "tiles": 6, "spacing": 4, "zoneDistance": 4 },
+    { "tiles": 170, "spacing": 8, "zoneDistance": 4 }
   ],
   "seasons": {
     "PH_SPRING": [456, 458, 69],

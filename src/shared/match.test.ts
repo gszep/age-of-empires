@@ -19,6 +19,23 @@ function follow(host: SharedMatch, ...clients: GameState[]): void {
 }
 
 describe('one household match', () => {
+  it.each([0, 2] as const)('preserves Islands fish generation %s over two-client JSON/rejoin; restart uses current', version => {
+    const state = createGame(95, undefined, undefined, 'islands', undefined, undefined, undefined, version);
+    const host = new SharedMatch(JSON.parse(JSON.stringify(state))); host.humanTwo = true;
+    const clients: GameState[] = [1, 2].map(() => JSON.parse(JSON.stringify(host.snapshot())).state);
+    for (let i = 0; i < 25; i++) {
+      follow(host, ...clients);
+      if (i === 10) clients[1] = JSON.parse(JSON.stringify(host.snapshot())).state;
+    }
+    for (const game of [host.state, ...clients]) {
+      expect(game.mapgenVersion).toBe(version || undefined);
+      expect(synchronizationHash(game)).toBe(synchronizationHash(host.state));
+    }
+    host.restart(95, 'islands');
+    expect(host.state.mapgenVersion).toBe(2);
+    expect(synchronizationHash(host.state)).toBe(synchronizationHash(createGame(95, undefined, undefined, 'islands')));
+  });
+
   it.each([false, true])('preserves idle trebuchet policy through two-client JSON/rejoin, but restarts current (legacy=%s)', legacy => {
     const state = createGame(131, trebuchetReplayRules());
     if (legacy) delete state.trebuchetTargetingVersion;

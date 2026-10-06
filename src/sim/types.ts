@@ -301,8 +301,8 @@ export interface GameState {
   siphonsVersion?: 1;
   /** New matches leave idle trebuchets packed; absent in pre-v8 recordings/snapshots. */
   trebuchetTargetingVersion?: 1;
-  /** Arabia's eleven weighted biomes. Absent means the frozen four-biome map. */
-  mapgenVersion?: 1;
+  /** 1: Arabia's eleven biomes; 2: Islands offshore fish. Absent retains the legacy map. */
+  mapgenVersion?: 1 | 2;
   /** Opt-in fixed200-year Wonder victory. Absent preserves legacy conquest. */
   wonderVictory?: boolean;
   wonderDraw?: boolean;

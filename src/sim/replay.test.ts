@@ -3,7 +3,7 @@ import { createReplayGame } from './replay';
 import { applyCommand, stepGame } from './game';
 import { trebuchetReplayRules } from '../headless/trebuchet-replay.fixture';
 
-it.each([1, 2, 3, 4, 5, 6, 7, 8] as const)('browser/headless v%s initialization selects every historical boundary and packed policy', version => {
+it.each([1, 2, 3, 4, 5, 6, 7, 8, 9] as const)('browser/headless v%s initialization selects every historical boundary and packed policy', version => {
   const rules = trebuchetReplayRules(), original = JSON.stringify(rules);
   const state = createReplayGame({ version, seed: 131, civilizations: { 1: 'open', 2: 'open' },
     mode: version === 1 ? undefined : 'random-map' }, rules);

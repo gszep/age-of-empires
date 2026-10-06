@@ -93,3 +93,14 @@ also reject relabeling v7 as v8 (and the reverse), validate a current v8 run
 launched with v7 input, and continue current/marker-less JSON states both before
 acquisition and during legacy setup. Manual Pack suppression and its removal by
 Stop remain legacy behavior; current Stop cannot enable idle deployment.
+
+## `pre-offshore-islands-v8.json` (#95)
+
+Generated and independently replayed before the fish correction with untouched
+`94dc0ff` using its fallback rules and `runMatch`: Islands seed95, ten seconds,
+idle strategies, two periodic checksums. SHA256:
+`7a7eb0ff34655966924d213fbe27c38603590572e0bc60210dda46748188df07`.
+This is a map/JSON continuation fixture, not fishing-economy acceptance.
+Recordv9 selects offshore generation; relabeling this record must fail rather
+than updating its hashes. `islands-fish.test.ts` additionally freezes initial
+and tick20 whole-state digests for eight seeds against the same untouched tree.
