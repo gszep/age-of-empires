@@ -158,6 +158,14 @@ export interface Entity {
   trainingQueueCosts?: (Cost | undefined)[];
   /** `paidCost` is refunded on cancel; absent in legacy saves, which refund the current price. */
   researching?: { tech: string; remainingTicks: number; paidCost?: Cost };
+  /**
+   * Technologies waiting behind the one being researched, in the order they
+   * were queued. Each was paid for when it was queued, as in AoE2, and is
+   * refunded if it is cancelled.
+   */
+  researchQueue?: string[];
+  /** Original paid prices, aligned with the waiting queue; legacy entries may be absent. */
+  researchQueueCosts?: (Cost | undefined)[];
   rally?: { target: Point; targetId?: number };
   attackCooldown?: number; // ticks until a new swing may start
   attackWindup?: number; // ticks until the started swing releases damage
@@ -272,6 +280,8 @@ export interface Projectile {
 }
 
 export interface GameState {
+  /** Absent in legacy saves/replays: busy-building research is rejected. */
+  researchQueueVersion?: 1;
   /** Opt-in fixed200-year Wonder victory. Absent preserves legacy conquest. */
   wonderVictory?: boolean;
   wonderDraw?: boolean;
@@ -353,7 +363,8 @@ export type Command =
   | { kind: 'pack'; player: PlayerId; entityIds: number[]; unpacked: boolean }
   /** Take the last unit off a building's queue and refund it. */
   | { kind: 'cancel-train'; player: PlayerId; buildingId: number; index?: number }
-  | { kind: 'cancel-research'; player: PlayerId; buildingId: number }
+  /** Index 0 is active; omitted means last, as with cancel-train. */
+  | { kind: 'cancel-research'; player: PlayerId; buildingId: number; index?: number }
   /** Everybody sheltering in this building comes out onto the ground round it. */
   | { kind: 'ungarrison'; player: PlayerId; buildingId: number; target?: Point }
   | { kind: 'town-bell'; player: PlayerId; buildingId: number; enabled: boolean }

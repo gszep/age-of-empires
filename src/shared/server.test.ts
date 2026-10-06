@@ -9,10 +9,11 @@ import type { Socket } from 'node:net';
 import { EventEmitter, once } from 'node:events';
 import { WebSocket } from 'ws';
 import { createServer } from 'vite';
-import { createGame } from '../sim/game';
+import { applyCommand, createGame } from '../sim/game';
+import { checksumState } from '../sim/checksum';
 import { FALLBACK_RULES } from '../sim/data';
 import { sharedMatchPlugin } from './server';
-import { SHARED_VERSION } from './protocol';
+import { SHARED_CHECKPOINT_VERSION, SHARED_VERSION } from './protocol';
 
 const directories: string[] = [];
 function fixture() {
@@ -27,7 +28,7 @@ it('carries Regicide/Treason over the real wire, rejects old clients and bad mod
   const { rules: ignored, ...state } = createGame(130, FALLBACK_RULES, undefined, 'arabia', 'regicide');
   state.players[1].gold = 900;
   const castle = state.entities.find(e => e.owner === 1 && e.kind === 'castle')!;
-  writeFileSync(checkpoint, JSON.stringify({ version: SHARED_VERSION,
+  writeFileSync(checkpoint, JSON.stringify({ version: SHARED_CHECKPOINT_VERSION,
     rulesHash: createHash('sha256').update(JSON.stringify(FALLBACK_RULES)).digest('hex'), state,
     settings: { paused: true, speed: 1, generation: 0 }, humanTwo: true, setup: { map: 'arabia', seed: 130, mode: 'regicide' } }));
   for (const restored of [false, true]) {
@@ -74,6 +75,65 @@ it('carries Regicide/Treason over the real wire, rejects old clients and bad mod
   }
 });
 
+it('rejects v4 simulators while preserving a marker-less v4 checkpoint and its legacy research rules (#293)', async () => {
+  const { directory, checkpoint } = fixture();
+  const original = createGame(293);
+  delete original.researchQueueVersion;
+  original.tick = 123;
+  original.players[1].food = 2000;
+  const buildingId = original.entities.find(e => e.owner === 1 && e.kind === 'town-center')!.id;
+  expect(applyCommand(original, { kind: 'research', player: 1, buildingId, tech: 'loom' }).ok).toBe(true);
+  const { rules, ...state } = original;
+  const saved = { version: 4, rulesHash: createHash('sha256').update(JSON.stringify(rules)).digest('hex'), state,
+    settings: { speed: 1, paused: true, generation: 7 }, humanTwo: true, setup: { map: 'arabia', seed: 293 } };
+  writeFileSync(checkpoint, JSON.stringify(saved));
+  // Reopen after the first save as well: only the checkpoint envelope advances
+  // to v5, never the old match's state, paid research, setup or rule marker.
+  for (const reopen of [false, true]) {
+    const beforeStartup = readFileSync(checkpoint, 'utf8');
+    const server = await createServer({ root: directory, configFile: false, logLevel: 'silent',
+      server: { host: '127.0.0.1', port: 0 }, plugins: [sharedMatchPlugin(directory, checkpoint)] });
+    try {
+      await server.listen();
+      expect(readFileSync(checkpoint, 'utf8')).toBe(beforeStartup);
+      const address = server.httpServer!.address();
+      if (!address || typeof address === 'string') throw new Error('Missing HTTP address');
+      const url = `ws://127.0.0.1:${address.port}/__match/socket?player=1`;
+      const config = await fetch(`http://127.0.0.1:${address.port}/__match/config`).then(r => r.json());
+      expect(config.version).toBe(5);
+      if (!reopen) {
+        const stale = new WebSocket(url), received: string[] = [];
+        stale.on('message', bytes => received.push(JSON.parse(String(bytes)).type));
+        await once(stale, 'open', { signal: AbortSignal.timeout(10_000) });
+        try {
+          const refused = once(stale, 'message', { signal: AbortSignal.timeout(10_000) });
+          const closed = once(stale, 'close', { signal: AbortSignal.timeout(10_000) });
+          stale.send(JSON.stringify({ type: 'join', version: 4 }));
+          expect(JSON.parse(String((await refused)[0]))).toEqual({ type: 'error', reason: 'Match protocol version mismatch' });
+          await closed;
+          expect(received).toEqual(['error']); // no snapshot/admission
+        } finally { stale.terminate(); }
+      }
+      const client = new WebSocket(url);
+      await once(client, 'open', { signal: AbortSignal.timeout(10_000) });
+      try {
+        const response = once(client, 'message', { signal: AbortSignal.timeout(10_000) });
+        client.send(JSON.stringify({ type: 'join', version: SHARED_VERSION }));
+        const snapshot = JSON.parse(String((await response)[0]));
+        expect(snapshot.type).toBe('snapshot');
+        expect(snapshot.state).not.toHaveProperty('researchQueueVersion');
+        expect(checksumState(snapshot.state)).toBe(checksumState(original));
+        expect(snapshot.settings).toEqual(saved.settings); expect(snapshot.setup).toEqual(saved.setup);
+        const beforeCommand = checksumState(snapshot.state);
+        expect(applyCommand(snapshot.state, { kind: 'research', player: 1, buildingId, tech: 'feudal-age' }))
+          .toEqual({ ok: false, reason: 'building is already researching' });
+        expect(checksumState(snapshot.state)).toBe(beforeCommand);
+      } finally { client.close(); await once(client, 'close'); }
+    } finally { await server.close(); }
+    expect(JSON.parse(readFileSync(checkpoint, 'utf8'))).toEqual(JSON.parse(JSON.stringify({ ...saved, version: SHARED_CHECKPOINT_VERSION })));
+  }
+});
+
 function host(checkpoint: string, port = 0) {
   return spawnSync(process.execPath, ['node_modules/tsx/dist/cli.mjs', 'tools/shared-host.mts'], {
     env: { ...process.env, MATCH_CHECKPOINT: checkpoint, MATCH_PORT: String(port) },
@@ -84,7 +144,7 @@ function host(checkpoint: string, port = 0) {
 describe('shared host startup failure policy', () => {
   it.each([
     JSON.stringify({ version: -1, rulesHash: 'old-rules', state: { tick: 123 } }),
-    JSON.stringify({ version: SHARED_VERSION, rulesHash: 'old-rules', state: { tick: 123 } }),
+    JSON.stringify({ version: SHARED_CHECKPOINT_VERSION, rulesHash: 'old-rules', state: { tick: 123 } }),
     '{interrupted JSON',
   ])('exits without retry status and preserves incompatible checkpoint bytes: %s', bytes => {
     const { checkpoint } = fixture();
@@ -116,7 +176,7 @@ describe('shared host startup failure policy', () => {
     const { rules: ignored, ...state } = createGame(157);
     state.tick = 123;
     const rulesHash = createHash('sha256').update(JSON.stringify(FALLBACK_RULES)).digest('hex');
-    const saved = { version: SHARED_VERSION, rulesHash, state,
+    const saved = { version: SHARED_CHECKPOINT_VERSION, rulesHash, state,
       settings: { speed: 1, paused: true, generation: 2 }, humanTwo: true, setup: { map: 'arabia', seed: 157 } };
     writeFileSync(checkpoint, JSON.stringify(saved));
     const server = await createServer({ root: directory, configFile: false, logLevel: 'silent',
@@ -136,7 +196,7 @@ it('compresses real host snapshots but leaves a large command tick plain (#174)'
   const { directory, checkpoint } = fixture();
   const { rules: ignored, ...state } = createGame(174, FALLBACK_RULES, undefined, 'windsor');
   const settings = { paused: true, speed: 1, generation: 0 };
-  writeFileSync(checkpoint, JSON.stringify({ version: SHARED_VERSION,
+  writeFileSync(checkpoint, JSON.stringify({ version: SHARED_CHECKPOINT_VERSION,
     rulesHash: createHash('sha256').update(JSON.stringify(FALLBACK_RULES)).digest('hex'),
     state, settings, humanTwo: true, setup: { map: 'windsor', seed: 174 } }));
   const server = await createServer({ root: directory, configFile: false, logLevel: 'silent',

@@ -31,6 +31,39 @@ class AtlasSharingTest(unittest.TestCase):
         self.assertEqual(len(groups), 20)
         self.assertTrue(all(len(group) == 1 for group in groups))
 
+    def test_cast_shadow_override_changes_only_the_shadow_source(self):
+        animation = {"source": "back.sld", "scale": 2, "frames": 1, "directions": 1,
+                     "shadow": {"source": "cast.sld", "scale": 1, "frames": 1, "directions": 1}}
+        manifest = {"entities": {"tc": {"category": "building", "animations": {"idle-feudal": animation}}}}
+        groups = shared_atlas_jobs(atlas_jobs(manifest), {"back.sld": "back", "cast.sld": "cast"})
+        work = [w for group in groups for w in group]
+        self.assertEqual(len(work), 5)  # body plus four masks; no extra body for cast.sld
+        self.assertEqual(len({w[0] for w in work}), 5)
+        for identifier, job, image, layer in work:
+            self.assertEqual(job['source'], 'cast.sld' if layer == 'shadow' else 'back.sld')
+            self.assertEqual(job['scale'], 1 if layer == 'shadow' else 2)
+            if layer == 'shadow':
+                self.assertEqual(identifier, 'tc:idle-feudal:shadow')
+                self.assertEqual(image, 'tc/idle-feudal-shadow.png')
+                self.assertTrue(job['required'])
+
+        # The old body's mask must not be reused under the same semantic key.
+        from atlas_cache import AtlasCache, LAYERS
+        cache = AtlasCache({'schema': 2, 'atlases': {'tc:idle-feudal:shadow': {
+            'source': 'back', 'expected': 1, 'image': 'tc/idle-feudal-shadow.png',
+            'atlas': {}, 'layer': 'shadow', 'decoder': 'same'}}},
+            dict.fromkeys(LAYERS, 'same'), 'legacy', Path('.'))
+        shadow = next(w for w in work if w[3] == 'shadow')
+        self.assertIsNone(cache.reuse('cast', shadow[1]['expected'], 'shadow', shadow[2]))
+
+    def test_required_cast_shadow_cannot_be_silently_skipped_or_reused_empty(self):
+        from convert_sld import require_atlas
+        group = [('tc:idle:shadow', {**self.job('tc'), 'required': True}, 'tc/idle-shadow.png', 'shadow')]
+        for atlas, error in [(None, 'decoder failed'), ({}, None)]:
+            with self.assertRaisesRegex(RuntimeError, 'required cast-shadow atlas'):
+                require_atlas(group, atlas, error)
+        require_atlas(group, {'frames': [{'w': 4, 'h': 4}]})
+
     def test_shared_multi_page_art_keeps_per_use_scale_and_every_frame(self):
         jobs = [self.job("a", scale=1), self.job("b", scale=2)]
         main = next(group for group in shared_atlas_jobs(jobs, {"sail.sld": "abc"}) if group[0][3] is None)

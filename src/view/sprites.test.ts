@@ -1510,6 +1510,133 @@ describe('player colour through the imported ramp', () => {
     expect(view.annexColors[0].mesh.visible).toBe(false);
   });
 
+  it('draws annex shadows when the annex atlas includes a shadow layer (#288)', () => {
+    // The East-Asian variant TC's annexes have shadow atlases in the
+    // manifest as annex${i}-${name}-shadow, which must be applied like the
+    // body shadow: visible, black-tinted, and below all sprites.
+    const assets = annexedAssets();
+    const frames = [{ x: 0, y: 0, w: 4, h: 4, cx: 2, cy: 2 }];
+    const shadowTexture = new THREE.DataTexture(new Uint8Array(4 * 4 * 4).fill(128), 4, 4);
+    shadowTexture.needsUpdate = true;
+    assets.textures.set('tc/annex0-idle-shadow.png', shadowTexture);
+    const annex = assets.entities['town-center'].annexes![0];
+    annex.atlases['annex0-idle-shadow'] = {
+      image: 'tc/annex0-idle-shadow.png',
+      size: [4, 4],
+      framesInFile: 1,
+      frames,
+    };
+    assets.shadows = { profile: 'fixture', strength: 0.8, color: [0, 0, 0] };
+
+    const state = createGame();
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const view = createEntityView(assets, tc);
+    updateEntityView(view, assets, state, tc, 0);
+
+    expect(view.annexShadows).toHaveLength(1);
+    expect(view.annexShadows![0].mesh.visible).toBe(true);
+    expect((view.annexShadows![0].mesh.material as THREE.MeshBasicMaterial).map)
+      .toBe(shadowTexture);
+    // Shadow renders below all bodies (ground layer), below annex body
+    expect(view.annexShadows![0].mesh.renderOrder).toBeLessThan(view.annexes[0].mesh.renderOrder);
+    // Shadow opacity matches configured shadow strength
+    expect((view.annexShadows![0].mesh.material as THREE.MeshBasicMaterial).opacity).toBe(0.8);
+  });
+
+  it('binds a separately imported age cast-shadow to the main shadow piece (#288)', () => {
+    const assets = annexedAssets();
+    const imported = assets.entities['town-center'];
+    imported.animations['idle-feudal'] = imported.animations.idle;
+    imported.atlases['idle-feudal'] = imported.atlases.idle;
+    // The converter replaces idle-feudal-shadow, not idle-feudal body art.
+    const texture = new THREE.DataTexture(new Uint8Array(8 * 6 * 4).fill(128), 8, 6);
+    texture.needsUpdate = true;
+    assets.textures.set('cast-shadow.png', texture);
+    imported.atlases['idle-feudal-shadow'] = {
+      image: 'cast-shadow.png', size: [8, 6], scale: 2, framesInFile: 1,
+      frames: [{ x: 0, y: 0, w: 8, h: 6, cx: 5, cy: 4 }],
+    };
+    const annex = imported.annexes![0];
+    annex.atlases['annex0-idle-shadow'] = annex.atlases['annex0-idle'];
+    const state = createGame();
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const view = createEntityView(assets, tc);
+    updateEntityView(view, assets, state, tc, 0);
+    expect(view.shadow.mesh.visible).toBe(false); // no borrowing later-age shadow
+    state.players[1].age = 1;
+    updateEntityView(view, assets, state, tc, 1);
+    const origin = worldToIso(tc.position.x, tc.position.y);
+    expect(view.animationState).toBe('town-center/idle-feudal');
+    expect(view.shadow.mesh.visible).toBe(true);
+    expect((view.shadow.mesh.material as THREE.MeshBasicMaterial).map).toBe(texture);
+    expect(view.shadow.mesh.scale.toArray()).toEqual([4, 3, 1]);
+    expect(view.shadow.mesh.position.x).toBe(origin.x - 0.5);
+    expect(view.shadow.mesh.position.y).toBe(origin.y + 0.5);
+    expect(view.shadow.mesh.renderOrder).toBeLessThan(view.body.mesh.renderOrder);
+    expect(view.body.textureImage).toBe('tc/idle.png');
+    expect(view.annexShadows![0].mesh.visible).toBe(true);
+    tc.buildProgress = 0.5;
+    updateEntityView(view, assets, state, tc, 2);
+    expect(view.shadow.mesh.visible).toBe(false);
+    delete tc.buildProgress; tc.dead = true;
+    updateEntityView(view, assets, state, tc, 3);
+    expect(view.shadow.mesh.visible).toBe(false);
+  });
+
+  it('hides annex shadow when the annex has no shadow atlas', () => {
+    // Fallback: if an annex lacks its own shadow layer in the manifest, do not show one.
+    const assets = annexedAssets();
+    // Deliberately omit the shadow atlas
+    const state = createGame();
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const view = createEntityView(assets, tc);
+    updateEntityView(view, assets, state, tc, 0);
+
+    expect(view.annexShadows).toHaveLength(1);
+    expect(view.annexShadows![0].mesh.visible).toBe(false);
+  });
+
+  it.each(['construction', 'death', 'missing-death', 'layers'] as const)('retires annex shadows on %s, including pending pages (#288)', transition => {
+    const assets = annexedAssets();
+    const imported = assets.entities['town-center'];
+    const annex = imported.annexes![0];
+    const image = 'tc/annex0-idle-shadow.png';
+    annex.atlases['annex0-idle-shadow'] = { ...annex.atlases['annex0-idle'], image };
+    const state = createGame();
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const view = createEntityView(assets, tc);
+    updateEntityView(view, assets, state, tc, 0);
+    expect(view.annexShadows![0].pendingTexture).toBe(image);
+    if (transition === 'construction') tc.buildProgress = 0.5;
+    if (transition === 'missing-death') tc.dead = true;
+    if (transition === 'death') {
+      tc.dead = true;
+      imported.animations.death = imported.animations.idle;
+      imported.atlases.death = imported.atlases.idle;
+    }
+    if (transition === 'layers') {
+      imported.animationLayers = { idle: [{ animation: 'idle', x: 0, y: 0 }] };
+    }
+    updateEntityView(view, assets, state, tc, 1);
+    assets.textures.set(image, assets.textures.get('tc/idle.png')!);
+    refreshEntityTextures(view, assets);
+    expect(view.annexShadows![0].pendingTexture).toBeUndefined();
+    expect(view.annexShadows![0].mesh.visible).toBe(false);
+  });
+
+  it('leaves all ground-shadow RGB unchanged in fog (#288)', () => {
+    const assets = annexedAssets();
+    const state = createGame();
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    const view = createEntityView(assets, tc);
+    const shadows = [view.shadow, ...view.annexShadows!];
+    // Nonblack catches double dimming that the owned Default black conceals.
+    for (const p of shadows) (p.mesh.material as THREE.MeshBasicMaterial).color.setRGB(0.2, 0.3, 0.4);
+    view.layerShadows = [view.annexShadows![0]];
+    dimFogSnapshot(view);
+    for (const p of shadows) expect((p.mesh.material as THREE.MeshBasicMaterial).color.toArray()).toEqual([0.2, 0.3, 0.4]);
+  });
+
   it('shows a unit its contour only while something taller hides it', () => {
     const assets = fakeAssets();
     const frames = [{ x: 0, y: 0, w: 4, h: 4, cx: 2, cy: 2 }];

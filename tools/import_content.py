@@ -324,6 +324,37 @@ def animation_entry(
     }
 
 
+def town_center_shadow(dat: DatFile, graphics_dir: Path | Graphics,
+                       animation: dict[str, Any], hashes: dict[str, str]) -> None:
+    """Keep the TC's extant back SLD, but take its cast mask from the DAT delta.
+
+    This is deliberately not naval.graphic_layers: these negative-SLP parents
+    still have body art. Only a single static, zero-offset, shadow-only leaf
+    can replace the body's shadow atlas without new renderer semantics.
+    """
+    parent = dat.graphics[animation["graphicId"]]
+    shadows = [delta for delta in parent.deltas if delta.graphic_id >= 0
+               and dat.graphics[delta.graphic_id].layer == 5]
+    if not shadows:
+        return
+    if len(shadows) != 1:
+        raise ValueError(f"TC graphic {animation['graphicId']}: multiple cast-shadow deltas")
+    delta = shadows[0]
+    graphic = dat.graphics[delta.graphic_id]
+    if (delta.offset_x or delta.offset_y or graphic.frame_count != 1 or graphic.angle_count != 1
+            or animation["frames"] != 1 or animation["directions"] != 1
+            or any(child.graphic_id >= 0 for child in graphic.deltas)):
+        raise ValueError(f"TC shadow {delta.graphic_id}: unreviewed offset/animation/composition")
+    shadow = animation_entry(dat, graphics_dir, delta.graphic_id, hashes)
+    # Some unenabled architectures (Andean) have main art in a layer5 delta.
+    # Never silently discard it by treating the file as just a BC4 mask.
+    from sld_layers import decode_colors
+    source = Graphics.of(graphics_dir).path(shadow["source"])
+    if any(frame is not None and not frame.empty for frame in decode_colors(source.read_bytes())):
+        raise ValueError(f"TC shadow {delta.graphic_id}: delta also contains body art")
+    animation["shadow"] = shadow
+
+
 def dead_standing_graphic(civ_units: Any, unit: Any) -> int:
     """The art of what a unit leaves behind, or -1 when it leaves nothing."""
     if unit.dying_graphic is None or unit.dying_graphic < 0:
@@ -1109,6 +1140,11 @@ def extract_entity(
                 }
             )
         entity["annexes"] = annexes
+
+    if spec["key"] == "town-center":
+        for name, animation in entity["animations"].items():
+            if name == "idle" or name.startswith("idle-"):
+                town_center_shadow(dat, graphics_dir, animation, hashes)
 
     return entity
 

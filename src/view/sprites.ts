@@ -77,6 +77,8 @@ export interface EntityView {
   annexes: Piece[];
   /** Player-colour mask over each annex, in the same order. */
   annexColors: Piece[];
+  /** Shadow under each annex, in the same order. */
+  annexShadows?: Piece[];
   layerShadows?: Piece[];
   layerOutlines?: Piece[];
   garrisonFlags?: Piece[];
@@ -189,6 +191,7 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
     leap = makePiece();
     group.add(leap.mesh);
   }
+  const annexShadows: Piece[] = [];
   if (imported?.annexes || imported?.animationLayers) {
     const count = Math.max(imported.annexes?.length ?? 0,
       ...Object.values(imported.animationLayers ?? {}).map(layers => layers.length - 1));
@@ -202,10 +205,15 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
       const annexColor = ramp ? makeRampPiece(ramp) : makePiece();
       annexColors.push(annexColor);
       group.add(annexColor.mesh);
+      // Each annex may have its own shadow layer.
+      const annexShadow = makePiece();
+      annexShadows.push(annexShadow);
+      group.add(annexShadow.mesh);
     }
   }
   const view: EntityView = {
-    group, owner: entity.owner, shadow, body, color, outline, annexes, annexColors, leap, fallback: !imported,
+    group, owner: entity.owner, shadow, body, color, outline, annexes, annexColors,
+    annexShadows: annexShadows.length > 0 ? annexShadows : undefined, leap, fallback: !imported,
     flames: [],
     facing: entity.owner === 2 ? Math.PI : 0,
     playerColor: playerColorHex(assets, entity.owner),
@@ -575,7 +583,7 @@ function configureShadow(piece: Piece, assets: ContentAssets): void {
 export function refreshEntityTextures(view: EntityView, assets: ContentAssets | undefined): void {
   if (!assets) return;
   for (const piece of [view.body, view.shadow, view.color, view.damage, view.leap,
-    ...view.annexes, ...view.annexColors, ...(view.layerShadows ?? []), ...(view.layerOutlines ?? []),
+    ...view.annexes, ...view.annexColors, ...(view.annexShadows ?? []), ...(view.layerShadows ?? []), ...(view.layerOutlines ?? []),
     ...(view.garrisonFlags ?? []), ...(view.garrisonColors ?? []), ...view.flames, view.outline]) {
     if (!piece) continue;
     const contour = piece === view.outline || !!view.layerOutlines?.includes(piece);
@@ -601,7 +609,7 @@ export function refreshEntityTextures(view: EntityView, assets: ContentAssets | 
  * through their trunks. Shadows and farm patches already receive ground fog. */
 export function dimFogSnapshot(view: EntityView): void {
   for (const piece of [view.body, view.color, view.outline, view.damage, view.leap,
-    ...view.annexes, ...view.annexColors, ...(view.layerShadows ?? []),
+    ...view.annexes, ...view.annexColors,
     ...(view.garrisonFlags ?? []), ...(view.garrisonColors ?? []), ...view.flames]) {
     if (piece) (piece.mesh.material as THREE.MeshBasicMaterial).color.multiplyScalar(1 - FOG_EXPLORED);
   }
@@ -1108,6 +1116,13 @@ export function updateEntityView(
   };
   const coherentUnit = !!assets && !view.fallback && isUnit(entity.kind) && !entity.dead;
   if (!coherentUnit) clearOutlines();
+  // Retire old annex masks even on early returns (missing death art). A late
+  // page must not revive one in a frozen construction/death snapshot.
+  for (const piece of view.annexShadows ?? []) {
+    piece.mesh.visible = false;
+    piece.pendingTexture = undefined;
+    piece.textureImage = undefined;
+  }
   updateGarrisonFlags(view, assets, state, entity, time, hasGarrison);
   if (entity.kind === 'farm') {
     updateFarmView(view, assets, state, entity);
@@ -1220,7 +1235,7 @@ export function updateEntityView(
     // drawing its living self there is worse than drawing nothing (issue #12).
     if (entity.dead) {
       for (const piece of [view.body, view.color, view.shadow, view.outline, ...view.annexes, ...view.annexColors,
-        ...(view.layerShadows ?? []), ...(view.layerOutlines ?? [])]) piece.mesh.visible = false;
+        ...(view.annexShadows ?? []), ...(view.layerShadows ?? []), ...(view.layerOutlines ?? [])]) piece.mesh.visible = false;
       return;
     }
     animation = imported?.animations['idle'];
@@ -1317,7 +1332,7 @@ export function updateEntityView(
       refreshEntityTextures(view, assets);
       if (view.poseAnchor) {
         for (const piece of [view.body, view.color, view.shadow, view.outline,
-          ...view.annexes, ...view.annexColors, ...(view.layerShadows ?? []), ...(view.layerOutlines ?? [])]) {
+          ...view.annexes, ...view.annexColors, ...(view.annexShadows ?? []), ...(view.layerShadows ?? []), ...(view.layerOutlines ?? [])]) {
           piece.mesh.position.x += anchor.x - view.poseAnchor.x;
           piece.mesh.position.y += anchor.y - view.poseAnchor.y;
         }
@@ -1416,6 +1431,7 @@ export function updateEntityView(
   // technology as the building itself, so each follows the same chain.
   const annexAge = isBuilding(entity.kind) ? ageChain(state, entity) : ['idle'];
   for (const [index, piece] of view.annexes.entries()) {
+    const shadowPiece = view.annexShadows?.[index];
     const layer = imported?.animationLayers?.[choice.name]?.[index + 1];
     if (imported?.animationLayers) {
       const colorPiece = view.annexColors[index];
@@ -1460,6 +1476,7 @@ export function updateEntityView(
     if (!annex || !annexAtlas || entity.buildProgress !== undefined || entity.dead) {
       piece.mesh.visible = false;
       if (colorPiece) colorPiece.mesh.visible = false;
+      if (shadowPiece) shadowPiece.mesh.visible = false;
       continue;
     }
     // Annex art is anchored by its own frame hotspot; the DAT misplacement
@@ -1481,6 +1498,16 @@ export function updateEntityView(
     } else if (colorPiece) {
       colorPiece.mesh.visible = false;
     }
+    // Shadow layer for the annex, if available. Like entity shadows, these are
+    // anchored by their own hotspot and drawn below every body.
+    const annexShadowAtlas = annex.atlases[`annex${index}-${annexName}-shadow`];
+    if (shadowPiece && annexShadowAtlas) {
+      applyFrame(shadowPiece, assets, annexShadowAtlas, 0, entity.position, 0x000000);
+      shadowPiece.mesh.renderOrder = groundLayerOrder(500, depth);
+      configureShadow(shadowPiece, assets);
+    } else if (shadowPiece) {
+      shadowPiece.mesh.visible = false;
+    }
   }
 
   // `applyFrame` anchors every piece on the flat world point. Raise the whole
@@ -1488,6 +1515,6 @@ export function updateEntityView(
   const raise = elevationAt(state, entity.position.x, entity.position.y) * ELEVATION_PIXELS;
   for (const piece of [
     view.shadow, view.body, view.color, view.outline, ...view.annexes, ...view.annexColors,
-    ...(view.layerShadows ?? []), ...(view.layerOutlines ?? []),
+    ...(view.annexShadows ?? []), ...(view.layerShadows ?? []), ...(view.layerOutlines ?? []),
   ]) piece.mesh.position.y += raise;
 }

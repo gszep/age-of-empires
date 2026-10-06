@@ -1,10 +1,10 @@
 import type { Activity, Command, EntityKind, Order, PlayerId, ResourceKind, UnitKind } from '../sim/types';
 import type { NodeKind } from '../sim/data';
 
-/** v8 adds compact explored terrain/elevation, enabling fog-safe coastal planning. */
-export const PROTOCOL_VERSION = 8;
-/** v2 records carry an explicit mode; legacy v1 records mean random map. */
-export const MATCH_FORMAT_VERSION = 2;
+/** v9 adds own-building waiting research and indexed research cancellation. */
+export const PROTOCOL_VERSION = 9;
+/** v3 enables research queues; v1/v2 replays retain busy-building rejection. */
+export const MATCH_FORMAT_VERSION = 3;
 
 export interface ObservedEntity {
   id: number;
@@ -33,6 +33,8 @@ export interface ObservedEntity {
   training?: { kind: UnitKind; remainingSeconds: number };
   /** What it is researching; own buildings only, like `training`. */
   researching?: { tech: string; remainingSeconds: number };
+  /** Waiting research technologies in FIFO order; own buildings only. */
+  researchQueue?: string[];
   /** Own carriers/buildings only: all occupants, including nested passengers.
    * They are not separate entries in the visible entity list. */
   garrisoned?: number;
@@ -92,7 +94,7 @@ export interface RejectedCommand {
 export interface MatchConfig {
   wonderVictory?: boolean;
   populationLimit?: number;
-  version: 1 | typeof MATCH_FORMAT_VERSION;
+  version: 1 | 2 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   maxTimeSeconds?: number;
   decideIntervalSeconds?: number;
@@ -124,7 +126,7 @@ export interface PlayerSummary {
 export interface MatchResult {
   mode?: import('../sim/types').GameMode;
   draw?: boolean;
-  version: 1 | typeof MATCH_FORMAT_VERSION;
+  version: 1 | 2 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   timeSeconds: number;
   winner?: PlayerId;
@@ -154,7 +156,7 @@ export interface MatchRecord {
   wonderVictory?: boolean;
   populationLimit?: number;
   mode?: import('../sim/types').GameMode;
-  version: 1 | typeof MATCH_FORMAT_VERSION;
+  version: 1 | 2 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   rulesOrigin: 'fallback' | 'imported';
   /**

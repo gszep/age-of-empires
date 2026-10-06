@@ -1,5 +1,28 @@
 # Ledger of approximations
 
+## Research queues (#293)
+
+Owned `depot_813782/widgetui/commandpanel.json` supplies the `QueueButtons`
+anchor; English localization 42100/42108 describes active/waiting research
+cancellation, 300178 describes the unit/technology queue, and 72608 explicitly
+describes DE mixed queuing. Research uses existing DAT costs, times, prerequisites
+and technology icons. **Inferred integration:** separate research FIFO paid on
+enqueue, exact paid-cost refund on cancellation, player-wide duplicate exclusion,
+and a single refund if a queued technology completes elsewhere before starting.
+Default cancellation removes the last entry, matching our training command;
+portrait clicks explicitly name the displayed index (active is zero).
+Death/capture discard research without refunds, matching the existing capture policy.
+The pre-existing concurrent training/research lanes remain: **DE's single mixed
+queue is not modelled**. Waiting research is drawn before the training row using
+the existing portrait geometry; no new native timing/layout calibration is claimed.
+Protocol v9 exposes a detached, own-player-only research queue. Match format v3
+enables these rules; v1/v2 replay states omit `researchQueueVersion` and retain
+busy-building rejection, legacy duplicate admission and corpse research fields.
+Legacy snapshots likewise retain their old research behavior.
+Shared client admission is v5: v4 simulators cannot join. Checkpoint compatibility
+is separate; the host still loads v4 checkpoints without adding a research marker,
+preserving their state and paid research. Subsequent saves use a v5 envelope.
+
 Every value, rule or picture in imported mode that is **not** read from the
 owned files, with where it came from and where it lives. `AGENTS.md`'s
 "downloaded-content first" rule requires each to be recorded here the day it

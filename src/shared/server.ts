@@ -12,7 +12,7 @@ import { matchOver } from '../sim/regicide';
 import { validateCommand } from '../protocol/validate';
 import type { PlayerId } from '../sim/types';
 import { SharedMatch } from './match';
-import { SHARED_SPEEDS, SHARED_VERSION, type HostMessage } from './protocol';
+import { SHARED_CHECKPOINT_VERSION, SHARED_SPEEDS, SHARED_VERSION, type HostMessage } from './protocol';
 import { SNAPSHOT_COMPRESSION } from './snapshot-compression';
 
 /** EX_CONFIG: retrying cannot repair a saved match; leave it for its owner. */
@@ -43,7 +43,7 @@ export function sharedMatchPlugin(root: string, checkpointPath = resolve(root, '
           if (error instanceof SyntaxError) throw new SharedCheckpointError(checkpoint, 'is not valid JSON');
           throw error;
         }
-        if (!saved || saved.version !== SHARED_VERSION || saved.rulesHash !== rulesHash || !validGameMode(saved.state?.mode)
+        if (!saved || ![4, SHARED_CHECKPOINT_VERSION].includes(saved.version) || saved.rulesHash !== rulesHash || !validGameMode(saved.state?.mode)
           || !validPopulationLimit(saved.state?.populationLimit) || !validWonderVictory(saved.state?.wonderVictory)) {
           throw new SharedCheckpointError(checkpoint, 'uses different rules/version');
         }
@@ -86,7 +86,7 @@ export function sharedMatchPlugin(root: string, checkpointPath = resolve(root, '
         if (pristine) return;
         mkdirSync(resolve(root, '.local'), { recursive: true });
         const { rules: _rules, ...state } = match.state;
-        writeFileSync(checkpoint + '.tmp', JSON.stringify({ version: SHARED_VERSION, rulesHash, state, settings: match.settings, humanTwo: match.humanTwo, setup: match.setup }));
+        writeFileSync(checkpoint + '.tmp', JSON.stringify({ version: SHARED_CHECKPOINT_VERSION, rulesHash, state, settings: match.settings, humanTwo: match.humanTwo, setup: match.setup }));
         renameSync(checkpoint + '.tmp', checkpoint);
       };
       server.middlewares.use('/__match/config', (_req, res) => {

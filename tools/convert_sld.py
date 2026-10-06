@@ -312,12 +312,12 @@ def published(atlas: dict[str, Any], image: str, scale: int) -> dict[str, Any]:
 
 
 def atlas_jobs(imported: dict[str, Any]) -> list[dict[str, Any]]:
-    """Every main-layer atlas to produce."""
+    """Body/mask jobs, including an explicit source for a TC cast-shadow mask."""
     jobs: list[dict[str, Any]] = []
 
     def add(key: str, animations: dict[str, Any], category: str, prefix: str = "") -> None:
         for state, animation in animations.items():
-            jobs.append({
+            job = {
                 "key": key,
                 "name": f"{prefix}{state}",
                 "source": animation["source"],
@@ -329,7 +329,16 @@ def atlas_jobs(imported: dict[str, Any]) -> list[dict[str, Any]]:
                 # else asks for it, and a unit's sheet carries one too.
                 "layers": MASK_LAYERS if category == "building" and state.startswith("idle")
                           else tuple(layer for layer in MASK_LAYERS if layer != "damage"),
-            })
+            }
+            shadow = animation.get("shadow")
+            if shadow:
+                # One semantic shadow atlas, never two writers racing for the
+                # same key. Body, colour, outline and damage keep their source.
+                job["layers"] = tuple(layer for layer in job["layers"] if layer != "shadow")
+                jobs.append({**job, "source": shadow["source"], "scale": shadow.get("scale", 1),
+                             "expected": shadow["frames"] * shadow["directions"],
+                             "main": False, "layers": ("shadow",), "required": True})
+            jobs.append(job)
 
     from civilization_profiles import art_entities
     for key, entity in art_entities(imported).items():
@@ -351,7 +360,8 @@ def shared_atlas_jobs(jobs: list[dict[str, Any]], hashes: dict[str, str]) -> lis
     """
     groups: dict[tuple[Any, ...], list[AtlasWork]] = {}
     for job in jobs:
-        for layer in (None, *job["layers"]):
+        layers = (None, *job["layers"]) if job.get("main", True) else job["layers"]
+        for layer in layers:
             suffix = "" if layer is None else f"-{layer}"
             identifier = f"{job['key']}:{job['name']}" + ("" if layer is None else f":{layer}")
             image = f"{job['key']}/{job['name']}{suffix}.png"
@@ -373,6 +383,12 @@ def _convert_one(work: tuple[str, str, str, int, str | None]) -> tuple[str, dict
         return identifier, convert_mask(Path(source), Path(output), expected, layer), None
     except Exception as error:  # noqa: BLE001 - reported to the parent, which decides
         return identifier, None, f"{type(error).__name__}: {error}"
+
+
+def require_atlas(group: list[AtlasWork], atlas: dict[str, Any] | None, error: str | None = None) -> None:
+    """An explicitly sourced cast shadow is required, on cache hits too."""
+    if any(job.get("required") for _, job, _, _ in group) and (error is not None or not atlas):
+        raise RuntimeError(f"{group[0][0]}: required cast-shadow atlas: {error or 'empty mask'}")
 
 
 def write_cache(path: Path, fingerprint: str, cache: dict[str, Any]) -> None:
@@ -480,6 +496,7 @@ def main() -> None:
     pending: list[list[AtlasWork]] = []
 
     def publish_group(group: list[AtlasWork], atlas: dict[str, Any]) -> None:
+        require_atlas(group, atlas)
         image = group[0][2]
         for identifier, job, _alias_image, layer in group:
             suffix = "" if layer is None else f"-{layer}"
@@ -513,6 +530,7 @@ def main() -> None:
             identifier, atlas, error = item
             group = by_identifier[identifier]
             layer = group[0][3]
+            require_atlas(group, atlas, error)
             if error is not None:
                 if layer is None:
                     raise RuntimeError(f"{identifier}: {error}")

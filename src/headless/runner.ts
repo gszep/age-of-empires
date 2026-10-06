@@ -22,7 +22,7 @@ export async function runMatch(
   strategies: Record<PlayerId, Strategy>,
   rules: GameRules = FALLBACK_RULES,
 ): Promise<{ result: MatchResult; record: MatchRecord }> {
-  if (config.version !== 1 && config.version !== 2) throw new Error('unknown match format');
+  if (![1, 2, 3].includes(config.version)) throw new Error('unknown match format');
   if (config.version === 1 && config.mode !== undefined) throw new Error('game mode requires match format v2');
   if (config.version === 1 && config.populationLimit !== undefined) throw new Error('population limit requires match format v2');
   if (config.version === 1 && config.wonderVictory !== undefined) throw new Error('Wonder victory requires match format v2');
@@ -75,7 +75,7 @@ export async function runMatch(
   }
 
   const result: MatchResult = {
-    version: 2,
+    version: 3,
     mode: config.mode ?? 'random-map',
     seed: config.seed,
     timeSeconds: Math.round(gameTimeSeconds(state) * 100) / 100,
@@ -90,7 +90,7 @@ export async function runMatch(
   const record: MatchRecord = {
     ...(config.wonderVictory !== undefined ? { wonderVictory: config.wonderVictory } : {}),
     ...(config.populationLimit !== undefined ? { populationLimit: config.populationLimit } : {}),
-    version: 2,
+    version: 3,
     seed: config.seed,
     rulesOrigin: rules.origin,
     civilizations: { 1: state.players[1].civilization, 2: state.players[2].civilization },
@@ -127,6 +127,7 @@ export function replayRecord(
     return { ok: false, checked: 0, expected: 'valid Wonder victory setting', actual: String(record.wonderVictory) };
   }
   const state = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode, record.populationLimit, record.wonderVictory);
+  if (record.version < 3) delete state.researchQueueVersion;
   const commands = [...record.commands];
   const checksums = new Map(record.checksums.map(entry => [entry.tick, entry.hash]));
   const lastTick = record.checksums.at(-1)?.tick ?? 0;

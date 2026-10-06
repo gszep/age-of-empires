@@ -31,7 +31,7 @@
       "properties": { "buy": { "$ref": "#/definitions/commodityPrices" }, "sell": { "$ref": "#/definitions/commodityPrices" },
         "tributeFee": { "type": "integer", "minimum": 0 } }, "required": ["buy", "sell", "tributeFee"] },
     "version": {
-      "const": 8
+      "const": 9
     },
     "time": {
       "type": "number",
@@ -502,6 +502,10 @@
               "remainingSeconds"
             ],
             "additionalProperties": false
+          },
+          "researchQueue": {
+            "type": "array",
+            "items": { "type": "string" }
           },
           "researching": {
             "type": "object",

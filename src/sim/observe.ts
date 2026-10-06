@@ -68,6 +68,10 @@ function observeEntity(state: GameState, entity: Entity, player: PlayerId): Obse
         remainingSeconds: Math.round(entity.researching.remainingTicks / workRate * TICK_SECONDS * 100) / 100,
       };
     }
+    // Observation consumers must not be able to mutate the authoritative queue.
+    if (entity.researchQueue?.length) {
+      observed.researchQueue = [...entity.researchQueue];
+    }
   }
   return observed;
 }

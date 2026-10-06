@@ -233,6 +233,7 @@ function startReplay(raw: unknown): void {
   // A record from before civilisations were written down replays as whatever
   // the content is for, which is what it was played as.
   game = createGame(record.seed, rules, record.civilizations, record.map ?? 'arabia', record.mode, record.populationLimit, record.wonderVictory);
+  if (record.version < 3) delete game.researchQueueVersion;
   activeSetup = { map: record.map ?? 'arabia', seed: record.seed, mode: record.mode, civilizations: record.civilizations,
     ...(record.populationLimit !== undefined ? { populationLimit: record.populationLimit } : {}),
     ...(record.wonderVictory ? { wonderVictory: true } : {}) };
@@ -463,9 +464,9 @@ function createHud(): Hud {
       applyCommand(game, { kind: 'cancel-train', player: localPlayer, buildingId, index });
       hud.setSelection(selectionInfo());
     },
-    onCancelResearch: buildingId => {
+    onCancelResearch: (buildingId, index) => {
       if (replay) return;
-      const result = applyCommand(game, { kind: 'cancel-research', player: localPlayer, buildingId });
+      const result = applyCommand(game, { kind: 'cancel-research', player: localPlayer, buildingId, index });
       if (!result.ok) reject(result.reason);
       hud.setSelection(selectionInfo());
     },
@@ -1407,6 +1408,8 @@ function currentCommands(): CommandButton[] {
     const building = selection.find(e => e.kind === tech.researchedAt && e.buildProgress === undefined);
     if (!building) continue;
     if (player1.researched.includes(key)) continue;
+    if (game.entities.some(e => !e.dead && e.owner === localPlayer
+      && (e.researching?.tech === key || e.researchQueue?.includes(key)))) continue;
     if (rules.civilizationBonuses?.nodes[tech.techId]?.disabled) continue;
     if (tech.requiredTechCount === undefined && player1.age < tech.requiresAge) continue;
     // AoE2 does not show a technology whose predecessor is still outstanding:
@@ -1418,7 +1421,7 @@ function currentCommands(): CommandButton[] {
       label: `Research ${tech.name} (${costLabel(researchCost)})`,
       help: tech.help ? plainHelp(tech.help, researchCost) : undefined,
       slot: tech.button,
-      enabled: !building.researching,
+      enabled: (!building.researching || !!game.researchQueueVersion) && !shortfall(game, localPlayer, researchCost),
       icon: hud.iconFor('Techs', tech.iconId, localPlayer),
     });
   }
@@ -1723,14 +1726,14 @@ function selectionInfo(): SelectionInfo | undefined {
         name: displayName(kind),
         icon: hud.iconFor('Units', importedEntity(kind, entity.owner)?.iconId, entity.owner),
       })),
-      ...(entity.researching ? { research: (() => {
-        const tech = rules.technologies[entity.researching.tech as TechKey];
+      ...(entity.researching ? { research: [entity.researching.tech, ...(entity.researchQueue ?? [])].map(key => {
+        const tech = rules.technologies[key as TechKey];
         return {
           name: tech.name,
           icon: hud.iconFor('Techs', tech.iconId, entity.owner),
           cancelLabel: messages.stopResearching ?? 'Click to stop researching this item.',
         };
-      })() } : {}),
+      }) } : {}),
     } : undefined,
     name,
     hpColor: preferences.palette !== 'default' && (entity.owner === 1 || entity.owner === 2)

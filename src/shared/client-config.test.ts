@@ -49,9 +49,9 @@ it.each(['502', 'network', 'malformed', 'missing-fields', 'invalid-player', 'une
   expect(fetch).toHaveBeenCalledTimes(2);
 });
 
-it('shows a protocol mismatch instead of silently starting solo', async () => {
+it.each([4, SHARED_VERSION + 1])('rejects incompatible host version %s instead of joining or silently starting solo', async version => {
   vi.stubGlobal('location', { search: '' });
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ enabled: true, version: SHARED_VERSION + 1, player: 1 })));
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ enabled: true, version, player: 1 })));
   const notice = vi.fn(), resume = vi.fn();
   await expect(connectSharedMatch(resume, notice)).rejects.toThrow('version mismatch');
   expect(notice).toHaveBeenCalledWith(expect.stringContaining('version mismatch'));

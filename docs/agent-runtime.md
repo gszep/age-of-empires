@@ -16,8 +16,10 @@ replay driver ─┘
 production and hidden state are not strategy inputs. Text descriptions derive
 from structured observations, not from a second interpretation of the world.
 
-`src/protocol/types.ts` is authoritative for versions: observations are **v8**;
-new match configs/results/records are **v2**. Legacy v1 records mean random map
+`src/protocol/types.ts` is authoritative for versions: observations are **v9**
+(including own-building waiting research); new match configs/results/records
+are **v3**. Replay of v1/v2 retains the pre-queue research rules, including
+rejection of research commands sent to a busy building. Legacy v1 records mean random map
 and cannot carry newer mode/population/Wonder settings. Explored terrain is
 run-length encoded with unknown cells retained as unknown. Shared-network and
 dev-snapshot versions are separate contracts, not observation versions.

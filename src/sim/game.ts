@@ -127,6 +127,7 @@ export function createGame(
     start.x = Math.round(width * (0.5 - (radius.min + Math.floor(random01(rng) * (radius.max - radius.min + 1))) / 100));
   }
   const state: GameState = {
+    researchQueueVersion: 1,
     ...(wonderVictory ? { wonderVictory: true } : {}),
     ...(populationLimit !== undefined ? { populationLimit } : {}),
     ...(mode === 'regicide' ? { mode } : {}),
@@ -945,7 +946,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
     if (!building) return rejected(`building ${command.buildingId} is not owned`);
     if (building.buildProgress !== undefined) return rejected('building is under construction');
-    if (building.researching) return rejected('building is already researching');
+    if (!state.researchQueueVersion && building.researching) return rejected('building is already researching');
     const technologies = rulesForPlayer(state, command.player).technologies;
     const tech = Object.hasOwn(technologies, command.tech) ? technologies[command.tech as TechKey] : undefined;
     if (state.mode === 'regicide' && tech?.effects.some(e => e.resource === 'spies')) return rejected('Spies is unavailable in Regicide; use Treason');
@@ -956,6 +957,10 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     if (tech.researchedAt !== building.kind) return rejected(`${building.kind} cannot research ${command.tech}`);
     const player = state.players[command.player];
     if (player.researched.includes(command.tech)) return rejected(`${command.tech} is already researched`);
+    if (state.researchQueueVersion && state.entities.some(e => !e.dead && e.owner === command.player
+      && (e.researching?.tech === command.tech || e.researchQueue?.includes(command.tech)))) {
+      return rejected(`${command.tech} is already active or queued`);
+    }
     if (rulesForPlayer(state, command.player).civilizationBonuses?.nodes[tech.techId]?.disabled) {
       return rejected(`${command.tech} is disabled by the technology tree`);
     }
@@ -968,20 +973,57 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     const cost = researchCostFor(state, command.player, command.tech);
     const paid = spendCost(state, command.player, cost);
     if (!paid.ok) return paid;
-    building.researching = {
-      tech: command.tech,
-      remainingTicks: Math.round(researchSecondsFor(state, command.player, command.tech) * TICKS_PER_SECOND),
-      paidCost: { ...cost },
-    };
+    // If already researching, add to queue; otherwise start research
+    if (building.researching) {
+      if (!building.researchQueue) building.researchQueue = [];
+      building.researchQueue.push(command.tech);
+      if (!building.researchQueueCosts) building.researchQueueCosts = [];
+      building.researchQueueCosts.push({ ...cost });
+    } else {
+      building.researching = {
+        tech: command.tech,
+        remainingTicks: Math.round(researchSecondsFor(state, command.player, command.tech) * TICKS_PER_SECOND),
+        paidCost: { ...cost },
+      };
+    }
     return { ok: true };
   }
 
   if (command.kind === 'cancel-research') {
     const building = state.entities.find(e => e.id === command.buildingId && e.owner === command.player && !e.dead);
     if (!building) return rejected(`building ${command.buildingId} is not owned`);
-    if (!building.researching) return rejected('nothing is being researched');
-    const cost = building.researching.paidCost ?? researchCostFor(state, command.player, building.researching.tech);
-    building.researching = undefined;
+
+    // Compute total queued count: current researching (if any) + queue
+    const queue = building.researchQueue ?? [];
+    const totalQueued = (building.researching ? 1 : 0) + queue.length;
+    if (!totalQueued) return rejected('nothing is being researched');
+
+    // Default index: last queued item (or current if no queue)
+    const index = command.index ?? totalQueued - 1;
+    if (!Number.isInteger(index) || index < 0 || index >= totalQueued) return rejected('invalid research queue index');
+
+    let refund: string | undefined;
+    let paidCost: Cost | undefined;
+
+    if (index > 0 || !building.researching) {
+      // Cancelling from queue (not currently researching)
+      const waitingIndex = index - (building.researching ? 1 : 0);
+      refund = queue[waitingIndex];
+      paidCost = building.researchQueueCosts?.[waitingIndex];
+      building.researchQueueCosts = building.researchQueueCosts?.filter((_, i) => i !== waitingIndex);
+      building.researchQueue = queue.filter((_, i) => i !== waitingIndex);
+      if (!building.researchQueue.length) building.researchQueue = undefined;
+      if (!building.researchQueueCosts?.length) building.researchQueueCosts = undefined;
+    } else if (building.researching) {
+      // Cancelling current research (index === 0 and researching exists)
+      refund = building.researching.tech;
+      paidCost = building.researching.paidCost;
+      building.researching = undefined;
+      startNextResearch(state, building);
+    }
+
+    if (!refund) return rejected('nothing is being researched');
+    const cost = paidCost ?? researchCostFor(state, command.player, refund);
     const player = state.players[command.player];
     player.food += cost.food; player.wood += cost.wood;
     player.gold += cost.gold; player.stone += cost.stone;
@@ -1608,6 +1650,10 @@ function kill(state: GameState, entity: Entity): void {
   // refund a queue that is razed, and neither does this.
   entity.trainingQueue = undefined;
   entity.trainingQueueCosts = undefined;
+  // Legacy replay corpses retained active research; preserve their checksums.
+  if (state.researchQueueVersion) entity.researching = undefined;
+  entity.researchQueue = undefined;
+  entity.researchQueueCosts = undefined;
   // The DAT states how long a body lies there, on the corpse unit itself.
   // Never shorter than the death graphic, or the thing vanishes mid-fall.
   entity.decayTicks = corpseLifetimeTicks(state, entity);
@@ -3236,6 +3282,7 @@ function updateBuildingResearch(state: GameState, entity: Entity): void {
   entity.researching = undefined;
   completeResearch(state, entity.owner as PlayerId, key);
   activateAutomaticTechnologies(state);
+  startNextResearch(state, entity);
 }
 
 /** How many units a building has spoken for: the one on the anvil and the queue. */
@@ -3278,6 +3325,30 @@ function startNextTraining(state: GameState, entity: Entity): void {
       paidCost: entity.trainingQueueCosts?.[0],
     };
     entity.trainingQueueCosts = queue.length > 1 ? entity.trainingQueueCosts?.slice(1) : undefined;
+  }
+}
+
+/** Advance FIFO, refunding already-completed entries exactly once (e.g. an
+ * automatic technology grant, or a pre-existing duplicate in a saved queue). */
+function startNextResearch(state: GameState, entity: Entity): void {
+  const player = state.players[entity.owner as PlayerId];
+  while (entity.researchQueue?.length) {
+    const tech = entity.researchQueue.shift()!;
+    const paidCost = entity.researchQueueCosts?.shift();
+    if (!entity.researchQueue.length) entity.researchQueue = undefined;
+    if (!entity.researchQueueCosts?.length) entity.researchQueueCosts = undefined;
+    if (player.researched.includes(tech)) {
+      const cost = paidCost ?? researchCostFor(state, entity.owner as PlayerId, tech);
+      player.food += cost.food; player.wood += cost.wood;
+      player.gold += cost.gold; player.stone += cost.stone;
+      continue;
+    }
+    entity.researching = {
+      tech,
+      remainingTicks: Math.round(researchSecondsFor(state, entity.owner as PlayerId, tech) * TICKS_PER_SECOND),
+      paidCost,
+    };
+    return;
   }
 }
 

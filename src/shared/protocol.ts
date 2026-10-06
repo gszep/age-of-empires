@@ -1,8 +1,11 @@
 import type { Command, GameState } from '../sim/types';
 import type { MatchSetup } from '../match-setup';
 
-/** v4: opt-in Wonder countdown/win state; older simulators must not join these matches. */
-export const SHARED_VERSION = 4;
+/** v5: research queues; v4 simulators reject or fail to advance queued research. */
+export const SHARED_VERSION = 5;
+/** Persisted format is separate from client admission. The host also reads v4
+ * checkpoints without adding the new research-rule marker to their state. */
+export const SHARED_CHECKPOINT_VERSION = 5;
 export const SHARED_SPEEDS = [1, 1.5, 1.7, 2, 5, 10];
 /** Native Normal; existing persisted indices retain their original multiplier. */
 export const DEFAULT_GAME_SPEED = 2;

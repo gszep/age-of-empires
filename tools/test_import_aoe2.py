@@ -1298,6 +1298,120 @@ class ContentImportIntegrationTest(unittest.TestCase):
             self.assertIn(f"idle-{age}", annex)
         self.assertNotEqual(annex["idle"]["source"], annex["idle-feudal"]["source"])
 
+    def test_tc_cast_shadow_extraction_keeps_body_annexes_and_naval_policy(self):
+        from naval import graphic_layers
+        dat = _dat()
+        profiles = [self.result, *self.result['civilizations'].values()]
+        for profile in profiles:
+            tc = profile['entities']['town-center']
+            self.assertNotIn('shadow', tc['animations']['idle'])
+            for age in ('feudal', 'castle', 'imperial'):
+                name = f'idle-{age}'
+                body = tc['animations'][name]
+                parent = dat.graphics[body['graphicId']]
+                delta, = [d for d in parent.deltas if d.graphic_id >= 0
+                          and dat.graphics[d.graphic_id].layer == 5]
+                source = dat.graphics[delta.graphic_id]
+                shadow = body['shadow']
+                self.assertEqual(body['source'], sld(parent.file_name.removesuffix('_x1')))
+                self.assertEqual(shadow['source'], sld(source.file_name.removesuffix('_x1')))
+                self.assertEqual(shadow['graphicId'], delta.graphic_id)
+                self.assertEqual((shadow['frames'], shadow['directions']), (1, 1))
+                self.assertEqual((delta.offset_x, delta.offset_y), (0, 0))
+                self.assertEqual(profile['source']['sha256'][shadow['source']], sha256(SOURCES.path(shadow['source'])))
+                for annex in tc['annexes']:
+                    self.assertNotIn('shadow', annex['animations'][name])
+                # Do NOT make negative-SLP placeholder parents naval body art.
+                self.assertLess(parent.slp, 0)
+                self.assertEqual(graphic_layers(dat, body['graphicId']), [(delta.graphic_id, 0, 0)])
+        west = self.result['entities']['town-center']['animations']['idle-feudal']
+        asian = self.result['civilizations']['japanese']['entities']['town-center']['animations']['idle-feudal']
+        self.assertEqual((west['graphicId'], west['shadow']['graphicId']), (3253, 439))
+        self.assertEqual((asian['graphicId'], asian['shadow']['graphicId']), (3251, 437))
+        self.assertEqual(asian['shadow']['source'], sld('b_asia_town_center_age2_shadow'))
+
+    def test_tc_cast_shadow_conversion_uses_owned_mask_hotspot_scale_and_cache_identity(self):
+        from convert_sld import atlas_jobs, shared_atlas_jobs, _convert_one, published, require_atlas
+        from sld_layers import decode_colors, decode_masks, LAYER_SHADOW
+        content = {'entities': {'town-center': self.result['entities']['town-center']},
+                   'civilizations': {key: {'entities': {'town-center': p['entities']['town-center']}}
+                                     for key, p in self.result['civilizations'].items()}}
+        hashes = dict(self.result['source']['sha256'])
+        for p in self.result['civilizations'].values():
+            hashes.update(p['source']['sha256'])
+        groups = shared_atlas_jobs(atlas_jobs(content), hashes)
+        required = [group for group in groups if any(w[1].get('required') for w in group)]
+        self.assertEqual(sum(len(group) for group in required), 3 * (1 + len(content['civilizations'])))
+        Path('.local').mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir='.local', prefix='tc288-convert-') as directory:
+            for group in required:
+                identifier, job, image, layer = group[0]
+                self.assertEqual(layer, 'shadow')
+                data = SOURCES.path(job['source']).read_bytes()
+                self.assertFalse(any(f is not None and not f.empty for f in decode_colors(data)))
+                source = decode_masks(data, LAYER_SHADOW)[0]
+                out = Path(directory) / image
+                _, atlas, error = _convert_one((identifier, str(SOURCES.path(job['source'])), str(out), job['expected'], layer))
+                require_atlas(group, atlas, error)
+                self.assertIsNone(error)
+                for _, alias, _, _ in group:
+                    entry = published(atlas, image, alias['scale'])
+                    frame = entry['frames'][0]
+                    self.assertEqual(entry.get('scale', 1), 2 if UHD else 1)
+                    self.assertEqual((frame['w'], frame['h'], frame['cx'], frame['cy']),
+                                     (source.width, source.height, source.hotspot_x, source.hotspot_y))
+                with Image.open(out) as sheet:
+                    crop = sheet.crop((frame['x'], frame['y'], frame['x']+frame['w'], frame['y']+frame['h']))
+                    self.assertEqual(crop.getchannel('A').tobytes(), bytes(source.alpha))
+                    self.assertEqual(crop.convert('RGB').getextrema(), ((255, 255),) * 3)
+
+    def test_tc_cast_shadow_rejects_unreviewed_offsets_and_mixed_art(self):
+        from copy import deepcopy
+        from import_content import town_center_shadow
+        parent = SimpleNamespace(deltas=[SimpleNamespace(graphic_id=1, offset_x=0, offset_y=0)])
+        shadow = SimpleNamespace(layer=5, frame_count=1, angle_count=1, deltas=[])
+        for change in ('offset', 'frames', 'directions', 'nested', 'multiple', 'parent-frames'):
+            dat = SimpleNamespace(graphics=deepcopy([parent, shadow]))
+            animation = {'graphicId': 0, 'frames': 1, 'directions': 1}
+            if change == 'offset': dat.graphics[0].deltas[0].offset_x = 1
+            if change == 'frames': dat.graphics[1].frame_count = 2
+            if change == 'directions': dat.graphics[1].angle_count = 8
+            if change == 'nested': dat.graphics[1].deltas = [SimpleNamespace(graphic_id=0)]
+            if change == 'multiple': dat.graphics[0].deltas *= 2
+            if change == 'parent-frames': animation['frames'] = 2
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, 'TC'):
+                town_center_shadow(dat, SOURCES, animation, {})
+        # The audited Andean delta really has nonempty BC1 art; don't discard it.
+        mixed = next(g for g in _dat().graphics if g and g.file_name == 'b_ande_town_center_age2_shadow_x1')
+        with self.assertRaisesRegex(ValueError, 'also contains body art'):
+            town_center_shadow(SimpleNamespace(graphics=[parent, mixed]), SOURCES,
+                               {'graphicId': 0, 'frames': 1, 'directions': 1}, {})
+
+    def test_published_tc_cast_shadow_metadata_and_pixels_match_delta(self):
+        from atlas_metadata import expand_atlas_frames
+        from sld_layers import decode_masks, LAYER_SHADOW
+        path = Path('public/imported/aoe2/manifest.json')
+        if not path.is_file():
+            self.skipTest('no published manifest; run after coordinated full import')
+        manifest = json.loads(path.read_text())
+        expand_atlas_frames(manifest)
+        profiles = [(self.result, manifest)] + [(p, manifest['civilizations'][key])
+                    for key, p in self.result['civilizations'].items()]
+        for expected, actual in profiles:
+            tc = actual['entities']['town-center']
+            for age in ('feudal', 'castle', 'imperial'):
+                name = f'idle-{age}'
+                shadow = expected['entities']['town-center']['animations'][name]['shadow']
+                self.assertEqual(tc['animations'][name].get('shadow'), shadow)
+                atlas = tc['atlases'][name+'-shadow']
+                frame = atlas['frames'][0]
+                source = decode_masks(SOURCES.path(shadow['source']).read_bytes(), LAYER_SHADOW)[0]
+                self.assertEqual((frame['w'], frame['h'], frame['cx'], frame['cy']),
+                                 (source.width, source.height, source.hotspot_x, source.hotspot_y))
+                with Image.open(path.parent / atlas['image']) as sheet:
+                    crop = sheet.crop((frame['x'], frame['y'], frame['x']+frame['w'], frame['y']+frame['h']))
+                    self.assertEqual(crop.getchannel('A').tobytes(), bytes(source.alpha))
+
     def test_each_age_falls_as_itself(self):
         # A razed Feudal house played the Dark Age collapse and left Dark Age
         # rubble (issue #61). The variant unit the age technology upgrades it

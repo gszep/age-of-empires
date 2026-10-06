@@ -10,7 +10,7 @@
     "populationLimit": { "enum": [25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 300, 400, 500] },
     "mode": { "enum": ["random-map", "regicide"] },
     "version": {
-      "enum": [1, 2]
+      "enum": [1, 2, 3]
     },
     "seed": {
       "type": "integer"

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { loadSession, loadSessionSetup, saveSession, SNAPSHOT_VERSION } from './dev-session';
-import { createGame } from './sim/game';
+import { applyCommand, createGame } from './sim/game';
 import { checksumState } from './sim/checksum';
 import { FALLBACK_RULES } from './sim/data';
 
@@ -69,9 +69,19 @@ it('preserves Regicide state/setup and temporary Treason while admitting only mo
   value = JSON.stringify({ ...stored, version: 2 });
   expect(loadSession(FALLBACK_RULES)).toBeUndefined();
   const { rules, ...legacy } = createGame(7);
+  delete legacy.researchQueueVersion;
+  legacy.players[1].food = 2000;
   value = JSON.stringify({ version: 2, rulesOrigin: rules.origin, state: legacy, setup: { map: 'arabia', seed: 7 } });
   expect(loadSession(FALLBACK_RULES)?.mode).toBeUndefined();
   expect(loadSession(FALLBACK_RULES)).toBeDefined();
+  const restored = loadSession(FALLBACK_RULES)!;
+  expect(restored).not.toHaveProperty('researchQueueVersion');
+  const buildingId = restored.entities.find(e => e.kind === 'town-center' && e.owner === 1)!.id;
+  expect(applyCommand(restored, { kind: 'research', player: 1, buildingId, tech: 'loom' }).ok).toBe(true);
+  const beforeBusy = checksumState(restored);
+  expect(applyCommand(restored, { kind: 'research', player: 1, buildingId, tech: 'feudal-age' }))
+    .toEqual({ ok: false, reason: 'building is already researching' });
+  expect(checksumState(restored)).toBe(beforeBusy);
   expect(loadSessionSetup(FALLBACK_RULES)).toEqual({ map: 'arabia', seed: 7 });
   value = JSON.stringify({ ...stored, state: { ...stored.state, mode: 'unknown' } });
   expect(loadSession(FALLBACK_RULES)).toBeUndefined();

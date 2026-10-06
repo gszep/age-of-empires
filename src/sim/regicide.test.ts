@@ -147,7 +147,7 @@ describe('King survival and temporary Treason', () => {
       [{ kind: 'delete' as const, player: observation.player, entityIds: observation.entities.filter(e => e.owner === observation.player && e.kind === 'king').map(e => e.id) }] };
     const { record, result } = await runMatch({ version: 2, seed: 130, mode: 'regicide', maxTimeSeconds: 1 }, { 1: suicide, 2: suicide });
     expect(result.draw).toBe(true); expect(result.winner).toBeUndefined(); expect(result.timeSeconds).toBe(0.05);
-    expect(record.mode).toBe('regicide'); expect(record.version).toBe(2);
+    expect(record.mode).toBe('regicide'); expect(record.version).toBe(3);
     expect(validateMatchRecord(record)).toBe(true); expect(validateMatchResult(result)).toBe(true);
     expect(replayRecord(JSON.parse(JSON.stringify(record))).ok).toBe(true);
     expect(validateMatchRecord({ ...record, version: 1 })).toBe(false);
@@ -164,6 +164,14 @@ describe('King survival and temporary Treason', () => {
     legacy.version = 1;
     const { mode: resultMode, ...legacyResult } = record.result;
     legacy.result = { ...legacyResult, version: 1 };
+    // A v3 recording cannot be made legacy by relabelling its checksum: the
+    // new research-rule marker is authoritative state. Rebuild the v1 fixture.
+    const legacyState = createGame(42);
+    delete legacyState.researchQueueVersion;
+    legacy.checksums = record.checksums.map(({ tick }) => {
+      while (legacyState.tick < tick) stepGame(legacyState);
+      return { tick, hash: checksumState(legacyState) };
+    });
     expect(validateMatchRecord(legacy)).toBe(true); expect(replayRecord(legacy).ok).toBe(true);
     expect(validateMatchRecord({ ...legacy, version: 2 })).toBe(false);
     expect(replayRecord({ ...legacy, version: 2 }).ok).toBe(false);

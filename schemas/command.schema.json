@@ -413,7 +413,12 @@
         },
         "buildingId": {
           "type": "integer",
-          "$comment": "Stops the building's research in progress and refunds what was paid for it."
+          "$comment": "Cancels research and refunds its paid cost."
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "$comment": "0 is active, subsequent indices are waiting; omitted cancels the last item."
         }
       },
       "required": [

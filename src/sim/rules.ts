@@ -99,6 +99,8 @@ export function inheritConvertedUnit(state: GameState, entity: Entity, owner: Pl
     entity.trainingQueue = undefined;
     entity.trainingQueueCosts = undefined;
     entity.researching = undefined;
+    entity.researchQueue = undefined;
+    entity.researchQueueCosts = undefined;
     entity.rally = undefined;
   }
   if (isUnit(entity.kind) && !entity.convertedRules) {

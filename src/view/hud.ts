@@ -84,8 +84,8 @@ export interface SelectionInfo {
   progress?: { label: string; name?: string; fraction: number };
   trainingQueue?: {
     buildingId: number; cancelLabel: string; entries: { kind: string; name: string; icon?: string }[];
-    /** The technology being researched; it takes the active slot, and a click cancels it. */
-    research?: { name: string; icon?: string; cancelLabel: string };
+    /** Active technology followed by FIFO waiting entries; indices are cancellation targets. */
+    research?: { name: string; icon?: string; cancelLabel: string }[];
   };
   /**
    * One entry per selected entity, when more than one is. AoE2 shows the
@@ -105,7 +105,7 @@ export interface HudCallbacks {
   /** A portrait in the group grid was clicked: select that one entity. */
   onSelectMember(id: number): void;
   onCancelTraining(buildingId: number, index: number): void;
-  onCancelResearch?(buildingId: number): void;
+  onCancelResearch?(buildingId: number, index: number): void;
   onMinimapNavigate(point: Point): void;
   /** The flare button, then a minimap click: signal that spot (canvas point). */
   onFlare(point: Point): void;
@@ -914,10 +914,11 @@ export class Hud {
     row.replaceChildren();
     active.replaceChildren();
     // Research holds the active slot, so every training entry waits in the row.
-    const firstWaiting = queue?.research ? 0 : 1;
-    row.hidden = !queue || queue.entries.length <= firstWaiting;
-    active.hidden = !queue || (!queue.entries.length && !queue.research) || !showActive;
-    if (!queue || (!queue.entries.length && !queue.research)) return;
+    const research = queue?.research ?? [];
+    const firstWaiting = research.length ? 0 : 1;
+    row.hidden = !queue || (queue.entries.length <= firstWaiting && research.length <= 1);
+    active.hidden = !queue || (!queue.entries.length && !research.length) || !showActive;
+    if (!queue || (!queue.entries.length && !research.length)) return;
     const layout = this.ui?.layouts.commandpanel;
     const anchor = widgetBox(layout, 'BackgroundRight', 'QueueButtons');
     const progress = widgetBox(layout, 'BackgroundRight', 'Progress');
@@ -958,15 +959,22 @@ export class Hud {
       return button;
     };
     if (showActive) {
-      const research = queue.research;
-      const button = research
-        ? portrait({ kind: 'research', ...research }, -1, 1, research.cancelLabel,
-          () => this.callbacks.onCancelResearch?.(queue.buildingId))
+      const current = research[0];
+      const button = current
+        ? portrait({ kind: 'research', ...current }, 0, 1, current.cancelLabel,
+          () => this.callbacks.onCancelResearch?.(queue.buildingId, 0))
         : portrait(queue.entries[0], 0);
       const fill = document.createElement('span');
       fill.className = 'production-progress';
       button.appendChild(fill);
       active.appendChild(button);
+    }
+    for (let index = 1; index < research.length; index++) {
+      const entry = research[index];
+      const button = portrait({ kind: 'research', ...entry }, index, 1, entry.cancelLabel,
+        () => this.callbacks.onCancelResearch?.(queue.buildingId, index));
+      button.classList.add('research-portrait');
+      row.appendChild(button);
     }
     // Without research, index 0 is already on the anvil and has its own
     // portrait above. Batch counts and cancellation targets here describe the
