@@ -1485,11 +1485,16 @@ when the result looks right. When a row is later read from a file, delete it
   explicitly unmodelled, not fabricated units.
 - **Deferred livestock protection (#304):** tech 405 / effect 417 **sets**
   resource 97 (`dominantSheepControl`) to 1. Help 120162 says livestock in Celt
-  unit LOS cannot be stolen; it does not grant long-range ownership conversion.
+  unit LOS cannot be stolen; the text does not specify acquisition precedence.
   The ordinary shared herd-range/contested-claim loop cannot represent that
   precedence. Owner/Gaia/enemy livestock, competing protected owners, LOS
   sources, garrisons and leaving sight need a bounded shared consumer and native
-  calibration. This command remains explicitly unmodelled.
+  calibration. [Partial native observations](celts-livestock-calibration.md)
+  on current build185872, not pinned48987, include a Celt stealing enemy-owned
+  sheep, a Celt acquiring contested Gaia sheep, and an Outpost-only negative
+  control. The ordinary King control also retained sheep, so a protection-only
+  patch is not justified; approach order and competing-owner precedence remain
+  unresolved. This command remains explicitly unmodelled.
 - **Inherited inference:** per-tick movement, reload rounding, production work
   integration, damage-preserving HP increases and donor-stat capture remain
   shared engine policies, not native calibration receipts. Stronghold reuses
