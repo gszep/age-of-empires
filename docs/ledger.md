@@ -1499,9 +1499,15 @@ when the result looks right. When a row is later read from a file, delete it
   accumulated as whole HP), with no extra aura; ungarrison restores .5 HP/s.
   Tests measure 1 to 2 HP in six seconds inside, then 1 to 3 in four seconds
   outside, including JSON continuation. These scheduling/geometry/stacking/cargo
-  choices are **inferred**. Its task flag differs from Bimaristan (4 versus 2),
-  so native flag semantics, geometry, stacking, garrison and allied behavior need
-  calibration under #306, not a claim that the script encodes our scheduler. Current locked
+  choices were **inferred**. [Partial native calibration](stronghold-calibration.md)
+  on current build185872, **not pinned48987**, visually observed Long Swordsman
+  healing consistent with .5 HP/s, equal overlapping Castles not doubling it,
+  and Knight/Crossbowman negative controls. Cargo32→54HP over about18s mostly
+  inside supports ordinary Herbal Medicine healing without an extra aura, but
+  lacks an isolated no-Stronghold control. Geometry attempts did not establish
+  measured offsets; inclusive centre distance remains inferred. Task flag4 versus
+  Bimaristan's2, unequal-source stacking, unit1831, garrison scheduling and allied
+  behavior remain open under #306, not script-decoded scheduler claims. Current locked
   two-player opponents supply the owner filter; allied teams are not offered.
 - **Evidence boundary:** strict all-consumed-cue audit resolves every Celts cue
   against both pinned audio packs, with zero reviewed gaps. Source animation
