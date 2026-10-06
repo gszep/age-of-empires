@@ -4,10 +4,12 @@ import { rulesFromManifest } from './data';
 import { activateAutomaticTechnologies, applyCommand, createGame, stepGame } from './game';
 import { checksumState } from './checksum';
 import { observe } from './observe';
+import { updateVisibility } from './visibility';
 import { addRelic } from './relics';
 import type { Entity, GameState, UnitKind } from './types';
 
-const path = 'public/imported/aoe2/manifest.json';
+const path = process.env.CIV_PROFILE_CONTENT ?? 'public/imported/aoe2/manifest.json';
+if (process.env.CIV_PROFILE_CONTENT && !existsSync(path)) throw new Error(`Requested Siphons fixture not found: ${path}`);
 const owned = existsSync(path) ? rulesFromManifest(JSON.parse(readFileSync(path, 'utf8'))) : undefined;
 function fixture() {
   const s = createGame(909, structuredClone(owned!));
@@ -29,6 +31,38 @@ function fixture() {
 const run = (s: GameState, n: number) => { for (let i = 0; i < n; i++) stepGame(s); };
 
 describe.skipIf(!owned)('owned Siphons outcomes', () => {
+  it.each(['dock', 'transport-ship'] as const)('preserves charge against buildings but spends it against ships: %s, including JSON continuation', kind => {
+    const { s, university, unit } = fixture();
+    const [key, tech] = Object.entries(s.rules.technologies).find(([, t]) => t.techId === 909)!;
+    expect(applyCommand(s, { kind: 'research', player: 1, buildingId: university.id, tech: key })).toEqual({ ok: true });
+    run(s, tech.researchSeconds * 20 + 1);
+    expect(s.players[1].researched).toContain(key);
+    const ship = unit('fire-ship', 1, 40, 40);
+    ship.charge = 1;
+    const target = kind === 'transport-ship' ? unit(kind, 2, 43.5, 40.5) : (() => {
+      const r = s.rules.buildings.dock;
+      const dock: Entity = { id: s.nextId++, kind, owner: 2, position: { x: 43.5, y: 40.5 },
+        hp: r.hp, maxHp: r.hp, radius: r.radius, activity: 'idle', order: { kind: 'idle' } };
+      s.entities.push(dock); return dock;
+    })();
+    updateVisibility(s);
+    expect(applyCommand(s, { kind: 'order', player: 1, entityIds: [ship.id], target: target.position, targetId: target.id })).toEqual({ ok: true });
+    const copy = JSON.parse(JSON.stringify(s)) as GameState;
+    let spent = false, launchedCharge = false;
+    for (let i = 0; i < 200; i++) {
+      stepGame(s); stepGame(copy);
+      spent ||= ship.charge < 1;
+      launchedCharge ||= s.projectiles.some(p => p.shooterId === ship.id && p.art === 'fire-charge');
+      expect(checksumState(copy)).toBe(checksumState(s));
+    }
+    // Positive ordinary damage prevents a failed attack/path from proving immunity.
+    expect(target.hp).toBeLessThan(target.maxHp);
+    expect(spent).toBe(kind === 'transport-ship');
+    expect(launchedCharge).toBe(kind === 'transport-ship');
+    if (kind === 'dock') expect(ship.charge).toBe(1);
+    else expect(ship.charge).toBeLessThan(1);
+  });
+
   it('research enables one extra explosive shot, damages a bystander and replays flight/impact/recharge through JSON', () => {
     const { s, university, unit } = fixture();
     const entry = Object.entries(s.rules.technologies).find(([, t]) => t.techId === 909);

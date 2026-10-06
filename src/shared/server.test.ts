@@ -296,9 +296,10 @@ describe('shared host startup failure policy', () => {
     } finally { await new Promise<void>(resolve => occupied.close(() => resolve())); }
   });
 
-  it('restores a compatible checkpoint and serves the shared endpoint', async () => {
+  it.each([false, true])('restores a compatible checkpoint without upgrading its Siphons policy (legacy=%s)', async legacy => {
     const { directory, checkpoint } = fixture();
     const { rules: ignored, ...state } = createGame(157);
+    if (legacy) delete state.siphonsVersion;
     state.tick = 123;
     const rulesHash = createHash('sha256').update(JSON.stringify(FALLBACK_RULES)).digest('hex');
     const saved = { version: SHARED_CHECKPOINT_VERSION, rulesHash, state,

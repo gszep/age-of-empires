@@ -134,6 +134,7 @@ export function createGame(
     scoreVersion: 1,
     researchQueueVersion: 1,
     packingVersion: 1,
+    siphonsVersion: 1,
     ...(map === 'arabia' && mapgenVersion === 1 ? { mapgenVersion: 1 as const } : {}),
     ...(wonderVictory ? { wonderVictory: true } : {}),
     ...(populationLimit !== undefined ? { populationLimit } : {}),

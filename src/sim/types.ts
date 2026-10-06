@@ -297,6 +297,8 @@ export interface GameState {
   researchQueueVersion?: 1;
   /** New matches use work/rate packing; absent in pre-v6 recordings/snapshots. */
   packingVersion?: 1;
+  /** New matches exclude buildings from Siphons; absent in pre-v7 recordings/snapshots. */
+  siphonsVersion?: 1;
   /** Arabia's eleven weighted biomes. Absent means the frozen four-biome map. */
   mapgenVersion?: 1;
   /** Opt-in fixed200-year Wonder victory. Absent preserves legacy conquest. */

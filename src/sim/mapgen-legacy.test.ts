@@ -2,11 +2,12 @@ import { expect, it } from 'vitest';
 import { createGame, stepGame } from './game';
 import { canonicalSnapshot, checksumState } from './checksum';
 import { useLegacyPacking } from './packing';
+import { useLegacySiphons } from './fire-charge';
 
 // Frozen against git archive 037b7dd2892d376408f93e61c6dbd7a7d7a1533c,
 // BEFORE this patch; initial and tick20 hash ALL dynamic state, not just terrain.
-// Rules themselves are excluded, but #259's packingVersion marker is included.
-// Select the pre-v6 packing policy for these historical hashes; never regenerate
+// Rules themselves are excluded, but later behavior markers are included.
+// Select pre-v6 packing and pre-v7 Siphons for these historical hashes; never regenerate
 // them for a new marker. Current matches retain calibrated packing, and their
 // entire remaining dynamic state (including terrain/spawns) must still agree.
 const hashes = {
@@ -18,18 +19,22 @@ for (const [map, expected] of Object.entries(hashes)) it(`${map}: legacy seeds a
   for (const [i, seed] of [1, 2, 3, 7, 29, 42, 118, 130].entries()) {
     const current = createGame(seed, undefined, undefined, map, undefined, undefined, undefined, 0);
     expect(current.packingVersion).toBe(1);
+    expect(current.siphonsVersion).toBe(1);
     expect(current.rules.units.trebuchet.unpacked!.seconds).toBeCloseTo(50 / 4.5);
     const currentInitial = checksumState(current);
     const state = createGame(seed, undefined, undefined, map, undefined, undefined, undefined, 0);
     useLegacyPacking(state);
+    useLegacySiphons(state);
     expect(state).not.toHaveProperty('mapgenVersion');
     expect(state).not.toHaveProperty('packingVersion');
+    expect(state).not.toHaveProperty('siphonsVersion');
     const [initial, continued] = expected[i].split('/');
     expect(checksumState(state), `seed ${seed}`).toBe(initial);
     const restored = JSON.parse(JSON.stringify(state));
     const expectSameDynamicState = () => {
-      const { packingVersion, ...dynamic } = JSON.parse(canonicalSnapshot(current));
+      const { packingVersion, siphonsVersion, ...dynamic } = JSON.parse(canonicalSnapshot(current));
       expect(packingVersion).toBe(1);
+      expect(siphonsVersion).toBe(1);
       expect(dynamic).toEqual(JSON.parse(canonicalSnapshot(state)));
     };
     expectSameDynamicState();

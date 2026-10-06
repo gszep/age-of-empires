@@ -4,6 +4,7 @@ import { applyCommand, createGame, stepGame } from '../sim/game';
 import { synchronizationHash } from './checksum';
 import type { GameState } from '../sim/types';
 import { completeWonder, WONDER_VICTORY_TICKS } from '../sim/wonder';
+import { siphonsReplayRules } from '../headless/siphons-replay.fixture';
 
 function follow(host: SharedMatch, ...clients: GameState[]): void {
   const message = JSON.parse(JSON.stringify(host.advance())) as ReturnType<SharedMatch['advance']>;
@@ -17,6 +18,33 @@ function follow(host: SharedMatch, ...clients: GameState[]): void {
 }
 
 describe('one household match', () => {
+  it.each([false, true])('preserves the Siphons snapshot policy on both clients and uses current rules after restart (legacy=%s)', legacy => {
+    const state = createGame(242, siphonsReplayRules());
+    if (legacy) delete state.siphonsVersion;
+    const host = new SharedMatch(JSON.parse(JSON.stringify(state))); host.humanTwo = true;
+    const clients: GameState[] = [1, 2].map(() => JSON.parse(JSON.stringify(host.snapshot())).state);
+    const rejected: string[] = [];
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    host.enqueue(1, { kind: 'train', player: 1, buildingId: tc.id, unit: 'fire-galley' }, reason => rejected.push(reason));
+    for (let i = 0; i < 20; i++) follow(host, ...clients);
+    const ship = host.state.entities.find(e => e.kind === 'fire-galley')!;
+    const target = host.state.entities.find(e => e.owner === 2 && e.kind === 'town-center')!;
+    host.enqueue(1, { kind: 'order', player: 1, entityIds: [ship.id], targetId: target.id, target: target.position }, reason => rejected.push(reason));
+    for (let i = 0; i < 100; i++) {
+      follow(host, ...clients);
+      for (const game of [host.state, ...clients]) {
+        expect(game.siphonsVersion).toBe(legacy ? undefined : 1);
+        expect((game.entities.find(e => e.id === ship.id)!.charge ?? 1) < 1).toBe(legacy);
+        expect(game.projectiles.some(p => p.art === 'fire-charge')).toBe(legacy);
+      }
+      if (i === 0) clients[1] = JSON.parse(JSON.stringify(host.snapshot())).state;
+    }
+    expect(rejected).toEqual([]);
+    for (const client of clients) expect(synchronizationHash(client)).toBe(synchronizationHash(host.state));
+    host.restart(242, 'arabia');
+    expect(host.state.siphonsVersion).toBe(1);
+  });
+
   it('restores an active Wonder deadline over JSON to both clients, wins identically, and clears it on restart', () => {
     const state = createGame(110, undefined, undefined, 'arabia', 'random-map', undefined, true);
     const home = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
