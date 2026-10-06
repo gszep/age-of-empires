@@ -33,7 +33,7 @@ it('replays frozen pre-change v5 pack/unpack and Kataparuto checksums', () => {
 
 it('writes the current format even for a v5 launch config and replays calibrated pack/unpack through JSON', async () => {
   expect(MATCH_FORMAT_VERSION).toBeGreaterThanOrEqual(6);
-  for (const version of [1, 2, 3, 4, 5, 6, 7]) expect(validateMatchConfig({ version, seed: 259 })).toBe(true);
+  for (const version of [1, 2, 3, 4, 5, 6, 7, 8]) expect(validateMatchConfig({ version, seed: 259 })).toBe(true);
   expect(validateMatchConfig({ version: MATCH_FORMAT_VERSION + 1, seed: 259 })).toBe(false);
   const rules = packingReplayRules();
   const { record, result } = await runMatch({ version: 5, seed: 259, maxTimeSeconds: 45, decideIntervalSeconds: .05 }, {

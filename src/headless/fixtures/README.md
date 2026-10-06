@@ -63,3 +63,33 @@ failed at tick100: expected `983ee1bb`, actual `0305327d`. The v7 adapter must
 restore those historical checksums, not replace them. Coverage also asserts the
 old projectile/charge result, rejects relabelling as v7, checks current v7
 recordings, and continues marker-less/current snapshots before and after release.
+
+## `pre-trebuchet-targeting-v7.json` (#131)
+
+Generated from untouched commit
+`1c316d84e7d65ff03e3d5b57286f000c442fd78b`, using its `runMatch` and
+`FALLBACK_RULES`, before the idle-packed acquisition correction or v8 adapter.
+That engine independently replayed all twelve checksums before freezing the file.
+SHA-256:
+`ae7ed93b06837cc14b78c709e09d7c9cbaccd51478e8db3ff4f6a6c05afad134`.
+
+Controlled **open-content fixture**, not an owned recording or balance preset:
+`../trebuchet-replay.fixture.ts` enables free zero-time TC Trebuchet training and
+enlarges sight/search/deployed range to200. Packing duration, attacks, reload and
+projectile values are unchanged. The engine decides automatic acquisition,
+deployment and actual damage. Pass the archived engine's fallback to the factory
+when reproducing provenance (or copy the factory into the archived source tree).
+
+Seed131, Arabia, v7 launch,60game seconds, decision interval0.05. The sole public
+command trains a trebuchet at TC1 at tick0. No attack or Unpack command, direct
+state staging or snapshot is injected into the recording. Old automatic
+acquisition starts at tick10, deployment completes at233 and enemy TC first
+loses HP at660. Periodic checksums cover ticks100 through1200.
+
+Against the corrected guard without compatibility, the frozen regression failed
+at tick100: expected `15f2d14b`, actual `8c258b10`. Recordingv8 restores all old
+hashes by selecting the legacy policy, not by updating expected results. Tests
+also reject relabeling v7 as v8 (and the reverse), validate a current v8 run
+launched with v7 input, and continue current/marker-less JSON states both before
+acquisition and during legacy setup. Manual Pack suppression and its removal by
+Stop remain legacy behavior; current Stop cannot enable idle deployment.

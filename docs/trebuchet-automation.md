@@ -5,18 +5,26 @@
 - Right-click an enemy with a packed trebuchet: it approaches to firing range,
   spends the resolved setup time, then fires. An already deployed engine packs
   and approaches when its explicitly ordered target is beyond range.
-- Idle trebuchets automatically select a visible enemy building inside both
-  their search/sight bound and their deployed firing envelope. They unpack if
-  necessary and fire without moving. Automatic targets inside minimum range,
+- Idle **unpacked** trebuchets automatically select a visible enemy building inside
+  both their search/sight bound and their deployed firing envelope, and fire
+  without moving. Idle packed engines stay packed, even beside such a building.
+  Automatic targets inside minimum range,
   outside range, lost from sight, destroyed or converted are released. A later
   acquisition can select another eligible building.
 - Move orders take priority over automatic acquisition. A move cancels an
   unfinished unpack, or finishes packing an already deployed engine before
   travel. Repeated move/pack requests preserve a running pack clock.
-- Manual Pack clears queued work and holds the engine packed until another
-  player command. Group Pack/Unpack continues to apply to every selected engine.
+- Manual Pack clears queued work and leaves the engine packed; Stop does not
+  deploy it either. Public Unpack or an attack order enables firing. Group
+  Pack/Unpack continues to apply to every selected engine.
 - The optional automatic-order marker, setup countdown and manual-pack hold are
   authoritative entity fields retained by JSON snapshots and checksums.
+
+These are **new-match** targeting rules: recordingv8 and
+`trebuchetTargetingVersion:1` select them. Recordingsv1–v7 and marker-less saved
+states keep the previous suppression-aware idle packed deployment. Restoring a
+snapshot never adds the marker; starting/restarting a match does. A frozen
+pre-change v7 recording preserves legacy acquisition, setup and damage hashes.
 
 ## Source and inference boundary
 
@@ -38,7 +46,14 @@ seconds normally and50/18 after Kataparuto. That50-work default is explicit in
 the installed185872 task125, but inferred for the pinned legacy task. See the
 [native cycle table](samurai-kataparuto-calibration.md) for precision and limits.
 
-**Inferred integration:** idle building-only acquisition, nearest-target/id
+**Observed visually, current build185872, not pinned48987:** packed idle does not
+deploy; public Unpack enables automatic building fire; a nearer villager is
+ignored in favour of a house; no repack occurred during a99-game-second
+post-destruction interval. [Captures and limits](siege-targeting-calibration.md).
+The DAT automatic-search flags alone did not establish idle packed deployment.
+
+**Inferred integration:** generalizing building-only acquisition beyond these
+fixtures, nearest-target/id
 tie-break, existing 10-tick acquisition cadence, existing circular target/radius
 range tolerances, no automatic pursuit, completion of setup if its target
 disappears midway, immediate cancellation of unfinished unpack on a move, and
@@ -77,9 +92,10 @@ Natural-start progression and siege balance remain part of#124.
 
 ## Verification
 
-- `npx vitest run src/sim/trebuchet.test.ts src/sim/ai-siege.test.ts`:
- 21deployment/control/replay outcomes and 5AI outcomes. Open and owned scenarios
- verify actual damage, not just a rule-table value.
+- Targeted trebuchet/siege-safety/AI suites:77outcomes with the existing owned
+ manifest, including30trebuchet and5AI cases. Open and owned scenarios verify
+ actual damage, not just a rule-table value. See the calibration receipt for
+ exact commands; the new packed-idle regression failed before the runtime fix.
 - The late-game AI fixture supplies Imperial Age, an army, housing and 640 stone;
  gathering the balance, construction, training, approach and bombardment use
  ordinary public commands and unchanged clocks. Two enemy TCs preserve the
