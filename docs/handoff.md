@@ -6,11 +6,53 @@ reviews. Do not append old test counts here as if they describe the latest tree.
 
 ## Source and verification
 
-- Latest verified source: `21f615b`, pushed to `origin/main` on October 5.
-  Owned checkpoint `npm run verify:owned` is GREEN: 1561 tests/129 files, eight
-  skipped, open-content build, 206 owned-import tests and real-browser debug
-  smoke; 415s total (`.local/verification/1791191937139-157510/`). No timeout
-  widening. Browser evidence uses Chrome/SwiftShader.
+- Latest verified source: `57e8d2f` (#95), pushed October 6; later commits are
+  Markdown-only. Owned checkpoint `npm run verify:owned` GREEN in 696 s
+  (build 19 s, test 290 s, serial 89 s, owned import tests 287 s, browser smoke
+  28 s; `.local/verification/1791294547507-1822338/`). No timeout widening.
+  Full owned import last regenerated for #259 (October 6). Nothing from the
+  October 5–6 calibration run is deployed: the household host still runs
+  `autonomous-20261005-c519be9`. Reload open tabs to pick up new art/strings.
+- **October 5–6 calibration run** (coordinator handoff
+  `.local/orchestrator/handoff.md`; per-issue evidence under
+  `.local/orchestrator/evidence/`). Owner decision for this run: the installed
+  DE 101.103.54800.0 (#185872) counts as calibration evidence, recorded as
+  "current build, not pinned 48987"; screenshot readings are "observed
+  visually". Native control: `.local/native-control.ps1` with tested macros and
+  coordinates in `.local/native-macro.sh` / `.local/native-recipes.md`.
+  - Closed: #161 ram crew, #253 population ceilings, #254 zero-time research,
+    #288 TC cast shadows, #291 relic/garrison flags, #293 research queue, #139
+    score, #281 agent ceilings/Wonder timers, #300 doc spacing, #302 Turks,
+    #175 path spikes, #305 Mongol Nomads/HP rounding, #301 Vikings/per-effect
+    cost rounding, #128 (audit), #59 Promisory reading, #285 Bimaristan,
+    #93 (already regenerated), #280 speed.
+  - Partial, issue open with evidence: #138 tech tree (other menu surfaces
+    remain), #92 top-bar SDF text (selection panel parked in
+    `.local/worktrees/issue-92-more-labels`: native weight mismatch), #118
+    11 Arabia biomes (snow dusting unmeasurable from captures), #95 offshore
+    deep fish (counts/water mask), #131 packed trebuchets no longer auto-deploy,
+    #259 packing 11.1/2.8 s (Samurai charge ~30 s recharge, kept vs houses,
+    spent vs rams; not modelled), #260 Chinese research floor + volley split,
+    #242 Siphons charge vs buildings, #267 healing stacking (trample, building
+    HP rounding open), #178 conversion stats (agree), #133, #252, #269, #304,
+    #306, #130, #117 (evidence docs only).
+  - Version markers now: observation protocol 11 (v9 research queue, v10
+    score, v11 ceilings/Wonders), match/recording format 9 (score, biomes,
+    packing, Siphons, trebuchet targeting, Islands fish), shared admission 9,
+    shared checkpoint 5. Older
+    recordings/snapshots replay through one version-aware initialiser. Existing
+    shared checkpoints whose rules changed (packing) are rejected at startup and
+    preserved — plan the household rollout accordingly.
+  - Not merged: #124 AI queue/Market (`.local/worktrees/issue-124-ai-finishing`;
+    batch regressed: research rejections 282→6518, no natural Markets) and
+    #299 import-test profiling (`.local/worktrees/issue-299-import-tests`).
+  - Harness lessons: Haiku workers could not drive the native UI (no reliable
+    screenshot reading/navigation) — native tasks went straight to Astra;
+    fine unit positioning in the DE editor remained unreliable, so prefer
+    readouts and coarse inside/outside setups. The commit guard inspects the
+    primary checkout's staged files even for worktree pushes. Background
+    launches inside long chained shell commands may start late: wait on the
+    PID and confirm the log exists before trusting a done-file.
 - Deployed October 5, 12:11 BST: the Ysgramor household host runs release
   `autonomous-20261005-c519be9` (protocol 4), carrying #287/#289 and today's
   fixes; see [shared play](shared-play.md#installed-arrangement) for the
