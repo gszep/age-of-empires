@@ -48,7 +48,7 @@ function catalog(): GameRules {
 }
 
 const sides = { 1: 'open', 2: 'donor' } as const;
-const manifestPath = 'public/imported/aoe2/manifest.json';
+const manifestPath = process.env.CIV_PROFILE_CONTENT ?? 'public/imported/aoe2/manifest.json';
 const imported = existsSync(manifestPath)
   ? rulesFromManifest(JSON.parse(readFileSync(manifestPath, 'utf8')) as ContentManifest) : undefined;
 const run = (state: GameState, ticks: number) => { for (let i = 0; i < ticks; i++) stepGame(state); };
@@ -87,6 +87,66 @@ function convert(state: GameState, monk: Entity, target: Entity): void {
 }
 
 describe('converted unit inheritance (#178)', () => {
+  it('retains the native-calibrated Viking infantry stats through Teuton research and JSON continuation', () => {
+    // Build 185872 panel measurements, not pinned-DAT values. Only these
+    // HP/attack/armour inputs are calibrated; the arena/timing remain fixtures.
+    // See docs/conversion-stats-calibration.md. No healing in this wound probe.
+    const rules = catalog(), donor = rules.civilizations!.donor;
+    for (const [profile, hp, melee] of [[rules, 60, 3], [donor, 72, 2]] as const) {
+      Object.assign(profile.units['long-swordsman'], { hp,
+        attacks: [{ class: 4, amount: 10 }],
+        armors: [{ class: 4, amount: melee }, { class: 3, amount: 2 }] });
+      profile.units.monk.heal = undefined;
+      profile.technologies.before.effects = [3, 4].map(armorClass => ({
+        unit: 'long-swordsman', attribute: 'armor', armorClass, operation: 'add', amount: 1,
+      }));
+      profile.technologies.after.effects = [{ unit: 'long-swordsman',
+        attribute: 'attack', armorClass: 4, operation: 'add', amount: 1 }];
+    }
+    const state = arena(rules);
+    research(state, 1, 'before'); // recipient-only Chain Mail equivalent
+    const native = spawn(state, 'long-swordsman', 1, 20.5, 20.5);
+    const opponent = spawn(state, 'long-swordsman', 2, 95.5, 20.5);
+    const target = spawn(state, 'long-swordsman', 2);
+    target.hp = 55;
+    const monk = spawn(state, 'monk', 1, 58.5);
+    command(state, { kind: 'order', player: 1, entityIds: [monk.id],
+      target: target.position, targetId: target.id });
+    expect(monk.order.kind).toBe('convert');
+    run(state, 1);
+    expect(target.owner).toBe(2);
+    const resumed = JSON.parse(JSON.stringify(state)) as GameState;
+    for (const match of [state, resumed]) {
+      const captured = match.entities.find(e => e.id === target.id)!;
+      until(match, () => captured.owner === 1);
+      expect(captured).toMatchObject({ hp: 55, maxHp: 72 });
+      expect(unitRulesForEntity(match, captured).armors).toEqual([
+        { class: 4, amount: 2 }, { class: 3, amount: 2 },
+      ]);
+      expect(unitRulesForEntity(match, match.entities.find(e => e.id === native.id)!).armors)
+        .toEqual([{ class: 4, amount: 4 }, { class: 3, amount: 3 }]);
+      expect(applyCommand(match, { kind: 'order', player: 2,
+        entityIds: [captured.id], target: { x: 65, y: 50 } }).ok).toBe(false);
+      research(match, 1, 'after'); // recipient-only Iron Casting equivalent
+      const attack = (id: number) => unitRulesForEntity(match,
+        match.entities.find(e => e.id === id)!).attacks.find(a => a.class === 4)!.amount;
+      expect([attack(native.id), attack(captured.id), attack(opponent.id)]).toEqual([11, 10, 10]);
+      research(match, 2, 'after'); // additional implementation control, not a native measurement
+      expect([attack(native.id), attack(captured.id), attack(opponent.id)]).toEqual([11, 10, 11]);
+      expect(captured).toMatchObject({ hp: 55, maxHp: 72 });
+      const victim = spawn(match, 'villager', 2, captured.position.x + 0.8, captured.position.y);
+      // The diagnostic donor villager's melee armour is 6: retained attack 10
+      // must deal 4, not recipient-upgraded attack 11 dealing 5.
+      const hp = victim.hp;
+      command(match, { kind: 'order', player: 1, entityIds: [captured.id],
+        target: victim.position, targetId: victim.id });
+      until(match, () => victim.hp < hp);
+      expect(hp - victim.hp).toBe(4);
+    }
+    expect(synchronizationHash(resumed)).toBe(synchronizationHash(state));
+    expect(JSON.parse(JSON.stringify(resumed))).toEqual(JSON.parse(JSON.stringify(state)));
+  });
+
   it('keeps both siege forms when a deployed engine is captured and packed again', () => {
     const rules = catalog();
     rules.civilizations!.donor.units.trebuchet.unpacked!.armors = [{ class: 3, amount: 150 }];
