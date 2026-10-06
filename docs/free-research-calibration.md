@@ -4,16 +4,16 @@
 
 Current Steam **101.103.54800.0 (#185872)**; not the pinned executable. Two
 separately saved native-editor scenarios used a blank grass map, Feudal player1,
-one male Villager,1000wood and zero food/gold/stone, no buildings and no triggers.
+one male Villager,1000 wood and zero food/gold/stone, no buildings and no triggers.
 One used Franks, the control Britons. Custom victory allowed the experiment to
 continue. The owned definitive economic-build menu was used to place and finish
-a real60-wood farm after the match had begun. No Mill or TC was built, and no
+a real 60-wood farm after the match had begun. No Mill or TC was built, and no
 technology was explicitly researched.
 
-- **Franks:** wood fell1000→940; the selected completed farm retained **243food**
+- **Franks:** wood fell 1000→940; the selected completed farm retained **243 food**
   after a little harvesting. This exceeds the unupgraded175 capacity outright.
-- **Britons control:** after stopping the worker, the farm retained **165food**
-  and the villager carried **10food**, with zero banked: **175total**. The farm
+- **Britons control:** after stopping the worker, the farm retained **165 food**
+  and the villager carried **10 food**, with zero banked: **175 total**. The farm
   was paid and built through the same commands, with no Mill.
 
 These are newly constructed farms, not editor-preplaced farms whose initialization
@@ -34,12 +34,12 @@ only the later `franks-real` and in-game **Franks** labels establish the test ci
 
 Re-read `empires2_x2_p1.dat` through the resolved owned depot:
 
-- Horse Collar14 has required count1 of101/758.101 is Feudal Age;758 is a
-  foreign civ36 alternative. Its research locations68/2556 are separate fields.
-- Heavy Plow13 requires count2 of102/14/761; Crop Rotation12 requires count2
+- Horse Collar14 has required count 1 of101/758.101 is Feudal Age;758 is a
+  foreign civ 36 alternative. Its research locations 68/2556 are separate fields.
+- Heavy Plow13 requires count 2 of102/14/761; Crop Rotation12 requires count 2
   of103/13/766. Foreign alternatives do not bypass the Frankish age chain.
-- Frank tree258 zeroes costs and research times of14/13/12.
-- Teuton tree262 zeroes research times of322/441;322 retains200food in the source
+- Frank tree 258 zeroes costs and research times of14/13/12.
+- Teuton tree 262 zeroes research times of322/441;322 retains200food in the source
   despite the owned free-tech description, as previously documented.
 
 The scheduler incorrectly added a completed research-location requirement after
@@ -55,7 +55,7 @@ resource bills and once-only research journal are preserved.
 ## Regression boundary
 
 The simulation regression builds farms without a Mill at Feudal/Castle/Imperial
-and verifies250/375/550food, no research payment, preserved age gates, no duplicate
+and verifies 250/375/550 food, no research payment, preserved age gates, no duplicate
 bonus/refill after subsequent Mill completion, and JSON continuation. The native
 measurement above covers Feudal; the later-age amounts also use owned effects.
 The maintained full-profile browser scenario now actually places the early farm

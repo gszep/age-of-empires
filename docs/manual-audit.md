@@ -10,7 +10,7 @@ been measured. No gameplay rules changed in this audit.
 
 Resolve the owned root with `uv run --locked python tools/depot.py`. The sources
 are under `depot_813781/Docs/en/` in that root. Re-extracted all three PDFs using
-the existing locked pypdf6.10.2 tool:
+the existing locked pypdf 6.10.2 tool:
 
 ```sh
 uv run --locked python tools/pdf_text.py "<root>/depot_813781/Docs/en/AoK Manual.pdf" > .local/docs/aok.json
@@ -40,7 +40,7 @@ not override patch-matched DAT/RMS/AI/XS or modern observed behaviour.
 | Topic | Printed page → physical PDF page | What the prose establishes | Implementation comparison / remaining boundary |
 | --- | --- | --- | --- |
 | Attack and fog | AoK34,37 →37,40 | Autonomous enemy acquisition; explicit attacks; unseen building changes remain hidden; separate military/non-military alerts grouped by attacker/area over time. | Basic targeting/fog/audio exist. Exact alarm area/reset timing remains #243; the prose supplies no numeric clock or radius. |
-| Elevation | AoK34 →37 | Cliffs obstruct movement; attacking from above has an advantage and from below a penalty. | Confirms the direction of the effect, **not** the1.25/.75 multipliers, fractional-height policy or projectile timing in the implementation. Those remain inferred under #134. |
+| Elevation | AoK34 →37 | Cliffs obstruct movement; attacking from above has an advantage and from below a penalty. | Confirms the direction of the effect, **not** the 1.25/.75 multipliers, fractional-height policy or projectile timing in the implementation. Those remain inferred under #134. |
 | Movement and formations | AoK35,40–43 →38,43–46 | Role-based placement in formations, slowest-member movement, locked line/box/staggered/flank arrangements; explicit patrol/guard/follow and four combat stances. | Our compact group destinations are not this complete formation/stance system. Current orders lack these modes and movement uses individual speed. Further field/command work is recorded on #54; exact defensive pursuit distance and formation algorithms are not stated. |
 | Waypoints and transports | AoK36 →39 | Queued waypoints; loading, capacity display and shore unloading; allied carriage is described. | Existing command queues and transports cover the supported two-player subset. Allied interactions remain deferred under #138. |
 | Building garrison | AoK37–38 →40–41 | Shelter, passive healing, ejection on heavy damage/destruction, visible occupancy flags, producer self-rally versus re-entry restrictions, ranged/villager firepower, and selective unloading. | Current capacity/type/heal/flag/volley/self-rally consumers have source support. Heavy-damage ejection and selective unloading are not implemented; recorded on #54. No damage threshold or detailed overflow/blocked-egress rule is supplied. |
@@ -53,24 +53,24 @@ not override patch-matched DAT/RMS/AI/XS or modern observed behaviour.
 | Tribute and commodity trade | AoK46–47 →49–50; TC8 →10 | Legacy30% tribute with100 delivered/130 paid; Coinage/Banking reduce fees; shared prices update per transaction;100-unit market lots; Shift500 and CTRL-all tribute. | Broad policy is owned; current fee parameters remain DAT-derived. Initial prices, step size, caps, partial-fill and bulk rounding remain #128. The manual's sale example is not an initial-price table. |
 | Trade-route profit | AoK47 →50 | Carts use markets, cogs use docks; foreign partners may be enemies; longer routes pay more; route trade does not consume stockpiled goods; gold returns to the trader's own drop site. | **No profit formula**, map-size normalization, distance metric, cap or rounding is stated. The implemented rate/distance model remains inferred. |
 | Ballistics and attack timing | AoK102,110–111 →105,112 | Ballistics improves hits on moving targets; the appendix describes tracking moving units. | Corroborates prediction intent, not the intercept algorithm or per-unit delay. Current attack delays must still come from DAT/graphic timing; legacy technology target lists are not modern eligibility. |
-| Score (additional finding) | AoK18 →21 | Legacy stockpile value0.1/resource, doubled value for completed assets/research with spent stock removed, transferred killed/converted unit value, and10 points per1% exploration. | Posted to #139 as a concrete starting source. Current scoring, refunds, discounts, rounding and special cases still require calibration; old example prices must not be copied. |
+| Score (additional finding) | AoK18 →21 | Legacy stockpile value 0.1/resource, doubled value for completed assets/research with spent stock removed, transferred killed/converted unit value, and 10 points per 1% exploration. | Posted to #139 as a concrete starting source. Current scoring, refunds, discounts, rounding and special cases still require calibration; old example prices must not be copied. |
 
 ## Answers to the two explicit numeric questions
 
 1. **Elevation bonus:** the manual states advantage/penalty, but not a numeric
    multiplier. Topic searches across both complete extracted manuals, followed
    by reading the terrain/combat and relevant appendix passages, did not locate
-   a percentage. Do not relabel the current1.25/.75 constants as owned.
+   a percentage. Do not relabel the current 1.25/.75 constants as owned.
 2. **Trade profit:** the manual states a positive relationship with route length
    and explains the round trip, but supplies no equation. Commodity fees are a
    different mechanism and cannot be substituted for a route-profit formula.
 
 ## Concrete gap reproduced
 
-During the audit, a capacity20 Transport Ship using the current owned rules and holding19 direct infantry
-accepted a Battering Ram holding6 more infantry. `canGarrison` returned true;
+During the audit, a capacity 20 Transport Ship using the current owned rules and holding 19 direct infantry
+accepted a Battering Ram holding 6 more infantry. `canGarrison` returned true;
 the public order succeeded and, after five ticks at an adjacent shore, the ram
-was aboard. The ship had20 direct entries but26 total carried entities.
+was aboard. The ship had 20 direct entries but 26 total carried entities.
 At that checkpoint, `canGarrison` counted only `garrison.length`. The TC p8 rule counts
 nested passengers as well. Reproduction and acceptance criteria are filed as
 **#251**; this audit does not silently change transport behaviour.

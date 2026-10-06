@@ -26,10 +26,10 @@ and [research decisions](research-directions.md) guide the next playable subset.
   F10 settings select map/seed/civilisations/mode without editing the URL.
    Shared setup is controlled by player one. Controls are in [play](play.md).
 
-On October 5 the Ysgramor host moved to release `c519be9` (protocol4) after private two-player verification; Artemis was unreachable and keeps its October 2 art ([shared play](shared-play.md#installed-arrangement)). On October2 the authorised deployment switched both services to the verified
+On October 5 the Ysgramor host moved to release `c519be9` (protocol 4) after private two-player verification; Artemis was unreachable and keeps its October 2 art ([shared play](shared-play.md#installed-arrangement)). On October2 the authorised deployment switched both services to the verified
 seven-profile setup, then added distinct Islands fish, gateway socket recovery
 and43e10ad's explicit shared-startup recovery: a pinned Ysgramor host/frontend
-and an isolated Artemis base-art runtime. Both configs were verified at protocol2;
+and an isolated Artemis base-art runtime. Both configs were verified at protocol 2;
 actual two-machine acceptance
 and local guest-art delivery pass. Old assets/releases remain for rollback,
 no current checkpoint needed archiving, and Tailscale routes are unchanged. Code
@@ -44,11 +44,11 @@ resources. See [shared-play.md](shared-play.md).
 | Civilisations | Britons, Franks, Goths, Teutons, Japanese, Chinese, Byzantines, Saracens, Turks, Vikings, Mongols and Celts with roster/research/bonus/art integration | [coverage](civilization-coverage.md), [bonus contract](civilization-bonuses.md); Saracen aura calibration/text mismatch#285, Turks#302 and Vikings#301 native calibration, Celts livestock#304, Mongols Nomads#305, aura calibration#306, shared Trade Cart audio gaps#271; wider catalogue is inventory only |
 | Buildings/specialists | Additional TCs, fortifications with authoritative automatic gate state, monasteries/relics, siege, conversion snapshots, nested cargo capacity and owner-preserving mobile-carrier conversion | [buildings](civ-buildings-integration.md), [specialists](civ-specialists-integration.md), [conversion](conversion-reference-checklist.md); gate trigger distance/timing remain inferred under#133 |
 | Naval | Briton dock roster, transports, trade cogs and fish traps; enabled profiles' regional ships; distinct snapper/salmon/dorado and shore fish | Owned DAT/task/art imports; all four fish identities gather/deplete/bank in open and imported modes and retain original art in fog; no claim of every native exception |
-| Modes/shared play | Solo and household two-seat play, reconnect/checkpoints, Regicide/Treason, locked diplomacy/tribute, configurable population ceilings and opt-in Wonder victory through menu/headless/replays | [shared play](shared-play.md), [Wonder evidence](wonder-victory.md); the Ysgramor host runs protocol4 since October 5; a live Artemis join is unverified |
+| Modes/shared play | Solo and household two-seat play, reconnect/checkpoints, Regicide/Treason, locked diplomacy/tribute, configurable population ceilings and opt-in Wonder victory through menu/headless/replays | [shared play](shared-play.md), [Wonder evidence](wonder-victory.md); the Ysgramor host runs protocol 4 since October 5; a live Artemis join is unverified |
 | Maps | Arabia, Black Forest, Islands, Windsor, Senlac and painted proof; RMS-inspired phases, surveys, elevation, relics and corrected spacing; global Islands fish reach both resource-islet coasts | [generation design](map-generation-design.md); home-land mirroring and native placement/slope semantics remain inferred; native Islands seasons/additional objects tracked in#274 |
 | Rendering | Owned x1/x2 sprites and ordinary A/B attack graphics, masks/contours/shadows, fog memory, source-backed water/foam, native blend families with shoreline tile-grid correction (#284), terrain plants and their shadows; multi-layer projectiles (#297), staged farm construction terrains (#296) and per-age annex player colour (#294) | [blend coverage and shoreline evidence](terrain-blend-coverage.md), [decode contract](block-decode-contract.md), October 5 smokes in [handoff](handoff.md); farm stage thresholds are inferred; native compositor and exact calibration remain open |
-| UI | Native command cells/icons/cursors, garrison/training/production controls, notifications/confirmation/end screens, map menu and persistent options; units selectable over farms while right-click retains crop targeting (#289); research shown in the production slot and cancelled with a refund (#295); `Ctrl+Alt+R` solo resource cheat for testing | [UI reference](ui-reference.md), [feedback review](reviews/2026-09-24-issue58.md), owned/fallback `tools/farm_selection_smoke.mts`, `tools/research_cancel_smoke.mts`; browser text rasterisation and some surfaces remain approximations |
-| Audio | Voices, combat/construction/ambient playback, layered action timing and27-track soundtrack | [audio reference](audio-reference.md); missing streams and native mix/spatial behaviour remain tracked |
+| UI | Native command cells/icons/cursors, garrison/training/production controls, notifications/confirmation/end screens, map menu and persistent options; units selectable over farms while right-click retains crop targeting (#289); research shown in the production slot and cancelled with a refund (#295); `Ctrl+Alt+R` solo resource cheat for testing | [UI reference](ui-reference.md), [feedback review](reviews/2026-09-24-issue 58.md), owned/fallback `tools/farm_selection_smoke.mts`, `tools/research_cancel_smoke.mts`; browser text rasterisation and some surfaces remain approximations |
+| Audio | Voices, combat/construction/ambient playback, layered action timing and 27-track soundtrack | [audio reference](audio-reference.md); missing streams and native mix/spatial behaviour remain tracked |
 | AI | Observation-only economy/building/combat strategy, coastal fishing, public-command sheep return and bounded late-game castle/trebuchet production and attacks | [fishing](ai-fishing.md), [siege](trebuchet-automation.md), herding outcomes; staged siege chain passes, natural-start progression/balance remains#124 |
 | Agents/replays | Browser/Node share commands; versioned observations and records, subprocess/WebSocket/MCP agents, deterministic batch/replay tools | Provider-dependent tests opt-in; open fallback stops at Castle Age |
 
@@ -73,7 +73,7 @@ do not close pinned-runtime acceptance.
 The Persian audio publication blocker (#271) has a narrowly scoped, owner-approved
 resolution: three absent Trade Cart events are explicitly `unavailable`, while
 other missing events and broken audio still fail. The isolated eight-profile
-audio fixture passes with4321 playable cues and exactly3 gaps; the regular audio
+audio fixture passes with4321 playable cues and exactly 3 gaps; the regular audio
 browser acceptance passes. Persians itself is not enabled: its preserved profile
 still needs integration, full regeneration, civilisation-specific browser checks
 and the owned checkpoint. See [handoff](handoff.md) and
@@ -81,8 +81,8 @@ and the owned checkpoint. See [handoff](handoff.md) and
 
 `npm run import:aoe2` is the only full publication entrypoint. It resolves pinned
 owned depots, verifies source container integrity, imports DAT/RMS/UI/audio and
-converts sprites/blends. Enhanced Graphics Pack art is sourced at scale2 and
-drawn at half size; atlases above8192px continue on pages. Western x1 monk sources
+converts sprites/blends. Enhanced Graphics Pack art is sourced at scale 2 and
+drawn at half size; atlases above 8192px continue on pages. Western x1 monk sources
 were recovered and installed. A newly consumed Slavic x1 file still needs default
 depot copy-back (#277); its existing original recovery copy validates. See
 [source integrity](source-integrity.md).
@@ -92,7 +92,7 @@ RGB565 endpoint promotion is corrected; permitted vendor interpolation is distin
 from that bug. [Compression evaluation](block-compression-evaluation.md) records
 the measured allocation benefit and pixel-equivalence limits.
 
-Sprites load on demand. Scene-required pages may exceed the512MiB soft residency
+Sprites load on demand. Scene-required pages may exceed the 512MiB soft residency
 budget; it is not a hard total-memory cap. Eviction, warm grace and idle expiry
 are chosen application policies. Living units retain their last complete pose
 while a cold body/colour/shadow/composite page loads, following position and
@@ -101,14 +101,14 @@ or expired art can still be temporarily absent. The private-browser regression
 holds a first public move's pages:11/12 missing-body frames before,0/12 after.
 
 Asset manifest schema4 interns repeated frame arrays while retaining every
-hotspot/page/scale. Seven-profile metadata measured552→53MB; whole-manifest
+hotspot/page/scale. Seven-profile metadata measured 552→53MB; whole-manifest
 expansion reproduced its original SHA256. Legacy inline metadata remains readable.
 This removes a reproduced JavaScript string-limit failure (#268); it does not
 change the PNG decoder or establish an FPS improvement.
 
 Layer-aware, namespace-independent atlas reuse has a full owned x1 verification:
 24715cached/fresh publication files are byte-identical after a real BC1 correction;
-the single controlled run saved31.03% atlas elapsed time and32.67% aggregate CPU.
+the single controlled run saved 31.03% atlas elapsed time and 32.67% aggregate CPU.
 See [cache verification](reviews/2026-10-02-atlas-cache.md) for inputs and limits.
 
 Owned files do not settle every engine rule. Conversion exceptions, volley/charge
@@ -165,8 +165,8 @@ Established historical measurements, with their original scope:
 - Ten-ship estimated RGBA residency:3.88GB→0.875GB, identical rendered pixels.
 -156.67-minute browser soak: no invalid bindings; peak estimated sprite data
   3,329.88MiB; remaining Windsor10× spike. See [performance report](reviews/2026-09-23-performance.md).
--27-track natural music cycle and39-minute combined audio/browser soak; the latter
-  completed19 tick-limit rounds. These are not physical-GPU FPS or AI victory claims.
+-27-track natural music cycle and 39-minute combined audio/browser soak; the latter
+  completed 19 tick-limit rounds. These are not physical-GPU FPS or AI victory claims.
 
 ## Projection invariant
 
@@ -189,7 +189,7 @@ excluded. This bounded regression check does not certify arbitrary prose as fres
 Not yet delivered: campaigns, public multiplayer, selectable formations,
 unlocked diplomatic relations/cooperative victories, native final compositing,
 all owned civilisations, complete RMS/elevation fidelity and several HUD surfaces.
-The Wonder has an opt-in fixed200-year completion countdown with owned banners,
+The Wonder has an opt-in fixed 200-year completion countdown with owned banners,
 public focus/notices and solo/shared/replay preservation; automatic map-size
 defaults and matching-build calibration remain open ([evidence](wonder-victory.md)).
 The [DAT](dat-field-audit.md), [manual](manual-audit.md) and

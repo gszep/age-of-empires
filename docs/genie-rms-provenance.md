@@ -43,11 +43,11 @@ The line numbers below are audit-time locators; UUIDs/tool-use IDs give stronger
 anchors if a log is later reserialized. Raw sessions and upstream source bodies
 are not copied into this repository.
 
-- Design session lines59–148, **2026-08-28 21:44–21:47 UTC**
+- Design session lines 59–148, **2026-08-28 21:44–21:47 UTC**
   (**22:44–22:47 BST**): source fetches, displayed reads and searches.
   Line162 at21:49:10 UTC writes `docs/map-generation-design.md`.
   The design was committed in **`b337daf`**, 2026-08-28 23:54:03 BST.
-- Implementation session lines699–700, **2026-08-28 23:15:20 UTC**
+- Implementation session lines 699–700, **2026-08-28 23:15:20 UTC**
   (**2026-08-29 00:15:20 BST**): repository-tree and licence query, tool
   `toolu_01GK3RNsk8BAqnK2NT8iWzAn`; result contains `GPL-3.0`.
 - Line703,23:15:24.890 UTC, message UUID
@@ -63,7 +63,7 @@ are not copied into this repository.
 - Line806,23:21:17.219 UTC, Write ID `toolu_01BZCouz32ZwgQrSxysTwixe`:
   project `src/sim/mapgen.ts` is written.
 - **`fbd277aa079293a805fbce262ca01614cc1435ec`**, 2026-08-29 **00:51:28 BST**
-  (=2026-08-28 23:51:28 UTC), introduces the404-line generator plus map tests
+  (=2026-08-28 23:51:28 UTC), introduces the 404-line generator plus map tests
   and integration. Its message records cost-ordered round-robin growth,
   two-pass cleaning, candidate scans, owned resource-band rereads and retained
   mirroring. The commit links Claude session

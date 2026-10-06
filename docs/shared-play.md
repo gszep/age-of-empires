@@ -22,13 +22,13 @@ and requires reloading matching client code.
 - Artemis: the same user-service name runs `tools/shared-join.mjs` on
   localhost:5174. Open **http://localhost:5174/** on Artemis.
 - Since October 5, 12:11 BST, Ysgramor serves
-  `.local/releases/autonomous-20261005-c519be9` (source `c519be9`, protocol4),
+  `.local/releases/autonomous-20261005-c519be9` (source `c519be9`, protocol 4),
   fingerprint `d3673108ba99ba5e9e35c1e7aafe81097a58d4f13a9a2da77efc0db5c6759099`.
   Before switching, the release's own `shared_smoke.mts` passed privately
   (1546 ticks, zero unintended resyncs, guest reload, checkpoint restart) and
   its real `shared-host.mts` entrypoint started on a private port. No shared
   checkpoint existed and no client was connected. Afterwards the service was
-  active with zero restarts, served protocol4 locally and over Tailscale, and a
+  active with zero restarts, served protocol 4 locally and over Tailscale, and a
   live solo page loaded the new code without page errors. The previous
   `autonomous-20261002-43e10ad` release remains for rollback:
   `node tools/install-shared.mjs host <that absolute path>`.
@@ -44,13 +44,13 @@ and requires reloading matching client code.
   It proxies the newer frontend from Ysgramor; no asset regeneration or gateway
   restart was needed for the shared-discovery fix.
   `MATCH_ASSETS` points to its `public` directory. The gateway follows the host
-  protocol and selects player2. The08:59 joint check reported both services at
-  protocol2/active/NRestarts0; Artemis SSH timed out at09:14 and12:35,
+  protocol and selects player 2. The08:59 joint check reported both services at
+  protocol 2/active/NRestarts0; Artemis SSH timed out at09:14 and 12:35,
   so that is the last remote live-health evidence.
 - Both machines now have seven profiles with184 definitions per profile.
-  Artemis serves4598 x1 sprite pages; Ysgramor serves4750 x2 pages. Both have3666
-  audio aliases and0 missing referenced files, and their simulation-rules hashes
-  agree. Each renderer uses its own frame metadata/scale. Fresh remote186 owned
+  Artemis serves 4598 x1 sprite pages; Ysgramor serves 4750 x2 pages. Both have 3666
+  audio aliases and 0 missing referenced files, and their simulation-rules hashes
+  agree. Each renderer uses its own frame metadata/scale. Fresh remote 186 owned
   tests,49 fish outcomes and original-species/fog browser acceptance pass; the one
   x2-only import test is inapplicable to Artemis's base import. Earlier Byzantine,
   Chinese and A/B acceptance evidence remains in the preceding deployment logs.
@@ -71,9 +71,9 @@ and requires reloading matching client code.
 
 ## Match behaviour
 
-Current source uses **protocol4** for configurable population ceilings (#253)
+Current source uses **protocol 4** for configurable population ceilings (#253)
 and optional Wonder countdowns (#110).
-The Ysgramor host and its frontend run protocol4 since October 5; the switch
+The Ysgramor host and its frontend run protocol 4 since October 5; the switch
 needed no checkpoint migration because none existed. Protocol2 checkpoints are
 not migrated.
 The host owns the population selection, includes it in authoritative snapshots
@@ -137,7 +137,7 @@ only after verifying checkpoint compatibility. Recovery requires the saved
 version **and rules hash** to match; otherwise retain the old runtime/rules
 and prove a migration privately first. Bump `SHARED_VERSION` when checkpoint
 compatibility changes.
-Regicide uses **shared protocol2**; version1 clients/checkpoints are deliberately
+Regicide uses **shared protocol 2**; version 1 clients/checkpoints are deliberately
 not silently reinterpreted. The implementation acceptance used private hosts;
 it does not itself replace a live managed match or archive its checkpoint.
 A checkpoint with a different version or rules hash is preserved and fails
@@ -146,18 +146,18 @@ service does not retry that permanent failure. Restore the matching game
 rules/version to resume it, or explicitly move the checkpoint aside to start
 a new match. The diagnostic prints the exact saved path.
 
-**Historical 2026-09-26 audit:** live config returned protocol1 while its mutable Vite root
-serves protocol2 frontend modules. Reload therefore fails the client's version
+**Historical 2026-09-26 audit:** live config returned protocol 1 while its mutable Vite root
+serves protocol 2 frontend modules. Reload therefore fails the client's version
 check. No default checkpoint was present during passive inspection, so recovery
 of any in-memory match is not established. No v1→v2 migration exists; matching-
 version recovery tests do not prove one. The managed service was left running.
 See [deployment evidence and required preservation work](shared-reference-audit.md#deployment-and-deferred-dependencies).
 
 **2026-10-01 resolution:** the owner confirmed no current match needed preservation.
-A passive recheck found the rebooted host already at protocol2. The real two-browser
-acceptance then exposed another mismatch: `shared-join.mjs` hardcoded version1.
+A passive recheck found the rebooted host already at protocol 2. The real two-browser
+acceptance then exposed another mismatch: `shared-join.mjs` hardcoded version 1.
 It now fetches the host config and overrides only the player seat; failed host
-config requests return502. Both installed endpoints now report version2 with
+config requests return 502. Both installed endpoints now report version 2 with
 their respective seats. Private two-browser acceptance passed clicks, reload,
 1500+ ticks without unintended resyncs and checkpoint restart. This is a fresh
 deployment, not proof of a generic v1→v2 migration.
@@ -211,7 +211,7 @@ public directory containing `imported/`; `PORT` defaults to 5174.
 
 ### Private cross-machine acceptance
 
-`tools/shared_smoke.mts` defaults to its private local host5201/gateway5202 and
+`tools/shared_smoke.mts` defaults to its private local host 5201/gateway 5202 and
 two local pages. It also accepts the paired environment variables
 `SHARED_GUEST_URL` and `SHARED_GUEST_BROWSER_URL`: the guest page then runs in a
 dedicated remote Chrome, while the host page remains local. All original click,
@@ -221,8 +221,8 @@ For a two-machine check, prepare a separate remote gateway pointing to this
 private host through an SSH reverse tunnel, plus a dedicated remote headless
 Chrome/CDP port through a local tunnel. Keep those ports bound to127.0.0.1 and
 use a separate temporary browser profile. For example, remote15201 forwards to
-local5201; remote gateway15202 uses that host and the candidate local-art directory;
-local15222 forwards to the dedicated remote CDP15222. Then run:
+local 5201; remote gateway15202 uses that host and the candidate local-art directory;
+local 15222 forwards to the dedicated remote CDP15222. Then run:
 
 ```bash
 SHARED_GUEST_URL=http://127.0.0.1:15202 \
@@ -260,7 +260,7 @@ Node reuses it (#275). Before any response headers, an `ECONNRESET` on a reused
 socket permits one fresh-connection retry for a body-free GET/HEAD. POSTs,
 body-bearing requests, fresh-socket errors and partial responses are not replayed.
 This is a bounded transport recovery policy, not a change to match commands.
-Retry diagnostics name the method/path; a failed retry still returns502. An
+Retry diagnostics name the method/path; a failed retry still returns 502. An
 interrupted response is terminated without crashing the gateway.
 
 ## Verification

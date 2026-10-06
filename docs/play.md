@@ -103,13 +103,13 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   Changing a field alone leaves the current match running. The chosen map and
   seed are remembered; **Restart** repeats them. In shared play, Ysgramor
   controls these settings and Artemis sees the selected values.
-- **Population** in Game Settings chooses a match ceiling from25 through500
+- **Population** in Game Settings chooses a match ceiling from 25 through500
   (the native selector's choices). Houses still provide population space, up to
   that ceiling; civilisation bonuses such as Gothic Imperial+10 apply separately.
   Start Game, Restart, reload, saved setup and replays retain the choice. Headless
   matches and batches accept `--population-limit 25` (or another offered value).
 - **Wonder:200 Years** in Game Settings enables an optional completion countdown.
-  Complete a Wonder and defend it for1000game seconds to win; destroying it
+  Complete a Wonder and defend it for 1000 game seconds to win; destroying it
   cancels its timer. The original player banner shows the years remaining and
   focuses the Wonder when clicked. The setting survives restart/reload/shared
   checkpoints and replays; headless runners accept `--wonder-victory true`.
@@ -126,7 +126,7 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   It is repeatable and reveals no ordinary unit/building sight. The current
   ten-second lifetime and marker cadence are explicit calibration choices (#240).
   Ordinary random-map **Spies** remains the permanent researched ability.
-- **Diplomacy** opens the two-player tribute dialog. Click100, Shift-click500,
+- **Diplomacy** opens the two-player tribute dialog. Click100, Shift-click 500,
   Ctrl-click all affordable stock including the fee; right-click subtracts.
   **OK** pays the whole draft atomically; Clear/Cancel discard it. Coinage and
   Banking reduce fees. Current opposing teams are locked; relation controls
@@ -145,9 +145,9 @@ The desktop/laptop layout is canonical. Landscape Chrome on mobile scales the sa
   for watching a whole match go by. The first visit starts at **Normal** and
   subsequent visits remember your selected speed. Normal is the
   match setting shown as1.7 by the native clock: every duration in the
-  data is quoted in game seconds, so a25-second villager takes about15 real
+  data is quoted in game seconds, so a25-second villager takes about 15 real
   seconds at Normal. Existing saved speed indices keep their previous pace
-  (saved1 remains1.5×, now correctly labelled Casual). The simulation's tick
+  (saved 1 remains 1.5×, now correctly labelled Casual). The simulation's tick
   length does not change — the speed only decides how many of the same ticks a
   second holds — so a match run fast plays out exactly as it would at any other
   speed, and replays and checksums are unaffected.

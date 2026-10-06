@@ -9,8 +9,8 @@ pinned-runtime parity or resolve its startup problem (#279).
 The measurement match was a two-player Tiny Islands skirmish, Vikings versus
 Standard Byzantine AI, default data, Standard resources/ages/victory, population
 250, cheats allowed but unused, speed unlocked. The human side remained idle.
-Display: fullscreen 2560×1440, default zoom50%, Enhanced Graphics unchecked,
-V-Sync off, initially FPS limit120. Water/waves, map lighting, bloom, sharpen,
+Display: fullscreen 2560×1440, default zoom 50%, Enhanced Graphics unchecked,
+V-Sync off, initially FPS limit 120. Water/waves, map lighting, bloom, sharpen,
 depth of field and anti-aliasing were enabled. The game remained foreground.
 
 ### Method and observations
@@ -20,7 +20,7 @@ Choose speed with the owned `VK_ADD`/`VK_SUBTRACT` bindings from
 `resources/_common/dat/hotkeys.json`. Capture the clock at four absolute
 Stopwatch deadlines spaced60 wall seconds apart. Record monotonic times immediately
 before/after `CopyFromScreen`, plus UTC. PNG saving occurs after that bracket.
-The largest capture bracket was under29ms; displayed seconds introduce about
+The largest capture bracket was under 29ms; displayed seconds introduce about
 one game second of endpoint-difference uncertainty. Rates below are rounded
 observations, not replacements for the nominal speed constants.
 
@@ -37,7 +37,7 @@ All runs used the same match and process. Only the FPS limit was changed for the
 last run. This demonstrates a measurable timing difference associated with the
 frame-cap change in this session; it does not identify the engine's scheduling
 algorithm or exclude every other host variable. The Normal label alone cannot
-certify a sustained1.700 wall-clock ratio. Copying1.628 or1.667 into our fixed-rate
+certify a sustained 1.700 wall-clock ratio. Copying1.628 or1.667 into our fixed-rate
 simulation would overfit one native setup. Mechanic probes should measure native
 game-clock intervals, rather than convert wall time using the displayed label.
 

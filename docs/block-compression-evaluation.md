@@ -20,8 +20,8 @@ that hardware sampling is intrinsically less faithful to DE.
   Graphics Pack's actual SLD blocks. No executable inspection or lossy encoding.
 - `sld_layers.py` reads BC1 main data, BC4 shadow/damage/player-coverage data,
   and a distinct outline bit stream. At this checkpoint its RGB565 expansion shifted bits rather
-  than extending them to the full8-bit range. Its interpolation uses integer
-  arithmetic. A synthetic white endpoint became248/252/248 in those PNGs.
+  than extending them to the full 8-bit range. Its interpolation uses integer
+  arithmetic. A synthetic white endpoint became 248/252/248 in those PNGs.
 - `convert_sld.py`/`sld_layers.py` generate four-channel pages. Shadows/outlines
   use neutral white RGB plus coverage alpha. Player-colour pages synthesize
   main-layer luma in RGB and separate mask coverage in alpha.
@@ -43,7 +43,7 @@ Native Windows Brave product version **154.1.96.59**, NVIDIA **RTX4060**, driver
 **32.0.15.8129**. WebGPU reports `nvidia` / `lovelace`,
 `isFallbackAdapter=false`, and `texture-compression-bc`. This is not SwiftShader.
 
-For each of villager, militia and galley, sample256 literal blocks from the main
+For each of villager, militia and galley, sample 256 literal blocks from the main
 and shadow streams using the existing command walker. Render each4096-pixel
 sample twice through PNG and once through native BC. The PNG readback is checked
 against the decoder's original bytes, not only against another PNG draw. BC4
@@ -70,7 +70,7 @@ The two fresh desktop browser processes agree exactly on every comparison.
 | Galley | 3417 | 7 | 528 | 3 |
 
 BC1 alpha is unchanged in these samples. With sRGB textures rendered to a
-linear-light8-bit target, main-layer differences reach16/255; changed pixels are
+linear-light 8-bit target, main-layer differences reach16/255; changed pixels are
 2448,1879,3244 respectively. These are separately labelled colour spaces, not
 interchangeable error scores. The numbers establish failure of byte parity; they
 do not measure perceived error or native DE's final composited appearance.
@@ -85,7 +85,7 @@ Source SHA-256:
 
 ## GPU memory result
 
-A separate allocation experiment creates and initializes eight2048×2048 textures
+A separate allocation experiment creates and initializes eight 2048×2048 textures
 in each fresh browser process and waits for submitted GPU work. Windows
 `Win32_PerfFormattedData_GPUPerformanceCounters_GPUProcessMemory` is queried for
 that isolated browser's process tree before/after allocation and after destroy.
@@ -96,7 +96,7 @@ This avoids treating network/file size or a texture-object count as VRAM usage.
 | RGBA8 | 134,217,728 bytes | 134,258,688 bytes | 152,084,480 bytes |
 | BC1 | 16,777,216 bytes | 16,703,488 bytes | 28,631,040 bytes |
 
-The measured dedicated increase is approximately128MiB versus16MiB. OS counters
+The measured dedicated increase is approximately128MiB versus 16MiB. OS counters
 include driver allocation granularity and other work in the isolated GPU process;
 they need not equal the logical payload exactly. Immediate destroy did **not**
 return the entire counter increase to baseline: driver/browser pooling or delayed

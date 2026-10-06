@@ -26,9 +26,9 @@ directory order. Native availability is checked per family; a missing family
 uses the existing classic mask and diamond UVs.
 
 Farm and construction-farm patches now choose the **pair's family**, rather
-than treating DAT `blendType` as a family index. Farm type1 on grass type0 uses
-mode3, not mode1/watershore. Each patch tile reads its receiving terrain, so a
-farm crossing a road can use mode6 there. Native patches include the four
+than treating DAT `blendType` as a family index. Farm type 1 on grass type 0 uses
+mode 3, not mode 1/watershore. Each patch tile reads its receiving terrain, so a
+farm crossing a road can use mode 6 there. Native patches include the four
 diagonal corner neighbours; classic fallback retains its side-only ring. A
 single mesh owns coalesced material groups when several families meet it.
 Moved placement previews rebuild their patch and dispose the old geometry and
@@ -36,20 +36,20 @@ materials, refreshing both texture origin and receiving-family selection.
 
 ## Source and sampler evidence
 
-Read all ten512-square sheets under owned
+Read all ten 512-square sheets under owned
 `depot_813782/resources/_common/terrain/blends`, the DAT-derived terrain rows
 in the full content extraction, and the `TerrainBlend_vs/ps.so` resources.
-Farm7 and construction-farm29 both have blend type1 and no overlay mask;
-grass0 uses type0, road24 type5, beach2 type2 and water1 type3.
+Farm7 and construction-farm 29 both have blend type 1 and no overlay mask;
+grass 0 uses type 0, road 24 type 5, beach2 type 2 and water 1 type 3.
 
 The pixel shader's reflection and instructions distinguish:
 
-- `sBilinear`, slot1: `g_MaskTexture` at t2 and `g_BlendTexture` at t3.
-- `sAnisotropic`, slot4: `g_TileTexture` at t0 and `g_LayerTexture` at t1.
+- `sBilinear`, slot 1: `g_MaskTexture` at t2 and `g_BlendTexture` at t3.
+- `sAnisotropic`, slot 4: `g_TileTexture` at t0 and `g_LayerTexture` at t1.
 
 The implementation previously assigned anisotropy16 to the overlay mask too.
-Changing **that mask** to anisotropy1 reduced the diagnostic crossing error from
-0.030495 to0.001896, against the same source samples and unchanged0.025 limit.
+Changing **that mask** to anisotropy 1 reduced the diagnostic crossing error from
+0.030495 to0.001896, against the same source samples and unchanged 0.025 limit.
 Terrain pictures retain their separate filtering policy. Exact mip/minification
 state is not recoverable from these sampler names alone.
 
@@ -72,7 +72,7 @@ New family source hashes:
 ## Verification
 
 `npm run import:aoe2` completed through content, sprite, UI, blend and audio
-publication: `.local/blend116-import.log`, exit0. All3162 sprite/layer atlas
+publication: `.local/blend116-import.log`, exit 0. All3162 sprite/layer atlas
 groups were reused; the blend change does not invalidate the sprite decoder.
 
 `tools/land_blend_smoke.mts` uses a private Vite server and real browser, actual
@@ -91,7 +91,7 @@ to exercise every family route; they do not assert new map/civilisation data.
 The probe also checks partial-manifest fallback, visible corner contribution,
 and simulation checksums around the rendering passes. The source-window
 orientation/contour and deterministic-publication import tests now cover all
-eight families. Focused view tests passed87 cases, including mixed-background
+eight families. Focused view tests passed 87 cases, including mixed-background
 farm materials, construction scale, fallback and moving-preview disposal.
 
 Receipts: `.local/land116-browser-r3.log`,
@@ -100,8 +100,8 @@ in `.local/land116-browser{,-r2}.log`; no tolerance or timeout was widened.
 A real-texture overview is `.local/land116-crossings.png`. It supplements the
 numbers and is **our renderer**, not a DE reference capture.
 
-Owned checkpoint **GREEN**, `.local/land116-gate.log`, exit0,13m52s:1117 Vitest tests
-across89 files (the same7 inapplicable cases skipped), build,164 Python/import
+Owned checkpoint **GREEN**, `.local/land116-gate.log`, exit 0,13m52s:1117 Vitest tests
+across 89 files (the same 7 inapplicable cases skipped), build,164 Python/import
 tests and real-browser debug smoke. Only Markdown edits followed checkpoint start.
 
 ```bash
@@ -130,38 +130,38 @@ that acceptance rather than declaring visual parity from self-comparison.
 
 ## Shoreline tile-grid correction (#284, October3)
 
-The reported Islands seed2 coast was reproduced on a private browser. The pale
+The reported Islands seed 2 coast was reproduced on a private browser. The pale
 tile pattern persisted with foam and the animated surface disabled. Changing
 corner suppression did not remove it; opacity gain and synthetic boundary
 correction were rejected as substitutes for complete source windows.
 
 The64-pixel `watershore` cuts truncate the authored fades: the original first
-edge's terminal row retains at least18% sand at its worst source sample. The
-new160-sample production-renderer join check measured15.2% exposed sand before
-the fix, despite the existing775 interior samples matching the imported atlas.
+edge's terminal row retains at least 18% sand at its worst source sample. The
+new 160-sample production-renderer join check measured 15.2% exposed sand before
+the fix, despite the existing 775 interior samples matching the imported atlas.
 
-`watershore` now uses96-pixel original-source windows, with border variants
+`watershore` now uses 96-pixel original-source windows, with border variants
 positioned clear of the sheet's other motifs. Other families retain their
-existing64-pixel cuts. Per-family `tile` metadata is consumed by ground and
+existing 64-pixel cuts. Per-family `tile` metadata is consumed by ground and
 terrain-patch UVs; old imports still use the common layout. Original samples,
 the authored irregular contour and source hash are preserved; no gain, blur or
-repainted alpha is used. The new join check requires less than2.5% exposed sand
-in linear-sRGB, alongside the unchanged0.025 source-alpha error limit.
+repainted alpha is used. The new join check requires less than 2.5% exposed sand
+in linear-sRGB, alongside the unchanged 0.025 source-alpha error limit.
 
 The96-pixel extent and exact cut coordinates are **inferred**, not a recovered
 native-engine UV table. This fixes the demonstrated truncated-fade defect; #116
 still owns exact DE crossing-width and junction calibration.
 
-Verification on the regenerated assets: maximum exposed-sand fraction at the160
-sampled joins fell from0.152 to0.008, with the same0.025 acceptance limit. All775
-shore and6200 family interior samples remain within0.002001 of the source alpha;
-the50 land-crossing and450 farm checks also pass. The full import reused4898
-sprite/layer atlases and completed all stages. Same-camera seed2 captures are
+Verification on the regenerated assets: maximum exposed-sand fraction at the 160
+sampled joins fell from 0.152 to0.008, with the same 0.025 acceptance limit. All775
+shore and 6200 family interior samples remain within 0.002001 of the source alpha;
+the 50 land-crossing and 450 farm checks also pass. The full import reused4898
+sprite/layer atlases and completed all stages. Same-camera seed 2 captures are
 `.local/shore284-all.png` and `.local/shore284-after-all.png`; foam/surface-off
 controls are retained beside them. No simulation-state changes were observed.
-Owned checkpoint GREEN: `.local/shore284-gate.log`, exit0,790s;1384 Vitest passes with
-the same8 skips,200 Python passes, typecheck/build and real-browser debug smoke.
-The focused view suite passed39 tests and the two new owned-source window tests
+Owned checkpoint GREEN: `.local/shore284-gate.log`, exit 0,790s;1384 Vitest passes with
+the same 8 skips,200 Python passes, typecheck/build and real-browser debug smoke.
+The focused view suite passed 39 tests and the two new owned-source window tests
 passed. Existing orientation/contour and deterministic-publication checks also
 passed with their original thresholds.
 
@@ -169,7 +169,7 @@ passed with their original thresholds.
 
 Native desktop automation now reaches the scenario editor, paints terrain,
 places a real farm and saves a separately named scenario. The first controlled
-fixture is `OpenEmpires-20261003-terrain116`: blank144-square grass map,
+fixture is `OpenEmpires-20261003-terrain116`: blank 144-square grass map,
 Default colour mood/water definition, a5×5 Beach stamp,3×3 Farm and Farm0%
 terrain stamps, and a separate player-one Farm building. Eye candy is disabled.
 Grid-on captures establish the painted footprints independently of texture edges.
@@ -187,14 +187,14 @@ It is **not the pinned source build**:
 
 For terrain IDs0,2,24, the only row difference is absolute blend priority
 (111→110,131→130,146→145); their relative ordering is unchanged. Farm7,
-construction29 and water1/22/23 rows are identical. These checks establish
+construction29 and water 1/22/23 rows are identical. These checks establish
 asset compatibility for this fixture, **not equivalence of engine-set UVs,
 draw ordering or shader constants across executable versions**.
 
 Private evidence is indexed in `.local/reference/index.md`. Captures are
-full-resolution2560×1440 desktop PNGs, display/sRGB, default-zoom slider50%,
+full-resolution2560×1440 desktop PNGs, display/sRGB, default-zoom slider 50%,
 UHD unchecked. Diagnostic settings disable depth of field, bloom, sharpen,
-vignette, map lighting and game-object antialiasing; gamma remains1.0.
+vignette, map lighting and game-object antialiasing; gamma remains 1.0.
 These settings intentionally isolate crossings and are not comparable to the
 older enhanced-pack, postprocessed reference corpus without normalization.
 The original options screen and source comparison receipt are retained privately.

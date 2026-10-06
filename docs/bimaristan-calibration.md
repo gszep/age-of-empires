@@ -3,7 +3,7 @@
 ## Current-build experiment, 2026-10-04
 
 Native Steam **101.103.54800.0 (#185872)**, fullscreen2560×1440, default
-zoom50%, Enhanced Graphics unchecked. This is current-build evidence, not the
+zoom 50%, Enhanced Graphics unchecked. This is current-build evidence, not the
 pinned executable's acceptance. See [speed calibration](speed-calibration.md)
 for the display/settings evidence and why game-clock intervals matter.
 
@@ -12,9 +12,9 @@ The native editor was used directly to create a blank flat-grass scenario:
 - Player1 Saracens, Imperial start; one ordinary Monk and one Monk with Relic,
   separated widely across the visible map.
 - Custom victory with no selected condition, allowing a controlled test.
-- One enabled non-looping trigger: Damage Object, player1, quantity20; then
+- One enabled non-looping trigger: Damage Object, player1, quantity 20; then
   Research Technology, player1, **Bimaristan**, item ID28, Force unchecked.
-- The actual tested units had45 maximum HP, including the starting-age upgrades.
+- The actual tested units had 45 maximum HP, including the starting-age upgrades.
   This is not a claim about unupgraded30-HP monks.
 - No building, allied healer or other friendly unit was present. The ordinary
   Monk and relic carrier were initially idle and outside each other's healing
@@ -38,13 +38,13 @@ not a separate aura-rate measurement.
 
 These observations support **no self-healing** and **aura healing while carrying
 a relic** in this current build, matching the existing implementation. The
-displayed regeneration value1 must not be treated as a fractional-rate readout.
+displayed regeneration value 1 must not be treated as a fractional-rate readout.
 
 ### Timed one/two/zero-emitter control
 
 A second manually staged layout replaced the ordinary Monk with a Knight and
 placed two relic carriers nearby, well inside the source range. The Knight had
-120 maximum HP after Imperial-start upgrades. The same20-damage/research trigger
+120 maximum HP after Imperial-start upgrades. The same 20-damage/research trigger
 was gated by a60-game-second Timer. The Knight was given No Attack (`F`, the
 owned definitive binding), preventing automatic pursuit out of the fixture.
 Native restart was used for each run. Public Delete removed one or both relic
@@ -61,14 +61,14 @@ healing, not individual engine scheduling ticks.
 |---:|---|
 | 2 | 00:59→120; 01:00→100; 01:03→104; 01:06→108; 01:09→112; 01:12→115; 01:15→119; 01:17→120 |
 | 1 | 00:58→120; 01:00→101; 01:03→104; 01:06→108; 01:08→112; 01:11→115; 01:14→119; 01:16→120 |
-| 0 | 20-damage event leaves100/120, still100/120 at02:01 |
+| 0 | 20-damage event leaves 100/120, still 100/120 at02:01 |
 
-The one- and two-emitter curves are consistent with the owned75HP/minute
+The one- and two-emitter curves are consistent with the owned 75HP/minute
 (1.25HP/game-second) interpretation and **non-additive overlapping Bimaristan
 auras**. A second emitter did not halve the recovery time. The zero-emitter
 control rules out ordinary Knight regeneration as the cause. A separate sample
-of one relic carrier receiving the other's aura recovered25→45 over approximately
-16game seconds, consistent with the same rate.
+of one relic carrier receiving the other's aura recovered 25→45 over approximately
+16 game seconds, consistent with the same rate.
 
 The first one-emitter attempt was rejected: the Knight had pursued an enemy
 before the intended selection, and no selected Knight HP was captured. The

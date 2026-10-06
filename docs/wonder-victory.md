@@ -1,7 +1,7 @@
 # Opt-in Wonder countdown (#110)
 
 **Game Settings → Wonder:200 Years** enables a fixed countdown for a new match.
-Completing a paid Wonder starts1000 simulation seconds (200 years); keeping it
+Completing a paid Wonder starts 1000 simulation seconds (200 years); keeping it
 standing wins even while the opponent has a surviving army or town. Destroying
 it cancels that deadline. Rebuilding starts a fresh one. Each completed Wonder
 keeps its own deadline; the HUD shows each side's earliest surviving deadline.
@@ -16,15 +16,15 @@ fallback's existing limited building/age roster is unchanged.
 
 ## Independent source and native measurement
 
-- Pinned Wonder276 task120 supplies the source task identity; building costs,
+- Pinned Wonder276 task 120 supplies the source task identity; building costs,
   footprint, HP and construction duration remain the existing DAT import.
-- Owned strings3019–3024,3058,11300/11301 and300180/300182 supply the notices,
-  years label, timer label and focus help. String9786 says300years/25minutes,
+- Owned strings 3019–3024,3058,11300/11301 and300180/300182 supply the notices,
+  years label, timer label and focus help. String9786 says300years/25 minutes,
   consistent with five game seconds per year.
 - Installed DE101.103.54800.0 (#185872), not the older pinned executable:
   a controlled120-square editor fixture with an actually built Wonder announced
-  **200years**. Its displayed clock changed17:55→23:48 while the banner changed
-  199→128:353game seconds for71integer-display years, consistent with5seconds
+  **200 years**. Its displayed clock changed 17:55→23:48 while the banner changed
+  199→128:353 game seconds for71integer-display years, consistent with5seconds
   per year and display rounding. Resuming the trial later reached victory with
   the opposing town center still standing.
 - The fixture used an Imperial builder funded with10000wood/gold/stone, paid
@@ -51,13 +51,13 @@ menu-panel rectangle intercepting its clicks. Cloth is now below menu artwork,
 while visible timer controls win hit testing. The passing check measures605blue
 sRGB screenshot pixels with the original threshold, and performs the actual
 focus click, reload, Delete/Yes cancellation, paid replacement construction and
-victory. It advances the real3500-second construction and1000-second victory
+victory. It advances the real 3500-second construction and 1000-second victory
 clocks through simulation ticks; no production rule is shortened by the browser
 fixture. The separate unit fixture uses fast construction but retains the full
 200-year victory clock. Shared JSON followers reproduce the final ticks/winner.
 
-Owned checkpoint GREEN on October3:1363 tests passed/8existing skips,
-build,193 owned import/tool tests and real-browser debug smoke (810seconds).
+Owned checkpoint GREEN on October3:1363 tests passed/8 existing skips,
+build,193 owned import/tool tests and real-browser debug smoke (810 seconds).
 All six selected feature receipts pass on the same non-Markdown tree; no
 existing assertion or clock was relaxed.
 
@@ -80,5 +80,5 @@ map defaults still need their own reference acceptance. The banner uses the
 default player palette and browser font rasterisation; exact compositor/SDF and
 colour-blind banner parity are not established.
 
-Source shared protocol4 rejects older simulators. Installed protocol2 services
+Source shared protocol 4 rejects older simulators. Installed protocol 2 services
 remain release-pinned; this change does not deploy, reset or migrate their match.

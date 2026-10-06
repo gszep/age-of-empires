@@ -53,7 +53,7 @@ below remain useful for native corroboration and the unresolved exceptions.
 | Player-side abilities | Compare defender Heresy before capture with attacker-only Heresy. Record target owner/death, released cargo and participating monks' faith. For every later supported civ ability, test donor-only versus recipient-only activation separately. | Heresy is read from the defender; successful conversion uses the existing faith/death lifecycle. No general claim about future abilities follows. |
 
 Conversion probability is a separate measurement: fixed seeds/one successful
-conversion cannot establish a distribution. Target-unit modifiers, resource182,
+conversion cannot establish a distribution. Target-unit modifiers, resource 182,
 faith scheduling and min/max timing need repeated trials with explicit controls;
 do not infer those rules from this inheritance matrix.
 
@@ -117,6 +117,6 @@ on verification builds. An initial one-worker full `npm test` also exceeded its
 The subsequent optimized owned checkpoint completed **GREEN** in14m50s:
 **1108 Vitest tests /89 files** (7 existing inapplicable cases skipped), public
 bundle build, **159 import tests**, and real-browser debug smoke. Receipt:
-`.local/gate-optimization.log`, exit0. No test timeout was widened; tests run at
-two workers/nice10, and the checkpoint build omits redundant owned-asset copies while
+`.local/gate-optimization.log`, exit 0. No test timeout was widened; tests run at
+two workers/nice 10, and the checkpoint build omits redundant owned-asset copies while
 the import tests/browser still consume owned content.

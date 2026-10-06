@@ -132,27 +132,27 @@ off the reference; **measured** — fitted to a reference screenshot;
 
 ## Saracen healing aura and source discrepancy (#187/#285)
 
-- **Owned:** DAT civ9/tree261/team409, current tree research28/454/368,
+- **Owned:** DAT civ 9/tree 261/team 409, current tree research28/454/368,
   `xs/Effects.xs` EffectFunction7 and `xs/Constants.xs` define the Bimaristan
-  task's work values75/1, range5, target classes, owner4/combat-level2,
-  search-wait109/gather-type21 and help string13404. The importer expands only
+  task's work values 75/1, range 5, target classes, owner 4/combat-level 2,
+  search-wait 109/gather-type 21 and help string 13404. The importer expands only
   this reviewed function into unit research effects; unknown script functions
   remain unsupported. Mameluke282/556 stats/art and bonuses are imported normally.
-- **Inferred runtime:** interpret75 as HP/minute (1.25HP/s), use inclusive
-  centre-distance range5, strongest-only overlapping auras, exclude the emitter
+- **Inferred runtime:** interpret 75 as HP/minute (1.25HP/s), use inclusive
+  centre-distance range 5, strongest-only overlapping auras, exclude the emitter
   itself and garrisoned sources/recipients, and continue during movement, healing,
   conversion and relic carrying. Apply fractional HP each fixed tick after unit
   actions. Captured monks retain the researched aura with their conversion rules;
   its beneficiaries follow their current owner. The two-seat locked-enemy model
-  means owner4 ally targeting currently reduces to same-owner recipients.
+  means owner 4 ally targeting currently reduces to same-owner recipients.
   Current-build185872 native editor observations support no self-healing and a
-  working relic-carrier aura: isolated monks stayed25/45, then both recovered
+  working relic-carrier aura: isolated monks stayed 25/45, then both recovered
   when brought together. Timed Knight controls with0/1/2 relic-carrier emitters
-  support75HP/minute and non-additive overlap: both healing runs recovered20HP
-  in about16game seconds; zero emitters left the wound intact. Exact boundaries,
+  support 75HP/minute and non-additive overlap: both healing runs recovered20HP
+  in about 16 game seconds; zero emitters left the wound intact. Exact boundaries,
   scheduling and other policies remain inferred; pinned-runtime acceptance is still open. See
   [Bimaristan calibration](bimaristan-calibration.md) and #285.
-- **Source mismatch:** team409 adds class21 attack+3 to DAT class0, whereas owned
+- **Source mismatch:** team 409 adds class 21 attack+3 to DAT class 0, whereas owned
   English120158 says+2 versus buildings. Preserve DAT arithmetic and original
   localization rather than silently editing either. Native resolution is #285.
 - Feedback currently uses recipient health and original research text. The
@@ -171,14 +171,14 @@ off the reference; **measured** — fitted to a reference screenshot;
 
 ## Opt-in Wonder countdown (#110)
 
-- **Owned:** Wonder task120, existing building DAT stats, announcement/timer
-  strings3019–3024/3058/11300/11301/300180/300182 and `wonderpanel.json` geometry/
-  original player banners. String9786 gives300years/25minutes.
+- **Owned:** Wonder task 120, existing building DAT stats, announcement/timer
+  strings 3019–3024/3058/11300/11301/300180/300182 and `wonderpanel.json` geometry/
+  original player banners. String9786 gives300years/25 minutes.
 - **Measured on installed185872, not pinned engine:** paid completion announces
-  200years;353game seconds elapse for71displayed years; eventual victory occurs
+  200 years;353 game seconds elapse for71displayed years; eventual victory occurs
   with the opponent's TC standing. The trial and rejected house-only/preplaced
   fixtures are distinguished in [wonder-victory.md](wonder-victory.md).
-- **Chosen scope:** fixed opt-in200years, five simulation seconds/year, off when
+- **Chosen scope:** fixed opt-in200 years, five simulation seconds/year, off when
   omitted. This is not a recovered automatic map-size default table or full
   Standard victory. It applies wherever explicitly selected, including surveys.
 - **Inferred integration:** only actual completion arms a deadline; each building
@@ -193,36 +193,36 @@ off the reference; **measured** — fitted to a reference screenshot;
   Visible controls beat the menu PNG's transparent hit rectangle without raising
   the cloth above its art. Palette/compositor/SDF parity remains unverified.
 - Optional state/config/record fields preserve omitted legacy checksums. Shared
-  protocol4 rejects older simulators; installed services remain on protocol2.
+  protocol 4 rejects older simulators; installed services remain on protocol 2.
   `sim/wonder.ts`, `view/wonder.ts`, `tools/wonder_smoke.mts`.
 
 ## Configurable population ceiling (#253)
 
-- **Owned:** `screensingleplayercreate.json` PopulationDropDown names label13516
+- **Owned:** `screensingleplayercreate.json` PopulationDropDown names label 13516
   ("Population:") and help93516 (maximum units each player can create). The
-  importer publishes both. Existing XS resource32/Gothic effect418 remains the
+  importer publishes both. Existing XS resource 32/Gothic effect 418 remains the
   independent Imperial+10 modifier, not housing.
-- **Measured on installed DE,2026-10-03:** native selector offers25,50,75,100,
+- **Measured on installed DE,2026-10-03:** native selector offers 25,50,75,100,
   125,150,175,200,225,250,300,400,500. Full-resolution dropdown/min/max captures
   are indexed privately under `native253-population-*`. The installed executable
   is101.103.54800.0 (#185872), newer than the pinned DAT; these are not claimed
-  as recovered pinned-engine constants. Its saved choice was250, which does
-  **not** establish a factory default. **Observed on current build 185872:**
+  as recovered pinned-engine constants. Its saved choice was 250, which does
+  **not** establish a factory default. **Observed on current build185872:**
   the skirmish lobby Reset sets 200 (#280, [speed calibration](speed-calibration.md)).
   The rules-bundle default 200 matches that reset-lobby path, not a claimed
   universal clean-install or pinned-build default.
 - **Implementation policy:** optional authoritative `state.populationLimit`
-  overrides every side's base ceiling; per-player resource32 is added afterwards.
+  overrides every side's base ceiling; per-player resource 32 is added afterwards.
   Housing remains a separate bound. The menu uses these measured choices in the
   existing compact setup form, not the native lobby's full layout. No mid-match
   cap command is provided; Start Game applies the choice to a new match.
 - **Compatibility:** absent fields retain rules-bundle defaults, including old
   uncapped rules, without inserting a new checksum field. Explicit limits travel
-  in v2 configs/records and JSON snapshots; v1 cannot carry one. Shared protocol3
+  in v2 configs/records and JSON snapshots; v1 cannot carry one. Shared protocol 3
   rejects older simulators and incompatible checkpoints rather than silently
-  ignoring the ceiling (subsequently protocol4 for Wonder victory). Installed services remain release-pinned on protocol2;
+  ignoring the ceiling (subsequently protocol 4 for Wonder victory). Installed services remain release-pinned on protocol 2;
   this change does not deploy or migrate their live state.
-- **Observed visually on current build 185872, not pinned 48987, 2026-10-06:**
+- **Observed visually on current build185872, not pinned48987, 2026-10-06:**
   with the same 225 housing and limit 200, Goths Imperial shows 1/210,
   Goths Castle 1/200, and Teutons Imperial 1/200. Goths Imperial with no houses
   shows 1/0; Teutons at limit 300 confirms 1/225. These separate editor Test starts
@@ -234,7 +234,7 @@ off the reference; **measured** — fitted to a reference screenshot;
 ## Agent public ceilings/deadlines (#281)
 
 - **Source/public policy:** the population section above (setup help93516,
-  resource32 and Gothic effect418) supports the observer's own effective
+  resource 32 and Gothic effect 418) supports the observer's own effective
   ceiling, not an opponent-bonus disclosure. Wonder help300180/300182 explicitly
   announces own/opponent completion, countdown and focus position; see
   [source evidence](wonder-victory.md#independent-source-and-native-measurement).
@@ -257,9 +257,9 @@ off the reference; **measured** — fitted to a reference screenshot;
 
 ## Persian Trade Cart unavailable audio (#271)
 
-- **Owned absence:** DAT8 unit128 and death graphic4862 reference Wwise events
+- **Owned absence:** DAT8 unit 128 and death graphic 4862 reference Wwise events
   3167914911,955679769 and2892846699, absent from the inspected pinned common and
-  English bank object tables. Legacy sound305's ordinary cart filenames do not
+  English bank object tables. Legacy sound 305's ordinary cart filenames do not
   establish a native fallback. Detailed source evidence is in
   [audio-reference.md](audio-reference.md#reviewed-persian-trade-cart-source-gaps-271).
 - **Human-approved application policy, 2026-10-02:** these exact Persian
@@ -274,11 +274,11 @@ off the reference; **measured** — fitted to a reference screenshot;
 
 ## Catapult automatic friendly-blast avoidance (#278; calibration #131)
 
-- **Owned intent:** bundled TC Manual printed3/5 (physical5/7) says Mangonels,
+- **Owned intent:** bundled TC Manual printed 3/5 (physical 5/7) says Mangonels,
   Onagers and Siege Onagers avoid automatic attacks that may harm friendly units.
   These are legacy manual statements, not a measurement of current DE targeting.
-  Pinned DAT280/550/588 gives blast radii1/1.25/1.5, levels2/1/1, friendly-fire
-  damage1 and accuracy100. Existing resolved rules supply the actual radius,
+  Pinned DAT280/550/588 gives blast radii 1/1.25/1.5, levels 2/1/1, friendly-fire
+  damage 1 and accuracy 100. Existing resolved rules supply the actual radius,
   projectile speed, research effects and blast-defense eligibility.
 - **Inferred prediction:** test current same-owner bodies using the existing
   circular splash geometry, around the target's current centre and nominal led
@@ -289,7 +289,7 @@ off the reference; **measured** — fitted to a reference screenshot;
   scaling remains separate#54 work.
 - **Chosen control/state adapter:** unsafe automatic targets are skipped; a held
   automatic order rechecks every simulation step, cancels pending windup/volley,
-  keeps its cooldown running and seeks a safe alternative at the existing10-tick
+  keeps its cooldown running and seeks a safe alternative at the existing 10-tick
   acquisition cadence. An optional saved attack-order marker preserves that
   intent through JSON. Explicit attack/attack-ground and unmarked legacy orders
   retain their existing friendly-fire behavior. Other unit families are unchanged.
@@ -313,8 +313,8 @@ off the reference; **measured** — fitted to a reference screenshot;
 ## Islands fish (#95; remaining seasons/content #274)
 
 - **Owned:** `GeneratingObjects.inc` GNR_STANDARDFISH requests global Gaia shore
-  fish (9999, temporary spacing6), then scaled FISH_A/FISH_B (6/170, spacing4/8,
-  maximum land-zone distance4). DAT69/455/456/458 provide shore/dorado/salmon/snapper
+  fish (9999, temporary spacing 6), then scaled FISH_A/FISH_B (6/170, spacing 4/8,
+  maximum land-zone distance 4). DAT69/455/456/458 provide shore/dorado/salmon/snapper
   food, classes, placement restrictions, original underwater/leap graphics and
   localization. `tools/fish_reference.py` checks the numeric map reference.
 - **Inferred adapter:** global shuffled tile candidates use the existing isolated
@@ -357,19 +357,19 @@ off the reference; **measured** — fitted to a reference screenshot;
   approximation: no frame, hotspot, page index, source pixel or rule is removed.
 - **Measured trigger:** adding the seventh profile produced551,770,741 bytes of
   minified JSON, exceeding V8's0x1fffffe8 string limit before tests or rendering
-  could load it. The six-profile pinned release was452,630,984 bytes. Shared PNG
+  could load it. The six-profile pinned release was 452,630,984 bytes. Shared PNG
   URLs alone did not deduplicate the repeated frame arrays.
 
 ## Byzantine healing, trample and bonuses (#185; calibration #267)
 
-- **Owned:** DAT7/tree256/team400; Cataphracts40/553 and Camel Riders329/330,
+- **Owned:** DAT7/tree 256/team 400; Cataphracts40/553 and Camel Riders329/330,
   independent tech gates, MEDI buildings/HUD/flags, icons and Byzantine voices.
-  Tree research-cost operation2 multiplies Imperial food/gold by.67; operations0/1
+  Tree research-cost operation 2 multiplies Imperial food/gold by.67; operations 0/1
   remain set/add. Free Town Watch/Patrol and staged building-HP factors are imported.
-- **Owned:** healing task105 has work_value_1=2 and Monk work_rate=1.25; team400
-  sets resource89 (`healRateModifer`, source spelling) to2, and help120156 says
-  +100% healing. **Inferred integration:** task amount times work rate gives2.5HP/s;
-  resource0 means the ordinary rate and a positive resource multiplies it. This
+- **Owned:** healing task 105 has work_value_1=2 and Monk work_rate=1.25; team 400
+  sets resource 89 (`healRateModifer`, source spelling) to2, and help120156 says
+  +100% healing. **Inferred integration:** task amount times work rate gives 2.5HP/s;
+  resource 0 means the ordinary rate and a positive resource multiplies it. This
   corrects the old task-amount omission for all imported monks. Fractional progress
   uses the existing integer-HP accumulator. Captured monks freeze this resolved
   unit-local rate under the shared conversion policy. Native cadence/stacking and
@@ -378,24 +378,24 @@ off the reference; **measured** — fitted to a reference screenshot;
   radius+.5/+6 infantry attack; UGC attribute115 describes negative area damage as
   fixed HP. **Inferred geometry:** use the existing target-centred radius plus
   bystander hitbox, exclude owner/direct target, respect blast defense classes and
-  deal exactly5 collateral HP without armour/elevation scaling. Positive melee
+  deal exactly 5 collateral HP without armour/elevation scaling. Positive melee
   blast damage scales the ordinary damage calculation. No native boundary/hill
   calibration is claimed. Greek Fire's source radius/range changes and projectile
   replacements506→537/508→1798 reach building and unit shots; shared ranged splash
   assumptions remain unchanged.
 - **Inferred numeric policy:** building HP retains the source's fractional chained
-  factors1.1/1.0909/1.0833/1.0769, with existing wound/foundation handling rather than
+  factors 1.1/1.0909/1.0833/1.0769, with existing wound/foundation handling rather than
   substituting exact10/20/30/40% values. Native rounding remains#267.
-- **Owned graphic composition:** MEDI garrison parents retain legacy2260/2263
+- **Owned graphic composition:** MEDI garrison parents retain legacy 2260/2263
   names (`I`, `R`, `B`, `RTWC2GI`, `MRKT2GI`, `ARRG2GI`, `STBL2GI`, `DOCK2GI`,
   `BRKS2GI`) without corresponding SLD files. Their delta11380 supplies the DE
   flag, retaining each original offset. The TC uses y−159/−165/−180 by age.
 
 ## Chinese opening, research and weapons (#184; calibration #260)
 
-- **Owned:** DAT6/tree257/team402;226 deducts starting food200/wood50 after
-  Town Center Spawn639,302 requires639 and annex307 and spawns three83 villagers
-  at annex619 with spawnCap234=1.425 sets TC first resource storage to15 and adds7
+- **Owned:** DAT6/tree 257/team 402;226 deducts starting food 200/wood 50 after
+  Town Center Spawn639,302 requires 639 and annex307 and spawns three 83 villagers
+  at annex619 with spawnCap234=1.425 sets TC first resource storage to15 and adds 7
   sight/search. **Inferred integration:** the automatic graph grants once at the
   first eligible completed TC, using the existing safe production exit placement;
   no subsequent TC rebuild, save/reload or age change repeats it. Starting-resource
@@ -405,75 +405,75 @@ off the reference; **measured** — fitted to a reference screenshot;
   **Inferred integer policy:** nearest-integer per resource, consistent with the
   existing cost consumer; pending accepted research is not repriced. Dynamic prices
   are visible to the HUD and agents. Native half-resource rounding remains#260.
-- **Owned:** team402 makes repeatable232 free/zero-time;232 copies resource36
-  multiplied by1.1 and multiplies resource69 (localization15069: Farm Food
-  Multiplier, initial1). **Inferred reapplication:** use that multiplier once on the final additive farm
+- **Owned:** team 402 makes repeatable232 free/zero-time;232 copies resource 36
+  multiplied by1.1 and multiplies resource 69 (localization15069: Farm Food
+  Multiplier, initial 1). **Inferred reapplication:** use that multiplier once on the final additive farm
   capacity once (including later Horse Collar/Heavy Plow), round when sowing and
-  keep existing crops unchanged. The resource36 copy and69 multiplier are paired,
+  keep existing crops unchanged. The resource 36 copy and 69 multiplier are paired,
   not two independent10% increases. Other232 targets (pastures/Folwarks)
   remain diagnostics outside this roster; native reapplication details are#260.
-- **Owned:** Chu Ko Nu73/559 fire3/5 projectiles, first from the shooter and
-  subsequent from510; Rocket Carts1904/1907 fire8/10 shooter-strength rockets.
+- **Owned:** Chu Ko Nu73/559 fire 3/5 projectiles, first from the shooter and
+  subsequent from 510; Rocket Carts1904/1907 fire 8/10 shooter-strength rockets.
   **Inferred scheduling:** distribute non-bulk shots through the remaining owned
-  attack-animation duration, quantized to the20Hz simulation clock. Pending shots
+  attack-animation duration, quantized to the 20Hz simulation clock. Pending shots
   snapshot their damage/art, cancel on retask/Stop or target loss, and survive JSON
   saves. Source counts/stats are not proof of native cadence/spread;#260 retains it.
-  Their embedded aura task155 templates are dormant: Combat Ability is0, without
-  the enabling32 bit documented by UGC. They are not unconditional Chinese buffs.
-- **Owned + documented interpretation:** Fire Lancers1901/1903 use type6,
-  target127, range modifier4/5, special graphics13031/13067 and three1925 bullets;
-  raw recharge precision preserves the30-second threshold. Lou Chuan1948 uses
-  type6/target127/range modifier−3 and ten1936 arrows. English help26601 identifies
+  Their embedded aura task 155 templates are dormant: Combat Ability is0, without
+  the enabling 32 bit documented by UGC. They are not unconditional Chinese buffs.
+- **Owned + documented interpretation:** Fire Lancers1901/1903 use type 6,
+  target 127, range modifier 4/5, special graphics13031/13067 and three1925 bullets;
+  raw recharge precision preserves the 30-second threshold. Lou Chuan1948 uses
+  type 6/target 127/range modifier−3 and ten 1936 arrows. English help26601 identifies
   arrows versus units and the long-range primary versus buildings/siege.
   **Inferred targeting/timing:** use that split, full-charge readiness, source
   special-animation windup and source bulk flag16; recharge in ordinary on-map
   simulation ticks. Fire Lancers close to melee while charge is unavailable.
   A weapon-mode change restarts its windup/animation together; ordinary pursuit
   with the same weapon keeps the existing windup. Native switching policy is#260.
-  Arrow range follows attribute61 separately from the primary weapon's range.
+  Arrow range follows attribute 61 separately from the primary weapon's range.
 - **Owned:** Rocketry483 changes weapon attacks and redirects1936→1879;
-  Chemistry redirects1936→1937 and510→522. Projectile tables retain their own
+  Chemistry redirects1936→1937 and 510→522. Projectile tables retain their own
   research effects, including repeated source commands. **Inferred redirection:**
   the latest completed replacement for an original projectile ID wins, then follow
   its replacement chain; already fired/pending shots keep their payload. Native
   order-dependent Chemistry/Rocketry redirection is explicitly unresolved in#260.
 - **Owned + UGC interpretation:** `type_50.break_off_combat` corresponds to
-  Combat Ability63: bits1/2 ignore melee/pierce armour/resist that bypass,8 permits
+  Combat Ability63: bits 1/2 ignore melee/pierce armour/resist that bypass,8 permits
   Attack Ground,16 releases a bulk volley. Projectile hitMode1/vanishMode0 intercepts
   the first enemy and disappears; vanishMode1 keeps the existing piercing path.
   Rocket splash shares the same armour-bypass calculation. **Inferred geometry:**
   existing swept-radius collision, nearest intercepted enemy and melee splash
   against enemies only; native blast/friendly-fire boundaries remain uncalibrated.
-- **Owned UI:** Attack Ground label4123/help4923, hotkey action23 (Definitive T)
-  and the imported action-sheet rock/ground icon60. **Chosen layout:** cell5 in the
+- **Owned UI:** Attack Ground label 4123/help4923, hotkey action 23 (Definitive T)
+  and the imported action-sheet rock/ground icon 60. **Chosen layout:** cell5 in the
   current compact command grid; the owned buttons.json subset has no ground-fire
   placement row. A selected artillery unit receives a public coordinate order;
   subsequent targeting, damage and cancellation remain simulation-owned.
 
 ## Japanese bonus and unique-unit integration (#183; calibration #259)
 
-- **Owned:** Japanese DAT5/tree255/team406; automatic190/306/340/341/422–424
+- **Owned:** Japanese DAT5/tree 255/team 406; automatic190/306/340/341/422–424
   supply cavalry-archer attack exceptions, fishing HP/work, camp prices and
-  Feudal infantry reload. Negative packed command−9730 means class38/−2,
-  cancelling the class15/+2 bonus against skirmishers. Values, research gates,
+  Feudal infantry reload. Negative packed command−9730 means class 38/−2,
+  cancelling the class 15/+2 bonus against skirmishers. Values, research gates,
   Samurai291/560, Elite Cannon Galleon691, Asia art/flags and voices are imported.
   Elite Cannon Galleon's tree row lacks `Node Type`; its `Link ID`420 and
   `Trigger Tech ID`376 still identify the paid upgrade.
-- **Owned:** Yasama484/effect539 adds2 to both total-projectile attribute102
-  and maximum107 on Watch Tower/Guard Tower/Keep. The existing secondary-arrow
+- **Owned:** Yasama484/effect 539 adds 2 to both total-projectile attribute102
+  and maximum 107 on Watch Tower/Guard Tower/Keep. The existing secondary-arrow
   damage/scatter model supplies those extra shots; native volley calibration
   remains part of the shared garrison boundary.
 - **Inferred engine interpretation:** Kataparuto59 multiplies deployed
-  trebuchet42 work rate by4 and reload duration by.75. Preserve the existing
+  trebuchet 42 work rate by4 and reload duration by.75. Preserve the existing
  4.5-second packing baseline (now read from its work-rate field), scaling
   duration inversely with the researched work-rate change. New pack/unpack
-  orders take1.125 seconds rounded to23 simulation ticks; already running
+  orders take 1.125 seconds rounded to23 simulation ticks; already running
   transitions retain their accepted duration. Native work-rate/time conversion
   and tick rounding are not established by the DAT; tracked in#259.
-- **Owned + community interpretation:** Samurai task133 carries initiation
-  distances2–6 (elite2–7) and speed multiplier1.25, with flag2001, ability3,
-  type1/event0. UGC's task133/attribute61 documentation describes attack
-  approach speed and non-depleting event0. **Inferred integration:** measure
+- **Owned + community interpretation:** Samurai task 133 carries initiation
+  distances 2–6 (elite 2–7) and speed multiplier 1.25, with flag 2001, ability 3,
+  type 1/event 0. UGC's task 133/attribute 61 documentation describes attack
+  approach speed and non-depleting event 0. **Inferred integration:** measure
   centre distance, latch the boost for the ordered target during pursuit, clear
   it on retask/idle; move orders use ordinary speed. This bounded mode adds no
   speculative charge damage or cooldown. Both running/task graphic slots are
@@ -486,8 +486,8 @@ off the reference; **measured** — fitted to a reference screenshot;
 
 ## Heresy conversion death (#180, shared conversion caveats #178)
 
-- **Owned:** technology439/effect188 sets player attribute192 (`heresy`) to1;
-  its monastery cost is1000 gold and research time60 seconds. English help28412
+- **Owned:** technology439/effect 188 sets player attribute192 (`heresy`) to1;
+  its monastery cost is1000 gold and research time 60 seconds. English help28412
   explicitly says converted units die instead of changing to the enemy's colour.
 - **Inferred integration:** successful conversion spends the usual monk/group
   faith, reads the defending player's current Heresy attribute, and enters the
@@ -499,28 +499,28 @@ off the reference; **measured** — fitted to a reference screenshot;
 
 ## Teuton monastery, fortification and bonus integration (#182)
 
-- **Owned:** action104 task rows identify target-specific min/max windows,
+- **Owned:** action 104 task rows identify target-specific min/max windows,
   adjacency range, research permission attributes27/28/29 and failure strings.
-  The importer now preserves these fields, including the source label15029 for
-  the unnamed XS attribute29. Source hero immunity plus excluded wall/gate/farm
+  The importer now preserves these fields, including the source label 15029 for
+  the unnamed XS attribute 29. Source hero immunity plus excluded wall/gate/farm
   classes implement the non-convertible structures named in help28315.
 - **Inferred scheduling:** specific-unit tasks override class/default tasks;
   zero task range uses the monk's normal conversion range, positive range uses
   the task's adjacency distance. The existing uniform probability model is
-  unchanged, now using15–25-second building windows. Per-unit conversion modifiers,
-  resource182 odds, foundation eligibility and native exceptions remain#178.
-- **Owned healing evidence:** Teuton effect345 sets healRange90 to8 and help120153
+  unchanged, now using 15–25-second building windows. Per-unit conversion modifiers,
+  resource 182 odds, foundation eligibility and native exceptions remain#178.
+- **Owned healing evidence:** Teuton effect 345 sets healRange90 to8 and help120153
   describes +100% healing range. **Inferred engine default:** a0 task/initial
-  resource range means normal range4; this corrects the former adjacent-only
+  resource range means normal range 4; this corrects the former adjacent-only
   imported monk. Captured monks retain the resolved unit-local range snapshot.
-- **Owned capacity and projectiles:** effects335/352 separately modify capacity2
+- **Owned capacity and projectiles:** effects 335/352 separately modify capacity 2
   and maximum-projectiles107. Existing volley contribution/rounding interpretation
   remains inferred; capacities, free healing and infantry-powered castle arrows
   are measured through public orders and actual projectiles.
 - **Zero-time grants (#254):** Murder Holes retains a200-food source cost after
-  tree262 sets its time and stone to0, while owned help calls it free. Zero-time
+  tree 262 sets its time and stone to0, while owned help calls it free. Zero-time
   public technologies now auto-complete without payment or an extra research
-  venue gate. **Measured on current build 185872, not pinned 48987:** a Castle
+  venue gate. **Measured on current build185872, not pinned48987:** a Castle
   Teuton tower damages an adjacent ram without University (Dark control does
   not); a wounded villager heals 10→17 without Monastery versus 10→11 in a
   comparable Dark control. Editor-start food remains 1000, not 800. Readings
@@ -529,28 +529,28 @@ off the reference; **measured** — fitted to a reference screenshot;
   and pinned confirmation remain open; no exact healing multiplier is claimed.
 - **Building capture:** see the converted-entity section below for retained donor
   rules and the inferred queue/cargo policy. Bombard Tower construction gates,
-  projectile506 and the .5 fractional class3 attack addition are owned; the
+  projectile506 and the .5 fractional class 3 attack addition are owned; the
   shared projectile collision/blast model remains the existing approximation.
 
 ## Gothic shared mechanics (#181)
 
-- **Owned:** Anarchy16 selects train-location entry1 with attribute158 and
-  writes barracks12 through attribute42. Huskarl41/555 preserve castle13s/button1
-  and secondary16s/button4/hotkey16748. **Inferred integration:** tree759/761 are
+- **Owned:** Anarchy16 selects train-location entry 1 with attribute158 and
+  writes barracks 12 through attribute 42. Huskarl41/555 preserve castle 13s/button 1
+  and secondary16s/button 4/hotkey 16748. **Inferred integration:** tree 759/761 are
   represented by the corresponding41/555 secondary slot, based on the actual
   Anarchy commands and matching nonzero combat/cost/graphics; the extra zero
   attack entry on41 is not a different playable unit. Slots, queue start times,
   HUD cells and native hotkey bindings use the selected producer.
-- **Owned:** TC annex619 triggers307, satisfying Gothic automatic343, whose
+- **Owned:** TC annex619 triggers 307, satisfying Gothic automatic343, whose
   effect sets paid Loom to1 second. **Inferred representation:** completion of
   a parent triggers its declared annex bookkeeping without separate sim actors.
 - **Owned:** hunting productivity268×1.23, worker rate×.8130081296 and hunter
   capacity+15. **Inferred integration:** preserve integer carried/banked food,
-  multiply output work by productivity, consume1/productivity source food per
-  carried unit, and clamp only productivity-adjusted terminal residue below1e−9.
+  multiply output work by productivity, consume 1/productivity source food per
+  carried unit, and clamp only productivity-adjusted terminal residue below 1e−9.
   Ordinary gathering keeps its previous path; decay still consumes raw carcass
   food. Native fractional/last-unit rounding remains uncalibrated.
-- **Owned:** Imperial technology406/effect418 adds10 to unit-limit resource32,
+- **Owned:** Imperial technology406/effect 418 adds 10 to unit-limit resource 32,
   distinct from housing; help63208 describes200→210. **Chosen mode default:** new
   rules bundles default to200 population; explicit match setup may override it,
   while missing legacy fields retain
@@ -566,8 +566,8 @@ off the reference; **measured** — fitted to a reference screenshot;
 
 ## Incendiaries death replacement (#181/#252)
 
-- **Owned:** technology910/effect916 replaces fire-ship death with unit2624:
-  HP−1,10 melee/+5 class60 attack, radius3, blast level2, sink graphic9347 and
+- **Owned:** technology910/effect 916 replaces fire-ship death with unit 2624:
+  HP−1,10 melee/+5 class60 attack, radius 3, blast level 2, sink graphic 9347 and
   child12206's`explosion_demo_ships`. Costs200 food/325 gold,50 seconds, requiring
   Imperial and Siphons. Help528007 explicitly specifies detonation when sunk.
 - **Inferred integration:** apply the source payload immediately through the
@@ -598,12 +598,12 @@ off the reference; **measured** — fitted to a reference screenshot;
   graphic-wide/per-direction `angle_sounds` frame events. Parent sound events
   survive file-less composite ship graphics. No simulation state is written.
 - **Inferred timing:** a building's construction cue plays when an observed
-  owned foundation becomes complete. Graphic-wide cues start at frame0; raw
+  owned foundation becomes complete. Graphic-wide cues start at frame 0; raw
   DAT frame numbers are interpreted on the existing zero-based sprite clock.
   These timings need reference-audio alignment, not just source-field tests.
 - **Chosen playback:** cosmetic per-action round robin; one acknowledgement
-  group; at most24 simultaneous/scheduled HTMLAudio elements; UI/voice gain1, world0.6,
-  ambience0.18. Owned v154 Play-action delay/fade/probability and delay ranges
+  group; at most 24 simultaneous/scheduled HTMLAudio elements; UI/voice gain 1, world 0.6,
+  ambience 0.18. Owned v154 Play-action delay/fade/probability and delay ranges
   are consumed (#248); chance/range draws are a separate match-seeded cosmetic
   stream. Sounds load lazily after a gesture and release on end/error,
   restart or hidden tab. World sounds are raised only from on-screen, actually
@@ -627,7 +627,7 @@ off the reference; **measured** — fitted to a reference screenshot;
 - **Chosen/inferred playlist:** ascending numbered states, repeat after the
   last available track, no civilisation intro/theme or chapter transitions.
   The localization's Classic description motivates that scope, but exact
-  ordering is not asserted from the engine. Default gain0.35, pause with the
+  ordering is not asserted from the engine. Default gain 0.35, pause with the
   match/hidden tab, restart at track one; one native media element at a time.
   Browser WAV playback preserves decoded PCM; Wwise bus DSP and music-mode
   selection remain outside this consumer (mixing #243). #141 supplies persisted
@@ -637,7 +637,7 @@ off the reference; **measured** — fitted to a reference screenshot;
 
 - **Human correction:** selecting a production building does not itself turn
   the pointer into the flag cursor. Only the Set Gather Point action arms it.
-- **Owned:** buttons.json action51, icon45, zero-based sequence4 → cell5;
+- **Owned:** buttons.json action 51, icon 45, zero-based sequence4 → cell5;
   hotkeys.json definitive T independently confirms the grid cell. Localization
  4144/4944 supplies the label/help. The UI import retains native command-button
   metadata rather than baking the new button's source values into imported mode.
@@ -648,19 +648,19 @@ off the reference; **measured** — fitted to a reference screenshot;
 ## Local options and native hotkey profiles (#141)
 
 - **Owned:** WPFG screenoptions and its audio/game/interface/hotkey tabs;
-  original panel00 nine-slice,1810×1500 panel metrics, font sizes and native
+  original panel 00 nine-slice,1810×1500 panel metrics, font sizes and native
   button resources. Localization supplies the option/profile/palette labels.
   Both shared and game-specific hotkey-group lists are read; unit hotkey-text
-  IDs minus139000 and technology description IDs plus10000 identify native
+  IDs minus 139000 and technology description IDs plus 10000 identify native
   string bindings. Four native profiles preserve explicit missing bindings.
 - **Chosen UI adapter:** the supported controls share one centered compact
   panel rather than reproducing all five full-screen tabs. Browser select/range
-  controls and linear0–100 volume scaling are integration choices. Defaults
-  preserve the preceding sound gain1/music gain.35 and Normal speed. Apply/OK
+  controls and linear 0–100 volume scaling are integration choices. Defaults
+  preserve the preceding sound gain 1/music gain.35 and Normal speed. Apply/OK
   persist a validated local preference; Cancel discards the uncommitted draft.
 - **Boundary:** speed stays a pacing preference; shared changes use the public
   settings channel and joining/reloading never sends local saved speed. Keys
-  and palettes remain view-only. Native ram unloadT/cell5 and relic dropQ/cell1
+  and palettes remain view-only. Native ram unloadT/cell5 and relic dropQ/cell 1
   replace the old generic unit-unload cell when the source bindings are known.
 - **Palette scope:** owned UI roles colour score/diplomacy badges, text,
   non-default selection health bars and live/remembered minimap dots. The field
@@ -671,9 +671,9 @@ off the reference; **measured** — fitted to a reference screenshot;
 ## Example fishing policy and explored-map input (#91)
 
 - **Owned policy evidence:** Promisory watercontrol uses a14-tile deep-fish
-  allowance and25-tile dock-centred search; units/buildings have conditional
-  fishing goals and4/8/12-boat limits. Dock150 wood/radius1.5/row6/hill3 and
-  ship75 wood/40s/row13 are the current DAT baseline. See the bounded eight-file
+  allowance and 25-tile dock-centred search; units/buildings have conditional
+  fishing goals and 4/8/12-boat limits. Dock150 wood/radius 1.5/row 6/hill 3 and
+  ship75 wood/40s/row 13 are the current DAT baseline. See the bounded eight-file
   reading in `docs/ai-fishing.md`; the scripts themselves are not copied.
 - **Chosen adapter:** a fixed four-boat cap, baseline price reservations,
   housing/wood-economy precedence, restaffing paid dock foundations, rotating
@@ -733,8 +733,8 @@ off the reference; **measured** — fitted to a reference screenshot;
   This supports the existing constants but is not a pinned native-runtime
   measurement. Fresh actual-distance/HP/unload/browser checks pass; source links
   and the exact remaining boundary are in `docs/civ-specialists-integration.md`.
-- **#161 current-build native (2026-10-06):** **measured on current build 185872,
-  not pinned 48987**, **observed visually** in the native attack tooltip:
+- **#161 current-build native (2026-10-06):** **measured on current build185872,
+  not pinned48987**, **observed visually** in the native attack tooltip:
   Teuton Battering Ram All Buildings attack 150/160/170/190 for 0/1/2/4 Militia;
   unloading restores 150 and one Villager leaves 150. This supports the +10
   crew attack addition and villager attack exclusion. A follow-up simultaneous
@@ -792,8 +792,8 @@ off the reference; **measured** — fitted to a reference screenshot;
 substitution is not pixel-identical to the existing CPU decode/PNG path. Main
 samples differ by up to7/255 in unorm data space (16/255 in linear-light readback
 from sRGB textures); shadow data differs by up to5/255. PNG agrees with the
-current decoder. An isolated eight-texture experiment measures about128MiB of
-dedicated GPU allocation for RGBA8 versus16MiB for BC1; physical allocation is
+current decoder. An isolated eight-texture experiment measures about 128MiB of
+dedicated GPU allocation for RGBA8 versus 16MiB for BC1; physical allocation is
 not inferred from file size. **Decision:** keep PNG in production, reconcile
 decode semantics under#256 before any compressed rollout. No approximation or
 production decoder change was introduced. Scope, hashes, colour spaces and
@@ -801,14 +801,14 @@ reproduction: [evaluation](block-compression-evaluation.md).
 
 **#256 follow-up:** the primary D3D11.3 specification requires high-bit
 replication for RGB565 promotion. `_rgb565` now implements it: source white is
-255/255/255, correcting the old248/252/248 export. The portable BC1 interpolation
+255/255/255, correcting the old 248/252/248 export. The portable BC1 interpolation
 rounding stays as before. BC4 retains its existing floor-to8-bit PNG export,
 an explicitly quantized approximation to a format requiring at least UNORM16
 sampling; it is not claimed to preserve native sub-byte mask precision.
 The spec allows vendor-dependent BC1–BC5 interpolation within per-channel
 bounds, so the earlier zero-PNG-difference requirement is not a universal
 hardware-fidelity contract. Float readbacks on RTX4060 pass those bounds and
-exact endpoints over2,121,728 texels. Shader-resource inspection confirms
+exact endpoints over 2,121,728 texels. Shader-resource inspection confirms
 post-sample luma/team processing, not a runtime bound-format capture. Source,
 verification and rollout boundaries: [decode contract](block-decode-contract.md).
 
@@ -984,7 +984,7 @@ verification and rollout boundaries: [decode contract](block-decode-contract.md)
 
 The [2026-09-26 bounded audit](shared-reference-audit.md) distinguishes owned
 legacy prose from current DAT values for market/conversion/Treason. Siphons'
-task133 and target64/vanish2 meanings remain unresolved under #242; their mere
+task 133 and target 64/vanish2 meanings remain unresolved under #242; their mere
 presence is not an implemented rule. AoK's Lock Teams ally-only tribute also
 conflicts with the current enemy-tribute adapter (#138); modern calibration is
 pending. No user approval of these remaining interpretations is claimed.
@@ -1030,52 +1030,52 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Elevation combat | post-armour damage ×1.25 downhill, ×0.75 uphill, ×1 on equal ground; retains fractional HP, including multiplying the existing minimum damage; projectile origin versus each victim's impact-time tile level | **inferred** base multipliers from [community Elevation article](https://ageofempires.fandom.com/wiki/Elevation#Age_of_Empires_II). Owned tutorial 73020 confirms higher-ground advantage. XS `cAttributeElevationBonusHigher/Lower` (211/212) and `ElevationDamageHigher/Lower` (272/273) are modifiers: Gaia/Britons/Franks all zero in the pinned DAT; Tatar effect adds 0.25 to 211 and Georgian effect adds −0.15 to 273. Those are not the base rule. Launch-point lifetime, victim-at-impact timing, fractional survey comparisons and minimum-damage ordering are inferred integration, not runtime-measured; civilisation modifiers remain #123 | `sim/elevation.ts`, `game.ts` | #134 |
 | Generated hills | Arabia non-extreme global roll; Black Forest clearing/forest passes; mirrored cost-grown footprints eroded inward into one-level eight-neighbour terraces, preserving a four-tile starting square; independent seed stream | Heights/counts/chances **owned** from `Arabia.rms` 265–278/897–925 and `Black_Forest.rms` 298–315; flat baseline 2 from help 30534, normalized to zero. **Chosen** growth/erosion, 100×100 quota scaling inherited from this generator, start protection and independent stream. Actual RMS spawn placeholders/biome-specific spawn elevation and engine `cleanElevation` are not reproduced; maxima are ceilings, not guaranteed peaks. Water remains flat; surveys are untouched; ordinary slopes retain existing traversal and LOS, cliffs require explicit geometry/obstructions | `mapgen.ts` `generateHills` | #134 |
 | Stationary collision tie-break | add a 1e-6-tile, entity-id/golden-angle perturbation to collision normals; contact distance remains the sum of unit radii | **chosen** numerical symmetry breaking for #83's reproduced arrival line, not DE formation geometry. Inspected owned `selection_group_def.json` (selection categories) and `hotkeys.json` (box/line/staggered/flank actions 84–87); neither specifies collision resolution. Uses existing DAT-backed radii and no simulation RNG; explicit formation slots remain unimplemented | `nav.ts` `separateUnits` | #83 |
-| Remaining DAT movement/foundation/combat fields | audited values, not silently supported rules | `dead_fish.min_collision_size_multiplier`, general foundation terrain/rubble, armed-idle art, reaction flags, target-unit conversion modifiers, generic friendly-fire scaling and full19-entry slope shapes remain unconsumed. Source values do not establish exact runtime semantics. Garrison/audio/terrain passability and plants have since gained consumers; see `docs/dat-field-audit.md` and `tools/README.md` for the current matrix and exceptions | importer/runtime audit only | #54 |
+| Remaining DAT movement/foundation/combat fields | audited values, not silently supported rules | `dead_fish.min_collision_size_multiplier`, general foundation terrain/rubble, armed-idle art, reaction flags, target-unit conversion modifiers, generic friendly-fire scaling and full 19-entry slope shapes remain unconsumed. Source values do not establish exact runtime semantics. Garrison/audio/terrain passability and plants have since gained consumers; see `docs/dat-field-audit.md` and `tools/README.md` for the current matrix and exceptions | importer/runtime audit only | #54 |
 | Starting resources | 200 food / 200 wood / 100 gold / 200 stone | game setting (the reference's Standard); the DAT's `civs[1].resources[0..3]` are 0 | `data.ts` `rulesFromManifest` | #109 |
 | Herdable claim rule | claimed by whoever comes within its line of sight | inferred rule; the distance is the DAT's `line_of_sight` (3) | `data.ts` `animal`, `game.ts` | — |
 | Training beyond housing | paid queues may exceed the population cap; the active unit finishes at 100% and waits until its full population cost fits, then releases before the next entry trains | **inferred** engine timing from #143's reference behavior; housing message **owned** string 3005 (also 20607), production-halted strings 3075/3076 corroborate the state. Reuses the existing population-cap cue for a one-shot message and keeps the same message in the selected blocked producer's status; exact reference alert timing/layout not measured | `game.ts` `updateBuildingProduction`, `main.ts` | #143 |
 | Drop-site acceptance | building resource sets and task-specific return-site lists come from worker DAT sites intersected with JSON worker/class/resource rows; a carried load retains its gathering task | **owned** `dropsites.json` plus `bird.drop_sites`/tasks; Gaia-only target classes come from the already imported resource rather than empty player DAT slots. Open/older manifests retain transcribed defaults. JSON target-state transitions are outside the current entity-state representation; imported `acceptsLivestock` is metadata, not livestock-delivery behavior. #136 separately implements AI sheep move orders to the TC, not an automatic simulator follow/delivery rule | `import_content.py` `import_drop_sites`, `data.ts`, `game.ts` `nearestDropSite` | #52/#136 |
 | Speed / train / reload / frame defaults when a manifest field is absent | `?? 0.8`, `?? 25`, `?? 2`, `?? 10` | chosen; only reached when a manifest key is missing (`imported-rules.test.ts` holds the stated ones) | `data.ts` `rulesFromManifest` | — |
-| Match-speed names and multipliers | Slow1.0 / Casual1.5 / Normal1.7 / Fast2.0; fresh local/pristine shared default index2 | Names **owned** strings13101/13126/13102/13103; nominal multipliers **measured** directly in native185872's game-clock overlay while using owned VK_ADD/VK_SUBTRACT bindings. Earlier20033–20036 "Default/Fast/Extra Fast" evidence was the **replay** hotkey group, not match presets. Numeric indices/multipliers are retained, so existing saved1 remains1.5 and is now labelled Casual. Current-build Game-pane reset displays Casual and reaches new editor tests; skirmish-lobby Reset instead selects Normal and launches a Normal1.7 match, supporting our fresh default for that path. Sustained current-build clock samples measure Slow1.000, Casual1.494, Fast2.000 and Normal1.628–1.667 depending on the sampled frame cap; these are observations, not replacement constants. Pinned runtime and native multiplayer defaults remain unverified; see `docs/speed-calibration.md`. Fast-forward5×/10× are still project extensions; fixed20Hz/replay state is unchanged | `main.ts`, `preferences.ts`, `shared/protocol.ts`, `tools/options_smoke.mts` | #280 |
+| Match-speed names and multipliers | Slow1.0 / Casual1.5 / Normal1.7 / Fast2.0; fresh local/pristine shared default index2 | Names **owned** strings13101/13126/13102/13103; nominal multipliers **measured** directly in native185872's game-clock overlay while using owned VK_ADD/VK_SUBTRACT bindings. Earlier20033–20036 "Default/Fast/Extra Fast" evidence was the **replay** hotkey group, not match presets. Numeric indices/multipliers are retained, so existing saved 1 remains 1.5 and is now labelled Casual. Current-build Game-pane reset displays Casual and reaches new editor tests; skirmish-lobby Reset instead selects Normal and launches a Normal1.7 match, supporting our fresh default for that path. Sustained current-build clock samples measure Slow1.000, Casual1.494, Fast2.000 and Normal1.628–1.667 depending on the sampled frame cap; these are observations, not replacement constants. Pinned runtime and native multiplayer defaults remain unverified; see `docs/speed-calibration.md`. Fast-forward 5×/10× are still project extensions; fixed 20Hz/replay state is unchanged | `main.ts`, `preferences.ts`, `shared/protocol.ts`, `tools/options_smoke.mts` | #280 |
 | A foundation's line of sight | 0 | chosen against observed behaviour (issue #1); DAT has no construction-time LOS | `visibility.ts` | — |
-| Conversion odds | uniform over the selected DAT task's window: ordinarily5–9 s for units,15–25 s for buildings, plus defender adjustments | chosen shape; task endpoints and ranges owned; per-unit modifiers/resource182 odds remain uncalibrated | `game.ts`, `monastery.ts` | #178 |
+| Conversion odds | uniform over the selected DAT task's window: ordinarily 5–9 s for units,15–25 s for buildings, plus defender adjustments | chosen shape; task endpoints and ranges owned; per-unit modifiers/resource 182 odds remain uncalibrated | `game.ts`, `monastery.ts` | #178 |
 | Converted-unit stat inheritance | unit-local rules snapshot before ownership changes; stored HP/wounds persist; later research/promotions skip captures. Mobile passengers keep their owners and remain aboard, with ejection controlled by the carrier owner | **Owned legacy prose** supports conversion-time attribute retention/no upgrades (AoK p33); mobile cargo rule **user-supplied 2026-09-30**. Economic/projectile/reconversion/building-cargo exceptions remain **inferred**. Synthetic outcomes, owned Loom combat/HP and JSON/replay verify the implementation, not modern DE parity | `game.ts` `updateConverter`, `rules.ts` `unitRulesForEntity`, `types.ts` | #178 remains open |
 | Blast falloff | none inside `blast_width` | chosen; DAT states no falloff | `game.ts` | — |
 | Scorpion bolt travel and contact | swept circle, one hit per enemy, no friendly damage, full shooter attack on the intended target and projectile attacks on others; travels maximum range +3 | **inferred** engine interpretation of owned hit/vanish mode 1; extra three tiles and friendly immunity corroborated by [community Scorpion article](https://ageofempires.fandom.com/wiki/Scorpion_(Age_of_Empires_II)); radius, speed, primary/collateral attacks and upgrade effects owned | `game.ts` `releaseAttack`, `updateProjectiles` | #127 |
 | Miss scatter, fallback rules only | 1 tile | chosen; imported units use `accuracy_dispersion` | `game.ts` `MISS_TILES` | — |
 | Trade gold | `bird.work_rate` × travel seconds, capped at `resource_capacity`, paid on return | **chosen** formula. Owned legacy AoK p47/PDF50 establishes greater profit for longer routes, foreign counterparties, no stockpile goods consumed and banking at one's own market/dock; it does not establish the implemented equation, cap, distance metric or modern payout/rounding exceptions. See `docs/manual-audit.md` | `game.ts` | #128 |
 | Trebuchet packed/unpacked pairing | named by hand (331 ↔ 42) | chosen; task 109 names no target unit | `data.ts` | — |
-| Trebuchet automatic deployment and ordered approach | idle visible enemy buildings inside search/sight and firing bounds trigger setup and stationary fire; packed explicit attacks approach then set up; distant explicit targets trigger repacking; manual Pack holds until a new command | **Owned legacy prose**: AoK p81/PDF84 explicitly describes packed right-click approach/unpack/attack. Numeric ranges/clocks **owned** DAT331/42, including Japanese modifiers. Building-only auto-acquisition, inherited10-tick cadence (task109 wait3 remains uncalibrated), circular range tolerances, no automatic pursuit, target-loss/setup completion, move cancellation and manual hold **inferred**. [Contract](trebuchet-automation.md) | `game.ts`, `types.ts`; `trebuchet.test.ts`, `tools/trebuchet_smoke.mts` | #131/#259 |
+| Trebuchet automatic deployment and ordered approach | idle visible enemy buildings inside search/sight and firing bounds trigger setup and stationary fire; packed explicit attacks approach then set up; distant explicit targets trigger repacking; manual Pack holds until a new command | **Owned legacy prose**: AoK p81/PDF84 explicitly describes packed right-click approach/unpack/attack. Numeric ranges/clocks **owned** DAT331/42, including Japanese modifiers. Building-only auto-acquisition, inherited 10-tick cadence (task 109 wait 3 remains uncalibrated), circular range tolerances, no automatic pursuit, target-loss/setup completion, move cancellation and manual hold **inferred**. [Contract](trebuchet-automation.md) | `game.ts`, `types.ts`; `trebuchet.test.ts`, `tools/trebuchet_smoke.mts` | #131/#259 |
 | Farm re-sow from the mill | option, off by default | engine convenience; DAT gives the farm one build location | `game.ts` | — |
 | Farm reservation and overflow | current gather order reserves a farm across owners during travel and banking; surplus direct orders choose a visible free owned farm within 3×LOS of the clicked farm, otherwise idle; one participating builder becomes its farmer | single-worker limit **owned** (farm help string 26149); reservation lifetime, cross-owner arbitration, overflow search and deterministic first-worker/lowest-id legacy conflict resolution **inferred**. Stop/death/retasking releases the reservation; queued orders re-evaluate on execution. Automatic continuation and mill-completion assignment retain their own-farm policy; foreign capture requires an explicit target | `game.ts` `farmWorker`, `farmAvailable`, `nearbyFreeFarm` | #82/#156 |
-| Abandoned enemy farms | villagers can gather completed, nonempty farms without an incumbent; transfer ownership on entering the existing gathering range; preserve crop, HP and maximum HP; credit worker's owner and reseed at that owner's expense | Permission and one-worker rule **owned** (26149); farmer259 task5 targets farm50/class49, but inspected fields do not define capture timing/arbitration. Capture by starting to gather is corroborated by the [community Farm reference](https://ageofempires.fandom.com/wiki/Farm_(Age_of_Empires_II)); exact contact timing, retained crop/HP and order-reservation policy are **inferred/chosen**, not native-runtime calibrated. No remote/hover ownership mutation; friendly incoming claimants prevent surplus workers attacking the still-foreign farm. Enemy occupied farms retain normal hostile targeting; fish-trap ownership policy unchanged | `game.ts`; `farm-claim.test.ts`, `farm_occupancy_smoke.mts` | #156 |
+| Abandoned enemy farms | villagers can gather completed, nonempty farms without an incumbent; transfer ownership on entering the existing gathering range; preserve crop, HP and maximum HP; credit worker's owner and reseed at that owner's expense | Permission and one-worker rule **owned** (26149); farmer 259 task 5 targets farm 50/class 49, but inspected fields do not define capture timing/arbitration. Capture by starting to gather is corroborated by the [community Farm reference](https://ageofempires.fandom.com/wiki/Farm_(Age_of_Empires_II)); exact contact timing, retained crop/HP and order-reservation policy are **inferred/chosen**, not native-runtime calibrated. No remote/hover ownership mutation; friendly incoming claimants prevent surplus workers attacking the still-foreign farm. Enemy occupied farms retain normal hostile targeting; fish-trap ownership policy unchanged | `game.ts`; `farm-claim.test.ts`, `farm_occupancy_smoke.mts` | #156 |
 | Gathering after camp construction | participating lumber-camp builders choose trees; mining-camp builders choose nearest gold/stone; mill builders choose berries/free owned farms; queued orders take precedence | target categories checked against owned `resources/_common/dat/dropsites.json` (562/584/68; farms `worker_num: 0`); narrower mill policy **human-specified** in #79, not the full food drop-off list. Worker-centred nearest selection, existing visible 3×LOS bound, elbow-room filter, id tie-break and priority over adjacent same-kind construction **inferred**; no full reachability guarantee | `game.ts` `workAfterBuilding` | #79 |
 | Fishing continuation | check clearance outside the entire resource footprint; after banking a vanished node's load, return to the ship's last working position before selecting visible fish | half-extents **owned**: DAT Gaia 458 deep fish 1×1, 69 shore fish 0.5×0.5; ship 13 collision 0.4×0.4, LOS 5, terrain row 13. Remembered-position return and existing visible 3×LOS search **inferred**; the ship's owned `bird.search_radius = 12` has not been established as this task's continuation radius. No unseen fish are selected and no global reachability guarantee is added | `game.ts` `hasElbowRoom`, `updateGatherer`; `types.ts` `fishingPosition` | #87 |
 | Example AI construction continuity | do not retask active builders; houses/ranges fall back to the other existing building-position lists | **chosen** strategy, not an imported engine rule. #79 changed idle-worker timing and exposed abandoned foundations and exhausted position lists on seed 7; passive-opponent victory retains its 2400-second bound | `ai.ts`, `ai-construction.test.ts` | #79; related #146, #86 |
 | AI recovery of paid house foundations | one replacement per unstaffed owned house, oldest id first; prefer idle villagers, then nearest gatherer with id tie-break; reserve assignments against the rest of the same decision and keep builders out of demolition | **chosen** strategy. Owned `ai/Promisory/buildings.per` lines 1284–1304 exclude active builders when placing another house and reassign builders to pending houses; lines 11916–11929 also assign house builders. These support reassignment but do not specify our selection policy. Observation v2 exposes own `buildTargetId` instead of guessing assignments from proximity. Presence of `buildProgress`, including a rounded 1, identifies unfinished foundations. Reachability of a still-assigned builder remains the navigation system's responsibility | `ai.ts`, `observe.ts`, `ai-house-recovery.test.ts` | #146 |
 | AI mill redundancy and camp supply | scan known unserved nodes rather than stopping at the nearest served node; exclude fish from the land economy's mill targets; unfinished camps still block another placement, including rounded 100% foundations. Mills require supply outside the existing mill's 8-tile service bound plus the 4.5-tile maximum placement radius, and a snapped placement farther than 8 tiles from existing mills. Lumber/mining camps retain the shorter-walk criterion | **chosen** strategy implementing #147's human distinction between mills and potentially useful adjacent lumber/mining camps; reuses existing 8/4.5 constants, not an owned minimum-mill-distance rule. Owned `Promisory/buildings.per` 3899–3911 explicitly considers a second mill for additional/distant forage; 2032–2042 permits adjacent lumber dropsites. DAT mill 68 collision half-extent 1 confirms the 2×2 placement. Selection still uses known resource memory and centre distances, not path-cost or a full resource-cluster model | `ai.ts` `supply` and camp loop; `ai-camps.test.ts` | #147 |
 | AI Feudal infrastructure reserve | reserve the next archery range's 175 wood, then blacksmith's 150, against extra camps/farms and archer training; housing, first drop sites and first farm remain available; release once both buildings exist | **chosen** strategy fixing #86's repeated small-purchase starvation, reusing existing building prices. Owned `Promisory/buildings.per` 11217–11239 explicitly targets and builds a blacksmith after a lumber camp; our reserve and exceptions are not an import of its goal system. Fresh imported seeds 1/7 now finish blacksmiths; seed 42 finishes a range and wins before its smith. Further building/unit policy remains #124 | `ai.ts`, `ai-military-buildings.test.ts` | #86 |
-| Example AI trebuchet finish | with10infantry/archer-line soldiers and known enemy buildings, prepare one castle from Castle Age; two non-food workers gather missing stone; reserve200W/200G and a population slot from Imperial; cap4 engines including active castle training; visible building attacks and coordinate moves to memory | Quota/army prerequisite adapted from **owned** `Promisory/finaling.per`81–88; producer policy corroborated by `units.per`12145–12164.650S castle and200W/200G engine are owned baseline budgets; actual public-command payment remains civilisation-specific. Worker choice, budget/placement integration, foundation recovery and target priorities **chosen**. Upgraded infantry/archers count and archer production follows upgrades. Staged paid end-to-end evidence, not natural-start balance parity. [Contract](trebuchet-automation.md) | `ai.ts`, `ai-siege.ts`, `ai-siege.test.ts` | #131/#124 |
+| Example AI trebuchet finish | with10infantry/archer-line soldiers and known enemy buildings, prepare one castle from Castle Age; two non-food workers gather missing stone; reserve 200W/200G and a population slot from Imperial; cap4 engines including active castle training; visible building attacks and coordinate moves to memory | Quota/army prerequisite adapted from **owned** `Promisory/finaling.per`81–88; producer policy corroborated by `units.per`12145–12164.650S castle and 200W/200G engine are owned baseline budgets; actual public-command payment remains civilisation-specific. Worker choice, budget/placement integration, foundation recovery and target priorities **chosen**. Upgraded infantry/archers count and archer production follows upgrades. Staged paid end-to-end evidence, not natural-start balance parity. [Contract](trebuchet-automation.md) | `ai.ts`, `ai-siege.ts`, `ai-siege.test.ts` | #131/#124 |
 | Repair targets beyond the class table (a farm) | repairs at the building rate | chosen | `game.ts` | — |
 | `garrison_heal_rate` unit | hit points a second | inferred | `game.ts` | — |
-| Briton relics | Gaia285 pickup → carrier286 → monastery104, persisted identity, gold income and drop/death release | **Owned** monk125 task132 (target285, result286, range0), carrier task136 (target104, result125, range1), Gaia285 HP30/radius0.5, resource191=30, original relic/carry art. Per-minute interpretation, integer banking with persisted fraction, nearest non-full owned monastery, unchanged monk collider/stat snapshot, damage immunity and deterministic release point are **inferred** integration. Reuses public ungarrison; Drop Relic wording is owned40106/41106, icon/cell reuse and count/faith text are **chosen** UI. Transport sinking retains existing passenger-loss policy. No relic victory (#110) | `relics.ts`, `game.ts`, `sprites.ts`, `main.ts` | #130 |
-| Briton monastery research consumers | Devotion/Faith delay enemy conversion, Theocracy spares other participants' faith, Illumination accelerates recharge, Block Printing extends actual conversion range, Herbal Medicine increases actual garrison healing | **Owned** effects46/45 add1/4 to178/179;494 sets193;219 multiplies class18 attribute10 by1.875;220 adds3 range;41 multiplies class3/52 attribute108 by6. Monk reload1.6 as faith points/sec over100, additive seconds and participant charge policy are **inferred** engine semantics atop the existing uniform conversion window. `convertedRules` remains locked; player resources remain live. No new conversion permissions, chance or healing modifiers | `monastery.ts`, `rules.ts`, `import_content.py`; owned offered-tech assertions + outcome tests | #128 |
-| Shared relic placement | Tiny Arabia 1 central + 2/player; Black Forest 2/player; Islands 2/player + 1 on land20 | **Owned** numeric/flag contract in `refdata/relic-placement.json`, deterministically extracted by `tools/relic_reference.py` and compared with owned RMS by the import suite. Arabia BALANCED and BF PLAYER use `includes/relics.inc`; Islands uses `GeneratingObjects.inc` PER2PL and `Islands.rms` 2498–2507. Circular player distances for Arabia/BF, box distances for Islands and Arabia central; spacing, forest exclusion, edge margins, land-ID/zone clearance and Arabia `require_path` are enforced without distance relaxation. Forest means tree entities; heights are not cliffs, and cliff exclusion is vacuous until #134 supplies cliff entities. No fictitious standard-mode resource actor areas: 10102/10202/10302 are Empire Wars-only | `relic-placement.ts`, `tools/relic_reference.py` | #130 |
-| RMS placement adapter | seeded scans over generated land IDs, independent relic RNG; generated metadata survives saves | **Inferred**, not exact DE RNG/placement parity: forest/actor radii use square tile masks; zone clearance checks the entire square (the prior algorithm read documents eight compass samples); central actor2000 is the analytic union of radius3 boxes about the radius0.20×map-side neutral marker region, rather than 2048 sampled placeholders. Central spacer11500 uses actor1500 radius2 + spacer26; player spacing uses box24. Closest-first sorting implements `find_closest`; Islands has no closest/circular flag. Arabia's uncarved dry base has one land zone; BF retains grown clearing IDs; resource islets retain20/23. Exhausted constraints throw an explicit initialization error rather than silently dropping relics | `relic-placement.ts`, `mapgen.ts` | #130 |
-| Arabia start geometry prerequisite | tiny two-player radius drawn from32–34%, rounded to tiles; existing horizontal mirroring retained | **Owned** `Arabia.rms` 832–838: `circle_radius rnd(32,34) 6`. **Chosen adapter** retains horizontal orientation, separate xorshift stream and omits variance6 jitter. Previous quarter-width starts were60 tiles apart: their32-tile box exclusions leave no valid central tile inside the radius24+actor3 neutral area. Correcting the source radius changes opening layouts; distances were not weakened. Shore carving can expose a forest diagonal; the dry corner is filled without planting on a beach | `game.ts`, `mapgen.ts` | #130 |
+| Briton relics | Gaia285 pickup → carrier 286 → monastery104, persisted identity, gold income and drop/death release | **Owned** monk 125 task 132 (target 285, result 286, range 0), carrier task 136 (target 104, result 125, range 1), Gaia285 HP30/radius0.5, resource 191=30, original relic/carry art. Per-minute interpretation, integer banking with persisted fraction, nearest non-full owned monastery, unchanged monk collider/stat snapshot, damage immunity and deterministic release point are **inferred** integration. Reuses public ungarrison; Drop Relic wording is owned40106/41106, icon/cell reuse and count/faith text are **chosen** UI. Transport sinking retains existing passenger-loss policy. No relic victory (#110) | `relics.ts`, `game.ts`, `sprites.ts`, `main.ts` | #130 |
+| Briton monastery research consumers | Devotion/Faith delay enemy conversion, Theocracy spares other participants' faith, Illumination accelerates recharge, Block Printing extends actual conversion range, Herbal Medicine increases actual garrison healing | **Owned** effects 46/45 add 1/4 to178/179;494 sets 193;219 multiplies class 18 attribute 10 by1.875;220 adds 3 range;41 multiplies class 3/52 attribute108 by6. Monk reload 1.6 as faith points/sec over 100, additive seconds and participant charge policy are **inferred** engine semantics atop the existing uniform conversion window. `convertedRules` remains locked; player resources remain live. No new conversion permissions, chance or healing modifiers | `monastery.ts`, `rules.ts`, `import_content.py`; owned offered-tech assertions + outcome tests | #128 |
+| Shared relic placement | Tiny Arabia 1 central + 2/player; Black Forest 2/player; Islands 2/player + 1 on land 20 | **Owned** numeric/flag contract in `refdata/relic-placement.json`, deterministically extracted by `tools/relic_reference.py` and compared with owned RMS by the import suite. Arabia BALANCED and BF PLAYER use `includes/relics.inc`; Islands uses `GeneratingObjects.inc` PER2PL and `Islands.rms` 2498–2507. Circular player distances for Arabia/BF, box distances for Islands and Arabia central; spacing, forest exclusion, edge margins, land-ID/zone clearance and Arabia `require_path` are enforced without distance relaxation. Forest means tree entities; heights are not cliffs, and cliff exclusion is vacuous until #134 supplies cliff entities. No fictitious standard-mode resource actor areas: 10102/10202/10302 are Empire Wars-only | `relic-placement.ts`, `tools/relic_reference.py` | #130 |
+| RMS placement adapter | seeded scans over generated land IDs, independent relic RNG; generated metadata survives saves | **Inferred**, not exact DE RNG/placement parity: forest/actor radii use square tile masks; zone clearance checks the entire square (the prior algorithm read documents eight compass samples); central actor 2000 is the analytic union of radius 3 boxes about the radius0.20×map-side neutral marker region, rather than 2048 sampled placeholders. Central spacer 11500 uses actor 1500 radius 2 + spacer 26; player spacing uses box24. Closest-first sorting implements `find_closest`; Islands has no closest/circular flag. Arabia's uncarved dry base has one land zone; BF retains grown clearing IDs; resource islets retain 20/23. Exhausted constraints throw an explicit initialization error rather than silently dropping relics | `relic-placement.ts`, `mapgen.ts` | #130 |
+| Arabia start geometry prerequisite | tiny two-player radius drawn from 32–34%, rounded to tiles; existing horizontal mirroring retained | **Owned** `Arabia.rms` 832–838: `circle_radius rnd(32,34) 6`. **Chosen adapter** retains horizontal orientation, separate xorshift stream and omits variance 6 jitter. Previous quarter-width starts were 60 tiles apart: their 32-tile box exclusions leave no valid central tile inside the radius 24+actor 3 neutral area. Correcting the source radius changes opening layouts; distances were not weakened. Shore carving can expose a forest diagonal; the dry corner is filled without planting on a beach | `game.ts`, `mapgen.ts` | #130 |
 | Authored-map relic fallback | five seeded, initially accessible relics on Windsor, Senlac and painted-proof | **Authored**, not native RMS behavior: these survey/proof boards have no patch-matched DE script. Uses public relic mechanics, free ground and reachability from at least one start, without imposing unrelated Arabia placement distances | `relic-placement.ts` | #130 |
-| Unsupported relic thresholds | Non-stockpile technology costs disable automatic nodes; legacy automatic699–702 return no technology/effects | **Owned** resource7 costs on699–702 are count prerequisites lost by old extraction. **Chosen fail-closed guard**, not implementation of Lithuanian bonuses or resource counters | `technologies.ts`, `import_content.py` | #130 |
-| Market exchange / Guilds | public 100/500-unit buy/sell orders, shared prices, owner-specific researched fee, atomic rejection, JSON continuation and observation quotes | **Owned** resources78=.3 and T15→effect15 sets .15; localization41072–41078 specifies100/Shift500 and changing prices; hotkeys determine wood/food/stone cells7–9/12–14. **Owned legacy prose**, AoK pp46–47, establishes all-player shared prices updated after each transaction. Initial bases100 wood/food,130 stone; ±3/lot,20–10000 bounds and ceiling buy/floor sell remain **inferred**, not DAT values or measured DE parity. The manual's sell-wood70 is an example, not an initial table. [Audit](shared-reference-audit.md) lists inspected resource/AI/docs sources | `market.ts`, `main.ts`, observation v6 | #128/#179 |
-| Tribute / Coinage / Banking | full recipient credit; same-resource sender fee; completed sender market; four-resource atomic confirmation and execution-time CTRL-all | **Owned** resource46=.3, T23→effect23=.2, T17→effect17=0; localization30353–30356 states100/Shift500/CTRL-all and same-resource fee. **Inferred integration**: ceiling fee on each resource total; CTRL-all is the maximum integer gift affordable including that fee (an indivisible remainder may remain); pending drafts reserve no simulation stock. One public `tribute-batch` validates all resources and current market/research/stock before paying; old single-resource commands remain valid. No trade-cart income change | `market.ts`, `schemas/command.schema.json` | #128/#179/#138 |
-| Two-player diplomacy dialog | enabled native menu button and market entry, player/civilisation/stance rows, tribute buttons, Clear/OK/Cancel, keyboard-modal lifecycle and read-only replay | **Owned** `widgetui/diplomacy.json`, WPFG `dialog/dialogdiplomacy.xaml` and `SystemResourcesDiplomacyItem.xaml`: imported columns, row height, fonts, button dimensions and16 original tribute icon states; existing owned nine-slice/button theme. **Chosen two-player adaptation** reduces eight player rows to two and retains fixed opposing teams: Ally/Neutral/Enemy and Allied Victory are disabled, Lock Teams is shown checked. Unlocked relations/cooperative victory are not offered. Right-click subtract100/Shift500 and Ctrl-right clear interpret the owned right-mouse-sensitive buttons; exact subtraction runtime behavior, two-row vertical compaction and modal dimmer remain inferred. No native slider exists in this inspected template | `view/diplomacy.ts`, `hud.ts`, `import_feedback.py`, `main.ts` | #138 |
-| Random-map Spies | live 200-gold-per-enemy-villager cost at command acceptance, HUD and observations; includes garrisoned living villagers; completed research shares all enemy unit/building LoS while keeping orders/queues private | **Owned** T408→effect420 sets resource183=1, base cost200/research1s/castle82/slot14; help28408 states the per-villager formula, enemy sight and locked-team ally exclusion. Current1v1 has no allied players. Zero villagers means zero price; no additional engine cap is inferred. Permanent research uses the existing journal; Regicide blocks both purchase and its visibility consumer (owned T117 is named Disable Spies, Regicide only) | `technologies.ts`, `visibility.ts`, `main.ts`, observation v7 | #179 |
-| Regicide King | one King434/player, 75HP, speed1.32, LOS6, radius.3, unarmed/untrainable, conversion immune, asks before Delete; original idle/walk/death/decay/icon48/voice for Britons and Franks | Stats, no attacks, train location−1 and hero_mode34 **owned**. Original King garrison graphic is−1; sheltering uses the already imported Castle/TC occupancy flag. Task3 targets transport20/building3; mapping King class59 to civilian garrison mask1 is **inferred**. Explicit move/stop/shelter controls are supported; extra task109 (auto-search1/wait3, unnamed by the inspected XS enum) and Guard13 are not newly interpreted | `data.ts`, `game.ts`, `import-spec.json`, `import_content.py` | #240 |
-| Regicide starting actors | ten villagers and a free Castle/player; modern King nearest5, Castle within circular13 with zone4/forest3/edge4; Arabia centre-facing, Black Forest edge-facing; Islands7 extra villagers at box6, King box6–8, Castle box10 | **Owned** narrow contract `refdata/regicide.json`, extracted by `tools/regicide_reference.py` from `includes/regicide.inc`, `villagers.inc`, Black Forest REGICIDE_BACKWARD and Islands GNR_REGICIDECLASSIC. **Inferred adapter** uses integer candidates, independent xorshift tie rolls, simplified actor exclusion/footprints and existing land IDs, before opening resources. Cliff distances1/3 are retained but vacuous without cliff entities; height is not a cliff. Authored survey maps choose nearest legal starts, not native RMS policy. Starting stockpiles inherit the existing random-map preset: selected RMS has no override, DAT91–94 are zero modifiers; exact native Regicide preset remains unverified | `regicide.ts`, `mapgen.ts`, `game.ts` | #240/#134 |
+| Unsupported relic thresholds | Non-stockpile technology costs disable automatic nodes; legacy automatic699–702 return no technology/effects | **Owned** resource 7 costs on699–702 are count prerequisites lost by old extraction. **Chosen fail-closed guard**, not implementation of Lithuanian bonuses or resource counters | `technologies.ts`, `import_content.py` | #130 |
+| Market exchange / Guilds | public 100/500-unit buy/sell orders, shared prices, owner-specific researched fee, atomic rejection, JSON continuation and observation quotes | **Owned** resources 78=.3 and T15→effect 15 sets .15; localization41072–41078 specifies100/Shift500 and changing prices; hotkeys determine wood/food/stone cells 7–9/12–14. **Owned legacy prose**, AoK pp46–47, establishes all-player shared prices updated after each transaction. Initial bases 100 wood/food,130 stone; ±3/lot,20–10000 bounds and ceiling buy/floor sell remain **inferred**, not DAT values or measured DE parity. The manual's sell-wood 70 is an example, not an initial table. [Audit](shared-reference-audit.md) lists inspected resource/AI/docs sources | `market.ts`, `main.ts`, observation v6 | #128/#179 |
+| Tribute / Coinage / Banking | full recipient credit; same-resource sender fee; completed sender market; four-resource atomic confirmation and execution-time CTRL-all | **Owned** resource 46=.3, T23→effect 23=.2, T17→effect 17=0; localization30353–30356 states 100/Shift500/CTRL-all and same-resource fee. **Inferred integration**: ceiling fee on each resource total; CTRL-all is the maximum integer gift affordable including that fee (an indivisible remainder may remain); pending drafts reserve no simulation stock. One public `tribute-batch` validates all resources and current market/research/stock before paying; old single-resource commands remain valid. No trade-cart income change | `market.ts`, `schemas/command.schema.json` | #128/#179/#138 |
+| Two-player diplomacy dialog | enabled native menu button and market entry, player/civilisation/stance rows, tribute buttons, Clear/OK/Cancel, keyboard-modal lifecycle and read-only replay | **Owned** `widgetui/diplomacy.json`, WPFG `dialog/dialogdiplomacy.xaml` and `SystemResourcesDiplomacyItem.xaml`: imported columns, row height, fonts, button dimensions and 16 original tribute icon states; existing owned nine-slice/button theme. **Chosen two-player adaptation** reduces eight player rows to two and retains fixed opposing teams: Ally/Neutral/Enemy and Allied Victory are disabled, Lock Teams is shown checked. Unlocked relations/cooperative victory are not offered. Right-click subtract 100/Shift500 and Ctrl-right clear interpret the owned right-mouse-sensitive buttons; exact subtraction runtime behavior, two-row vertical compaction and modal dimmer remain inferred. No native slider exists in this inspected template | `view/diplomacy.ts`, `hud.ts`, `import_feedback.py`, `main.ts` | #138 |
+| Random-map Spies | live 200-gold-per-enemy-villager cost at command acceptance, HUD and observations; includes garrisoned living villagers; completed research shares all enemy unit/building LoS while keeping orders/queues private | **Owned** T408→effect 420 sets resource 183=1, base cost 200/research1s/castle 82/slot 14; help28408 states the per-villager formula, enemy sight and locked-team ally exclusion. Current1v1 has no allied players. Zero villagers means zero price; no additional engine cap is inferred. Permanent research uses the existing journal; Regicide blocks both purchase and its visibility consumer (owned T117 is named Disable Spies, Regicide only) | `technologies.ts`, `visibility.ts`, `main.ts`, observation v7 | #179 |
+| Regicide King | one King434/player, 75HP, speed 1.32, LOS6, radius.3, unarmed/untrainable, conversion immune, asks before Delete; original idle/walk/death/decay/icon 48/voice for Britons and Franks | Stats, no attacks, train location−1 and hero_mode34 **owned**. Original King garrison graphic is−1; sheltering uses the already imported Castle/TC occupancy flag. Task3 targets transport 20/building 3; mapping King class 59 to civilian garrison mask 1 is **inferred**. Explicit move/stop/shelter controls are supported; extra task 109 (auto-search1/wait 3, unnamed by the inspected XS enum) and Guard13 are not newly interpreted | `data.ts`, `game.ts`, `import-spec.json`, `import_content.py` | #240 |
+| Regicide starting actors | ten villagers and a free Castle/player; modern King nearest 5, Castle within circular 13 with zone 4/forest 3/edge 4; Arabia centre-facing, Black Forest edge-facing; Islands7 extra villagers at box6, King box6–8, Castle box10 | **Owned** narrow contract `refdata/regicide.json`, extracted by `tools/regicide_reference.py` from `includes/regicide.inc`, `villagers.inc`, Black Forest REGICIDE_BACKWARD and Islands GNR_REGICIDECLASSIC. **Inferred adapter** uses integer candidates, independent xorshift tie rolls, simplified actor exclusion/footprints and existing land IDs, before opening resources. Cliff distances 1/3 are retained but vacuous without cliff entities; height is not a cliff. Authored survey maps choose nearest legal starts, not native RMS policy. Starting stockpiles inherit the existing random-map preset: selected RMS has no override, DAT91–94 are zero modifiers; exact native Regicide preset remains unverified | `regicide.ts`, `mapgen.ts`, `game.ts` | #240/#134 |
 | Royal loss and immunity in carriers | scan living Kings recursively at carrier positions; loss of all own Kings ends Regicide even if other units survive; a razed building may release its King, a sunk transport loses cargo; simultaneous losses draw | Royal-loss condition **owned** strings13081/30171/9846. Mobile passengers retain their owners under the **user-supplied 2026-09-30** rule, including Kings and their nested carriers. Recursive survival/position accounting and end-of-tick simultaneous draw are **inferred integration**. Population follows each living unit's owner through nested cargo. Ordinary conquest tie policy is unchanged. Draw has an explicit protocol/state flag; HUD uses owned Game over wording plus authored simultaneous-loss explanation rather than declaring one player victorious | `regicide.ts`, `game.ts`, `rules.ts`, runner/protocol/HUD | #240/#178 |
-| Regicide Treason | immediate400 gold/use from an owned completed Castle, repeatable, separate temporary King-position channel; no research journal/queue or normal fog reveal; live positions follow garrison/transport carriers | **Owned** localization28408/40112/41112:400 per use, enemy Kings to team, few seconds, flashing minimap X; T117 disables permanent Spies408 in Regicide. **Inferred** ten simulation seconds, refreshing from latest paid use, live rather than frozen positions, half-second blink, ten-backing-pixel X/line width2, completed-Castle availability without age/busy-research gating, and reuse of408's icon19/slot14. Current locked two-player teams contain one player each. Lifetime, presentation and action availability are not claimed as measured DE parity | `regicide.ts`, `minimap.ts`, `main.ts`, observation v7 | #240 |
-| Siphons charge | only Fire Galley/Fire Ship/Fast Fire Ship mode6/event0/target64; ready normal attacks release one additional explosive projectile; one charge recovers at .04/s and keeps its reservoir through conversion/saves | **Owned** T909/effect915 sets attributes62=6,59=1 on1103/529/532; University209,45s,100food/175gold. Creatable fields name projectile2629: speed3, blast.5/level2, its own class attacks; smart mode1, arc.45, vanish mode2. Tracking677→graphic3823 names `flamethrower_flame`; dying graphic12726 names `impact_grenade` (85 original frames90–174,1.5s,scale.2). Full initial charge, one extra projectile per ready normal swing, no repeated damaging ticks during the retained impact, and ordinary blast friendly-fire are **inferred bounded engine semantics**, not a general charge engine or runtime calibration. Original impact art expires on saved simulation time; relics are immune to splash | `fire-charge.ts`, `game.ts`, `sprites.ts`, `tools/naval.py` | #179 |
+| Regicide Treason | immediate400 gold/use from an owned completed Castle, repeatable, separate temporary King-position channel; no research journal/queue or normal fog reveal; live positions follow garrison/transport carriers | **Owned** localization28408/40112/41112:400 per use, enemy Kings to team, few seconds, flashing minimap X; T117 disables permanent Spies408 in Regicide. **Inferred** ten simulation seconds, refreshing from latest paid use, live rather than frozen positions, half-second blink, ten-backing-pixel X/line width2, completed-Castle availability without age/busy-research gating, and reuse of408's icon 19/slot 14. Current locked two-player teams contain one player each. Lifetime, presentation and action availability are not claimed as measured DE parity | `regicide.ts`, `minimap.ts`, `main.ts`, observation v7 | #240 |
+| Siphons charge | only Fire Galley/Fire Ship/Fast Fire Ship mode 6/event 0/target 64; ready normal attacks release one additional explosive projectile; one charge recovers at .04/s and keeps its reservoir through conversion/saves | **Owned** T909/effect 915 sets attributes62=6,59=1 on1103/529/532; University209,45s,100 food/175 gold. Creatable fields name projectile2629: speed 3, blast.5/level 2, its own class attacks; smart mode 1, arc.45, vanish mode 2. Tracking677→graphic 3823 names `flamethrower_flame`; dying graphic12726 names `impact_grenade` (85 original frames 90–174,1.5s,scale.2). Full initial charge, one extra projectile per ready normal swing, no repeated damaging ticks during the retained impact, and ordinary blast friendly-fire are **inferred bounded engine semantics**, not a general charge engine or runtime calibration. Original impact art expires on saved simulation time; relics are immune to splash | `fire-charge.ts`, `game.ts`, `sprites.ts`, `tools/naval.py` | #179 |
 | Garrison firepower and volley resolution | positive firepower multiplies ranged DPS; a negative value adds its magnitude as flat DPS (villager −2.5 → 2.5 DPS); sum contributions, divide by the researched building's pierce DPS, floor and cap; an absent primary projectile consumes neither the nominal base arrow nor its maximum slot | signed field **owned**; sign meaning **community-documented** in [UGC attribute 130](https://ugc.aoe2.rocks/general/attributes/attributes/#130-garrison-firepower). Ranged-DPS basis, flooring and absent-primary slot interpretation **inferred** engine integration, tested through actual released volleys. Replaces the old fixed-one-arrow treatment; not claimed as a patch-matched runtime measurement | `game.ts` `volleyArrows` | #137 |
-| Town bell recall and return | nearest eligible owned villagers first, stable ID ties, up to free TC capacity minus incoming garrison reservations; remember interrupted order/queue, bank carried loads on entry, restore work on bell release; newer orders cancel the remembered task; newly trained villagers shelter while the bell rings | toggle/return behavior **owned** help 41111, button actions 163/165 at zero-based sequence14 → cell15/B with icons49/61 (#245); cue aliases `townbell_start/stop` **owned**. Global nearest-worker selection with no radius cutoff, reservation policy, preserving manually sheltered units and new-villager handling **chosen/inferred**; exact DE bell search radius/overflow routing is not stated by inspected files | `game.ts`, `main.ts`, observation v5 | #137 |
+| Town bell recall and return | nearest eligible owned villagers first, stable ID ties, up to free TC capacity minus incoming garrison reservations; remember interrupted order/queue, bank carried loads on entry, restore work on bell release; newer orders cancel the remembered task; newly trained villagers shelter while the bell rings | toggle/return behavior **owned** help 41111, button actions 163/165 at zero-based sequence 14 → cell 15/B with icons 49/61 (#245); cue aliases `townbell_start/stop` **owned**. Global nearest-worker selection with no radius cutoff, reservation policy, preserving manually sheltered units and new-villager handling **chosen/inferred**; exact DE bell search radius/overflow routing is not stated by inspected files | `game.ts`, `main.ts`, observation v5 | #137 |
 | Production and ram shelter | self-rally holds trainees; type-0 producers refuse returning units; overflow emerges outside. Rams carry infantry/villagers, reject archers/cavalry, unload to passable land and release on destruction where possible | self-rally **owned** help 4944; production capacity 10/type 0, ram 35/422 capacity 6 **owned**. Filtering/egress **inferred/chosen**; live crew constants and their remaining calibration caveat are recorded above | `data.ts`, `game.ts` | #137/#161 |
 | Garrison categories by DAT class | editor table | chosen | `game.ts` `GARRISON_CATEGORY` | — |
 | Shift-click queue count | 5 | inferred (the reference's count); `hotkeys.json` binds nothing | `main.ts` | — |
@@ -1089,17 +1089,17 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Animal think interval | 5 ticks | chosen | `game.ts` `ANIMAL_INTERVAL` | — |
 | Engagement tolerances | `radius + 1.6`, margins 0.15-0.4, spawn ring +0.2, node pop ≤ 0.12 | chosen | `game.ts` | — |
 | Villager task gathering | hunter 0.41/35, farmer 0.53/10, shepherd 0.33/10, forager 0.31/10, fisher 0.43/10, lumberjack 0.39/10, gold miner 0.38/10, stone miner 0.36/10 (rate/capacity); each variant's technology effects | **owned** DAT `bird.work_rate`/`resource_capacity` on 122/259/592/120/56/123/579/124, already published as `villager-*.gather`; open fallback copies these numbers. Heavy Plow gives farmer +1 capacity; Wheel Barrow's patch-specific class-4 multiplier is **1.2695**, Hand Cart's 1.5. Existing whole-resource collection rounds fractional capacity upward (**inferred**, not reference-measured); switching tasks uses the new target's capacity and banks an overfull load first (**inferred**). A carried load remembers its task if its source disappears; legacy loads lacking both source and task default to forager | `data.ts` `villagerGather`, `game.ts` `rateOn`/`holdOf` | #132 |
-| Technology prerequisites and automatic bonuses | full nonnegative DAT prerequisite IDs plus `required_tech_count`; foreign/disabled alternatives remain unsatisfied. Completed buildings supply `building.tech_id`. Initial tree/team effects and eligible locationless/free research activate once in completion order, without an extra research-location building gate | gates, IDs, costs, amounts and triggers **owned**. **Measured current185872, not pinned48987:** newly paid Feudal Frankish farm without a Mill retains243food, versus Briton165+10carried=175; Castle Teutons fire at an adjacent ram without University and heal faster without Monastery than Dark controls, with no editor-start food deduction. Applying this to remaining zero-time technologies, fixed-point activation order and historical building-trigger persistence remain **inferred engine semantics**; live age-up accounting and pinned confirmation remain open. Positive counts with empty lists remain blocked. Legacy manifests retain their former all-listed path | `import_content.py`, `technologies.ts`, `game.ts`; [contract](civilization-bonuses.md), [native evidence](free-research-calibration.md) | #123/#129/#179/#180/#254 |
+| Technology prerequisites and automatic bonuses | full nonnegative DAT prerequisite IDs plus `required_tech_count`; foreign/disabled alternatives remain unsatisfied. Completed buildings supply `building.tech_id`. Initial tree/team effects and eligible locationless/free research activate once in completion order, without an extra research-location building gate | gates, IDs, costs, amounts and triggers **owned**. **Measured current185872, not pinned48987:** newly paid Feudal Frankish farm without a Mill retains243food, versus Briton165+10 carried=175; Castle Teutons fire at an adjacent ram without University and heal faster without Monastery than Dark controls, with no editor-start food deduction. Applying this to remaining zero-time technologies, fixed-point activation order and historical building-trigger persistence remain **inferred engine semantics**; live age-up accounting and pinned confirmation remain open. Positive counts with empty lists remain blocked. Legacy manifests retain their former all-listed path | `import_content.py`, `technologies.ts`, `game.ts`; [contract](civilization-bonuses.md), [native evidence](free-research-calibration.md) | #123/#129/#179/#180/#254 |
 | Bonus prices and production | cost multipliers in completion order, then nearest whole resource (half up); production/research advances by building work rate | multipliers **owned**: TC wood ×0.5; castle ×0.85 then ×0.882353; range work ×1.1. Rounding/tick quantization **inferred**: TC wood 138, castle stone 553/488 are implementation outcomes, not DE measurements. Existing HP policy adds max-HP delta preserving absolute damage; converted entities skip bulk HP/upgrades | `rules.ts`, `game.ts` | #123/#178 |
 | Bonus scope and remaining effects | current 1v1 applies each player's own team effect; unsupported commands/attributes remain diagnostic. No allied teams, timed locationless research or general enable/disable-unit effect execution | **owned** commands retained; range/sight, gathering, production, prices, cavalry HP, building age baselines, relic income and the documented monastery/market/Spies resources have consumers. This is not a general all-civilisation effect engine | `civilizationBonuses.nodes`, `import_content.py` | #123/#128/#126/#130/#180 |
 | Remaining attribute coverage | 23 limits combat acquisition and 130 modifies actual garrison firepower; generic 48/49 and noncombat automatic-search semantics remain diagnostic or outside the implemented consumers | owned fields; consumer scope explicit rather than treating decoder recognition as completeness | `rules.ts`, `game.ts`, manifest `unmodelled` | #128 |
-| Named player-attribute coverage | all named DAT initial values plus resource29 imported; research consumers include farm food, repair, relic gold, conversion permissions/resistance/Heresy/Theocracy, healing range, hunting productivity, population ceiling, Spies, market and tribute fees. Other resource effects remain unmodelled; initial food/population/score entries are not live counters | names/indices **owned** from XS, with29 identified by owned localization15029; values **owned** from configured civ. Lower-first-letter keys, legacy `FarmFood` → `farmFoodAmount` and numeric `resource-29` are schema conventions | `import_content.py`, `rules.ts`, `monastery.ts`, `relics.ts`, `market.ts` | #53/#128/#130/#182 |
+| Named player-attribute coverage | all named DAT initial values plus resource 29 imported; research consumers include farm food, repair, relic gold, conversion permissions/resistance/Heresy/Theocracy, healing range, hunting productivity, population ceiling, Spies, market and tribute fees. Other resource effects remain unmodelled; initial food/population/score entries are not live counters | names/indices **owned** from XS, with29 identified by owned localization15029; values **owned** from configured civ. Lower-first-letter keys, legacy `FarmFood` → `farmFoodAmount` and numeric `resource-29` are schema conventions | `import_content.py`, `rules.ts`, `monastery.ts`, `relics.ts`, `market.ts` | #53/#128/#130/#182 |
 | Skipped technologies | not researchable, reason each | owned | manifest `skippedTechnologies` | #128, #97 |
 | Building age and paid upgrades | stable age variants select HP/armour/LOS; paid tower/wall/gate upgrades replace kind, retaining damage and scaling foundation gains by built fraction | baselines, IDs, costs/gates/armour **owned**; absolute damage retention, fractional foundation scaling and shared gate HP **inferred**. Generic sole-age rows 71/72 normalize into baselines with `includedTechs` preventing graph reapplication; source float precision retained | `tools/buildings.py`, `rules.ts`, `game.ts`; building contract | #126/#179/#180 |
-| Gate topology, state and art | stone/fortified four-tile construction with two-tile doorway and solid posts; two axes preserved by upgrade. Palisade/stone/fortified gates carry checksum-visible `closed/open/blocked` state, shared physical collision and matching imported pose. Owner routes may approach a closed uncontested gate; enemy doorway contact closes it for everybody | geometry, links and graphics **owned**: DAT789↔790,793↔794,64↔78 change obstruction type2↔0; inspected gate tasks are empty and poses have one frame/zero duration. Help41104 supports automatic owner opening; AI constants identify closed/open units. **Inferred**: inherited2.5-tile centre-box owner range, enemy centre within doorway half-extents plus unit radius, enemy precedence, neutral wildlife ignored, instantaneous once-per-tick transition before movement, no close delay and absent legacy state treated as closed. Shared HP remains inferred; native trigger/timing and diagonal placement remain #133 | `gates.ts`, `nav.ts`, `game.ts`, `sprites.ts`; `gates.test.ts`, `tools/gates_smoke.mts` | #133 |
+| Gate topology, state and art | stone/fortified four-tile construction with two-tile doorway and solid posts; two axes preserved by upgrade. Palisade/stone/fortified gates carry checksum-visible `closed/open/blocked` state, shared physical collision and matching imported pose. Owner routes may approach a closed uncontested gate; enemy doorway contact closes it for everybody | geometry, links and graphics **owned**: DAT789↔790,793↔794,64↔78 change obstruction type 2↔0; inspected gate tasks are empty and poses have one frame/zero duration. Help41104 supports automatic owner opening; AI constants identify closed/open units. **Inferred**: inherited 2.5-tile centre-box owner range, enemy centre within doorway half-extents plus unit radius, enemy precedence, neutral wildlife ignored, instantaneous once-per-tick transition before movement, no close delay and absent legacy state treated as closed. Shared HP remains inferred; native trigger/timing and diagonal placement remain #133 | `gates.ts`, `nav.ts`, `game.ts`, `sprites.ts`; `gates.test.ts`, `tools/gates_smoke.mts` | #133 |
 | Stone/fortified wall frames | x=0, y=1, post/junction=2, horizontal/vertical screen diagonals=3/4 | **Measured** by composing owned x2 frames at hotspots divided by scale (`tools/probes/building_wall_art.py`). Neighbour-footprint junction selection **inferred**; palisades keep their separate mapping | `sprites.ts` `wallShape` | #126 roster slice |
 | Mirror-symmetric board | exact mirror | chosen divergence; the paired batch rests on it | `mapgen.ts` | — |
-| Land versus terrain clumping defaults | omitted land factors use8 for player lands and resource islets; terrain/elevation growth retains20; explicit factors are preserved | **Owned** TC Random Map Scripting Guide LAND/TERRAIN_GENERATION definitions. Its historical land range1–15 is not imposed on modern RMS, which explicitly uses22 for Islands homes. The shared cost-growth/phase adapter remains reconstructed; guide contract comparison and source hash are in `docs/map-generation-design.md` | `mapgen.ts`, `mapgen-defaults.test.ts` | #56 |
+| Land versus terrain clumping defaults | omitted land factors use 8 for player lands and resource islets; terrain/elevation growth retains 20; explicit factors are preserved | **Owned** TC Random Map Scripting Guide LAND/TERRAIN_GENERATION definitions. Its historical land range 1–15 is not imposed on modern RMS, which explicitly uses 22 for Islands homes. The shared cost-growth/phase adapter remains reconstructed; guide contract comparison and source hash are in `docs/map-generation-design.md` | `mapgen.ts`, `mapgen-defaults.test.ts` | #56 |
 | Candidate spacing enforcement | live exclusion masks for forest/pond seed scans and opening-group anchors; reserve after accepted placement | Fixes array reassignment during `for…of`. Preserves existing **inferred** square geometry: exclude only when both axis distances are strictly below the margin; exact boundary allowed. Existing spacing values, scan order and mirroring remain; no new native-RMS parity claim. Seeds now produce different woods/resources where exclusions previously failed; depleted candidate bands stop without violating spacing | `mapgen.ts`, `mapgen-spacing.test.ts`; private before/after browser comparisons | #90 |
 | Black Forest seed 7 | one far-gold pair dropped | chosen compromise | `mapgen.ts` | — |
 | Straggler clearance, neutral wood counts | scaled from the script | chosen | `mapgen.ts` | — |
@@ -1110,16 +1110,16 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Naval roster and research | current Britons galley/fire/demolition/hulk lines, Cannon Galleon, transport and trade cog; no unavailable Carrack/Elite Cannon Galleon | **owned** DAT and `CivTechTrees/BRITONS.json`; shared researches 34/35, including automatic children 911/246 with sole prerequisite 35; cannon unit prerequisite 47. Normal projectile/volley attack timing uses existing simulation rules; the Hulk's negative class-21 attack subtracts before the minimum damage (**inferred** arithmetic, not a reference damage measurement) | `tools/naval.py`, `import_content.py`, `data.ts`, `game.ts` | #97 |
 | Ship composites and fire shot | flatten owned file-bearing hull/sail deltas in layer order with their own frame clocks, offsets and colour/shadow/outline masks; file-less fire projectile 676 uses `flamethrower_flame` | composite graphics **owned**, including placeholder W/X and file-less SLP -1 parents; underwater alpha from owned palette. Flame atlas/29 frames/scale endpoints **owned**; binding to projectile 676, mean start scale and one puff per projectile with flight-normalized animation **inferred**, not the closed engine's emitter. Hull occlusion decides the whole ship's contour | `naval.py`, `sprites.ts` | #97 |
 | Demolition detonation | contact attack or lethal damage detonates once at the DAT radius; enemy units/buildings take full shared-class damage; friendly units are spared; deletion does not detonate | radius/attacks and self-destruction wording **owned**; interpretation of blast level 66 as low-bit level 2, full damage without falloff, death-trigger/friendly-fire rules **inferred** | `game.ts` `kill`, `applyBlast` | #97 |
-| Transport boarding/unloading | capacity includes each carried unit and its nested passengers; rechecked on arrival, owner HUD/observation use the same count. Board at interaction range, preserve loads/population; Unload selects a shore, retains cargo offshore or when blocked; cargo is lost on sinking. Conversion leaves cargo aboard with original owners; only the carrier owner can unload it | capacity and load/unload action **owned** unit545/help26443; unload strings3053/4107, definitive hotkey Q. TC Manual p8/PDF10 explicitly counts ram passengers as well as the ram. #251 fixes the reproduced26-in20 undercount; legacy over-capacity saves retain cargo but admit no further boarders, a **chosen** compatibility policy. Captured carriers use their stored capacity. Mobile conversion retention/authority **user-supplied 2026-09-30**; adjacent landing samples (32 angles at carrier radius + passenger radius +0.6), eligibility, cargo loss and targeting-path semantics remain **inferred** | `garrison.ts`, `game.ts`, `observe.ts`, `main.ts` | #97/#251/#178 |
+| Transport boarding/unloading | capacity includes each carried unit and its nested passengers; rechecked on arrival, owner HUD/observation use the same count. Board at interaction range, preserve loads/population; Unload selects a shore, retains cargo offshore or when blocked; cargo is lost on sinking. Conversion leaves cargo aboard with original owners; only the carrier owner can unload it | capacity and load/unload action **owned** unit 545/help26443; unload strings 3053/4107, definitive hotkey Q. TC Manual p8/PDF10 explicitly counts ram passengers as well as the ram. #251 fixes the reproduced26-in20 undercount; legacy over-capacity saves retain cargo but admit no further boarders, a **chosen** compatibility policy. Captured carriers use their stored capacity. Mobile conversion retention/authority **user-supplied 2026-09-30**; adjacent landing samples (32 angles at carrier radius + passenger radius +0.6), eligibility, cargo loss and targeting-path semantics remain **inferred** | `garrison.ts`, `game.ts`, `observe.ts`, `main.ts` | #97/#251/#178 |
 | Fish Trap economy | ship-built water-only trap, 100 wood, 700 food, one reserved fishing ship, manual rebuilding on depletion; ship's 0.24/s × task factor 1.45, dock drop-off | cost, resource 88, builder 13, task factor **owned**. Build duration derived as DAT 40 / (0.24 × build task 3.57); applying that work-rate interpretation and the existing multi-builder rule, exclusive reservation, open-water placement and no automatic reseed **inferred**. Fishing Lines/Gillnets affect collection/carry; construction uses the imported baseline duration | `import_content.py`, `game.ts` | #97 |
 | Trade Cog income | dock-to-foreign-dock round trips, 0.375375 per travel second, capacity 200 | work rate/capacity/dock target **owned**; travel-time income reuses the existing trade-cart approximation rather than reproducing DE's distance formula | `game.ts` `updateTrader` | #97 |
 | A ship is afloat or nowhere; final approach slides along the bank | rule | inferred from the table's shape | `game.ts` `groundAllows`, `moveTowardOnGround` | — |
 | Placement-side neighbourhood | any of the eight neighbouring tiles satisfies the DAT's `placement_side_terrain` alternatives | inferred engine interpretation; the shore fish's beach IDs 2/35 are owned | `mapgen.ts` `dealFish` | #145 |
-| Islands resource islets | tiny-map lands20/23, zones56/57, 1% each; gold2×3 on20, stone2 on23; fifth relic on20 | **Owned** `Islands.rms` 121–147,2498–2558: exactly **two** tiny-map islets (21/22/24 belong to larger branches), borders30%, fuzz10, avoidance7. **Inferred adapter** reserves connected islets before mirrored home growth, selects centres furthest from starts with seeded tie order, uses square base_size3 (omitted RMS engine default from earlier algorithm read), existing cost growth/default clumping and cleaning. This differs from native land-phase order/RNG, but retains quotas, named IDs and water separation. Fish now use global Gaia candidate scans, including both unpaired islet coasts; see the Islands fish section above for remaining season/distance inferences. | `mapgen.ts`, `refdata/relic-placement.json` | #130/#274 |
-| Black Forest clearing quota | 44% of actual map area shared across players, not a fixed1580/player | **Owned** `Black_Forest.rms` 288–296: land_percent44, circular base14, clumping2, avoidance6. At120×120 this is3168/player before cleaning. Existing mirrored growth/road adapter remains inferred. The old half-size quota made source24-tile relic constraints infeasible | `mapgen.ts`, `refdata/relic-placement.json` | #130 |
+| Islands resource islets | tiny-map lands 20/23, zones 56/57, 1% each; gold 2×3 on20, stone 2 on23; fifth relic on20 | **Owned** `Islands.rms` 121–147,2498–2558: exactly **two** tiny-map islets (21/22/24 belong to larger branches), borders 30%, fuzz 10, avoidance 7. **Inferred adapter** reserves connected islets before mirrored home growth, selects centres furthest from starts with seeded tie order, uses square base_size3 (omitted RMS engine default from earlier algorithm read), existing cost growth/default clumping and cleaning. This differs from native land-phase order/RNG, but retains quotas, named IDs and water separation. Fish now use global Gaia candidate scans, including both unpaired islet coasts; see the Islands fish section above for remaining season/distance inferences. | `mapgen.ts`, `refdata/relic-placement.json` | #130/#274 |
+| Black Forest clearing quota | 44% of actual map area shared across players, not a fixed1580/player | **Owned** `Black_Forest.rms` 288–296: land_percent44, circular base 14, clumping 2, avoidance 6. At120×120 this is3168/player before cleaning. Existing mirrored growth/road adapter remains inferred. The old half-size quota made source 24-tile relic constraints infeasible | `mapgen.ts`, `refdata/relic-placement.json` | #130 |
 | The AI never orders a villager onto a boar | rule | chosen (deliberate) | `ai.ts` | — |
 | AI tuning constants | `ARMY_BEFORE_AGE`, `FARM_SPOTS`, camp costs… | chosen; strategy, not fidelity | `ai.ts` | #124 |
-| The wonder wins nothing | current staged placeholder | human approved cosmetic first, then a reference countdown after settings; settings now exist, but exact map-size defaults/query-clock conversion remain unverified after the DAT task120/manual/strings/AI read recorded on #110 | `game.ts` | #110 |
+| The wonder wins nothing | current staged placeholder | human approved cosmetic first, then a reference countdown after settings; settings now exist, but exact map-size defaults/query-clock conversion remain unverified after the DAT task 120/manual/strings/AI read recorded on #110 | `game.ts` | #110 |
 | The 2026-08-28 UTC genie-rms read | algorithm understanding only; original project implementation written fresh as declared in the contemporary trace | Historical GitHub licence result `GPL-3.0`; inspected Land/Terrain/Objects/Elevation generators, Map cleaning, CRandom, Module/StackNode and script examples on upstream `master`. Exact upstream revision was not retained. Design/implementation sessions, successful versus failed reads, UTC/BST dates and commit `fbd277a` are reconstructed in `docs/genie-rms-provenance.md`. No runtime dependency or vendored upstream files; not a new source-similarity audit. Owned-guide precedence remains #56 | `mapgen.ts`; policy #112 | #142, recorded |
 
 ## View
@@ -1146,9 +1146,9 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Fog sampler | cubic B-spline | chosen; the shader names bilinear (pulls the contour inward a fraction of a tile) | `world.ts` | — |
 | Fog levels | unseen 1.0, explored 0.5 | owned (`colorcorrection.json`); black-when-animate-off from the option's string and web reading | `world.ts` | #117 |
 | Whole sprites at a fog boundary | ground fog below bodies; current visibility admits the whole sprite; last-seen sprites retain opaque silhouettes with RGB ×0.5; scenery obeys its anchor tile too | **human** comparison supplied for #88 shows whole trees over the ground contour; reusing Default's explored-ground multiplier for remembered sprites is **inferred**, pending the full reference compositor | `world.ts`, `sprites.ts` `dimFogSnapshot`, `scatter.ts` | #88, #149 |
-| Blend shapes | all eight mapped land/farm/road/snow/ice/water families use DE square windows when present; each missing family falls back to classic diamond masks | **Owned** red-channel pixels from `terrain/blends/*.png`, with source hashes. **Inferred** window cuts:64×64 except96×96 `watershore` (#284); quarter windows for adjacent edge pairs, classic-table family binding and maximum-alpha unions for opposite/three-edge cases remain inferred. The old shore cuts stopped mid-fade (up to15.2% exposed sand in160 GPU join samples), revealing the tile grid. The wider shore cuts include the authored fade and avoid neighbouring atlas motifs; family-specific layout metadata preserves the other seven families and old-import compatibility. No synthetic noise, contrast gain or alpha remapping is applied. `TerrainBlend_vs` passes UVs through and does not establish these window dimensions or their exact native physical crossing width. Source sampling and join continuity are not DE parity; `herbwatershore`/`reserved` remain unmapped. See `terrain-blend-coverage.md` | `world.ts`, `assets.ts`, `import_blends.py`, `tools/land_blend_smoke.mts`, `tools/shore_blend_smoke.mts` | #284/#148/#116/#113 |
-| Land crossings through the overlay masks, both ways | the higher terrain over the lower's tile at shape × its `overlay_mask_name`, and the lower back over the higher's tile the same way | **Owned:** `TerrainBlend_ps` uses an RGB lerp through `g_MaskTexture` at terrain UV and independent shape alpha. **Inferred:** texture-role assignments, the equivalent coverage model at overlaps, the reverse pass and land-on/water-off gating. **Sampler correction,2026-10-01:** reflection/instructions bind mask/blend through `sBilinear` s1 and terrain pictures through `sAnisotropic` s4; overlay masks now use anisotropy1 rather than16. The existing two-way-policy probe's error falls0.030495→0.001896 without widening its limit. Exact mip/minification state and native junction ordering remain uncalibrated | `world.ts` `masked`, `assets.ts`; `terrain-blend-coverage.md` | #116 |
-| Farm blend families and corners | select the receiving terrain pair's family, refresh moved previews, use native diagonal corner windows; classic fallback retains the side-only ring | Farm7/construction29 blend type1 and absent overlay mask are **owned**. Pair-table use fixes confusing a terrain category with a family index (farm/grass uses3, not watershore1). Native25-tile versus classic21-tile patch coverage follows the existing inferred neighbour topology, not a recovered engine UV table. Mixed-family material groups and preview invalidation are **implementation**. Both stages pass450 source-alpha samples; furrow scale/orientation are preserved | `world.ts`, `sprites.ts`, `tools/land_blend_smoke.mts` | #116 |
+| Blend shapes | all eight mapped land/farm/road/snow/ice/water families use DE square windows when present; each missing family falls back to classic diamond masks | **Owned** red-channel pixels from `terrain/blends/*.png`, with source hashes. **Inferred** window cuts:64×64 except 96×96 `watershore` (#284); quarter windows for adjacent edge pairs, classic-table family binding and maximum-alpha unions for opposite/three-edge cases remain inferred. The old shore cuts stopped mid-fade (up to15.2% exposed sand in160 GPU join samples), revealing the tile grid. The wider shore cuts include the authored fade and avoid neighbouring atlas motifs; family-specific layout metadata preserves the other seven families and old-import compatibility. No synthetic noise, contrast gain or alpha remapping is applied. `TerrainBlend_vs` passes UVs through and does not establish these window dimensions or their exact native physical crossing width. Source sampling and join continuity are not DE parity; `herbwatershore`/`reserved` remain unmapped. See `terrain-blend-coverage.md` | `world.ts`, `assets.ts`, `import_blends.py`, `tools/land_blend_smoke.mts`, `tools/shore_blend_smoke.mts` | #284/#148/#116/#113 |
+| Land crossings through the overlay masks, both ways | the higher terrain over the lower's tile at shape × its `overlay_mask_name`, and the lower back over the higher's tile the same way | **Owned:** `TerrainBlend_ps` uses an RGB lerp through `g_MaskTexture` at terrain UV and independent shape alpha. **Inferred:** texture-role assignments, the equivalent coverage model at overlaps, the reverse pass and land-on/water-off gating. **Sampler correction,2026-10-01:** reflection/instructions bind mask/blend through `sBilinear` s1 and terrain pictures through `sAnisotropic` s4; overlay masks now use anisotropy 1 rather than 16. The existing two-way-policy probe's error falls 0.030495→0.001896 without widening its limit. Exact mip/minification state and native junction ordering remain uncalibrated | `world.ts` `masked`, `assets.ts`; `terrain-blend-coverage.md` | #116 |
+| Farm blend families and corners | select the receiving terrain pair's family, refresh moved previews, use native diagonal corner windows; classic fallback retains the side-only ring | Farm7/construction29 blend type 1 and absent overlay mask are **owned**. Pair-table use fixes confusing a terrain category with a family index (farm/grass uses 3, not watershore 1). Native25-tile versus classic 21-tile patch coverage follows the existing inferred neighbour topology, not a recovered engine UV table. Mixed-family material groups and preview invalidation are **implementation**. Both stages pass 450 source-alpha samples; furrow scale/orientation are preserved | `world.ts`, `sprites.ts`, `tools/land_blend_smoke.mts` | #116 |
 | Water surface arithmetic | `Water_ps`'s SM2 build, read: height field summed over rgb, three drifting layers, central difference at 0.05, normal over 0.1, dome through `skyDomeMtx`, glint at `specularPower` | owned; register map c0 = (seaFloorIntensity, skyIntensity, specularIntensity, specularPower), c1 = (waveAnimationSpeed, waveRepeatLength, waveAmplitude, mapScale), c2 = (seaFloorScale, lightDirection), c3-c5 specularColor/waterColour/skyColor, c6-c7.xy skyDomeMtx, c7.z time, c7.w terrainScale, c8.x SampleBlendTexture; s4 surface, s5 floor, s0 dome, s1 visibility, s2 depth, s3 beach blend | `water.ts` | #94 |
 | Water world frame | world x = tile -x, world y = tile +y; the eye looks along world (1, -1) at 30 degrees | measured: the sun `(0.7, -0.68, 0.45)` reaches the eye only from beyond the surface, and the surface's rows lie at the down-left tile axis's 155 degrees in the reference | `water.ts` `VIEW` | #94 |
 | Water `g_terrainScale` | 1, so the Default preset repeats every `20 * 0.0045 * mapWidth` tiles (10.8 on 120) | engine-set, unstated; measured: the reference's streaks decorrelate along their length at that repeat's rate | `water.ts` `TERRAIN_SCALE` | #94 |
@@ -1179,11 +1179,11 @@ freshly extracted TC metadata in memory without publishing a partial import).
 | Under-attack alert rearm | 10 s | chosen; `sounds.json` names the cue, not its rearm | `cues.ts` `ALERT_INTERVAL` | — |
 | Fallow-farm alert grace | 0.5 game seconds | chosen | `cues.ts` `RESEED_GRACE` | — |
 | RMS aesthetic scatter | view-only sprites | chosen (the script deals objects); existing biome aesthetic passes remain separate from DAT terrain plants | `scatter.ts` | — |
-| Scenery soft shadows | matching owned idle-shadow variant, own hotspot and atlas scale; existing ground-shadow pass500, owned Default profile strength/colour | **owned** SLD masks and profile values; reuses the entity-shadow renderer policy. Previously omitted by scatter. Plants/ground both use sRGB; measured flat Islands3 ground factor0.98 versus plant1.0 is a separate terrain-shading approximation. No guessed tint, blur or extra alpha attenuation added; full native composite/grade remains #149 | `scatter.ts`, `terrain_scatter_smoke.mts` | #250 |
-| DAT terrain plants | import all used terrain-unit rows, draw only non-blocking Gaia scenery | Unit IDs, densities, masked densities, centering, graphics and variant counts are **owned**. Seven class14 plant types have zero collision/obstruction; resource-tree rows have no decoration key. Independent density/1000 probability (capped at1), tile/unit-seeded RNG, uniform uncentered jitter, position-hashed variants and hiding under known building/farm footprints are **inferred/chosen**. Masked density is retained but not yet applied; exact native row weights, mask semantics and density remain #249. Fog uses existing sprite policy and last-seen building memory; no sim entities/RNG/state are added or changed | `import_content.py`, `scatter.ts`; source contract and browser pixels/reload checks | #55/#249 |
+| Scenery soft shadows | matching owned idle-shadow variant, own hotspot and atlas scale; existing ground-shadow pass 500, owned Default profile strength/colour | **owned** SLD masks and profile values; reuses the entity-shadow renderer policy. Previously omitted by scatter. Plants/ground both use sRGB; measured flat Islands3 ground factor 0.98 versus plant 1.0 is a separate terrain-shading approximation. No guessed tint, blur or extra alpha attenuation added; full native composite/grade remains #149 | `scatter.ts`, `terrain_scatter_smoke.mts` | #250 |
+| DAT terrain plants | import all used terrain-unit rows, draw only non-blocking Gaia scenery | Unit IDs, densities, masked densities, centering, graphics and variant counts are **owned**. Seven class 14 plant types have zero collision/obstruction; resource-tree rows have no decoration key. Independent density/1000 probability (capped at1), tile/unit-seeded RNG, uniform uncentered jitter, position-hashed variants and hiding under known building/farm footprints are **inferred/chosen**. Masked density is retained but not yet applied; exact native row weights, mask semantics and density remain #249. Fog uses existing sprite policy and last-seen building memory; no sim entities/RNG/state are added or changed | `import_content.py`, `scatter.ts`; source contract and browser pixels/reload checks | #55/#249 |
 | Nearctic snow dusting | not dealt | tried, reverted | — | #118 |
 | Deer startle | hop 1.5 tiles, rest 14-20 s | inferred (AoE wiki); the 1-tile trigger is the DAT's `search_radius` | `data.ts` | — |
-| Base monk source integrity | clean pinned x1 files restored and verified in the default depot | Original files were zero-filled after1MiB, not an alternate outline format. Fresh owner download and copy-back pass569/569 source walks; full isolated x1 import and idle/attack browser contours pass without decoder changes. Structural pre-cache validation prevents silent incomplete art; original/recovered hashes are in `docs/source-integrity.md` | `sld_integrity.py`, atlas-step preflight | #119/#247 |
+| Base monk source integrity | clean pinned x1 files restored and verified in the default depot | Original files were zero-filled after 1MiB, not an alternate outline format. Fresh owner download and copy-back pass 569/569 source walks; full isolated x1 import and idle/attack browser contours pass without decoder changes. Structural pre-cache validation prevents silent incomplete art; original/recovered hashes are in `docs/source-integrity.md` | `sld_integrity.py`, atlas-step preflight | #119/#247 |
 | Which file the Enhanced Graphics Pack draws, and at what size | the DAT's `<stem>_x1.sld` becomes the pack's `<stem>_x2.sld`, drawn at half size | inferred: the DAT names `_x1` only; the pack ships a `_x2` for each and its drawn pixels sit within one x1 pixel of the x1 art's once halved about the hotspot (`test_the_pack_sources_every_sprite_at_twice_the_density`); `widgetui/build_atlas.ps1` states the UI's UHD level is twice HD, nothing states the sprites' | `depot.py` `Graphics.source`, `sprites.ts` `applyFrame` | #151 |
 | Shared-match presentation pacing | 100 ms wall-clock input buffer; yield after a 4 ms work batch (or 32 messages); linear position interpolation between adjacent simulated ticks | chosen engineering policy for household play, not read DE networking behaviour; fixed-timestep and lockstep sources in `docs/shared-play.md` | `src/shared/playback.ts`, `src/shared/client.ts`, `main.ts` | #153 |
 | Shared snapshot compression | negotiate permessage-deflate for snapshots ≥1 KiB, no context takeover; ordinary server ticks/settings/errors stay plain | **chosen** transport policy using the existing `ws` implementation and its default compression level, not DE networking behaviour; extension opt-out preserves the same raw JSON protocol | `src/shared/snapshot-compression.ts`, `server.ts` | #174 |
@@ -1343,10 +1343,10 @@ when the result looks right. When a row is later read from a file, delete it
 
 ## Relic storage garrison flags (#291)
 
-- **Read:** pinned Briton monastery104 has capacity10 and
-  `creatable.garrison_graphic=4786` (`CRCH3GW`), whose file-bearing layer11385
+- **Read:** pinned Briton monastery104 has capacity 10 and
+  `creatable.garrison_graphic=4786` (`CRCH3GW`), whose file-bearing layer 11385
   is `GarrisonFlag WEST`, `b_west_garrison_flag_x1`, offset(-74,-221),90 frames
-  at ~0.033333s. The existing import selects its owned x2 counterpart at scale2.
+  at ~0.033333s. The existing import selects its owned x2 counterpart at scale 2.
 - **Owner-reported / inferred trigger:** stored building relics raise that same
   occupancy flag; carried monk relics do not. No distinct relic-only art or
   newly invented placement/timing is introduced. Exact native trigger semantics

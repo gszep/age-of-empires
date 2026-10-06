@@ -16,7 +16,7 @@ geography, and the fidelity dial between a 1:1 map and a playable miniature.
 - **Patch-matched script instances:** `Arabia.rms`, `Islands.rms`,
   `land_resources.inc` and related includes under
   `depot_813784/resources/_common/drs/gamedata_x2/`. Modern explicit script values
-  take precedence over legacy guide ranges; Islands uses land clumping22.
+  take precedence over legacy guide ranges; Islands uses land clumping 22.
 - **`genie-rms`** (github.com/genie-js/genie-rms), a reverse-engineered
   evaluator whose modules are named after the decompiled functions
   (`RGE_RMM_Objects_Generator__place_object` is left in a comment). It is the
@@ -43,15 +43,15 @@ parser. Section/command names are the citation anchors, not invented page number
 
 | Guide statement | Current adapter and disposition |
 | --- | --- |
-| Land `clumping_factor` defaults to8; terrain defaults to20. The historical land range is1–15. | **Fixed:** player-land fallback and resource-islet growth both use8; terrain/elevation growth retains20. Explicit modern overrides are preserved, including Islands22; no legacy-range clamp is applied. |
+| Land `clumping_factor` defaults to8; terrain defaults to20. The historical land range is1–15. | **Fixed:** player-land fallback and resource-islet growth both use 8; terrain/elevation growth retains 20. Explicit modern overrides are preserved, including Islands22; no legacy-range clamp is applied. |
 | Land precedes elevation; terrain follows elevation. Land grows collectively, while terrain/objects run in script order. | The adapter reserves resource islets before growing mirrored homes, and grows forest masks before hills so hills can target forests/clearings. Biome painting then runs in ordered passes. This is not a complete RMS phase evaluator; land/order and elevation/terrain limitations remain under #130/#134. |
 | Terrain is painted on its declared base; if that base is absent at that point, the pass produces nothing. | `paintBiome` scans the currently matching base and skips empty candidate sets, preserving pass order. It is a fixed set of supported passes, not a parser for arbitrary scripts. |
-| Terrain quotas are evenly divided among clumps (18 tiles/3 clumps gives6 each). | Round-robin growth shares a total budget and can redistribute work when frontiers fail; independent exact quotas/failure semantics are not enforced. Remains an approximation, not a guide-proven algorithm. |
+| Terrain quotas are evenly divided among clumps (18 tiles/3 clumps gives 6 each). | Round-robin growth shares a total budget and can redistribute work when frontiers fail; independent exact quotas/failure semantics are not enforced. Remains an approximation, not a guide-proven algorithm. |
 | `spacing_to_other_terrain_types` also counts the same terrain type. | Existing shoreline exclusions and seed/group spacing are partial adapters, not a general same-type clump-edge separation rule. #90 fixed candidate exclusion, not this broader terrain contract. |
 | `height_limits` restricts terrain to an elevation band; `set_flat_terrain_only` prevents crossing slopes. | No general terrain height-band/flat-only predicate exists. The supported hill passes and flat water treatment do not implement these general flags (#134). |
 | Terrain `set_avoid_player_start_areas` is a flag; common blocking terrain avoids starts by default. | The current descriptors use explicit start masks/fades. There is no generic terrain/object flag interpreter; source-defined defaults and rejection details remain inferred. |
 | Object min/max player distances default to0/infinity; specific-land placement uses that land's centre. Tight groups are contiguous; loose groups allow gaps. Group spacing refers to group centres. | Existing descriptors supply finite bands; tight/loose placement and named islets are supported. Square distance metric, deterministic candidate scan, mirroring and retry details remain chosen/reconstructed. #90 now enforces the specified anchor spacing. |
-| `land_percent`, scaling flags and group counts determine quotas. | Biome percentages currently use eligible base-terrain area, and scaling is simplified around100×100. The guide's total-land wording and several inconsistent arithmetic examples are not proof of the exact current denominator/rounding. Existing policy is retained for calibration under #130, rather than changed by guesswork. |
+| `land_percent`, scaling flags and group counts determine quotas. | Biome percentages currently use eligible base-terrain area, and scaling is simplified around 100×100. The guide's total-land wording and several inconsistent arithmetic examples are not proof of the exact current denominator/rounding. Existing policy is retained for calibration under #130, rather than changed by guesswork. |
 
 The guide itself contains inconsistent examples (e.g. scaling arithmetic and
 fish described as never *more* than a minimum spacing apart). Definitions,
@@ -59,14 +59,14 @@ patch-matched scripts and runtime measurements must be distinguished; reading
 this document does not make every old example a current engine constant.
 
 Verification: four new outcome regressions failed before the correction and now
-pass, including implicit8 versus explicit8/20 and preservation of22 overrides.
-All24 existing map-generation and5 spacing tests pass. Before/after terrain,
-elevation, land-ID and entity hashes for seeds3/7 are unchanged on Arabia,
+pass, including implicit 8 versus explicit8/20 and preservation of22 overrides.
+All24 existing map-generation and 5 spacing tests pass. Before/after terrain,
+elevation, land-ID and entity hashes for seeds 3/7 are unchanged on Arabia,
 Black Forest, Windsor, Senlac and Painted Proof. Islands changes because its
 owned resource-islet blocks omit clumping; their gold/stone quotas remain intact.
 Six natural browser map cases and fresh reloads pass, with reviewed Islands
 minimaps (`.local/rms56-browser.log`, `.local/rms56-after-*`).
-The owned checkpoint is GREEN (`.local/rms56-gate.log`, exit0):1055 Vitest tests/86 files,
+The owned checkpoint is GREEN (`.local/rms56-gate.log`, exit 0):1055 Vitest tests/86 files,
 build,150 Python/owned-source tests and real-browser debug smoke. No test timeout
 was widened and no owned asset regeneration was needed.
 
@@ -86,7 +86,7 @@ current adapter's departures are recorded in the audit above.
 One `StackNode` per tile, shared by every phase, threaded onto a linked list
 kept sorted ascending by `totalCost`; a pop takes the head. Growth is then:
 
-- Seed. A land seeds a `base_size` square (inferred default3, so7x7; the guide
+- Seed. A land seeds a `base_size` square (inferred default 3, so7x7; the guide
   does not state that omitted value) at its origin and
   stamps its zone id into a search map. A terrain or elevation clump seeds one
   tile taken from a randomised list of the whole map, and then *removes* the

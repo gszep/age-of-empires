@@ -111,9 +111,9 @@ are v4 with score accounting (v3 introduced research queue rules); v1–v3
 replay retains pre-score hashes and v1/v2 replay retains busy-building research
 rejection through an absent `researchQueueVersion` state marker. Legacy v1
 recordings are accepted only without a mode field and mean random map. Shared
-protocol6 additionally carries the authoritative match population ceiling and
+protocol 6 additionally carries the authoritative match population ceiling and
 opt-in Wonder completion deadlines/win state, and rejects pre-score simulation
 clients. Persisted shared checkpoints v4 remain loadable without changing their
 state or legacy research rules; subsequent saves write a v5 envelope.
-Dev snapshot3 admits mode-less v2
+Dev snapshot 3 admits mode-less v2
 snapshots as legacy random maps. A mode is not inferred from a map filename.

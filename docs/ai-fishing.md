@@ -22,9 +22,9 @@ claim that the entire DE AI was ported. Proprietary script text stays outside Gi
 | `threats.per`1630–1719 | Military pressure and victory urgency change priorities. Naval combat/defence remains outside the small fishing adapter. |
 | `researches.per`5230–5314 | Naval research is context/roster-gated, including an Antiquity branch; those technology names are not blindly added to the current profiles. |
 
-DAT dock45 supplies150 wood,1.5-tile half-width, terrain restriction6 and hill
-mode3. Fishing ship13 supplies75 wood,0.4 collision half-width, restriction13,
-Dock training/button1/40 seconds. The strategy reserves those baseline prices;
+DAT dock 45 supplies 150 wood,1.5-tile half-width, terrain restriction6 and hill
+mode 3. Fishing ship13 supplies 75 wood,0.4 collision half-width, restriction13,
+Dock training/button 1/40 seconds. The strategy reserves those baseline prices;
 the authoritative public command still charges the owner's actual rules.
 
 ## Public map contract
@@ -49,7 +49,7 @@ remain unchanged because no simulation rule or command shape changed.
   clock if the public command rejects finer geometry. This is not the engine's
   `up-can-build-line` implementation.
 - Fishing uses connected **known** water, not Euclidean distance across two
-  lakes. Idle ships prefer nearby deep fish with the source14-tile allowance;
+  lakes. Idle ships prefer nearby deep fish with the source 14-tile allowance;
   a25-tile ready-dock envelope bounds work/exploration. One idle boat explores
   a known-water frontier when its component has no known fish. Working/carrying
   ships keep their simulation-managed gather/bank continuation.
@@ -67,9 +67,9 @@ implies; the natural-opening checks below use no staged survey or stockpile.
 `terrain.test.ts` checks JSON round trips, exact known values, compact unknown
 rows and identical observations when hidden terrain/elevation changes.
 
-Natural owned Node openings, player1/seeds2,3,7, first fish deposits at game
-seconds693.6,752.55,644.4 with zero naval refusals. The real browser's normal
-player2 AI, untouched Islands seed2, completes dock/train/deposit at601.8/822.1/
-858.6 seconds in owned mode and601.8/728.6/765.1 in fallback, depositing15 food
+Natural owned Node openings, player1/seeds 2,3,7, first fish deposits at game
+seconds 693.6,752.55,644.4 with zero naval refusals. The real browser's normal
+player 2 AI, untouched Islands seed 2, completes dock/train/deposit at601.8/822.1/
+858.6 seconds in owned mode and 601.8/728.6/765.1 in fallback, depositing15 food
 with zero naval refusals. `tools/ai_fishing_smoke.mts` observes these transitions
 without changing state, then checks real dock/ship rendering and selection.

@@ -12,7 +12,7 @@ reviews. Do not append old test counts here as if they describe the latest tree.
   smoke; 415s total (`.local/verification/1791191937139-157510/`). No timeout
   widening. Browser evidence uses Chrome/SwiftShader.
 - Deployed October 5, 12:11 BST: the Ysgramor household host runs release
-  `autonomous-20261005-c519be9` (protocol4), carrying #287/#289 and today's
+  `autonomous-20261005-c519be9` (protocol 4), carrying #287/#289 and today's
   fixes; see [shared play](shared-play.md#installed-arrangement) for the
   verification and rollback. Artemis was unreachable over SSH, so a live guest
   join and its older local art remain unverified.
@@ -69,7 +69,7 @@ reviews. Do not append old test counts here as if they describe the latest tree.
 - Shoreline tile-grid correction (#284): `watershore` now uses complete
   96-pixel source windows with per-family UV layout metadata. The full import,
   shoreline/land/farm probes and owned checkpoint passed; see the
-  [correction evidence](terrain-blend-coverage.md#shoreline-tile-grid-correction-284-october3).
+  [correction evidence](terrain-blend-coverage.md#shoreline-tile-grid-correction-284-october 3).
   Regenerated shore assets need the updated viewer. Exact native UV and
   crossing-width calibration remains #116; broader visual acceptance is #113.
 - Gameplay baseline: `70bda6c` (#280). Owned match-speed

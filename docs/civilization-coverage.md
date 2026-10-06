@@ -211,18 +211,18 @@ Japanese integration consumes the half-price mill/camps, Feudal infantry reload,
 age-gated fishing speed/double HP, cavalry-archer anti-archer/skirmisher exception,
 and Galley-line sight effects. Yasama increases both base and maximum tower
 projectiles; Kataparuto modifies actual pack/unpack and deployed attack clocks.
-Samurai use the bounded source task133 approach-speed mode. Native runtime
+Samurai use the bounded source task 133 approach-speed mode. Native runtime
 calibration of the latter two is#259; conversion retains the shared#178 policy.
 
-`src/sim/japanese.test.ts` passes24 outcome tests: paid construction, age research,
+`src/sim/japanese.test.ts` passes 24 outcome tests: paid construction, age research,
 existing/garrisoned/new infantry, actual fishing collection/banking and age
 progression, visible tiles, damage exceptions, paid/refunded training, elite
 upgrades, charge thresholds/cancellation, three-arrow empty-tower volleys through
 Guard Tower/Keep, packing/fire timing, captured unique units, naval upgrade damage,
 JSON continuation and mixed replay. Four owned Python tests cross-check source
 gates, roster completeness, signed/fractional attack decoding, task fields and
-unique research. The six-file shared regression pass covered80 tests before the
-six extra fishing/approach cases were added; all24 final Japanese cases pass.
+unique research. The six-file shared regression pass covered 80 tests before the
+six extra fishing/approach cases were added; all 24 final Japanese cases pass.
 Receipts: `.local/japanese183-{sim-r3,source-tests,regressions}.log`.
 
 The private browser passes both pending and **published enabled** acceptance
@@ -230,33 +230,33 @@ The private browser passes both pending and **published enabled** acceptance
 real menu/restart/reload, mill placement and
 50-wood payment, Samurai icon/name/training/elite art, own Asia building art,
 Yasama's three live tower arrows, paid Guard Tower/Keep/Kataparuto, actual unpack
-button and23-tick transition, fishing100HP/food banking and Elite Cannon Galleon
+button and 23-tick transition, fishing100HP/food banking and Elite Cannon Galleon
 research/art/reload. The first browser attempt exposed a probe comparing the
 raw editor qualifier `Trebuchet (Packed)` against the correctly normalised panel
 name `Trebuchet`; the shared probe now uses the existing display-name contract.
-Initial fixture corrections used source50HP fishing ships, TC garrison admission,
+Initial fixture corrections used source 50HP fishing ships, TC garrison admission,
 Euclidean movement distance and the missing-type naval upgrade row, without
 widening any test clock.
 
 Final owned checkpoint **GREEN** (`.local/japanese183-gate.log`),14m47s:
 1150 Vitest tests/90 files,7 inapplicable Gothic fortification cases skipped,
 public build,168 owned/Python tests and real-browser smoke. Full enabled import
-completed (`.local/japanese183-enabled-import.log`), reusing3907 atlas groups.
+completed (`.local/japanese183-enabled-import.log`), reusing 3907 atlas groups.
 
 ### Chinese implementation (2026-10-01)
 
-DAT6/tree257/team402 now has no missing available roster IDs. The pinned roster
+DAT6/tree 257/team 402 now has no missing available roster IDs. The pinned roster
 includes Chu Ko Nu/elite, Fire Lancers/elite, Rocket Carts/heavy, Dragon Ship,
 Lou Chuan and Siege Ram, with original profile-local buildings, flags, icons,
 voices and unit/projectile art. Regional upgrade nodes are recognised alongside
 ordinary/unique upgrades. Dragon Ship is the source's free Heavy Warships
 descendant, including existing ships and later production.
 
-The starting tech graph grants three extra villagers once, deducts200 food/50
-wood and supplies15 TC housing/+7 sight. Age-gated research-cost resource85 feeds
+The starting tech graph grants three extra villagers once, deducts 200 food/50
+wood and supplies 15 TC housing/+7 sight. Age-gated research-cost resource 85 feeds
 actual command payments, tooltips and agent quotes. Hidden free team tech232
-combines the farm-capacity copy with source resource69 (Farm Food Multiplier)
-instead of compounding two10% bonuses. Great Wall reaches existing/occupied
+combines the farm-capacity copy with source resource 69 (Farm Food Multiplier)
+instead of compounding two 10% bonuses. Great Wall reaches existing/occupied
 structures, foundations and later construction. Pending crops keep their food.
 
 Shared combat consumers now support sequential primary/secondary volleys,
@@ -267,15 +267,15 @@ reaches real Scorpion/Rocket Cart damage and Lou Chuan rocket art. Exact native
 cadence/spread, replacement ordering and opening/bonus rounding are#260; the
 ledger distinguishes source values from the deterministic integration policy.
 
-`src/sim/chinese.test.ts` has27 outcome cases: three-map starts and reload,
+`src/sim/chinese.test.ts` has 27 outcome cases: three-map starts and reload,
 TC construction without repeated grants, research payments through all ages,
 farm yields, Great Wall HP, Chu Ko Nu damage/refunds/elite/capture, firearm
 animation/bullets/melee/recharge, interception, ground-fire schema and splash,
 regional upgrades, moving-target firearm/melee windup switching, Lou Chuan range/Chemistry/Rocketry, Scorpion/Ram damage,
 Dragon Ship/Siphons, in-progress volley JSON continuation and mixed opening
-replay. The focused Chinese/protocol/sprite run passed82 tests
+replay. The focused Chinese/protocol/sprite run passed 82 tests
 (`.local/chinese184-sim-r4.log`, before the final switching case); the final
-Chinese/building/civilisation pass has85 passing cases plus7 existing inapplicable
+Chinese/building/civilisation pass has 85 passing cases plus 7 existing inapplicable
 skips (`.local/chinese184-final-focused.log`). Four owned contracts pass
 (`.local/chinese184-source-tests-r2.log`).
 
@@ -290,7 +290,7 @@ probe failure exposed its pages-as-strings assumption: the correctly rendered
 actual page URL. Another attempt was interrupted by an agent edit causing a full
 reload/pause; the complete run was repeated with code frozen. No clock widened.
 
-The broader checkpoint exposed old fixture assumptions: every civilisation paying200
+The broader checkpoint exposed old fixture assumptions: every civilisation paying 200
 food for Fortified Wall, every opening containing three villagers, an effect mock
 omitting its real `c` field, a shooter-dispersion assertion applied to projectile
 definitions, and an Incendiaries target inventory predating the captured Dragon
@@ -301,24 +301,24 @@ review also kept ground fire behind the common civilisation/match guards and
 synchronised firearm-to-melee windup with the selected animation.
 
 The complete enabled import (`.local/chinese184-enabled-import.log`) reused4101
-atlas groups. The first import's canonical-namespace cache misses took about80
+atlas groups. The first import's canonical-namespace cache misses took about 80
 minutes; concrete evidence is recorded on#257, not hidden as a stalled job.
 
-Final owned checkpoint **GREEN**, exit0,19m27s (`.local/chinese184-gate-r3.log`):
+Final owned checkpoint **GREEN**, exit 0,19m27s (`.local/chinese184-gate-r3.log`):
 1186 Vitest tests/91 files,7 existing inapplicable Gothic fortification cases
 skipped, public bundle build,172 Python/owned-content tests and real-browser
 debug smoke. No test timeout or fixture clock was widened.
 
 ### Byzantine implementation (2026-10-02)
 
-DAT7/tree256/team400 now has no missing available roster IDs. Cataphracts40/553
+DAT7/tree 256/team 400 now has no missing available roster IDs. Cataphracts40/553
 and Camel Riders329/330 join the existing shared roster, with independent gates,
 MEDI buildings/flags/HUD, icons and voices. The source's free sight technologies,
 discounted Imperial research and counter-unit prices, staged building HP and
 Fire Ship/Dromon reload bonuses have public-command outcome coverage.
 
-New shared consumers cover type101/103 multiplication, heal task amount times
-work rate and resource89, fixed melee collateral from negative `blast_damage`,
+New shared consumers cover type 101/103 multiplication, heal task amount times
+work rate and resource 89, fixed melee collateral from negative `blast_damage`,
 and building projectile redirection. Logistica adds source infantry damage and
 five-HP collateral; Greek Fire reaches actual Fire Ship range and Dromon/Bombard
 Tower radius/projectile changes. Native geometry/healing/rounding remains#267;
@@ -347,14 +347,14 @@ The seventh profile exposed a shared release blocker#268:551,770,741 bytes of
 minified atlas metadata exceeded V8's string ceiling. Schema4 interns repeated
 frame arrays to52,882,276 bytes/2334 unique arrays. Expanding the whole manifest
 reproduced SHA2569380ea82b21c3108f24479a3e5e2531bdd24537137527d422c866d6875e28367
-exactly. Full publication reused all4850 cached atlas groups; no decoder or PNG
+exactly. Full publication reused all 4850 cached atlas groups; no decoder or PNG
 changes were needed. Browser hydration preserves root/profile/annex frames and
 per-use scale/pages; malformed references fail and legacy inline metadata works.
 
 Published-enabled acceptance, frame-metadata/general-browser and owned/fallback
 cargo receipts all pass (`.local/byzantines-published-acceptance.log`,
 `.local/atlas268-acceptance.log`, `.local/byzantines-cargo-acceptance.log`). Final
-owned checkpoint **GREEN**,13m05s:1218 TypeScript tests/100 files,8existing skips, build,
+owned checkpoint **GREEN**,13m05s:1218 TypeScript tests/100 files,8 existing skips, build,
 184 owned/Python tests and real-browser smoke (`.local/byzantines-gate.log`).
 Live household deployment remains separately versioned in the current handoff.
 
@@ -428,7 +428,7 @@ fidelity certificate.
 
 The refreshed published profile has no missing roster entries and no offered
 typed-tree research absent from its technology table. Heresy was the remaining
-wholly skipped available research: technology439/effect188 now reaches the
+wholly skipped available research: technology439/effect 188 now reaches the
 defending player's conversion-death consumer, preserving ownership and entering
 normal death feedback. Owned cost/time/icon/help remain pipeline-derived.
 
@@ -446,7 +446,7 @@ the existing menu/restart/reload, castle-cost and free-farm lifecycle checks.
 Both profiles pass (`.local/franks-profiles-browser-r2.log`). The first attempt
 put monastery on the wrong probe menu page; the probe now uses the maintained
 `pageOf` helper, with unchanged timeouts. Full import succeeded
-(`.local/franks-import.log`); five profile import tests and39 focused simulation
+(`.local/franks-import.log`); five profile import tests and 39 focused simulation
 tests pass. Native conversion odds, cargo and other shared engine calibration
 limitations remain separately tracked; these checks do not establish native
 runtime parity.
@@ -490,8 +490,8 @@ consumers include garrison capacity and maximum projectiles, heal-range changes,
 conversion task permissions/ranges/windows, captured-building rule snapshots,
 construction research prerequisites and fractional packed attack values.
 
-`src/sim/teutons.test.ts` has16 passing outcome tests:36-wood farms; once-only free
-Murder Holes/Herbal Medicine; extended healing and25/10 TC/tower garrisons; actual
+`src/sim/teutons.test.ts` has 16 passing outcome tests:36-wood farms; once-only free
+Murder Holes/Herbal Medicine; extended healing and 25/10 TC/tower garrisons; actual
 age-dependent armour on existing, garrisoned and new units; paid Ironclad,
 Crenellations and elite upgrades; ranged castle fire and infantry volley growth;
 Redemption/Atonement permissions, adjacency, protected structures and retained
@@ -503,7 +503,7 @@ tests verify the newly consumed task and effect encodings.
 an enablement override (`.local/teutons-published-browser.log`). Actual menu,
 restart/reload, paid research, farm/Bombard Tower placement, original unique/elite/
 Siege Onager/tower artwork, right-click permission feedback and building capture,
-monk conversion, retained captured HP and the25-capacity garrison HUD are exercised.
+monk conversion, retained captured HP and the 25-capacity garrison HUD are exercised.
 The scenario is explicitly staged and the opposing example AI is replaced by a
 passive player; simulation clocks are unchanged and later actions use real buttons
 or public commands. Shared private-browser helpers live in `tools/civ_browser.mts`.
@@ -518,8 +518,8 @@ researched tower types rather than assuming every tower is an upgrade descendant
 The first owned checkpoint also exposed a definition/availability mismatch: unavailable
 building definitions remain available for captured/scenario entities, but their
 `buildable` flag now respects the civilisation's tree. The page invariant tests
-all loaded profiles and their full research sets. Mapping capacity attribute2
-also activates the owned standard transport bonuses1163/1164:20/20/25/35 by age.
+all loaded profiles and their full research sets. Mapping capacity attribute 2
+also activates the owned standard transport bonuses 1163/1164:20/20/25/35 by age.
 Four public group-boarding checks verify the exact limits; the old base-20 test
 now explicitly uses Dark Age. Long AI/relic tests pass focused reruns; host Windows
 game/Steam CPU contention motivated a one-worker checkpoint, without changing timeouts.
@@ -547,21 +547,21 @@ debug smoke. One worker, unchanged timeouts. Only Markdown changed afterwards.
 
 The profile adds Huskarl/Elite Huskarl, Hussar and Dromon, independent
 availability/bonuses, architecture, flags, icons, voices and native hotkeys.
-Source tree759/761 are represented by the current41/555 secondary training slot;
+Source tree 759/761 are represented by the current 41/555 secondary training slot;
 the DAT Anarchy effect now enables barracks production without moving the castle
 button. Both source clocks and cells survive queued production and elite upgrades.
 TC-annex bookkeeping activates the one-second paid Loom modifier. Hunting has
 distinct output productivity, work rate and carrying capacity. Imperial's+10
 unit-limit bonus changes the match ceiling rather than granting houses; see#253
-for chosen default200 and remaining configuration/reference calibration.
+for chosen default 200 and remaining configuration/reference calibration.
 
 Incendiaries was the final wholly skipped available research. It now uses dead
-unit2624's own blast attacks/radius and the owned explosion feedback. The single
+unit 2624's own blast attacks/radius and the owned explosion feedback. The single
 death feedback, non-owner damage and immediate/scuttling behaviour are documented
 inferences under#252. The profile has no missing roster entries or wholly skipped
 available research; that inventory is supplemented by actual outcome checks.
 
-`src/sim/goths.test.ts` verifies13 outcomes: paid Loom, four age discounts/refunds
+`src/sim/goths.test.ts` verifies 13 outcomes: paid Loom, four age discounts/refunds
 and building damage, Anarchy/elite/Perfusion production, a housing-versus-ceiling
 production boundary, hunting consumption/banking, Incendiaries damage/death art,
 Dromon volleys, captured Huskarls, unavailable fortifications and mixed replay.
@@ -584,14 +584,14 @@ inapplicable Gothic fortification cases skipped, build,156 owned-import tests,
 and real-browser debug smoke. The first checkpoint exposed an availability-path
 performance regression: resolving all units' combat effects was unnecessary.
 Only changed training-location units now need full resolution. The affected
-isolated AI test measured28.4→13.1s; three seeds through12000 ticks have identical
+isolated AI test measured 28.4→13.1s; three seeds through12000 ticks have identical
 whole-state and availability-stream hashes before/after the optimization
 (`.local/goths-training-equivalence.log`). No timeout increase.
 
 ## Saracens (#187)
 
-The October3 re-audit reconciles civ9/tree261/team409 with `SARACENS.json`,
-English120158, original graphics/audio metadata and `Effects.xs` function7.
+The October3 re-audit reconciles civ 9/tree 261/team 409 with `SARACENS.json`,
+English120158, original graphics/audio metadata and `Effects.xs` function 7.
 No Saracen-specific RMS/include branches were found in the common depot;
 Promisory's Saracen research branch describes strategy rather than replacing
 the DAT rules. Mameluke282/556 additions close the remaining roster coverage.
@@ -618,7 +618,7 @@ acceptance (`.local/saracens-browser-r2.log`): selection/restart/reload, ORIE HU
 castle/Mameluke/elite/camel/monk/market/ship art, paid age and unique research,
 passive healing, Mameluke damage, discounted market construction/exchange and
 naval upgrades. Detailed source exports stay local under `.local/saracens-*`.
-Final owned checkpoint **GREEN** (`.local/saracens-final-gate.log`):1403 Vitest tests across111
+Final owned checkpoint **GREEN** (`.local/saracens-final-gate.log`):1403 Vitest tests across 111
 files, build,204 owned-import tests and general real-browser debug smoke.
 Ten Saracen-specific outcomes pass; generic profile building tests additionally
 exercise Saracen age stats, armour damage and JSON continuation. Eight existing
@@ -666,9 +666,9 @@ No smoke or checkpoint result is implied by an extraction-only fixture.
 
 ## Vikings (#189)
 
-Worker implementation (October 5): DAT civ11/tree276/team411, owned
+Worker implementation (October 5): DAT civ 11/tree 276/team 411, owned
 `CivTechTrees/VIKINGS.json`, localization120160/28312/28431, `Effects.xs`
-function5 and the original graphic/audio records are reconciled. HUD metadata
+function 5 and the original graphic/audio records are reconciled. HUD metadata
 is **CivSlav**, not CivNorse. Unique units are Longboat250/533 and Berserk692/694;
 583/683 from the abandoned worker attempt are unrelated and removed. Both
 Longboats use the existing composite-ship/no-decay spec, not invented corpses.
@@ -677,9 +677,9 @@ The imported roster has no missing available tree nodes.
 | Surface | Worker status |
 | --- | --- |
 | Infantry HP | Shared automatic416 gives +20% at Feudal;391/415 have no effects, not additional age bonuses. Existing/new/garrisoned infantry compared against Britons after both players publicly research each age. |
-| Warship and Dock costs | Age-gated395/501/502 source multipliers; team411 targets Dock IDs with attribute100. Galley/Longboat wood and gold payments/refunds, fishing-ship prices, unavailable Longboat rejection, Dock payments and enemy isolation tested. |
-| Free Wheelbarrow/Hand Cart | Tree276 zeros213/249 cost/time; required-count automatic research supplies Feudal/Castle gates. Paid public age completion grants each only to Vikings, charging only the age price; movement and banked loads tested.392/400 are empty markers. |
-| Unique units | Both lines train/upgrade; Berserks regenerate from owned40 HP/minute field; Longboats use shared four-projectile ship attacks. Converted Berserk regeneration, Chieftains lethal attacks/loot and in-flight Longboat shots have JSON-continuation checks. The mixed opening command replay covers villager training only. |
+| Warship and Dock costs | Age-gated 395/501/502 source multipliers; team 411 targets Dock IDs with attribute100. Galley/Longboat wood and gold payments/refunds, fishing-ship prices, unavailable Longboat rejection, Dock payments and enemy isolation tested. |
+| Free Wheelbarrow/Hand Cart | Tree276 zeros 213/249 cost/time; required-count automatic research supplies Feudal/Castle gates. Paid public age completion grants each only to Vikings, charging only the age price; movement and banked loads tested.392/400 are empty markers. |
+| Unique units | Both lines train/upgrade; Berserks regenerate from owned 40 HP/minute field; Longboats use shared four-projectile ship attacks. Converted Berserk regeneration, Chieftains lethal attacks/loot and in-flight Longboat shots have JSON-continuation checks. The mixed opening command replay covers villager training only. |
 | Unique research | Chieftains463 cavalry/camel attacks plus XS loot tasks; loot tests include pre-research, same-owner non-infantry and enemy-killer negative controls. Bogsveigar49 archer-line/Longboat attack. Obsolete Berserkergang is not offered. |
 | Presentation | Source art, names, icons, CivSlav HUD and Vikings audio switch flow through existing import machinery;542/542 consumed audio aliases resolve to media in both pinned packs, without new exceptions. |
 | Integration | Enabled. Coordinator integration (October 5) passed full regeneration, `tools/vikings_smoke.mts` private-browser acceptance and the owned checkpoint; see the integration receipt below |

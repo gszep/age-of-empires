@@ -84,6 +84,6 @@ first establish stable, fast full runs rather than add another maintenance syste
 ## Evidence
 
 October5 economy split, unchanged two-worker fallback runs:135.82→87.72s;98 passed
-and19 skipped in both layouts, with identical test names/statuses and suite bodies.
+and 19 skipped in both layouts, with identical test names/statuses and suite bodies.
 That is a single measured suite comparison, not a full-CI performance claim.
 See #299 for final integrated timings and any remaining target misses.

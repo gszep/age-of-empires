@@ -16,7 +16,7 @@ atlas-stage elapsed time** and **32.67% of aggregate atlas-stage CPU time**.
 | Atlas-stage system CPU |19.25s|13.43s|
 | Aggregate atlas-stage CPU |9209.14s|6200.41s|
 
-This saves749.58s elapsed and3008.73s aggregate CPU in the measured atlas stage.
+This saves 749.58s elapsed and 3008.73s aggregate CPU in the measured atlas stage.
 Groups are work items, including empty masks, not equal-cost units or PNG pages.
 The52.23% reduction in regenerated groups is therefore not a52.23% timing claim.
 
@@ -35,12 +35,12 @@ The52.23% reduction in regenerated groups is therefore not a52.23% timing claim.
   really decodes with the old helper and creates a schema2 cache. Its publication
   is retained for the layer-aware arm; the global arm starts with a clean
   publication directory and the equivalent legacy cache metadata.
-- Three phases run sequentially under GNU time, nice10 and the default four
+- Three phases run sequentially under GNU time, nice 10 and the default four
   workers. A timing wrapper around the atlas stage is the only shell change in
   the private exports. Cold audio/UI work is excluded from the cache speedup:
-  whole-pipeline times were2661.43s global and1940.60s layer-aware, but are not the
+  whole-pipeline times were 2661.43s global and 1940.60s layer-aware, but are not the
   numbers used for the headline comparison.
-- The old baseline took2421.87s in its atlas stage,2667.02s overall, with0hits.
+- The old baseline took 2421.87s in its atlas stage,2667.02s overall, with0 hits.
   Copying the baseline and final full-tree hashing are preparation/verification,
   outside the timed import stages.
 
@@ -68,12 +68,12 @@ Independent baseline inventory and actual conversion logs agree:
   SHA256): `67269af2b5107bcabcc76816b29115b3929bcfdf2ab181a00538b41ea6788202`.
 - Identical corrected cache SHA256:
   `b0efc463b0895eb4c9d9090ef94937a1790a383b005f9b670fb63f39c89b26ad`.
-- Against the old baseline, encoded bytes change on1166main and884player-colour
+- Against the old baseline, encoded bytes change on1166 main and884player-colour
   pages; no shadow/outline/damage page changes. The cache-aware publication is
   exactly equal to the clean corrected publication, including metadata/UI/audio.
 - Independent Pillow decoding confirms actual pixel changes, not just different
   PNG encodings. Measurement space is **decoded PNG RGBA8 without colour-space
-  conversion**, not rendered screen colour. `animal-skeleton/idle.png` has1404
+  conversion**, not rendered screen colour. `animal-skeleton/idle.png` has 1404
   changed nontransparent texels; example(59,4): `[136,120,88,255]`→`[140,121,90,255]`.
   `arbalester/attack-playercolor.png` has70028changed nontransparent texels;
   example(41,8): `[78,78,78,15]`→`[80,80,80,15]`. Corrected cached/fresh decoded arrays

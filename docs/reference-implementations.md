@@ -115,7 +115,7 @@ Both target older Genie/AoC behavior rather than the current DE patch. Agreement
 
 ### 5. Combat and data experiments
 
-[aoe2-unit-analyzer](https://github.com/ddk220-light/aoe2-unit-analyzer) extracts current DE data and contains a tick-based battle simulator. It is a useful inventory of modern mechanics and experiment design, not a complete spatial oracle. No repository license was detected during review, so its code must not be copied without permission.
+[aoe2-unit-analyzer](https://github.com/ddk 220-light/aoe2-unit-analyzer) extracts current DE data and contains a tick-based battle simulator. It is a useful inventory of modern mechanics and experiment design, not a complete spatial oracle. No repository license was detected during review, so its code must not be copied without permission.
 
 ### 6. Game instrumentation and replay evidence
 
@@ -173,7 +173,7 @@ For AoE-sized groups, start with deterministic grid A* plus simple stable local 
 | Combat formulas | DAT attack/armor classes and effects | openage research; unit-analyzer experiments | controlled one-hit and sustained-combat scenarios |
 | Projectiles | DAT projectile/task fields | openage research | static/moving target grids across seeds |
 | RMS maps | official RMS guide and scripts | Mangudai/rms-check | map statistics and fixed-seed snapshots |
-| AI strategy compatibility | installed `.per` scripts and official AI docs | AI Module/pyage2 as historical API references | scripted scenario facts/actions |
+| AI strategy compatibility | installed `.per` scripts and official AI docs | AI Module/pyage 2 as historical API references | scripted scenario facts/actions |
 | Commands/replays | `.aoe2record` command stream | aoc-mgz; OpenRA architecture | native/WASM replay checksums |
 | Determinism | our explicit contract | OpenRA; Spring | cross-runtime golden hashes |
 | Navigation | focused AoE2DE tests and first-party talks | openage; 0 A.D.; published flow fields | path suites, congestion, wall gaps, regrouping |

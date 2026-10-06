@@ -61,7 +61,7 @@ changes and verify the installed-CLI mock-provider smoke before promising readin
   A run once wrapped up at dawn believing it was mid-afternoon because it
   had narrated the time for five hours.
 - **Honour the user's context wrap-up instruction.** When asked to wrap up
-  around60% context, stop broadening the task, reach a safe checkpoint and
+  around 60% context, stop broadening the task, reach a safe checkpoint and
   provide a concise handoff with verification and remaining work. The user can
   then compact or start a fresh session; continuing the same conversation does
   not clear its context. No additional automatic compaction threshold is set.

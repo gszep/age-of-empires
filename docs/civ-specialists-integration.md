@@ -81,7 +81,7 @@ and `garrison-edges.test.ts`:71 tests pass across fallback and owned profiles.
 (`.local/ram161-browser.log`): real training/boarding, .65 versus .60 tiles/s,
 +10 actual building HP loss, unload reversal and loaded-cargo reload.
 
-Re-reading pinned ram35/422/548 creatable/combat/tasks and English help
+Re-reading pinned ram 35/422/548 creatable/combat/tasks and English help
 26094/26289/26446 still establishes the mechanic, not its numeric constants.
 The public [Battering Ram](https://ageofempires.fandom.com/wiki/Battering_Ram_(Age_of_Empires_II))
 and [Capped Ram](https://ageofempires.fandom.com/wiki/Capped_Ram_(Age_of_Empires_II))

@@ -15,10 +15,10 @@ Run them from the repo root: `npx tsx tools/probes/snapshot.ts`.
   requests, console/init errors, loading DOM, canvas/debug readiness and GPU
   information. The general `debug_smoke.mjs` now saves those diagnostics under
   `.local/browser-diagnostics/startup-*/` on navigation/readiness failure before
-  closing the page, retaining the original failure and60-second readiness clock.
+  closing the page, retaining the original failure and 60-second readiness clock.
   `events.json` is saved first; page/GPU queries are each bounded to five seconds
   and record diagnostic errors if unavailable. Completed requests and console
-  events retain the latest500 entries; DOM HTML is capped at100,000 characters.
+  events retain the latest 500 entries; DOM HTML is capped at100,000 characters.
   This captures evidence; it does not establish or fix an intermittent init cause.
 
 - **`land_blend_smoke.mts`** — #116's eight native families through production
@@ -27,8 +27,8 @@ Run them from the repo root: `npx tsx tools/probes/snapshot.ts`.
   state immutability. Source-alpha errors are measured in linear-sRGB. Saves
   `.local/land116-crossings.png` as a real-texture overview; this is not a
   matched DE capture. Pair with `shore_blend_smoke.mts` for the actual water IDs.
-  The shore probe also samples160 joins to opaque water (#284), requiring less
-  than2.5% exposed sand in linear-sRGB; matching interior atlas samples alone
+  The shore probe also samples 160 joins to opaque water (#284), requiring less
+  than 2.5% exposed sand in linear-sRGB; matching interior atlas samples alone
   previously passed despite a visible pale tile grid. Family-specific window
   dimensions come from the imported layout, with common-layout compatibility.
 
@@ -46,7 +46,7 @@ existing complete pinned813784 recovery directory (see source-integrity.md).
 Live assets, original depots and the production decoder are not modified.
 
 Check backing-drive space first: this keeps three publication trees and caches.
-Stages run sequentially at nice10/default worker count with retained process-group
+Stages run sequentially at nice 10/default worker count with retained process-group
 handles and per-stage timeouts. Logs, GNU-time metrics and a final `report.json`
 stay under the new `.local` directory; an existing directory is never overwritten.
 Atlas-stage timing is separate from whole-pipeline timing so cold audio/UI work
@@ -86,11 +86,11 @@ browser smoke and are maintained regression tools.
   non-silent PCM; looking away suppresses offscreen combat and unseen terrain.
   Mixer/reference calibration is separately tracked as #243.
   #248 adds actual four-layer ambient fade playback and a real militia-training
-  completion whose horn and500ms-delayed voice are both observed playing.
+  completion whose horn and 500ms-delayed voice are both observed playing.
 - **`music_smoke.mts`** — #115's27 real owned soundtrack tracks, native seek/end
   transitions and wrap, one live source, gesture unlock, pause/resume,
   hidden/foreground, restart and absent-audio fallback. `MUSIC_SOAK=1` also
-  waits for a natural complete111-minute playlist with scene redraws frozen;
+  waits for a natural complete 111-minute playlist with scene redraws frozen;
   the real audio player and native end callbacks continue throughout.
 - **`options_smoke.mts`** — #141's real settings/menu controls, four owned
   training-key profiles, explicit unbound keys, left-handed navigation, exact
@@ -99,14 +99,14 @@ browser smoke and are maintained regression tools.
   Also runs with `OPEN_FALLBACK=1`. `map_menu_smoke.mts` additionally verifies
   that saved local speed never overwrites shared authority on join/reload,
   while an explicit options Apply reaches both private clients.
-- **`ai_fishing_smoke.mts`** — #91's actual player2 example AI from an untouched
-  Islands seed2 opening, using normal speed keys and the normal simulation/AI
+- **`ai_fishing_smoke.mts`** — #91's actual player 2 example AI from an untouched
+  Islands seed 2 opening, using normal speed keys and the normal simulation/AI
   loop. A read-only observer records paid dock completion, ship creation and
   real fish deposits; only afterwards does F4 reveal the dock/ship for rendering
   and selection checks. Also runs with `OPEN_FALLBACK=1`.
 
 - **`regicide_smoke.mts`** — real mode checkbox/Start Game, King sprite/colour/
-  voice request, reload/restart and return to random map; two actual400-gold
+  voice request, reload/restart and return to random map; two actual 400-gold
   Treason clicks, pixel-verified minimap X blink/expiry at a hidden garrisoned
   King, no fog/research leakage, real shelter/occupied-Castle flag and royal
   Delete confirmation/defeat. Loads a v2 headless record through file input and
@@ -125,7 +125,7 @@ browser smoke and are maintained regression tools.
 
 - **`relic_placement_smoke.mts`** — generated Islands seed 130, untouched terrain,
   resources and relic positions, staged Castle-age monk/monastery/transport.
-  Real right-click pickup of a home relic and the fifth relic on resource land20;
+  Real right-click pickup of a home relic and the fifth relic on resource land 20;
   public outward/return transport, deposits and 60 gold/minute. Shares the journey
   with `relic-journey.test.ts`, which also checks JSON continuation throughout.
 
@@ -184,7 +184,7 @@ browser smoke and are maintained regression tools.
   `.local/scatter55-islands.png`. Source density/masked-density calibration is
   separate (#249); this probe proves visibility, not exact native distribution.
 - **`transport_capacity_smoke.mts`** — #251's loaded-ram boarding. Actual
-  overflow/exact-fit right-clicks and cursors, recursive20/20 HUD, a converted
+  overflow/exact-fit right-clicks and cursors, recursive 20/20 HUD, a converted
   carrier's stored capacity, intact nested payload and reload hash. Also run
   with `OPEN_FALLBACK=1`. Private coastal fixture, no shared-match mutation.
 - **`conversion_cargo_smoke.mts`** — #178's public boarding/conversion fixture,
@@ -204,7 +204,7 @@ browser smoke and are maintained regression tools.
   owned mode compares the imported strings. Pair with
   `population_queue_smoke.mts` for queued production blocked by housing.
 - **`map_spacing_smoke.mts`** — #90's natural Arabia/Islands/Black Forest openings
-  at seeds3/7. Records resource positions/counts, screenshots and full-board
+  at seeds 3/7. Records resource positions/counts, screenshots and full-board
   minimaps; checks every resource kind exists, no page errors and deterministic
   fresh-seed reload. `MAPGEN_REF=<git-ref>` substitutes only that revision's
   generator in the private Vite server for baseline inspection. Outputs stay
@@ -252,7 +252,7 @@ browser smoke and are maintained regression tools.
 - **`garrison_edges_smoke.mts`** — #137's real bell/return buttons, production
   self-rally and training, ram boarding/unload, plus rendered player-colour pixels
   in the imported garrison flag rectangles reported through `entities`.
-  #245 additionally checks native cell15/B for bell and cell10/G for building
+  #245 additionally checks native cell 15/B for bell and cell 10/G for building
   ungarrison, and exercises those keys through the actual browser input path.
 - **`minimap_markers_smoke.mts`** — actual minimap pixels for live and remembered
   building dots, reveal parity, and the absence of a farm marker.

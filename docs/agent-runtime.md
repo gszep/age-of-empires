@@ -42,7 +42,7 @@ dev-snapshot versions are separate contracts, not observation versions.
   and the id is not authorization to target an unseen entity. Text summaries
   include both fields; no alternate text-only state channel exists.
 - Source policy: [population ledger](ledger.md#configurable-population-ceiling-253)
-  (owned setup help 93516, resource32/Gothic effect418) and
+  (owned setup help 93516, resource 32/Gothic effect 418) and
   [Wonder source/measurement](wonder-victory.md#independent-source-and-native-measurement)
   (owned help 300180/300182 explicitly supplies an opponent timer and focus
   location); [Wonder ledger](ledger.md#opt-in-wonder-countdown-110) records the

@@ -20,33 +20,33 @@
 
 ## Source and inference boundary
 
-The bundled **AoK Manual, printed p81 / physical page84**, explicitly says that
+The bundled **AoK Manual, printed p81 / physical page 84**, explicitly says that
 right-clicking an enemy with a packed trebuchet moves it into range, unpacks it
 and starts attacking. Owned help26381 requires packing to move and unpacking to
 attack, with a minimum range. This replaces the previous packed right-click
 behavior, which classified an enemy as a plain move destination.
 
-Pinned DAT331/42 supplies the existing imported ranges16/4, LOS19,
-search radius18, work rate4.5, projectile371 and attack/reload/graphic clocks.
-331's task109 has `auto_search_targets=1`, `search_wait_time=3` and no target
+Pinned DAT331/42 supplies the existing imported ranges 16/4, LOS19,
+search radius 18, work rate 4.5, projectile371 and attack/reload/graphic clocks.
+331's task 109 has `auto_search_targets=1`, `search_wait_time=3` and no target
 unit;42's attack and pack tasks also have automatic search enabled. These fields
 support automatic transformation/search but do not establish the exact runtime
 meaning of its wait or target selection. Japanese Kataparuto uses the existing
 resolved work-rate modifier, including for automatic setup.
 
 **Inferred integration:** idle building-only acquisition, nearest-target/id
-tie-break, existing10-tick acquisition cadence, existing circular target/radius
+tie-break, existing 10-tick acquisition cadence, existing circular target/radius
 range tolerances, no automatic pursuit, completion of setup if its target
 disappears midway, immediate cancellation of unfinished unpack on a move, and
 manual Pack holding until the next command. The packed/unpacked unit pairing
-remains explicitly named331↔42. Native stance, retarget, interruption and task
+remains explicitly named 331↔42. Native stance, retarget, interruption and task
 wait semantics remain calibration under#131/#259. There is no new native-DE
 runtime capture or claim of exact modern engine parity.
 
 ## Example-AI finishing policy
 
 `ai-siege.ts` reads only the public observation. Promisory `finaling.per`81–88
-trains trebuchets with at least10 military units and enemy buildings, using a
+trains trebuchets with at least 10 military units and enemy buildings, using a
 four-engine lower quota and twelve-engine upper quota. `units.per`12145–12164
 selects completed idle castles and trains through the engine's permission check.
 The example adapts the lower quota:
@@ -56,7 +56,7 @@ The example adapts the lower quota:
 - Up to two existing non-food workers gather the missing stone for one castle;
   ordinary wood/gold assignments resume once it exists. Paid unstaffed castle
   foundations receive replacement builders using the existing recovery policy.
-- Imperial Age reserves200wood/200gold and a population slot for trebuchet
+- Imperial Age reserves200wood/200 gold and a population slot for trebuchet
   production, counting active castle training toward a four-engine limit.
 - Idle engines target visible buildings first, then known building memories by
   distance/id. Memory produces a coordinate move; a subsequently visible target
@@ -64,7 +64,7 @@ The example adapts the lower quota:
 - An `ExampleAiOptions.siege=false` control disables this policy. Archer
   production also follows completed Crossbowman/Arbalester upgrades.
 
-The650-stone castle budget and200wood/200gold engine budget are conservative
+The650-stone castle budget and 200 wood/200 gold engine budget are conservative
 owned baseline prices. The simulator charges the selected civilisation's actual
 price. Worker selection, resource reservations, reuse of existing candidate
 building sites, memory priority and integrating the script's quota into this
@@ -74,9 +74,9 @@ Natural-start progression and siege balance remain part of#124.
 ## Verification
 
 - `npx vitest run src/sim/trebuchet.test.ts src/sim/ai-siege.test.ts`:
- 21deployment/control/replay outcomes and5AI outcomes. Open and owned scenarios
+ 21deployment/control/replay outcomes and 5AI outcomes. Open and owned scenarios
  verify actual damage, not just a rule-table value.
-- The late-game AI fixture supplies Imperial Age, an army, housing and640stone;
+- The late-game AI fixture supplies Imperial Age, an army, housing and 640 stone;
  gathering the balance, construction, training, approach and bombardment use
  ordinary public commands and unchanged clocks. Two enemy TCs preserve the
  current last-TC defeat precondition; an outpost explicitly reveals the targets.

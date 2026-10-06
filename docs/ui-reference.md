@@ -156,8 +156,8 @@ Do not infer a complete navigation graph from filenames alone.
 
 ## Useful online references
 
-- [AoE2DE UI Layout Editor](https://jonasbl3.github.io/AoE2DE-UI-editor/) visually loads and edits shipped widget JSON. Its source repository has no detected license, so use the tool/reference but do not copy its code.
-- [Ch4nKyy/age2de-ui](https://github.com/Ch4nKyy/age2de-ui) demonstrates practical panel modifications and live-reload behavior; verify its license before code reuse.
+- [AoE2DE UI Layout Editor](https://jonasbl 3.github.io/AoE2DE-UI-editor/) visually loads and edits shipped widget JSON. Its source repository has no detected license, so use the tool/reference but do not copy its code.
+- [Ch4nKyy/age 2de-ui](https://github.com/Ch4nKyy/age 2de-ui) demonstrates practical panel modifications and live-reload behavior; verify its license before code reuse.
 - [Official AoE Modding Hub](https://support.ageofempires.com/hc/en-us/p/ModHub) and [Return of Rome mod updates](https://support.ageofempires.com/hc/en-us/articles/15607286588948-Return-of-Rome-Mod-Updates) document support for `icons.json`, `materials.json`, `morematerials.json`, and `sounds.json`.
 - [Official control/resources guide](https://www.ageofempires.com/learn-to-play/control-resources-aoe2/) identifies the intended HUD regions and player-facing roles.
 - StepS's [AoE2DE Audio Modding Guide](https://steamcommunity.com/sharedfiles/filedetails/?id=1915891079) and linked UI-sound spreadsheet are the strongest community Wwise event references.
