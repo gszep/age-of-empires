@@ -33,8 +33,12 @@
     "market": { "type": "object", "additionalProperties": false,
       "properties": { "buy": { "$ref": "#/definitions/commodityPrices" }, "sell": { "$ref": "#/definitions/commodityPrices" },
         "tributeFee": { "type": "integer", "minimum": 0 } }, "required": ["buy", "sell", "tributeFee"] },
+    "wonderCountdowns": { "description": "Both players' announced surviving completed Wonders, independent of fog; absent when none are active. Ids do not authorize targeting hidden entities.", "type": "array", "items": { "type": "object", "additionalProperties": false,
+      "properties": { "owner": { "enum": [1, 2] }, "entityId": { "type": "integer" },
+        "x": { "type": "number" }, "y": { "type": "number" }, "remainingSeconds": { "type": "number", "minimum": 0 } },
+      "required": ["owner", "entityId", "x", "y", "remainingSeconds"] } },
     "version": {
-      "const": 10
+      "const": 11
     },
     "time": {
       "type": "number",
@@ -83,6 +87,11 @@
     "populationCap": {
       "type": "integer",
       "minimum": 0
+    },
+    "populationLimit": {
+      "description": "Observer's effective ceiling including own bonuses, not housing. In v11 absence means unbounded legacy rules.",
+      "type": "integer",
+      "minimum": 1
     },
     "age": {
       "type": "integer",

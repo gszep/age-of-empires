@@ -5,6 +5,10 @@ import { createGame, applyCommand, stepGame } from './game';
 import { describeObservation, observe } from './observe';
 import { isTileExplored, isTileVisible } from './visibility';
 import { validateCommand, validateObservation, explain } from '../protocol/validate';
+import { WONDER_VICTORY_TICKS } from './wonder';
+import { gothicCeilingFixture, publicWonderFixture } from './agent-public.fixture';
+import { checksumState } from './checksum';
+import { synchronizationHash } from '../shared/checksum';
 import type { Entity } from './types';
 
 describe('the public contract', () => {
@@ -264,5 +268,88 @@ describe('player observations', () => {
     expect(a).toBe(b);
     expect(a).toContain('food=200 wood=200');
     expect(a).toContain('enemy seen: none');
+  });
+
+  it('exposes the own effective ceiling, including defaults, bonuses and legacy unbounded rules', () => {
+    const state = createGame(7);
+    expect(observe(state, 1).populationLimit).toBe(200);
+    expect(observe(state, 2).populationLimit).toBe(200);
+
+    const limited = createGame(42, undefined, undefined, 'arabia', 'random-map', 100);
+    expect(observe(limited, 1).populationLimit).toBe(100);
+    expect(observe(limited, 2).populationLimit).toBe(100);
+    for (const limit of [undefined, 200, 100]) {
+      const f = gothicCeilingFixture(limit);
+      expect(observe(f.state, 1).populationLimit).toBe(limit ?? 200);
+      f.imperial();
+      expect(observe(f.state, 1).populationLimit).toBe((limit ?? 200) + 10);
+      expect(observe(f.state, 2).populationLimit).toBe(limit ?? 200);
+    }
+    const rules = structuredClone(FALLBACK_RULES);
+    delete rules.populationLimit;
+    const unbounded = observe(createGame(7, rules), 1);
+    expect(unbounded).not.toHaveProperty('populationLimit');
+    expect(JSON.parse(JSON.stringify(unbounded))).not.toHaveProperty('populationLimit');
+    expect(validateObservation(unbounded), explain(validateObservation)).toBe(true);
+    expect(describeObservation(unbounded)).toContain('population limit=unbounded');
+  });
+
+  it('exposes public Wonder countdowns even when hidden in fog', () => {
+    const { state, wonder, finish } = publicWonderFixture();
+    expect(wonder.buildProgress).toBeDefined();
+    expect(isTileExplored(state, 2, wonder.position.x, wonder.position.y)).toBe(false);
+    expect(observe(state, 2).entities.some(e => e.id === wonder.id)).toBe(false);
+    expect(observe(state, 2).wonderCountdowns).toBeUndefined();
+    finish();
+    expect(wonder.buildProgress).toBeUndefined();
+    const deadline = state.wonderCountdowns![0].finishTick;
+    expect(deadline).toBe(state.tick + WONDER_VICTORY_TICKS);
+    const expected = [{ owner: 1, entityId: wonder.id, ...wonder.position, remainingSeconds: 1000 }];
+    for (const player of [1, 2] as const) expect(observe(state, player).wonderCountdowns).toEqual(expected);
+    expect(observe(state, 2).entities.some(e => e.id === wonder.id)).toBe(false);
+    expect(observe(state, 2).memory.some(e => e.id === wonder.id)).toBe(false);
+    expect(isTileExplored(state, 2, wonder.position.x, wonder.position.y)).toBe(false);
+    for (let i = 0; i < 25; i++) stepGame(state);
+    expect(state.wonderCountdowns![0].finishTick).toBe(deadline);
+    expect(observe(state, 2).wonderCountdowns![0].remainingSeconds).toBe(998.75);
+    const before = [checksumState(state), synchronizationHash(state), JSON.stringify(state.visibility)];
+    const text = describeObservation(observe(state, 2));
+    expect(text).toContain('population limit=150');
+    expect(text).toContain(`wonder countdowns: p1#${wonder.id}@26.5,20.5 998.75s`);
+    expect([checksumState(state), synchronizationHash(state), JSON.stringify(state.visibility)]).toEqual(before);
+  });
+
+  it('validates observations with population ceiling and Wonder countdowns against schema', () => {
+    const { state, finish } = publicWonderFixture();
+    finish();
+    const observation = JSON.parse(JSON.stringify(observe(state, 2)));
+    expect(observation.populationLimit).toBe(150);
+    expect(observation.wonderCountdowns).toHaveLength(1);
+    expect(validateObservation(observation), explain(validateObservation)).toBe(true);
+    observation.wonderCountdowns[0].hp = 100;
+    expect(validateObservation(observation)).toBe(false);
+    delete observation.wonderCountdowns[0].hp;
+    observation.wonderCountdowns[0].remainingSeconds = -1;
+    expect(validateObservation(observation)).toBe(false);
+  });
+
+  it.each(['delete', 'destroy', 'ownership', 'disabled', 'unannounced'] as const)(
+    'omits inactive public deadlines: %s', reason => {
+      const { state, wonder, finish } = publicWonderFixture(reason !== 'disabled');
+      finish();
+      if (reason === 'delete') expect(applyCommand(state, { kind: 'delete', player: 1, entityIds: [wonder.id] }).ok).toBe(true);
+      if (reason === 'destroy') wonder.hp = 0;
+      if (reason === 'ownership') wonder.owner = 2;
+      if (reason === 'unannounced') delete state.wonderCountdowns;
+      for (const player of [1, 2] as const) expect(observe(state, player)).not.toHaveProperty('wonderCountdowns');
+    },
+  );
+
+  it('keeps an expired public timer schema-valid at zero', () => {
+    const { state, finish } = publicWonderFixture(); finish();
+    state.tick = state.wonderCountdowns![0].finishTick + 1;
+    const observation = observe(state, 2);
+    expect(observation.wonderCountdowns![0].remainingSeconds).toBe(0);
+    expect(validateObservation(observation), explain(validateObservation)).toBe(true);
   });
 });

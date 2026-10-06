@@ -2,7 +2,8 @@ import { TICK_SECONDS } from './data';
 import { isEntityVisible } from './visibility';
 import { isAnimal, isUnit } from './data';
 import type { BuildingKind, Entity, GameState, PlayerId } from './types';
-import { buildingRulesForEntity, playerAttributeFor, unitRulesForEntity } from './rules';
+import { buildingRulesForEntity, playerAttributeFor, unitRulesForEntity, populationLimitFor } from './rules';
+import { wonderCountdowns } from './wonder';
 import { researchCostFor, technologyRequirementsMet } from './technologies';
 import { COMMODITIES, hasMarket, marketQuote, tributeFee } from './market';
 import { TREASON_GOLD, treasonMarkers } from './regicide';
@@ -100,6 +101,7 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
   for (let y = 0; y < state.height; y++) {
     explored.push(visibility.explored.slice(y * state.width, (y + 1) * state.width).join(''));
   }
+  const populationLimit = populationLimitFor(state, player);
   const observation: PlayerObservation = {
     version: PROTOCOL_VERSION,
     scores: { 1: calculateScore(state, 1).total, 2: calculateScore(state, 2).total },
@@ -114,6 +116,7 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
     stone: self.stone,
     population: self.population,
     populationCap: self.populationCap,
+    ...(Number.isFinite(populationLimit) ? { populationLimit } : {}),
     civilization: self.civilization,
     age: self.age,
     ...(self.autoReseedFarms !== undefined ? { autoReseedFarms: self.autoReseedFarms } : {}),
@@ -142,6 +145,18 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
     sell: Object.fromEntries(COMMODITIES.map(r => [r, marketQuote(state, player, r, 'sell').gold])) as Record<'wood' | 'food' | 'stone', number>,
     tributeFee: tributeFee(state, player, 100),
   };
+  const wonders = wonderCountdowns(state);
+  if (wonders.length) observation.wonderCountdowns = wonders.map(timer => {
+    // wonderCountdowns has already checked that this standing entity exists.
+    const entity = state.entities.find(e => e.id === timer.entityId)!;
+    return {
+      owner: timer.owner,
+      entityId: timer.entityId,
+      x: entity.position.x,
+      y: entity.position.y,
+      remainingSeconds: Math.max(0, Math.round((timer.finishTick - state.tick) * TICK_SECONDS * 100) / 100),
+    };
+  });
   return observation;
 }
 
@@ -167,12 +182,15 @@ export function describeObservation(observation: PlayerObservation): string {
     `p${observation.player}`,
     `mode=${observation.mode}`,
     `food=${observation.food} wood=${observation.wood} gold=${observation.gold} stone=${observation.stone} pop=${observation.population}/${observation.populationCap}`,
+    `population limit=${observation.populationLimit ?? 'unbounded'}`,
     `age=${observation.age}${observation.researched.length ? ` researched=${observation.researched.join(',')}` : ''}`,
     `own: ${countByKind(mine) || 'none'}${idle ? ` (${idle} idle)` : ''}`,
     `enemy seen: ${countByKind(enemies) || 'none'}`,
     `remembered: ${observation.memory.length}`,
     `resource nodes: ${nodes.filter(e => e.resource === 'food').length} food, ${nodes.filter(e => e.resource === 'wood').length} wood, ${nodes.filter(e => e.resource === 'gold').length} gold, ${nodes.filter(e => e.resource === 'stone').length} stone`,
   ];
+  parts.push(`wonder countdowns: ${observation.wonderCountdowns?.map(w =>
+    `p${w.owner}#${w.entityId}@${w.x},${w.y} ${w.remainingSeconds}s`).join('; ') || 'none'}`);
   if (observation.winner) parts.push(observation.winner === observation.player ? 'result: victory' : 'result: defeat');
   if (observation.draw) parts.push('result: draw');
   if (observation.treason?.kings.length) parts.push(`enemy kings: ${observation.treason.kings.map(k => `p${k.owner}@${k.x},${k.y}`).join('; ')}`);

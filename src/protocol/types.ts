@@ -1,8 +1,8 @@
 import type { Activity, Command, EntityKind, Order, PlayerId, ResourceKind, UnitKind } from '../sim/types';
 import type { NodeKind } from '../sim/data';
 
-/** v10 adds public totals for both players; v9 added waiting research. */
-export const PROTOCOL_VERSION = 10;
+/** v11 adds public population ceilings and Wonder countdowns; v10 added public scores; v9 added waiting research. */
+export const PROTOCOL_VERSION = 11;
 /** v4 records score receipts; v3 enables research queues. */
 export const MATCH_FORMAT_VERSION = 4;
 
@@ -70,6 +70,9 @@ export interface PlayerObservation {
   stone: number;
   population: number;
   populationCap: number;
+  /** This observer's effective ceiling (match/rules base plus own bonuses), not
+   * housing. In v11 absence means unbounded legacy rules; never emits Infinity. */
+  populationLimit?: number;
   /** 0 is the Dark Age; a completed age technology moves it on. */
   age: number;
   /** Whether this player's fallow farms re-sow themselves (issue #24). Their
@@ -80,6 +83,10 @@ export interface PlayerObservation {
   /** Current public prices; Spies' quote deliberately reveals its villager-based price. */
   researchCosts?: Record<string, { food: number; wood: number; gold: number; stone: number }>;
   market?: { buy: Record<'wood' | 'food' | 'stone', number>; sell: Record<'wood' | 'food' | 'stone', number>; tributeFee: number };
+  /** Announced, surviving completed Wonders of both players, independent of fog.
+   * Absence means no active timers (including disabled victory). Coordinates do
+   * not reveal terrain/stats or authorize targeting a hidden entityId. */
+  wonderCountdowns?: Array<{ owner: PlayerId; entityId: number; x: number; y: number; remainingSeconds: number }>;
   entities: ObservedEntity[];
   /** Last-seen snapshots of entities not currently visible. */
   memory: RememberedEntityObservation[];

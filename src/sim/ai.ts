@@ -3,7 +3,7 @@ import { isBuilding, isFishKind } from './data';
 import { distance } from './nav';
 import type { PlayerObservation } from '../protocol/types';
 import { DOCK_WOOD, FISHING_SHIP_WOOD, fishingWater, fishingDockSite, fishingOrders, fishingProducer, plannedWood } from './ai-fishing';
-import { CASTLE_STONE, TREBUCHET_BUDGET, siegePlan } from './ai-siege';
+import { CASTLE_STONE, TREBUCHET_BUDGET, enemyWonderDeadline, siegePlan } from './ai-siege';
 
 interface Spotted {
   id: number; kind: string; owner: number; x: number; y: number; hp: number;
@@ -230,6 +230,7 @@ export function exampleAiCommands(
   const wantedResource = (index: number): ResourceKind => siege?.gatherStone && stoneWorkers.has(index)
     ? 'stone' : ASSIGNMENT[index % ASSIGNMENT.length];
   const militia = army;
+  const deadline = enemyWonderDeadline(observation);
   const tc = mine.find(e => e.kind === 'town-center');
   const water = options.fishing === false ? undefined : fishingWater(observation);
   const dock = mine.find(e => e.kind === 'dock');
@@ -482,7 +483,8 @@ export function exampleAiCommands(
   const houseHeadroom = 3;
   const housesAtOnce = headroom <= 0 ? 2 : 1;
   const building = mine.filter(e => e.kind === 'house' && e.buildProgress !== undefined).length;
-  if (idleBuilder && headroom <= houseHeadroom && building < housesAtOnce
+  if (idleBuilder && observation.populationCap < (observation.populationLimit ?? Infinity)
+      && headroom <= houseHeadroom && building < housesAtOnce
       && observation.wood >= 25 + (headroom > 0 ? siege?.reserve ?? 0 : 0)) {
     // Cycle deterministically through candidate spots so a blocked placement
     // is retried elsewhere on the next decision.
@@ -720,7 +722,7 @@ export function exampleAiCommands(
   // once the enemy field is clear, villagers join the demolition. Only at
   // march strength: "no soldiers in sight" across a fogged map once sent
   // three militia and the whole economy on a fifteen-minute villager rush.
-  if (enemyTcVisible && army.length >= marchAt && enemySoldiers.length === 0) {
+  if (!deadline && enemyTcVisible && army.length >= marchAt && enemySoldiers.length === 0) {
     // The food villagers stay home. Sending the whole economy stopped every
     // farm for the minutes the town center's twenty-four hundred hit points
     // take to chew through -- which is exactly when the surplus would have
@@ -752,7 +754,15 @@ export function exampleAiCommands(
   // soldiers to meet any intruder made every mirror-matched attack repel
   // perfectly and dropped the batch from 14 decided to 4; reinforcing a push
   // already under way did not close the one slow siege it was written for.)
-  if (idleMilitia.length >= 5 || (idleMilitia.length && militia.length >= marchAt)) {
+  const responders = army.filter(e => e.order === 'idle' || e.order === 'move');
+  if (deadline && responders.length) {
+    // Announced defeat takes priority over pooling/raiding. The public marker
+    // is a destination, not permission to address an unseen entity by id.
+    // Reissuing attacks aborts windup; let already engaged troops finish.
+    commands.push({ kind: 'order', player, entityIds: responders.map(e => e.id).sort((a, b) => a - b),
+      target: { x: deadline.x, y: deadline.y },
+      ...(observation.entities.some(e => e.id === deadline.entityId) ? { targetId: deadline.entityId } : {}) });
+  } else if (!deadline && (idleMilitia.length >= 5 || (idleMilitia.length && militia.length >= marchAt))) {
     const enemyTc = enemyTcVisible;
     // Anything of theirs that is still standing, nearest first: an army whose
     // only heading was the mirror of its own town center had nowhere to go

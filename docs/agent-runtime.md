@@ -16,14 +16,50 @@ replay driver ─┘
 production and hidden state are not strategy inputs. Text descriptions derive
 from structured observations, not from a second interpretation of the world.
 
-`src/protocol/types.ts` is authoritative for versions: observations are **v10**
-(public score totals for both players, plus v9's own-building waiting research); new match configs/results/records
+`src/protocol/types.ts` is authoritative for versions: observations are **v11**
+(own effective population ceiling and public Wonder completion countdowns,
+plus v10's score totals and v9's own-building waiting research); new match configs/results/records
 are **v4** (score receipts/counters). Replay of v1–v3 retains pre-score hashes;
 replay of v1/v2 also retains the pre-queue research rules, including
 rejection of research commands sent to a busy building. Legacy v1 records mean random map
 and cannot carry newer mode/population/Wonder settings. Explored terrain is
 run-length encoded with unknown cells retained as unknown. Shared-network and
 dev-snapshot versions are separate contracts, not observation versions.
+
+### Public ceilings and deadlines (v11, #281)
+
+- `populationLimit` is the **observing player's** effective ceiling: explicit
+  match override or rules default, plus that player's researched bonuses (e.g.
+  Imperial Goths 210 at base 200). It is not housing (`populationCap` remains
+  housing bounded by that ceiling). In v11 absence means unbounded legacy rules;
+  `Infinity`/`null` are never emitted. Opponents' effective ceilings are not exposed.
+- `wonderCountdowns` contains each announced, surviving completed Wonder's
+  `{owner, entityId, x, y, remainingSeconds}` for **both players**, even in
+  unexplored fog. Seconds are simulation time, clamped at zero after expiry.
+  Absence means no active announcements, including disabled Wonder victory,
+  construction, preplaced/unannounced Wonders and canceled/destroyed deadlines.
+  A public coordinate does not reveal terrain, HP, orders or other hidden stats,
+  and the id is not authorization to target an unseen entity. Text summaries
+  include both fields; no alternate text-only state channel exists.
+- Source policy: [population ledger](ledger.md#configurable-population-ceiling-253)
+  (owned setup help 93516, resource32/Gothic effect418) and
+  [Wonder source/measurement](wonder-victory.md#independent-source-and-native-measurement)
+  (owned help 300180/300182 explicitly supplies an opponent timer and focus
+  location); [Wonder ledger](ledger.md#opt-in-wonder-countdown-110) records the
+  integration inferences. This does not claim native hidden-stat disclosure.
+
+The example AI stops buying houses at its effective ceiling. An announced enemy
+Wonder takes priority over ordinary waves/raids: earliest deadline, then entity
+id; idle/moving soldiers and trebuchets head to its coordinate and target its id
+only once visible. Existing attacks are left alone to avoid aborting windups.
+Siege preparation no longer waits for ten soldiers/known buildings during an
+enemy countdown. This bounded deterministic strategy is an inferred adapter,
+not native tactical-AI parity (see the ledger).
+
+Observation/AI policy does not change authoritative rules or checksum fields.
+New AI decisions can change future matches; headless replay consumes recorded
+commands, and the shared host broadcasts its accepted AI commands to followers
+which never rerun AI. Match v4/shared v6 therefore remain unchanged.
 
 ## What runs today
 

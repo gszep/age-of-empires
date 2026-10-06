@@ -4,8 +4,40 @@ import { builtinStrategy, mcpStrategy, subprocessStrategy, websocketStrategy } f
 import { WebSocketServer } from 'ws';
 import { parseStrategyLine } from '../protocol/validate';
 import { validateMatchRecord, explain } from '../protocol/validate';
+import { publicWonderFixture } from '../sim/agent-public.fixture';
+import { describeObservation, observe } from '../sim/observe';
+import type { StrategyInputMessage } from '../protocol/types';
 
 describe('headless matches', () => {
+  it('sends effective ceilings and an actually hidden Wonder timer identically on the strategy wire', async () => {
+    const { state, wonder, finish } = publicWonderFixture(); finish();
+    const observation = observe(state, 2);
+    expect(observation.entities.some(e => e.id === wonder.id)).toBe(false);
+    expect(observation.populationLimit).toBe(150);
+    expect(observation.wonderCountdowns).toHaveLength(1);
+    const input: StrategyInputMessage = { type: 'observation', observation,
+      text: describeObservation(observation), rejected: [] };
+    const server = new WebSocketServer({ port: 0 });
+    await new Promise<void>(resolve => server.once('listening', resolve));
+    let received: StrategyInputMessage | undefined;
+    server.on('connection', socket => socket.on('message', raw => {
+      received = JSON.parse(String(raw));
+      socket.send(JSON.stringify({ type: 'commands', time: observation.time, commands: [] }));
+    }));
+    const address = server.address();
+    if (typeof address === 'string' || address === null) throw new Error('WebSocket fixture did not bind');
+    const strategy = websocketStrategy(`ws://127.0.0.1:${address.port}`);
+    try {
+      expect(await strategy.decide(input)).toEqual([]);
+      expect(received).toEqual(JSON.parse(JSON.stringify(input)));
+      expect(received!.observation.populationLimit).toBe(observation.populationLimit);
+      expect(received!.observation.wonderCountdowns).toEqual(observation.wonderCountdowns);
+    } finally {
+      strategy.stop?.();
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  });
+
   it('is deterministic for the same seed and strategies', async () => {
     const config = { version: 1 as const, seed: 21, maxTimeSeconds: 120 };
     const a = await runMatch(config, { 1: builtinStrategy(), 2: builtinStrategy() });

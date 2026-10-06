@@ -231,6 +231,30 @@ off the reference; **measured** — fitted to a reference screenshot;
   Pinned-runtime parity remains unverified (#279). `src/sim/population.ts`,
   `rules.ts`, `match-setup.ts`, `tools/map_menu_smoke.mts`.
 
+## Agent public ceilings/deadlines (#281)
+
+- **Source/public policy:** the population section above (setup help93516,
+  resource32 and Gothic effect418) supports the observer's own effective
+  ceiling, not an opponent-bonus disclosure. Wonder help300180/300182 explicitly
+  announces own/opponent completion, countdown and focus position; see
+  [source evidence](wonder-victory.md#independent-source-and-native-measurement).
+  Observation v11 forwards the existing authoritative timer channel without
+  revealing ordinary entities, terrain or memory. Omitted ceiling means legacy
+  unbounded rules; omitted timers means no active announcements.
+- **Inferred example-AI adapter:** Promisory `buildings.per` distinguishes
+  housing-headroom from population-headroom; `threats.per` responds to enemy
+  Wonders and victory-time. Our bounded policy stops new houses at the effective
+  ceiling and prioritizes the earliest announced enemy deadline (id tie-break),
+  bypassing ordinary army/siege staging thresholds. Idle/moving troops approach
+  public coordinates; only visible Wonders receive targeted attacks. Existing
+  attacks continue, because reissuing them aborts windup. This is not a port of
+  native strategic numbers, timing thresholds or victory-race tactics.
+- **Compatibility:** no new simulation fields/rules; recorded command replay
+  and shared command followers keep their hash formats/versions. Fresh AI runs
+  may issue different commands. Tests cover fog safety, exact countdown deltas,
+  own bonus/default/uncapped ceilings, paid damage and shared JSON following;
+  `tools/agent_public_smoke.mts` compares the real browser and Node observers.
+
 ## Persian Trade Cart unavailable audio (#271)
 
 - **Owned absence:** DAT8 unit128 and death graphic4862 reference Wwise events

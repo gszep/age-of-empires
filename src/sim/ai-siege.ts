@@ -12,19 +12,33 @@ export const CASTLE_STONE = 650;
 export const TREBUCHET_BUDGET = 200;
 export const TREBUCHET_LIMIT = 4;
 
+/** Example policy, not a reproduction of native tactical AI: earliest opposing
+ * announcement first, entity id breaks ties independently of array order. */
+export function enemyWonderDeadline(observation: PlayerObservation) {
+  return observation.wonderCountdowns?.filter(w => w.owner !== observation.player)
+    .sort((a, b) => a.remainingSeconds - b.remainingSeconds || a.entityId - b.entityId)[0];
+}
+
 export function siegePlan(observation: PlayerObservation, army: number) {
+  const deadline = enemyWonderDeadline(observation);
   const mine = observation.entities.filter(e => e.owner === observation.player && e.hp > 0);
   const castles = mine.filter(e => e.kind === 'castle').sort((a, b) => a.id - b.id);
   const engines = mine.filter(e => e.kind === 'trebuchet');
   const targets = [...observation.entities, ...observation.memory]
     .filter(e => e.hp > 0 && e.owner !== 0 && e.owner !== observation.player && isBuilding(e.kind));
-  const active = observation.age >= 2 && army >= 10 && targets.length > 0;
+  const active = observation.age >= 2 && (deadline !== undefined || (army >= 10 && targets.length > 0));
   const count = engines.length + castles.filter(e => e.training?.kind === 'trebuchet').length;
   const saving = active && observation.age >= 3 && count < TREBUCHET_LIMIT;
   const producer = saving ? castles.find(e => e.buildProgress === undefined && !e.training && !e.researching) : undefined;
   const orders: Command[] = [];
   for (const engine of engines) {
     if (engine.order !== 'idle' && engine.order !== 'move') continue;
+    if (deadline) {
+      orders.push({ kind: 'order', player: observation.player, entityIds: [engine.id],
+        target: { x: deadline.x, y: deadline.y },
+        ...(observation.entities.some(e => e.id === deadline.entityId) ? { targetId: deadline.entityId } : {}) });
+      continue;
+    }
     const visible = new Set(observation.entities.map(e => e.id));
     const target = targets.filter(e => engine.order === 'idle' || visible.has(e.id))
       .sort((a, b) => Number(!visible.has(a.id)) - Number(!visible.has(b.id))
