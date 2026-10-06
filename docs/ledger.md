@@ -483,7 +483,17 @@ comes from untouched1c316d8; see `src/headless/fixtures/README.md` and
   rounding; no runtime change follows. Ordinary Palisade165/300/325/350 and
   Watch935/1020/1326→Guard2100 also fit exact staged bonuses, nearest-per-command,
   nearest-final and float32-chain/ceiling-display models. Final-floor and naive
-  double-ceiling models do not fit all panels. Native internal rounding remains#267.
+  double-ceiling models do not fit all panels. **HP-only follow-up:** Imperial
+  Mill1400, Castle6720 and Bombard Tower3108 still do not distinguish nearest
+  rounding stages. Both DAT trees deny Byzantines Masonry/Architecture; paid
+  Spanish Architecture gives Tower2442→2686, rejecting strict float32-chain/
+  ceiling display2687. Timed2686 Damage Object destroyed that tower: unrounded
+  2686.2 with death only at zero does not fit, but trigger versus HP/death
+  quantization is not isolated. Castle6719-damage reads1/6720 but accidentally
+  damaged all Player1 objects. These are retained observations/limits, not a
+  fitted building rule. No authoritative/display code changed; internal rounding
+  and replay-safe policy remain#267. Details and failed probes are in the
+  [HP follow-up](byzantines-calibration.md#hp-only-follow-up-candidate-scan-and-fractional-control).
 - **Owned graphic composition:** MEDI garrison parents retain legacy 2260/2263
   names (`I`, `R`, `B`, `RTWC2GI`, `MRKT2GI`, `ARRG2GI`, `STBL2GI`, `DOCK2GI`,
   `BRKS2GI`) without corresponding SLD files. Their delta11380 supplies the DE

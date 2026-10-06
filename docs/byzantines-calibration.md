@@ -17,7 +17,8 @@ established paid Logistica and one direct strike, but not a positive collateral
 control or a reliable radius/eligibility boundary. Do not treat trample as calibrated.
 
 Evidence root (ignored; retain the worktree):
-`/home/fraser/repos/age-of-empires/.local/worktrees/issue-267-byzantines/.local/native/`.
+`/home/fraser/repos/age-of-empires/.local/orchestrator/evidence/issue-267/native/`
+(archived from the former `issue-267-byzantines` worktree).
 Named observations have full-resolution PNGs and JSON action receipts. Derived
 panel montages do not replace originals. Source dump: `.local/byz-source.log`.
 The initial worktree was clean; no cheap-worker partial diff or failing-check
@@ -230,10 +231,131 @@ float32, and integer nearest rounding per command (`.local/byz-cont-source.log`)
 Nearest-per-command, nearest-final, exact percentages, and **float32 chained
 values displayed with ceiling** all predict these panels. Dark Tower's float32
 product is exactly935. Neither these buildings nor the Houses discriminate those
-remaining policies. No evidence warrants replacing the existing fractional rule.
+remaining policies. The HP-only follow-up below rejects universal ceiling display,
+but does not establish the Byzantine internal rounding stage.
 The earlier scratch `.local/byz-rounding-models.log` incorrectly assumed1020 for
 every Watch Tower age; it is superseded by the source-checked continuation log.
 No wounded/foundation or paid age-up HP experiment was completed.
+
+## HP-only follow-up: candidate scan and fractional control
+
+2026-10-06, base `0d291e5`; **current build185872, not pinned48987, observed
+visually**. Same PID22012, fullscreen2560×1440, inherited UHD-unchecked settings.
+Only editor Tests; no restart, saved scenario, import, checkpoint, commit or push.
+The clean worktree inherited no partial diff; archived prior patch, failed healing
+checks and source/rounding logs were reviewed. Existing code/coverage is untouched.
+
+**BLOCKED for an authoritative HP-rounding fix; docs-only progress.** Paid
+Architecture rejects strict ceiling display. The integer-damage probes add a
+candidate runtime disagreement, but do not locate quantization inside the engine.
+
+New ignored evidence root:
+`/home/fraser/repos/age-of-empires/.local/worktrees/issue-267-hp-rounding/.local/`.
+`hp-models.py` / `hp-models.log` reread both DATs; hashes match the table above.
+`hp-candidates.py` / `hp-candidates-byz.log` use the **Byzantine profile** of the
+existing `byzantines-content.json` extract plus fresh DAT reads. The earlier
+scratch `hp-candidates.log` used that extract's root Briton profile and is not
+the accepted civilization/availability analysis. No import was run. Full PNGs,
+JSON receipts and the `hp-readings.png` montage are under `native/`.
+
+### Candidate computation
+
+Both DATs encode incremental factors `1.100000023841858`, `1.09089994430542`,
+`1.083299994468689`, `1.0769000053405762`, not independent1.1/1.2/1.3/1.4.
+The following chains round each multiplication to float32. Nearest here means
+positive half-up; ties-to-even is untested. These are arithmetic baselines, not
+claims of normal availability in every age.
+
+| Candidate | Base HP Dark/Feudal/Castle/Imperial | Imperial float32 chain | Nearest / ceiling panel |
+| --- | --- | --- | --- |
+| Mill / Lumber Camp |600/800/1000/1000 |1399.915161 |1400 /1400 |
+| Outpost |500 throughout |699.957581 |700 /700 |
+| Stone Gate |1650/1650/~2750/~2750 |3849.766846 |3850 /3850 |
+| Stone Wall, before Fortified |1080/1080/~1800/~1800 |2519.847412 |2520 /2520 |
+| Castle |4800 throughout |6719.592773 |6720 /6720 |
+| Town Center |2400 throughout |3359.796387 |3360 /3360 |
+| Dock |1800 throughout |2519.847412 |2520 /2520 |
+| Fish Trap |250 throughout |349.978790 |350 /350 |
+| Bombard Tower |2220 throughout |3107.812012 |3108 /3108 |
+| Control Bombard Tower, Masonry then Architecture |2220→2442 |2686.199951 |**2686 /2687** |
+
+The ordinary age-only examples do not discriminate the remaining panel models.
+Control Keep2250×1.1×1.1 gives2722.5 (half-up/ceiling2723, ties-even2722), but
+was not measured. Walls/gates include tech71's1.6666666269302368; normalized
+baselines are not exact integers or proof of native command order. Palisade
+tech72 is1.6666699647903442: control150 becomes250.000488 in float32, not250.
+The earlier native control250 thus also cautions against universal strict ceiling;
+substituting exact250 before modeling loses that distinction.
+
+Both DAT trees disable Masonry50 and Architecture51 for Byzantines. Both effects
+multiply applicable classes3/52 by float32(1.1): compounding, not additive20%.
+Teutons lack Architecture; the missing button and owned tree caught this, and
+**Spanish** supplied the paid control. Hoardings379 multiplies Castle HP by
+1.2100000381469727 in both DATs despite the current “+1,000 HP” tooltip. It was
+hovered, not purchased; that tooltip is not evidence of additive behavior.
+
+### Native outcome table
+
+One-player fixture, custom victory without conditions. Villager1280,700 keeps
+the camera stable; Mill850,500, Castle1900,450, University1700,850 and Bombard
+Tower1100,900 were editor-placed, not foundations. Players tab set Imperial;
+all accepted panels verify building name and civ. Test selection coordinates:
+Mill850,460; Castle1900,350; University1700,780; Tower1100,830.
+
+| Civ / condition | Observed HP | Discrimination / capture basename |
+| --- | --- | --- |
+| Byzantines Imperial Mill |1400/1400 |None: `hp-byz-imperial-mill` |
+| Byzantines Imperial Castle |6720/6720 |None: `hp-byz-imperial-castle` |
+| Byzantines Imperial Bombard Tower |3108/3108 |None: `hp-byz-imperial-tower` |
+| Teuton / Spanish Tower, Imperial preset Masonry |2442/2442 each |Integral control: `hp-control-imperial-tower`, `hp-spanish-tower-before` |
+| Spanish Tower, paid Architecture completed |**2686/2686** |**Rejects strict ceiling2687**: `hp-spanish-tower-after` |
+
+Architecture50,1250 was hover-verified. Food5000→4700, wood5000→4800;
+button/queue gone, armour+1→+2 and University2310→2541 confirm completion
+(`hp-spanish-architecture-hover`, `hp-spanish-architecture-done`). Gold5020
+is visible afterward, not a gold cost. No cheats or forced research.
+
+Two integer-damage probes followed:
+
+- Fresh Spanish Test: non-looping Damage Object2686 targeting the tower, Timer150.
+  Architecture paid again;01:42 tower2686/2686,02:40 rubble (`hp-boundary-before`,
+  `hp-boundary-after`; fields `hp-damage-fields`, `hp-timer-value`). Unrounded
+  2686.199951 minus2686 with death only at zero predicts survival, so that
+  **combined model fails**. Stat rounding, trigger-damage quantization and a
+  sub-HP death threshold are not separately identified. No2685 positive boundary
+  repeat or ordinary-combat confirmation was completed.
+- Byzantine Castle: Timer30, Damage6719,00:12→00:38 gives6720/6720→**1/6720**
+  (`hp-byz-boundary-before/after`). **Target isolation failed** after Reset/Set
+  Objects: all Player1 objects were damaged, killing the Villager and other
+  buildings. The Castle panel is readable, but not an isolated control success.
+  Integer6720−6719 and fractional6719.592773−6719 displayed nearest both give1.
+
+### Implementation comparison and bounded handoff
+
+`buildingRulesFor` / `applyBuildingEffect` multiply HP without rounding; the unit
+`integerHitPoints` marker is not applied to buildings. The importer normalizes
+source precision. `src/main.ts` passes raw maxHp to the HUD; `src/view/hud.ts`
+ceilings current HP but prints maxHp directly. Native integer panels therefore
+do not certify current presentation; the Spanish trigger boundary also remains
+a candidate gameplay disagreement. Neither identifies the authoritative rounding
+stage. No runtime, importer, marker or acceptance changes were made.
+
+An optional old-extract lookup probe failed before returning HP: `hp-runtime.log`
+reports Arabia relic-placement constraints; an isolated retry in
+`hp-runtime-lookup.log` reports unloaded `open` civilization for Player2. Both
+exit1 logs and the scratch probe are retained, not reported as passing checks.
+Successful checks are the DAT/model computation and visual native observations.
+No tsc/test/verify was run for this Markdown-only change; handoff uses
+`git diff --check`. Earlier automated acceptance remains unchanged.
+
+Next: repeat2685/2686 with a verified target and ordinary combat to separate
+trigger semantics from HP/death quantization. Find a legal operation sequence
+whose nearest-per-command and nearest-final predictions differ before selecting
+a replay-compatible rule. Do not replace this with more Mill/Outpost panels.
+
+Final `native/hp-final-main-menu.png` / JSON confirms main menu, build185872,
+PID22012 and2560×1440. No controller remains active; settings/services unchanged.
+The worktree/evidence remain intact, tracked changes uncommitted.
 
 ## Bounded continuation
 
