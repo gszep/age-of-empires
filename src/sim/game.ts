@@ -2342,7 +2342,9 @@ export function canGarrison(state: GameState, unit: Entity, building: Entity): b
     const carrier = unitRulesForEntity(state, building);
     if (carrier.infantryCapacity) {
       const category = unitRulesForEntity(state, unit).datClass;
-      const admitted = carrier.passengerTypes === undefined ? category === 4 || category === 6
+      // Ram-family admission is separate from the building/Siege Tower mask.
+      // Native 185872 admits class-44 foot gunners for Turks and Teutons (#302).
+      const admitted = carrier.passengerTypes === undefined ? category === 4 || category === 6 || category === 44
         : !!(carrier.passengerTypes & garrisonCategory(state, unit));
       return admitted && (building.garrison?.length ?? 0) < carrier.infantryCapacity;
     }

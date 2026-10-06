@@ -25,7 +25,10 @@ export function researchCostFor(state: GameState, owner: PlayerId, key: string):
   const tech = rulesForPlayer(state, owner).technologies[key];
   const factor = playerAttributeFor(state, owner, 'researchCostMod') || 1;
   const price = { ...tech.cost };
-  for (const resource of ['food', 'wood', 'gold', 'stone'] as const) price[resource] = Math.max(0, Math.round(price[resource] * factor));
+  // DAT technology-cost edits feed an integer price: native Turks Elite Cannon
+  // Galleon accepts exactly 262 wood (525 * .5), not 263 (#302). Keep this
+  // distinct from the existing player researchCostMod rounding policy.
+  for (const resource of ['food', 'wood', 'gold', 'stone'] as const) price[resource] = Math.max(0, Math.round(Math.trunc(price[resource]) * factor));
   if (!tech.effects.some(e => e.resource === 'spies')) return price;
   const count = (entities: Entity[]): number => entities.reduce((n, e) => e.dead ? n : n
     + (e.owner !== 0 && e.owner !== owner && e.kind === 'villager' ? 1 : 0) + count(e.garrison ?? []), 0);

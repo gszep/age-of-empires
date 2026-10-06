@@ -146,7 +146,7 @@ describe.skipIf(!rules?.civilizations?.turks)('owned Turkish gameplay', () => {
     for (const p of passengers) expect(s.entities.some(e => e.id === p.id && !e.dead)).toBe(true);
   });
 
-  it('Frank Hand Cannoneers board mask-11 Siege Towers, unload, but cannot board rams', () => {
+  it('Frank Hand Cannoneers board mask-11 Siege Towers and unload', () => {
     const s = arena(3, 'franks'), tower = unit(s, 'siege-tower', 2, 40, 40);
     expect(unitRulesFor(s, 2, 'siege-tower').passengerTypes).toBe(11);
     const gunner = unit(s, 'dat-unit-5', 2, 41, 40);
@@ -155,11 +155,23 @@ describe.skipIf(!rules?.civilizations?.turks)('owned Turkish gameplay', () => {
     expect(applyCommand(s, { kind: 'ungarrison', player: 2, buildingId: tower.id }).ok).toBe(true);
     expect(s.entities.some(e => e.id === gunner.id)).toBe(true);
     expect(tower.garrison?.length ?? 0).toBe(0);
-    const ram = unit(s, 'battering-ram', 2, 45, 40);
-    expect(canGarrison(s, gunner, ram)).toBe(false); order(s, gunner, ram);
+  });
+
+  it.each([1, 2] as const)('seat %s foot gunners board and leave rams without admitting cavalry', owner => {
+    // Native build 185872, Turks and Teutons: HC + Janissary occupy 2/6.
+    // See docs/turks-calibration.md; pinned-build admission is not measured.
+    const s = arena(3, 'teutons'), ram = unit(s, 'battering-ram', owner, 40, 40);
+    const passengers = [unit(s, 'dat-unit-5', owner, 41, 40), unit(s, 'dat-unit-46', owner, 41, 41)];
+    for (const p of passengers) { expect(canGarrison(s, p, ram)).toBe(true); order(s, p, ram); }
+    until(s, () => ram.garrison?.length === 2);
+    expect(ram.garrison!.map(p => p.id).sort()).toEqual(passengers.map(p => p.id).sort());
+    const knight = unit(s, 'knight', owner, 42, 40);
+    expect(canGarrison(s, knight, ram)).toBe(false); order(s, knight, ram);
     for (let i = 0; i < 100; i++) stepGame(s);
+    expect(ram.garrison).toHaveLength(2);
+    expect(applyCommand(s, { kind: 'ungarrison', player: owner, buildingId: ram.id }).ok).toBe(true);
     expect(ram.garrison?.length ?? 0).toBe(0);
-    expect(s.entities.some(e => e.id === gunner.id)).toBe(true);
+    for (const p of passengers) expect(s.entities.some(e => e.id === p.id && !e.dead)).toBe(true);
   });
 
   it('gunpowder trains in 80% time with unchanged payments/refunds and owner-local HP', () => {
@@ -229,9 +241,22 @@ describe.skipIf(!rules?.civilizations?.turks)('owned Turkish gameplay', () => {
     const sea = arena(3, 'britons', true), dock = home(sea, 'dock');
     const ship = train(sea, dock, 'cannon-galleon'), bank = { ...sea.players[1] };
     research(sea, dock, 'elite-cannon-galleon');
-    // The shared payment adapter rounds 525 × .5; native half-cost rounding remains uncalibrated.
-    expect(bank.wood - sea.players[1].wood).toBe(263); expect(bank.gold - sea.players[1].gold).toBe(250);
+    // Native 185872: tooltip 262W/250G; 5000W -> 4738W (#302).
+    expect(bank.wood - sea.players[1].wood).toBe(262); expect(bank.gold - sea.players[1].gold).toBe(250);
     expect(ship.kind).toBe('dat-unit-691'); expect(ship.maxHp).toBe(187.5);
+  });
+
+  it('accepts the native 262-wood Elite Cannon Galleon budget and refunds exactly that payment', () => {
+    const s = arena(3, 'britons', true), dock = home(s, 'dock');
+    train(s, dock, 'cannon-galleon');
+    s.players[1].wood = 261; s.players[1].gold = 250;
+    expect(applyCommand(s, { kind: 'research', player: 1, buildingId: dock.id, tech: 'elite-cannon-galleon' }).ok).toBe(false);
+    expect(s.players[1].wood).toBe(261); expect(s.players[1].gold).toBe(250);
+    s.players[1].wood = 262;
+    expect(applyCommand(s, { kind: 'research', player: 1, buildingId: dock.id, tech: 'elite-cannon-galleon' }).ok).toBe(true);
+    expect(s.players[1].wood).toBe(0); expect(s.players[1].gold).toBe(0);
+    expect(applyCommand(s, { kind: 'cancel-research', player: 1, buildingId: dock.id }).ok).toBe(true);
+    expect(s.players[1].wood).toBe(262); expect(s.players[1].gold).toBe(250);
   });
 
   it('Janissary shots land and captured gunpowder keeps its stats across JSON continuation', () => {

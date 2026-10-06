@@ -101,16 +101,32 @@ off the reference; **measured** — fitted to a reference screenshot;
   that class to bit 2 is inferred, not a claim that these fields encode it.
   The existing hand-maintained garrison table
   omitted this class entirely. Public castle admission/elite-upgrade coverage
-  now exercises it; native admission/arrow-contribution calibration is not
-  established by these fields. No mask or capacity has been changed.
+  now exercises it. Current-build 185872 editor tests observed HC + Janissary
+  admission to TC, Guard Tower, Castle and Battering Ram for Turks and Teutons
+  (#302, [capture table](turks-calibration.md)); this is not pinned-build evidence.
+  Rams used a separate class-4/6 gate despite the building mask adapter;
+  class 44 now also passes that gate. Other ram variants inherit the correction
+  without individual native measurements. No mask, capacity or crew bonus changed;
+  native Siege Tower/arrow-contribution calibration remains open.
 - **Inherited inferences, not new native measurements:** zero-time research
   follows required-count gates, without requiring its paid research building
   (#254). Empty effects 95/285 are not substitute upgrade implementations:
   tree 263 sets Chemistry/Light Cavalry/Hussar prices and times to zero.
-  HP remains fractional (Janissary 35 × 1.25 = 43.75); research payment uses
-  the shared whole-resource rounding (Elite Cannon Galleon 525 × .5 = 262.5
-  source wood, charged 263). Native HP/half-cost rounding still needs calibration
-  as in #260/#267. The regression asserts this adapter policy, not DE parity.
+  HP remains fractional (Janissary 35 × 1.25 = 43.75). Current-build panels show
+  Janissary 44/44 versus control 35/35; Damage Object 43 leaves 1/44, which
+  cannot distinguish stored fractional HP from display rounding. Invalid decimal
+  trigger quantities reset to -1; that failed probe is not threshold evidence.
+  Cannon Galleon/Elite show 150/188 versus Byzantine 120/150, also panel readings.
+  Native stored-HP rounding still needs calibration as in #260/#267.
+  **Measured payment correction (#302):** current-build Turks Elite Cannon Galleon
+  tooltip is 262W/250G, 5000W becomes 4738W, and exactly 262W suffices (zero left).
+  Spanish tooltip is 525W/500G. `researchCostFor` now truncates transformed
+  definition costs before the existing player-wide multiplier/rounding, rather
+  than charging 263 for source 525 × .5. General truncation for other fractional
+  definitions/modifier order remains inferred; Chinese player-factor rounding is
+  not claimed calibrated by this experiment. Exact budget/debit/refund tests cover
+  the correction. Bombard Tower 400F/200W and Elite Janissary 850F/750G payments
+  also match their tooltips; Artillery tooltip remains the full 600F/650G.
   The 1v1 locked-enemy model applies the team bonus to its owner only; there is
   no allied-seat propagation claim. Conversion snapshots remain the #178 policy.
 - **Scope retained:** foreign/scenario targets (e.g. Sipahi 1738/1740, Artillery
@@ -119,7 +135,14 @@ off the reference; **measured** — fitted to a reference screenshot;
   Make Camels Available/Heavy Camel, not tower unit IDs: XS names the operation
   `cModifyTech` and attribute 12 `cTechStackingEnabled`. Repeat/stack activation
   is not implemented; the existing one-time camel availability/upgrade pipeline
-  remains in use. These commands stay diagnostic. General
+  remains in use. Current-build Castle-start → paid Imperial age → paid Heavy
+  Camel gives Turks 120→120→140 HP versus Byzantines 100→100→120; neither Stable
+  offers another Camel upgrade after Heavy. Bloodlines accounts for the +20;
+  Imperial Camel tech 521 is restricted to Hindustanis, not Turks. This does not
+  measure trigger-forced repeated activation.
+  Effects 224/225 enable/upgrade camels, not a Turkish camel HP bonus; source
+  details and the installed/pinned prerequisite difference are in the #302
+  capture table. These commands stay diagnostic. General
   Chemistry projectile-art replacements and shared specialist limitations are
   not solved by making Chemistry free. Full native calibration, imported
   browser acceptance and rollout remain coordinator work.
