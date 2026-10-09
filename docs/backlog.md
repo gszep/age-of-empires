@@ -4,6 +4,13 @@ The backlog is the GitHub issue tracker; `tools/session_start.sh` prints it
 in working order. This file only records how the tracker is used, so a
 session does not have to infer it.
 
+Calibration-run follow-ups are tracked as #308–#311 (controlled native fixtures,
+saved-scenario analysis, HP boundary experiments and timestamped video) and
+#312–#313 (reference-build and Persian-scope decisions). Existing #243 retains
+audio-capture prerequisites and #279 the pinned-executable startup failure.
+See [handoff](handoff.md#calibration-follow-up-tracker-october-9) for the dependency
+map; these issues do not replace the unresolved acceptance in each calibration.
+
 - **Labels.** `bug` outranks everything: a bug filed by the human is worked
   before any queue. `decision` is a product or policy call only the human can
   make — the agent files it with a recommendation and does not act until it

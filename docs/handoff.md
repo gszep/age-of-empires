@@ -6,6 +6,35 @@ reviews. Do not append old test counts here as if they describe the latest tree.
 
 ## Source and verification
 
+### Calibration follow-up tracker (October 9)
+
+The remaining tooling and scope blockers are now filed, rather than left only
+in the calibration-run conversation:
+
+- [#308](https://github.com/gszep/age-of-empires/issues/308): exact-coordinate
+  native fixtures for gates, aura boundaries, trample and livestock precedence.
+- [#309](https://github.com/gszep/age-of-empires/issues/309): saved-scenario reader
+  and complete terrain/object censuses; licence and format validation precede
+  adopting a library. Supports #308 and map-placement calibration.
+- [#310](https://github.com/gszep/age-of-empires/issues/310): paired damage and
+  ordinary-combat experiments for hidden HP fractions; depends on #308.
+- [#311](https://github.com/gszep/age-of-empires/issues/311): timestamped native
+  video for projectile, charge, recoil, explosion and fog timing.
+- [#312](https://github.com/gszep/age-of-empires/issues/312): owner decision on
+  retaining the pinned executable versus a deliberate permanent reference-build
+  migration; startup diagnostics remain #279.
+- [#313](https://github.com/gszep/age-of-empires/issues/313): owner decision on
+  deferring Caravanserai behind #186 or making Persians a scope exception.
+- Audio loopback capture and comparison prerequisites were added to existing
+  #243, not duplicated. Related calibration issues have dependency comments.
+
+These are follow-up requests, not implemented tools or new permissions. The
+October 5–6 current-build acceptance was run-specific; it did not repin assets.
+Recorder installation/elevation and a new-civilisation exception still require
+explicit approval. No calibration acceptance is waived by these dependencies.
+
+### Verified source and deployment
+
 - Latest verified source: `57e8d2f` (#95), pushed October 6; later commits are
   Markdown-only. Owned checkpoint `npm run verify:owned` GREEN in 696 s
   (build 19 s, test 290 s, serial 89 s, owned import tests 287 s, browser smoke
