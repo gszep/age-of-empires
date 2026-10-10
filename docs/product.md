@@ -1,6 +1,6 @@
 # What we are building
 
-Owner-aligned direction, October 5, 2026. This is a priority contract, not a list
+Owner-aligned direction, updated October 10, 2026. This is a priority contract, not a list
 of delivered capabilities; those belong in [status](status.md).
 
 ## Play and experimentation are one loop
@@ -38,6 +38,24 @@ commands, observations and replay records are foundations for that work—not a
 claim that campaign generation or open-ended learning is already implemented.
 
 ## Scope and fidelity
+
+**Current push: at most three active civilisations.** Britons is the initial
+baseline, with one Native American civilisation awaiting the owner's choice
+(#314). A third slot is optional and unchosen. Do not work through the remaining
+civilisation catalogue or its unique-unit/technology calibration tickets. Existing
+shipped profiles and useful regression tests remain; this is a development-focus
+decision, not permission to delete content or saves.
+
+Prioritize common gameplay, task and animation machinery over per-civilisation
+micromanagement. Validate a shared contract with representative focused-roster
+units, then let imported data supply their differences. Do not assume every native
+exception is proven merely because the data has a common shape.
+
+GitHub Project **Open Empires Lab #1**, milestone **Play-first: focused roster and
+shared systems #1**, and `priority-push` identify the active work. Other open issues
+carry `deferred` and Project status **Deferred**; they are retained, not rejected.
+The small co-op scenario (#316) and correct two-machine play (#317) give the
+shared-system investigation (#315) a concrete purpose. A scope change is explicit.
 
 Long-term, aim toward the supported AoE2 experience. Near-term, choose a strategic
 subset that makes the next experience playable. Core controls, legible rendering,

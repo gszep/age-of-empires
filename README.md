@@ -23,9 +23,11 @@ npm run dev
 Open **http://localhost:5173/?solo=1** for a local game. If the installed shared
 service already uses that port, run `npm run dev -- --port 5175` instead.
 
-Current scope includes solo AI and two-seat **competitive** shared play, several
-maps, and twelve owned-content civilisations. Co-op teams and generated campaigns
-are still to be built. **Ysgramor and Artemis are the supported play machines.**
+Current scope includes solo AI, two-seat **competitive** shared play, several maps
+and twelve existing owned-content profiles. **Development now focuses on at most
+three civilisations:** Britons plus a Native American choice still to be selected;
+other civilisation work is deferred. Co-op teams and generated campaigns remain
+goals. **Ysgramor and Artemis are the supported play machines.**
 
 - [Controls and supported gameplay](docs/play.md)
 - [Two-machine shared play](docs/shared-play.md)

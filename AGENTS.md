@@ -15,6 +15,14 @@ simulation; Three.js is only a view.
 - Choose a coherent playable subset before exhaustive AoE2 parity. Prioritize
   shared play, controls, readable visuals and meaningful interactions. Rare edge
   cases need not prevent play; never hide known failures to make a check green.
+- Active civilisation development is capped at **three**: Britons is the initial
+  baseline; one Native American choice is pending #314; the third slot is unchosen.
+  Defer other civilisation implementations and unique-mechanic calibration. Preserve
+  shipped content and regression coverage; shared fixes may benefit it incidentally.
+- Prefer shared task/state/animation contracts (#315) over per-civilisation tuning.
+  Work from milestone 1 and `priority-push`, excluding `deferred` even when an issue
+  also has `bug` or `decision`. Re-triage new blockers to focused play; do not expand
+  the roster or a native calibration matrix without an explicit scope change.
 - Target 1–5 minute normal verification. Measure before adding machinery; retain
   expensive checks only where they establish an outcome cheaper checks cannot.
   Do not block a playable preview on unrelated checks or full asset regeneration.
@@ -24,8 +32,8 @@ simulation; Three.js is only a view.
 ## Start Here
 
 - Run `tools/session_start.sh` first. It reports git divergence, checkpoint/import
-  freshness, relevant processes, and the GitHub issue queue. The tracker is the
-  work queue: human-filed bugs first, then answered `decision` issues, then
+  freshness, relevant processes, and the GitHub issue inventory. The active milestone
+  is the work queue: within it, human-filed bugs first, then answered `decision` issues, then
   enhancements. File newly discovered gaps with evidence instead of leaving
   them only in prose (`docs/backlog.md`).
 - Read `docs/lessons.md` before working; its rules are grouped by the moment

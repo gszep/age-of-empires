@@ -15,12 +15,17 @@ starting an unattended coordinator. The smoke verifies the installed CLI's nativ
 session or a passing application build does not validate this harness.
 
 GitHub issues hold the request, acceptance, evidence and result. A GitHub Project
-is a scheduling view of those same issues, never a second backlog. Bugs retain
-priority over enhancements. Use one repository board with its existing Status
+is a scheduling view of those same issues, never a second backlog. Select milestone
+1 / `priority-push` and exclude `deferred` before applying bug/decision/enhancement
+priority. The active civilisation cap and pending choice are in `docs/product.md`.
+Use one repository board with its existing Status
 field; inspect actual fields/options instead of assuming IDs or renaming them.
 The repository Project is **Open Empires Lab**, owner `gszep`, number **1**:
 `https://github.com/users/gszep/projects/1`. It is linked to this repository and
-uses Todo, In Progress and Done; In Progress includes review/verification.
+uses Todo, In Progress, Done and Deferred; In Progress includes review/verification.
+Milestone **1, Play-first: focused roster and shared systems**, was created on
+October 10. Deferred is outside that push, not another ready-work column. The
+label on the issue and status on its Project card must agree.
 Blockers belong in issue comments; do not create draft cards that duplicate issues.
 
 Projects access requires `gh auth refresh -s project`. Setup and live helper
@@ -33,8 +38,8 @@ incomplete results. Supply the actual board number and exact Status option:
 
 ```bash
 node tools/project.mjs inspect --owner gszep --project 1
-node tools/project.mjs add --owner gszep --project 1 https://github.com/gszep/age-of-empires/issues/292
-node tools/project.mjs status --owner gszep --project 1 https://github.com/gszep/age-of-empires/issues/292 "In Progress"
+node tools/project.mjs add --owner gszep --project 1 https://github.com/gszep/age-of-empires/issues/317
+node tools/project.mjs status --owner gszep --project 1 https://github.com/gszep/age-of-empires/issues/317 "In Progress"
 ```
 
 `status` updates an existing issue card; it does not close the issue. Read back
