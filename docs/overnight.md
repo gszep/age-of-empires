@@ -50,7 +50,11 @@ changes and verify the installed-CLI mock-provider smoke before promising readin
 
 ## During the run
 
-- **One integration at a time, in the tracker's order**: bugs, then decisions
+- **Scope before queue order:** use milestone 1 / `priority-push`, excluding
+  `deferred`. At most three active civilisations; Britons baseline, Native American
+  choice in #314, no implicit third. Prioritize shared mechanics and the chosen
+  play experience, not the old full-catalogue or calibration backlog.
+- **One integration at a time, within that scope**: bugs, then decisions
   the human has answered, then enhancements. Independent implementation may run
   in bounded worker worktrees under [orchestration.md](orchestration.md). An item
   is done only when its acceptance and the combined tree's owned checkpoint pass; commit and

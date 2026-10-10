@@ -70,6 +70,25 @@ Before changing language, try in order:
 
 ## Current state
 
+### Shared task and animation contract
+
+Owned DAT tasks and graphics provide a common data shape across profiles. The
+importer's `find_task` selects action/class/unit records and raises on missing
+matches; `animation_entry` imports frame counts, directions, frame duration,
+mirroring and frame-linked sound events (`tools/import_content.py`). The runtime
+shares attack windup/release/volley paths (`src/sim/game.ts`), while
+`chooseAnimation` and frame advancement (`src/view/sprites.ts`) use activity/task
+state and imported metadata. This is evidence for shared, data-driven machinery,
+not proof of every scheduling rule inside the native executable.
+
+Investigate common transition, release, loop/reset and sound synchronization
+contracts once with representative focused-roster units (#315). Separate source
+facts from inferred scheduling. Do not create per-civilisation timing tables or
+another animation framework without a demonstrated shared gap. The three-civ
+development cap is defined in [product priorities](product.md).
+
+### Delivered implementation
+
 The slice has grown well past the first horizontal cut: deterministic
 pathfinding, obstruction, DAT-backed combat, fog of war, projectiles,
 construction, drop-sites, the Dark, Feudal and Castle Age building sets, ages
