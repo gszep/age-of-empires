@@ -87,7 +87,7 @@ sight/range, reconversion and replay coverage is preserved.
 
 No native speed, damage-per-hit, range/sight, donor-later research, tier promotion,
 reconversion, economics/task switching, Ballistics, building queues/cargo, or
-special-ability exception measurements were made. #178 stays open for its existing
+special-ability exception measurements were made. #178 was closed October 10; these remain inferred against the
 acceptance matrix in [conversion-reference-checklist](conversion-reference-checklist.md).
 This is modern-build corroboration of the legacy owned-manual rule, not evidence
 that build48987 has identical exception behavior.
