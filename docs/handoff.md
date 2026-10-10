@@ -42,7 +42,14 @@ explicit approval. No calibration acceptance is waived by these dependencies.
   Full owned import last regenerated for #259 (October 6). Nothing from the
   October 5–6 calibration run was deployed on October 10 (see below). Reload
   open tabs to pick up new art/strings.
-- Deployed October 10, 13:31 BST, after a human report that Celts were not
+- Deployed October 10, 17:15 BST: release `autonomous-20261010-9193e62` (commit
+  `9193e62`, #138 minimap colour/filter modes + Objectives screen; full import;
+  verify:owned GREEN 721 s). Release shared/minimap/objectives smokes green before
+  the switch; active, NRestarts 0, 200 local and Tailscale. Rollback: the earlier
+  October 10 release `autonomous-20261010-4b1c697`. Chat split to #318.
+  Closed October 10 under the play-first scope with residuals kept as inferred:
+  #41, #110, #131, #133, #178, #138.
+- Earlier October 10 deployment, 13:31 BST, after a human report that Celts were not
   selectable: Ysgramor runs `.local/releases/autonomous-20261010-4b1c697`
   (source equals verified `57e8d2f` plus Markdown), fingerprint `605a2b21…5434`.
   The release's own `shared_smoke.mts` and `celts_smoke.mts` passed privately;
