@@ -111,6 +111,83 @@ npx tsx tools/shore_blend_smoke.mts
 
 ## Remaining calibration
 
+### Reopened #284: square coast outline (2026-10-10)
+
+The October 3 opaque-water join fix below does **not** resolve the human's
+square notches. Diagnosis reproduced the gold/scout/sheep coast at world
+(47.5,59.5), Islands seed2, default zoom0.8, F4 reveal and F3 pause. A fresh
+browser needs `?solo=1&seed=2&map=islands`: without a saved Islands preference,
+the reported `?solo=1&seed=2` URL opens Arabia. Debug `look` accepts `entity`
+or `rect:[x,y,0,0]`, not top-level `x`/`y`. Both mistakes invalidated the earlier
+worker's coast diagnosis. Its unknown IDs128/122/100 were dry South American
+forest/Grass Flowers1/Dry Grass, not fog or water.
+
+The valid coast has Grass2=12 (priority119, type0), Beach=2 (131,2), Water,
+Shallow=1 (166,3), and offshore Water, Medium=23 (178,3), decoded from the owned
+manifest. All357 tile elevations in the inspected21×17 region are zero.
+The grid naturally steps in whole tiles; that alone cannot distinguish a
+generator defect from failure to blend its outline. No generator/replay change
+is justified by this investigation.
+
+There is a concrete failure in the **inferred native window layout at
+blend-to-blend joins**, in both watershore and landland:
+
+- Beach tiles(46,55)/(46,56) use watershore columns22/19 (two adjacent water
+  edges versus a diagonal water neighbour). At their common edge, local x=0.3,
+  production bilinear UV sampling gives alpha0.718039/0.358039: a0.360 jump.
+- Grass2 tiles(47,58)/(47,59) use landland columns22/8. At their common edge,
+  local x=0.4, alpha is0.456471/0.097255: a0.359216 jump.
+- These published columns are byte-identical to the original source cuts:
+  watershore22=(320,224),19=(0,416),96²; landland22=(320,256),8=(0,64),64².
+  This is not a stale import, GPU orientation error, foam or elevation seam.
+  Reading `TerrainBlend_ps.so` again establishes independent shape alpha, not
+  the engine's window selection. It does not authorize synthetic stitching.
+
+A real-GPU, flat-colour draw of the captured seed2 terrain through `createGround`
+retains the notches without surface water or foam. Across792 same-base joins,
+sampled0.07 tiles apart away from vertices, the maximum normalized linear-sRGB
+channel jump is0.736 with production land gating, and0.348 with land gating
+disabled. The latter isolates the shape problem; disabling gating is **not a
+proposed fix**. Hiding all blends gives zero same-base jumps. Classic masks do
+not solve it either (maximum0.708876 with the existing land gating). The separate
+source-edge test above removes finite pixel spacing from the diagnosis.
+
+Baseline outline statistic: in the1000×500 gold-centred crop,19.75% of water
+and38.04% of land 50%-coverage contour crossings lie within0.06 tiles of an
+integer tile axis (linear-sRGB diagnostic colours). This is a reproducible
+baseline, **not** a calibrated DE acceptance limit or a before/after success.
+The prior worker's local DE-reference copy shows rounded sub-tile transitions
+even on its stepped coast; the external originals were denied by this session's
+image reader, so neither a verified two-reference comparison nor a numerical
+DE contour comparison is claimed.
+
+Existing smokes remain green on this visibly defective baseline: shore775
+source samples (max error0.002),160 opaque-water joins (exposure0.008);
+land6200 shape/50 crossing/450 farm samples (errors0.002/0.001896/0.001743).
+They check correct sampling of the inferred windows, not compatibility between
+neighbouring windows. `world.test.ts`:30 passes; public-content build passes.
+No production code, imported assets or existing acceptance thresholds changed.
+
+**Bounded next work:** establish the native UV rectangles/topology for adjoining
+single-edge, diagonal and adjacent-edge windows against a matched native coast
+or editor fixture; include both sides of every join, not just interiors and
+opaque-water joins. Preserve those fixtures plus the actual seed2 contour
+baseline. Correct `tools/import_blends.py:de_masks` only with that evidence;
+audit the separately inferred two-way land overlay policy if discontinuities
+remain. Re-publication would require the **blend stage** of the full
+`npm run import:aoe2` pipeline under the coordinator's slot: the current packed
+atlases already contain the incompatible cuts, so a view-only fix cannot sample
+source pixels outside them. Decoder geometry and sprite conversion need no
+change. Do not resize/blur/remap alpha merely to meet a metric. Then repeat the
+two existing smokes, source tests, real seed2 before/after contours and native
+comparison before claiming the human bug fixed. No reimport was run here.
+
+Durable investigation artifacts are under the issue284 worktree's ignored
+`.local/`: `astra284-before-{full,coast}.png`, `astra284-snapshot.json`,
+`astra284-tile-map.txt`, `astra284-isolation.json`, `astra284-source-joins.json`,
+and their diagnostic scripts/logs. These are handoff evidence, not shipped
+assets or maintained regression coverage. No after-fix image exists.
+
 The window cuts, classic-table family bindings, edge-variant selection and
 maximum-alpha unions for compound edges remain the documented interpretation
 from#148, extended to compatible source layouts. Native farm corner inclusion
