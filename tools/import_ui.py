@@ -375,6 +375,19 @@ def import_cursors(directory: Path, names: list[str], out_root: Path, hashes: di
     return result
 
 
+def extract_objectives_strings(widgetui: Path, strings_path: Path, hashes: dict[str, str]) -> dict[str, str]:
+    """Only the current-match Objectives vocabulary, not all campaign text."""
+    from import_content import read_strings
+    references_path = widgetui / "stringreference.json"
+    references = json.loads(references_path.read_text())
+    strings = read_strings(strings_path)
+    hashes[references_path.name] = sha256(references_path)
+    hashes["objectivesStrings"] = sha256(strings_path)
+    ids = [references["IDS_OBJECTIVES_MAIN"], references["IDS_TEXT_CLOSE"],
+           9823, 11436, 11301]
+    return {str(identifier): strings[identifier] for identifier in ids}
+
+
 def extract_ui(
     widgetui: Path,
     sounds_path: Path,
@@ -446,6 +459,8 @@ def extract_ui(
         "icons.json": sha256(widgetui / "icons.json"),
         "sounds.json": sha256(sounds_path),
     }
+    objectives_strings = extract_objectives_strings(widgetui,
+        sounds_path.parents[2] / "en/strings/key-value/key-value-strings-utf8.txt", hashes)
     buttons_path = sounds_path.with_name('buttons.json')
     hashes['buttons.json'] = sha256(buttons_path)
     command_buttons = {
@@ -643,6 +658,7 @@ def extract_ui(
         if hotkeys_path and ui_spec.get("hotkeys") else {},
         **compact_techtrees(tech_trees),
         "techTreeLayout": tree_layout,
+        "objectivesStrings": objectives_strings,
         "source": {"sha256": hashes},
     }
 

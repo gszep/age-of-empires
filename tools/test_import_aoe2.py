@@ -2437,6 +2437,48 @@ class UiImportIntegrationTest(unittest.TestCase):
     def tearDownClass(cls):
         cls.directory.cleanup()
 
+    def test_minimap_modes_publish_all_owned_states_deterministically(self):
+        # mappanel's placeholders do not name every engine-selected mode.
+        # Assert actual extraction, not just the spec's prefix inventory.
+        from import_ui import load_material_index, resolve_texture
+        materials, textures = load_material_index(WIDGETUI)
+        modes = {
+            "MinimapColorFull": "minimap_mode_color",
+            "MinimapColorGreyscale": "minimap_mode_grayscale",
+            "MinimapColorNoTera": "minimap_mode_noterrain",
+            "MinimapFilterAll": "minimap_filter_all",
+            "MinimapFilterMilitary": "minimap_filter_military",
+            "MinimapFilterEconomy": "minimap_filter_economy",
+        }
+        wanted = {base + state: stem + "_" + state.lower() + ".png"
+                  for base, stem in modes.items() for state in ("Normal", "Hover", "Active")}
+        selected = {name: entry for name, entry in self.result["materials"].items()
+                    if name.startswith(("MinimapColor", "MinimapFilter"))}
+        self.assertEqual(list(selected), sorted(wanted))
+        for name, filename in wanted.items():
+            with self.subTest(material=name):
+                definition = materials[name]
+                relative = textures[definition["TextureRef"]]
+                self.assertEqual(Path(relative).name, filename)
+                self.assertEqual(selected[name]["texture"], relative)
+                self.assertEqual(selected[name]["blend"], definition["Blend"])
+                source = resolve_texture(WIDGETUI, relative)
+                self.assertEqual((Path(self.directory.name) / relative).read_bytes(), source.read_bytes())
+                self.assertEqual(self.result["source"]["sha256"][relative], sha256(source))
+        # Reordering the allow-list must neither lose a sibling nor reorder or
+        # change the emitted materials. Use the real extractor and owned files.
+        reordered = json.loads(json.dumps(SPEC))
+        reordered["ui"]["materialPrefixes"].reverse()
+        with tempfile.TemporaryDirectory(dir=self.directory.name) as again:
+            result = extract_ui(WIDGETUI, SOUNDS, reordered, extracted_content(), Path(again))
+            repeated = {name: entry for name, entry in result["materials"].items()
+                        if name.startswith(("MinimapColor", "MinimapFilter"))}
+            self.assertEqual(list(repeated.items()), list(selected.items()))
+            for entry in repeated.values():
+                relative = entry["texture"]
+                self.assertEqual((Path(again) / relative).read_bytes(),
+                                 (Path(self.directory.name) / relative).read_bytes())
+
     @unittest.skipUnless((ROOT / 'depot_813781/resources/_common/fonts/combined.txt').is_file(),
                          'owned distance font unavailable')
     def test_ui_stage_publishes_distance_font_and_all_display_characters(self):

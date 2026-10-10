@@ -9,10 +9,12 @@ import { placeCommands } from './command-grid';
 import { widgetBox } from './layout';
 import { findWidget, installUiColors, placeFeedback } from './feedback';
 import { animateEmbers, buttonText, placeEndScreen } from './native-feedback';
-import { Minimap } from './minimap';
+import { Minimap, type MinimapColorMode, type MinimapFilter } from './minimap';
 import { DiplomacyDialog, type TributeDraft } from './diplomacy';
 import { TechTreeDialog } from './techtree';
 import './techtree.css';
+import './objectives.css';
+import { ObjectivesDialog } from './objectives';
 import { OptionsDialog } from './options';
 import type { Preferences } from './preferences';
 import { POPULATION_LIMITS } from '../sim/population';
@@ -135,6 +137,7 @@ export class Hud {
   minimap: Minimap;
   diplomacy: DiplomacyDialog;
   techtree: TechTreeDialog;
+  objectives: ObjectivesDialog;
   options: OptionsDialog;
   private palette = 'default';
   private commandGrid!: HTMLElement;
@@ -193,7 +196,10 @@ export class Hud {
           color: color ? [color.r*rgbScale, color.g*rgbScale, color.b*rgbScale, color.a > 1 ? color.a/255 : color.a] : undefined,
           treatment: widget === 'AgeTextLabel' ? AGE_SDF_TREATMENT : COUNTER_SDF_TREATMENT });
     }
-    if (!ui) this.root.querySelector('[data-command="techtree"]')!.textContent = 'Tech Tree';
+    if (!ui) {
+      this.root.querySelector('[data-command="techtree"]')!.textContent = 'Tech Tree';
+      this.root.querySelector<HTMLButtonElement>('[data-command="objectives"]')!.textContent = 'Objectives';
+    }
     this.wonders = new WonderPanel(this.root, ui, strings, text => this.showMessage(text), id => this.callbacks.onWonderFocus?.(id));
     installUiColors(this.root, ui, new URLSearchParams(location.search).get('uiPalette') ?? 'default');
     placeFeedback(this.root, ui);
@@ -204,6 +210,7 @@ export class Hud {
       preferences => this.callbacks.onPreferences?.(preferences), () => this.callbacks.onSound('button_ui'));
     this.techtree = new TechTreeDialog(this.root, ui, (category, index) => this.iconFor(category, index),
       () => this.callbacks.onSound('button_ui'));
+    this.objectives = new ObjectivesDialog(this.root, ui, () => this.callbacks.onSound('button_ui'));
     const canvas = this.root.querySelector<HTMLCanvasElement>('#minimap-canvas')!;
     this.minimap = new Minimap(canvas);
     this.minimap.playerColor = owner => this.uiColor(this.colorName(owner), 'MiniMap');
@@ -270,6 +277,7 @@ export class Hud {
     this.options.close();
     this.diplomacy.close();
     this.techtree.close();
+    this.objectives.close();
     this.resolveConfirmation?.('aborted');
     for (const timer of this.messageTimers.values()) window.clearTimeout(timer);
     window.clearTimeout(this.defeatTimer);
@@ -282,6 +290,42 @@ export class Hud {
   private texture(name: string): string {
     const url = materialUrl(this.ui, name);
     return url ? `url('${url}')` : 'none';
+  }
+
+  private updateMinimapButtons(): void {
+    // Material names from widgetui/materials.json, not the PNG stem names.
+    // Short English labels transcribe help40048/40049; older publications
+    // missing any cycling icon must not silently turn owned controls blank.
+    const colors: Record<MinimapColorMode, [string, string]> = {
+      color: ['MinimapColorFullNormal', 'Full Terrain'],
+      grayscale: ['MinimapColorGreyscaleNormal', 'Simple Terrain'],
+      noterrain: ['MinimapColorNoTeraNormal', 'No Terrain'],
+    };
+    const filters: Record<MinimapFilter, [string, string]> = {
+      all: ['MinimapFilterAllNormal', 'Normal'],
+      military: ['MinimapFilterMilitaryNormal', 'Combat'],
+      economy: ['MinimapFilterEconomyNormal', 'Economic'],
+    };
+    for (const [key, entries, current] of [
+      ['color', colors, this.minimap?.colorMode ?? 'color'],
+      ['filter', filters, this.minimap?.filter ?? 'all'],
+    ] as const) {
+      const button = this.root.querySelector<HTMLButtonElement>(`[data-map="${key}"]`)!;
+      const [material, label] = (entries as Record<string, [string, string]>)[current];
+      const missing = !!this.ui && Object.values(entries).some(([name]) => !materialUrl(this.ui, name));
+      button.disabled = missing;
+      button.dataset.mode = current;
+      button.title = `Mini-map ${key === 'color' ? 'terrain' : 'mode'}: ${label}`
+        + (missing ? ' — requires reimporting owned minimap mode icons' : ' (click to cycle)');
+      button.setAttribute('aria-label', button.title);
+      button.style.backgroundImage = this.texture(material);
+      if (!this.ui) {
+        button.textContent = label;
+        // Open text controls occupy the empty bottom corners of the diamond.
+        Object.assign(button.style, { display: 'block', bottom: '0', fontSize: '12px',
+          [key === 'color' ? 'left' : 'right']: '0' });
+      }
+    }
   }
 
   private build(): void {
@@ -305,7 +349,7 @@ export class Hud {
       </div>
       <div id="menu-panel" class="panel">
         <button class="menu-button" data-command="techtree" data-icon="techtree" data-widget="Techtree" title="Technology tree — requires imported owned tech-tree data" disabled></button>
-        <button class="menu-button" data-icon="objectives" data-widget="Objectives" title="Objectives (not yet available)" disabled></button>
+        <button class="menu-button" data-command="objectives" data-icon="objectives" data-widget="Objectives" title="Objectives" disabled></button>
         <button class="menu-button" data-icon="chat" data-widget="Chat" title="Chat (not yet available)" disabled></button>
         <button class="menu-button" data-command="diplomacy" data-icon="diplomacy" data-widget="Diplomacy" title="Diplomacy"></button>
         <button data-options class="menu-button" data-icon="settings" data-widget="Settings" title="Options"></button>
@@ -318,8 +362,8 @@ export class Hud {
         <canvas id="minimap-canvas" width="240" height="130"></canvas>
         <button class="map-button" data-widget="ButtonFlare" data-map="flare" title="Flare: click the minimap to signal a spot"></button>
         <button class="map-button active" data-widget="ButtonPlayer" data-map="players" title="Show or hide the player scores"></button>
-        <button class="map-button" data-widget="ButtonColor" data-map="color" title="Minimap colours (not yet available)" disabled></button>
-        <button class="map-button" data-widget="ButtonFilter" data-map="filter" title="Minimap filter (not yet available)" disabled></button>
+        <button class="map-button" data-widget="ButtonColor" data-map="color" title="Minimap colour mode: Color"></button>
+        <button class="map-button" data-widget="ButtonFilter" data-map="filter" title="Minimap display filter: All"></button>
       </div>
       <div id="score-panel"></div>
       <div id="game-message"><div class="message-lines" role="log" aria-live="polite" aria-relevant="additions"></div></div>
@@ -506,6 +550,24 @@ export class Hud {
         this.root.querySelector<HTMLElement>('#score-panel')!.classList.toggle('hidden', !this.scoresShown);
         return;
       }
+      // View-local modes; no simulation command/state change.
+      if (map === 'color') {
+        const modes: MinimapColorMode[] = ['color', 'grayscale', 'noterrain'];
+        const current = modes.indexOf(this.minimap.colorMode);
+        this.minimap.colorMode = modes[(current + 1) % modes.length];
+        this.updateMinimapButtons();
+        this.callbacks.onSound('button_ui');
+        return;
+      }
+      // Minimap filter cycling
+      if (map === 'filter') {
+        const filters: MinimapFilter[] = ['all', 'military', 'economy'];
+        const current = filters.indexOf(this.minimap.filter);
+        this.minimap.filter = filters[(current + 1) % filters.length];
+        this.updateMinimapButtons();
+        this.callbacks.onSound('button_ui');
+        return;
+      }
       const menu = target.closest<HTMLElement>('[data-menu]')?.dataset.menu;
       if (command || menu) this.callbacks.onSound('button_ui');
       if (menu === 'open') this.toggleMenu(true);
@@ -613,11 +675,7 @@ export class Hud {
         }
       }
     }
-    // The map panel's four buttons (mappanel.json): flare, player stats, and
-    // the colour and filter modes (issue #68). Only the flare does anything
-    // yet; the file gives the two modes one shared material and the engine
-    // swaps in the current mode's, so the full-colour and show-all icons are
-    // what the reference shows at rest.
+    // mappanel.json supplies geometry; mode materials are engine substitutions.
     const mapArt: Record<string, string> = {
       flare: 'MinimapFlareNormal', players: 'MinimapPlayerStatsActive',
       color: 'MinimapColorFullNormal', filter: 'MinimapFilterAllNormal',
@@ -627,6 +685,7 @@ export class Hud {
       place(`#map-panel [data-widget="${button.dataset.widget}"]`,
         widgetBox(this.ui?.layouts.mappanel, 'Background', button.dataset.widget!), true);
     }
+    this.updateMinimapButtons();
     for (const button of this.root.querySelectorAll<HTMLElement>('#menu-panel [data-widget]')) {
       place(`#menu-panel [data-widget="${button.dataset.widget}"]`,
         widgetBox(this.ui?.layouts.menupanel, 'Background', button.dataset.widget!), true);
@@ -745,7 +804,7 @@ export class Hud {
   get confirmationOpen(): boolean { return this.root.querySelector<HTMLDialogElement>('#confirm-dialog')!.open; }
 
   get modalOpen(): boolean {
-    return this.options.element.open || this.diplomacy.open || this.techtree.open || this.confirmationOpen || this.root.querySelector<HTMLDialogElement>('#popup-dialog')!.open || this.endOpen;
+    return this.options.element.open || this.diplomacy.open || this.techtree.open || this.objectives.open || this.confirmationOpen || this.root.querySelector<HTMLDialogElement>('#popup-dialog')!.open || this.endOpen;
   }
 
   /** Errors that need acknowledgement use the owned generic OK modal. */

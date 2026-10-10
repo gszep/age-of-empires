@@ -3,6 +3,22 @@ import { wonderCountdowns, WONDER_YEARS, WONDER_YEAR_TICKS } from '../sim/wonder
 import { iconUrl, materialUrl, type UiAssets } from './assets';
 import { widgetBox } from './layout';
 
+/** Shared by the banner and read-only Objectives screen: five seconds/year,
+ * ceiling fractional years, clamped at expiry (see docs/wonder-victory.md). */
+export function wonderYearsRemaining(finishTick: number, tick: number): number {
+  return Math.max(0, Math.ceil((finishTick - tick) / WONDER_YEAR_TICKS));
+}
+
+export function wonderTimerText(years: number, template = 'Wonder: %d Years'): string {
+  return template.replace('%d', String(years));
+}
+
+export function displayedWonderCountdowns(state: ReadonlyGameState) {
+  return [...wonderCountdowns(state)].sort((a, b) => a.finishTick - b.finishTick || a.entityId - b.entityId)
+    .filter((t, i, all) => all.findIndex(other => other.owner === t.owner) === i)
+    .sort((a, b) => a.owner - b.owner);
+}
+
 /** Owned WonderPanel banners and public construction/countdown announcements.
  * Browser font rasterisation and adjacent banner packing remain view adapters. */
 export class WonderPanel {
@@ -39,9 +55,7 @@ export class WonderPanel {
     this.known = current;
     // The native panel has player banners. Show that side's earliest standing
     // deadline; a second Wonder does not erase the first one's elapsed time.
-    const shown = [...timers].sort((a, b) => a.finishTick - b.finishTick || a.entityId - b.entityId)
-      .filter((t, i, all) => all.findIndex(other => other.owner === t.owner) === i)
-      .sort((a, b) => a.owner - b.owner);
+    const shown = displayedWonderCountdowns(state);
     const layout = this.ui?.layouts.wonderpanel;
     const flag = widgetBox(layout, 'Banners', 'Flag') ?? { left: -195, top: -55, width: 90, height: 457 };
     const scaled = (value: number) => `calc(${value}px * var(--ui-scale))`;
@@ -72,13 +86,13 @@ export class WonderPanel {
       button.classList.toggle('open-banner', !art);
       const icon = iconUrl(this.ui, 'Buildings', 37);
       button.querySelector<HTMLElement>('.wonder-icon')!.style.backgroundImage = icon ? `url("${icon}")` : '';
-      const years = Math.max(0, Math.ceil((timer.finishTick - state.tick) / WONDER_YEAR_TICKS));
+      const years = wonderYearsRemaining(timer.finishTick, state.tick);
       button.querySelector('.wonder-years')!.textContent = String(years);
       button.querySelector('.wonder-unit')!.textContent = this.strings.wonderYears ?? 'Years';
       button.querySelector('.wonder-owner')!.textContent = String(timer.owner);
       button.title = (timer.owner === self ? this.strings.wonderTimerSelf : this.strings.wonderTimerEnemy)?.replace('%s', names[timer.owner])
         ?? `${names[timer.owner]} — Wonder: ${years} Years`;
-      button.setAttribute('aria-label', `${names[timer.owner]}: ${(this.strings.wonderTimer ?? 'Wonder: %d Years').replace('%d', String(years))}`);
+      button.setAttribute('aria-label', `${names[timer.owner]}: ${wonderTimerText(years, this.strings.wonderTimer)}`);
     }
     for (const [id, button] of this.buttons) if (!shown.some(t => t.entityId === id)) { button.remove(); this.buttons.delete(id); }
     this.root.hidden = shown.length === 0;

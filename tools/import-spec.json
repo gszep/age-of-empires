@@ -2460,7 +2460,9 @@
       "GameNotificationPanel",
       "popupmessage",
       "technologyprogresspanel",
-      "wonderpanel"
+      "wonderpanel",
+      "objectivespanel",
+      "dialogobjectives"
     ],
     "iconCategories": {
       "Buildings": "entities",
@@ -2488,7 +2490,8 @@
       "WonderBanner",
       "IconAction",
       "ButtonsShield",
-      "MinimapColorFull",
+      "MinimapColor",
+      "MinimapFilter",
       "PlayerAge",
       "BlackPanel_"
     ],

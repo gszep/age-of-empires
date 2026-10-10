@@ -1,5 +1,5 @@
-import type { EntityKind, GameState, PlayerId, Point, ResourceKind, UnitKind, ReadonlyGameState } from '../sim/types';
-import { isBuilding, NODE_OF_RESOURCE, type NodeKind } from '../sim/data';
+import type { DeepReadonly, Entity, EntityKind, PlayerId, Point, ResourceKind, UnitKind, ReadonlyGameState } from '../sim/types';
+import { isBuilding, isUnit, NODE_OF_RESOURCE, type NodeKind } from '../sim/data';
 import { rulesForPlayer } from '../sim/civilizations';
 import type { ContentAssets, ImportedTerrain } from './assets';
 import { playerColorHex } from './sprites';
@@ -76,6 +76,53 @@ export function minimapResourceDotSize(width: number, height: number): number {
   return Math.max(1, Math.min(3, 360 / Math.max(width, height)));
 }
 
+export type MinimapColorMode = 'color' | 'grayscale' | 'noterrain';
+export type MinimapFilter = 'all' | 'military' | 'economy';
+
+/** Apply color mode transformation to terrain RGB. Grayscale uses standard luminance formula. */
+export function minimapTerrainColor(
+  rgb: readonly [number, number, number] | undefined,
+  mode: MinimapColorMode,
+): readonly [number, number, number] | undefined {
+  if (!rgb) return undefined;
+  if (mode === 'color') return rgb;
+  if (mode === 'grayscale') {
+    const lum = Math.round(rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114);
+    return [lum, lum, lum];
+  }
+  // Help 40048 says No Terrain, not land-only: the caller uses black for all tiles.
+  return undefined;
+}
+
+/**
+ * Determine if an entity should be shown given the current filter.
+ * Owned help 41051: combat units only; 41053: own idle villagers/trade
+ * units and all players' trade buildings. DAT-backed capabilities avoid
+ * roster lists. Mapping combat/support and trade producers remains inferred.
+ */
+export function minimapShowsEntity(
+  entity: DeepReadonly<Pick<Entity, 'kind' | 'owner'> & Partial<Pick<Entity, 'order' | 'convertedRules'>>>,
+  state: ReadonlyGameState,
+  player: PlayerId,
+  filter: MinimapFilter,
+): boolean {
+  if (filter === 'all') return true;
+  const { kind, owner } = entity;
+  if (kind === 'resource') return false;
+  const rules = rulesForPlayer(state, owner);
+  if (isBuilding(kind)) {
+    return filter === 'economy' && Object.values(rules.units).some(unit =>
+      (unit.tradeRatePerSecond ?? 0) > 0 && unit.trainedAt === kind);
+  }
+  if (!isUnit(kind)) return false;
+  const unit = entity.convertedRules ?? rules.units[kind];
+  const villager = unit.datClass === 4; // owned XS cVillagerClass = 904 (class + 900)
+  if (filter === 'economy') return owner === player &&
+    ((villager && entity.order?.kind === 'idle') || (unit.tradeRatePerSecond ?? 0) > 0);
+  return !villager && !unit.gather && !unit.foodAmount &&
+    (unit.attacks.some(attack => attack.amount > 0) || !!unit.convert || !!unit.heal);
+}
+
 export class Minimap {
   playerColor?: (owner: number) => string | undefined;
   private context: CanvasRenderingContext2D;
@@ -91,6 +138,9 @@ export class Minimap {
    * `drawImage` under the matrix that reproduces it exactly.
    */
   private tiles?: { canvas: HTMLCanvasElement; image: ImageData };
+
+  colorMode: MinimapColorMode = 'color';
+  filter: MinimapFilter = 'all';
 
   constructor(private canvas: HTMLCanvasElement, public player: PlayerId = 1) {
     this.context = canvas.getContext('2d')!;
@@ -131,11 +181,13 @@ export class Minimap {
     for (let index = 0; index < state.width * state.height; index++) {
       const terrain = state.terrain[index] ?? 0;
       const slot = palette.get(terrain);
-      const base = (slot && reliefColor(state, index % state.width, Math.floor(index / state.width), slot))
+      const baseColor = (slot && reliefColor(state, index % state.width, Math.floor(index / state.width), slot))
         ?? (terrain === 1 ? WATER : terrain === 24 ? ROAD : terrain === 10 ? FOREST : IN_SIGHT);
+      // Pixels are rewritten every draw; a mode switch needs no cache allocation.
+      const colorModed = minimapTerrainColor(baseColor, this.colorMode) ?? UNEXPLORED;
       const unexplored = !reveal && visibility.explored[index] !== 1;
       const remembered = !reveal && !unexplored && visibility.visible[index] !== 1;
-      const shade = unexplored ? UNEXPLORED : base;
+      const shade = unexplored ? UNEXPLORED : colorModed;
       const factor = remembered ? REMEMBERED_FACTOR : 1;
       const at = index * 4;
       pixels[at] = shade[0] * factor;
@@ -217,6 +269,7 @@ export class Minimap {
     };
     for (const entity of state.entities) {
       if (entity.dead) continue;
+      if (!minimapShowsEntity(entity, state, this.player, this.filter)) continue;
       const index = Math.floor(entity.position.y) * state.width + Math.floor(entity.position.x);
       const visible = reveal || visibility.visible[index] === 1;
       if (entity.owner !== this.player && !visible) continue;
@@ -231,6 +284,7 @@ export class Minimap {
       }
     }
     for (const remembered of reveal ? [] : Object.values(visibility.memory)) {
+      if (!minimapShowsEntity(remembered, state, this.player, this.filter)) continue;
       const index = Math.floor(remembered.y) * state.width + Math.floor(remembered.x);
       if (visibility.visible[index] === 1) continue;
       const color = remembered.kind === 'resource'

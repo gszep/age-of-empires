@@ -26,6 +26,7 @@ import { researchCostFor, researchSecondsFor, technologyRequirementsMet } from '
 import { COMMODITIES, hasMarket, marketQuote, maximumTribute, tributeFee, type Commodity } from './sim/market';
 import type { DiplomacyModel } from './view/diplomacy';
 import { techTreeModel } from './view/techtree';
+import { objectivesAvailable, objectivesModel } from './view/objectives';
 import { civilizationRules } from './sim/civilizations';
 import { profileArtKey } from './view/sprites';
 import { gridKey, placeCommands } from './view/command-grid';
@@ -656,6 +657,11 @@ function diplomacyModel(): DiplomacyModel {
       color: hud.uiColor(playerColorName(id), 'Icons', playerColorHex(assets, id) ?? (id === 1 ? '#3b64ff' : '#ff3b3b'))! })) };
 }
 function runUiCommand(id: string, shift = false): void {
+  if (id === 'objectives') {
+    if (objectivesAvailable(uiAssets)) hud.objectives.show(objectivesModel(game, localPlayer, uiAssets?.objectivesStrings,
+      { 1: scoreRows()[0].name, 2: scoreRows()[1].name }));
+    return;
+  }
   if (id === 'techtree') {
     const tree = uiAssets?.techTrees?.[game.players[localPlayer].civilization];
     if (tree && uiAssets?.techTreeLayout) hud.techtree.show(techTreeModel(tree, game, localPlayer, uiAssets.techTreeStrings));
@@ -2153,6 +2159,11 @@ renderer.setAnimationLoop(now => {
     treeButton.disabled = !tree || !uiAssets?.techTreeLayout;
     treeButton.title = treeButton.disabled ? 'Technology tree — requires imported owned tech-tree data' : 'Technology Tree';
     if (hud.techtree.open && tree) hud.techtree.update(techTreeModel(tree, game, localPlayer, uiAssets?.techTreeStrings));
+    const objectivesButton = hud.root.querySelector<HTMLButtonElement>('[data-command="objectives"]')!;
+    objectivesButton.disabled = !objectivesAvailable(uiAssets);
+    objectivesButton.title = objectivesButton.disabled ? 'Objectives — requires imported owned definitions' : uiAssets!.objectivesStrings!['10910'];
+    if (hud.objectives.open) hud.objectives.update(objectivesModel(game, localPlayer, uiAssets?.objectivesStrings,
+      { 1: scoreRows()[0].name, 2: scoreRows()[1].name }));
     hud.updateProduction(productionItems());
     hud.updateScore(scoreRows());
     hud.wonders.update(game, localPlayer, { 1: scoreRows()[0].name, 2: scoreRows()[1].name });
@@ -2166,12 +2177,14 @@ renderer.setAnimationLoop(now => {
       ended = true;
       hud.diplomacy.close();
       hud.techtree.close();
+      hud.objectives.close();
       hud.showPopup(`${(messages.gameOver ?? 'Game over.').split('.')[0]}.\n${game.wonderDraw ? 'Draw: both Wonder countdowns expired together.' : 'Draw: both Kings were lost in the same tick.'}`);
     }
     if (game.winner && !ended) {
       ended = true;
       hud.diplomacy.close();
       hud.techtree.close();
+      hud.objectives.close();
       const defeated = scoreRows().find(row => row.number !== game.winner)!;
       hud.showDefeat(defeated);
       hud.showEnd(game.winner === localPlayer);

@@ -308,6 +308,7 @@ export interface HotkeyProfile {
 }
 
 export interface UiAssets {
+  objectivesStrings?: Record<string, string>;
   techTrees?: Record<string, import('./techtree').TechTreeData>;
   techTreeStrings?: Record<string, string>;
   techTreeLayout?: import('./techtree').TechTreeLayout;
