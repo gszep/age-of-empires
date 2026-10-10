@@ -172,9 +172,8 @@ explicit approval. No calibration acceptance is waived by these dependencies.
 
 ## Installed household release
 
-The last recorded authorised rollout is October 10 (above); the October 2 notes below
-later source changes above have not been deployed. Source protocol 4 and
-installed protocol 2 are distinct. [Shared play](shared-play.md) describes use.
+The current rollout is October 10 (above). The notes below describe the
+October 2 rollout (protocol 2, seven profiles) and are kept for rollback history. [Shared play](shared-play.md) describes use.
 
 - Ysgramor: `.local/releases/autonomous-20261002-43e10ad`;
   <http://localhost:5173/> and <https://ysgramor.tail6e864b.ts.net:5173/>.
