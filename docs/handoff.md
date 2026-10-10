@@ -40,8 +40,18 @@ explicit approval. No calibration acceptance is waived by these dependencies.
   (build 19 s, test 290 s, serial 89 s, owned import tests 287 s, browser smoke
   28 s; `.local/verification/1791294547507-1822338/`). No timeout widening.
   Full owned import last regenerated for #259 (October 6). Nothing from the
-  October 5–6 calibration run is deployed: the household host still runs
-  `autonomous-20261005-c519be9`. Reload open tabs to pick up new art/strings.
+  October 5–6 calibration run was deployed on October 10 (see below). Reload
+  open tabs to pick up new art/strings.
+- Deployed October 10, 13:31 BST, after a human report that Celts were not
+  selectable: Ysgramor runs `.local/releases/autonomous-20261010-4b1c697`
+  (source equals verified `57e8d2f` plus Markdown), fingerprint `605a2b21…5434`.
+  The release's own `shared_smoke.mts` and `celts_smoke.mts` passed privately;
+  its `shared-host.mts` served on private port 5299; no shared checkpoint
+  existed. Afterwards the service was active, NRestarts 0, 200 locally and over
+  Tailscale, serving Celts code and manifest profile. This carries Saracens,
+  Turks, Vikings, Mongols, Celts and the calibration run. Rollback:
+  `node tools/install-shared.mjs host <abs path to autonomous-20261005-c519be9>`.
+  Artemis was not checked or refreshed (its local art predates these profiles).
 - **October 5–6 calibration run** (coordinator handoff
   `.local/orchestrator/handoff.md`; per-issue evidence under
   `.local/orchestrator/evidence/`). Owner decision for this run: the installed
@@ -162,7 +172,7 @@ explicit approval. No calibration acceptance is waived by these dependencies.
 
 ## Installed household release
 
-The last recorded authorised rollout is October 2, protocol 2, seven profiles;
+The last recorded authorised rollout is October 10 (above); the October 2 notes below
 later source changes above have not been deployed. Source protocol 4 and
 installed protocol 2 are distinct. [Shared play](shared-play.md) describes use.
 
