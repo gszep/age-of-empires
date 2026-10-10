@@ -42,7 +42,11 @@ explicit approval. No calibration acceptance is waived by these dependencies.
   Full owned import last regenerated for #259 (October 6). Nothing from the
   October 5–6 calibration run was deployed on October 10 (see below). Reload
   open tabs to pick up new art/strings.
-- Deployed October 10, 17:15 BST: release `autonomous-20261010-9193e62` (commit
+- Deployed October 10, 20:21 BST: release `autonomous-20261010-7e7f214` (commit
+  `7e7f214`, #49 play-feedback particle effects; import +28 MB; verify:owned GREEN
+  776 s; release shared + feedback smokes green; active, 200 local/Tailscale).
+  Rollback: `autonomous-20261010-9193e62`. Cosmetic effects deferred in #319.
+- Earlier October 10, 17:15 BST: release `autonomous-20261010-9193e62` (commit
   `9193e62`, #138 minimap colour/filter modes + Objectives screen; full import;
   verify:owned GREEN 721 s). Release shared/minimap/objectives smokes green before
   the switch; active, NRestarts 0, 200 local and Tailscale. Rollback: the earlier

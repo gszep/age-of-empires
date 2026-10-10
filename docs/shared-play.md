@@ -21,8 +21,8 @@ and requires reloading matching client code.
   localhost:5173 behind the existing Tailscale route. Your usual link is unchanged.
 - Artemis: the same user-service name runs `tools/shared-join.mjs` on
   localhost:5174. Open **http://localhost:5174/** on Artemis.
-- Since October 10, 17:15 BST, Ysgramor serves `.local/releases/autonomous-20261010-9193e62`
-  (twelve profiles, minimap modes, Objectives); see the handoff for its acceptance.
+- Since October 10, 20:21 BST, Ysgramor serves `.local/releases/autonomous-20261010-7e7f214`
+  (twelve profiles, minimap modes, Objectives, feedback particles); see the handoff for its acceptance.
   The superseded October 5 arrangement follows.
 - From October 5, 12:11 BST, Ysgramor served
   `.local/releases/autonomous-20261005-c519be9` (source `c519be9`, protocol 4),
