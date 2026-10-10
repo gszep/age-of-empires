@@ -33,13 +33,16 @@ import { gridKey, placeCommands } from './view/command-grid';
 import type { ConfirmationResult, ProductionItem, ResourceStatus, ScoreRow } from './view/hud';
 import { costLabel, displayName as nameFrom, plainHelp } from './view/names';
 import { contextCursor, cursorCss } from './view/cursors';
-import { artKey, chooseAnimation, createEntityView, refreshEntityTextures, dimFogSnapshot, gatherTargetResource, playerColorHex, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, type EntityView } from './view/sprites';
+import { artKey, chooseAnimation, createEntityView, refreshEntityTextures, dimFogSnapshot, gatherTargetResource, playerColorHex, createFlagView, createProjectileView, updateEntityView, updateFlagView, updateProjectileView, updateOcclusion, entityKey, gateBoxKey, importedEntityFor, type EntityView } from './view/sprites';
 import { createGround, createFog, createFootprint, createSelectionOutline, updateSelectionOutline, elevatedWorldToIso, elevationAt, ELEVATION_PIXELS } from './view/world';
 import { createScatter, fillScatter } from './view/scatter';
 import { createCueWatcher, pollCues } from './view/cues';
 import { ConstructionCues } from './view/construction-cues';
 import { AudioPlayer } from './view/audio';
 import { MusicPlayer } from './view/music';
+import { EffectPlayer } from './view/effects';
+import { hasGroundMove } from './view/move-feedback';
+import { detectEffectTriggers, type ViewSnapshot } from './view/effect-triggers';
 import { loadPreferences, normalizePreferences, savePreferences, type Preferences } from './view/preferences';
 import { commandHotkey, hotkeyLabel, matchesHotkey } from './view/hotkeys';
 import { WorldSounds, type SoundPose } from './view/world-sounds';
@@ -237,6 +240,7 @@ function startReplay(raw: unknown): void {
   // A record from before civilisations were written down replays as whatever
   // the content is for, which is what it was played as.
   game = createReplayGame(record, rules);
+  resetFeedbackEffects();
   activeSetup = { map: record.map ?? 'arabia', seed: record.seed, mode: record.mode, civilizations: record.civilizations,
     ...(record.populationLimit !== undefined ? { populationLimit: record.populationLimit } : {}),
     ...(record.wonderVictory ? { wonderVictory: true } : {}) };
@@ -290,6 +294,15 @@ let scatter = createScatter(game, assets);
 scene.add(scatter);
 let fog = view.createFog(game, localPlayer);
 scene.add(fog.mesh);
+
+// View-only transient effects (cosmetic feedback, never touches game state)
+const effectPlayer = new EffectPlayer(game.seed, assets);
+scene.add(effectPlayer.group);
+let effectSnapshot: ViewSnapshot | undefined;
+function resetFeedbackEffects(): void {
+  effectSnapshot = undefined;
+  effectPlayer.reset(game.seed);
+}
 
 const views = new Map<string, EntityView>();
 const ringGeometry = new THREE.RingGeometry(50, 53, 32);
@@ -545,6 +558,7 @@ if (shared) {
   shared.onNotice = notice => hud.showMessage(notice);
   shared.onSnapshot = (state, changedMap) => {
     game = state;
+    resetFeedbackEffects(); // Includes same-map recovery/resync.
     rules = state.rules;
     if (shared.setup) {
       const different = !setupKnown || activeSetup.map !== shared.setup.map || activeSetup.seed !== shared.setup.seed
@@ -610,6 +624,7 @@ function restart(setup: MatchSetup | undefined = setupKnown ? activeSetup : unde
 }
 
 function resetMatchView(): void {
+  resetFeedbackEffects();
   hud.toggleMenu(false);
   cameraCenter = homeCamera(game);
   selectedIds = [];
@@ -643,6 +658,11 @@ function selectIdleVillager(): void {
   const next = idle[(current + 1) % idle.length];
   selectedIds = [next.id];
   cameraCenter = elevatedWorldToIso(game, next.position.x, next.position.y);
+  // Spawn idle pointer effect above the villager (if manifest has it)
+  if (assets?.particles?.['idlepointer']) {
+    effectPlayer.spawn('idlepointer', next.position, gameTimeSeconds(game), performance.now() / 1000,
+      { entityId: next.id, once: true, offsetY: 60 });
+  }
 }
 
 /** How many a Shift-click on a train button asks for, as the reference does. */
@@ -1025,6 +1045,7 @@ function contextOrder(point: Point, _clientX: number, _clientY: number, queue = 
   const target = pickEntity(point);
   const command = planContextCommand(game, localPlayer, selection, point, target, queue);
   if (!command) return;
+  const groundMove = hasGroundMove(game, command, selection);
   const result = applyCommand(game, command);
   if (!result.ok) { reject(result.reason); return; }
   if (command.kind === 'rally') {
@@ -1033,12 +1054,15 @@ function contextOrder(point: Point, _clientX: number, _clientY: number, queue = 
     return;
   }
   const hostile = target !== undefined && isHostile(target);
-  if (selection.some(e => isUnit(e.kind))) acknowledge(
-    hostile || (target && (target.kind === 'resource' || target.kind === 'farm'
-      || target.buildProgress !== undefined || selection.some(e => isRepairable(game, e, target))))
-      ? 'attack' : 'move');
+  const isMove = !hostile && (!target || (target.kind !== 'resource' && target.kind !== 'farm'
+    && target.buildProgress === undefined && !selection.some(e => isRepairable(game, e, target))));
+  if (selection.some(e => isUnit(e.kind))) acknowledge(isMove ? 'move' : 'attack');
   else hud.showMessage(hostile ? 'Target set' : 'Target cleared');
   if (hostile) orderFlash = { entityId: target!.id, startedAt: gameTimeSeconds(game) };
+  // Spawn move marker for successful move orders (cosmetic feedback only)
+  if (groundMove) {
+    effectPlayer.spawn('move', point, gameTimeSeconds(game), performance.now() / 1000);
+  }
 }
 
 function updateContextCursor(): void {
@@ -1770,6 +1794,28 @@ function entityVisible(entity: Entity): boolean {
 
 function syncScene(time: number): void {
   musicPlayer.update(preferences.music > 0 && !paused && !matchOver(game) && !document.hidden);
+
+  // Detect effect triggers from snapshot diff
+  const { effects, snapshot } = detectEffectTriggers(
+    game, effectSnapshot,
+    (e: Entity) => ({
+      imported: importedEntityFor(assets, e),
+      visible: entityVisible(e),
+    })
+  );
+  effectSnapshot = snapshot;
+
+  // Process effect requests
+  for (const req of effects) {
+    if (req.type === 'spawn') {
+      effectPlayer.spawn(req.name, req.position, time, performance.now() / 1000, { entityId: req.entityId });
+    } else if (req.type === 'start') {
+      effectPlayer.start(req.entityId, req.name, req.position, time, performance.now() / 1000);
+    } else if (req.type === 'stop') {
+      effectPlayer.stop(req.entityId, time, performance.now() / 1000);
+    }
+  }
+
   const wanted = new Set<string>();
   const soundPoses = new Map<number, SoundPose>();
   for (const entity of game.entities) {
@@ -2142,6 +2188,8 @@ renderer.setAnimationLoop(now => {
   selectedIds = selectedIds.filter(id =>
     game.entities.some(e => e.id === id && (!e.dead || isCarcass(e))));
   syncScene(gameTimeSeconds(game));
+  effectPlayer.update(gameTimeSeconds(game), now / 1000, effectSnapshot?.visibleIds,
+    point => elevationAt(game, point.x, point.y) * ELEVATION_PIXELS);
   fog.mesh.visible = !revealMap;
   if (!revealMap) fog.update(game);
 
@@ -2274,6 +2322,8 @@ if (import.meta.hot) {
           assetsModule.loadAudioAssets(),
         ]);
         if (assets) assets.civilizationForOwner = owner => owner === 1 || owner === 2 ? game.players[owner].civilization : undefined;
+        effectPlayer.setAssets(assets);
+        resetFeedbackEffects();
       }
       if (world) {
         view.createGround = world.createGround;

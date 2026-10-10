@@ -75,6 +75,10 @@ export interface ImportedEntity {
   garrisonFlags?: Record<string, { animation: string; x: number; y: number }[]>;
   particleEffect?: string;
   deathEffect?: string;
+  spawnEffect?: string;
+  researchingEffect?: string;
+  researchCompleteEffect?: string;
+  constructionEffect?: string;
   annexes?: { unitId: number; misplacement: [number, number]; animations: Record<string, AnimationInfo>; atlases: Record<string, Atlas> }[];
   /**
    * A building's fires (issue #73): per standing animation (the age's own
@@ -102,6 +106,36 @@ export interface ParticleEffect {
   cycleSeconds: [number, number];
   fadeInSeconds: number;
   fadeOutSeconds: number;
+  /** Fade-in mode: 'Fade' to blend from alpha 0. */
+  startMode?: string;
+  /** Duration in seconds for fade-in. */
+  startDuration?: number;
+  /** Fade-out mode: 'Fade' to blend to alpha 0. */
+  stopMode?: string;
+  /** Duration in seconds for fade-out. */
+  stopDuration?: number;
+  /** Initial alpha (may exceed 1.0 for brightness/glow). */
+  alphaStart?: number;
+  /** Final alpha after fade. */
+  alphaEnd?: number;
+  /** Overall alpha multiplier. */
+  alpha?: number;
+  /** Layer: 'Terrain', 'Top', etc. */
+  layer?: string;
+  /** Display when fog hides this tile. */
+  displayInFog?: boolean;
+  /** Display in unexplored (hidden) terrain. */
+  displayInHidden?: boolean;
+  /** Darken when in fog. */
+  dimInFog?: boolean;
+  /** Start delay range [min, max] in seconds. */
+  startDelay?: [number, number];
+  /** Timer type: 'Real' or game time. */
+  timer?: string;
+  /** Sort bias for layering. */
+  sortBias?: number;
+  /** Display level: 'High', 'Low', etc. */
+  displayLevel?: string;
 }
 
 /** One player's block of the game palette, found at the DAT's own colour base. */

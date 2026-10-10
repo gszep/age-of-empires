@@ -10,6 +10,7 @@ LAYERS = ("main", "playercolor", "shadow", "outline", "damage")
 # Unclassified code is deliberately common: adding a helper cannot silently
 # escape invalidation. Container/geometry/packing constants remain common.
 SPECIALIZED = {
+    "convert_particles": set(),  # Particle conversion does not affect sprite atlas layers.
     "_rgb565": {"main", "playercolor"},
     "_bc1_lookup": {"main", "playercolor"},
     "_decode_bc1_block": {"main", "playercolor"},

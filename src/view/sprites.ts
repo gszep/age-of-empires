@@ -124,7 +124,7 @@ const material = () => {
   return result;
 };
 
-function makePiece(): Piece {
+export function makePiece(): Piece {
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material());
   mesh.visible = false;
   return { mesh };
@@ -616,7 +616,7 @@ export function dimFogSnapshot(view: EntityView): void {
   }
 }
 
-function applyFrame(
+export function applyFrame(
   piece: Piece,
   assets: ContentAssets,
   atlas: Atlas,
@@ -669,6 +669,12 @@ function applyFrame(
   const iso = worldToIso(position.x, position.y);
   // Anchor the hotspot at the entity ground position.
   mesh.position.set(iso.x + w / 2 - frame.cx / scale, iso.y - h / 2 + frame.cy / scale, 0);
+}
+
+/** Resolve the imported entity data for a given game entity (used by view effects to get particle definitions). */
+export function importedEntityFor(assets: ContentAssets | undefined, entity: Entity): ImportedEntity | undefined {
+  if (!assets) return undefined;
+  return assets.entities[profileArtKey(assets, entity.owner, entityKey(entity))];
 }
 
 /**

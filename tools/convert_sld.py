@@ -252,16 +252,19 @@ def convert_particles(particles: dict[str, Any], out_dir: Path) -> dict[str, Any
     sprite frame: an atlas rectangle with a hotspot, at 1:1.
     """
     from PIL import Image
+    from io import BytesIO
 
     from sld_layers import ColorFrame, pack_color_atlas
 
     converted: dict[str, Any] = {}
     sheets: dict[str, Any] = {}
+    page_images: dict[str, str] = {}
     for name, effect in sorted(particles.items()):
         atlas_path = Path(effect["atlas"])
-        if atlas_path.name not in sheets:
-            sheets[atlas_path.name] = Image.open(atlas_path).convert("RGBA")
-        sheet = sheets[atlas_path.name]
+        if str(atlas_path) not in sheets:
+            with Image.open(atlas_path) as source:
+                sheets[str(atlas_path)] = source.convert("RGBA")
+        sheet = sheets[str(atlas_path)]
         scale = float(effect["scale"])
         frames: list[ColorFrame] = []
         for frame in effect["frames"]:
@@ -285,15 +288,43 @@ def convert_particles(particles: dict[str, Any], out_dir: Path) -> dict[str, Any
             frames.append(ColorFrame(cut.width, cut.height, round(hotspot_x), round(hotspot_y),
                                      bytearray(cut.tobytes())))
         images, atlas = pack_color_atlas(frames, len(frames))
-        relative = f"particles/{name}.png"
-        save_pages(images, out_dir / relative)
+        pages = []
+        for index, image in enumerate(images):
+            # Hash the exact published bytes. Sorted effect/page order chooses
+            # one stable URL, while each effect retains its own frame hotspots.
+            buffer = BytesIO()
+            image.save(buffer, format="PNG", optimize=True)
+            encoded = buffer.getvalue()
+            digest = hashlib.sha256(encoded).hexdigest()
+            if digest not in page_images:
+                relative = page_path(Path(f"particles/{name}.png"), index).as_posix()
+                (out_dir / relative).parent.mkdir(parents=True, exist_ok=True)
+                (out_dir / relative).write_bytes(encoded)
+                page_images[digest] = relative
+            pages.append({"image": page_images[digest], "size": list(image.size)})
+            image.close()
         converted[name] = {
-            "atlas": {**atlas, "image": relative},
+            "atlas": {**atlas, "image": pages[0]["image"], **({"pages": pages} if "pages" in atlas else {})},
             "loop": effect["loop"],
             "cycleSeconds": effect["cycleSeconds"],
             "fadeInSeconds": effect["fadeInSeconds"],
             "fadeOutSeconds": effect["fadeOutSeconds"],
+            **{key: effect[key] for key in (
+                "startMode", "startDuration", "stopMode", "stopDuration", "alphaStart", "alphaEnd",
+                "alpha", "layer", "displayInFog", "displayInHidden", "dimInFog", "startDelay",
+                "timer", "sortBias", "displayLevel",
+            ) if key in effect},
         }
+    for sheet in sheets.values():
+        sheet.close()
+    # Remove superseded per-effect pages from an earlier non-deduplicated run;
+    # never remove a canonical page still referenced by any effect this run.
+    used = set(page_images.values())
+    for name in particles:
+        old_pages = [out_dir / f"particles/{name}.png", *(out_dir / "particles").glob(f"{name}-p[0-9]*.png")]
+        for old in old_pages:
+            if old.is_file() and old.relative_to(out_dir).as_posix() not in used:
+                old.unlink()
     return converted
 
 

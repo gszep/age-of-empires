@@ -63,6 +63,18 @@ class AtlasCacheTest(unittest.TestCase):
             self.assertEqual({layer for layer in LAYERS if original[layer] != changed[layer]}, expected)
         self.assertTrue(all(original[k] != fingerprints(source, 'changed conversion')[k] for k in LAYERS))
 
+    def test_particle_conversion_isolated_from_sprite_layer_fingerprints(self):
+        import ast
+        source = Path(__file__).with_name('convert_sld.py').read_text()
+        original = fingerprints(source, 'conversion')
+        for name, expected in [('convert_particles', set()), ('convert', set(LAYERS))]:
+            with self.subTest(function=name):
+                node = next(n for n in ast.parse(source).body if getattr(n, 'name', None) == name)
+                lines = source.splitlines(keepends=True)
+                lines.insert(node.body[0].lineno - 1, "    'dependency probe'\n")
+                changed = fingerprints(''.join(lines), 'conversion')
+                self.assertEqual({layer for layer in LAYERS if original[layer] != changed[layer]}, expected)
+
     def test_namespace_changes_reuse_all_pages_and_match_clean_metadata(self):
         with tempfile.TemporaryDirectory() as directory:
             out = Path(directory)

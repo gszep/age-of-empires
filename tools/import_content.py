@@ -27,6 +27,15 @@ RESOURCE_NAMES = {0: "food", 1: "wood", 2: "stone", 3: "gold", 17: "food"}
 PROJECTILE_LEADS_TARGET = 1
 POPULATION_TYPE = 4
 
+# View feedback effects not linked via DAT graphics: movement, spawn, research, construction, idle indicator.
+FEEDBACK_PARTICLES = {
+    "move", "spawn", "upgrade",
+    "building_researching_glow_2x2", "building_researching_glow_3x3", "building_researching_glow_4x4",
+    "building_research_complete_2x2", "building_research_complete_3x3", "building_research_complete_4x4",
+    "construction_tiny_ground", "construction_small_ground", "construction_medium_ground", "construction_large_ground",
+    "idlepointer",
+}
+
 
 # `creatable.hero_mode` bit: the unit asks before it is deleted.
 HERO_CONFIRM_DELETE = 32
@@ -399,40 +408,65 @@ def damage_stages(dat: DatFile, unit: Any) -> list[dict[str, Any]]:
     return stages
 
 
+def feedback_effect_links(dat: DatFile, unit: Any) -> dict[str, str]:
+    """DAT links shared by full extraction and the isolated feedback probe."""
+    result: dict[str, str] = {}
+    def link(key: str, graphic_id: int) -> None:
+        graphic = dat.graphics[graphic_id] if graphic_id >= 0 else None
+        if graphic and graphic.particle_effect_name:
+            result[key] = graphic.particle_effect_name
+    if unit.creatable:
+        link('spawnEffect', unit.creatable.spawning_graphic)
+    if unit.building:
+        link('researchingEffect', unit.building.researching_graphic)
+        link('researchCompleteEffect', unit.building.research_completed_graphic)
+        # Construction graphics are foundations; dust is a particle delta.
+        foundation = unit.building.construction_graphic_id
+        if foundation >= 0 and dat.graphics[foundation]:
+            dust = sorted({dat.graphics[d.graphic_id].particle_effect_name
+                           for d in dat.graphics[foundation].deltas
+                           if d.graphic_id >= 0 and dat.graphics[d.graphic_id]
+                           and dat.graphics[d.graphic_id].particle_effect_name})
+            if len(dust) > 1:
+                raise ValueError(f'foundation graphic {foundation} names several particle effects: {dust}')
+            if dust:
+                result['constructionEffect'] = dust[0]
+    return result
+
+
 def particle_effects(
-    particles_dir: Path, names: set[str], hashes: dict[str, str]
+    particles_dir: Path, names: set[str], hashes: dict[str, str],
+    composed_dir: Path = Path('.local/aoe2de/particle-atlases'),
 ) -> dict[str, Any]:
     """The reference's particle definitions, for the effects the content names.
 
-    A fire is not a physics system: `particles/<name>.json` is a flipbook --
-    `ImageCount` frames from `ImageFirst` in the TexturePacker atlas
-    `AtlasFile` names, at `Scale`, looping over `Duration1`..`Duration2`
-    seconds and fading in and out over `StartDuration`/`StopDuration`, with
-    `FlipH` on the right-handed variants. The frames' rectangles are read
-    here from the atlas's own table; the converter cuts them out.
+    A particle effect is a flipbook defined by `particles/<name>.json`:
+    - AtlasFile (DDS or PNG): frames from a TexturePacker atlas
+    - AtlasImagesRaw: numbered frame files from a pattern directory
+    At `Scale`, looping over `Duration1`..`Duration2` seconds and fading in
+    and out over `StartDuration`/`StopDuration`. The frames' rectangles are
+    read here from the atlas's own table; the converter cuts them out.
+    Extra timing/visibility fields are carried into the manifest.
     """
     effects: dict[str, Any] = {}
     tables: dict[str, dict[str, Any]] = {}
+
     for name in sorted(names):
         path = particles_dir / f"{name}.json"
         definition = json.loads(path.read_text())
         hashes[f"particles/{name}.json"] = sha256(path)
-        atlas = Path(definition["AtlasFile"].replace("\\", "/"))
-        table_path = particles_dir / atlas.with_suffix(".json")
-        image_path = particles_dir / atlas.with_suffix(".png")
-        if not image_path.is_file():
-            image_path = particles_dir / atlas  # some shipped flipbooks are DDS-only
-        if atlas.name not in tables:
-            tables[atlas.name] = json.loads(table_path.read_text())
-            hashes[f"particles/{atlas.with_suffix('.json').as_posix()}"] = sha256(table_path)
-            hashes[f"particles/{image_path.relative_to(particles_dir).as_posix()}"] = sha256(image_path)
-        table = tables[atlas.name]
-        first, count = int(definition["ImageFirst"]), int(definition["ImageCount"])
-        frames = table["frames"][first:first + count]
-        if len(frames) != count:
-            raise ValueError(f"particle {name}: {count} frames from {first} outrun the atlas table")
-        effects[name] = {
-            "atlas": str(image_path),
+
+        # Dispatch by atlas format
+        if "AtlasImagesRaw" in definition:
+            frames, image_paths = _load_atlas_raw(definition, particles_dir, hashes, composed_dir)
+        elif "AtlasFile" in definition:
+            frames, image_paths = _load_atlas_file(definition, particles_dir, tables, hashes)
+        else:
+            raise ValueError(f"particle {name}: no AtlasFile or AtlasImagesRaw defined")
+
+        # Build the effect entry with all fields
+        effect: dict[str, Any] = {
+            "atlas": str(image_paths[0]),
             "scale": rounded(definition.get("Scale", (definition.get("ScaleStart1", 1.0) + definition.get("ScaleStart2", 1.0)) / 2)),
             "flipHorizontal": bool(definition.get("FlipH", False)),
             "loop": definition.get("Type") == "Loop",
@@ -440,18 +474,168 @@ def particle_effects(
                              rounded(definition.get("Duration2", definition.get("Duration", 1.0)))],
             "fadeInSeconds": rounded(definition.get("StartDuration", 0.0)),
             "fadeOutSeconds": rounded(definition.get("StopDuration", 0.0)),
-            "frames": [
-                {
-                    "x": f["frame"]["x"], "y": f["frame"]["y"], "w": f["frame"]["w"], "h": f["frame"]["h"],
-                    "rotated": bool(f["rotated"]),
-                    "sourceX": f["spriteSourceSize"]["x"], "sourceY": f["spriteSourceSize"]["y"],
-                    "sourceW": f["sourceSize"]["w"], "sourceH": f["sourceSize"]["h"],
-                    "pivotX": f["pivot"]["x"], "pivotY": f["pivot"]["y"],
-                }
-                for f in frames
-            ],
+            "frames": frames,
         }
+
+        # Optional timing/visibility fields with camelCase keys
+        if "StartMode" in definition:
+            effect["startMode"] = definition["StartMode"]
+        if "StartDuration" in definition:
+            effect["startDuration"] = rounded(definition["StartDuration"])
+        if "StopMode" in definition:
+            effect["stopMode"] = definition["StopMode"]
+        if "StopDuration" in definition:
+            effect["stopDuration"] = rounded(definition["StopDuration"])
+        if "AlphaStart" in definition:
+            effect["alphaStart"] = rounded(definition["AlphaStart"])
+        if "AlphaEnd" in definition:
+            effect["alphaEnd"] = rounded(definition["AlphaEnd"])
+        if "Alpha" in definition:
+            effect["alpha"] = rounded(definition["Alpha"])
+        if "Layer" in definition:
+            effect["layer"] = definition["Layer"]
+        if "DisplayInFog" in definition:
+            effect["displayInFog"] = bool(definition["DisplayInFog"])
+        if "DisplayInHidden" in definition:
+            effect["displayInHidden"] = bool(definition["DisplayInHidden"])
+        if "DimInFog" in definition:
+            effect["dimInFog"] = bool(definition["DimInFog"])
+        if "StartDelay" in definition or "StartDelay2" in definition:
+            effect["startDelay"] = [
+                rounded(definition.get("StartDelay", 0.0)),
+                rounded(definition.get("StartDelay2", definition.get("StartDelay", 0.0)))
+            ]
+        if "Timer" in definition:
+            effect["timer"] = definition["Timer"]
+        if "SortBias" in definition:
+            effect["sortBias"] = int(definition["SortBias"])
+        if "DisplayLevel" in definition:
+            effect["displayLevel"] = definition["DisplayLevel"]
+
+        effects[name] = effect
+
     return effects
+
+
+def _load_atlas_file(
+    definition: dict[str, Any], particles_dir: Path, tables: dict[str, dict[str, Any]], hashes: dict[str, str]
+) -> tuple[list[dict[str, Any]], list[Path]]:
+    """Load frames from AtlasFile (DDS or PNG)."""
+    atlas = Path(definition["AtlasFile"].replace("\\", "/"))
+    table_path = particles_dir / atlas.with_suffix(".json")
+    image_path = particles_dir / atlas.with_suffix(".png")
+
+    if not image_path.is_file():
+        image_path = particles_dir / atlas  # some shipped flipbooks are DDS-only
+
+    if atlas.as_posix() not in tables:
+        tables[atlas.as_posix()] = json.loads(table_path.read_text())
+        hashes[f"particles/{atlas.with_suffix('.json').as_posix()}"] = sha256(table_path)
+        hashes[f"particles/{image_path.relative_to(particles_dir).as_posix()}"] = sha256(image_path)
+
+    table = tables[atlas.as_posix()]
+    first, count = int(definition["ImageFirst"]), int(definition["ImageCount"])
+    frames_table = table["frames"][first:first + count]
+
+    if len(frames_table) != count:
+        raise ValueError(f"AtlasFile {atlas.name}: {count} frames from {first} outrun the atlas table")
+
+    frames = [
+        {
+            "x": f["frame"]["x"], "y": f["frame"]["y"], "w": f["frame"]["w"], "h": f["frame"]["h"],
+            "rotated": bool(f["rotated"]),
+            "sourceX": f["spriteSourceSize"]["x"], "sourceY": f["spriteSourceSize"]["y"],
+            "sourceW": f["sourceSize"]["w"], "sourceH": f["sourceSize"]["h"],
+            "pivotX": f["pivot"]["x"], "pivotY": f["pivot"]["y"],
+        }
+        for f in frames_table
+    ]
+
+    return frames, [image_path]
+
+
+def _load_atlas_raw(
+    definition: dict[str, Any], particles_dir: Path, hashes: dict[str, str], composed_dir: Path
+) -> tuple[list[dict[str, Any]], list[Path]]:
+    """Compose numbered frame files into a single PNG atlas (near-square grid layout)."""
+    from PIL import Image
+    import math
+
+    raw = definition["AtlasImagesRaw"]
+    fmt = raw["Format"].replace("\\", "/")
+    first = int(raw["First"])
+    last = int(raw["Last"])
+    count = last - first + 1
+    if count <= 0:
+        raise ValueError('AtlasImagesRaw: empty frame range')
+
+    # Load each frame file and measure dimensions
+    frame_images = []
+    frame_sizes = []
+
+    for i in range(first, last + 1):
+        frame_path = particles_dir / fmt.replace("%04d", f"{i:04d}")
+        if not frame_path.exists():
+            raise ValueError(f"AtlasImagesRaw: frame file missing: {frame_path}")
+
+        hashes[f"particles/{frame_path.relative_to(particles_dir).as_posix()}"] = sha256(frame_path)
+        with Image.open(frame_path) as source:
+            img = source.convert('RGBA')
+        frame_images.append(img)
+        frame_sizes.append(img.size)
+
+    # Layout frames in a near-square grid: columns = ceil(sqrt(n)), row-major order
+    cols = math.ceil(math.sqrt(count))
+    rows = math.ceil(count / cols)
+
+    # Measure grid dimensions (assume uniform or find max per column/row)
+    max_width = max(w for w, h in frame_sizes) if frame_sizes else 1
+    max_height = max(h for w, h in frame_sizes) if frame_sizes else 1
+
+    atlas_width = cols * max_width
+    atlas_height = rows * max_height
+
+    # Assert atlas fits within GPU texture limit (8192 px)
+    if atlas_width > 8192 or atlas_height > 8192:
+        raise ValueError(
+            f"AtlasImagesRaw: composed atlas {atlas_width}×{atlas_height} exceeds 8192 px limit"
+        )
+
+    # Compose into a single grid PNG
+    # Owned depots are read-only. Generated sheets belong to private scratch.
+    composed_dir.mkdir(parents=True, exist_ok=True)
+
+    # Name: extract from format (e.g., "textures/test_move/p_all_move_%04d.png" -> "p_all_move.png")
+    composed_name = Path(fmt).stem.replace("_%04d", "") + ".png"
+    composed_path = composed_dir / composed_name
+
+    # Create grid atlas and paste frames row-major
+    atlas = Image.new("RGBA", (atlas_width, atlas_height), (0, 0, 0, 0))
+    frames = []
+
+    for idx, img in enumerate(frame_images):
+        row = idx // cols
+        col = idx % cols
+        x = col * max_width
+        y = row * max_height
+
+        # Paste frame (top-left aligned in its cell)
+        # Copy RGBA verbatim: using alpha as a paste mask squares coverage.
+        atlas.paste(img, (x, y))
+
+        width, height = img.size
+        frames.append({
+            "x": x, "y": y, "w": width, "h": height,
+            "rotated": False,
+            "sourceX": 0, "sourceY": 0,
+            "sourceW": width, "sourceH": height,
+            "pivotX": 0.5, "pivotY": 0.5,
+        })
+        img.close()
+
+    atlas.save(composed_path)
+
+    return frames, [composed_path]
 
 
 def costs_of(creatable: Any) -> tuple[dict[str, int], int]:
@@ -1005,6 +1189,7 @@ def extract_entity(
         if gid not in [d.graphic_id for d in dat.graphics[unit.dying_graphic].deltas]:
             raise ValueError(f"death particle {gid} is not a child of {unit.id}'s death graphic")
         entity["deathEffect"] = dat.graphics[gid].particle_effect_name
+    entity.update(feedback_effect_links(dat, unit))
     if spec["key"] == "trade-cog":
         entity["trade"] = {"ratePerSecond": rounded(unit.bird.work_rate), "capacity": unit.resource_capacity, "buildingId": 45}
     if spec["key"] == "naval-fire":
@@ -2317,6 +2502,11 @@ def extract(
     flame_names.update(e["particleEffect"] for e in entities.values() if "particleEffect" in e)
     flame_names.update(e["deathEffect"] for e in entities.values() if "deathEffect" in e)
     flame_names.update(e["impactEffect"] for e in entities.values() if "impactEffect" in e)
+    flame_names.update(e["spawnEffect"] for e in entities.values() if "spawnEffect" in e)
+    flame_names.update(e["researchingEffect"] for e in entities.values() if "researchingEffect" in e)
+    flame_names.update(e["researchCompleteEffect"] for e in entities.values() if "researchCompleteEffect" in e)
+    flame_names.update(e["constructionEffect"] for e in entities.values() if "constructionEffect" in e)
+    flame_names.update(FEEDBACK_PARTICLES)
     particles = particle_effects(dat_path.parent.parent / "particles", flame_names, hashes)
     for entity in entities.values():
         if "fireCharge" in entity:
