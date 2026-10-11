@@ -7,14 +7,15 @@ below before choosing work.
 ## Current play-first push
 
 Milestone **1: Play-first: focused roster and shared systems** is the active queue
-in Project **Open Empires Lab #1**. Select `priority-push` and exclude `deferred`:
+in Project **Open Empires Lab #1**. The agent execution queue requires
+`priority-push` **AND** `urgent` **AND** `important`, excluding deferred/blocked:
 
 ```bash
-gh issue list --milestone 'Play-first: focused roster and shared systems' --label priority-push --search '-label:deferred'
+gh issue list --state open --milestone 'Play-first: focused roster and shared systems' --label priority-push --label urgent --label important --search '-label:deferred -label:blocked'
 ```
 
-Britons is the initial baseline; #314 selects one Native American civilisation.
-Do not activate all candidate tickets or fill the optional third slot by default.
+The roster is **Britons + Inca**, selected in **#314 (resolved)**; Inca work is #199.
+Do not activate Aztecs, Maya or fill the unused third slot by default.
 The roster cap is three. #315 investigates shared task/animation contracts, #316
 defines a small playable co-op scenario, and #317 restores Artemis compatibility.
 `shared-mechanic` distinguishes cross-civilisation questions, including those
@@ -27,7 +28,11 @@ Fine HP arithmetic, broad recording/audio work and unchosen-civilisation scope
 are deferred. Historical evidence in [handoff](handoff.md) and the ledger remains
 useful; an old acceptance checklist does not override the new priority scope.
 
-- **Labels.** Apply `priority-push`/the milestone and exclude `deferred` first.
+- **Urgency and importance.** `urgent` blocks the next playable step or needs
+  immediate action; `important` materially serves play or campaign creation.
+  Agents require both, not either. Important-only work is the planned backlog.
+  Empty or blocked ready queues are reported, not filled by self-promotion.
+- **Labels.** Apply the milestone and the three-label intersection above first.
   Within that scope, human-filed `bug` issues outrank enhancements. A deferred
   issue is not reactivated merely because it also says `bug` or `civilisation`;
   re-triage when it blocks focused play or the owner changes scope.
@@ -58,4 +63,8 @@ useful; an old acceptance checklist does not override the new priority scope.
 - **Projects and parallel work.** Projects is a status view of these issues,
   not another backlog. The coordinator records bounded worker assignments and
   verification on the issue; only integrated, verified work moves to Done.
+  **Agents: urgent and important** is the saved execution view. **Milestone
+  delivery** includes completed work; **Important, not urgent** and **Deferred**
+  keep future work visible without feeding it to agents. Todo is queued work,
+  not a claim someone is implementing it. In Progress needs a current owner/run.
   See [orchestration.md](orchestration.md) for setup and compression checkpoints.

@@ -1,6 +1,6 @@
 # What we are building
 
-Owner-aligned direction, updated October 10, 2026. This is a priority contract, not a list
+Owner-aligned direction, updated October 11, 2026. This is a priority contract, not a list
 of delivered capabilities; those belong in [status](status.md).
 
 ## Play and experimentation are one loop
@@ -39,9 +39,9 @@ claim that campaign generation or open-ended learning is already implemented.
 
 ## Scope and fidelity
 
-**Current push: at most three active civilisations.** Britons is the initial
-baseline, with one Native American civilisation awaiting the owner's choice
-(#314). A third slot is optional and unchosen. Do not work through the remaining
+**Current push: Britons + Inca, at most three active civilisations.** The owner
+selected Inca in #314; implementation is #199. The third slot is unused.
+Do not work through the remaining
 civilisation catalogue or its unique-unit/technology calibration tickets. Existing
 shipped profiles and useful regression tests remain; this is a development-focus
 decision, not permission to delete content or saves.
@@ -52,8 +52,13 @@ units, then let imported data supply their differences. Do not assume every nati
 exception is proven merely because the data has a common shape.
 
 GitHub Project **Open Empires Lab #1**, milestone **Play-first: focused roster and
-shared systems #1**, and `priority-push` identify the active work. Other open issues
-carry `deferred` and Project status **Deferred**; they are retained, not rejected.
+shared systems #1**, and `priority-push` identify the delivery scope. Within it,
+agents execute only open, unblocked issues labelled **urgent AND important**.
+`urgent` means blocking the next playable step or needing immediate action;
+`important` means material to focused-roster play, shared systems or campaign
+creation. Important-only work is planned. Do not add urgency just to fill an
+agent's queue. Out-of-scope issues carry `deferred` and Project status **Deferred**;
+they are retained, not rejected.
 The small co-op scenario (#316) and correct two-machine play (#317) give the
 shared-system investigation (#315) a concrete purpose. A scope change is explicit.
 

@@ -15,14 +15,17 @@ simulation; Three.js is only a view.
 - Choose a coherent playable subset before exhaustive AoE2 parity. Prioritize
   shared play, controls, readable visuals and meaningful interactions. Rare edge
   cases need not prevent play; never hide known failures to make a check green.
-- Active civilisation development is capped at **three**: Britons is the initial
-  baseline; one Native American choice is pending #314; the third slot is unchosen.
+- Active civilisation development is capped at **three**: **Britons + Inca** are
+  selected (#314 resolved; Inca implementation #199); the third slot is unused.
   Defer other civilisation implementations and unique-mechanic calibration. Preserve
   shipped content and regression coverage; shared fixes may benefit it incidentally.
 - Prefer shared task/state/animation contracts (#315) over per-civilisation tuning.
-  Work from milestone 1 and `priority-push`, excluding `deferred` even when an issue
-  also has `bug` or `decision`. Re-triage new blockers to focused play; do not expand
-  the roster or a native calibration matrix without an explicit scope change.
+  Agent execution requires an open milestone 1 issue with **all three labels**:
+  `priority-push`, `urgent` **and** `important`, excluding `deferred` and `blocked`.
+  Use the Project's **Agents: urgent and important** view or the exact query in
+  `docs/backlog.md`; the broader startup inventory is not an execution queue.
+  Important-only work is planned, not automatically started. If no eligible work
+  remains, report that rather than adding urgency or expanding scope yourself.
 - Target 1–5 minute normal verification. Measure before adding machinery; retain
   expensive checks only where they establish an outcome cheaper checks cannot.
   Do not block a playable preview on unrelated checks or full asset regeneration.
@@ -32,8 +35,8 @@ simulation; Three.js is only a view.
 ## Start Here
 
 - Run `tools/session_start.sh` first. It reports git divergence, checkpoint/import
-  freshness, relevant processes, and the GitHub issue inventory. The active milestone
-  is the work queue: within it, human-filed bugs first, then answered `decision` issues, then
+  freshness, relevant processes, and the GitHub issue inventory. The urgent-and-important
+  subset of the active milestone is the work queue: within it, human-filed bugs first, then answered `decision` issues, then
   enhancements. File newly discovered gaps with evidence instead of leaving
   them only in prose (`docs/backlog.md`).
 - Read `docs/lessons.md` before working; its rules are grouped by the moment

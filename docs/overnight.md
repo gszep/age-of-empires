@@ -50,9 +50,11 @@ changes and verify the installed-CLI mock-provider smoke before promising readin
 
 ## During the run
 
-- **Scope before queue order:** use milestone 1 / `priority-push`, excluding
-  `deferred`. At most three active civilisations; Britons baseline, Native American
-  choice in #314, no implicit third. Prioritize shared mechanics and the chosen
+- **Scope before queue order:** use open milestone 1 issues with `priority-push`
+  AND `urgent` AND `important`, excluding `deferred` and `blocked`. At most three
+  active civilisations; Britons + Inca selected, no implicit third. If that queue
+  is empty or blocked, report it rather than starting important-only work.
+  Prioritize shared mechanics and the chosen
   play experience, not the old full-catalogue or calibration backlog.
 - **One integration at a time, within that scope**: bugs, then decisions
   the human has answered, then enhancements. Independent implementation may run
@@ -73,9 +75,10 @@ changes and verify the installed-CLI mock-provider smoke before promising readin
   move to another eligible item during an unattended run. Do not retry denied
   actions through another tool. Check the deadline immediately after a long
   tool return; an approval wait consumes the real run window too.
-- **When the queue empties early, keep going down the tracker** (the human's
-  rule, 2026-09-19). A run stops at the deadline the human gave, not when the
-  work looks done.
+- **Stay within the eligible queue.** The October 11 urgent-AND-important rule
+  supersedes the old instruction to keep working down the whole tracker. Stop
+  expansion when no eligible work is actionable; preserve evidence and report
+  the blocker or empty queue. Never relabel work to extend an unattended run.
 - **Decoder items first and alone.** Anything touching `tools/sld_layers.py`
   or the `convert`/`convert_mask` functions in `convert_sld.py` costs an
   hour's re-decode; start it before anything else and do not overlap it.

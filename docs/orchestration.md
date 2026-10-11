@@ -15,9 +15,12 @@ starting an unattended coordinator. The smoke verifies the installed CLI's nativ
 session or a passing application build does not validate this harness.
 
 GitHub issues hold the request, acceptance, evidence and result. A GitHub Project
-is a scheduling view of those same issues, never a second backlog. Select milestone
-1 / `priority-push` and exclude `deferred` before applying bug/decision/enhancement
-priority. The active civilisation cap and pending choice are in `docs/product.md`.
+is a scheduling view of those same issues, never a second backlog. Agent work
+requires open milestone 1 issues labelled `priority-push`, `urgent` AND `important`,
+excluding `deferred`/`blocked`, before applying bug/decision/enhancement priority.
+Use the saved **Agents: urgent and important** view or the query in `docs/backlog.md`.
+Britons + Inca are selected; the unused third slot needs an explicit owner choice.
+An empty execution queue is reported, not permission to start important-only work.
 Use one repository board with its existing Status
 field; inspect actual fields/options instead of assuming IDs or renaming them.
 The repository Project is **Open Empires Lab**, owner `gszep`, number **1**:
