@@ -410,6 +410,8 @@ export interface CivilizationRules {
   displayName?: string;
   /** What the reference calls a computer player of it ("Henry V" ...). */
   computerNames?: string[];
+  /** Imported opening scout (DAT resource263); absent/unknown uses scout-cavalry. */
+  startingScout?: UnitKind;
   unavailable: {
     technologies: number[];
     units: number[];
@@ -1434,7 +1436,7 @@ export const FALLBACK_RULES: GameRules = {
         volley: { base: 5, max: 21, ownProjectile: true, arrowSpeed: 7, arrowAttacks: [{ class: 3, amount: 11 }] },
       },
     },
-  },
+  } satisfies Omit<Record<BuildingKind, BuildingRules>, 'settlement'> as unknown as Record<BuildingKind, BuildingRules>, // completed by the non-enumerable settlement below
   nodes: {
     berries: { resource: 'food', radius: 0.5, amount: 125, fogVisibility: 1, blastDefenseLevel: 0 },
     tree: { resource: 'wood', radius: 0.5, amount: 100, fogVisibility: 1, blastDefenseLevel: 1 },
@@ -1519,6 +1521,20 @@ export const FALLBACK_RULES: GameRules = {
     },
   },
 };
+
+// Settlement (DAT 2556/2558/2560) is Inca-only imported content, not open-content
+// game data. The type needs an entry, so the open rules carry an inert,
+// non-buildable placeholder that is deliberately NON-ENUMERABLE: hashes, clones and
+// iteration see the unchanged open rules (the frozen #118 checkpoint exception
+// depends on that), while direct lookups stay type-complete. Imported profiles
+// always supply their own enumerable `settlement`.
+Object.defineProperty(FALLBACK_RULES.buildings, 'settlement', {
+  enumerable: false,
+  value: {
+    hp: 0, radius: 0, lineOfSight: 0, cost: cost(0, 0), buildSeconds: 0,
+    popSupport: 0, buildable: false, accepts: [], armors: [],
+  } satisfies BuildingRules,
+});
 
 interface ManifestEntity {
   packingWork?: number;
@@ -1954,6 +1970,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
         name: manifest.civilization.name,
         displayName: manifest.civilization.displayName,
         computerNames: manifest.civilization.computerNames,
+        ...(manifest.civilization.startingScout !== undefined
+          ? { startingScout: manifest.civilization.startingScout } : {}),
         unavailable: {
           technologies: [...manifest.civilization.unavailable.technologies],
           units: [...manifest.civilization.unavailable.units],
@@ -2105,6 +2123,7 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       castle: building('castle', true),
       'palisade-wall': building('palisade-wall', true),
       'palisade-gate': building('palisade-gate', true),
+      settlement: building('settlement', !!e.settlement),
     },
     nodes: {
       berries: node('berries', 'food', 'berries'),
@@ -2221,7 +2240,7 @@ const BUILDING_KINDS = new Set<string>([
   'town-center', 'barracks', 'house', 'mill', 'lumber-camp', 'mining-camp', 'farm',
   'outpost', 'watch-tower', 'archery-range', 'blacksmith', 'market', 'stable',
   'monastery', 'siege-workshop', 'castle', 'university', 'wonder', 'dock',
-  'palisade-wall', 'palisade-gate',
+  'palisade-wall', 'palisade-gate', 'settlement',
   ...Object.keys(BUILDING_ROSTER),
 ]);
 

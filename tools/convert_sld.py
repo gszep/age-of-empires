@@ -433,18 +433,27 @@ def write_cache(path: Path, fingerprint: str, cache: dict[str, Any]) -> None:
 
 def drain(start, publish, save, interval: float | None = None, clock=time.monotonic) -> None:
     """Start the jobs, publish each completed one, and persist progress at most
-    every `interval` seconds. Kept outside the decoder fingerprint."""
+    every `interval` seconds. By default the spacing is also at least ten times
+    the last save's own duration, so a large cache's serialization (which holds
+    the GIL and starves the pool's task feeding) cannot dominate the
+    conversion; an explicit `interval` is honoured exactly. Kept outside the
+    decoder fingerprint."""
+    adaptive = interval is None
     interval = CHECKPOINT_SECONDS if interval is None else interval
+
+    def persist() -> float:
+        began = clock()
+        save()
+        ended = clock()
+        return ended + (max(interval, 10 * (ended - began)) if adaptive else interval)
+
     # Persist first: the on-disk cache then names only reused or completed
     # sheets, never a page a pending job is about to overwrite (or --fresh).
-    save()
-    due = clock() + interval
+    due = persist()
     for item in start():
         publish(item)
-        now = clock()
-        if now >= due:
-            save()
-            due = now + interval
+        if clock() >= due:
+            due = persist()
 
 
 def main() -> None:

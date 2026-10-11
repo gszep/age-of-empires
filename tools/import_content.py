@@ -334,12 +334,13 @@ def animation_entry(
 
 
 def town_center_shadow(dat: DatFile, graphics_dir: Path | Graphics,
-                       animation: dict[str, Any], hashes: dict[str, str]) -> None:
+                       animation: dict[str, Any], hashes: dict[str, str],
+                       *, body_layer: dict[str, Any] | None = None) -> None:
     """Keep the TC's extant back SLD, but take its cast mask from the DAT delta.
 
     This is deliberately not naval.graphic_layers: these negative-SLP parents
-    still have body art. Only a single static, zero-offset, shadow-only leaf
-    can replace the body's shadow atlas without new renderer semantics.
+    still have body art. Only a single static, zero-offset leaf is reviewed.
+    Mixed leaves require an explicit body-layer consumer; never mask them away.
     """
     parent = dat.graphics[animation["graphicId"]]
     shadows = [delta for delta in parent.deltas if delta.graphic_id >= 0
@@ -355,12 +356,16 @@ def town_center_shadow(dat: DatFile, graphics_dir: Path | Graphics,
             or any(child.graphic_id >= 0 for child in graphic.deltas)):
         raise ValueError(f"TC shadow {delta.graphic_id}: unreviewed offset/animation/composition")
     shadow = animation_entry(dat, graphics_dir, delta.graphic_id, hashes)
-    # Some unenabled architectures (Andean) have main art in a layer5 delta.
-    # Never silently discard it by treating the file as just a BC4 mask.
+    # Andean (and any matching TC composition) has main art in the layer5
+    # delta as well. A caller that cannot retain that layer must still fail.
     from sld_layers import decode_colors
     source = Graphics.of(graphics_dir).path(shadow["source"])
     if any(frame is not None and not frame.empty for frame in decode_colors(source.read_bytes())):
-        raise ValueError(f"TC shadow {delta.graphic_id}: delta also contains body art")
+        if body_layer is None:
+            raise ValueError(f"TC shadow {delta.graphic_id}: delta also contains body art; needs a body-layer consumer")
+        if parent.layer <= graphic.layer:
+            raise ValueError(f"TC shadow {delta.graphic_id}: unreviewed body layer order")
+        body_layer.update(shadow)
     animation["shadow"] = shadow
 
 
@@ -735,6 +740,8 @@ def extract_entity(
     # -- the female villager (293) beside the male (83), and a counterpart for
     # every task unit. It is drawn instead of the unit it skins, at the odds
     # `objreplacement.json` states, and is nothing on the simulation's side.
+    if "kind" in spec:
+        entity["kind"] = spec["kind"]
     if "skinOf" in spec:
         entity["skinOf"] = spec["skinOf"]
         entity["skin"] = spec["skin"]
@@ -1200,6 +1207,16 @@ def extract_entity(
         tracking = civ_units[unit.dead_fish.tracking_unit]
         entity["particleEffect"] = dat.graphics[tracking.standing_graphic[0]].particle_effect_name
         entity["impactEffect"] = dat.graphics[unit.dying_graphic].particle_effect_name
+    if unit.id in (676, 2629) and not entity["animations"]:
+        # Reviewed file-less fire-projectile carrier, not a missing SLD.
+        # Naval specs select the particle path before shared combat additions.
+        carrier = dat.graphics[unit.standing_graphic[0]]
+        tracking = civ_units[unit.dead_fish.tracking_unit]
+        particle = dat.graphics[tracking.standing_graphic[0]]
+        if carrier.file_name != "None" or particle.particle_effect_name != entity.get("particleEffect"):
+            raise ValueError(f"unreviewed file-less projectile {unit.id}")
+        entity["sourceAbsence"] = {"graphicId": unit.standing_graphic[0],
+            "reason": "DAT file-less particle carrier", "particleGraphicId": tracking.standing_graphic[0]}
     if category == "unit" and unit.creatable and unit.bird:
         charge = unit.creatable
         tasks = [t for t in unit.bird.tasks if t.action_type == 133 and t.work_flag_2 == 2001]
@@ -1337,9 +1354,17 @@ def extract_entity(
         entity["annexes"] = annexes
 
     if spec["key"] == "town-center":
-        for name, animation in entity["animations"].items():
+        for name, animation in list(entity["animations"].items()):
             if name == "idle" or name.startswith("idle-"):
-                town_center_shadow(dat, graphics_dir, animation, hashes)
+                body_layer = {}
+                town_center_shadow(dat, graphics_dir, animation, hashes, body_layer=body_layer)
+                if body_layer:
+                    key = f"{name}-cast-body"
+                    entity["animations"][key] = body_layer
+                    entity.setdefault("animationLayers", {})[name] = [
+                        {"animation": name, "x": 0, "y": 0},
+                        {"animation": key, "x": 0, "y": 0, "belowBody": True, "shadow": False},
+                    ]
 
     return entity
 
@@ -1411,6 +1436,25 @@ def age_variants(dat: DatFile, unit_id: int) -> dict[str, int]:
             if command.type == EFFECT_UPGRADE_UNIT and int(command.a) == unit_id:
                 found[age] = int(command.b)
                 break
+    # Regional buildings can put the same age replacement in an automatic
+    # child gated by their make-available tech (Settlement1354/1355). Only
+    # accept the exact age + enable pair, not arbitrary bonus/count gates.
+    for tech in dat.techs:
+        required = {r for r in tech.required_techs if r >= 0}
+        ages = required & set(AGE_UPGRADE_TECHS.values())
+        if tech.civ != -1 or tech.effect_id < 0 or tech.required_tech_count != 2 \
+                or len(required) != 2 or len(ages) != 1 \
+                or any(l.location_id >= 0 or l.research_time > 0 for l in tech.research_locations):
+            continue
+        enabling_id, = required - ages
+        enable = dat.techs[enabling_id]
+        if enable.effect_id < 0 or not any(c.type == EFFECT_ENABLE and c.b == 1 and c.a == unit_id
+                for c in dat.effects[enable.effect_id].effect_commands):
+            continue
+        for command in dat.effects[tech.effect_id].effect_commands:
+            if command.type == EFFECT_UPGRADE_UNIT and command.a == unit_id:
+                age = next(name for name, tid in AGE_UPGRADE_TECHS.items() if tid in ages)
+                found[age] = int(command.b)
     return found
 
 
@@ -1721,7 +1765,11 @@ def technology_entry(
     effect = dat.effects[tech.effect_id] if tech.effect_id >= 0 else None
     if "effect" in spec and effect is not None and effect.name != spec["effect"]:
         raise ValueError(f"tech {spec['techId']} effect is {effect.name!r}, not {spec['effect']!r}")
-    location = next(l for l in tech.research_locations if l.location_id >= 0)
+    primary = next(l for l in tech.research_locations if l.location_id >= 0)
+    # The tree can select a secondary DAT venue (Settlement economy). Its
+    # time/button/hotkey travel together; never invent a venue from its name.
+    location = next((l for l in tech.research_locations
+                     if l.location_id == spec.get("researchLocationId")), primary)
     entry: dict[str, Any] = {
         "techId": spec["techId"],
         "requiredTechs": [int(r) for r in tech.required_techs if r >= 0],
@@ -1742,6 +1790,8 @@ def technology_entry(
     if location.button_id > 0:
         entry["button"] = location.button_id
     entry["hotkeyTextId"] = tech.language_dll_description + 10000
+    if location is not primary and location.hot_key_id >= 0:
+        entry["hotkeyTextId"] = location.hot_key_id
     if strings:
         text = text_of(strings, tech.language_dll_name, tech.language_dll_description, tech.language_dll_help)
         if "create" in text:
@@ -1817,6 +1867,14 @@ def civilization_entry(
             tree_id = tree_unit_id(dat, spec["civIndex"], entity)
             if tree_id not in present[bucket] or tree_id in unavailable[bucket]:
                 unavailable[bucket].append(entity["unitId"])
+    # Initial DAT unit disables override the presentation tree. Keep the
+    # entities/art (captured actors still need them), but refuse production.
+    civ = dat.civs[spec["civIndex"]]
+    for command in dat.effects[civ.tech_tree_id].effect_commands:
+        if command.type == EFFECT_ENABLE and command.b == 0:
+            uid = int(command.a)
+            bucket = "buildings" if civ.units[uid].type == 80 else "units"
+            unavailable[bucket].append(uid)
     unavailable = {key: sorted(set(values)) for key, values in unavailable.items()}
     entry: dict[str, Any] = {
         "key": civ_spec["key"],
@@ -1846,6 +1904,11 @@ def civilization_entry(
                 count = int(strings[offset])
                 entry["computerNames"] = [strings[offset + i] for i in range(1, count + 1) if offset + i in strings]
             break
+    # Emit startingScout if different from default Scout Cavalry (448)
+    civ_data = dat.civs[spec["civIndex"]]
+    starting_scout_id = int(civ_data.resources[263])
+    if starting_scout_id >= 0 and starting_scout_id != 448:
+        entry["startingScout"] = f"dat-unit-{starting_scout_id}"
     return entry
 
 
@@ -1868,6 +1931,7 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
     modifiers = [*tree, *dat.effects[civ.team_bonus_id].effect_commands]
     time_overrides = {}
     disabled = {int(c.d) for c in tree if c.type == 102}
+    ready = {int(c.a) for c in tree if c.type == 8 and c.b == 12 and c.d == 1}
     by_id = {t["techId"]: key for key, t in technologies.items()}
     buildings = {e["id"]: key for key, e in entities.items()
                  if e.get("category") == "building" and "skinOf" not in e}
@@ -1886,7 +1950,9 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
         entities[key]["workRate"] = rounded(unit.bird.work_rate)
     # Tree research cost/time commands: c=0 sets, c=1 adds, c=2 multiplies. Unknown forms stay
     # in the provenance report instead of silently enabling free research.
-    handled = {f"effect type {c.type}: a={c.a}, b={c.b}, c={c.c}, d={c.d}" for c in tree if c.type == 102}
+    handled = {f"effect type {c.type}: a={c.a}, b={c.b}, c={c.c}, d={c.d}" for c in tree
+               if c.type == 102 or c.type == EFFECT_ENABLE and c.b == 0
+               or c.type == 8 and c.b == 12 and c.d == 1}
     for c in modifiers:
         if c.type == 103 and c.c == 0:
             time_overrides[int(c.a)] = rounded(c.d)
@@ -1904,7 +1970,7 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
         else:
             continue
         handled.add(f"effect type {c.type}: a={c.a}, b={c.b}, c={c.c}, d={c.d}")
-    ids = set(by_id) | set(triggers) | set(time_overrides) | {
+    ids = set(by_id) | set(triggers) | set(time_overrides) | ready | {
         i for i, t in enumerate(dat.techs) if t.civ == civ_index
         and not any(l.location_id >= 0 for l in t.research_locations)
     }
@@ -1954,6 +2020,18 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
             "automatic": automatic or free,
             "effects": [] if public else effects,
         }
+        if tid in ready:
+            # XS cAttrSetState=12 / cTechStateReady=1 enables research, not
+            # cTechStateDone=3. Preserve paid research and its count gates.
+            node["initialState"] = "ready"
+            # A zero-time make-available row can name a venue (Champi Scout)
+            # without being paid research. It is bookkeeping, not an upgrade.
+            if not public and tech.effect_id >= 0 \
+                    and all(c.type == EFFECT_ENABLE and c.b == 1
+                            for c in dat.effects[tech.effect_id].effect_commands) \
+                    and all(l.research_time == 0 for l in tech.research_locations) \
+                    and not any(c.flag and c.amount > 0 for c in tech.resource_costs):
+                node["automatic"] = True
         if tid in disabled or tech.civ not in (-1, civ_index):
             node["disabled"] = True
         if any(c.flag and c.type >= 0 and c.type not in RESOURCE_NAMES for c in tech.resource_costs):
@@ -2077,6 +2155,12 @@ def technologies_from_tree(
         # locations are all -1) or nothing to do (the Galleon's effect is -1)
         # is listed but not offered.
         tech = dat.techs[tech_id]
+        # Some RegionalUnit roots carry a Trigger Tech ID for an enable-only
+        # row, not an upgrade button (e.g. Champi Scout1350).
+        if tech.effect_id >= 0 and dat.effects[tech.effect_id].effect_commands \
+                and all(c.type == EFFECT_ENABLE and c.b == 1
+                        for c in dat.effects[tech.effect_id].effect_commands):
+            continue
         if not any(l.location_id >= 0 for l in tech.research_locations):
             if {int(r) for r in tech.required_techs if r >= 0}.issubset(research_ids):
                 continue  # automatic child of a research button below
@@ -2084,7 +2168,8 @@ def technologies_from_tree(
                             "reason": "the DAT gives it no research location or no effect"})
             continue
         entry = technology_entry(
-            dat, {"techId": tech_id, "entities": entities, "scriptedEffects": scripted_effects}, hashes, attribute_ids, strings
+            dat, {"techId": tech_id, "entities": entities, "scriptedEffects": scripted_effects,
+                  "researchLocationId": int(node["Building ID"])}, hashes, attribute_ids, strings
         )
         commands = list(dat.effects[tech.effect_id].effect_commands) if tech.effect_id >= 0 else []
         # Heavy Warships (35) has no effect itself: automatic technologies

@@ -170,7 +170,10 @@ export function createGame(
     // it is not a luxury: a town center sees eight tiles and the nearest food
     // the script places is ten away, so without something to ride out and look
     // there is nothing known to gather from and the game never starts.
-    addEntity(state, 'scout-cavalry', player, at({ x: start.x + 8, y: start.y }), rules.units['scout-cavalry']);
+    const requestedScout = rules.civilization.startingScout;
+    const scoutKind = requestedScout && isUnit(requestedScout) && Object.hasOwn(rules.units, requestedScout)
+      ? requestedScout : 'scout-cavalry';
+    addEntity(state, scoutKind, player, at({ x: start.x + 8, y: start.y }), rules.units[scoutKind]);
   }
   // Real-world map landmarks are surveyed points in the baked descriptor,
   // represented with existing owned art. Place them before terrain objects so

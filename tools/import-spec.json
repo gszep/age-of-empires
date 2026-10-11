@@ -1,8 +1,8 @@
 {
   "schemaVersion": 3,
   "civIndex": 1,
-  "profileCivilizations": ["franks", "goths", "teutons", "japanese", "chinese", "byzantines", "saracens", "turks", "vikings", "celts", "mongols"],
-  "enabledCivilizations": ["franks", "goths", "teutons", "japanese", "chinese", "byzantines", "saracens", "turks", "vikings", "celts", "mongols"],
+  "profileCivilizations": ["franks", "goths", "teutons", "japanese", "chinese", "byzantines", "saracens", "turks", "vikings", "celts", "mongols", "incas"],
+  "enabledCivilizations": ["franks", "goths", "teutons", "japanese", "chinese", "byzantines", "saracens", "turks", "vikings", "celts", "mongols", "incas"],
   "combatRoster": [
     { "unitId": 46 },
     { "unitId": 557 },
@@ -46,7 +46,16 @@
     { "unitId": 11 },
     { "unitId": 561 },
     { "unitId": 1370 },
-    { "unitId": 1372 }
+    { "unitId": 1372 },
+    { "unitId": 2550 },
+    { "unitId": 2588 },
+    { "unitId": 2552 },
+    { "unitId": 2554 },
+    { "unitId": 879 },
+    { "unitId": 881 },
+    { "unitId": 185 },
+    { "unitId": 1570 },
+    { "unitId": 2633, "composite": true, "decay": false }
   ],
   "civilization": {
     "key": "britons",
@@ -1602,6 +1611,19 @@
         "idle": {
           "slot": "standing"
         }
+      }
+    },
+    {
+      "key": "settlement",
+      "kind": "settlement",
+      "unitId": 2556,
+      "category": "building",
+      "rosterAliases": [2558, 2560],
+      "animations": {
+        "idle": { "slot": "standing" },
+        "construction": { "slot": "construction" },
+        "death": { "slot": "dying" },
+        "decay": { "slot": "dead" }
       }
     },
     {

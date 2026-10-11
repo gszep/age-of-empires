@@ -28,7 +28,7 @@ export type BuildingKind =
   | 'outpost' | 'watch-tower'
   | 'archery-range' | 'blacksmith' | 'market' | 'stable'
   | 'monastery' | 'siege-workshop' | 'castle' | 'university' | 'wonder' | 'dock'
-  | 'palisade-wall' | 'palisade-gate' | 'fish-trap'
+  | 'palisade-wall' | 'palisade-gate' | 'fish-trap' | 'settlement'
   | 'stone-wall' | 'fortified-wall' | 'stone-gate' | 'fortified-gate' | 'guard-tower' | 'keep' | 'bombard-tower';
 export type EntityKind = UnitKind | BuildingKind | 'resource' | 'relic';
 export type Activity =

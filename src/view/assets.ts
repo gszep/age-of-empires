@@ -70,7 +70,12 @@ export interface ImportedEntity {
   projectile?: { arc: number };
   animations: Record<string, AnimationInfo>;
   atlases: Record<string, Atlas>;
-  animationLayers?: Record<string, { animation: string; x: number; y: number }[]>;
+  animationLayers?: Record<string, { animation: string; x: number; y: number;
+    /** Reviewed DAT delta below the parent, rather than a sail above it. */
+    belowBody?: boolean;
+    /** False when this layer's shadow is already routed to the parent atlas. */
+    shadow?: boolean;
+  }[]>;
   /** File-bearing garrison graphic deltas, indexed by the carrier's age art. */
   garrisonFlags?: Record<string, { animation: string; x: number; y: number }[]>;
   particleEffect?: string;

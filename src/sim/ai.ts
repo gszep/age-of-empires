@@ -1,4 +1,4 @@
-import type { BuildingKind, Command, EntityKind, ResourceKind } from './types';
+import type { BuildingKind, Command, EntityKind, ResourceKind, UnitKind } from './types';
 import { isBuilding, isFishKind } from './data';
 import { distance } from './nav';
 import type { PlayerObservation } from '../protocol/types';
@@ -189,7 +189,14 @@ const BANKS: Record<string, ResourceKind[]> = {
   'lumber-camp': ['wood'],
   'mining-camp': ['gold', 'stone'],
   mill: ['food'],
+  settlement: ['food', 'wood', 'gold', 'stone'],
 };
+
+// Pinned INCAS.json / DAT civ21: resource263 = 2550; tree disables
+// 68/562/584/74. Settlement2556 costs 125 wood and serves all four resources.
+// Like the existing Briton price/roster knowledge, these are public content
+// facts, not reads of game state. The imported profile key is "incas".
+const CHAMPI: UnitKind[] = ['dat-unit-2550', 'dat-unit-2588', 'dat-unit-2552', 'dat-unit-2554'];
 
 /**
  * The example strategy: gather food/wood/gold, keep housing ahead of
@@ -218,12 +225,21 @@ export function exampleAiCommands(
   const known: Spotted[] = [...observation.entities, ...observation.memory];
   const mine = observation.entities.filter(e => e.owner === player);
   const villagers = mine.filter(e => e.kind === 'villager');
+  const inca = observation.civilization === 'incas';
+  // Keep one Champi on the opening scout duty, including after its upgrade.
+  // Later recruits join the army; a lone Kamayuk or Slinger is never a scout.
+  // Bounded strategy approximation: lowest observed owned Champi id wins.
+  // Losing the original therefore pulls the oldest surviving paid recruit
+  // onto scout duty. No hidden spawn history or non-serializable AI memory.
+  const champiScout = inca ? mine.filter(e => CHAMPI.includes(e.kind as UnitKind))
+    .sort((a, b) => a.id - b.id)[0] : undefined;
   // Everything that fights. The army is not militia any more once the Feudal
   // Age opens the archery range, and the attack, the endgame raze and the
   // decision to keep saving all count soldiers rather than militia.
   const army = mine.filter(
     e => ['militia', 'man-at-arms', 'long-swordsman', 'two-handed-swordsman', 'champion',
-      'archer', 'crossbowman', 'arbalester'].includes(e.kind));
+      'archer', 'crossbowman', 'arbalester'].includes(e.kind)
+      || (inca && CHAMPI.includes(e.kind as UnitKind) && e.id !== champiScout?.id));
   const siege = options.siege === false ? undefined : siegePlan(observation, army.length);
   const stoneWorkers = new Set(villagers.map((_, index) => index)
     .filter(index => ASSIGNMENT[index % ASSIGNMENT.length] !== 'food').slice(-2));
@@ -359,7 +375,8 @@ export function exampleAiCommands(
   // out there is nothing known to gather. It walks a widening ring around the
   // base, taking its next heading from the clock so no state has to be kept
   // between decisions and two runs of the same match scout identically.
-  for (const scout of mine.filter(e => e.kind === 'scout-cavalry' && e.order === 'idle')) {
+  for (const scout of mine.filter(e => e.order === 'idle'
+    && (inca ? e.id === champiScout?.id : e.kind === 'scout-cavalry'))) {
     const leg = Math.floor(observation.time / 12);
     // A turn of about 137 degrees a leg never repeats a heading soon, and the
     // radius steps out and starts again, so the ring is covered rather than
@@ -498,7 +515,7 @@ export function exampleAiCommands(
   // mining camp first, in the minutes before the scout has even found the
   // trees, left 15 wood, an income of ten a minute, and a lumber camp that
   // arrived at minute eleven -- measured, on the real distance bands.
-  const woodIsHandy = mine.some(e => e.kind === 'lumber-camp' && e.buildProgress === undefined)
+  const woodIsHandy = mine.some(e => e.kind === (inca ? 'settlement' : 'lumber-camp') && e.buildProgress === undefined)
     || (supply('wood').next().value?.walk ?? Infinity) <= CAMP_RANGE;
   const range = mine.find(e => e.kind === 'archery-range');
   const smith = mine.find(e => e.kind === 'blacksmith');
@@ -512,7 +529,9 @@ export function exampleAiCommands(
   const dockReserve = water && !dock && woodIsHandy ? DOCK_WOOD : 0;
   const camps = siege?.gatherStone ? [...CAMPS, { resource: 'stone' as const, building: 'mining-camp' as const }] : CAMPS;
   for (const camp of camps) {
-    if (observation.wood < CAMP_COST_WOOD || !idleBuilder || !tc) continue;
+    const buildingToUse = inca ? 'settlement' : camp.building;
+    const campCost = inca ? 125 : CAMP_COST_WOOD;
+    if (observation.wood < campCost || !idleBuilder || !tc) continue;
     if (camp.resource !== 'wood' && !woodIsHandy) continue;
     // Gold waits for the barracks: the mining camp was a hundred wood the
     // barracks was waiting for, and pushed it to minute eleven (measured,
@@ -520,8 +539,8 @@ export function exampleAiCommands(
     // thirteen tiles home, and the Feudal Age slipped from eleven minutes to
     // nineteen (also measured).
     if (camp.resource === 'gold' && !barracks) continue;
-    const built = mine.filter(e => e.kind === camp.building);
-    if (built.length && observation.wood < CAMP_COST_WOOD + Math.max(militaryWoodReserve, dockReserve)) continue;
+    const built = mine.filter(e => e.kind === buildingToUse);
+    if (built.length && observation.wood < campCost + Math.max(militaryWoodReserve, dockReserve)) continue;
     if (built.length >= CAMPS_PER_RESOURCE) continue;
     // One of each until the barracks is up. Three camps and a mill is four
     // hundred wood, and a player who keeps buying them never saves the
@@ -535,15 +554,15 @@ export function exampleAiCommands(
       // Do not keep retrying a mill beside the old one as this fan rotates.
       // Its entire placement envelope must clear the existing service area.
       // #147 permits useful nearby wood/mining camps, but not duplicate mills.
-      if (camp.building === 'mill' && built.some(site =>
+      if (buildingToUse === 'mill' && built.some(site =>
         distance(site, at.node) <= CAMP_RANGE + Math.max(...CAMP_RADII))) continue;
       const home = Math.atan2(tc.y - at.node.y, tc.x - at.node.x);
       const bearing = home + CAMP_FAN[step % CAMP_FAN.length];
       const target = { x: at.node.x + Math.cos(bearing) * reach, y: at.node.y + Math.sin(bearing) * reach };
       // The mill's 2×2 placement snaps to whole tiles at the command boundary.
-      if (camp.building === 'mill' && built.some(site =>
+      if (buildingToUse === 'mill' && built.some(site =>
         distance(site, { x: Math.round(target.x), y: Math.round(target.y) }) <= CAMP_RANGE)) continue;
-      build(camp.building, target);
+      build(buildingToUse, target);
       break;
     }
   }
@@ -645,7 +664,12 @@ export function exampleAiCommands(
   // age's own price. Everything above that is spent, so a player who can
   // already afford the age is never also refusing to build soldiers.
   const banking = ageing && nextAge !== undefined
-    && army.length >= ARMY_BEFORE_AGE[Math.min(observation.age, ARMY_BEFORE_AGE.length - 1)]
+    // Permit one Dark-Age Champi before saving for Feudal; do not require it
+    // before an already affordable age-up (the research rule below is unchanged).
+    // This is example-strategy policy, not a free unit or an age-rule override:
+    // DAT1350 enables paid Scout2550 production already in the Dark Age.
+    && army.length >= (inca && observation.age === 0 ? 1
+      : ARMY_BEFORE_AGE[Math.min(observation.age, ARMY_BEFORE_AGE.length - 1)])
     && observation.food < nextAge.food + 50;
   if (ageing && nextAge && tc && !tc.researching
       && observation.food >= nextAge.food && observation.gold >= nextAge.gold) {
@@ -661,7 +685,10 @@ export function exampleAiCommands(
   const wantVillagers = VILLAGERS_BY_AGE[Math.min(observation.age, VILLAGERS_BY_AGE.length - 1)];
   // Spend what the age is not waiting for. Anything on the list it can afford
   // outright, at a building of its own that is standing idle.
-  for (const want of WISH_LIST) {
+  for (const entry of WISH_LIST) {
+    if (inca && entry.tech === 'man-at-arms' && observation.age < 1) continue;
+    const want = inca && entry.tech === 'man-at-arms'
+      ? { ...entry, tech: 'champi-runner', food: 90, gold: 60 } : entry;
     if (observation.researched.includes(want.tech)) continue;
     // Saving for an age is saving food; a technology that costs none of it
     // -- loom is fifty gold -- is not what the age is waiting for.
@@ -680,11 +707,15 @@ export function exampleAiCommands(
   }
   if (
     barracks && (barracks.buildProgress ?? 1) >= 1 && !barracks.training && !banking &&
-    observation.food >= 50 && observation.gold >= 20 + siegeGold && headroom > plannedPopulation
+    observation.food >= 50 && observation.gold >= (inca ? 25 : 20) + siegeGold && headroom > plannedPopulation
   ) {
     // Whatever the barracks actually offers: once the upgrade lands the
     // militia is gone from it, and asking for one is refused for ever.
-    const infantry = observation.researched.includes('man-at-arms') ? 'man-at-arms' : 'militia';
+    const infantry = inca
+      ? observation.researched.includes('elite-champi-warrior') ? 'dat-unit-2554'
+        : observation.researched.includes('champi-warrior') ? 'dat-unit-2552'
+          : observation.researched.includes('champi-runner') ? 'dat-unit-2588' : 'dat-unit-2550'
+      : observation.researched.includes('man-at-arms') ? 'man-at-arms' : 'militia';
     commands.push({ kind: 'train', player, buildingId: barracks.id, unit: infantry });
   }
   // Archers cost wood and gold rather than food, so they are what a player

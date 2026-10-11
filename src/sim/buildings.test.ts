@@ -66,9 +66,12 @@ describe.each(Object.entries(profiles))('%s building outcomes', (_key, source) =
     const state = fixture(source); state.players[1].age = 2;
     const university = build(state, 'university', 30, 30);
     const before = state.players[1].stone;
+    // The player's effective price: Inca tech 519 discounts wall/gate stone.
+    const price = buildingRulesFor(state, 1, 'stone-wall').cost.stone + buildingRulesFor(state, 1, 'stone-gate').cost.stone;
+    expect(price).toBe(_key === 'incas' ? 30 : 35);
     const wall = build(state, 'stone-wall');
     const gate = build(state, 'stone-gate', 44, 40.5);
-    expect(before - state.players[1].stone).toBe(35);
+    expect(before - state.players[1].stone).toBe(price);
     gate.hp -= 20; wall.hp -= 10;
     const denied = { kind: 'build' as const, player: 1 as const, builderIds: [], building: 'fortified-wall' as const, target: { x: 50.5, y: 40.5 } };
     expect(applyCommand(state, denied).ok).toBe(false);

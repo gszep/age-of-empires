@@ -1819,3 +1819,49 @@ when the result looks right. When a row is later read from a file, delete it
 | `particles/move.json`: 15 raw 800×600 frames, Once, 0.5 s, Scale 0.5, Timer Real, hidden/fog display enabled. Raw RGBA is copied without multiplying alpha, composed in private scratch (3200×2400), then scaled/pivoted by the existing particle converter. This intermediate size is **not a published atlas/residency budget**; the coordinator measures the full import. DDS/PNG tables, source hashes and optional timing/visibility metadata survive publication. | **Inferred:** an accepted command triggers the marker only if the sim's pure resolver gives at least one selected mobile unit a ground move (not garrison, tower target-clear, rally, attack or gather); no invented fallback art. Textures remain evictable: after a miss, an instance starts its clock when all pages are ready. One-shots are dropped at a 2 s wall-time cap rather than appearing stale; keyed research loops keep waiting until ready or stopped/hidden/removed. Active pages are touched, not permanently pinned. Real timers use wall time; other timers use simulation time. Delay randomness is a separate view stream seeded with `seed ^ 0x49e7`. |
 | DAT `creatable.spawning_graphic` → `spawn`; building research graphics 12289–12294 → `building_researching_glow_*` / `building_research_complete_*`. Construction dust comes from **foundation graphic deltas**, e.g. TC 355 → 12214, house 210 → 12212, not directly from the construction graphic's name. Byte-identical converted PNG pages share the first sorted effect/page URL (including glow/completion), without merging timing or hotspots. | **Inferred:** linear snapshot diff emits visible newly allocated unit/foundation IDs, resumes current research loops, and emits completion only when that building's previous technology newly enters its owner's researched list (including queued handoff). Initial/load/replay/restart/resync snapshots suppress historical one-shots; old IDs returning from fog/garrison do not count as training. Renderer visibility governs all entity feedback, with immediate culling on fog/death/removal rather than a leaking fade. Preload is limited to referenced Once effects with maximum cycle ≤1 s, plus the UI's one-shot idle-pointer exception: move/spawn/idlepointer total 7.116 MiB decoded in the coordinator's October 10 publication. Longer effects load on demand; research completion reuses its glow's resident page. |
 | Particle JSON names Terrain/Top, alpha, start/stop modes/durations, delays and cycle ranges. `idlepointer.json` is a Real-time 2 s Loop with no DAT trigger link. | **Inferred:** Terrain is a pass above ground fog/below sprites, Top above sprites; unspecified layers use sprite depth with SortBias. Cycle ranges use their midpoint; Once holds its final frame through an explicit stop fade. Missing fade duration falls back to imported legacy duration (zero if absent); native engine defaults/phase timing are uncalibrated. Alpha above 1 is saturated, **not** HDR/additive glow. Idle-villager selection shows the pointer for one cycle, 60 screen pixels above its ground hotspot. Native trigger timing/placement and perceptual parity remain uncalibrated; #319 tracks upgrade/age-up/blood, not delivered here. |
+
+## Inca source reconciliation and first playable boundaries (#199)
+
+- **Owned:** pinned DAT civ 21 (`incas`, English "Inca", help 120170), tree effect 3,
+  team effect 4, `INCAS.json`. The pinned source is the Champi/Settlement era: opening
+  scout is resource 263 = 2550 (Champi Scout → 2588 Runner → 2552 Warrior → 2554 Elite;
+  techs 1350/1402/1351/1352). Eagles 751/752/753 are not in the Inca tree and are not
+  substituted. Kamayuk 879→881 (508/509), Slinger 185 (528), Andean Sling 516,
+  Fabric Shields 517 (internally "Couriers"; no Eagles, no speed).
+- **Tree commands:** type 2 with `b = 0` disables units (Mill 68, Lumber Camp 562,
+  Mining Camp 584, Militia 74); applied generically. Type 8 (XS `cModifyTech`) with
+  attribute 12 (`cAttrSetState`), value 1 = Ready makes techs 1353, 1350, 1402, 1351,
+  1352, 528, 378 and 913 available. Ready is bookkeeping only: paid upgrades stay paid
+  and are never auto-completed. Other enabled profiles gain only provenance and empty
+  automatic nodes (Goth/Byzantine 886, Chinese 1034); no newly available unit.
+- **Settlement:** 2556 (Feudal 2558, Castle 2560), kind `settlement`, 3×3, 125 wood,
+  builder 118, 40 s, popSupport 5, accepts food/wood/gold/stone through `dropsites.json`.
+  It is a secondary research venue for the economy techs that list location 2556.
+  The open fallback carries only an inert, non-buildable placeholder.
+- **Bonuses through existing consumers:** food cost 152–155 (attribute 103 on the listed
+  classes; ordered reciprocal operands ×.85; ×1.176·×.8; ×1.25·×.75; ×1.33333·×.7 are
+  preserved with existing per-effect rounding, not idealized percentages); villager
+  Blacksmith 474–479 (class 4, gated by 113/Castle); housing 495 (+5, including
+  Settlements); stone 519 (classes 3/52/27/39 ×.85, TC forms reciprocally excluded) and
+  158 (TC ×.85, triggered by Shadow TC Annex 307).
+- **Inferred / approximate:** Andean TC ages 2–4 keep main colour art and soot inside the
+  layer-5 "shadow" deltas 13682/13698/13714. Sources, zero offsets and relative layer
+  order are DAT-derived; drawing them as one below-body layer reuses the existing
+  painter-order and building-soot interpretation. Native/browser visual calibration is
+  unverified. No decoder semantics changed.
+- **Not implemented:** team bonus tech 730 → XS EffectFunction1 (one free llama 305/1963
+  at TC annex 619) needs an XS adapter and food-bearing spawn; Xolotl 1570 and Catapult
+  Galleon are availability-only. Settlement construction→gather continuation is limited to
+  conventional camps until native behaviour is observed. Graphic 3822 is a file-less
+  particle carrier (676/2629 → 677 → 3823 `flamethrower_flame`), not missing art.
+- **Inca example strategy — chosen, not native-AI parity.** The lowest-ID observed owned
+  Champi handles scouting, including upgrades; if it is lost, the oldest observed survivor
+  (possibly a paid recruit) takes over. The strategy permits one Dark-Age army recruit
+  before saving, but never postpones an already affordable Feudal advance. The AI treats
+  Settlement as a food/wood/gold/stone bank and builds it instead of the camps the Inca
+  tree disables. These branches use the public civilisation identity because observations
+  do not yet expose buildable/bank capabilities. Boundary and scout-loss regressions cover them.
+- **Settlement reseeding — unresolved.** DAT tasks (68/2556 both empty, class 3/interface 2),
+  `hotkeys.json` (Mill actions 173/184 queue/toggle farms; the Settlement group lists only
+  research/training), `widgetui/commandpanel.json` and localization do not bind farm
+  reseeding to the Settlement. Mill-only reseeding remains; Inca reseeding is not delivered.

@@ -107,8 +107,11 @@ it.skipIf(!imported)('matches the open acceptance sets for shared buildings and 
   for (const [kind, rule] of Object.entries(FALLBACK_RULES.buildings)) {
     expect([...imported!.buildings[kind as BuildingKind].accepts].sort(), kind).toEqual([...rule.accepts].sort());
   }
+  // Imported tasks also name the Inca-only Settlement (DAT dropsites.json lists
+  // 2556); the shared comparison covers the buildings the open rules carry.
+  const shared = new Set(Object.keys(FALLBACK_RULES.buildings));
   for (const [task, rule] of Object.entries(FALLBACK_RULES.villagerGather)) {
-    expect([...(imported!.villagerGather[task as VillagerGatherTask].dropSites ?? [])].sort(), task)
+    expect([...(imported!.villagerGather[task as VillagerGatherTask].dropSites ?? [])].filter(kind => shared.has(kind)).sort(), task)
       .toEqual([...(rule.dropSites ?? [])].sort());
   }
 });

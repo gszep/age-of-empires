@@ -217,3 +217,31 @@ class AtlasCacheTest(unittest.TestCase):
         # The first save precedes any conversion, so a stale entry for a page
         # that is about to be rewritten never survives an interruption.
         self.assertEqual(save_calls, [0, 31, 62])
+
+    def test_drain_spaces_checkpoints_by_their_own_cost(self):
+        """A slow save (a large cache) pushes the next checkpoint to 10x its duration."""
+        from convert_sld import drain
+
+        clock_state = [0]
+        save_calls = []
+
+        def save():
+            save_calls.append(clock_state[0])
+            clock_state[0] += 5  # each save takes 5 s
+
+        def results():
+            for t in [10, 40, 60, 100, 120]:
+                clock_state[0] = t
+                yield (f'item{t}', None, None)
+
+        # Default interval (CHECKPOINT_SECONDS = 30). Initial save 0->5, due 5 + max(30, 50) = 55.
+        # t=60 saves (60->65, due 115); t=100 does not; t=120 saves. A fixed 30 s
+        # interval would also save at t=100.
+        import convert_sld
+        self.assertEqual(convert_sld.CHECKPOINT_SECONDS, 30)
+        drain(results, lambda item: None, save, clock=lambda: clock_state[0])
+        self.assertEqual(save_calls, [0, 60, 120])
+        # An explicit interval is honoured exactly, whatever a save costs.
+        clock_state[0], save_calls[:] = 0, []
+        drain(results, lambda item: None, save, interval=30, clock=lambda: clock_state[0])
+        self.assertEqual(save_calls, [0, 40, 100])

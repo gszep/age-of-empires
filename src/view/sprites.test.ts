@@ -535,6 +535,108 @@ function annexedAssets(): ContentAssets {
   return assets;
 }
 
+describe('TC mixed cast-shadow/body deltas (#199)', () => {
+  function fixture() {
+    const assets = annexedAssets(), tcArt = assets.entities['town-center'];
+    const idle = tcArt.animations.idle;
+    const atlas = (image: string): Atlas => ({ image, size: [16, 12], scale: 2, framesInFile: 1,
+      frames: [{ x: 0, y: 0, w: 16, h: 12, cx: 5, cy: 7 }] });
+    tcArt.animationLayers = {};
+    for (const age of ['feudal', 'castle', 'imperial']) {
+      const name = `idle-${age}`, lower = `${name}-cast-body`;
+      tcArt.animations[name] = tcArt.animations[lower] = idle;
+      for (const key of [name, lower, `${name}-shadow`, `${lower}-shadow`, `${lower}-playercolor`, `${lower}-damage`]) {
+        tcArt.atlases[key] = atlas(key);
+        assets.textures.set(key, new THREE.Texture());
+      }
+      tcArt.animationLayers[name] = [{ animation: name, x: 0, y: 0 },
+        { animation: lower, x: 0, y: 0, belowBody: true, shadow: false }];
+    }
+    const state = createGame(199);
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    state.elevation[Math.floor(tc.position.y) * state.width + Math.floor(tc.position.x)] = 2;
+    return { assets, tcArt, state, tc, view: createEntityView(assets, tc) };
+  }
+
+  it('draws both colour sources, all annexes and exactly one cast shadow in every age', () => {
+    const { assets, state, tc, view } = fixture();
+    expect(view.annexes).toHaveLength(2); // annex + extra graphic, not one replacing the other
+    updateEntityView(view, assets, state, tc, 0);
+    expect(view.annexes[0].mesh.visible).toBe(true);
+    expect(view.annexes[1].mesh.visible).toBe(false);
+    for (const [index, age] of ['feudal', 'castle', 'imperial'].entries()) {
+      state.players[1].age = index + 1;
+      updateEntityView(view, assets, state, tc, index + 1);
+      const lower = view.annexes[1], color = view.annexColors[1];
+      expect(lower.textureImage).toBe(`idle-${age}-cast-body`);
+      expect(view.body.textureImage).toBe(`idle-${age}`);
+      expect(view.annexes[0].textureImage).toBe('tc/annex0-idle.png');
+      expect([lower, color, view.body, view.annexes[0], view.annexColors[0], view.shadow]
+        .every(p => p.mesh.visible)).toBe(true);
+      expect(lower.mesh.scale.toArray()).toEqual([8, 6, 1]);
+      const origin = worldToIso(tc.position.x, tc.position.y);
+      expect(lower.mesh.position.toArray()).toEqual([origin.x + 1.5, origin.y + .5 + 2 * ELEVATION_PIXELS, 0]);
+      expect(lower.mesh.position).toEqual(view.body.mesh.position);
+      expect(view.shadow.mesh.renderOrder).toBeLessThan(lower.mesh.renderOrder);
+      expect(lower.mesh.renderOrder).toBeLessThan(color.mesh.renderOrder);
+      expect(color.mesh.renderOrder).toBeLessThan(view.body.mesh.renderOrder);
+      expect(view.body.mesh.renderOrder).toBeLessThan(view.annexes[0].mesh.renderOrder);
+      expect(view.shadow.textureImage).toBe(`idle-${age}-shadow`);
+      expect(view.layerShadows!.every(p => !p.mesh.visible)).toBe(true); // no double darkening
+    }
+  });
+
+  it('uses the existing building soot rule on the extra body, without painting over the TC back', () => {
+    const { assets, state, tc, view } = fixture();
+    state.players[1].age = 1;
+    tc.hp = tc.maxHp / 4;
+    updateEntityView(view, assets, state, tc, 0);
+    const soot = view.layerDamage![1];
+    expect(soot.mesh.visible).toBe(true);
+    expect(soot.textureImage).toBe('idle-feudal-cast-body-damage');
+    expect((soot.mesh.material as THREE.MeshBasicMaterial).opacity).toBe(.75);
+    expect((soot.mesh.material as THREE.MeshBasicMaterial).color.getHex()).toBe(0);
+    expect(soot.mesh.position).toEqual(view.annexes[1].mesh.position);
+    expect(soot.mesh.renderOrder).toBeGreaterThan(view.annexColors[1].mesh.renderOrder);
+    expect(soot.mesh.renderOrder).toBeLessThan(view.body.mesh.renderOrder);
+    tc.hp = tc.maxHp;
+    updateEntityView(view, assets, state, tc, 1);
+    expect(soot.mesh.visible).toBe(false);
+    expect(soot.pendingTexture).toBeUndefined();
+  });
+
+  it.each(['construction', 'death', 'dark-age'] as const)('retires pending lower-body pages on %s without fog resurrection', transition => {
+    const { assets, state, tc, view, tcArt } = fixture();
+    state.players[1].age = 1;
+    tc.hp = tc.maxHp / 2;
+    const image = 'idle-feudal-cast-body', texture = assets.textures.get(image)!;
+    assets.textures.delete(image);
+    const sootImage = image + '-damage', sootTexture = assets.textures.get(sootImage)!;
+    assets.textures.delete(sootImage);
+    updateEntityView(view, assets, state, tc, 0);
+    const lower = view.annexes[1];
+    expect(lower.pendingTexture).toBe(image);
+    expect(view.layerDamage![1].pendingTexture).toBe(sootImage);
+    if (transition === 'construction') {
+      tc.buildProgress = .5;
+      tcArt.animations.construction = tcArt.animations.idle;
+      tcArt.atlases.construction = tcArt.atlases.idle;
+    } else if (transition === 'death') tc.dead = true;
+    else state.players[1].age = 0;
+    updateEntityView(view, assets, state, tc, 1);
+    assets.textures.set(image, texture);
+    assets.textures.set(sootImage, sootTexture);
+    refreshEntityTextures(view, assets);
+    expect(lower.pendingTexture).toBeUndefined();
+    expect(lower.mesh.visible).toBe(false);
+    expect(view.annexColors[1].mesh.visible).toBe(false);
+    expect(view.layerDamage![1].mesh.visible).toBe(false);
+    expect(view.layerDamage![1].pendingTexture).toBeUndefined();
+    expect(view.shadow.mesh.visible).toBe(false);
+    if (transition === 'dark-age') expect(view.annexes[0].mesh.visible).toBe(true);
+  });
+});
+
 describe('the colours a player is drawn in', () => {
   it('takes them from the imported palette, not the open-content pair', () => {
     // The minimap used to read the fallback (a soft `#1a6cff` and `#e02b2b`)
@@ -1668,6 +1770,7 @@ describe('player colour through the imported ramp', () => {
       imported.atlases.death = imported.atlases.idle;
     }
     if (transition === 'layers') {
+      delete imported.annexes; // replacement art no longer names TC annexes
       imported.animationLayers = { idle: [{ animation: 'idle', x: 0, y: 0 }] };
     }
     updateEntityView(view, assets, state, tc, 1);

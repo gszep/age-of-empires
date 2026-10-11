@@ -1090,7 +1090,7 @@ class ContentImportIntegrationTest(unittest.TestCase):
         self.assertEqual(farmer["gather"], {"resource": "food", "ratePerSecond": 0.53, "capacity": 10,
                                              "task": {"actionType": 5, "unitId": 50},
                                              # The farm task names a unit, not a class: no factor.
-                                             "classFactors": {}, "dropSites": [68, 109]})
+                                             "classFactors": {}, "dropSites": [68, 109, 2556]})
         self.assertEqual(entities["villager-female-farmer"]["skinOf"], "villager-farmer")
         self.assertEqual(entities["villager-female-farmer"]["id"], 214)
 
@@ -1379,14 +1379,21 @@ class ContentImportIntegrationTest(unittest.TestCase):
             hashes.update(p['source']['sha256'])
         groups = shared_atlas_jobs(atlas_jobs(content), hashes)
         required = [group for group in groups if any(w[1].get('required') for w in group)]
-        self.assertEqual(sum(len(group) for group in required), 3 * (1 + len(content['civilizations'])))
+        self.assertEqual(sum(bool(w[1].get('required')) for group in required for w in group),
+                         3 * (1 + len(content['civilizations'])))
+        profiles = [self.result, *self.result['civilizations'].values()]
+        mixed_sources = {tc['animations'][layer['animation']]['source']
+                         for p in profiles for tc in [p['entities']['town-center']]
+                         for layers in tc.get('animationLayers', {}).values()
+                         for layer in layers if layer.get('belowBody')}
         Path('.local').mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(dir='.local', prefix='tc288-convert-') as directory:
             for group in required:
                 identifier, job, image, layer = group[0]
                 self.assertEqual(layer, 'shadow')
                 data = SOURCES.path(job['source']).read_bytes()
-                self.assertFalse(any(f is not None and not f.empty for f in decode_colors(data)))
+                self.assertEqual(any(f is not None and not f.empty for f in decode_colors(data)),
+                                 job['source'] in mixed_sources)
                 source = decode_masks(data, LAYER_SHADOW)[0]
                 out = Path(directory) / image
                 _, atlas, error = _convert_one((identifier, str(SOURCES.path(job['source'])), str(out), job['expected'], layer))
@@ -1984,18 +1991,19 @@ class ContentImportIntegrationTest(unittest.TestCase):
     def test_drop_sites_publish_building_acceptance_and_each_worker_variant(self):
         entities = self.result["entities"]
         expected = {"town-center": ["food", "wood", "gold", "stone"], "mill": ["food"],
-                    "lumber-camp": ["wood"], "mining-camp": ["gold", "stone"], "dock": ["food"]}
+                    "lumber-camp": ["wood"], "mining-camp": ["gold", "stone"], "dock": ["food"],
+                    "settlement": ["food", "wood", "gold", "stone"]}
         for key, entity in entities.items():
             if entity.get("category") == "building":
                 self.assertEqual(entity["accepts"], expected.get(key, []), key)
         self.assertTrue(entities["mill"]["acceptsLivestock"])
         self.assertTrue(entities["town-center"]["acceptsLivestock"])
         for task in ("forager", "farmer", "hunter", "shepherd"):
-            self.assertEqual(entities[f"villager-{task}"]["gather"]["dropSites"], [68, 109])
-        self.assertEqual(entities["villager-fisher"]["gather"]["dropSites"], [45, 68, 109])
-        self.assertEqual(entities["villager-lumberjack"]["gather"]["dropSites"], [109, 562])
+            self.assertEqual(entities[f"villager-{task}"]["gather"]["dropSites"], [68, 109, 2556])
+        self.assertEqual(entities["villager-fisher"]["gather"]["dropSites"], [45, 68, 109, 2556])
+        self.assertEqual(entities["villager-lumberjack"]["gather"]["dropSites"], [109, 562, 2556])
         for task in ("goldminer", "stonemason"):
-            self.assertEqual(entities[f"villager-{task}"]["gather"]["dropSites"], [109, 584])
+            self.assertEqual(entities[f"villager-{task}"]["gather"]["dropSites"], [109, 584, 2556])
         self.assertEqual(entities["fishing-ship"]["gather"]["dropSites"], [45])
         self.assertEqual(self.result["source"]["sha256"]["dropsites.json"], sha256(DAT.parent / "dropsites.json"))
         path = Path("public/imported/aoe2/manifest.json")

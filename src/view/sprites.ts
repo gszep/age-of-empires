@@ -82,6 +82,7 @@ export interface EntityView {
   annexShadows?: Piece[];
   layerShadows?: Piece[];
   layerOutlines?: Piece[];
+  layerDamage?: Piece[];
   garrisonFlags?: Piece[];
   garrisonColors?: Piece[];
   fallback: boolean;
@@ -194,7 +195,7 @@ export function createEntityView(assets: ContentAssets | undefined, entity: Enti
   }
   const annexShadows: Piece[] = [];
   if (imported?.annexes || imported?.animationLayers) {
-    const count = Math.max(imported.annexes?.length ?? 0,
+    const count = (imported.annexes?.length ?? 0) + Math.max(0,
       ...Object.values(imported.animationLayers ?? {}).map(layers => layers.length - 1));
     for (let i = 0; i < count; i++) {
       const piece = makePiece();
@@ -584,7 +585,7 @@ function configureShadow(piece: Piece, assets: ContentAssets): void {
 export function refreshEntityTextures(view: EntityView, assets: ContentAssets | undefined): void {
   if (!assets) return;
   for (const piece of [view.body, view.shadow, view.color, view.damage, view.leap,
-    ...view.annexes, ...view.annexColors, ...(view.annexShadows ?? []), ...(view.layerShadows ?? []), ...(view.layerOutlines ?? []),
+    ...view.annexes, ...view.annexColors, ...(view.annexShadows ?? []), ...(view.layerShadows ?? []), ...(view.layerOutlines ?? []), ...(view.layerDamage ?? []),
     ...(view.garrisonFlags ?? []), ...(view.garrisonColors ?? []), ...view.flames, view.outline]) {
     if (!piece) continue;
     const contour = piece === view.outline || !!view.layerOutlines?.includes(piece);
@@ -610,7 +611,7 @@ export function refreshEntityTextures(view: EntityView, assets: ContentAssets | 
  * through their trunks. Shadows and farm patches already receive ground fog. */
 export function dimFogSnapshot(view: EntityView): void {
   for (const piece of [view.body, view.color, view.outline, view.damage, view.leap,
-    ...view.annexes, ...view.annexColors,
+    ...view.annexes, ...view.annexColors, ...(view.layerDamage ?? []),
     ...(view.garrisonFlags ?? []), ...(view.garrisonColors ?? []), ...view.flames]) {
     if (piece) (piece.mesh.material as THREE.MeshBasicMaterial).color.multiplyScalar(1 - FOG_EXPLORED);
   }
@@ -687,12 +688,17 @@ export function importedEntityFor(assets: ContentAssets | undefined, entity: Ent
  * in over its own seconds when the stage begins. Neither shows on a
  * foundation, a corpse or an undamaged building.
  */
+function buildingDamageFraction(entity: Entity): number {
+  return isBuilding(entity.kind) && !entity.dead && entity.buildProgress === undefined && entity.maxHp > 0
+    ? Math.max(0, 1 - entity.hp / entity.maxHp) : 0;
+}
+
 function updateDamage(
   view: EntityView, assets: ContentAssets, state: ReadonlyGameState, entity: Entity,
   imported: ImportedEntity | undefined, animationName: string, frameIndex: number, depth: number, time: number,
 ): void {
-  const lost = entity.maxHp > 0 ? 1 - entity.hp / entity.maxHp : 0;
-  const standing = isBuilding(entity.kind) && !entity.dead && entity.buildProgress === undefined && lost > 0;
+  const lost = buildingDamageFraction(entity);
+  const standing = lost > 0;
   const damageAtlas = standing ? imported?.atlases[`${animationName}-damage`] : undefined;
   if (view.damage && damageAtlas) {
     applyFrame(view.damage, assets, damageAtlas, frameIndex, entity.position, 0x000000);
@@ -1125,10 +1131,19 @@ export function updateEntityView(
   if (!coherentUnit) clearOutlines();
   // Retire old annex masks even on early returns (missing death art). A late
   // page must not revive one in a frozen construction/death snapshot.
-  for (const piece of view.annexShadows ?? []) {
+  for (const piece of [...(view.annexShadows ?? []), ...(view.layerDamage ?? []), ...(coherentUnit ? [] : view.layerShadows ?? [])]) {
     piece.mesh.visible = false;
     piece.pendingTexture = undefined;
     piece.textureImage = undefined;
+  }
+  // Buildings can carry both annexes and extra graphic layers. Retire the
+  // previous pose's pieces/pending pages even when death has no body atlas.
+  if (!coherentUnit) {
+    for (const piece of [...view.annexes, ...view.annexColors]) {
+      piece.mesh.visible = false;
+      piece.pendingTexture = undefined;
+      piece.textureImage = undefined;
+    }
   }
   updateGarrisonFlags(view, assets, state, entity, time, hasGarrison);
   if (entity.kind === 'farm') {
@@ -1417,7 +1432,7 @@ export function updateEntityView(
 
   const annexes = imported?.annexes ?? [];
   // Upgrading a ship can add masts/sails to the same entity id and view.
-  const needed = (imported?.animationLayers?.[choice.name]?.length ?? 1) - 1;
+  const needed = annexes.length + (imported?.animationLayers?.[choice.name]?.length ?? 1) - 1;
   while (view.annexes.length < needed) {
     const piece = makePiece();
     const ramp = assets.playerRamps.get(entity.owner);
@@ -1433,14 +1448,22 @@ export function updateEntityView(
       view.group.add(shadow.mesh, outline.mesh);
     }
     for (const piece of view.layerShadows) piece.mesh.visible = false;
+    if (isBuilding(entity.kind)) {
+      view.layerDamage ??= [];
+      while (view.layerDamage.length < view.annexes.length) {
+        const damage = makePiece();
+        view.layerDamage.push(damage); view.group.add(damage.mesh);
+      }
+    }
   }
   // The town center's four annex pieces are upgraded by the same age
   // technology as the building itself, so each follows the same chain.
   const annexAge = isBuilding(entity.kind) ? ageChain(state, entity) : ['idle'];
   for (const [index, piece] of view.annexes.entries()) {
     const shadowPiece = view.annexShadows?.[index];
-    const layer = imported?.animationLayers?.[choice.name]?.[index + 1];
-    if (imported?.animationLayers) {
+    const layerIndex = index - annexes.length;
+    const layer = layerIndex >= 0 ? imported?.animationLayers?.[choice.name]?.[layerIndex + 1] : undefined;
+    if (layerIndex >= 0) {
       const colorPiece = view.annexColors[index];
       piece.mesh.visible = false;
       if (colorPiece) colorPiece.mesh.visible = false;
@@ -1448,7 +1471,8 @@ export function updateEntityView(
       const sheet = layer && imported.atlases[layer.animation];
       if (!layer || !anim || !sheet) continue;
       const frame = layerFrameIndex(anim, sheet, view.facing, elapsed, !!entity.dead);
-      const order = spriteLayerOrder(depth, 2 + index * 2);
+      const pieceOrder = layer.belowBody ? -2 : 2 + index * 2;
+      const order = spriteLayerOrder(depth, pieceOrder);
       applyFrame(piece, assets, sheet, frame, entity.position, 0xffffff);
       piece.mesh.position.x += layer.x;
       piece.mesh.position.y -= layer.y;
@@ -1459,6 +1483,7 @@ export function updateEntityView(
         ['outline', view.layerOutlines![index], view.outlineColor ?? 0xffffff],
       ] as const) {
         const maskSheet = imported.atlases[`${layer.animation}-${suffix}`];
+        if (suffix === 'shadow' && layer.shadow === false) continue;
         if (!maskSheet || entity.dead || (suffix === 'outline' && view.outlineColor === undefined)) continue;
         applyFrame(part, assets, maskSheet, frame, entity.position, tint);
         part.mesh.position.x += layer.x; part.mesh.position.y -= layer.y;
@@ -1471,8 +1496,17 @@ export function updateEntityView(
         applyFrame(colorPiece, assets, mask, frame, entity.position, colorPiece.mapNode ? 0xffffff : PLAYER_COLORS[entity.owner]);
         colorPiece.mesh.position.x += layer.x;
         colorPiece.mesh.position.y -= layer.y;
-        colorPiece.mesh.renderOrder = spriteLayerOrder(depth, 3 + index * 2);
+        colorPiece.mesh.renderOrder = spriteLayerOrder(depth, pieceOrder + 1);
         (colorPiece.mesh.material as THREE.MeshBasicMaterial).opacity = anim.alpha ?? 1;
+      }
+      const lost = buildingDamageFraction(entity);
+      const damage = view.layerDamage?.[index];
+      const damageAtlas = imported.atlases[`${layer.animation}-damage`];
+      if (damage && damageAtlas && lost > 0) {
+        applyFrame(damage, assets, damageAtlas, frame, entity.position, 0x000000);
+        damage.mesh.position.x += layer.x; damage.mesh.position.y -= layer.y;
+        damage.mesh.renderOrder = spriteLayerOrder(depth, pieceOrder + 1.5);
+        (damage.mesh.material as THREE.MeshBasicMaterial).opacity = lost;
       }
       continue;
     }
@@ -1522,6 +1556,6 @@ export function updateEntityView(
   const raise = elevationAt(state, entity.position.x, entity.position.y) * ELEVATION_PIXELS;
   for (const piece of [
     view.shadow, view.body, view.color, view.outline, ...view.annexes, ...view.annexColors,
-    ...(view.annexShadows ?? []), ...(view.layerShadows ?? []), ...(view.layerOutlines ?? []),
+    ...(view.annexShadows ?? []), ...(view.layerShadows ?? []), ...(view.layerOutlines ?? []), ...(view.layerDamage ?? []),
   ]) piece.mesh.position.y += raise;
 }
