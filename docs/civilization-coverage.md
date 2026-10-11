@@ -821,3 +821,23 @@ existing herding comparisons (#307) now run alone after the parallel stage
 checkpoint is GREEN: 1656 parallel tests (9 skips), 9 serial herding tests,
 public build, 233 owned-import tests and real-browser smoke in 572 s
 (`.local/verification/1791236984355-317966/`). Open: #304 (livestock), #306 (aura calibration).
+
+## Inca (#199; first playable slice, integrated October 12 as 9a73341)
+
+- **Source era:** pinned DAT civ 21 / `INCAS.json` is the Champi/Settlement design. Opening
+  scout is the Champi Scout (resource 263 = 2550); the Champi line 2550→2588→2552→2554 trains
+  at the Barracks. Eagles are not in this tree and are not substituted.
+- **Delivered:** selectable `incas` profile (ANDE HUD); Mill/Lumber Camp/Mining Camp/Militia
+  disabled; Settlement 2556/2558/2560 as a food/wood/gold/stone bank with housing and the
+  secondary economy-research venue; Kamayuk/Elite Kamayuk at the Castle, Slinger at the
+  Archery Range; Andean Sling, Fabric Shields; food-cost, villager-Blacksmith, housing and
+  stone bonuses through existing consumers; Andean Town Center art with its below-body layer.
+  The example AI scouts with its Champi and banks/builds through Settlements.
+- **Evidence:** `tools/test_inca.py` (12), `src/sim/inca.test.ts`, `src/sim/ai-inca.test.ts`,
+  `tools/inca_smoke.mts` (private browser: opening, art, paid research/training, reload),
+  owned checkpoint green (2006 + 291 owned import tests). Non-Inca TC manifest entries are
+  byte-identical to the previous import; every other profile marks Settlement and the Inca
+  units unavailable.
+- **Not delivered / approximate:** team bonus tech 730 (XS free llama), Settlement farm
+  reseeding (#321), Xolotl/Catapult Galleon availability only, native timing/visual
+  calibration of the Andean TC composition. Approximations are in the ledger (#199 section).
