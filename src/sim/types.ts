@@ -21,7 +21,7 @@ export type UnitKind =
   | 'trebuchet' | 'petard' | 'siege-tower' | 'king'
   | AnimalKind | NavalUnitKind;
 /** Gaia's food on the hoof: herded, or hunted where it stands. */
-export type AnimalKind = 'sheep' | 'deer' | 'boar';
+export type AnimalKind = 'sheep' | 'deer' | 'boar' | `dat-unit-${number}`;
 export type BuildingKind =
   | 'town-center' | 'barracks' | 'house'
   | 'mill' | 'lumber-camp' | 'mining-camp' | 'farm'

@@ -398,7 +398,7 @@ function researchedAttribute(
 /** Task identity is about the food source, not the shared food stockpile. */
 function villagerTaskOn(state: GameState, node: Entity): VillagerGatherTask {
   if (node.kind === 'farm') return 'farmer';
-  if (isAnimal(node.kind)) return rulesForPlayer(state, node.owner).units[node.kind].herdRange !== undefined ? 'shepherd' : 'hunter';
+  if (isAnimal(node.kind, rulesForPlayer(state, node.owner))) return rulesForPlayer(state, node.owner).units[node.kind].herdRange !== undefined ? 'shepherd' : 'hunter';
   if (isFishNode(node)) return 'fisher';
   return GATHER_TASK[node.resourceKind ?? 'food'];
 }
@@ -553,7 +553,7 @@ function isGatherable(state: GameState, entity: Entity, gatherer: Entity, claimA
     && entity.owner === gatherer.owner && entity.buildProgress === undefined && farmAvailable(state, entity, gatherer)))
     && !entity.dead && (entity.amount ?? 0) > 0;
   if (entity.kind === 'resource') return true;
-  if (isAnimal(entity.kind)) {
+  if (isAnimal(entity.kind, rulesForPlayer(state, entity.owner))) {
     // A carcass is food for whoever reaches it. A live herdable is food only
     // for the player it has walked over to; a live deer or boar has to be
     // hunted down first.
@@ -586,7 +586,7 @@ function nearbyFreeFarm(state: GameState, worker: Entity, origin: Point): Entity
 
 /** A live animal a hunter has to kill before there is anything to carry. */
 function isHuntable(state: GameState, entity: Entity): boolean {
-  return isAnimal(entity.kind) && !entity.dead && (entity.amount ?? 0) > 0
+  return isAnimal(entity.kind, rulesForPlayer(state, entity.owner)) && !entity.dead && (entity.amount ?? 0) > 0
     && rulesForPlayer(state, entity.owner).units[entity.kind].herdRange === undefined;
 }
 
@@ -692,7 +692,7 @@ export function trainableUnitsAt(state: GameState, player: PlayerId, building: B
     const unit = relocated.has(kind) ? unitRulesFor(state, player, kind) : rules.units[kind];
     return unit.trainable !== false && !!trainingAt(unit, building) && (unit.age ?? 0) <= state.players[player].age
       && (unit.requires ?? []).every(key => state.players[player].researched.includes(key))
-      && !isAnimal(kind) && civHas(state, player, 'units', unit.treeUnitId ?? unit.datId)
+      && !isAnimal(kind, rulesForPlayer(state, player)) && civHas(state, player, 'units', unit.treeUnitId ?? unit.datId)
       && !upgradedAway(state, player, kind) && !notYetUpgradedInto(state, player, kind);
   });
 }
@@ -1400,7 +1400,7 @@ function attackProfile(
     };
   }
   const rules = unitRulesForEntity(state, entity);
-  if (rules.hunt && target && isAnimal(target.kind)) return { ...rules.hunt };
+  if (rules.hunt && target && isAnimal(target.kind, rulesForPlayer(state, target.owner))) return { ...rules.hunt };
   const combat = combatOf(state, entity, target);
   return {
     range: combat.range,
@@ -1483,14 +1483,14 @@ function nextToWork(
   let best: Entity | undefined;
   let bestKey = Infinity;
   for (const candidate of state.entities) {
-    if (candidate.dead && !isAnimal(candidate.kind)) continue;
+    if (candidate.dead && !isAnimal(candidate.kind, rulesForPlayer(state, candidate.owner))) continue;
     if (candidate.resourceKind !== resource || (candidate.amount ?? 0) <= 0) continue;
     if (!isGatherable(state, candidate, entity)) continue;
     // A claimed herdable is an asset its owner walked home, not a pile
     // anybody may wander onto. Carrying on from a bush onto the flock spends
     // it without being asked (issue #21); carrying on from one sheep to the
     // next is the same job and stays, and a carcass is already spent.
-    if (isAnimal(candidate.kind) && !candidate.dead && candidate.kind !== was) continue;
+    if (isAnimal(candidate.kind, rulesForPlayer(state, candidate.owner)) && !candidate.dead && candidate.kind !== was) continue;
     const d = distance(entity.position, candidate.position);
     if (d > range) continue;
     if (!isEntityVisible(state, owner, candidate)) continue;
@@ -1501,10 +1501,10 @@ function nextToWork(
     // Finish a carcass before opening another live animal. When the old one
     // runs out, follow a fellow worker's next animal rather than each killing
     // whichever member of the flock happens to be closest (#85).
-    const alreadyWorked = isAnimal(candidate.kind) && state.entities.some(worker =>
+    const alreadyWorked = isAnimal(candidate.kind, rulesForPlayer(state, candidate.owner)) && state.entities.some(worker =>
       worker.owner === entity.owner && !worker.dead && worker.order.kind === 'gather'
       && worker.order.targetId === candidate.id);
-    const herdPriority = isAnimal(candidate.kind) ? candidate.dead ? 0 : alreadyWorked ? 1 : 2 : 0;
+    const herdPriority = isAnimal(candidate.kind, rulesForPlayer(state, candidate.owner)) ? candidate.dead ? 0 : alreadyWorked ? 1 : 2 : 0;
     const key = d + (candidate.kind === was ? 0 : 4 * (range + 1)) + herdPriority * (range + 1);
     if (key < bestKey - 1e-9 || (Math.abs(key - bestKey) <= 1e-9 && best && candidate.id < best.id)) {
       best = candidate;
@@ -1820,7 +1820,7 @@ function updateGatherer(state: GameState, grid: NavGrid, entity: Entity): void {
 
   // AoE2 turns a herdable into a carcass the moment a villager works it: the
   // sheep stops walking about and the food comes off the body.
-  if (isAnimal(node.kind) && !node.dead) kill(state, node);
+  if (isAnimal(node.kind, rulesForPlayer(state, node.owner)) && !node.dead) kill(state, node);
 
   entity.activity = 'gathering';
   if (entity.kind === 'fishing-ship') entity.fishingPosition = { ...entity.position };
@@ -2616,7 +2616,7 @@ function applyDamage(
   // a decision rather than a formality. It hangs off taking damage rather than
   // off the swing that dealt it: villagers hunt with a bow, so the blow that
   // angers a boar usually arrives as an arrow.
-  if (isAnimal(target.kind) && unitRulesForEntity(state, target).attacks.some(a => a.amount > 0)
+  if (isAnimal(target.kind, rulesForPlayer(state, target.owner)) && unitRulesForEntity(state, target).attacks.some(a => a.amount > 0)
     && target.order.kind !== 'attack') {
     const attacker = state.entities.find(e => e.id === attackerId && !e.dead);
     if (attacker && attacker.owner !== target.owner) {
@@ -2930,7 +2930,7 @@ export function useLegacyTrebuchetTargeting(state: GameState): void {
 /** Idle military units acquire the nearest living enemy in line of sight. */
 function autoAcquire(state: GameState, entity: Entity): void {
   if (entity.order.kind !== 'idle' || !isUnit(entity.kind) || entity.kind === 'villager'
-    || entity.kind === 'trade-cart' || isAnimal(entity.kind)) return;
+    || entity.kind === 'trade-cart' || isAnimal(entity.kind, rulesForPlayer(state, entity.owner))) return;
   acquireAutomaticTarget(state, entity);
 }
 
@@ -3259,7 +3259,22 @@ function completeResearch(state: GameState, owner: PlayerId, key: string): void 
       const homes = state.entities.filter(e => e.owner === owner && !e.dead && e.kind === spawn.building && e.buildProgress === undefined);
       const cap = playerAttributeFor(state, owner, 'spawnCap') ?? 0;
       for (const home of cap > 0 ? homes.slice(0, cap) : homes) {
-        for (let i = 0; i < spawn.count; i++) spawnTrainedUnit(state, home, spawn.unit, { food: 0, wood: 0, gold: 0, stone: 0 });
+        for (let i = 0; i < spawn.count; i++) {
+          // Only choice grants consume RNG; the seed is already serialized in
+          // GameState. Existing type7 single-unit grants keep their draw stream.
+          if (spawn.units?.length === 0) throw new Error('Spawn choice must not be empty');
+          const unitKind = spawn.unit ?? spawn.units![Math.floor(random01(state) * spawn.units!.length)];
+          const rules = unitRulesFor(state, owner, unitKind);
+          if (rules.foodAmount !== undefined) {
+            // Food animals are not trained troops: no rally or garrison order.
+            addEntity(state, unitKind, owner,
+              spawnPoint(state, home, rules.radius, rules.terrainRestriction ?? LAND_RESTRICTION), rules,
+              { resourceKind: 'food', amount: rules.foodAmount,
+                ...(state.scoreVersion ? { scorePaidCost: 0 } : {}) });
+          } else {
+            spawnTrainedUnit(state, home, unitKind, { food: 0, wood: 0, gold: 0, stone: 0 });
+          }
+        }
       }
     }
   }
@@ -3419,7 +3434,7 @@ function isDefeated(state: GameState, player: PlayerId): boolean {
   let unit = false;
   let production = false;
   for (const entity of state.entities) {
-    if (entity.dead || entity.owner !== player || isAnimal(entity.kind)) continue;
+    if (entity.dead || entity.owner !== player || isAnimal(entity.kind, rulesForPlayer(state, entity.owner))) continue;
     if (entity.kind === 'town-center') townCenter = true;
     if (isUnit(entity.kind) || entity.garrison?.length) unit = true;
     // "Can still produce" is asked of the rules, not of a list of building
@@ -3448,7 +3463,7 @@ function updateAnimals(state: GameState): void {
   const units: Entity[] = [];
   for (const entity of state.entities) {
     if (entity.dead || !isUnit(entity.kind)) continue;
-    if (isAnimal(entity.kind)) animals.push(entity);
+    if (isAnimal(entity.kind, rulesForPlayer(state, entity.owner))) animals.push(entity);
     else if (entity.owner !== 0) units.push(entity);
   }
   if (!animals.length || !units.length) return;
@@ -3544,7 +3559,7 @@ function stepGameBody(state: GameState): void {
   for (const entity of [...state.entities]) {
     if (entity.dead) {
       entity.decayTicks = (entity.decayTicks ?? 0) - 1;
-      if (isAnimal(entity.kind) && (entity.amount ?? 0) > 0) {
+      if (isAnimal(entity.kind, rulesForPlayer(state, entity.owner)) && (entity.amount ?? 0) > 0) {
         const rate = rulesForPlayer(state, entity.owner).units[entity.kind].foodDecayPerSecond ?? 0;
         const progress = (entity.foodDecayProgress ?? 0) + rate * TICK_SECONDS;
         const spoiled = Math.floor(progress + 1e-9);

@@ -1,4 +1,4 @@
-import type { AnimalKind, BuildingKind, Entity, EntityKind, ResourceKind, UnitKind, NavalUnitKind } from './types';
+import type { AnimalKind, BuildingKind, Entity, EntityKind, ResourceKind, UnitKind, NavalUnitKind, DeepReadonly } from './types';
 import { BUILDING_ROSTER, BUILDING_TECHS } from './buildings';
 
 export const TICK_SECONDS = 0.05;
@@ -665,8 +665,10 @@ export interface TechRules {
  * or one of the villager task variants that carry the gather rates.
  */
 export interface TechEffect {
-  /** One-shot DAT type7 grant, attached to its original automatic-tech gate. */
-  spawn?: { unit: UnitKind; building: BuildingKind; count: number };
+  /** One-shot DAT/XS grant, attached to its original automatic-tech gate. */
+  spawn?: { building: BuildingKind; count: number } & (
+    { unit: UnitKind; units?: never } | { unit?: never; units: UnitKind[] }
+  );
   /** Repeatable resource-copy multipliers reapply after additive crop research. */
   reapplyMultiplier?: boolean;
   reapplyMultiplierFrom?: PlayerAttribute;
@@ -2165,7 +2167,14 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       : FALLBACK_RULES.terrainRestrictions,
   };
   for (const [key, entity] of Object.entries(e)) {
-    if (!/^dat-unit-\d+$/.test(key) || entity.category !== 'unit') continue;
+    if (!/^dat-unit-\d+$/.test(key)) continue;
+    if (entity.category === 'animal' && entity.class === 58) {
+      result.units[key as UnitKind] = { ...unit(key, 'town-center'), trainable: false, popCost: 0,
+        foodAmount: entity.storage?.food, foodDecayPerSecond: entity.foodDecayPerSecond,
+        herdRange: entity.lineOfSight };
+      continue;
+    }
+    if (entity.category !== 'unit') continue;
     const producer = entity.train && buildingKindOf.get(entity.train.buildingId);
     if (!producer) throw new Error(`Imported unit ${key} has no supported producer`);
     result.units[key as UnitKind] = unit(key, producer);
@@ -2249,4 +2258,10 @@ const BUILDING_KINDS = new Set<string>([
 export const isUnit = (kind: EntityKind): kind is UnitKind => kind !== 'resource' && (UNIT_KINDS.has(kind) || kind in NAVAL_RULES || /^dat-unit-\d+$/.test(kind));
 export const isBuilding = (kind: EntityKind): kind is BuildingKind => kind !== 'resource' && (BUILDING_KINDS.has(kind) || kind === 'fish-trap');
 const ANIMAL_KINDS = new Set<string>(['sheep', 'deer', 'boar']);
-export const isAnimal = (kind: EntityKind): kind is AnimalKind => ANIMAL_KINDS.has(kind);
+/** Classify from this match's serialized rules, never from a process-global
+ * import registry. Legacy named animals retain their open-content identity. */
+export function isAnimal(kind: EntityKind, rules?: DeepReadonly<Pick<GameRules, 'units'>>): kind is AnimalKind {
+  if (ANIMAL_KINDS.has(kind)) return true;
+  const unit = rules?.units[kind as UnitKind];
+  return !!unit && unit.datClass === 58 && unit.foodAmount !== undefined;
+}

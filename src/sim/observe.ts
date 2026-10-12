@@ -15,6 +15,13 @@ import { observedTerrain } from '../protocol/terrain';
 import { garrisonCount, hasGarrisonFlag } from './garrison';
 import { calculateScore } from './score';
 
+/** Kind identity is public; memory must never consult the hidden live actor. */
+function livestockIdentity(state: GameState, entity: Pick<Entity, 'kind' | 'owner'>): { livestock?: true } {
+  const rules = rulesForPlayer(state, entity.owner);
+  return isAnimal(entity.kind, rules) && rules.units[entity.kind].herdRange !== undefined
+    ? { livestock: true } : {};
+}
+
 function observeEntity(state: GameState, entity: Entity, player: PlayerId): ObservedEntity {
   const observed: ObservedEntity = {
     id: entity.id,
@@ -24,6 +31,7 @@ function observeEntity(state: GameState, entity: Entity, player: PlayerId): Obse
     y: Math.round(entity.position.y * 100) / 100,
     hp: entity.dead ? 0 : Math.max(0, Math.ceil(entity.hp)),
     maxHp: entity.maxHp,
+    ...livestockIdentity(state, entity),
   };
   if (entity.resourceKind) observed.resource = entity.resourceKind;
   if (entity.node) observed.node = entity.node;
@@ -85,7 +93,7 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
   const visibleIds = new Set<number>();
   const entities: ObservedEntity[] = [];
   for (const entity of state.entities) {
-    if ((entity.dead && !(isAnimal(entity.kind) && (entity.amount ?? 0) > 0))
+    if ((entity.dead && !(isAnimal(entity.kind, rulesForPlayer(state, entity.owner)) && (entity.amount ?? 0) > 0))
       || !isEntityVisible(state, player, entity)) continue;
     visibleIds.add(entity.id);
     entities.push(observeEntity(state, entity, player));
@@ -95,6 +103,7 @@ export function observe(state: GameState, player: PlayerId): PlayerObservation {
     .sort((a, b) => a.id - b.id)
     .map(remembered => ({
       ...remembered,
+      ...livestockIdentity(state, remembered),
       lastSeenAt: Math.round(remembered.lastSeenAt * TICK_SECONDS * 100) / 100,
     }));
   const explored: string[] = [];

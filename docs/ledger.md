@@ -1849,8 +1849,20 @@ when the result looks right. When a row is later read from a file, delete it
   order are DAT-derived; drawing them as one below-body layer reuses the existing
   painter-order and building-soot interpretation. Native/browser visual calibration is
   unverified. No decoder semantics changed.
-- **Not implemented:** team bonus tech 730 → XS EffectFunction1 (one free llama 305/1963
-  at TC annex 619) needs an XS adapter and food-bearing spawn; Xolotl 1570 and Catapult
+- **Llama grant:** team effect4 makes hidden tech730 automatic through639 and
+  completed TC-annex307. Effect678 sets spawnCap1 and calls reviewed XS
+  EffectFunction1: one uniformly selected llama305/1963 at annex619. Source IDs,
+  statements, random bounds, target/count and spawn constant fail closed on drift.
+  DAT class58 and food metadata drive match-scoped herdable classification;
+  food, decay and art come from Gaia. Gathering, proximity capture, carcass
+  observation and AI return-to-TC reuse shared livestock machinery. Observation
+  v12 exposes only visible/remembered kind identity. Team benefits remain
+  owner-only in the 1v1 model. Persisted simulation RNG and existing TC-perimeter
+  spawn placement are deterministic adaptations, not native RNG/geometry
+  calibration; the existing proximity policy and AI staging remain inferred.
+  The researched ledger grants once per match, including after another TC or
+  JSON continuation. Native repeatable bookkeeping timing is not calibrated.
+- **Not implemented:** Xolotl 1570 and Catapult
   Galleon are availability-only. Settlement construction→gather continuation is limited to
   conventional camps until native behaviour is observed. Graphic 3822 is a file-less
   particle carrier (676/2629 → 677 → 3823 `flamethrower_flame`), not missing art.

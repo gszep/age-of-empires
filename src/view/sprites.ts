@@ -293,7 +293,7 @@ export function entityKey(entity: Entity): string {
  * a soldier's corpse still rots on the clock.
  */
 export function decayFraction(state: ReadonlyGameState, entity: Entity): number | undefined {
-  if (!entity.dead || !isAnimal(entity.kind)) return undefined;
+  if (!entity.dead || !isAnimal(entity.kind, rulesForPlayer(state, entity.owner))) return undefined;
   const total = rulesForPlayer(state, entity.owner).units[entity.kind].foodAmount ?? 0;
   if (total <= 0) return undefined;
   const left = Math.max(0, Math.min(total, entity.amount ?? 0));
@@ -526,7 +526,7 @@ export function chooseAnimation(state: ReadonlyGameState, entity: Entity): { key
 /** The villager variant an animal task calls for, or undefined for anything else. */
 function animalVariant(state: ReadonlyGameState, entity: Entity): string | undefined {
   const target = gatherTarget(state, entity);
-  if (!target || !isAnimal(target.kind)) return undefined;
+  if (!target || !isAnimal(target.kind, rulesForPlayer(state, target.owner))) return undefined;
   // A herdable is walked home and milked where it stands; everything else on
   // four legs is hunted. The rules already draw that line for gathering.
   return rulesForPlayer(state, target.owner).units[target.kind].herdRange !== undefined
@@ -539,7 +539,7 @@ function huntingTarget(state: ReadonlyGameState, entity: Entity): boolean {
   const order = entity.order;
   if (order.kind !== 'attack') return false;
   const target = state.entities.find(e => e.id === order.targetId);
-  return !!target && isAnimal(target.kind);
+  return !!target && isAnimal(target.kind, rulesForPlayer(state, target.owner));
 }
 
 function gatherTarget(state: ReadonlyGameState, entity: Entity): DeepReadonly<Entity> | undefined {

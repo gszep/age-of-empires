@@ -120,7 +120,8 @@ implementation policy, not a substitute for the reference compositor (#149).
 Game mode (`random-map` / `regicide`) is authoritative match input. Regicide
 starting actors, King survival through nested carriers, repeatable Treason and
 draw outcomes live in `src/sim/regicide.ts`/`game.ts`; minimap markers consume a
-read-only King-position channel, never mutate fog. Observation v11 adds the
+read-only King-position channel, never mutate fog. Observation v12 adds optional
+rule-derived livestock identity on visible/remembered entities; v11 added the
 observer's effective population ceiling and announced Wonder timers/locations
 for both players without revealing hidden entities. It retains v10's public
 score totals for both players and v9's mode,

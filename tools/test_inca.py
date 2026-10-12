@@ -279,5 +279,88 @@ class IncaSourceContractTest(unittest.TestCase):
                 {'unit': key, 'attribute': 'populationSupport', 'operation': 'add', 'amount': 5}])
 
 
+@unittest.skipUnless(DAT.exists(), 'owned DAT unavailable')
+class IncaLlamaSourceContractTest(unittest.TestCase):
+    """Inca team bonus llama: XS parsing and validation."""
+
+    def test_free_llama_parses_effect_function_1_and_validates_structure(self):
+        from scripted_effects import free_llama
+        hashes = {}
+        spec = free_llama(DAT.parent.parent, hashes)
+        self.assertEqual(spec, {'unitIds': [305, 1963], 'buildingId': 619, 'count': 1})
+        self.assertEqual(set(hashes), {'xs/Effects.xs', 'xs/Constants.xs'})
+
+    def test_hidden_team_graph_and_shared_animal_art_are_extracted(self):
+        content = extracted_content()
+        profile = content['civilizations']['incas']
+        nodes = profile['civilizationBonuses']['nodes']
+        self.assertEqual(nodes['730']['requiredTechs'], [639, 307])
+        self.assertEqual(nodes['730']['requiredTechCount'], 2)
+        self.assertTrue(nodes['730']['automatic'])
+        self.assertEqual(nodes['639']['requiredTechCount'], 0)
+        self.assertEqual(nodes['307']['triggeredByBuildings'], ['town-center'])
+        self.assertEqual(nodes['730']['effects'], [
+            {'resource': 'spawnCap', 'operation': 'set', 'amount': 1},
+            {'spawn': {'units': ['dat-unit-305', 'dat-unit-1963'], 'building': 'town-center', 'count': 1},
+             'operation': 'set', 'amount': 1}])
+        self.assertFalse(nodes['730'].get('unmodelled'))
+        self.assertNotIn('730', content['civilizationBonuses']['nodes'])
+        for p in (content, profile):
+            for uid in (305, 1963):
+                animal = p['entities'][f'dat-unit-{uid}']
+                self.assertEqual((animal['category'], animal['class'], animal['storage']['food']), ('animal', 58, 100))
+                self.assertEqual(animal['foodDecayPerSecond'], .25)
+                for action in ('idle', 'walk', 'death', 'decay'):
+                    self.assertTrue(SOURCES.path(animal['animations'][action]['source']).is_file())
+
+    def test_dispatch_uses_effect_function_not_technology_number(self):
+        from import_content import effects_of
+        from scripted_effects import free_llama
+        profile = extracted_content()['civilizations']['incas']
+        # Supply tech0 with effect678: a hardcoded tech730 branch cannot pass.
+        effects, unmodelled, unreached = effects_of(_dat(), 0, profile['entities'],
+            profile['playerAttributeIds'], effect_id=678,
+            scripted_effects={1: free_llama(DAT.parent.parent, {})})
+        self.assertEqual(effects, profile['civilizationBonuses']['nodes']['730']['effects'])
+        self.assertEqual((unmodelled, unreached), ([], []))
+        missing = dict(profile['entities'])
+        del missing['dat-unit-1963']
+        effects, _, unreached = effects_of(_dat(), 0, missing, profile['playerAttributeIds'], effect_id=678,
+            scripted_effects={1: free_llama(DAT.parent.parent, {})})
+        self.assertFalse(any('spawn' in e for e in effects))
+        self.assertTrue(any('EffectFunction1' in reason for reason in unreached))
+
+    def test_free_llama_raises_on_mutated_xs_body(self):
+        from scripted_effects import free_llama
+        common_path = DAT.parent.parent
+        xs_path = common_path / 'xs/Effects.xs'
+        original_text = xs_path.read_text(encoding='utf-8-sig')
+        constants = (common_path / 'xs/Constants.xs').read_text()
+        mutations = [('int llamaId = 305;', 'int llamaId = 306;'),
+                     ('llamaId = 1963;', 'llamaId = 305;'),
+                     ('xsGetRandomNumberLH(0, 2)', 'xsGetRandomNumberLH(0, 3)'),
+                     ('if (randomNumber == 1)', 'if (randomNumber == 0)'),
+                     ('llamaId, 619, 1, playerId', 'llamaId, 109, 1, playerId'),
+                     ('llamaId, 619, 1, playerId', 'llamaId, 619, 2, playerId'),
+                     ('llamaId, 619, 1, playerId', 'llamaId, 619, 1, 0'),
+                     ('int llamaId = 305;', 'int llamaId = 305;\n    llamaId = 1963;'),
+                     ('void EffectFunction1(', 'void MissingEffectFunction1(')]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            (tmp_path / 'xs').mkdir()
+            (tmp_path / 'xs/Constants.xs').write_text(constants)
+            for before, after in mutations:
+                with self.subTest(mutation=after):
+                    mutated = original_text.replace(before, after, 1)
+                    self.assertNotEqual(mutated, original_text)
+                    (tmp_path / 'xs/Effects.xs').write_text(mutated, encoding='utf-8-sig')
+                    with self.assertRaisesRegex(ValueError, 'EffectFunction1'):
+                        free_llama(tmp_path, {})
+            (tmp_path / 'xs/Effects.xs').write_text(original_text, encoding='utf-8-sig')
+            (tmp_path / 'xs/Constants.xs').write_text(constants.replace('cSpawnUnit = 7;', 'cSpawnUnit = 8;'))
+            with self.assertRaisesRegex(ValueError, 'cSpawnUnit'):
+                free_llama(tmp_path, {})
+
+
 if __name__ == '__main__':
     unittest.main()

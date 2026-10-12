@@ -838,6 +838,9 @@ public build, 233 owned-import tests and real-browser smoke in 572 s
   owned checkpoint green (2006 + 291 owned import tests). Non-Inca TC manifest entries are
   byte-identical to the previous import; every other profile marks Settlement and the Inca
   units unavailable.
-- **Not delivered / approximate:** team bonus tech 730 (XS free llama), Settlement farm
+- **Free llama (team bonus 730):** reviewed XS EffectFunction1 grants one llama 305/1963
+  (persisted sim RNG) at the TC; DAT class 58 + food make it a normal herdable; the AI
+  sees it through observation v12 `livestock`. Shared protocol is v10.
+- **Not delivered / approximate:** Settlement farm
   reseeding (#321), Xolotl/Catapult Galleon availability only, native timing/visual
   calibration of the Andean TC composition. Approximations are in the ledger (#199 section).

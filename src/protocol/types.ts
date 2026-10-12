@@ -1,8 +1,8 @@
 import type { Activity, Command, EntityKind, Order, PlayerId, ResourceKind, UnitKind } from '../sim/types';
 import type { NodeKind } from '../sim/data';
 
-/** v11 adds public population ceilings and Wonder countdowns; v10 added public scores; v9 added waiting research. */
-export const PROTOCOL_VERSION = 11;
+/** v12 adds optional livestock identity; v11 added population ceilings/Wonder countdowns; v10 scores; v9 waiting research. */
+export const PROTOCOL_VERSION = 12;
 /** v9 corrects Islands fish zone clearance; v8 leaves idle trebuchets packed;
  * v7 excludes buildings from Siphons charge;
  * v6 calibrates packing work/time; v5 deals all Arabia biomes;
@@ -10,6 +10,8 @@ export const PROTOCOL_VERSION = 11;
 export const MATCH_FORMAT_VERSION = 9;
 
 export interface ObservedEntity {
+  /** Public livestock identity from match rules, not ownership or current orders. */
+  livestock?: boolean;
   id: number;
   kind: EntityKind;
   owner: PlayerId | 0;
@@ -148,6 +150,8 @@ export interface MatchResult {
 }
 
 export interface RememberedEntityObservation {
+  /** Identity of the remembered kind, without consulting its hidden live entity. */
+  livestock?: boolean;
   id: number;
   kind: EntityKind;
   owner: PlayerId | 0;

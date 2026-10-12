@@ -1612,6 +1612,19 @@ def effects_of(
     for command in (dat.effects[effect_id].effect_commands if effect_id >= 0 else []):
         if command.type == 1 and command.a == 33 and command.b == 0 and scripted_effects and command.d in scripted_effects:
             aura = scripted_effects[command.d]
+            if command.d == 1:
+                choices = [next((key for key in by_id.get(uid, [])
+                                 if entities[key].get('category') == 'animal'), None)
+                           for uid in aura['unitIds']]
+                homes = [key for key, e in entities.items() if e.get('category') == 'building'
+                         and (e.get('id') == aura['buildingId'] or any(
+                             a.get('unitId') == aura['buildingId'] for a in e.get('annexes', [])))]
+                if all(choices) and len(homes) == 1:
+                    effects.append({'spawn': {'units': choices, 'building': homes[0], 'count': aura['count']},
+                                    'operation': 'set', 'amount': aura['count']})
+                else:
+                    unreached.add('EffectFunction1 requires both imported llama animals and one TC annex owner')
+                continue
             if command.d == 5:
                 for key, entity in entities.items():
                     if entity.get('class') == aura['sourceClass'] and 'skinOf' not in entity:
@@ -1919,7 +1932,7 @@ def tree_nodes(dat_path: Path, spec: dict[str, Any]) -> list[dict[str, Any]]:
     return tree["civ_techs_buildings"] + tree["civ_techs_units"]
 
 
-def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
+def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids, *, scripted_effects=None):
     """Resolve only source-addressed bonuses and their complete prerequisite graph.
 
     IDs remain DAT IDs, including foreign/unsatisfied alternatives. Tree/team
@@ -1994,7 +2007,7 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
         required = {r for r in tech.required_techs if r >= 0}
         if not required:
             continue
-        decoded[tid] = effects_of(dat, tid, entities, attribute_ids)
+        decoded[tid] = effects_of(dat, tid, entities, attribute_ids, scripted_effects=scripted_effects)
         if decoded[tid][0]:
             descendants[tid] = required
     while True:
@@ -2012,7 +2025,8 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
         # its owned civilisation help explicitly calls it free. The zero-time
         # bonus is automatic, not a paid instant button.
         free = public is not None and public["researchSeconds"] == 0
-        effects, unmodelled, unreached = decoded[tid] if tid in decoded else effects_of(dat, tid, entities, attribute_ids)
+        effects, unmodelled, unreached = decoded[tid] if tid in decoded else effects_of(
+            dat, tid, entities, attribute_ids, scripted_effects=scripted_effects)
         node = {
             "key": by_id.get(tid, f"automatic-{tid}"),
             "requiredTechs": [int(r) for r in tech.required_techs if r >= 0],
@@ -2067,7 +2081,8 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids):
             if reason in node.get('unmodelled', []):
                 node['unmodelled'].remove(reason)
     for tid, eid in [(-1, civ.tech_tree_id), (-2, civ.team_bonus_id)]:
-        effects, unmodelled, unreached = effects_of(dat, 0, entities, attribute_ids, effect_id=eid)
+        effects, unmodelled, unreached = effects_of(dat, 0, entities, attribute_ids,
+                                                  effect_id=eid, scripted_effects=scripted_effects)
         if tid in (-1, -2):
             unreached = [r for r in unreached if r not in handled]
             # Tree modifiers above are already folded into the profile tables;
@@ -2562,6 +2577,24 @@ def extract(
     if strings_path is not None and strings_path.is_file():
         strings = read_strings(strings_path)
         hashes["strings"] = sha256(strings_path)
+    # The reviewed XS spawn is a hidden automatic technology, not a public
+    # tech-tree button. Its animals need shared Gaia rules/art just like sheep
+    # (including after capture), regardless of which side receives the grant.
+    scripted_spawns = {}
+    if any(c.type == 1 and c.a == 33 and c.b == 0 and c.d == 1
+           for effect in dat.effects for c in effect.effect_commands):
+        from scripted_effects import free_llama
+        scripted_spawns[1] = free_llama(dat_path.parent.parent, hashes)
+        known = {e['unitId'] for e in spec['entities']}
+        animals = []
+        for uid in scripted_spawns[1]['unitIds']:
+            if dat.civs[spec['gaiaIndex']].units[uid].class_ != 58:
+                raise ValueError(f'EffectFunction1 animal {uid} is no longer a herdable')
+            if uid not in known:
+                animals.append({'key': f'dat-unit-{uid}', 'unitId': uid, 'civ': 'gaia', 'category': 'animal',
+                                'animations': {name: {'slot': slot} for name, slot in
+                                    [('idle', 'standing'), ('walk', 'walking'), ('death', 'dying'), ('decay', 'dead')]}})
+        spec = {**spec, 'entities': [*spec['entities'], *animals]}
     entities: dict[str, Any] = {}
     for entity_spec in spec["entities"]:
         civ_index = spec["gaiaIndex"] if entity_spec.get("civ") == "gaia" else spec["civIndex"]
@@ -2610,7 +2643,8 @@ def extract(
     technologies, skipped_technologies = technologies_from_tree(
         dat, dat_path, spec, entities, civilization, hashes, attribute_ids, strings
     )
-    bonuses = civilization_bonuses(dat, spec["civIndex"], entities, technologies, attribute_ids)
+    bonuses = civilization_bonuses(dat, spec["civIndex"], entities, technologies, attribute_ids,
+                                   scripted_effects=scripted_spawns)
     by_tech_id = {value["techId"]: key for key, value in technologies.items()}
     by_unit_id = {value["id"]: value for value in entities.values() if value.get("category") in ("unit", "building")}
     # Explicit replacements inherit their tree node's age/requirements.

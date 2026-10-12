@@ -33,7 +33,7 @@ export function contextCursor(
   if (!isUnit(first.kind)) return targetEntity ? 'attack' : 'default';
   const order = resolveUnitOrder(game, first, point, targetEntity);
   switch (order.kind) {
-    case 'attack': return first.kind === 'villager' && targetEntity && isAnimal(targetEntity.kind) ? 'hunt' : 'attack';
+    case 'attack': return first.kind === 'villager' && targetEntity && isAnimal(targetEntity.kind, rulesForPlayer(state, targetEntity.owner)) ? 'hunt' : 'attack';
     case 'build': return 'build';
     case 'repair': return 'repair';
     case 'heal': return 'heal';
@@ -45,7 +45,7 @@ export function contextCursor(
       && rulesForPlayer(game, targetEntity.owner).units[targetEntity.kind].transportCapacity ? 'board' : 'garrison';
     case 'gather': {
       const node = order.targetId === targetEntity?.id ? targetEntity : game.entities.find(e => e.id === order.targetId);
-      if (node && isAnimal(node.kind)) return 'gather_meat';
+      if (node && isAnimal(node.kind, rulesForPlayer(state, node.owner))) return 'gather_meat';
       if (node?.kind === 'fish-trap' || isFishKind(node?.node)) return 'fish';
       return node?.resourceKind === 'wood' ? 'chop' : node?.resourceKind === 'gold' ? 'mine_gold'
         : node?.resourceKind === 'stone' ? 'mine_stone' : 'gather';

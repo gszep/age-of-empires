@@ -9,6 +9,7 @@ interface Spotted {
   id: number; kind: string; owner: number; x: number; y: number; hp: number;
   resource?: ResourceKind; node?: string; amount?: number; training?: unknown; researching?: unknown;
   buildProgress?: number; order?: string;
+  livestock?: boolean;
 }
 
 
@@ -46,6 +47,10 @@ const ASSIGNMENT: ResourceKind[] = [
  * one loses both. Recorded in `docs/backlog.md`.
  */
 const HERD: string[] = ['sheep', 'deer'];
+// Legacy observations have no identity flag. Keep their sheep/deer decisions
+// unchanged; new imported livestock arrives only through the public wire.
+const livestock = (e: Spotted | undefined): boolean => !!e && (e.livestock === true || e.kind === 'sheep');
+const dinnerAnimal = (e: Spotted | undefined): boolean => !!e && (HERD.includes(e.kind) || livestock(e));
 /** Strategy staging distance around a completed TC, not an engine sheep rule.
  * Promisory/gatherers.per moves livestock to precise points by the TC; our
  * observation-only adapter uses its centre and this arrival tolerance. */
@@ -279,7 +284,7 @@ export function exampleAiCommands(
   const foodTargets = new Set(villagers.map(v => v.gatherTargetId));
   const herdHome = options.herding === false ? undefined
     : mine.find(e => e.kind === 'town-center' && e.buildProgress === undefined);
-  const incoming = new Set(mine.filter(e => e.kind === 'sheep' && e.hp > 0 && herdHome
+  const incoming = new Set(mine.filter(e => livestock(e) && e.hp > 0 && herdHome
     && distance(e, herdHome) > HERD_HOME_RADIUS).map(e => e.id));
   if (herdHome) for (const sheep of mine.filter(e => incoming.has(e.id) && e.order === 'idle')) {
     commands.push({ kind: 'order', player, entityIds: [sheep.id], target: { x: herdHome.x, y: herdHome.y } });
@@ -292,7 +297,7 @@ export function exampleAiCommands(
     returningShepherds.add(worker.id);
     commands.push({ kind: 'order', player, entityIds: [worker.id], target: { x: herdHome.x, y: herdHome.y } });
   }
-  const dinner = known.filter(e => HERD.includes(e.kind) && (e.amount ?? 0) > 0
+  const dinner = known.filter(e => dinnerAnimal(e) && (e.amount ?? 0) > 0
     && (e.hp <= 0 || e.owner === player) && !incoming.has(e.id))
     .sort((a, b) => Number(a.hp > 0) - Number(b.hp > 0)
       || Number(!foodTargets.has(a.id)) - Number(!foodTargets.has(b.id))
@@ -361,7 +366,7 @@ export function exampleAiCommands(
       if (constructionWorkers.has(worker.id) || returningShepherds.has(worker.id) || ASSIGNMENT[index % ASSIGNMENT.length] !== 'food'
         || worker.order !== 'gather' || worker.gatherTargetId === dinner.id) continue;
       const current = known.find(e => e.id === worker.gatherTargetId);
-      if (dinnerAssigned && !HERD.includes(current?.kind ?? '')) continue;
+      if (dinnerAssigned && !dinnerAnimal(current)) continue;
       commands.push({
         kind: 'order', player, entityIds: [worker.id],
         target: { x: dinner.x, y: dinner.y }, targetId: dinner.id,
@@ -621,7 +626,7 @@ export function exampleAiCommands(
   // farms whatever else it has, which is what pays for the Castle Age.
   const foodNearby = known.some(e => e.resource === 'food' && (e.amount ?? 0) > 0
     && !isFishKind(e.node)
-    && (e.kind === 'resource' || HERD.includes(e.kind))
+    && (e.kind === 'resource' || dinnerAnimal(e))
     && tc && distance(e, tc) <= FOOD_WALK);
   const farms = mine.filter(e => e.kind === 'farm');
   const farmsUnderway = farms.some(e => (e.buildProgress ?? 1) < 1);

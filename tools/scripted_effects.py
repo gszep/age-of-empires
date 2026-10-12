@@ -129,3 +129,39 @@ def healing_aura(common, hashes):
             'range': values['cTaskAttrWorkRange'],
             'hitPointsPerSecond': values['cTaskAttrWorkValue1'] / 60,
             'helpStringId': int(values['cTaskAttrGatheringSoundInt32'])}
+
+
+def free_llama(common, hashes):
+    """Inca team effect spawns a random llama at the TC annex."""
+    from import_content import sha256
+    path = common / 'xs/Effects.xs'
+    text = path.read_text(encoding='utf-8-sig')
+    hashes['xs/Effects.xs'] = sha256(path)
+    function = re.search(r'void EffectFunction1\(int playerId = -1\)\s*\{(.*?)\n\}', text, re.S)
+    if function is None:
+        raise ValueError('missing reviewed EffectFunction1')
+    body = function[1]
+    # Validate the exact structure: two unit IDs, one random choice, one spawn call.
+    statements = [line.strip() for line in body.splitlines() if line.strip()]
+    expected_shape = [
+        r'int llamaId = 305;',
+        r'int randomNumber = xsGetRandomNumberLH\(0, 2\);',
+        r'if \(randomNumber == 1\)',
+        r'\{',
+        r'llamaId = 1963;',
+        r'\}',
+        r'xsEffectAmount\(cSpawnUnit, llamaId, 619, 1, playerId\);',
+    ]
+    if len(statements) != len(expected_shape):
+        raise ValueError(f'EffectFunction1 statement count changed: {len(statements)} vs {len(expected_shape)}')
+    for i, (pattern, line) in enumerate(zip(expected_shape, statements)):
+        if not re.fullmatch(pattern, line):
+            raise ValueError(f'EffectFunction1 statement {i} changed: {line}')
+    constants_path = common / 'xs/Constants.xs'
+    constants = constants_path.read_text(encoding='utf-8-sig')
+    hashes['xs/Constants.xs'] = sha256(constants_path)
+    if not re.search(r'extern const int cSpawnUnit = 7;', constants):
+        raise ValueError('EffectFunction1 cSpawnUnit changed')
+    # The reviewed LH draw chooses each integer in [0, 2) equally. Resolve
+    # source IDs to imported keys at the call site, not inside the XS adapter.
+    return {'unitIds': [305, 1963], 'buildingId': 619, 'count': 1}

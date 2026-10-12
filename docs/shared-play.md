@@ -74,8 +74,9 @@ and requires reloading matching client code.
 
 ## Match behaviour
 
-Current source uses **protocol 4** for configurable population ceilings (#253)
-and optional Wonder countdowns (#110).
+Current source uses shared **protocol 10** (`SHARED_VERSION`): Inca Settlement and
+source herdables change local simulation, so older peers must reload (#199). Protocol 4
+introduced configurable population ceilings (#253) and optional Wonder countdowns (#110).
 The Ysgramor host and its frontend run protocol 4 since October 5; the switch
 needed no checkpoint migration because none existed. Protocol2 checkpoints are
 not migrated.

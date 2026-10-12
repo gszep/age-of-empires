@@ -59,7 +59,7 @@ export function* contextTargets(state: ReadonlyGameState, player: PlayerId, reve
       hp: memory.hp, maxHp: memory.maxHp, radius: rule.radius,
       activity: 'idle', order: { kind: 'idle' }, resourceKind: memory.resource,
       node: memory.node, amount: memory.amount, buildProgress: memory.buildProgress,
-      ...(isAnimal(memory.kind) && memory.hp <= 0 ? { dead: true } : {}),
+      ...(isAnimal(memory.kind, state.rules) && memory.hp <= 0 ? { dead: true } : {}),
     } };
   }
 }

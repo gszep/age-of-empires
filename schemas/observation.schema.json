@@ -38,7 +38,7 @@
         "x": { "type": "number" }, "y": { "type": "number" }, "remainingSeconds": { "type": "number", "minimum": 0 } },
       "required": ["owner", "entityId", "x", "y", "remainingSeconds"] } },
     "version": {
-      "const": 11
+      "const": 12
     },
     "time": {
       "type": "number",
@@ -108,6 +108,7 @@
       "items": {
         "type": "object",
         "properties": {
+          "livestock": { "type": "boolean" },
           "id": {
             "type": "integer"
           },
@@ -259,6 +260,7 @@
       "items": {
         "type": "object",
         "properties": {
+          "livestock": { "type": "boolean" },
           "id": {
             "type": "integer"
           },

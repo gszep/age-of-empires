@@ -16,15 +16,24 @@ replay driver ─┘
 production and hidden state are not strategy inputs. Text descriptions derive
 from structured observations, not from a second interpretation of the world.
 
-`src/protocol/types.ts` is authoritative for versions: observations are **v11**
-(own effective population ceiling and public Wonder completion countdowns,
+`src/protocol/types.ts` is authoritative for versions: observations are **v12**
+(optional public livestock identity, own effective population ceiling and public Wonder completion countdowns,
 plus v10's score totals and v9's own-building waiting research); new match configs/results/records
-are **v4** (score receipts/counters). Replay of v1–v3 retains pre-score hashes;
+are **v9** (`MATCH_FORMAT_VERSION`; v4 added score receipts/counters). Replay of v1–v3 retains pre-score hashes;
 replay of v1/v2 also retains the pre-queue research rules, including
 rejection of research commands sent to a busy building. Legacy v1 records mean random map
 and cannot carry newer mode/population/Wonder settings. Explored terrain is
 run-length encoded with unknown cells retained as unknown. Shared-network and
 dev-snapshot versions are separate contracts, not observation versions.
+
+### Livestock identity (v12, #199)
+
+Visible and remembered entities may carry `livestock: true`, derived from their
+kind's match rules. It describes what the animal is, not its hidden live state;
+unseen, unremembered entities are not disclosed. The field is optional, so
+observations without it remain valid at v12. The AI retains its legacy sheep/deer
+policy and also herds and eats imported livestock. Shared-play, snapshot,
+checkpoint and replay versions are unchanged.
 
 ### Public ceilings and deadlines (v11, #281)
 

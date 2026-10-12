@@ -86,8 +86,8 @@ explicit approval. No calibration acceptance is waived by these dependencies.
     #242 Siphons charge vs buildings, #267 healing stacking (trample, building
     HP rounding open), #178 conversion stats (agree), #133, #252, #269, #304,
     #306, #130, #117 (evidence docs only).
-  - Version markers now: observation protocol 11 (v9 research queue, v10
-    score, v11 ceilings/Wonders), match/recording format 9 (score, biomes,
+  - Version markers now: observation protocol 12 (v9 research queue, v10
+    score, v11 ceilings/Wonders, v12 livestock identity), match/recording format 9 (score, biomes,
     packing, Siphons, trebuchet targeting, Islands fish), shared admission 9,
     shared checkpoint 5. Older
     recordings/snapshots replay through one version-aware initialiser. Existing
