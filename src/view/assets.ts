@@ -2,12 +2,19 @@ import * as THREE from 'three/webgpu';
 import { skinFamilies, type SkinFamily } from './skins';
 import { SpriteResidency } from './sprite-residency';
 import { expandAtlasFrames } from './atlas-metadata';
+import { bcSupported, forcePng, loadBcTexture, uploadBcTexture, type BcRenderer } from './bc-pages';
 
 /** A frame's box on its page, in the page's pixels; `page` indexes `Atlas.pages` and is absent on a one-page atlas. */
 export type Frame = { x: number; y: number; w: number; h: number; cx: number; cy: number; page?: number };
-export type AtlasPage = { image: string; size: [number, number] };
+export type AtlasPage = {
+  image: string; size: [number, number];
+  /** Optional BC-compressed version: alternative to PNG. */
+  bc?: { image: string; format: 'bc1' | 'bc4' };
+};
 export type Atlas = {
   image: string; size: [number, number]; framesInFile: number; frames: Frame[];
+  /** Optional BC-compressed version for the first page. */
+  bc?: { image: string; format: 'bc1' | 'bc4' };
   /** Every page when the art outgrew one sheet; `image`/`size` are the first. */
   pages?: AtlasPage[];
   /** The art's pixels per screen unit: 1 for the base depot's `_x1` sprites
@@ -464,7 +471,7 @@ function rampTexture(color: PlayerColor, shadeLevels: number[]): THREE.DataTextu
   return texture;
 }
 
-export async function loadContentAssets(): Promise<ContentAssets | undefined> {
+export async function loadContentAssets(renderer?: BcRenderer, search = globalThis.location?.search ?? ''): Promise<ContentAssets | undefined> {
   const manifest = await fetchJson<{
     entities: Record<string, ImportedEntity>;
     civilizations?: Record<string, { entities: Record<string, ImportedEntity> }>;
@@ -478,6 +485,7 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
   }>(`${CONTENT_BASE}manifest.json`);
   if (!manifest) return undefined;
   expandAtlasFrames(manifest);
+
   const rootSkins = skinFamilies(manifest.entities);
   const civilizationSkins: Record<string, Map<string, SkinFamily[]>> = {};
   for (const [civ, profile] of Object.entries(manifest.civilizations ?? {})) {
@@ -487,6 +495,21 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     }
   }
   const textures = new Map<string, THREE.Texture>();
+  // Index after profile expansion; annexes and particle flipbooks are sprite
+  // pages too. BC4 masks retain their PNG white-RGB/alpha coverage semantics.
+  const bcPages = new Map<string, { image: string; format: 'bc1'; size: [number, number] }>();
+  const indexAtlas = (atlas: Atlas) => {
+    for (const page of [atlas, ...(atlas.pages ?? [])]) {
+      if (page.bc?.format === 'bc1') bcPages.set(page.image, { ...page.bc, format: 'bc1', size: page.size });
+    }
+  };
+  for (const entity of Object.values(manifest.entities)) {
+    for (const part of [entity, ...(entity.annexes ?? [])]) {
+      Object.values(part.atlases ?? {}).forEach(indexAtlas);
+    }
+  }
+  for (const particle of Object.values(manifest.particles ?? {})) indexAtlas(particle.atlas);
+  const useBc = renderer && bcSupported(renderer) && !forcePng(search);
   const spriteResidency = new SpriteResidency(textures);
   const loader = new THREE.TextureLoader();
   const jobs: Promise<void>[] = [];
@@ -511,27 +534,30 @@ export async function loadContentAssets(): Promise<ContentAssets | undefined> {
     }
   };
   const startTexture = (image: string) => {
-    loader.loadAsync(CONTENT_BASE + image).then(texture => {
-      texture.colorSpace = THREE.SRGBColorSpace;
-      // Sprites are x1 art drawn at 1:1 CSS pixels, so a HiDPI backing store
-      // or zoom magnifies them; nearest sampling turned that into visible
-      // blocks. Filter linearly (applyFrame insets the UVs by half a texel so
-      // neighbouring atlas frames cannot bleed in). Mipmaps stay off: they
-      // would blend across frame boundaries within the atlas. The pack's x2
-      // art is drawn at half size, where bilinear is exactly a 2x2 box.
-      texture.magFilter = THREE.LinearFilter;
-      texture.minFilter = THREE.LinearFilter;
-      texture.generateMipmaps = false;
-      // A player-colour sheet is not a picture: its RGB is the shade to look
-      // up in the player's ramp, so it must arrive as the byte the importer
-      // wrote rather than as an sRGB colour to be decoded.
-      if (/-playercolor(-p\d+)?\.png$/.test(image)) texture.colorSpace = THREE.NoColorSpace;
+    const loadPage = async () => {
+      const bc = useBc && bcPages.get(image);
+      let texture: THREE.Texture | undefined = bc ? await loadBcTexture(
+        CONTENT_BASE + bc.image, bc.format, bc.size, texture => uploadBcTexture(renderer!, texture),
+      ) : undefined;
+      if (!texture) {
+        texture = await loader.loadAsync(CONTENT_BASE + image);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        // Half-texel UV insets prevent neighbouring frame bleed. Mipmaps
+        // would mix atlas frames; x2 art at half size uses a 2x2 box filter.
+        texture.magFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearFilter;
+        texture.generateMipmaps = false;
+        // Player-colour RGB is lookup data, not an sRGB picture.
+        if (/-playercolor(-p\d+)?\.png$/.test(image)) texture.colorSpace = THREE.NoColorSpace;
+      }
       spriteResidency.add(image, texture);
       failedAt.delete(image);
-    }, error => {
+    };
+    void loadPage().catch(error => {
       failedAt.set(image, performance.now());
       console.error(`sprite page ${image} failed to load`, error);
     }).finally(() => {
+      // One completion path for BC, BC→PNG, PNG and failures.
       pending.delete(image);
       active--;
       pumpTextures();

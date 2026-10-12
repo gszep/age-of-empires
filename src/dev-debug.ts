@@ -23,6 +23,7 @@ import type { Command, Entity, GameState, Point } from './sim/types';
 import { colorStats, type ColorStats, edgeWidth, lumaProfile, matchCount } from './dev-debug-stats';
 import { worldToIso, TILE_W } from './view/iso';
 import { WALL_JOINT, WALL_POST, WALL_RUN_X, WALL_RUN_Y, wallShape } from './view/sprites';
+import type { ContentAssets } from './view/assets';
 
 export interface DebugContext {
   game(): GameState;
@@ -52,10 +53,11 @@ export interface DebugContext {
     annexes?: { mesh?: { visible?: boolean } }[];
     garrisonFlags?: { mesh: { visible: boolean; position: Point; scale: Point } }[];
   }>;
+  assets?: ContentAssets;
 }
 
 interface DebugQuery {
-  type: 'sim' | 'snapshot' | 'resync' | 'entities' | 'pixels' | 'edge' | 'command' | 'select' | 'look';
+  type: 'sim' | 'snapshot' | 'resync' | 'entities' | 'pixels' | 'edge' | 'textures' | 'command' | 'select' | 'look';
   id?: number;
   owner?: number;
   kind?: string;
@@ -72,6 +74,20 @@ interface DebugQuery {
   dead?: boolean;
   command?: Command;
   ids?: number[];
+}
+
+/** Read-only sprite residency plus format counts for the content texture map.
+ * The latter also includes terrain/water, so its total can exceed resident. */
+export function spriteTextureStats(assets?: Pick<ContentAssets, 'spriteResidency' | 'textures'>): {
+  resident: number; bytes: number; compressed: number; png: number;
+} {
+  const stats = assets?.spriteResidency?.stats;
+  let compressed = 0, png = 0;
+  for (const texture of assets?.textures.values() ?? []) {
+    if ((texture as THREE.CompressedTexture).isCompressedTexture) compressed++;
+    else png++;
+  }
+  return { resident: stats?.pages ?? 0, bytes: stats?.bytes ?? 0, compressed, png };
 }
 
 export function installDebug(context: DebugContext): void {
@@ -377,6 +393,9 @@ export function installDebug(context: DebugContext): void {
       const point = entity ? entity.position : { x: query.rect?.[0] ?? 0, y: query.rect?.[1] ?? 0 };
       context.lookAt(point);
       return { center: { x: round(point.x), y: round(point.y) } };
+    }
+    if (query.type === 'textures') {
+      return spriteTextureStats(context.assets);
     }
     throw new Error(`unknown debug query type: ${(query as { type: string }).type}`);
   }

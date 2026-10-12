@@ -1,4 +1,4 @@
-import type { Texture } from 'three/webgpu';
+import type { CompressedTexture, Texture } from 'three/webgpu';
 
 /** Presentation cache policy, not an emulation of DE's undocumented cache.
  * Active art is never evicted to meet the soft budget. A short grace keeps
@@ -29,7 +29,10 @@ export class SpriteResidency {
 
   add(image: string, texture: Texture): void {
     const size = texture.image as { width: number; height: number };
-    const bytes = size.width * size.height * 4; // RGBA8, no sprite mipmaps
+    // Every THREE.Texture has a `mipmaps` array; only compressed ones set this flag.
+    const bytes = (texture as CompressedTexture).isCompressedTexture
+      ? (texture as CompressedTexture).mipmaps.reduce((sum, mip) => sum + mip.data.byteLength, 0)
+      : size.width * size.height * 4; // RGBA8, no sprite mipmaps
     this.textures.set(image, texture);
     this.pages.set(image, { texture, bytes, used: this.now() });
     this.bytes += bytes;
@@ -53,6 +56,7 @@ export class SpriteResidency {
       // its decoded image as well as its GPU allocation; the next use rebinds
       // a newly loaded texture. THREE.Cache is disabled by default.
       page.texture.source.data = null;
+      if ((page.texture as CompressedTexture).isCompressedTexture) page.texture.mipmaps = [];
     }
   }
 

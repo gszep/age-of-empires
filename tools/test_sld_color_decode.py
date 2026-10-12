@@ -9,7 +9,7 @@ class SldColorDecodeTest(unittest.TestCase):
         # Selector row0,1,2,3, repeated. RGB565 red/green and their two blends.
         data = struct.pack('<HHI', 0xf800, 0x07e0, 0xe4e4e4e4)
         frame = ColorFrame(4, 4, 2, 3, bytearray(_decode_bc1_block(data, 0)))
-        pages, atlas = pack_color_atlas([frame], 1)
+        pages, atlas, bc_pages = pack_color_atlas([frame], 1)
         self.assertEqual(list(pages[0].get_flattened_data()),
                          [(255,0,0,255), (0,255,0,255), (170,85,0,255), (85,170,0,255)] * 4)
         self.assertEqual(atlas['frames'][0], dict(x=0,y=0,w=4,h=4,cx=2,cy=3))

@@ -71,9 +71,34 @@ PNG render readback and actual OS GPU-process memory counters. Artifacts stay
 under `.local/probes/bc163-*`. The initial RTX4060 result found memory savings
 but pixel differences. #256 subsequently corrected RGB565 endpoint promotion
 and established that legacy BC interpolation permits vendor variation. Native
-compressed loading is still pending; see `docs/block-compression-evaluation.md`
+BC1 loading for main pages shipped later under #163 (fleet acceptance below); see `docs/block-compression-evaluation.md`
 and `docs/block-decode-contract.md` rather than treating zero-PNG-difference as
 a universal hardware contract.
+
+**Fleet acceptance probe (#163):** `npx tsx tools/probes/bc_fleet_desktop.mjs`
+from WSL uses the seed-11, five-hull idle/attacking fixture from
+`tools/atlas_sharing_smoke.mts` in two fresh Windows Brave processes: default BC
+versus `?textures=png`. `BC_PROBE_PUBLIC=/absolute/path/to/public` optionally serves
+an existing publication read-only (default: this worktree's `public/`); no copy,
+symlink or import. Private Vite port 5281 (`BC_PROBE_PORT` overrides) uses explicit
+root/configFile and gzip manifest serving. A probe-only transform pauses the
+simulation/presentation clock and exposes renderer/views for full-piece residency
+checks. The snapshot must actually resume and the readback must contain fleet pixels.
+
+Windows GPU-process dedicated/committed counters are sampled after renderer init
+but before content loading, then after full scene residency and submitted GPU work.
+These whole-scene deltas include terrain/UI/driver allocations, not just sprites.
+`{type:'textures'}` reports logical sprite residency bytes/counts and BC/PNG counts
+for the content texture map (which also includes terrain/water pages, so the
+format counts' sum can exceed sprite residency).
+The actual renderer's GPUDevice identifies the adapter and BC feature. Both modes
+must use hardware BC; BC mode needs compressed pages **but may also use PNG-only
+masks/ineligible pages**; forced PNG must have no compressed pages. Hashes must
+match. Missing measurements and browser errors fail rather than skip. sRGB RGBA
+pixel differences (changed pixels, per-channel maxima/means and 256-bin absolute
+error histograms) are reported, never thresholded; this is not native-DE pixel parity.
+Outputs: `.local/probes/bc163-fleet-{bc,png,summary}.json`. Only owned browser PID
+trees are killed, cleanup IDs recorded and the private port checked free afterwards.
 
 **Decode reconciliation (#256):** add `--synthetic` to the fixture command, then
 run the desktop script with `BC_PROBE_MODE=decode BC_PROBE_READBACK=1`. This skips

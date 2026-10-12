@@ -1877,3 +1877,13 @@ when the result looks right. When a row is later read from a file, delete it
   `hotkeys.json` (Mill actions 173/184 queue/toggle farms; the Settlement group lists only
   research/training), `widgetui/commandpanel.json` and localization do not bind farm
   reseeding to the Settlement. Mill-only reseeding remains; Inca reseeding is not delivered.
+
+## Block-compressed sprite pages (#163)
+
+- **Source-backed:** BC1/BC4 bytes are the SLD's own blocks, copied without re-encoding;
+  a page is advertised only when the copy is lossless (aligned inheritance, transparent
+  or zero fringe). Geometry, hotspots and simulation are unchanged.
+- **Inferred / approximate:** hardware BC1 decoding legitimately differs from the
+  portable 8-bit decode, by up to 5/255 per channel in the RTX 4060 fleet probe.
+  Accepted per the #256 contract (no blanket image threshold). Masks remain PNG
+  (decision #323).

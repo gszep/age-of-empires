@@ -70,13 +70,30 @@ class AtlasCache:
             atlas = entry["atlas"]
             count = len(atlas.get("pages", [0])) if atlas else 0
             old = self.out / entry["image"]
-            if not all(page_path(old, page).is_file() for page in range(count)):
+            files = [(page_path(old, page), page_path(self.out / image, page)) for page in range(count)]
+            bc_pages = atlas.get("bcPages", [])
+            if bc_pages and len(bc_pages) != count:
+                continue
+            valid = True
+            for page, bc in enumerate(bc_pages):
+                if bc is None:
+                    continue
+                if bc.get('format') not in ('bc1', 'bc4'):
+                    valid = False
+                    break
+                source = page_path(old, page).with_suffix(f".{bc['format']}")
+                size = atlas.get('pages', [atlas['size']])[page]
+                if (not source.is_file() or source.stat().st_size != size[0] * size[1] // 2
+                        or hashlib.sha256(source.read_bytes()).hexdigest() != bc.get('sha256')):
+                    valid = False
+                    break
+                files.append((source, page_path(self.out / image, page).with_suffix(f".{bc['format']}")))
+            if not valid or not all(source.is_file() for source, _ in files):
                 continue
             if entry["image"] != image:
-                for page in range(count):
-                    target = page_path(self.out / image, page)
+                for source, target in files:
                     target.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(page_path(old, page), target)
+                    shutil.copyfile(source, target)
             result = dict(atlas)
             if "image" in result:
                 result["image"] = Path(image).name

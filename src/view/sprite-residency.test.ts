@@ -1,9 +1,25 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Texture } from 'three/webgpu';
+import { CompressedTexture, RGBA_S3TC_DXT1_Format, Texture } from 'three/webgpu';
 import { spriteTexture, type ContentAssets } from './assets';
 import { SpriteResidency, SPRITE_CACHE_POLICY } from './sprite-residency';
 
 describe('sprite page residency (#152)', () => {
+  it('counts real compressed buffers and releases every mip on eviction without counting ordinary empty mipmaps as BC', () => {
+    const f = fixture();
+    const texture = new CompressedTexture([
+      { data: new Uint8Array(32), width: 8, height: 8 },
+      { data: new Uint8Array(8), width: 4, height: 4 },
+    ], 8, 8, RGBA_S3TC_DXT1_Format);
+    const disposed = vi.fn(); texture.addEventListener('dispose', disposed);
+    f.residency.add('compressed', texture);
+    f.add('png');
+    expect(f.residency.stats.bytes).toBe(40 + 256);
+    f.at(121); f.residency.sweep();
+    expect(texture.mipmaps).toEqual([]);
+    expect(texture.image).toBeNull();
+    expect(disposed).toHaveBeenCalledOnce();
+    expect(f.residency.stats).toEqual({ bytes: 0, pages: 0, evictions: 2 });
+  });
   function fixture(budgetBytes = 512) {
     let clock = 0;
     const textures = new Map<string, Texture>();

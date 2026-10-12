@@ -40,8 +40,9 @@ def convert(source: Path, output: Path, expected_frames: int) -> dict[str, Any]:
     if playable == 0:
         raise ValueError(f"{source.name}: no frames decoded")
 
-    images, atlas = pack_color_atlas(frames, playable)
-    save_pages(images, output)
+    images, atlas, bc_pages = pack_color_atlas(frames, playable)
+    save_pages(images, output, bc_pages, 'bc1')
+    atlas = add_bc_to_atlas(atlas, bc_pages, 'bc1')
     atlas["framesInFile"] = len(frames)
     return {"image": output.name, **atlas}
 
@@ -52,10 +53,29 @@ def page_path(output: Path, page: int) -> Path:
     return output if page == 0 else output.with_name(f"{output.stem}-p{page}{output.suffix}")
 
 
-def save_pages(images: list[Any], output: Path) -> None:
+def save_pages(images: list[Any], output: Path, bc_pages: list[bytes | None] | None = None, bc_format: str | None = None) -> None:
+    """Save PNG pages and optionally BC pages (raw block data)."""
     output.parent.mkdir(parents=True, exist_ok=True)
     for page, image in enumerate(images):
         image.save(page_path(output, page), optimize=True)
+        # Remove obsolete alternatives too (including a formerly eligible page).
+        for fmt in ('bc1', 'bc4'):
+            target = page_path(output, page).with_suffix(f'.{fmt}')
+            payload = bc_pages[page] if bc_pages is not None and fmt == bc_format else None
+            if payload is None:
+                target.unlink(missing_ok=True)
+            else:
+                assert image.width % 4 == image.height % 4 == 0
+                assert len(payload) == image.width * image.height // 2
+                target.write_bytes(payload)
+
+
+def add_bc_to_atlas(atlas: dict[str, Any], bc_pages: list[bytes | None], bc_format: str) -> dict[str, Any]:
+    """Internal cache metadata only; URLs are derived at publication, not here."""
+    return {**atlas, "bcPages": [
+        {"format": bc_format, "sha256": hashlib.sha256(data).hexdigest()} if data is not None else None
+        for data in bc_pages
+    ]}
 
 
 MASK_LAYERS = ("shadow", "playercolor", "outline", "damage")
@@ -76,6 +96,9 @@ def convert_mask(source: Path, output: Path, expected_frames: int, layer: str) -
     up in the player's palette ramp. A damage sheet is white with the layer's
     per-pixel weight as alpha: how much of the soot a pixel takes as the
     building loses hit points (issue #73).
+
+    BC4 pages are written for shadow and damage layers only. Player-colour
+    pages are synthesised (not raw blocks), and outline uses bitstream encoding.
     """
     from sld_layers import (LAYER_DAMAGE, LAYER_PLAYERCOLOR, LAYER_SHADOW, decode_colors,
                             decode_masks, decode_outlines, pack_mask_atlas, pack_playercolor_atlas)
@@ -91,9 +114,15 @@ def convert_mask(source: Path, output: Path, expected_frames: int, layer: str) -
         return {}
     if layer == "playercolor":
         images, atlas = pack_playercolor_atlas(frames, decode_colors(data), playable)
+        save_pages(images, output)
     else:
-        images, atlas = pack_mask_atlas(frames, playable)
-    save_pages(images, output)
+        # shadow, damage, outline: pack_mask_atlas returns (images, atlas, bc_pages)
+        images, atlas, bc_pages = pack_mask_atlas(frames, playable)
+        # Only shadow and damage get BC output; outline does not
+        bc_format = 'bc4' if layer in ('shadow', 'damage') else None
+        save_pages(images, output, bc_pages if layer in ('shadow', 'damage') else None, bc_format)
+        if bc_format:
+            atlas = add_bc_to_atlas(atlas, bc_pages, bc_format)
     return atlas
 
 
@@ -232,14 +261,17 @@ def decoder_fingerprint() -> str:
     atlas -- not this whole file, which used to cost a twenty-minute
     re-decode for adding one key to the manifest dict below.
     """
-    import inspect
-
     digest = hashlib.sha256()
     digest.update(Path(__file__).with_name("sld_layers.py").read_bytes())
-    for function in (convert, convert_mask, page_path, save_pages):
-        digest.update(inspect.getsource(function).encode())
-    digest.update(repr(MASK_LAYERS).encode())
+    digest.update(conversion_dependencies().encode())
     return digest.hexdigest()
+
+
+def conversion_dependencies() -> str:
+    """One dependency list for legacy and per-layer cache identities."""
+    import inspect
+    return "\n".join(inspect.getsource(fn) for fn in
+                     (convert, convert_mask, page_path, save_pages, add_bc_to_atlas)) + repr(MASK_LAYERS)
 
 
 def convert_particles(particles: dict[str, Any], out_dir: Path) -> dict[str, Any]:
@@ -287,7 +319,7 @@ def convert_particles(particles: dict[str, Any], out_dir: Path) -> dict[str, Any
                 hotspot_y *= scale
             frames.append(ColorFrame(cut.width, cut.height, round(hotspot_x), round(hotspot_y),
                                      bytearray(cut.tobytes())))
-        images, atlas = pack_color_atlas(frames, len(frames))
+        images, atlas, bc_pages = pack_color_atlas(frames, len(frames))
         pages = []
         for index, image in enumerate(images):
             # Hash the exact published bytes. Sorted effect/page order chooses
@@ -332,9 +364,18 @@ def published(atlas: dict[str, Any], image: str, scale: int) -> dict[str, Any]:
     """The manifest's entry for a packed atlas: its image, each further page's
     image beside the first, and the art's pixels per screen unit."""
     entry = {**atlas, "image": image}
+    bc_pages = entry.pop("bcPages", [])
+
+    def alternative(page: int, png: str) -> dict[str, Any]:
+        bc = bc_pages[page] if page < len(bc_pages) else None
+        return {"bc": {"image": Path(png).with_suffix(f".{bc['format']}").as_posix(),
+                       "format": bc["format"]}} if bc else {}
+
+    entry.update(alternative(0, image))
     if "pages" in atlas:
         entry["pages"] = [
-            {"image": page_path(Path(image), page).as_posix(), "size": size}
+            {"image": (png := page_path(Path(image), page).as_posix()), "size": size,
+             **alternative(page, png)}
             for page, size in enumerate(atlas["pages"])
         ]
     if scale != 1:
@@ -515,10 +556,9 @@ def main() -> None:
     # do not define source identity. `--fresh` skips the cache entirely.
     cache_path = args.cache
     fingerprint = decoder_fingerprint()
-    import inspect
     from atlas_cache import AtlasCache, fingerprints
     layer_fingerprints = fingerprints(Path(__file__).with_name("sld_layers.py").read_text(),
-        "\n".join(inspect.getsource(fn) for fn in (convert, convert_mask, page_path, save_pages)) + repr(MASK_LAYERS))
+        conversion_dependencies())
     stored: dict[str, Any] = {}
     if cache_path.is_file() and not args.fresh:
         stored = json.loads(cache_path.read_text())
@@ -534,10 +574,17 @@ def main() -> None:
     # never fatal.
     mask_skipped: list[str] = []
     pending: list[list[AtlasWork]] = []
+    bc_counts = {layer: [0, 0] for layer in ('main', *MASK_LAYERS)}
 
     def publish_group(group: list[AtlasWork], atlas: dict[str, Any]) -> None:
         require_atlas(group, atlas)
         image = group[0][2]
+        if atlas:
+            layer = group[0][3] or 'main'
+            count = len(atlas.get('pages', [atlas['size']]))
+            eligible = sum(page is not None for page in atlas.get('bcPages', []))
+            bc_counts[layer][0] += eligible
+            bc_counts[layer][1] += count - eligible
         for identifier, job, _alias_image, layer in group:
             suffix = "" if layer is None else f"-{layer}"
             cache[identifier] = {"source": source_hashes.get(job["source"]), "expected": job["expected"],
@@ -560,7 +607,11 @@ def main() -> None:
     # `--jobs`, each decoding one source and writing its pages. The order
     # they finish in is not the order they are published in -- the manifest
     # is assembled by key -- so the output stays byte-identical.
-    from multiprocessing import Pool
+    # forkserver: workers start from a fresh interpreter instead of forking this
+    # process, whose heap (the parsed atlas cache, gigabytes of objects) would
+    # otherwise be inherited copy-on-write and progressively duplicated.
+    from multiprocessing import get_context
+    Pool = get_context("forkserver").Pool
 
     work = [(identifier, str(graphics.path(job["source"])), str(args.out / image), job["expected"], layer)
             for group in pending for identifier, job, image, layer in [group[0]]]
@@ -582,6 +633,9 @@ def main() -> None:
             print(identifier)
         drain(lambda: pool.imap_unordered(_convert_one, work), publish,
               lambda: write_cache(cache_path, fingerprint, cache))
+
+    for layer, (eligible, ineligible) in bc_counts.items():
+        print(f"bc-pages layer={layer} eligible={eligible} ineligible={ineligible} (canonical, including cache)")
 
     from civilization_profiles import art_entities
     entities: dict[str, Any] = {}

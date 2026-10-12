@@ -54,6 +54,8 @@ LAYER_PLAYERCOLOR = 0x10
 FLAG_DELTA = 0x80
 
 BLOCK = 4
+EMPTY_BC1 = bytes.fromhex("00000000ffffffff")
+EMPTY_BC4 = bytes(8)
 
 
 @dataclass
@@ -67,6 +69,8 @@ class MaskFrame:
     hotspot_x: int
     hotspot_y: int
     alpha: bytearray
+    # Raw BC4 blocks after inheritance; None means no exact block representation.
+    blocks: list[bytes] | None = None
 
     channels = 1
 
@@ -88,6 +92,8 @@ class ColorFrame:
     hotspot_x: int
     hotspot_y: int
     rgba: bytearray
+    # Raw BC1 blocks after inheritance; None means no exact block representation.
+    blocks: list[bytes] | None = None
 
     channels = 4
 
@@ -158,6 +164,88 @@ def _decode_bc1_block(data: bytes, offset: int) -> list[int]:
         values.extend(table[indices & 0b11])
         indices >>= 2
     return values
+
+
+def _extract_blocks(
+    data: bytes,
+    width: int,
+    height: int,
+    command_offset: int,
+    command_count: int,
+    delta: bool,
+    keyframe: MaskFrame | ColorFrame | None,
+    keyframe_offset: tuple[int, int],
+    layer_offset: tuple[int, int],
+    channels: int,
+) -> list[bytes] | None:
+    """Copy literal/keyframe blocks, or decline non-block-representable inheritance.
+
+    The pixel decoder clips inheritance to the keyframe's *real* box. A raw
+    boundary block is equivalent only if its clipped-away coverage is zero.
+    Trailing unspecified blocks stay empty, as in _decode_layer.
+    """
+    blocks_x = (width + BLOCK - 1) // BLOCK
+    blocks_y = (height + BLOCK - 1) // BLOCK
+    total_blocks = blocks_x * blocks_y
+    block_data = command_offset + COMMAND_COUNT.size + command_count * 2
+
+    empty = EMPTY_BC1 if channels == 4 else EMPTY_BC4
+    result = [empty] * total_blocks
+
+    def get_keyframe_block(index: int) -> bytes | None:
+        if keyframe is None:
+            return empty
+        canvas_x = (index % blocks_x) * BLOCK + layer_offset[0]
+        canvas_y = (index // blocks_x) * BLOCK + layer_offset[1]
+        src_x = canvas_x - keyframe_offset[0]
+        src_y = canvas_y - keyframe_offset[1]
+        if src_x % BLOCK or src_y % BLOCK:
+            return None
+        if not (0 <= src_x < keyframe.width and 0 <= src_y < keyframe.height):
+            return empty
+        if keyframe.blocks is None:
+            return None
+        stride = (keyframe.width + BLOCK - 1) // BLOCK
+        block = keyframe.blocks[(src_y // BLOCK) * stride + src_x // BLOCK]
+        if not _zero_fringe(block, src_x, src_y, keyframe.width, keyframe.height, channels):
+            return None
+        return block
+
+    index = 0
+    cursor = block_data
+    for command in range(command_count):
+        skip, draw = data[command_offset + COMMAND_COUNT.size + command * 2:
+                          command_offset + COMMAND_COUNT.size + command * 2 + 2]
+        if delta:
+            for _ in range(skip):
+                if index >= total_blocks:
+                    break
+                block = get_keyframe_block(index)
+                if block is None:
+                    return None
+                result[index] = block
+                index += 1
+        else:
+            index += skip
+        for _ in range(draw):
+            if index >= total_blocks or cursor + 8 > len(data):
+                break
+            result[index] = data[cursor:cursor + 8]
+            cursor += 8
+            index += 1
+    return result
+
+
+def _zero_fringe(block: bytes, x: int, y: int, width: int, height: int, channels: int) -> bool:
+    """Portable #256 alpha/coverage outside a frame must be exactly zero."""
+    if len(block) != 8:
+        return False
+    if x + BLOCK <= width and y + BLOCK <= height:
+        return True
+    values = _decode_bc1_block(block, 0) if channels == 4 else _decode_block(block, 0)
+    return all(values[(row * BLOCK + col) * channels + channels - 1] == 0
+               for row in range(BLOCK) for col in range(BLOCK)
+               if x + col >= width or y + row >= height)
 
 
 def _decode_layer(
@@ -376,7 +464,15 @@ def _decode_wanted(
                     bool(flags & FLAG_DELTA), keyframe, keyframe_offset, (x1, y1),
                     channels, decode_block,
                 )
-                found = factory(width, height, hotspot_x - x1, hotspot_y - y1, pixels)
+                # Extract blocks for BC layers (but not for outline which uses bitstream)
+                blocks = None
+                if mask in (LAYER_MAIN, LAYER_SHADOW, LAYER_DAMAGE):
+                    blocks = _extract_blocks(
+                        data, width, height, cursor, count,
+                        bool(flags & FLAG_DELTA), keyframe,
+                        keyframe_offset, (x1, y1), channels,
+                    )
+                found = factory(width, height, hotspot_x - x1, hotspot_y - y1, pixels, blocks)
                 if not flags & FLAG_DELTA:
                     keyframe = found
                     keyframe_offset = (x1, y1)
@@ -398,6 +494,11 @@ def _decode_wanted(
 MAX_SHEET = 8192
 
 
+def _ceil4(value: int) -> int:
+    """Round up to the nearest multiple of 4."""
+    return (value + 3) // 4 * 4
+
+
 def _shelf_pack(
     usable: list[MaskFrame | ColorFrame | None],
 ) -> tuple[list[dict[str, int]], list[tuple[int, int]]]:
@@ -411,11 +512,14 @@ def _shelf_pack(
     quadruples every sheet, and the unpacked trebuchet's attack already filled
     one -- the packing continues on a further page: every placement names its
     page, and the pages' sizes come back in order. Placements are indexed by
-    frame, so the physical order on the sheets is free to differ."""
+    frame, so the physical order on the sheets is free to differ.
+
+    All positions are aligned to 4-pixel boundaries, and reserved space is
+    rounded up to 4-pixel multiples to support BC block packing."""
     boxes = [(f.width, f.height) if f else (0, 0) for f in usable]
     widest = max((w for w, _ in boxes), default=1)
     columns = max(1, int(len(usable) ** 0.5))
-    sheet_width = max(1, widest * columns)
+    sheet_width = max(1, _ceil4(widest * columns))
     order = list(range(len(usable)))
     if sheet_width > MAX_SHEET:
         sheet_width = MAX_SHEET
@@ -434,21 +538,24 @@ def _shelf_pack(
             continue
         if height > MAX_SHEET:
             raise ValueError(f"a frame is {height} tall, over the {MAX_SHEET} device limit")
-        if x + width > sheet_width and x > 0:
+        # Reserve space rounded up to 4-pixel boundaries
+        reserved_width = _ceil4(width)
+        reserved_height = _ceil4(height)
+        if x + reserved_width > sheet_width and x > 0:
             x = 0
             y += row_height
             row_height = 0
-        if y + height > MAX_SHEET:
-            pages.append((sheet_width, max(1, y + row_height)))
+        if y + reserved_height > MAX_SHEET:
+            pages.append((_ceil4(sheet_width), _ceil4(max(1, y + row_height))))
             page += 1
             x = y = row_height = 0
         placements[index] = {
             "x": x, "y": y, "w": width, "h": height,
             "cx": frame.hotspot_x, "cy": frame.hotspot_y, "page": page,
         }
-        x += width
-        row_height = max(row_height, height)
-    pages.append((sheet_width, max(1, y + row_height)))
+        x += reserved_width
+        row_height = max(row_height, reserved_height)
+    pages.append((_ceil4(sheet_width), _ceil4(max(1, y + row_height))))
     return placements, pages
 
 
@@ -469,8 +576,8 @@ def _atlas(placements: list[dict[str, int]], pages: list[tuple[int, int]]) -> di
     return atlas
 
 
-def pack_mask_atlas(frames: list[MaskFrame | None], limit: int) -> tuple[Any, dict[str, Any]]:
-    """Pack the first `limit` masks into greyscale-alpha atlas pages.
+def pack_mask_atlas(frames: list[MaskFrame | None], limit: int) -> tuple[Any, dict[str, Any], list[bytes | None]]:
+    """Pack the first `limit` masks into greyscale-alpha atlas pages, plus BC4 pages.
 
     Frame order matches the main layer, so the renderer reuses the frame index
     it already computed.
@@ -492,7 +599,8 @@ def pack_mask_atlas(frames: list[MaskFrame | None], limit: int) -> tuple[Any, di
     # through this, so the sheet has to stay neutral: baking a colour in here
     # would multiply to that colour, and baking black would multiply to black.
     rgba = [Image.merge("RGBA", [Image.new("L", image.size, 255)] * 3 + [image]) for image in images]
-    return rgba, _atlas(placements, pages)
+    bc_pages = _build_bc_pages(placements, usable, pages, 'bc4')
+    return rgba, _atlas(placements, pages), bc_pages
 
 
 def luminance(red: int, green: int, blue: int) -> int:
@@ -511,6 +619,8 @@ def pack_playercolor_atlas(
     needs is the main layer's luma there and the mask is its alpha. The mask
     layer carries no geometry of its own - it covers the main layer's box - so
     the two frames are the same size and index alike.
+
+    Player-colour pages are synthesised (not raw BC blocks), so no BC output.
     """
     from PIL import Image
 
@@ -538,8 +648,49 @@ def pack_playercolor_atlas(
     return rgba, _atlas(placements, pages)
 
 
-def pack_color_atlas(frames: list[ColorFrame | None], limit: int) -> tuple[Any, dict[str, Any]]:
-    """Pack the first `limit` main-layer frames into RGBA atlas pages."""
+def _build_bc_pages(placements: list[dict[str, int]], usable: list[Any], pages: list[tuple[int, int]], bc_format: str) -> list[bytes | None]:
+    """Build exact source-block alternatives; None marks a PNG-only page.
+
+    Aligned padded reservations never overlap. Check each boundary block's
+    fringe before copying: PNG clips it, but raw BC sampling would not.
+    """
+    empty = EMPTY_BC1 if bc_format == 'bc1' else EMPTY_BC4
+    channels = 4 if bc_format == 'bc1' else 1
+
+    bc_pages = []
+    for page, (page_width, page_height) in enumerate(pages):
+        blocks_x = page_width // 4
+        page_blocks = [empty] * (blocks_x * (page_height // 4))
+        eligible = True
+        for placement, frame in zip(placements, usable):
+            if frame is None or placement["w"] == 0 or placement["page"] != page:
+                continue
+            frame_blocks_x = (frame.width + 3) // 4
+            frame_blocks_y = (frame.height + 3) // 4
+            if frame.blocks is None or len(frame.blocks) != frame_blocks_x * frame_blocks_y:
+                eligible = False
+                break
+            for i, block in enumerate(frame.blocks):
+                x, y = (i % frame_blocks_x) * 4, (i // frame_blocks_x) * 4
+                if not _zero_fringe(block, x, y, frame.width, frame.height, channels):
+                    eligible = False
+                    break
+                page_index = ((placement['y'] + y) // 4) * blocks_x + (placement['x'] + x) // 4
+                page_blocks[page_index] = block
+            if not eligible:
+                break
+
+        if eligible:
+            payload = b''.join(page_blocks)
+            assert len(payload) == page_width * page_height // 2
+            bc_pages.append(payload)
+        else:
+            bc_pages.append(None)
+    return bc_pages
+
+
+def pack_color_atlas(frames: list[ColorFrame | None], limit: int) -> tuple[Any, dict[str, Any], list[bytes | None]]:
+    """Pack the first `limit` main-layer frames into RGBA atlas pages, plus BC1 pages."""
     from PIL import Image
 
     usable = [f if (f is not None and not f.empty) else None for f in frames[:limit]]
@@ -553,7 +704,8 @@ def pack_color_atlas(frames: list[ColorFrame | None], limit: int) -> tuple[Any, 
             Image.frombytes("RGBA", (frame.width, frame.height), bytes(frame.rgba)),
             (placement["x"], placement["y"]),
         )
-    return images, _atlas(placements, pages)
+    bc_pages = _build_bc_pages(placements, usable, pages, 'bc1')
+    return images, _atlas(placements, pages), bc_pages
 
 
 def mask_summary(frames: list[MaskFrame | None]) -> dict[str, Any]:

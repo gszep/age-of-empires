@@ -77,7 +77,7 @@ app.appendChild(renderer.domElement);
 await renderer.init();
 
 let [assets, uiAssets, audioAssets] = await Promise.all([
-  loadContentAssets(), loadUiAssets(), loadAudioAssets(),
+  loadContentAssets(renderer), loadUiAssets(), loadAudioAssets(),
 ]);
 let preferences = loadPreferences();
 const requestedPalette = new URLSearchParams(location.search).get('uiPalette');
@@ -599,6 +599,8 @@ async function installDevelopmentDebug(): Promise<void> {
     scene,
     camera,
     views,
+    // A getter: asset hot replacement reassigns `assets` (see import.meta.hot below).
+    get assets() { return assets; },
   });
 }
 
@@ -2317,7 +2319,7 @@ if (import.meta.hot) {
     async ([world, sprites, hudModule, assetsModule]) => {
       if (assetsModule) {
         [assets, uiAssets, audioAssets] = await Promise.all([
-          assetsModule.loadContentAssets(),
+          assetsModule.loadContentAssets(renderer),
           assetsModule.loadUiAssets(),
           assetsModule.loadAudioAssets(),
         ]);

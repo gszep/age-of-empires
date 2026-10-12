@@ -910,8 +910,12 @@ class ContentImportIntegrationTest(unittest.TestCase):
                         f"{key}/{name} ({page['image']}) is {width}x{height}, over the 8192 device limit",
                     )
                     self.assertTrue((manifest.parent / page["image"]).is_file(), page["image"])
+                    if "bc" in page:  # #163: a lossless block sidecar of the same page
+                        self.assertTrue((manifest.parent / page["bc"]["image"]).is_file(), page["bc"]["image"])
                 if "pages" in atlas:
-                    self.assertEqual(atlas["pages"][0], {"image": atlas["image"], "size": atlas["size"]})
+                    first = {"image": atlas["image"], "size": atlas["size"],
+                             **({"bc": atlas["bc"]} if "bc" in atlas else {})}
+                    self.assertEqual(atlas["pages"][0], first)
                     self.assertEqual(
                         len(atlas["pages"]), 1 + max(frame.get("page", 0) for frame in atlas["frames"]),
                         f"{key}/{name} lists a page no frame is on",
@@ -2161,7 +2165,7 @@ class AtlasPackingTest(unittest.TestCase):
         # Five frames 8000 wide and 3000 tall: one per row, two rows per
         # page, so three pages, and every frame keeps its own index.
         frames = [ColorFrame(8000, 3000, 10 * i, 7, bytearray(b"\xff" * (8000 * 3000 * 4))) for i in range(5)]
-        images, atlas = pack_color_atlas(frames, len(frames))
+        images, atlas, bc_pages = pack_color_atlas(frames, len(frames))
         self.assertEqual(atlas["pages"], [[MAX_SHEET, 6000], [MAX_SHEET, 6000], [MAX_SHEET, 3000]])
         self.assertEqual(atlas["size"], [MAX_SHEET, 6000])
         self.assertEqual([image.size for image in images], [(MAX_SHEET, 6000), (MAX_SHEET, 6000), (MAX_SHEET, 3000)])
@@ -2173,7 +2177,7 @@ class AtlasPackingTest(unittest.TestCase):
     def test_a_sheet_that_fits_keeps_the_one_page_shape(self):
         from sld_layers import ColorFrame, pack_color_atlas
         frames = [ColorFrame(4, 4, 1, 1, bytearray(64)) for _ in range(3)]
-        images, atlas = pack_color_atlas(frames, 3)
+        images, atlas, bc_pages = pack_color_atlas(frames, 3)
         self.assertEqual(len(images), 1)
         self.assertNotIn("pages", atlas)
         self.assertTrue(all("page" not in frame for frame in atlas["frames"]))

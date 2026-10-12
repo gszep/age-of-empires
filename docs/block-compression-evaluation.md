@@ -132,3 +132,40 @@ multi-page geometry, synthesized player shading, mask swizzles, fallback loading
 residency/disposal and full-renderer pixel/simulation-hash equivalence. No full
 atlas regeneration was needed for this evaluation; any production regeneration
 must still go through `npm run import:aoe2`.
+
+## First production rollout (October 12, 2026)
+
+Implemented under #163 with the evidence-backed format contract from #256:
+
+- **Import:** one geometry for PNG and BC. `_shelf_pack` places frames at 4-aligned
+  offsets with 4-padded reservations; frame boxes and hotspots are unchanged. Main
+  pages publish a raw `.bc1` sidecar and shadow/damage pages a raw `.bc4` sidecar,
+  copied from source blocks (keyframe inheritance at block granularity). A page gets
+  `bc: {image, format}` only when it is a lossless copy: block-aligned inheritance and
+  zero portable-#256 alpha/coverage outside every frame box. Otherwise it stays
+  PNG-only; there is no re-encoding. Player-colour (synthesised) and outline (bitstream)
+  are PNG-only. Cache reuse validates sidecar length and hash.
+- **Full import:** every eligible page qualified (main 1716, shadow 1725, damage 315;
+  zero ineligible). PNG page area is unchanged (1.0000×). The owned tree grew
+  56 → 74 GB (`.bc1` 7.8 GB, `.bc4` 9.7 GB; BC4 is currently unused, decision #323).
+  The conversion pool now uses `forkserver`, so workers no longer inherit the parsed
+  cache heap: 3 workers instead of 1, about 4¼ h for a full rebuild.
+- **Renderer:** BC1 main pages only, when the initialized renderer reports
+  `texture-compression-bc` (WebGL needs S3TC + S3TC-sRGB). Otherwise, or on
+  fetch/validation/upload error, it falls back to PNG per page. `initTexture` forces the
+  upload before publication; later draw errors and device loss are not recovered. BC
+  sampling uses a texture-only vertical flip, so PNG UVs are unchanged. `?textures=png`
+  forces PNG. Masks stay PNG (`MeshBasicMaterial` alpha semantics).
+- **Native acceptance** (`BC_PROBE_PUBLIC=… npx tsx tools/probes/bc_fleet_desktop.mjs`,
+  Windows Brave, RTX 4060, non-fallback adapter, fresh process per mode, same fleet
+  scene). Simulation hashes are identical (`a9e367cc`); no browser/GPU errors.
+  - Sprite residency fell 888,361,216 → 712,906,272 bytes (−20%), with 60 resident
+    sprite pages in both modes.
+  - OS dedicated GPU-process delta fell 895,582,208 → 828,903,424 bytes (−7.4%).
+    This counter includes terrain, water, masks and driver pooling; only 19 textures
+    were BC.
+  - sRGB pixels: 32,255 of 615,600 changed, max |Δ| RGBA [5,5,3,0], mean
+    ≤ 0.053/255. These are reported, not thresholded: hardware BC1 interpolation
+    legitimately differs from one 8-bit decode (docs/block-decode-contract.md).
+- **Not established:** native DE composited parity, BC4 masks, frame-time effects,
+  and memory on other GPUs. Receipts are in `.local/orchestrator/163/`.

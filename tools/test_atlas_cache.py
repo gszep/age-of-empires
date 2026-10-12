@@ -2,11 +2,71 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from atlas_cache import AtlasCache, LAYERS, fingerprints
 
 
 class AtlasCacheTest(unittest.TestCase):
+    def test_bc_sidecars_relocate_and_match_fresh_multipage_bytes_and_metadata(self):
+        from convert_sld import convert, convert_mask, published
+        from test_bc_pages import sld, record, RED, COVERAGE
+        from sld_layers import LAYER_MAIN, LAYER_SHADOW, LAYER_DAMAGE
+        for layer, bit, block in [('main', LAYER_MAIN, RED), ('shadow', LAYER_SHADOW, COVERAGE),
+                                  ('damage', LAYER_DAMAGE, COVERAGE)]:
+            with self.subTest(layer=layer), tempfile.TemporaryDirectory() as directory, patch('sld_layers.MAX_SHEET', 4):
+                out = Path(directory)
+                source = out / 'fixture.sld'
+                source.write_bytes(sld([record(blocks=(block,))] * 3, bit))
+
+                def generate(image):
+                    return (convert(source, out / image, 3) if layer == 'main' else
+                            convert_mask(source, out / image, 3, layer))
+
+                original = generate('old/body.png')
+                entry = dict(source='sha', expected=3, layer=layer, decoder='valid',
+                             image='old/body.png', atlas=original)
+                # JSON round-trip exercises the on-disk cache, not object identity.
+                stored = json.loads(json.dumps({'schema': 2, 'atlases': {'old:idle': entry}}))
+                cache = AtlasCache(stored, dict.fromkeys(LAYERS, 'valid'), 'legacy', out)
+                reused = cache.reuse('sha', 3, layer, 'new/idle.png')
+                fresh = generate('fresh/idle.png')
+                manifest = published(reused, 'new/idle.png', 2)
+                self.assertEqual(manifest, published(fresh, 'new/idle.png', 2))
+                self.assertEqual(original, stored['atlases']['old:idle']['atlas'])
+                self.assertEqual(len(manifest['pages']), 3)
+                for page in manifest['pages']:
+                    for url in (page['image'], page['bc']['image']):
+                        self.assertEqual((out / url).read_bytes(), (out / url.replace('new/', 'fresh/')).read_bytes())
+
+                # Missing first/continuation sidecars, wrong length and obsolete
+                # same-length data all force regeneration before ANY relocation.
+                for page in published(original, 'old/body.png', 1)['pages']:
+                    sidecar = out / page['bc']['image']
+                    good = sidecar.read_bytes()
+                    for bad in (None, good[:-1], bytes(byte ^ 255 for byte in good)):
+                        if bad is None:
+                            sidecar.unlink()
+                        else:
+                            sidecar.write_bytes(bad)
+                        self.assertIsNone(cache.reuse('sha', 3, layer, 'incomplete/idle.png'))
+                        self.assertFalse((out / 'incomplete').exists())
+                        sidecar.write_bytes(good)
+
+    def test_output_helpers_invalidate_both_cache_identities(self):
+        import inspect
+        import convert_sld
+        source = Path(__file__).with_name('sld_layers.py').read_text()
+        baseline = fingerprints(source, convert_sld.conversion_dependencies())
+        legacy = convert_sld.decoder_fingerprint()
+        original = inspect.getsource
+        for name in ('convert', 'convert_mask', 'page_path', 'save_pages', 'add_bc_to_atlas'):
+            with self.subTest(helper=name), patch('inspect.getsource', side_effect=lambda fn:
+                    original(fn) + ('\n# dependency probe' if fn.__name__ == name else '')):
+                changed = fingerprints(source, convert_sld.conversion_dependencies())
+                self.assertEqual({layer for layer in LAYERS if changed[layer] != baseline[layer]}, set(LAYERS))
+                self.assertNotEqual(convert_sld.decoder_fingerprint(), legacy)
+
     def test_conversion_budget_uses_cpu_and_memory_without_changing_decoder_identity(self):
         from convert_sld import conversion_workers, decoder_fingerprint
         gib = 1024 ** 3
@@ -51,6 +111,9 @@ class AtlasCacheTest(unittest.TestCase):
             'decode_outline_layer': {'outline'},
             '_shelf_pack': set(LAYERS),
             '_decode_wanted': set(LAYERS),
+            '_extract_blocks': set(LAYERS),
+            '_zero_fringe': set(LAYERS),
+            '_build_bc_pages': set(LAYERS),
         }
         for name, expected in cases.items():
             # Inject a statement at the actual dependency boundary, without
