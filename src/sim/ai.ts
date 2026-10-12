@@ -4,6 +4,7 @@ import { distance } from './nav';
 import type { PlayerObservation } from '../protocol/types';
 import { DOCK_WOOD, FISHING_SHIP_WOOD, fishingWater, fishingDockSite, fishingOrders, fishingProducer, plannedWood } from './ai-fishing';
 import { CASTLE_STONE, TREBUCHET_BUDGET, enemyWonderDeadline, siegePlan } from './ai-siege';
+import { observedBuildingSites } from './ai-placement';
 
 interface Spotted {
   id: number; kind: string; owner: number; x: number; y: number; hp: number;
@@ -282,6 +283,10 @@ export function exampleAiCommands(
   // stable while workers walk or bank food. Promisory/gatherers.per likewise
   // tracks current-livestock by id instead of inferring work from proximity.
   const foodTargets = new Set(villagers.map(v => v.gatherTargetId));
+  // A farmer reserves its plot while walking and banking, not only while
+  // gathering. Own public gatherTargetId covers all those phases. Reserve
+  // this decision's assignments too, before the commands reach the sim.
+  const reservedFarms = new Set(villagers.filter(v => v.order === 'gather').map(v => v.gatherTargetId));
   const herdHome = options.herding === false ? undefined
     : mine.find(e => e.kind === 'town-center' && e.buildProgress === undefined);
   const incoming = new Set(mine.filter(e => livestock(e) && e.hp > 0 && herdHome
@@ -314,7 +319,7 @@ export function exampleAiCommands(
       .filter(e => e.resource === wanted && (e.amount ?? 1) > 0
         && !isFishKind(e.node)
         && (e.kind === 'resource' || e.id === dinner?.id
-          || (e.kind === 'farm' && e.owner === player && (e.buildProgress ?? 1) >= 1)))
+          || (e.kind === 'farm' && e.owner === player && e.buildProgress === undefined && !reservedFarms.has(e.id))))
       // A claimed herdable first, as the reference opening eats sheep before
       // berries -- and since the map's distance bands became the original's
       // boxes, the near sheep can stand in a band corner a few tiles beyond
@@ -324,6 +329,7 @@ export function exampleAiCommands(
         || distance(villager, a) - distance(villager, b) || a.id - b.id)[0];
     if (node) {
       if (node.id === dinner?.id) dinnerAssigned = true;
+      if (node.kind === 'farm') reservedFarms.add(node.id);
       commands.push({
         kind: 'order', player, entityIds: [villager.id],
         target: { x: node.x, y: node.y }, targetId: node.id,
@@ -410,11 +416,18 @@ export function exampleAiCommands(
    * for the first four minutes because the house was always overwritten.
    */
   let builderTasked = constructionWorkers.size > 0;
-  const build = (building: BuildingKind, target: { x: number; y: number }) => {
-    if (builderTasked || !idleBuilder) return;
+  // Decode once, lazily, only when this decision actually considers a site.
+  let siteAllowed: ReturnType<typeof observedBuildingSites> | undefined;
+  const legalSite = (kind: BuildingKind, at: { x: number; y: number }) =>
+    (siteAllowed ??= observedBuildingSites(observation))(kind, at);
+  const build = (building: BuildingKind, target: { x: number; y: number }, builder = idleBuilder) => {
+    if (builderTasked || !builder) return false;
+    // Dock candidates already have their own observation-only shore screen.
+    if (building !== 'dock' && !legalSite(building, target)) return false;
     builderTasked = true;
-    constructionWorkers.add(idleBuilder.id);
-    commands.push({ kind: 'build', player, builderIds: [idleBuilder.id], building, target });
+    constructionWorkers.add(builder.id);
+    commands.push({ kind: 'build', player, builderIds: [builder.id], building, target });
+    return true;
   };
   /**
    * The first of these spots with nothing already standing on it.
@@ -427,34 +440,14 @@ export function exampleAiCommands(
    * being told to start something it could never start. Asking what is
    * already there costs one pass over what it can see.
    */
-  /**
-   * Roughly how much room a thing takes, for deciding whether a spot is free.
-   * Centre to centre, so both footprints count -- and a tree is not a town
-   * center. Using one number for everything was measurably wrong in both
-   * directions: two and a half tiles let a farm be asked for inside the town
-   * center every decision, and five tiles ruled out every barracks spot on the
-   * map, because there is always a tree within five tiles of home. The AI
-   * cannot read the rules, so these are the same order of approximation as the
-   * prices it already knows.
-   */
-  const bulk = (kind: string): number =>
-    kind === 'town-center' || kind === 'castle' ? 2
-      : isBuilding(kind as EntityKind) ? 1.5
-      : kind === 'resource' ? 0.5 : 0.3;
-  const clearSpot = (spots: { x: number; y: number }[], half: number) => {
+  // Candidate offsets retain the strategy's layout preference. Static overlap,
+  // ground and map bounds come from the observation-only legality screen;
+  // the former circular bulk estimate also vetoed legal adjacent buildings.
+  const clearSpot = (spots: { x: number; y: number }[], kind: BuildingKind) => {
     const offset = Math.floor(observation.time / 3);
     for (let i = 0; i < spots.length; i++) {
       const at = place(spots[(i + offset) % spots.length]);
-      if (at.x < 2 || at.y < 2 || at.x > observation.mapWidth - 2 || at.y > observation.mapHeight - 2) continue;
-      // Only what stays put. A villager standing on the spot walks away when
-      // the foundation goes down; counting them meant that every candidate
-      // near home was "occupied" by whoever happened to be wandering past, and
-      // the barracks -- and with it the entire army -- was never built at all.
-      const blocked = [...known, ...mine].some(
-        e => (isBuilding(e.kind as EntityKind) || e.kind === 'resource')
-          && distance(e, at) < half + bulk(e.kind) + 0.4,
-      );
-      if (blocked) continue;
+      if (!legalSite(kind, at)) continue;
       return at;
     }
     return undefined;
@@ -510,8 +503,8 @@ export function exampleAiCommands(
       && observation.wood >= 25 + (headroom > 0 ? siege?.reserve ?? 0 : 0)) {
     // Cycle deterministically through candidate spots so a blocked placement
     // is retried elsewhere on the next decision.
-    const spot = clearSpot(HOUSE_SPOTS, 1) ?? clearSpot(RANGE_SPOTS, 1)
-      ?? clearSpot(BARRACKS_SPOTS, 1);
+    const spot = clearSpot(HOUSE_SPOTS, 'house') ?? clearSpot(RANGE_SPOTS, 'house')
+      ?? clearSpot(BARRACKS_SPOTS, 'house');
     if (spot) build('house', spot);
   }
   // Either the trees are near a drop site already, or a camp has been built
@@ -532,6 +525,46 @@ export function exampleAiCommands(
     ? !range ? 175 : options.blacksmith !== false && !smith ? 150 : 0
     : 0);
   const dockReserve = water && !dock && woodIsHandy ? DOCK_WOOD : 0;
+  // A worked forage cluster needs a bank, not another march across the map.
+  // Use the existing camp distances/fan, duplicate limits and public legality;
+  // reserve only when a known legal site and an observed forager exist.
+  const foodCamp = inca ? 'settlement' : 'mill';
+  const foodCampCost = inca ? 125 : CAMP_COST_WOOD;
+  const foodCamps = mine.filter(e => e.kind === foodCamp);
+  const step = Math.floor(observation.time / 3);
+  const campTarget = (kind: BuildingKind, built: Spotted[], node: Spotted, sample: number) => {
+    if (!tc) return;
+    if (kind === 'mill' && built.some(site => distance(site, node) <= CAMP_RANGE + Math.max(...CAMP_RADII))) return;
+    const reach = CAMP_RADII[Math.floor(sample / CAMP_FAN.length) % CAMP_RADII.length];
+    const bearing = Math.atan2(tc.y - node.y, tc.x - node.x) + CAMP_FAN[sample % CAMP_FAN.length];
+    const target = { x: node.x + Math.cos(bearing) * reach, y: node.y + Math.sin(bearing) * reach };
+    if (kind === 'mill' && built.some(site => distance(site,
+      { x: Math.round(target.x), y: Math.round(target.y) }) <= CAMP_RANGE)) return;
+    return legalSite(kind, target) ? target : undefined;
+  };
+  let foragePlan: { target: { x: number; y: number }; builder: typeof idleBuilder } | undefined;
+  if (woodIsHandy && foodCamps.length < CAMPS_PER_RESOURCE
+    && (barracks || !foodCamps.length) && !foodCamps.some(e => e.buildProgress !== undefined)) {
+    for (const { node } of supply('food', true)) {
+      const foragers = villagers.filter(v => v.order === 'gather' && v.gatherTargetId === node.id
+        && !constructionWorkers.has(v.id));
+      if (!foragers.length) continue;
+      for (let i = 0; i < CAMP_RADII.length * CAMP_FAN.length; i++) {
+        const target = campTarget(foodCamp, foodCamps, node, step + i);
+        if (!target) continue;
+        const builder = foragers.sort((a, b) => distance(a, target) - distance(b, target) || a.id - b.id)[0];
+        foragePlan = { target, builder }; break;
+      }
+      if (foragePlan) break;
+    }
+  }
+  const forageReserve = foragePlan ? foodCampCost : 0;
+  const forageIssued = !!foragePlan && observation.wood >= foodCampCost
+    && build(foodCamp, foragePlan.target, foragePlan.builder);
+  // The open Settlement is an inert placeholder; retain the already-known
+  // Inca125 price rather than letting its zero fallback cost erase the reserve.
+  const unreservedWood = () => observation.wood - (forageIssued
+    ? Math.max(forageReserve, plannedWood(commands)) : forageReserve + plannedWood(commands));
   const camps = siege?.gatherStone ? [...CAMPS, { resource: 'stone' as const, building: 'mining-camp' as const }] : CAMPS;
   for (const camp of camps) {
     const buildingToUse = inca ? 'settlement' : camp.building;
@@ -553,22 +586,12 @@ export function exampleAiCommands(
     if (!barracks && built.length >= 1) continue;
     // One at a time: a second would be sited against the same node anyway.
     if (built.some(e => e.buildProgress !== undefined)) continue;
-    const step = Math.floor(observation.time / 3);
-    const reach = CAMP_RADII[Math.floor(step / CAMP_FAN.length) % CAMP_RADII.length];
     for (const at of supply(camp.resource, true)) {
       // Do not keep retrying a mill beside the old one as this fan rotates.
       // Its entire placement envelope must clear the existing service area.
       // #147 permits useful nearby wood/mining camps, but not duplicate mills.
-      if (buildingToUse === 'mill' && built.some(site =>
-        distance(site, at.node) <= CAMP_RANGE + Math.max(...CAMP_RADII))) continue;
-      const home = Math.atan2(tc.y - at.node.y, tc.x - at.node.x);
-      const bearing = home + CAMP_FAN[step % CAMP_FAN.length];
-      const target = { x: at.node.x + Math.cos(bearing) * reach, y: at.node.y + Math.sin(bearing) * reach };
-      // The mill's 2×2 placement snaps to whole tiles at the command boundary.
-      if (buildingToUse === 'mill' && built.some(site =>
-        distance(site, { x: Math.round(target.x), y: Math.round(target.y) }) <= CAMP_RANGE)) continue;
-      build(buildingToUse, target);
-      break;
+      const target = campTarget(buildingToUse, built, at.node, step);
+      if (target && build(buildingToUse, target)) break;
     }
   }
 
@@ -587,8 +610,8 @@ export function exampleAiCommands(
   // asks about a drop site near *known* wood, not the town center: a player
   // whose camp served a different wood once never built a barracks at all.)
   if (!range && barracks && idleBuilder && observation.age >= 1 && observation.wood >= 175) {
-    const spot = clearSpot(RANGE_SPOTS, 1.5) ?? clearSpot(BARRACKS_SPOTS, 1.5)
-      ?? clearSpot(HOUSE_SPOTS, 1.5);
+    const spot = clearSpot(RANGE_SPOTS, 'archery-range') ?? clearSpot(BARRACKS_SPOTS, 'archery-range')
+      ?? clearSpot(HOUSE_SPOTS, 'archery-range');
     if (spot) build('archery-range', spot);
   }
 
@@ -599,20 +622,20 @@ export function exampleAiCommands(
       && observation.age >= 1 && observation.wood >= 150) {
     // Any spot list will do -- on some boards the range's five candidates
     // are down to one, and a strategy with no smith buys no technology.
-    const spot = clearSpot(RANGE_SPOTS, 1.5) ?? clearSpot(BARRACKS_SPOTS, 1.5)
-      ?? clearSpot(HOUSE_SPOTS, 1.5);
+    const spot = clearSpot(RANGE_SPOTS, 'blacksmith') ?? clearSpot(BARRACKS_SPOTS, 'blacksmith')
+      ?? clearSpot(HOUSE_SPOTS, 'blacksmith');
     if (spot) build('blacksmith', spot);
   }
 
   if (!barracks && idleBuilder && observation.wood >= 175 && woodIsHandy) {
     // Cycle candidate spots like houses do, so terrain under one spot cannot
     // block the barracks -- and the whole military opening -- permanently.
-    const spot = clearSpot(BARRACKS_SPOTS, 1.5);
+    const spot = clearSpot(BARRACKS_SPOTS, 'barracks');
     if (spot) build('barracks', spot);
   }
 
   if (siege?.needsCastle && observation.stone >= CASTLE_STONE && idleBuilder) {
-    const spot = clearSpot(RANGE_SPOTS, 2) ?? clearSpot(BARRACKS_SPOTS, 2) ?? clearSpot(HOUSE_SPOTS, 2);
+    const spot = clearSpot(RANGE_SPOTS, 'castle') ?? clearSpot(BARRACKS_SPOTS, 'castle') ?? clearSpot(HOUSE_SPOTS, 'castle');
     if (spot) build('castle', spot);
   }
 
@@ -646,8 +669,8 @@ export function exampleAiCommands(
   const mayFarm = barracks !== undefined || farms.length < 1;
   if ((!foodNearby || (observation.age >= 1 && foodShort)) && mayFarm && idleBuilder
       && !farmsUnderway && farms.length < FARM_SPOTS.length
-      && observation.wood >= 60 + (farms.length ? Math.max(militaryWoodReserve, dockReserve) : 0)) {
-    const spot = clearSpot(FARM_SPOTS, 1.5);
+      && observation.wood >= 60 + forageReserve + (farms.length ? Math.max(militaryWoodReserve, dockReserve) : 0)) {
+    const spot = clearSpot(FARM_SPOTS, 'farm');
     if (spot) build('farm', spot);
   }
 
@@ -682,7 +705,7 @@ export function exampleAiCommands(
   }
 
   const siegeGold = siege?.reserve ?? 0;
-  if (siege?.producer && observation.wood - plannedWood(commands) >= TREBUCHET_BUDGET
+  if (siege?.producer && unreservedWood() >= TREBUCHET_BUDGET
     && observation.gold >= TREBUCHET_BUDGET && headroom > 0) {
     commands.push({ kind: 'train', player, buildingId: siege.producer.id, unit: 'trebuchet' });
   }
@@ -732,7 +755,7 @@ export function exampleAiCommands(
     || observation.gold >= nextAge.gold + 100;
   if (
     range && (range.buildProgress ?? 1) >= 1 && !range.training && goldFree &&
-    observation.wood >= 25 + militaryWoodReserve && observation.gold >= 45 + siegeGold && headroom > plannedPopulation
+    unreservedWood() >= 25 + militaryWoodReserve && observation.gold >= 45 + siegeGold && headroom > plannedPopulation
   ) {
     const archer = observation.researched.includes('arbalester') ? 'arbalester'
       : observation.researched.includes('crossbowman') ? 'crossbowman' : 'archer';
@@ -829,7 +852,7 @@ export function exampleAiCommands(
     const producer = fishingProducer(water);
     const plannedPopulation = commands.filter(command => command.kind === 'train').length;
     if (producer && headroom > plannedPopulation
-      && observation.wood - plannedWood(commands) >= FISHING_SHIP_WOOD + militaryWoodReserve) {
+      && unreservedWood() >= FISHING_SHIP_WOOD + militaryWoodReserve) {
       commands.push({ kind: 'train', player, buildingId: producer.id, unit: 'fishing-ship' });
     }
   }

@@ -1,9 +1,12 @@
 import type { GameState, Point, ReadonlyGameState } from './types';
 
+/** Also accepts decoded public terrain without granting access to game state. */
+type ElevationGrid = Pick<ReadonlyGameState, 'width' | 'height'> & { readonly elevation?: ArrayLike<number> };
+
 /** Authoritative tile-centre level, shared by combat and the view. Old flat
  * snapshots may have no samples. Survey levels retain their fractional part. */
 export function elevationAt(
-  state: Pick<ReadonlyGameState, 'width' | 'height' | 'elevation'>, x: number, y: number,
+  state: ElevationGrid, x: number, y: number,
 ): number {
   const tx = Math.max(0, Math.min(state.width - 1, Math.floor(x)));
   const ty = Math.max(0, Math.min(state.height - 1, Math.floor(y)));
@@ -27,7 +30,7 @@ function bounds(at: Point, half: Point) {
 /** DAT chooses the mode; interpreting its relief limit over tile-centre
  * levels is documented in the ledger rather than claimed as DE slope geometry. */
 export function elevationAllowsPlacement(
-  state: ReadonlyGameState, at: Point, half: Point, hillMode: number,
+  state: ElevationGrid, at: Point, half: Point, hillMode: number,
 ): boolean {
   if (hillMode === 0) return true;
   const box = bounds(at, half);

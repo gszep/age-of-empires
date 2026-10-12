@@ -3,7 +3,7 @@ import { createReplayGame } from './replay';
 import { applyCommand, stepGame } from './game';
 import { trebuchetReplayRules } from '../headless/trebuchet-replay.fixture';
 
-it.each([1, 2, 3, 4, 5, 6, 7, 8, 9] as const)('browser/headless v%s initialization selects every historical boundary and packed policy', version => {
+it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const)('browser/headless v%s initialization selects every historical boundary and packed policy', version => {
   const rules = trebuchetReplayRules(), original = JSON.stringify(rules);
   const state = createReplayGame({ version, seed: 131, civilizations: { 1: 'open', 2: 'open' },
     mode: version === 1 ? undefined : 'random-map' }, rules);
@@ -13,6 +13,7 @@ it.each([1, 2, 3, 4, 5, 6, 7, 8, 9] as const)('browser/headless v%s initializati
   expect(state.packingVersion).toBe(version >= 6 ? 1 : undefined);
   expect(state.siphonsVersion).toBe(version >= 7 ? 1 : undefined);
   expect(state.trebuchetTargetingVersion).toBe(version >= 8 ? 1 : undefined);
+  expect(state.gridSpawnVersion).toBe(version >= 10 ? 1 : undefined);
   expect(state.rules.units.trebuchet.unpacked!.seconds).toBeCloseTo(version >= 6 ? 50 / 4.5 : 4.5);
   const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
   expect(applyCommand(state, { kind: 'train', player: 1, buildingId: tc.id, unit: 'trebuchet' }).ok).toBe(true);

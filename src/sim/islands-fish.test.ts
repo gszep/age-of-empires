@@ -43,10 +43,10 @@ it.each([
   [29, '0e88e48c', '9f250216'], [42, 'c2e293ad', '9f14a807'],
   [95, '6a2b4511', '1be90969'], [130, 'dc4842d2', 'd83355da'],
 ] as const)('keeps the pre-offshore Islands state/JSON digest, seed %i', (seed, initial, tick20) => {
-  const state = createGame(seed, undefined, undefined, 'islands', undefined, undefined, undefined, 1);
+  const state = createGame(seed, undefined, undefined, 'islands', undefined, undefined, undefined, 1, 0);
   expect(state).not.toHaveProperty('mapgenVersion');
   expect(checksumState(state)).toBe(initial);
-  expect(checksumState(createGame(seed, undefined, undefined, 'islands', undefined, undefined, undefined, 0))).toBe(initial);
+  expect(checksumState(createGame(seed, undefined, undefined, 'islands', undefined, undefined, undefined, 0, 0))).toBe(initial);
   const restored = JSON.parse(JSON.stringify(state));
   for (let i = 0; i < 20; i++) { stepGame(state); stepGame(restored); }
   expect(checksumState(state)).toBe(tick20);

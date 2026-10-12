@@ -1887,3 +1887,74 @@ when the result looks right. When a row is later read from a file, delete it
   portable 8-bit decode, by up to 5/255 per channel in the RTX 4060 fleet probe.
   Accepted per the #256 contract (no blanket image threshold). Masks remain PNG
   (decision #323).
+
+## Grid-locked load-time unit placement (#325, owner clarification 2026-10-12)
+
+- **Owner observation of DE, clarified scope:** only units placed when the game
+  loads use tile centres (`floor + 0.5` on each axis): starting villagers/scouts,
+  regicide starting units and map landmark units. Mapgen objects already use
+  tile centres. Movement remains continuous; buildings are unchanged. The
+  earlier “every appearance” interpretation is superseded by the owner comment
+  [6133035997](https://github.com/gszep/age-of-empires/issues/325#issuecomment-6133035997).
+- **Source inspected:** pinned `F_StartingVills.inc` and `includes/regicide.inc`
+  specify placement distances, closest-point and tile-placeholder requests,
+  not the executable's exact selection order. **Inferred until #308:** starting
+  offsets and regicide integer tile selection retain their existing deterministic
+  order, with unit coordinates snapped before insertion. The load-only generator
+  clearance callback reserves already placed units against map objects. Its
+  centred half-tile footprint already covers the whole tile; the additional
+  fractional-foundation runtime clearance tweak is removed, not needed here.
+- **Runtime unchanged:** training, technology grants (including grants activated
+  during initialization), building/transport ungarrison, destruction releases and
+  Siege Tower unloads use exactly the base f56c30e continuous placement functions,
+  regardless of marker. No snapped candidates, new deduplication, unit-occupancy
+  checks or new nav-tile screening remain in those paths. Existing runtime
+  stacking, radius-only clearance and hemmed-in producer fallback are preserved,
+  not claimed as new native parity or silently fixed by this load-placement change.
+- **Compatibility:** match format 10 (9 already belongs to Islands generation)
+  selects `gridSpawnVersion: 1` before any initial placements. Formats 1–9 and
+  marker-less snapshots retain historical starts/checksums. Runtime placement
+  does not consult the marker. Deleting it after generation cannot restore old
+  starts. Both existing snapshot/hash paths include optional simulation fields.
+
+## Observation-only AI placement and farm reservations (#326)
+
+- **Shared rule, not a new native rule:** the example strategy calls the same
+  `elevationAllowsPlacement` predicate as construction, with only its decoded
+  public terrain/elevation grid. Unknown footprints are rejected rather than
+  treated as flat ground. Terrain restrictions, map edges and known stationary
+  footprints are screened before reserving a builder; military-site search
+  continues past an illegal candidate instead of retrying its slope forever.
+- **Strategy metadata limitation:** like its existing price knowledge and
+  fishing policy, it uses public `FALLBACK_RULES` building/node metadata, not
+  hidden match rules. Imported-profile differences and stale fog memories can
+  still cause the final public build command to reject a screened site. This
+  is not a claim that an observation-only agent can certify every hidden
+  obstruction or imported footprint. Dock selection retains its existing
+  observation-only shore screen. No simulation construction rule is relaxed.
+- **Spacing review:** `b4318eb` introduced the old circular bulk estimate to
+  avoid repeated overlapping build orders, not as a deliberate buffer rule.
+  It is superseded by the observation-only footprint/terrain predicate. Candidate
+  offsets and their deterministic rotation still express the strategy's layout
+  preference, and mobile units still do not block construction. This removes
+  false vetoes on legal adjacent farms and military buildings without relaxing
+  authoritative placement or reading hidden obstructions.
+- **Farm assignment:** an owned public `gatherTargetId` reserves the farm while
+  its worker walks, gathers or banks food. The example AI excludes those plots
+  and reserves new assignments within the same command batch. Otherwise a
+  successful public order can legitimately resolve back to idle when the farm
+  is occupied, leaving a stateless agent retrying forever. Unassigned workers
+  select another known food source/free farm; existing construction policy can
+  add a farm when food is needed. Rounded 100% foundations remain unavailable
+  until construction actually completes. This is strategy bookkeeping, not a
+  change to simulation farm occupancy or an assertion about native AI policy.
+- **Worked forage banking:** the strategy plans a mill (Inca: Settlement) for
+  an observed gather target beyond the existing8-tile camp-service range. It
+  searches only the existing camp fan/radii through the observation-only legality
+  predicate, retains duplicate/pending/camp-count and early-economy guards, and
+  chooses a nearby observed forager as builder. Urgent housing stays first;
+  a known buildable food-bank plan reserves its existing public100/125-wood price
+  against discretionary farm/archer/boat/siege spending. Unknown/unbuildable sites
+  reserve nothing. The reservation and issued build are counted once, including
+  the inert open Settlement placeholder's otherwise zero cost. This is an
+  observation-only strategy priority, not new native placement or economy rules.

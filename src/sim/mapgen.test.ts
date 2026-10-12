@@ -456,7 +456,7 @@ describe('the Windsor footprint', () => {
     const horse = state.entities.find(e => e.owner === 0 && e.kind === 'scout-cavalry');
     // Transposed with the survey (x and y swapped for AoE2's handedness).
     expect(castle?.position).toEqual({ x: 158.543, y: 183.007 });
-    expect(horse?.position).toEqual({ x: 375.012, y: 375.012 });
+    expect(horse?.position).toEqual({ x: 375.5, y: 375.5 }); // load-time unit placement snaps the surveyed point
     const townCentres = state.entities
       .filter(e => e.kind === 'town-center')
       .map(e => [e.position.x, e.position.y]);

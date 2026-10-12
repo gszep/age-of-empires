@@ -40,7 +40,12 @@ describe('Regicide starts and mode isolation', () => {
           expect(units.filter(e => e.kind === 'king')).toHaveLength(1);
           expect(new Set(units.map(e => `${e.position.x}/${e.position.y}`)).size).toBe(11);
           const home = s.entities.find(e => e.owner === owner && e.kind === 'town-center')!, k = king(s, owner), c = castle(s, owner);
-          const box = (e: Entity) => Math.max(Math.abs(e.position.x - home.position.x), Math.abs(e.position.y - home.position.y));
+          // Source bands select tile indices; walkers now appear at their centres.
+          for (const unit of units) {
+            expect(unit.position.x % 1).toBe(.5); expect(unit.position.y % 1).toBe(.5);
+          }
+          const box = (e: Entity) => Math.max(Math.abs(Math.floor(e.position.x) - home.position.x),
+            Math.abs(Math.floor(e.position.y) - home.position.y));
           expect(box(k)).toBeGreaterThanOrEqual(map === 'islands' ? 6 : 5);
           if (map === 'islands') { expect(box(k)).toBeLessThanOrEqual(8); expect(box(c)).toBe(10); }
           else {
@@ -170,7 +175,7 @@ describe('King survival and temporary Treason', () => {
     legacy.result = { ...legacyResult, version: 1 };
     // A v3 recording cannot be made legacy by relabelling its checksum: the
     // new research-rule marker is authoritative state. Rebuild the v1 fixture.
-    const legacyState = createGame(42, undefined, undefined, 'arabia', undefined, undefined, undefined, 0);
+    const legacyState = createGame(42, undefined, undefined, 'arabia', undefined, undefined, undefined, 0, 0);
     useLegacyScore(legacyState);
     useLegacyPacking(legacyState);
     useLegacySiphons(legacyState);

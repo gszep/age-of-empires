@@ -24,10 +24,10 @@ it('replays the untouched pre-correction Islands recording and never upgrades re
   }
 });
 
-it('records offshore Islands as v9 even for a legacy launch; JSON replays the exact new map', async () => {
+it('records offshore Islands in the current format even for a legacy launch; JSON replays the exact new map', async () => {
   const config = { version: 8 as const, seed: 95, map: 'islands', maxTimeSeconds: 10 };
   const { record, result } = await runMatch(config, { 1: { decide: () => [] }, 2: { decide: () => [] } });
-  expect(MATCH_FORMAT_VERSION).toBe(9);
+  expect(MATCH_FORMAT_VERSION).toBeGreaterThanOrEqual(9);
   expect(record.version).toBe(MATCH_FORMAT_VERSION);
   expect(result.version).toBe(MATCH_FORMAT_VERSION);
   const wire = JSON.parse(JSON.stringify(record));

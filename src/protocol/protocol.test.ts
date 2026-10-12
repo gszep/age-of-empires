@@ -20,7 +20,8 @@ const ENTITY_KEYS = [
   'owner', 'researching', 'researchQueue', 'resource', 'training', 'x', 'y', 'carryingRelic', 'relics', 'faith', 'charge',
   'livestock',
 ];
-const ENTITY_ALWAYS = ['activity', 'hp', 'id', 'kind', 'maxHp', 'order', 'owner', 'x', 'y'];
+const ENTITY_ALWAYS = ['hp', 'id', 'kind', 'maxHp', 'owner', 'x', 'y'];
+const ENTITY_OWN_ONLY = ['activity', 'order'];
 
 describe('the observation contract', () => {
   it('has the keys strategies were written against, at this version', () => {
@@ -38,6 +39,24 @@ describe('the observation contract', () => {
         expect(ENTITY_KEYS, `entity.${key} is new to the contract: bump PROTOCOL_VERSION`).toContain(key);
       }
       for (const key of ENTITY_ALWAYS) expect(entity, `entity.${key} left the contract`).toHaveProperty(key);
+      for (const key of ENTITY_OWN_ONLY) {
+        if (entity.owner === observation.player) expect(entity).toHaveProperty(key);
+        else expect(entity).not.toHaveProperty(key);
+      }
+    }
+  });
+
+  it.each([1, 2] as const)('exposes activity/order only for player %s, never visible enemy or Gaia entities', player => {
+    const state = createGame(7);
+    state.visibility[player].visible.fill(1);
+    const observation = JSON.parse(JSON.stringify(observe(state, player)));
+    for (const owner of [0, 1, 2]) {
+      const entities = observation.entities.filter((e: { owner: number }) => e.owner === owner);
+      expect(entities.length, `fixture contains owner ${owner}`).toBeGreaterThan(0);
+      for (const entity of entities) for (const key of ENTITY_OWN_ONLY) {
+        if (owner === player) expect(entity).toHaveProperty(key);
+        else expect(entity).not.toHaveProperty(key);
+      }
     }
   });
 

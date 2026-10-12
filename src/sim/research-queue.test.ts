@@ -188,7 +188,7 @@ describe('research queueing (#293)', () => {
     let lastQueue: string[] | undefined;
     expect(replayRecord(record, rules, s => { lastQueue = townCenter(s).researchQueue; }).ok).toBe(true);
     expect(lastQueue).toEqual(['feudal-age']);
-    const legacyState = createGame(record.seed, rules, undefined, 'arabia', undefined, undefined, undefined, 0);
+    const legacyState = createGame(record.seed, rules, undefined, 'arabia', undefined, undefined, undefined, 0, 0);
     useLegacyScore(legacyState);
     useLegacyPacking(legacyState);
     useLegacySiphons(legacyState);

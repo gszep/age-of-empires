@@ -3,11 +3,12 @@ import type { NodeKind } from '../sim/data';
 
 /** v12 adds optional livestock identity; v11 added population ceilings/Wonder countdowns; v10 scores; v9 waiting research. */
 export const PROTOCOL_VERSION = 12;
-/** v9 corrects Islands fish zone clearance; v8 leaves idle trebuchets packed;
+/** v10 snaps initial unit placement to tile centres; v9 corrects Islands fish zone clearance;
+ * v8 leaves idle trebuchets packed;
  * v7 excludes buildings from Siphons charge;
  * v6 calibrates packing work/time; v5 deals all Arabia biomes;
  * v4 records score receipts; v3 enables research queues. */
-export const MATCH_FORMAT_VERSION = 9;
+export const MATCH_FORMAT_VERSION = 10;
 
 export interface ObservedEntity {
   /** Public livestock identity from match rules, not ownership or current orders. */
@@ -109,7 +110,7 @@ export interface RejectedCommand {
 export interface MatchConfig {
   wonderVictory?: boolean;
   populationLimit?: number;
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | typeof MATCH_FORMAT_VERSION;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   maxTimeSeconds?: number;
   decideIntervalSeconds?: number;
@@ -141,7 +142,7 @@ export interface PlayerSummary {
 export interface MatchResult {
   mode?: import('../sim/types').GameMode;
   draw?: boolean;
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | typeof MATCH_FORMAT_VERSION;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   timeSeconds: number;
   winner?: PlayerId;
@@ -174,7 +175,7 @@ export interface MatchRecord {
   wonderVictory?: boolean;
   populationLimit?: number;
   mode?: import('../sim/types').GameMode;
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | typeof MATCH_FORMAT_VERSION;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | typeof MATCH_FORMAT_VERSION;
   seed: number;
   rulesOrigin: 'fallback' | 'imported';
   /**

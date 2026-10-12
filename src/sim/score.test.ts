@@ -64,7 +64,7 @@ describe('manual-derived public score (#139)', () => {
     const rules = structuredClone(FALLBACK_RULES);
     rules.units.villager.trainSeconds = .1;
     rules.technologies.loom.researchSeconds = .1;
-    const s = createGame(139, rules, undefined, 'arabia', undefined, undefined, undefined, 0); useLegacyScore(s);
+    const s = createGame(139, rules, undefined, 'arabia', undefined, undefined, undefined, 0, 0); useLegacyScore(s);
     useLegacyPacking(s);
     useLegacySiphons(s);
     useLegacyTrebuchetTargeting(s);

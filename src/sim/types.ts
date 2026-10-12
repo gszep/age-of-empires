@@ -301,6 +301,8 @@ export interface GameState {
   siphonsVersion?: 1;
   /** New matches leave idle trebuchets packed; absent in pre-v8 recordings/snapshots. */
   trebuchetTargetingVersion?: 1;
+  /** New matches snap load-time unit placement only; absent in pre-v10 recordings/snapshots. */
+  gridSpawnVersion?: 1;
   /** 1: Arabia's eleven biomes; 2: Islands offshore fish. Absent retains the legacy map. */
   mapgenVersion?: 1 | 2;
   /** Opt-in fixed200-year Wonder victory. Absent preserves legacy conquest. */

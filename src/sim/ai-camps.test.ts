@@ -33,12 +33,83 @@ function fixture(kind: Camp = 'mill') {
   state.players[1].wood = 100;
   state.players[1].food = 400;
   state.visibility[1].visible.fill(1);
-  return { state, home, existing, node };
+  state.visibility[1].explored.fill(1); // visible remote camp sites have known terrain too
+  return { state, home, existing, node, building };
 }
 const camps = (state: GameState, kind: Camp) => exampleAiCommands(JSON.parse(JSON.stringify(observe(state, 1))))
   .filter(c => c.kind === 'build' && c.building === kind);
 
 describe('AI drop-site placement (#147)', () => {
+  function workedForage() {
+    const f = fixture();
+    const { state, home, building } = f;
+    state.elevation.fill(0);
+    building('archery-range', -12, -12); building('blacksmith', -16, -12);
+    state.players[1].age = 1;
+    Object.assign(state.players[1], { food: 0, wood: 80, gold: 200 });
+    const remote = addNode(state, 'berries', { x: home.position.x + 45, y: home.position.y });
+    const workers = state.entities.filter(e => e.owner === 1 && e.kind === 'villager');
+    // Public gather targets identify a worked cluster, including the banking leg.
+    const near = workers[2], far = workers[0];
+    near.position = { x: remote.position.x + 1, y: remote.position.y };
+    for (const worker of [near, far]) expect(applyCommand(state, { kind: 'order', player: 1,
+      entityIds: [worker.id], target: remote.position, targetId: remote.id }).ok).toBe(true);
+    return { ...f, remote, near, far };
+  }
+
+  it('saves for a legal mill at worked distant forage instead of spending each deposit on archers/farms', () => {
+    const { state, existing, remote, near } = workedForage();
+    expect(Math.hypot(remote.position.x - existing.position.x, remote.position.y - existing.position.y)).toBeGreaterThan(20);
+    let commands = exampleAiCommands(JSON.parse(JSON.stringify(observe(state, 1))));
+    expect(commands.some(c => c.kind === 'train' && c.unit === 'archer')).toBe(false);
+    expect(commands.some(c => c.kind === 'build' && c.building === 'farm')).toBe(false);
+    expect(commands.some(c => c.kind === 'build' && c.building === 'mill')).toBe(false);
+    state.players[1].wood = 100;
+    commands = exampleAiCommands(JSON.parse(JSON.stringify(observe(state, 1))));
+    const mill = commands.find(c => c.kind === 'build' && c.building === 'mill');
+    expect(mill).toBeDefined();
+    if (mill?.kind !== 'build') throw new Error('missing mill plan');
+    expect(mill.builderIds).toEqual([near.id]);
+    expect(Math.hypot(mill.target.x - remote.position.x, mill.target.y - remote.position.y)).toBeLessThan(5);
+    expect(commands.some(c => c.kind === 'train' && c.unit === 'archer')).toBe(false); // mill spending is counted once
+    for (const c of commands) expect(applyCommand(state, c).ok).toBe(true);
+    expect(state.players[1].wood).toBe(0);
+    const added = state.entities.find(e => e.kind === 'mill' && e.id !== existing.id)!;
+    expect(added.buildProgress).toBeDefined();
+    expect(camps(state, 'mill')).toEqual([]); // do not buy another while this one is pending
+    let banked = false;
+    for (let tick = 0; tick < 1800 && !banked; tick++) {
+      if (tick % 10 === 0) for (const c of exampleAiCommands(observe(state, 1))) applyCommand(state, c);
+      const food = state.players[1].food, carried = near.carrying?.amount ?? 0;
+      stepGame(state);
+      banked = carried > 0 && !near.carrying && state.players[1].food >= food + carried
+        && Math.hypot(near.position.x - added.position.x, near.position.y - added.position.y) < 3;
+    }
+    expect(added.buildProgress).toBeUndefined();
+    expect(banked).toBe(true);
+  });
+
+  it('does not reserve wood for a distant mill without any explored legal candidate', () => {
+    const { state } = workedForage();
+    const observation = JSON.parse(JSON.stringify(observe(state, 1)));
+    observation.terrain = Array.from({ length: observation.mapHeight }, () => [[observation.mapWidth, -1, -1]]);
+    const before = JSON.stringify(observation);
+    const commands = exampleAiCommands(observation);
+    expect(commands.some(c => c.kind === 'build')).toBe(false);
+    expect(commands.some(c => c.kind === 'train' && c.unit === 'archer')).toBe(true);
+    expect(JSON.stringify(observation)).toBe(before);
+  });
+
+  it('does not reserve for a second mill when the actively worked food already has a nearby bank', () => {
+    const { state, remote, existing } = workedForage();
+    remote.position = { x: existing.position.x + 3, y: existing.position.y };
+    const commands = exampleAiCommands(JSON.parse(JSON.stringify(observe(state, 1))));
+    expect(commands.some(c => c.kind === 'build' && c.building === 'mill')).toBe(false);
+    // The existing farm policy can spend60 of the80 wood; no phantom100 mill
+    // reserve blocks it (and only20 remains, so an archer cannot also be paid).
+    expect(commands.some(c => c.kind === 'build' && c.building === 'farm')).toBe(true);
+  });
+
   it('does not place a second mill beside the first for the far edge of the same food patch', () => {
     const { state } = fixture();
     // Every bearing and radius: rejecting just the current candidate must not

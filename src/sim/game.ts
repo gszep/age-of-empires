@@ -62,6 +62,11 @@ export function addNode(state: GameState, node: NodeKind, position: Point): Enti
   });
 }
 
+/** The centre of the containing tile; movement itself remains continuous. */
+function snapToTileCentre(pos: Point): Point {
+  return { x: Math.floor(pos.x) + 0.5, y: Math.floor(pos.y) + 0.5 };
+}
+
 /** Which node rules a resource entity plays by: its own kind, or the one its
  * resource implies on a board dealt before nodes were told apart. */
 export function nodeOf(entity: Entity): NodeKind {
@@ -100,7 +105,10 @@ function addAnimal(state: GameState, kind: AnimalKind, position: Point): Entity 
  * tiles count: a forest-based map seals its rim with trees, and a one-tile
  * walkable ring around the wood would be a route the road is meant to be. */
 function freeSpot(state: GameState, at: Point): boolean {
-  return spawnFree(state, at, 0.5);
+  // Load-time generation only: reserve the units already placed on this board.
+  // Runtime spawns retain their original continuous/radius-only policy.
+  return spawnFree(state, at, 0.5) && (!state.gridSpawnVersion || state.entities.every(entity =>
+    entity.dead || !isUnit(entity.kind) || distance(at, entity.position) >= 0.5 + entity.radius));
 }
 
 export function createGame(
@@ -109,6 +117,7 @@ export function createGame(
   map = 'arabia', mode: GameMode = 'random-map', populationLimit?: number, wonderVictory?: boolean,
   // Replay callers must choose before generating, not delete a marker afterwards.
   mapgenVersion: 0 | 1 | 2 = 2,
+  gridSpawnVersion: 0 | 1 = 1,
 ): GameState {
   if (!validWonderVictory(wonderVictory)) throw new Error(`invalid Wonder victory setting ${wonderVictory}`);
   if (!validPopulationLimit(populationLimit)) throw new Error(`invalid population limit ${populationLimit}`);
@@ -136,6 +145,7 @@ export function createGame(
     packingVersion: 1,
     siphonsVersion: 1,
     trebuchetTargetingVersion: 1,
+    ...(gridSpawnVersion ? { gridSpawnVersion: 1 as const } : {}),
     ...(map === 'arabia' && mapgenVersion >= 1 ? { mapgenVersion: 1 as const }
       : map === 'islands' && mapgenVersion >= 2 ? { mapgenVersion: 2 as const } : {}),
     ...(wonderVictory ? { wonderVictory: true } : {}),
@@ -164,7 +174,9 @@ export function createGame(
     addEntity(state, 'town-center', player, at(start), rules.buildings['town-center']);
     for (const dy of [-1, 0, 1]) {
       if (mode === 'regicide' && map !== 'islands') continue;
-      addEntity(state, 'villager', player, at({ x: start.x + 2.8, y: start.y + dy }), rules.units.villager);
+      const villagerPos = { x: start.x + 2.8, y: start.y + dy };
+      const pos = state.gridSpawnVersion ? snapToTileCentre(villagerPos) : villagerPos;
+      addEntity(state, 'villager', player, at(pos), rules.units.villager);
     }
     // `create_object SCOUT`, one per player at 7-9 tiles. On a board this size
     // it is not a luxury: a town center sees eight tiles and the nearest food
@@ -173,7 +185,9 @@ export function createGame(
     const requestedScout = rules.civilization.startingScout;
     const scoutKind = requestedScout && isUnit(requestedScout) && Object.hasOwn(rules.units, requestedScout)
       ? requestedScout : 'scout-cavalry';
-    addEntity(state, scoutKind, player, at({ x: start.x + 8, y: start.y }), rules.units[scoutKind]);
+    const scoutPos = { x: start.x + 8, y: start.y };
+    const pos = state.gridSpawnVersion ? snapToTileCentre(scoutPos) : scoutPos;
+    addEntity(state, scoutKind, player, at(pos), rules.units[scoutKind]);
   }
   // Real-world map landmarks are surveyed points in the baked descriptor,
   // represented with existing owned art. Place them before terrain objects so
@@ -182,7 +196,8 @@ export function createGame(
     if (isBuilding(landmark.kind)) {
       addEntity(state, landmark.kind, 0, { x: landmark.x, y: landmark.y }, rules.buildings[landmark.kind]);
     } else if (isUnit(landmark.kind)) {
-      addEntity(state, landmark.kind, 0, { x: landmark.x, y: landmark.y }, rules.units[landmark.kind]);
+      const at = { x: landmark.x, y: landmark.y };
+      addEntity(state, landmark.kind, 0, state.gridSpawnVersion ? snapToTileCentre(at) : at, rules.units[landmark.kind]);
     }
   }
   const { terrain, elevation, landIds } = generateMap(
@@ -193,12 +208,15 @@ export function createGame(
       beforeObjects: mode === 'regicide' ? layers => {
         Object.assign(state, layers);
         placeRegicideStart(state, map, {
-          free: at => freeSpot(state, at),
+          free: at => freeSpot(state, state.gridSpawnVersion ? snapToTileCentre(at) : at),
           castleLegal: (at, owner) => placementLegal(state, 'castle', at, 'x', owner).ok
             && state.entities.every(e => !isUnit(e.kind) || !footprintsOverlap(at,
               buildingFootprint(state, 'castle', 'x', owner), e.position, halfExtent(e))),
-          add: (kind, owner, at) => addEntity(state, kind, owner, at,
-            kind === 'castle' ? buildingRulesFor(state, owner, kind) : unitRulesFor(state, owner, kind)),
+          add: (kind, owner, at) => {
+            const pos = kind === 'castle' || !state.gridSpawnVersion ? at : snapToTileCentre(at);
+            return addEntity(state, kind, owner, pos,
+              kind === 'castle' ? buildingRulesFor(state, owner, kind) : unitRulesFor(state, owner, kind));
+          },
         });
       } : undefined,
       free: at => freeSpot(state, at),
