@@ -1,0 +1,23 @@
+{
+  "name":"sheep-immobile-outpost-live","spec_version":3,"scenario_version":"1.59","reference_build":185872,
+  "map_size":80,"terrain":0,"elevation":0,"victory":"CUSTOM",
+  "source":"Installed DAT 4aa2f0a7: outpost598 speed0, type80/class3, LOS6, no task rows; 30-tile station separation",
+  "players":[
+    {"number":1,"civilization":"BRITONS","age":"DARK_AGE","human":true,"ai":"NONE","diplomacy":{"2":"NEUTRAL"}},
+    {"number":2,"civilization":"INCAS","age":"DARK_AGE","human":true,"ai":"NONE","diplomacy":{"1":"NEUTRAL"}}
+  ],
+  "setup":{"timer":0,"execute_on_load":true,"speed":0,"freeze":true,"only_unit_constants":[594]},
+  "guard":{"half_extent_tiles":1,"owners":[0,1,2,3,4,5,6,7,8],"object_state":2},
+  "samples_game_seconds":[1,10,30],"guard_start_game_seconds":1,
+  "readout_units":["O1","O2","S1","VC"],
+  "units":[
+    {"name":"O1","player":0,"unit_const":594,"x":20.5,"y":20.5,"z":0,"reference_id":0},
+    {"name":"O1-outpost","player":1,"unit_const":598,"x":22.5,"y":20.5,"z":0,"reference_id":100},
+    {"name":"O2","player":0,"unit_const":594,"x":50.5,"y":20.5,"z":0,"reference_id":1},
+    {"name":"O2-outpost","player":2,"unit_const":598,"x":52.5,"y":20.5,"z":0,"reference_id":101},
+    {"name":"S1","player":0,"unit_const":594,"x":20.5,"y":50.5,"z":0,"reference_id":2},
+    {"name":"VC","player":0,"unit_const":594,"x":50.5,"y":50.5,"z":0,"reference_id":3},
+    {"name":"VC-villager","player":1,"unit_const":83,"x":52.5,"y":50.5,"z":0,"reference_id":102},
+    {"name":"P2-survival-barracks","player":2,"unit_const":12,"x":70.5,"y":70.5,"z":0,"reference_id":200}
+  ]
+}

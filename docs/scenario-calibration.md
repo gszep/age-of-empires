@@ -272,3 +272,100 @@ No Steam-installation file or pre-existing user file was modified. These local
 dependencies are required to reproduce the custom-AI scenarios, not distributed
 project content. Closed chat/diplomacy, quit Test, then editor. Final `p2-final-06-main-menu.png`:
 **game PID16560 running at main menu/build185872**, no controller process remains.
+
+## 2026-10-13 — immobile claimant eligibility: stopped before precedence
+
+**BLOCKED for precedence, with clean negative eligibility measurements.** After
+fetching and comparing the integrated text, this section alone was appended;
+the earlier sections and integrated specs were not rewritten. Reference remains
+installed **185872**, 2560×1440, inherited Casual1.5 speed.
+
+The installed DAT (`4aa2f0a719e88e5f1502517eddb27c669aeb40c2fe9d8c4f3eec7751c01e7baa`)
+was read once per batched source query, not regenerated. Gaia/British/Inca records
+agree on the fields below (`.local/native308/immobile-source.txt`):
+
+| Candidate | DAT id/type/class | Speed | LOS | Task rows | Use |
+| --- | --- | --- | --- | --- | --- |
+| Outpost | 598 / 80 / 3 | 0 | 6 | None | First tested building |
+| Unpacked Trebuchet | 42 / 80 / 54 | 0 | 19 | Attack/other tasks present | One allowed alternate |
+| Barracks | 12 / 80 / 3 | 0 | 6 | None | Distant survival building, not a nearby claimant |
+
+Trebuchets were **not assumed permanently untaskable**: they have tasks and can
+change form, so the exact-id area guard would reject packing/departure. Neither
+claimant received speed/freeze effects or orders. The private adapter now accepts
+`setup.only_unit_constants`; these specs use `[594]`, applying the familiar
+speed0/freeze setup only to sheep. Existing specs without the option retain their
+previous behavior.
+
+### Controlled layout and verified pipeline
+
+Both accepted fixtures have eight objects on an80×80 grass/elevation0 map:
+
+- P1-only sheep(20.5,20.5), claimant(22.5,20.5): distance2.
+- P2-only sheep(50.5,20.5), claimant(52.5,20.5): distance2.
+- Sheep-alone negative at(20.5,50.5).
+- Separate positive: sheep(50.5,50.5), P1 villager(52.5,50.5).
+- P2 survival barracks at(70.5,70.5), more than28 tiles from the closest sheep.
+
+Station spacing is30 tiles; the positive villager and survival barracks cannot
+serve as nearby claimants for the tested sheep. P1 Britons/P2 Inca, Dark Age,
+mutual Neutral, Either/None AI, custom victory. No new AI files or settings were
+introduced. Each run is a fresh editor Test after native Save As/readback.
+Both accepted native saves pass **4,177 field checks**, exact reference IDs,
+custom-victory and zero native-AI-error checks.
+
+| Fixture / station | Sheep owner at1s | 10s | 30s | Missing guards through paused35s |
+| --- | --- | --- | --- | --- |
+| Outpost P1-only (O1) | Gaia | Gaia | Gaia | None |
+| Outpost P2-only (O2) | Gaia | Gaia | Gaia | None |
+| Trebuchet P1-only (T1) | Gaia | Gaia | Gaia | None |
+| Trebuchet P2-only (T2) | Gaia | Gaia | Gaia | None |
+| Sheep-alone S1, both fixtures | Gaia | Gaia | Gaia | None |
+| P1 villager positive VC, both fixtures | P1 | P1 | P1 | None |
+
+Both runs show `SETUP-OK` and `OK-EMPTY-GUARD`, and no attack warnings. Thus sheep
+are present and capturable by the positive control, but **neither tested immobile
+type acquires sheep at distance2 in this setup**. This is not a claim about every
+building, packed trebuchets, all distances, or Celt ownership protection.
+
+| Precedence case | Result this round |
+| --- | --- |
+| Equal distance, left/right and reference orders | Not run: claimant eligibility gate failed |
+| P1 nearer / P2 nearer | Not run |
+| Neutral versus Enemy precedence | Not run; eligibility controls used Neutral only |
+
+The single allowed alternate is exhausted; no third claimant type or precedence
+batch was attempted. No player-number/reference-order/nearest-owner hypothesis
+is rejected by these negative eligibility results. The current sim's broad
+non-animal-unit candidate list warrants a separate eligibility audit for unpacked
+trebuchets; no runtime rule was changed or replacement filter inferred here.
+
+### Rejected run, provenance and evidence
+
+The first outpost fixture, lacking the distant barracks, ended in automatic
+victory before the sample window. It is **not** a negative capture result. Adding
+the barracks kept the repeated Test alive; that observation does not establish the
+general native defeat formula. Original spec and native file/readback remain in
+`.local/scenarios/immobile-rejected/`; initial `outpost-*` captures retain the
+victory dialog. No failure was discarded or assertion weakened.
+
+| Spec / artifact | SHA-256 |
+| --- | --- |
+| `tools/scenarios/sheep-immobile-outpost.json` | `828afdd9814182b9e6ef20a447484a35bb3bc01b86efc1ef4808185b6e2e9527` |
+| `tools/scenarios/sheep-immobile-trebuchet.json` | `0d646fb50dd514f816aa9fd6305724764eaa0e0ae1ed46835a316fa44f072792` |
+| Generated `sheep-immobile-outpost-live.aoe2scenario` | `f45b6de77fd0d8940784ecb4d47a5c85e32c01e615d3b141652f43a432252bc5` |
+| Generated `sheep-immobile-trebuchet.aoe2scenario` | `10fa586c4867aaa2384bacf4793fadd8b2ff0229e0ad6de956604c573f72ef02` |
+| Native `OpenEmpires-308-sheep-immobile-outpost-live-rt.aoe2scenario` | `ede902c77d0cdc9862b653d21d67133a379a0637ed56dc0dbdfed825a85e42e8` |
+| Native `OpenEmpires-308-sheep-immobile-trebuchet-rt.aoe2scenario` | `ce4638e8b916a654654ff9a14b6f01c5dc10b2559ebb14fc9d0f1680f29e2ae5` |
+
+Private artifacts remain in this worktree's `.local/scenarios/` and `native-rt/`.
+Evidence under `.local/native308/`: `outpost-live-11-chat.png`,
+`outpost-live-{12,13}-history.png`, `imm-treb-14-chat.png`,
+`imm-treb-{15,16}-history.png`; receipts, DAT dump, hashes and index retained.
+The index distinguishes the rejected automatic-victory run from the two accepted
+negative controls. All six newly created Windows scenario files (original,
+survival-corrected outpost and trebuchet, each with native round trip) are retained.
+No pre-existing user file, persistent setting, graphics setting, Steam file or AI
+dependency was changed. No commit/import/checkpoint/deployment. Final
+`immobile-final-06-main-menu.png`: **PID16560 running at main menu**, no controller
+process remains.
