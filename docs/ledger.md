@@ -1949,11 +1949,11 @@ when the result looks right. When a row is later read from a file, delete it
   until construction actually completes. This is strategy bookkeeping, not a
   change to simulation farm occupancy or an assertion about native AI policy.
 - **Worked forage banking:** the strategy plans a mill (Inca: Settlement) for
-  an observed gather target beyond the existing8-tile camp-service range. It
+  an observed gather target beyond the existing 8-tile camp-service range. It
   searches only the existing camp fan/radii through the observation-only legality
   predicate, retains duplicate/pending/camp-count and early-economy guards, and
   chooses a nearby observed forager as builder. Urgent housing stays first;
-  a known buildable food-bank plan reserves its existing public100/125-wood price
+  a known buildable food-bank plan reserves its existing public 100/125-wood price
   against discretionary farm/archer/boat/siege spending. Unknown/unbuildable sites
   reserve nothing. The reservation and issued build are counted once, including
   the inert open Settlement placeholder's otherwise zero cost. This is an
