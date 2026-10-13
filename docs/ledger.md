@@ -219,12 +219,20 @@ off the reference; **measured** — fitted to a reference screenshot;
 
 ## Saracen healing aura and source discrepancy (#187/#285)
 
-- **Owned:** DAT civ 9/tree 261/team 409, current tree research28/454/368,
+- **Owned (build48987):** DAT civ 9/tree 261/team 409, current tree research28/454/368,
   `xs/Effects.xs` EffectFunction7 and `xs/Constants.xs` define the Bimaristan
   task's work values 75/1, range 5, target classes, owner 4/combat-level 2,
   search-wait 109/gather-type 21 and help string 13404. The importer expands only
   this reviewed function into unit research effects; unknown script functions
   remain unsupported. Mameluke282/556 stats/art and bonuses are imported normally.
+- **Build185872 importer exclusion (#324):** Saracen Bimaristan technology28
+  (effect28) is **omitted**, logged and recorded in `skippedTechnologies`.
+  Its XS EffectFunction7 uses `xsModifyObjectTasks` with a complement class
+  mask, which the current healingAura contract cannot represent faithfully.
+  This owner-approved deferred-civilisation exclusion requires exactly the
+  reviewed DAT invocation and XS program/constant values; drift fails loudly.
+  It does not reuse build48987's explicit target list. The build48987 import
+  and its runtime description below remain unchanged.
 - **Inferred runtime:** interpret 75 as HP/minute (1.25HP/s), use inclusive
   centre-distance range 5, strongest-only overlapping auras, exclude the emitter
   itself and garrisoned sources/recipients, and continue during movement, healing,
@@ -1884,7 +1892,7 @@ when the result looks right. When a row is later read from a file, delete it
   order are DAT-derived; drawing them as one below-body layer reuses the existing
   painter-order and building-soot interpretation. Native/browser visual calibration is
   unverified. No decoder semantics changed.
-- **Llama grant:** team effect4 makes hidden tech730 automatic through639 and
+- **Llama grant (48987):** team effect4 makes hidden tech730 automatic through639 and
   completed TC-annex307. Effect678 sets spawnCap1 and calls reviewed XS
   EffectFunction1: one uniformly selected llama305/1963 at annex619. Source IDs,
   statements, random bounds, target/count and spawn constant fail closed on drift.
@@ -1897,6 +1905,26 @@ when the result looks right. When a row is later read from a file, delete it
   calibration; the existing proximity policy and AI staging remain inferred.
   The researched ledger grants once per match, including after another TC or
   JSON continuation. Native repeatable bookkeeping timing is not calibrated.
+- **185872 llama activation (#324):** generic startup tech79/effect79 now
+  disables730 (type102/d730). Inca tree3 re-enables it through Team Modify
+  Technology18/a730/b12/c−1/d1; owned XS names attribute12 SetState and value1
+  Ready. Team effect4 is empty.730 stays generic(civ−1), repeatable1,
+  required639+307/count2, location−1, but now time0/no costs. Effect678 and
+  EffectFunction1 still set spawnCap1 and spawn one random305/1963 at619.
+  The importer resolves startup disable before tree readiness, retaining the
+  existing runtime count-gated spawn rather than auto-granting to every civ.
+  Python genieutils has raw command fields; the command18 team classification
+  is documented by [AGE's effect labels](https://github.com/Tapsa/AGE/blob/master/AGE_Frame/Techs.cpp).
+  Source-native recipients include Inca's team, not enemy/standalone Britons.
+  **Existing bounded/inferred integration retained:** this two-player initial
+  enemy model applies team benefits to the owner only; initial allied-team
+  propagation/full-tech-tree mode is not delivered. Grant-once bookkeeping,
+  native startup ordering, TC-perimeter placement and simulation RNG remain
+  the existing uncalibrated adaptations above, not new native timing claims.
+- **Britons185872 roster exclusion (#331, owner decision):** Mounted
+  Crossbowman2700/Heavy Mounted Crossbowman2701 remain absent, explicitly
+  unavailable and listed/logged as deferred. The source catalogue retains the
+  missing IDs rather than claiming parity or substituting Cavalry Archers.
 - **Not implemented:** Xolotl 1570 and Catapult
   Galleon are availability-only. Settlement construction→gather continuation is limited to
   conventional camps until native behaviour is observed. Graphic 3822 is a file-less

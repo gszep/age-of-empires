@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -377,6 +378,23 @@ def dead_standing_graphic(civ_units: Any, unit: Any) -> int:
         return -1
     dead = civ_units[unit.dead_unit_id]
     return dead.standing_graphic[0] if dead is not None else -1
+
+
+def empty_annex_graphic(dat: DatFile, graphic_id: int) -> bool:
+    """The empty TC annex changed from -1 to the DAT's explicit BLANK.
+
+    Do not treat other file-less graphics as empty: they may be compositions,
+    particles or sound cues. Nonempty/unreviewed entries still reach the strict
+    animation importer.
+    """
+    if graphic_id < 0:
+        return True
+    graphic = dat.graphics[graphic_id]
+    return (graphic is not None and graphic.name == 'BLANK'
+            and graphic.file_name == 'None' and graphic.slp == -1
+            and not graphic.deltas and not graphic.particle_effect_name
+            and graphic.sound_id == -1 and not graphic.wwise_sound_id
+            and not graphic.angle_sounds_used and not graphic.angle_sounds)
 
 
 def damage_stages(dat: DatFile, unit: Any) -> list[dict[str, Any]]:
@@ -1326,7 +1344,7 @@ def extract_entity(
             if annex.unit_id < 0:
                 continue
             annex_unit = civ_units[annex.unit_id]
-            if annex_unit is None or annex_unit.standing_graphic[0] < 0:
+            if annex_unit is None or empty_annex_graphic(dat, annex_unit.standing_graphic[0]):
                 continue
             annexes.append(
                 {
@@ -1932,6 +1950,35 @@ def tree_nodes(dat_path: Path, spec: dict[str, Any]) -> list[dict[str, Any]]:
     return tree["civ_techs_buildings"] + tree["civ_techs_units"]
 
 
+def initial_team_research_gates(dat, civ_index):
+    """Initial Team Modify Technology readiness, within the owner-only 1v1 profile.
+
+    Generic zero-time descendants are not necessarily enabled: normal startup
+    research can disable them before a civ tree enables them for its team.
+    Limit this adapter to the reviewed SetState/Ready form, not arbitrary18.
+    """
+    commands = [c for civ in dat.civs if civ.tech_tree_id >= 0
+                for c in dat.effects[civ.tech_tree_id].effect_commands if c.type == 18]
+    ready_commands = [c for c in commands if c.b == 12 and c.c == -1 and c.d == 1]
+    targets = {int(c.a) for c in ready_commands}
+    if not targets:
+        return set(), set()
+    disabled = set()
+    for tech in dat.techs:
+        if (tech.civ != -1 or tech.full_tech_mode != 0 or tech.required_tech_count != 0
+                or tech.effect_id < 0 or any(r >= 0 for r in tech.required_techs)
+                or any(l.location_id >= 0 or l.research_time != 0 for l in tech.research_locations)
+                or any(c.flag and c.type >= 0 and c.amount > 0 for c in tech.resource_costs)):
+            continue
+        disabled.update(int(c.d) for c in dat.effects[tech.effect_id].effect_commands
+                        if c.type == 102 and int(c.d) in targets)
+    own = dat.effects[dat.civs[civ_index].tech_tree_id].effect_commands
+    enabled = {int(c.a) for c in own if c.type == 18 and c.b == 12 and c.c == -1 and c.d == 1}
+    if not enabled.issubset(disabled):
+        raise ValueError(f'Team Modify Technology readiness without reviewed initial disable: {sorted(enabled - disabled)}')
+    return disabled, enabled
+
+
 def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids, *, scripted_effects=None):
     """Resolve only source-addressed bonuses and their complete prerequisite graph.
 
@@ -1945,6 +1992,9 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids, 
     time_overrides = {}
     disabled = {int(c.d) for c in tree if c.type == 102}
     ready = {int(c.a) for c in tree if c.type == 8 and c.b == 12 and c.d == 1}
+    team_disabled, team_ready = initial_team_research_gates(dat, civ_index)
+    ready.update(team_ready)
+    unavailable_team_research = team_disabled - ready
     by_id = {t["techId"]: key for key, t in technologies.items()}
     buildings = {e["id"]: key for key, e in entities.items()
                  if e.get("category") == "building" and "skinOf" not in e}
@@ -1965,7 +2015,8 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids, 
     # in the provenance report instead of silently enabling free research.
     handled = {f"effect type {c.type}: a={c.a}, b={c.b}, c={c.c}, d={c.d}" for c in tree
                if c.type == 102 or c.type == EFFECT_ENABLE and c.b == 0
-               or c.type == 8 and c.b == 12 and c.d == 1}
+                or c.type == 8 and c.b == 12 and c.d == 1
+                or c.type == 18 and int(c.a) in team_ready and c.b == 12 and c.c == -1 and c.d == 1}
     for c in modifiers:
         if c.type == 103 and c.c == 0:
             time_overrides[int(c.a)] = rounded(c.d)
@@ -2001,7 +2052,7 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids, 
     decoded = {}
     descendants = {}
     for tid, tech in enumerate(dat.techs):
-        if tech.civ != -1 or tid in ids or tech.effect_id < 0 \
+        if tech.civ != -1 or tid in ids or tid in unavailable_team_research or tech.effect_id < 0 \
                 or any(l.location_id >= 0 or l.research_time > 0 for l in tech.research_locations):
             continue
         required = {r for r in tech.required_techs if r >= 0}
@@ -2046,7 +2097,7 @@ def civilization_bonuses(dat, civ_index, entities, technologies, attribute_ids, 
                     and all(l.research_time == 0 for l in tech.research_locations) \
                     and not any(c.flag and c.amount > 0 for c in tech.resource_costs):
                 node["automatic"] = True
-        if tid in disabled or tech.civ not in (-1, civ_index):
+        if tid in disabled or tid in unavailable_team_research or tech.civ not in (-1, civ_index):
             node["disabled"] = True
         if any(c.flag and c.type >= 0 and c.type not in RESOURCE_NAMES for c in tech.resource_costs):
             node["disabled"] = True  # live counter gates are outside this Briton implementation
@@ -2128,14 +2179,22 @@ def technologies_from_tree(
     nodes = tree_nodes(dat_path, spec)
     disabled_techs = {int(c.d) for c in dat.effects[dat.civs[spec["civIndex"]].tech_tree_id].effect_commands
                       if c.type == 102}
-    research_ids = {int(n["Node ID"]) for n in nodes if n.get("Node Type") == "Research"}
+    research_types = ('Research', 'UniqueTech', 'RegionalTech')
+    research_ids = {int(n["Node ID"]) for n in nodes if n.get("Node Type") in research_types}
     scripted_effects = {}
+    scripted_exclusions = {}
     if any(n.get('Node ID') == 463 and n.get('Node Status') != 'NotAvailable' for n in nodes):
         from scripted_effects import infantry_loot
         scripted_effects[5] = infantry_loot(dat_path.parent.parent, hashes)
     if any(n.get('Node ID') == 28 and n.get('Node Status') != 'NotAvailable' for n in nodes):
-        from scripted_effects import healing_aura
-        scripted_effects[7] = healing_aura(dat_path.parent.parent, hashes)
+        from scripted_effects import healing_aura, UnsupportedBimaristanMask, deferred_script_exclusion
+        try:
+            scripted_effects[7] = healing_aura(dat_path.parent.parent, hashes)
+        except UnsupportedBimaristanMask as error:
+            scripted_exclusions[28] = deferred_script_exclusion(
+                civilization['key'], spec['civIndex'], 28, dat.techs[28].civ, dat.techs[28].effect_id, error,
+                commands=dat.effects[28].effect_commands)
+            print(scripted_exclusions[28], file=sys.stderr)
     if any(n.get('Node ID') == 482 and n.get('Node Status') != 'NotAvailable' for n in nodes):
         from scripted_effects import stronghold_aura
         scripted_effects[8] = stronghold_aura(dat_path.parent.parent, hashes)
@@ -2151,7 +2210,7 @@ def technologies_from_tree(
         upgrade = (node.get("Node Type") in ("UnitUpgrade", "UniqueUnit", "RegionalUnit")
                    or ("Node Type" not in node and node.get("Use Type") == "Unit" and "Link ID" in node)) \
                   and node.get("Trigger Tech ID")
-        if node.get("Node Type") != "Research" and not upgrade:
+        if node.get("Node Type") not in research_types and not upgrade:
             continue
         name = node["Name"]
         tech_id = int(node["Trigger Tech ID"]) if upgrade else int(node["Node ID"])
@@ -2160,6 +2219,9 @@ def technologies_from_tree(
         if node["Node Status"] == "NotAvailable":
             skipped.append({"name": name, "techId": tech_id,
                             "reason": f"the {civilization['name']} do not have it"})
+            continue
+        if tech_id in scripted_exclusions:
+            skipped.append({'name': name, 'techId': tech_id, 'reason': scripted_exclusions[tech_id]})
             continue
         building = buildings.get(int(node["Building ID"]))
         if building is None:
@@ -2511,6 +2573,46 @@ def import_drop_sites(
         building["accepts"] = [resource for resource in ("food", "wood", "gold", "stone") if resource in accepted[index]]
 
 
+def focused_import_blockers(civ_key, bonuses):
+    """Do not ship newly encountered activation semantics for the focused roster."""
+    if civ_key not in ('britons', 'incas'):
+        return []
+    blockers = [f'{civ_key}: DAT tree effect{bonuses["treeEffectId"]}: {reason}; '
+            'technology activation/recipient semantics are not implemented. '
+            'Build185872 Inca llama tech730 changed from team cost/time grants to '
+            'tree command18 with zero-cost/zero-time research; implementation decision required'
+            for reason in bonuses['nodes'].get('-1', {}).get('unmodelled', [])
+            if reason.startswith('effect type 18:')]
+    return blockers
+
+
+def focused_roster_blockers(catalogue):
+    blockers = []
+    for key in ('britons', 'incas'):
+        row = catalogue.get(key, {})
+        missing = [uid for uid in row.get('missingRoster', [])
+                   if not (key == 'britons' and uid in (2700, 2701))]
+        if missing:
+            names = {n['Node ID']: n.get('Name', '') for n in row.get('roster', [])}
+            blockers.append(f'{key}: focused source roster is not imported: '
+                            + ', '.join(f'{uid} {names.get(uid, "")}' for uid in missing)
+                            + '; source roster implementation decision required')
+    return blockers
+
+
+def deferred_roster_exclusions(catalogue):
+    row = catalogue.get('britons', {})
+    names = {n['Node ID']: n.get('Name', '') for n in row.get('roster', [])}
+    exclusions = [{'unitId': uid, 'name': names.get(uid, ''), 'issue': 331,
+                   'reason': 'owner-deferred Britons roster #331; not available in this implementation'}
+                  for uid in row.get('missingRoster', []) if uid in (2700, 2701)]
+    if exclusions:
+        row['deferredExclusions'] = exclusions
+        for entry in exclusions:
+            print(f"deferred-civ exclusion #331: Britons unit{entry['unitId']} {entry['name']}", file=sys.stderr)
+    return exclusions
+
+
 def extract(
     dat_path: Path,
     graphics_dir: Path,
@@ -2521,6 +2623,7 @@ def extract(
     uhd_dir: Path | None = None,
     _dat: DatFile | None = None,
     _sld_hashes: dict[Path, str] | None = None,
+    _inventory_only: bool = False,
 ) -> dict[str, Any]:
     """Everything the game reads off the owned data, as `content.json`.
 
@@ -2645,6 +2748,9 @@ def extract(
     )
     bonuses = civilization_bonuses(dat, spec["civIndex"], entities, technologies, attribute_ids,
                                    scripted_effects=scripted_spawns)
+    blockers = focused_import_blockers(civilization['key'], bonuses)
+    if blockers and not _inventory_only:
+        raise ValueError('; '.join(blockers))
     by_tech_id = {value["techId"]: key for key, value in technologies.items()}
     by_unit_id = {value["id"]: value for value in entities.values() if value.get("category") in ("unit", "building")}
     # Explicit replacements inherit their tree node's age/requirements.
@@ -2808,17 +2914,31 @@ def extract(
         },
         "entities": entities,
     }
+    if blockers:
+        result['importBlockers'] = blockers
     if "profileCivilizations" in spec:
         from civilization_profiles import catalogue, profile_spec
         rows = catalogue(dat, dat_path, spec, hashes, strings, attribute_ids)
         result["civilizationCatalog"] = rows
+        roster_exclusions = deferred_roster_exclusions(rows)
+        if civilization['key'] == 'britons' and roster_exclusions:
+            civilization['unavailable']['units'] = sorted(set(civilization['unavailable']['units'])
+                                                         | {e['unitId'] for e in roster_exclusions})
+        roster_blockers = focused_roster_blockers(rows)
+        if roster_blockers and not _inventory_only:
+            raise ValueError('; '.join(roster_blockers))
+        if roster_blockers:
+            result.setdefault('importBlockers', []).extend(roster_blockers)
         for key in spec["profileCivilizations"]:
             if key == civilization["key"]:
                 continue
             profile = extract(dat_path, graphics_dir, palettes_dir, profile_spec(spec, rows[key]),
-                              source, strings_path, uhd_dir, _dat=dat, _sld_hashes=hashes.sld_hashes)
+                              source, strings_path, uhd_dir, _dat=dat, _sld_hashes=hashes.sld_hashes,
+                              _inventory_only=_inventory_only)
             profile["civilization"]["enabled"] = rows[key]["enabled"]
             result["civilizations"][key] = profile
+            if profile.get('importBlockers'):
+                result.setdefault('importBlockers', []).extend(profile['importBlockers'])
             result["particles"].update(profile["particles"])
             hashes.update(profile["source"]["sha256"])
     return result
@@ -2840,6 +2960,8 @@ def main() -> None:
     parser.add_argument("--profiles", nargs="+", help="additional base-era profile keys, or 'base' for all; does not enable them")
     parser.add_argument("--source", type=Path, default=Path(__file__).with_name("aoe2-source.json"))
     parser.add_argument("--out", type=Path, default=Path(".local/aoe2de/content.json"))
+    parser.add_argument('--inventory-only', action='store_true',
+                        help='write diagnostic content including focused importBlockers; exits 2 if blocked, never production-ready')
     args = parser.parse_args()
     spec = json.loads(args.spec.read_text())
     if args.profiles is not None:
@@ -2857,10 +2979,15 @@ def main() -> None:
         json.loads(args.source.read_text()),
         args.strings,
         uhd_dir=args.uhd_graphics,
+        _inventory_only=args.inventory_only,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     print(args.out)
+    if result.get('importBlockers'):
+        for reason in result['importBlockers']:
+            print(f'BLOCKED diagnostic inventory only: {reason}', file=sys.stderr)
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":

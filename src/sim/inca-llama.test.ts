@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES, isAnimal, rulesFromManifest, type ContentManifest, type TechEffect } from './data';
-import { activateAutomaticTechnologies, applyCommand, createGame, placementLegal, stepGame } from './game';
+import { activateAutomaticTechnologies, applyCommand, createGame, placementLegal, rulesForPlayer, stepGame } from './game';
 import { checksumState } from './checksum';
 import { random01 } from './random';
 import { observe } from './observe';
@@ -11,7 +11,8 @@ import { contextTargets } from '../view/selection';
 import { decayFraction } from '../view/sprites';
 import { SharedMatch } from '../shared/match';
 import { replayRecord, runMatch } from '../headless/runner';
-import type { Entity, GameState, PlayerId } from './types';
+import type { BuildingKind, Entity, GameState, PlayerId } from './types';
+import { existsSync, readFileSync } from 'node:fs';
 
 const choices = ['dat-unit-305', 'dat-unit-1963'] as const;
 const sides = { 1: 'incas', 2: 'britons' } as const;
@@ -46,6 +47,38 @@ function arena(seed = 199) {
 }
 
 describe('Inca XS llama grant', () => {
+  // The worker's full185872 x1 extraction is optional owned evidence. The
+  // synthetic profile above exercises the same normalized 639/307/730 graph.
+  it.skipIf(!existsSync('.local/content-185872.json'))('185872 imported activation grants Inca one llama and enemy Britons none through aging', () => {
+    const content = JSON.parse(readFileSync('.local/content-185872.json', 'utf8'));
+    expect(content.importBlockers).toBeUndefined();
+    expect(content.civilizationBonuses.nodes['730']).toBeUndefined();
+    expect(content.civilizations.incas.civilizationBonuses.nodes['730']).toMatchObject({
+      initialState: 'ready', automatic: true, requiredTechs: [639, 307], requiredTechCount: 2,
+    });
+    const s = createGame(199, rulesFromManifest(content), sides);
+    expect(llamas(s, 1)).toHaveLength(1);
+    expect(llamas(s, 2)).toHaveLength(0);
+    const tc = s.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    Object.assign(s.players[1], { food: 10000, wood: 10000, gold: 10000, stone: 10000 });
+    for (const [tech, age] of [['feudal-age', 1], ['castle-age', 2], ['imperial-age', 3]] as const) {
+      // Fixture completed venues supply the real DAT age prerequisites. This
+      // tests research/llama outcomes, not construction or map placement.
+      const venues: BuildingKind[][] = [[], ['settlement', 'barracks'], ['blacksmith', 'market'], ['monastery', 'siege-workshop']];
+      for (const [i, kind] of venues[age].entries()) {
+        const rule = rulesForPlayer(s, 1).buildings[kind];
+        s.entities.push({ id: s.nextId++, kind, owner: 1, position: { x: 55 + i * 5, y: 50 + age * 5 },
+          hp: rule.hp, maxHp: rule.hp, radius: rule.radius, activity: 'idle', order: { kind: 'idle' } });
+      }
+      activateAutomaticTechnologies(s);
+      expect(applyCommand(s, { kind: 'research', player: 1, buildingId: tc.id, tech }), tech).toEqual({ ok: true });
+      for (let i = 0; i < 10000 && s.players[1].age < age; i++) stepGame(s);
+      expect(s.players[1].age).toBe(age);
+      expect(llamas(s, 1)).toHaveLength(1);
+      expect(llamas(s, 2)).toHaveLength(0);
+    }
+    expect(s.players[1].researched.filter(k => k === 'automatic-730')).toHaveLength(1);
+  });
   it.each([1, 2] as const)('naturally completes 639/307/730 and grants one animal beside player %s TC, not Britons', owner => {
     const other = owner === 1 ? 2 : 1;
     const selected = { [owner]: 'incas', [other]: 'britons' } as Record<PlayerId, string>;

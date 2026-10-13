@@ -2,6 +2,31 @@
 import re
 
 
+def file_int_constant(text, name):
+    """Resolve a single literal file-scope int, never evaluate arbitrary XS."""
+    scope = text[:re.search(r'^void\s', text, re.M).start()]
+    values = re.findall(r'^const int ' + re.escape(name) + r' = (\d+);\s*$', scope, re.M)
+    if len(values) != 1:
+        raise ValueError(f'unresolved/ambiguous XS constant: {name}')
+    return int(values[0])
+
+
+class UnsupportedBimaristanMask(ValueError):
+    """Recognized source program whose dynamic target predicate is not modelled."""
+
+
+def deferred_script_exclusion(civ_key, civ_index, tech_id, tech_civ, effect_id, error, *, commands):
+    # #324 coordinator-authorized exclusion, not a generic catch-and-continue.
+    if ((civ_key, civ_index, tech_id, tech_civ, effect_id) != ('saracens', 9, 28, 9, 28)
+            or not isinstance(error, UnsupportedBimaristanMask)):
+        raise error
+    actual = [(c.type, c.a, c.b, c.c, c.d) for c in commands]
+    if actual != [(1, 33, 0, -1, 7.0)]:
+        raise ValueError(f'Saracens Bimaristan tech28/effect28 commands changed: {actual}; '
+                         'exclusion requires exactly the reviewed EffectFunction7 invocation')
+    return f'deferred-civ exclusion #324: Saracens Bimaristan tech28/effect28: {error}'
+
+
 def infantry_loot(common, hashes):
     """Chieftains' actual XS tasks, not the conflicting English summary."""
     from import_content import sha256
@@ -35,6 +60,8 @@ def infantry_loot(common, hashes):
         if not m or amount is None:
             raise ValueError(f'EffectFunction5 changed: {line}')
         name = m[1]
+        if name not in symbols:
+            symbols[name] = file_int_constant(text, name)
         targets[name] = {'classId' if name.endswith('Class') else 'unitId': symbols[name] - (900 if name.endswith('Class') else 0), 'amount': amount}
     if not targets:
         raise ValueError('EffectFunction5 has no loot targets')
@@ -59,6 +86,9 @@ def stronghold_aura(common, hashes):
     # maps. A reset/reassignment between tasks changes their meaning even when
     # the final dictionary would contain the same values.
     statements = [line.strip() for line in body.splitlines() if line.strip()]
+    if statements and statements[0] == 'xsResetTaskAmount();':
+        statements[:0] = [f'int {name} = {file_int_constant(text, name)};'
+                          for name in ('WarriorPriestWithRelicID', 'CastleID')]
     number = r'\d+(?:\.\d+)?'
     shape = [r'int WarriorPriestWithRelicID = \d+;', r'int CastleID = \d+;',
              re.escape('xsResetTaskAmount();'),
@@ -73,7 +103,7 @@ def stronghold_aura(common, hashes):
     if len(statements) != len(shape) or any(not re.fullmatch(pattern, line)
                                            for pattern, line in zip(shape, statements)):
         raise ValueError('EffectFunction8 statement order/count changed')
-    ids = {k: int(v) for k, v in re.findall(r'int (\w+) = (\d+);', body)}
+    ids = {k: int(v) for k, v in re.findall(r'int (\w+) = (\d+);', '\n'.join(statements))}
     values = {k: float(v) for k, v in re.findall(r'xsTaskAmount\((\w+), ([\d.]+)\);', body)}
     expected = {'cTaskAttrWorkValue2': 1, 'cTaskAttrOwnerType': 4,
                 'cTaskAttrCombatLevelFlag': 4, 'cTaskAttrSearchWaitTime': 109,
@@ -99,6 +129,54 @@ def healing_aura(common, hashes):
     if function is None:
         raise ValueError('missing reviewed EffectFunction7')
     body = function[1]
+    if 'xsModifyObjectTasks' in body:
+        # Recognize this particular rewrite before authorizing a narrow deferred
+        # exclusion. Other script changes must still fail loudly, including for
+        # Saracens. Never approximate this complement mask with the old list.
+        statements = [line.split('//', 1)[0].strip() for line in body.splitlines()]
+        statements = [line for line in statements if line]
+        expected = ['int TargetClass = 0;', 'xsResetTaskAmount();']
+        expected += [f'xsEffectAmount(cAddAttribute, {name}, cCombatAbility, {amount}, playerId);'
+                     for name, amount in [('cMonkClass', 32), ('cMonkWithRelicClass', 32),
+                                          ('WarriorPriestWithRelicID', -32)]]
+        expected += [f'xsTaskAmount(cTaskAttr{name}, {value});' for name, value in [
+            ('WorkValue1', 75), ('WorkValue2', 1), ('WorkRange', 5),
+            ('GatheringSoundInt32', 13404), ('DepositSoundInt32', 13404),
+            ('OwnerType', 4), ('CombatLevelFlag', 2), ('SearchWaitTime', 109), ('GatherType', 21)]]
+        expected += [
+            'TargetClass = cFlagClassRemoval * (cFlagClassOffset + cFlagClassBuilding + cFlagClassSiege + cFlagClassShip);',
+            'xsTaskAmount(cTaskAttrObjectClass, TargetClass);',
+            'xsTaskAmount(cTaskAttrTaskType, cTaskTypeAura);',
+            'xsModifyObjectTasks(cMonkClass, playerId, 0);',
+            'xsModifyObjectTasks(cMonkWithRelicClass, playerId, 0);',
+            'xsModifyObjectTasks(WarriorPriestWithRelicID, playerId, -1);',
+            'xsResetTaskAmount();']
+        if statements != expected:
+            raise ValueError('EffectFunction7 xsModifyObjectTasks program changed beyond reviewed build185872; review semantics')
+        # Symbolically identical statements are not proof of identical semantics.
+        # Resolve every constant operand, including task-field IDs, and reject
+        # missing, nonliteral, duplicate or shadowing file-scope definitions.
+        expected_constants = {
+            'WarriorPriestWithRelicID': 1831, 'cAddAttribute': 4, 'cCombatAbility': 63,
+            'cMonkClass': 918, 'cMonkWithRelicClass': 943,
+            'cFlagClassRemoval': -1, 'cFlagClassOffset': 1000,
+            'cFlagClassBuilding': 256, 'cFlagClassSiege': 128, 'cFlagClassShip': 64,
+            'cTaskAttrWorkValue1': 0, 'cTaskAttrWorkValue2': 1, 'cTaskAttrWorkRange': 2,
+            'cTaskAttrGatheringSoundInt32': 18, 'cTaskAttrDepositSoundInt32': 21,
+            'cTaskAttrOwnerType': 6, 'cTaskAttrCombatLevelFlag': 5,
+            'cTaskAttrSearchWaitTime': 4, 'cTaskAttrGatherType': 25,
+            'cTaskAttrObjectClass': 30, 'cTaskAttrTaskType': 28, 'cTaskTypeAura': 155,
+        }
+        scope = text[:re.search(r'^void\s', text, re.M).start()]
+        for name, value in expected_constants.items():
+            definitions = re.findall(r'^(?:extern )?const (\w+) ' + re.escape(name)
+                                     + r'\s*=\s*([^;\n]+);', constants + '\n' + scope, re.M)
+            if [(kind, expression.strip()) for kind, expression in definitions] != [('int', str(value))]:
+                raise ValueError(f'EffectFunction7 constant {name} changed: {definitions}; expected int {value}')
+        raise UnsupportedBimaristanMask(
+            'EffectFunction7 now uses xsModifyObjectTasks with a complement class mask '
+            '(excluding Building/Siege/Ship) instead of enumerated aura targets; '
+            'dynamic target-mask semantics are not represented by the current healingAura contract')
     values = {k: float(v) for k, v in re.findall(r'xsTaskAmount\((\w+), ([\d.]+)\);', body)}
     # This adapter implements the healing family, not arbitrary task scripting.
     for key, expected in {'cTaskAttrWorkValue2': 1, 'cTaskAttrOwnerType': 4,
@@ -143,24 +221,44 @@ def free_llama(common, hashes):
     body = function[1]
     # Validate the exact structure: two unit IDs, one random choice, one spawn call.
     statements = [line.strip() for line in body.splitlines() if line.strip()]
+    # Newer sources lift the two literal IDs into file-scope constants and
+    # rename the local. Resolve only those operands, not arbitrary XS code.
+    declaration = re.fullmatch(r'int (\w+) = (\w+);', statements[0]) if statements else None
+    if declaration is None:
+        raise ValueError('EffectFunction1 llama declaration changed')
+    if declaration[1] in ('randomNumber', 'playerId'):
+        raise ValueError('EffectFunction1 llama variable aliases control state')
+    variable = re.escape(declaration[1])
+    def unit_id(token):
+        if token.isdecimal():
+            return int(token)
+        return file_int_constant(text, token)
+
     expected_shape = [
-        r'int llamaId = 305;',
+        r'int ' + variable + r' = (\w+);',
         r'int randomNumber = xsGetRandomNumberLH\(0, 2\);',
         r'if \(randomNumber == 1\)',
         r'\{',
-        r'llamaId = 1963;',
+        variable + r' = (\w+);',
         r'\}',
-        r'xsEffectAmount\(cSpawnUnit, llamaId, 619, 1, playerId\);',
+        r'xsEffectAmount\(cSpawnUnit, ' + variable + r', 619, 1, playerId\);',
     ]
     if len(statements) != len(expected_shape):
         raise ValueError(f'EffectFunction1 statement count changed: {len(statements)} vs {len(expected_shape)}')
     for i, (pattern, line) in enumerate(zip(expected_shape, statements)):
         if not re.fullmatch(pattern, line):
             raise ValueError(f'EffectFunction1 statement {i} changed: {line}')
+    operands = [re.fullmatch(expected_shape[i], statements[i])[1] for i in (0, 4)]
+    if (set(operands) & {declaration[1], 'randomNumber', 'playerId'}
+            or declaration[1] in ('cSpawnUnit', 'xsEffectAmount', 'xsGetRandomNumberLH')):
+        raise ValueError('EffectFunction1 local binding shadows a referenced global')
+    ids = [unit_id(token) for token in operands]
+    if ids != [305, 1963]:
+        raise ValueError(f'EffectFunction1 llama IDs changed: {ids}')
     constants_path = common / 'xs/Constants.xs'
     constants = constants_path.read_text(encoding='utf-8-sig')
     hashes['xs/Constants.xs'] = sha256(constants_path)
-    if not re.search(r'extern const int cSpawnUnit = 7;', constants):
+    if re.findall(r'^extern const int cSpawnUnit = (\d+);\s*$', constants, re.M) != ['7']:
         raise ValueError('EffectFunction1 cSpawnUnit changed')
     # The reviewed LH draw chooses each integer in [0, 2) equally. Resolve
     # source IDs to imported keys at the call site, not inside the XS adapter.
