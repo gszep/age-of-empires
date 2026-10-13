@@ -28,6 +28,7 @@ for (const [map, expected] of Object.entries(hashes)) it(`${map}: legacy seeds a
     useLegacyPacking(state);
     useLegacySiphons(state);
     useLegacyTrebuchetTargeting(state);
+    delete state.herdClaimVersion;
     expect(state).not.toHaveProperty('mapgenVersion');
     expect(state).not.toHaveProperty('packingVersion');
     expect(state).not.toHaveProperty('siphonsVersion');
@@ -37,10 +38,11 @@ for (const [map, expected] of Object.entries(hashes)) it(`${map}: legacy seeds a
     expect(checksumState(state), `seed ${seed}`).toBe(initial);
     const restored = JSON.parse(JSON.stringify(state));
     const expectSameDynamicState = () => {
-      const { packingVersion, siphonsVersion, trebuchetTargetingVersion, ...dynamic } = JSON.parse(canonicalSnapshot(current));
+      const { packingVersion, siphonsVersion, trebuchetTargetingVersion, herdClaimVersion, ...dynamic } = JSON.parse(canonicalSnapshot(current));
       expect(packingVersion).toBe(1);
       expect(siphonsVersion).toBe(1);
       expect(trebuchetTargetingVersion).toBe(1);
+      expect(herdClaimVersion).toBe(1);
       expect(dynamic).toEqual(JSON.parse(canonicalSnapshot(state)));
     };
     expectSameDynamicState();

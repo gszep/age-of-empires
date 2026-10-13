@@ -145,6 +145,7 @@ export function createGame(
     packingVersion: 1,
     siphonsVersion: 1,
     trebuchetTargetingVersion: 1,
+    herdClaimVersion: 1,
     ...(gridSpawnVersion ? { gridSpawnVersion: 1 as const } : {}),
     ...(map === 'arabia' && mapgenVersion >= 1 ? { mapgenVersion: 1 as const }
       : map === 'islands' && mapgenVersion >= 2 ? { mapgenVersion: 2 as const } : {}),
@@ -3465,18 +3466,18 @@ function isDefeated(state: GameState, player: PlayerId): boolean {
 }
 
 /**
- * Gaia's animals decide for themselves once a tick.
- *
- * A herdable joins whoever came closest and then stands where it is, ordered
- * about by hand from then on; two players' units in range and it stays gaia's,
- * as in AoE2. A deer is startled only from close by, hops a short way and then
+ * New Gaia herdable claims resolve each tick: first claimant, then lower player slot
+ * for simultaneous arrivals (#330 owner ruling). Owned herds retain the existing
+ * five-tick, herdRange-only stealing rule and otherwise keep their orders. A deer is startled
+ * only from close by, hops a short way and then
  * grazes through a cooldown — the numbers are the rules', not this comment's.
  * A boar does neither: its answer to being wounded is in `applyDamage`.
  */
-const ANIMAL_INTERVAL = 5; // ticks; a quarter second is quick enough to herd by
+const ANIMAL_INTERVAL = 5; // ticks; huntable AI and legacy claim cadence
 
 function updateAnimals(state: GameState): void {
-  if (state.tick % ANIMAL_INTERVAL !== 0) return;
+  const animalTick = state.tick % ANIMAL_INTERVAL === 0;
+  if (!state.herdClaimVersion && !animalTick) return;
   const animals: Entity[] = [];
   const units: Entity[] = [];
   for (const entity of state.entities) {
@@ -3488,6 +3489,12 @@ function updateAnimals(state: GameState): void {
   for (const animal of animals) {
     if (animal.order.kind === 'attack') continue;
     const rules = rulesForPlayer(state, animal.owner).units[animal.kind as AnimalKind];
+    const newGaiaClaim = !!state.herdClaimVersion && animal.owner === 0 && rules.herdRange !== undefined;
+    if (!newGaiaClaim && !animalTick) continue;
+    // Keep herdRange untouched for old recordings (fallback 2.5, imported LOS).
+    // New geometry is inferred: Gaia sheep DAT LOS3 + collision_size_x0.3.
+    const claimRange = rules.herdRange === undefined ? undefined
+      : newGaiaClaim ? rules.lineOfSight + animal.radius : rules.herdRange;
     let nearest: Entity | undefined;
     let nearestDistance = Infinity;
     let claimant: PlayerId | 0 = 0;
@@ -3495,17 +3502,18 @@ function updateAnimals(state: GameState): void {
     for (const other of units) {
       const d = distance(other.position, animal.position);
       if (d < nearestDistance) { nearest = other; nearestDistance = d; }
-      if (rules.herdRange !== undefined && d <= rules.herdRange) {
+      if (claimRange !== undefined && d <= claimRange) {
         if (claimant && other.owner !== claimant) contested = true;
-        claimant = other.owner as PlayerId;
+        claimant = (newGaiaClaim && claimant
+          ? Math.min(claimant, other.owner) : other.owner) as PlayerId;
       }
     }
     if (rules.herdRange !== undefined) {
-      // A herdable joins whoever came closest, stops where it stands, and is
-      // theirs to move from then on. Driving it after that — following the
-      // nearest unit about — would overwrite every order given to it a moment
-      // later, which is the same as not being able to command it at all.
-      if (!contested && claimant && animal.owner !== claimant) {
+      // Resolve contested Gaia claims, but do not steal a defended herd or
+      // cancel its owner's move order every tick. Ownership remembers the
+      // earlier claimant; the minimum slot above only breaks an unclaimed tie.
+      if (claimant && animal.owner !== claimant
+        && (!contested || newGaiaClaim)) {
         animal.owner = claimant;
         becomeIdle(animal);
       }

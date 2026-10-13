@@ -180,6 +180,7 @@ describe('King survival and temporary Treason', () => {
     useLegacyPacking(legacyState);
     useLegacySiphons(legacyState);
     useLegacyTrebuchetTargeting(legacyState);
+    delete legacyState.herdClaimVersion;
     delete legacyState.researchQueueVersion;
     legacy.checksums = record.checksums.map(({ tick }) => {
       while (legacyState.tick < tick) stepGame(legacyState);

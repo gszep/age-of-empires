@@ -68,6 +68,7 @@ describe('manual-derived public score (#139)', () => {
     useLegacyPacking(s);
     useLegacySiphons(s);
     useLegacyTrebuchetTargeting(s);
+    delete s.herdClaimVersion;
     const commands: Command[] = [
       { kind: 'train', player: 1, buildingId: tc(s).id, unit: 'villager' },
       { kind: 'research', player: 1, buildingId: tc(s).id, tech: 'loom' },

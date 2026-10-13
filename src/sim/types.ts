@@ -303,6 +303,8 @@ export interface GameState {
   trebuchetTargetingVersion?: 1;
   /** New matches snap load-time unit placement only; absent in pre-v10 recordings/snapshots. */
   gridSpawnVersion?: 1;
+  /** New matches apply owner ruling to herdable claims (earlier claimant, same-tick tie to lower id); absent in pre-v11 recordings/snapshots. */
+  herdClaimVersion?: 1;
   /** 1: Arabia's eleven biomes; 2: Islands offshore fish. Absent retains the legacy map. */
   mapgenVersion?: 1 | 2;
   /** Opt-in fixed200-year Wonder victory. Absent preserves legacy conquest. */

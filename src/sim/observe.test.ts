@@ -184,10 +184,12 @@ describe('player observations', () => {
     const scout = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
     const enemy = state.entities.find(e => e.owner === 2 && e.kind === 'villager')!;
     const sheep = state.entities.find(e => e.kind === 'sheep')!;
-    enemy.position = { x: 40, y: 40 };
+    // Visible, but outside the sheep's LOS+radius claim range (#330).
+    enemy.position = { x: 37.5, y: 39.5 };
     sheep.position = { x: 41, y: 40 };
-    scout.position = { x: 40, y: 41 };
+    scout.position = { x: 37.5, y: 40.5 };
     stepGame(state);
+    expect(sheep.owner).toBe(0);
     expect(observe(state, 1).entities.some(e => e.id === enemy.id)).toBe(true);
     expect(observe(state, 1).entities.some(e => e.id === sheep.id)).toBe(true);
 
@@ -211,14 +213,18 @@ describe('player observations', () => {
     const scout = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
     const sheep = state.entities.find(e => e.kind === 'sheep')!;
     sheep.position = { x: 41, y: 40 };
-    scout.position = { x: 40, y: 41 };
+    // Discover from outside capture range, then approach on the next tick.
+    scout.position = { x: 37.5, y: 40.5 };
     stepGame(state);
+    expect(sheep.owner).toBe(0);
     // Seen, so it is not yet *remembered* in the observation -- the snapshot
     // that outlives the fog is the one taken here.
     expect(state.visibility[1].memory[sheep.id]).toBeDefined();
 
     // Claim it and walk it home, leaving the spot it was found in the fog.
-    sheep.owner = 1;
+    scout.position = { x: 40, y: 41 };
+    stepGame(state);
+    expect(sheep.owner).toBe(1);
     sheep.position = { x: 60, y: 60 };
     scout.position = { x: 60, y: 61 };
     stepGame(state);

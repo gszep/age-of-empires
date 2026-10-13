@@ -8,8 +8,9 @@ describe('herding and hunting', () => {
   const animalOf = (state: GameState, kind: string) =>
     state.entities.find(e => e.kind === kind && !e.dead)!;
 
-  it('gives a sheep to whoever came closest, and not while both are near', () => {
+  it('legacy claims reject competing players, then claim when only one remains', () => {
     const state = createGame(31);
+    delete state.herdClaimVersion;
     const sheep = animalOf(state, 'sheep');
     expect(sheep.owner).toBe(0);
     const mine = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;

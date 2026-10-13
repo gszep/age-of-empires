@@ -1,5 +1,40 @@
 # Ledger of approximations
 
+## Herdable claim owner ruling (#308/#330, 2026-10-13)
+
+**Owner ruling, inferred rather than natively measured:** The first claimant
+within range takes an unclaimed herdable. On an exact same-tick tie, the lower
+player slot wins. New **Gaia** claims are evaluated each simulation tick, not the old
+five-tick animal-AI cadence, so arrivals on adjacent ticks are not collapsed into
+a tie. Once owned, herdables use exactly the pre-change stealing policy:
+five-tick evaluation, original `herdRange`, and contested rejection. No permanent
+ownership lock or expanded defense/stealing range is introduced; the earlier
+claimant retains ownership while defended within that original range. **Stealing
+has not been calibrated natively and remains a follow-up**, outside the Gaia-only
+owner ruling and #329 measurement. The owner-stated Celts exception—protection within a Celt
+unit's LOS and Celt priority on simultaneous approach—is **not implemented**
+(deferred civ, #304). Ordinary claimant eligibility is unchanged; this is not a
+calibration of the unpacked-trebuchet eligibility gap noted in #308.
+
+**Capture distance, inferred from native measurement #329:** a P1 villager captures
+at centre distance 3.25 but not 3.5 on build 185872. The Gaia-only formula is
+centre distance ≤ herdable.lineOfSight + herdable.radius (for sheep: 3 + 0.3 = 3.3).
+Pinned `depot_813781/resources/_common/dat/empires2_x2_p1.dat`, Gaia
+`civs[0].units[594]`: `line_of_sight=3`, `collision_size_x≈0.300000012`
+(importer rounds to 0.3). `import_content.py` publishes `lineOfSight`/`collision`;
+`rulesFromManifest` consumes LOS and `collision[0]` for radius. The fallback has
+the same LOS/radius. **The formula, not the fields, is inferred**: this bracket
+does not establish the exact engine threshold or generalized livestock geometry.
+Native evidence starts at 1 s and does not prove first-second sub-tile stationarity.
+No new native measurement or full import was run for this change.
+
+Match format 11 gates the rule with `herdClaimVersion`. Pre-v11 recordings and
+marker-less snapshots retain five-tick claim timing, contested rejection, and
+their original `herdRange` (2.5 fallback / sheep LOS3 imported), without adding
+radius. The marker is read only during play, so replay initialization removes it
+after `createGame` without changing generation. Huntable AI retains its existing
+five-tick cadence in both modes.
+
 ## Current-match Objectives dialog (#138, slice B)
 
 | Owned sources | Adaptation / limits |

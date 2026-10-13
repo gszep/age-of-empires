@@ -18,5 +18,6 @@ export function createReplayGame(record: Pick<MatchRecord, 'version' | 'seed' | 
   if (record.version < 6) useLegacyPacking(state);
   if (record.version < 7) useLegacySiphons(state);
   if (record.version < 8) useLegacyTrebuchetTargeting(state);
+  if (record.version < 11) delete state.herdClaimVersion;
   return state;
 }

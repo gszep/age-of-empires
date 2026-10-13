@@ -843,8 +843,8 @@ export const FALLBACK_RULES: GameRules = {
       armors: [{ class: 1, amount: 0 }, { class: 4, amount: 0 }, { class: 3, amount: 0 }],
       attackReloadSeconds: 3, attackReleaseSeconds: 0.5,
     },
-    // AoE2's herdables walk to whoever comes closest; its huntables bolt or
-    // bite. Their food is what the DAT stores on the animal.
+    // Herdables can be claimed and ordered; huntables bolt or bite.
+    // Their food is what the DAT stores on the animal.
     sheep: {
       hp: 7, radius: 0.3, speed: 0.7, lineOfSight: 3, cost: cost(), trainSeconds: 0,
       trainedAt: 'town-center', popCost: 0,
@@ -1849,8 +1849,8 @@ export function rulesFromManifest(manifest: ContentManifest): GameRules {
       popCost: 0,
       foodAmount: e[key]?.storage?.food ?? fallback.foodAmount,
       foodDecayPerSecond: e[key]?.foodDecayPerSecond ?? fallback.foodDecayPerSecond,
-      // A herdable is claimed by whoever comes within its sight: the rule is
-      // the reference's (inferred), the distance is the DAT's line of sight.
+      // Legacy/owned claim range and herdable eligibility. New Gaia claims add
+      // collision radius to LOS in updateAnimals (#330 inferred geometry).
       herdRange: fallback.herdRange === undefined ? undefined : e[key]?.lineOfSight ?? fallback.herdRange,
       // Which animals startle is a rule; how close you have to come is the
       // DAT's `search_radius` for that animal.

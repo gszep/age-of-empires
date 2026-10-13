@@ -287,13 +287,13 @@ describe('grid-locked load placement only (#325 owner clarification)', () => {
     expect(checksumState(restored)).toBe(continued);
   });
 
-  it('writes format10, accepts historical formats and replays through JSON', async () => {
-    expect(MATCH_FORMAT_VERSION).toBe(10);
-    for (let version = 1; version <= 10; version++) expect(validateMatchConfig({ version, seed: 325 })).toBe(true);
-    expect(validateMatchConfig({ version: 11, seed: 325 })).toBe(false);
+  it('writes the current format, accepts historical formats and replays through JSON', async () => {
+    expect(MATCH_FORMAT_VERSION).toBeGreaterThanOrEqual(10);
+    for (let version = 1; version <= MATCH_FORMAT_VERSION; version++) expect(validateMatchConfig({ version, seed: 325 })).toBe(true);
+    expect(validateMatchConfig({ version: MATCH_FORMAT_VERSION + 1, seed: 325 })).toBe(false);
     const idle = { decide: () => [] };
     const { record, result } = await runMatch({ version: 9, seed: 325, maxTimeSeconds: 5 }, { 1: idle, 2: idle });
-    expect(record.version).toBe(10); expect(result.version).toBe(10);
+    expect(record.version).toBe(MATCH_FORMAT_VERSION); expect(result.version).toBe(MATCH_FORMAT_VERSION);
     const wire = JSON.parse(JSON.stringify(record));
     expect(validateMatchRecord(wire)).toBe(true);
     expect(validateMatchResult(result)).toBe(true);
