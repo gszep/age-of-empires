@@ -1,0 +1,33 @@
+{
+  "name": "sheep-b2-r3",
+  "spec_version": 2,
+  "scenario_version": "1.59",
+  "reference_build": 185872,
+  "map_size": 100,
+  "terrain": 0,
+  "elevation": 0,
+  "players": [
+    {"number": 1, "civilization": "BRITONS", "age": "DARK_AGE", "human": true, "ai": "NONE", "diplomacy": {"2": "ENEMY"}},
+    {"number": 2, "civilization": "INCAS", "age": "DARK_AGE", "human": false, "ai": "NONE", "diplomacy": {"1": "ENEMY"}}
+  ],
+  "stationary_intervention": {"movement_speed": 0, "villager_stance": "NO_ATTACK_STANCE", "freeze_explicit_references": true, "execute_on_load": true, "setup_timer": 0},
+  "readout": {"boundary_seconds": 5, "precedence_seconds": 20, "repeat_seconds": 35, "sample_window_seconds": 1, "target_player": 1},
+  "stations": [
+    {"label":"B100", "sheep":[10.5,10.5], "claimants":[{"player":1,"dx":1,"dy":0,"reference_id":100}]},
+    {"label":"B275", "sheep":[30.5,10.5], "claimants":[{"player":1,"dx":2.75,"dy":0,"reference_id":101}]},
+    {"label":"B300", "sheep":[50.5,10.5], "claimants":[{"player":1,"dx":3,"dy":0,"reference_id":102}]},
+    {"label":"B325", "sheep":[70.5,10.5], "claimants":[{"player":1,"dx":3.25,"dy":0,"reference_id":103}]},
+    {"label":"B350", "sheep":[10.5,30.5], "claimants":[{"player":1,"dx":3.5,"dy":0,"reference_id":104}]},
+    {"label":"B375", "sheep":[30.5,30.5], "claimants":[{"player":1,"dx":3.75,"dy":0,"reference_id":105}]},
+    {"label":"B400", "sheep":[50.5,30.5], "claimants":[{"player":1,"dx":4,"dy":0,"reference_id":106}]},
+    {"label":"B425", "sheep":[70.5,30.5], "claimants":[{"player":1,"dx":4.25,"dy":0,"reference_id":107}]},
+    {"label":"B600", "sheep":[10.5,50.5], "claimants":[{"player":1,"dx":6,"dy":0,"reference_id":108}]},
+    {"label":"C0", "sheep":[30.5,50.5], "claimants":[]},
+    {"label":"E1", "sheep":[50.5,50.5], "claimants":[{"player":1,"dx":-2,"dy":0,"reference_id":200},{"player":2,"dx":2,"dy":0,"reference_id":201}]},
+    {"label":"N1", "sheep":[70.5,50.5], "claimants":[{"player":1,"dx":-1,"dy":0,"reference_id":202},{"player":2,"dx":2,"dy":0,"reference_id":203}]},
+    {"label":"N2", "sheep":[10.5,70.5], "claimants":[{"player":1,"dx":-2,"dy":0,"reference_id":204},{"player":2,"dx":1,"dy":0,"reference_id":205}]},
+    {"label":"E2", "sheep":[30.5,70.5], "claimants":[{"player":1,"dx":2,"dy":0,"reference_id":206},{"player":2,"dx":-2,"dy":0,"reference_id":207}]},
+    {"label":"E3", "sheep":[50.5,70.5], "claimants":[{"player":2,"dx":2,"dy":0,"reference_id":208},{"player":1,"dx":-2,"dy":0,"reference_id":209}]},
+    {"label":"E4", "sheep":[70.5,70.5], "claimants":[{"player":2,"dx":-2,"dy":0,"reference_id":210},{"player":1,"dx":2,"dy":0,"reference_id":211}]}
+  ]
+}

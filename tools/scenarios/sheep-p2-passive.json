@@ -1,0 +1,21 @@
+{
+  "name":"sheep-p2-noexplore","spec_version":3,"scenario_version":"1.59","reference_build":185872,
+  "map_size":40,"terrain":0,"elevation":0,"victory":"CUSTOM",
+  "ai_source":"Installed resources/_common/ai/E3-p2.per: from the villagers rule through EOF; identical to pinned file",
+  "ai_source_sha256":"6443a80d627c9f33388de40e74a9c07267cc1bc8b68924865cc640d7d5f29b46",
+  "ai_additional_controls":{"sn-minimum-civilian-explorers":0,"sn-initial-exploration-required":0},
+  "ai_additional_sources":"Installed Promisory/general.per:226 and scoutcontrol.per:81",
+  "players":[
+    {"number":1,"civilization":"BRITONS","age":"DARK_AGE","human":true,"ai":"NONE","diplomacy":{"2":"NEUTRAL"}},
+    {"number":2,"civilization":"INCAS","age":"DARK_AGE","human":true,"ai":"CUSTOM","ai_name":"OpenEmpires-308-NoExplore","ai_script_path":".local/scenarios/OpenEmpires-308-NoExplore.per","diplomacy":{"1":"NEUTRAL"}}
+  ],
+  "setup":{"timer":0,"execute_on_load":true,"speed":0,"freeze":true},
+  "guard":{"half_extent_tiles":1,"owners":[0,1,2,3,4,5,6,7,8],"object_state":2},
+  "samples_game_seconds":[1,10,30],"guard_start_game_seconds":1,
+  "units":[
+    {"name":"P2C","player":0,"unit_const":594,"x":20.5,"y":20.5,"z":0,"reference_id":0},
+    {"name":"P2C-V","player":2,"unit_const":83,"x":22.5,"y":20.5,"z":0,"reference_id":1},
+    {"name":"S1","player":0,"unit_const":594,"x":8.5,"y":8.5,"z":0,"reference_id":2},
+    {"name":"P1-spectator","player":1,"unit_const":83,"x":32.5,"y":32.5,"z":0,"reference_id":3}
+  ]
+}

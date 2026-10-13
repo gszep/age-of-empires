@@ -1,0 +1,58 @@
+{
+  "name": "coords-probe",
+  "spec_version": 1,
+  "scenario_version": "1.59",
+  "reference_build": 185872,
+  "map_size": 40,
+  "terrain": 0,
+  "elevation": 0,
+  "players": [
+    {"number": 1, "civilization": "BRITONS", "age": "DARK_AGE", "human": true, "ai": "NONE", "diplomacy": {"2": "ENEMY"}},
+    {"number": 2, "civilization": "INCAS", "age": "DARK_AGE", "human": false, "ai": "NONE", "diplomacy": {"1": "ENEMY"}}
+  ],
+  "units": [
+    {"name": "villager_1", "player": 1, "unit_const": 83, "x": 10.5, "y": 10.5, "z": 0},
+    {"name": "villager_2", "player": 1, "unit_const": 83, "x": 20.5, "y": 10.5, "z": 0},
+    {"name": "villager_3_subtile", "player": 1, "unit_const": 83, "x": 15.25, "y": 12.75, "z": 0},
+    {"name": "militia_1", "player": 2, "unit_const": 74, "x": 30.5, "y": 30.5, "z": 0},
+    {"name": "sheep_gaia", "player": 0, "unit_const": 594, "x": 20.5, "y": 20.5, "z": 0}
+  ],
+  "triggers": [
+    {
+      "name": "OK-V1", "enabled": true, "looping": false, "execute_on_load": false,
+      "control_unit": "villager_1", "expected_initial_match": true,
+      "conditions": [{"type": "OBJECTS_IN_AREA", "quantity": 1, "source_player": 1, "object_list": 83, "area_x1": 10, "area_y1": 10, "area_x2": 10, "area_y2": 10, "inverted": 0, "object_state": 2}],
+      "effects": [{"type": "SEND_CHAT", "source_player": 1, "string_id": -1, "message": "OK-V1", "sound_name": ""}]
+    },
+    {
+      "name": "OK-V2", "enabled": true, "looping": false, "execute_on_load": false,
+      "control_unit": "villager_2", "expected_initial_match": true,
+      "conditions": [{"type": "OBJECTS_IN_AREA", "quantity": 1, "source_player": 1, "object_list": 83, "area_x1": 20, "area_y1": 10, "area_x2": 20, "area_y2": 10, "inverted": 0, "object_state": 2}],
+      "effects": [{"type": "SEND_CHAT", "source_player": 1, "string_id": -1, "message": "OK-V2", "sound_name": ""}]
+    },
+    {
+      "name": "OK-V3", "enabled": true, "looping": false, "execute_on_load": false,
+      "control_unit": "villager_3_subtile", "expected_initial_match": true,
+      "conditions": [{"type": "OBJECTS_IN_AREA", "quantity": 1, "source_player": 1, "object_list": 83, "area_x1": 15, "area_y1": 12, "area_x2": 15, "area_y2": 12, "inverted": 0, "object_state": 2}],
+      "effects": [{"type": "SEND_CHAT", "source_player": 1, "string_id": -1, "message": "OK-V3", "sound_name": ""}]
+    },
+    {
+      "name": "OK-M1", "enabled": true, "looping": false, "execute_on_load": false,
+      "control_unit": "militia_1", "expected_initial_match": true,
+      "conditions": [{"type": "OBJECTS_IN_AREA", "quantity": 1, "source_player": 2, "object_list": 74, "area_x1": 30, "area_y1": 30, "area_x2": 30, "area_y2": 30, "inverted": 0, "object_state": 2}],
+      "effects": [{"type": "SEND_CHAT", "source_player": 1, "string_id": -1, "message": "OK-M1", "sound_name": ""}]
+    },
+    {
+      "name": "OK-S1", "enabled": true, "looping": false, "execute_on_load": false,
+      "control_unit": "sheep_gaia", "expected_initial_match": true,
+      "conditions": [{"type": "OBJECTS_IN_AREA", "quantity": 1, "source_player": 0, "object_list": 594, "area_x1": 20, "area_y1": 20, "area_x2": 20, "area_y2": 20, "inverted": 0, "object_state": 2}],
+      "effects": [{"type": "SEND_CHAT", "source_player": 1, "string_id": -1, "message": "OK-S1", "sound_name": ""}]
+    },
+    {
+      "name": "BAD-E0", "enabled": true, "looping": false, "execute_on_load": false,
+      "control_unit": null, "expected_initial_match": false,
+      "conditions": [{"type": "OBJECTS_IN_AREA", "quantity": 1, "source_player": 1, "object_list": 83, "area_x1": 5, "area_y1": 5, "area_x2": 8, "area_y2": 8, "inverted": 0, "object_state": 2}],
+      "effects": [{"type": "SEND_CHAT", "source_player": 1, "string_id": -1, "message": "BAD-E0", "sound_name": ""}]
+    }
+  ]
+}

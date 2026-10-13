@@ -1,0 +1,17 @@
+{
+  "name":"sheep-p2-human","spec_version":3,"scenario_version":"1.59","reference_build":185872,
+  "map_size":40,"terrain":0,"elevation":0,"victory":"CUSTOM",
+  "players":[
+    {"number":1,"civilization":"BRITONS","age":"DARK_AGE","human":true,"ai":"NONE","diplomacy":{"2":"NEUTRAL"}},
+    {"number":2,"civilization":"INCAS","age":"DARK_AGE","human":true,"ai":"NONE","diplomacy":{"1":"NEUTRAL"}}
+  ],
+  "setup":{"timer":0,"execute_on_load":true,"speed":0,"freeze":true},
+  "guard":{"half_extent_tiles":1,"owners":[0,1,2,3,4,5,6,7,8],"object_state":2},
+  "samples_game_seconds":[1,10,30],"guard_start_game_seconds":1,
+  "units":[
+    {"name":"P2C","player":0,"unit_const":594,"x":20.5,"y":20.5,"z":0,"reference_id":0},
+    {"name":"P2C-V","player":2,"unit_const":83,"x":22.5,"y":20.5,"z":0,"reference_id":1},
+    {"name":"S1","player":0,"unit_const":594,"x":8.5,"y":8.5,"z":0,"reference_id":2},
+    {"name":"P1-spectator","player":1,"unit_const":83,"x":32.5,"y":32.5,"z":0,"reference_id":3}
+  ]
+}
