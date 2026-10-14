@@ -1,0 +1,5 @@
+{
+  "source": "AoE2DE build48987 Black_Forest.rms create_player_lands",
+  "sha256": "8233a46ea426381cd9edc7919b7df326d70dc1d18f411f2ee347fafffebef81a",
+  "land": { "percent": 44, "baseSize": 14, "clumping": 2, "clearance": 6 }
+}

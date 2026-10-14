@@ -1,6 +1,6 @@
 # Native shadow overlap evidence (#288)
 
-2026-10-06, installed DE 101.103.54800.0 (#185872), **not pinned 48987**.
+2026-10-06, reference build 185872.
 2560×1440 fullscreen, default zoom 50%, UHD unchecked, shadows enabled.
 No runtime code change. All colour values below are **sRGB screenshot bytes**,
 not linear-light values. Native editor, flat grass, Teuton Feudal Watch Towers.

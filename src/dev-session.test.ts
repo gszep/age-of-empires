@@ -43,6 +43,16 @@ it('keeps older matches playable without inventing a seed for them', () => {
   expect(loadSessionSetup(state.rules)).toBeUndefined();
 });
 
+it.each([0, 3] as const)('resumes Black Forest generation%s without re-dealing or upgrading a snapshot', version => {
+  const state = createGame(7, undefined, undefined, 'black-forest', undefined, undefined, undefined, version);
+  saveSession(state, { map: 'black-forest', seed: 7 });
+  const resumed = loadSession(state.rules)!;
+  expect(resumed.mapgenVersion).toBe(version || undefined);
+  expect(checksumState(resumed)).toBe(checksumState(state));
+  for (let i = 0; i < 20; i++) { stepGame(state); stepGame(resumed); }
+  expect(checksumState(resumed)).toBe(checksumState(state));
+});
+
 it('resumes an explicit population ceiling and rejects inconsistent setup and invalid saved ceilings', () => {
   const state = createGame(253, FALLBACK_RULES, undefined, 'arabia', 'random-map', 25);
   const setup = { map: 'arabia', seed: 253, populationLimit: 25 };

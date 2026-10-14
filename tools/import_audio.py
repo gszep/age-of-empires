@@ -23,6 +23,7 @@ from struct import unpack_from
 from typing import Any
 
 from wwise_pck import PackedFile, extract, read_index
+from wwise_hirc import action_type, audio_node, event_actions
 
 
 # Reviewed source gaps, not a general missing-audio fallback. DAT8's ORIE cart
@@ -85,6 +86,8 @@ def _chunks(data: bytes) -> dict[bytes, bytes]:
         end = offset + 8 + size
         if end > len(data):
             raise ValueError(f"truncated Wwise bank chunk {tag!r}")
+        if tag in chunks:
+            raise ValueError(f'duplicate Wwise bank chunk {tag!r}')
         chunks[tag] = data[offset + 8:end]
         offset = end
     if offset != len(data):
@@ -92,8 +95,19 @@ def _chunks(data: bytes) -> dict[bytes, bytes]:
     return chunks
 
 
+def require_bank_version(version: int) -> None:
+    if version not in (154, 172):
+        raise ValueError(f'unsupported bank version {version}; expected 154 or 172')
+
+
 def read_bank(name: str, data: bytes) -> Bank:
     chunks = _chunks(data)
+    if len(chunks.get(b'BKHD', b'')) < 4:
+        raise ValueError(f'{name}: missing or truncated BKHD version')
+    version = unpack_from('<I', chunks[b'BKHD'])[0]
+    require_bank_version(version)  # before parsing/sharing even control-only banks
+    if len(chunks[b'BKHD']) < 40:
+        raise ValueError(f'{name}: truncated v{version} BKHD')
     hirc = chunks.get(b"HIRC")
     didx = chunks.get(b"DIDX")
     payload = chunks.get(b"DATA")
@@ -115,6 +129,8 @@ def read_bank(name: str, data: bytes) -> Bank:
         if size < 4 or offset + 5 + size > len(hirc):
             raise ValueError(f"{name}: invalid HIRC object size")
         object_id = unpack_from("<I", hirc, offset + 5)[0]
+        if object_id in objects:
+            raise ValueError(f'{name}: duplicate HIRC object {object_id}')
         objects[object_id] = (object_type, hirc[offset + 9:offset + 5 + size])
         offset += 5 + size
     if offset != len(hirc):
@@ -130,7 +146,18 @@ def read_bank(name: str, data: bytes) -> Bank:
         if data_offset + size > len(payload):
             raise ValueError(f"{name}: truncated embedded media {media_id}")
         media[media_id] = payload[data_offset:data_offset + size]
-    version = unpack_from('<I', chunks[b'BKHD'])[0] if b'BKHD' in chunks else 0
+    for object_id, (kind, body) in objects.items():
+        try:
+            if kind == 3:
+                if action_type(body) == 4:
+                    play_parameters(body, validate_playback=False)
+            elif version == 172:
+                if kind in (2, 5, 6):
+                    audio_node(kind, body, version)
+                elif kind == 4:
+                    event_actions(body, version)
+        except ValueError as error:
+            raise ValueError(f'{name}: HIRC{kind} object{object_id}: {error}') from error
     return Bank(name, objects, media, version=version)
 
 
@@ -250,18 +277,20 @@ def resolve_event(bank: Bank, event_name: str, switch: str | None = None) -> lis
     return resolve_event_id(bank, wwise_id(event_name), switch)
 
 
-def resolve_event_id(bank: Bank, event_id: int, switch: str | None = None) -> list[int]:
+def resolve_event_id(bank: Bank, event_id: int, switch: str | None = None, *, structural: bool = False) -> list[int]:
     """Every available medium one event plays.
 
     Widget cues arrive as a name to hash; unit voices arrive as the DAT's own
     `wwise_*_sound_id`, which is already the hashed id (as a signed integer).
     `switch` narrows a civilisation switch container to one branch.
     """
+    require_bank_version(bank.version)
+    structural = structural or bank.version == 172
     event = bank.objects.get(event_id & 0xFFFFFFFF)
     if not event or event[0] != 4:
         return []
     payload = event[1]
-    action_ids = [unpack_from("<I", payload, 1 + index * 4)[0] for index in range(payload[0])]
+    action_ids = event_actions(payload, bank.version)
     media_ids: list[int] = []
 
     def descend(object_id: int, visited: set[int]) -> None:
@@ -270,8 +299,33 @@ def resolve_event_id(bank: Bank, event_id: int, switch: str | None = None) -> li
         visited.add(object_id)
         item = bank.objects.get(object_id)
         if not item:
+            if structural:
+                raise ValueError(f'missing audio graph object {object_id}')
             return
         object_type, object_payload = item
+        if structural and object_type in (2, 5, 6):
+            node = audio_node(object_type, object_payload, bank.version)
+            if object_type == 2:
+                media_id = node['media']
+                if node['stream'] in (1, 2) and not isinstance(bank.media.get(media_id), Stream):
+                    raise ValueError(f'incomplete streamed audio graph medium {media_id}')
+                if media_id not in bank.media:
+                    raise ValueError(f'missing audio graph medium {media_id}')
+                if media_id not in media_ids:
+                    media_ids.append(media_id)
+                return
+            children = node['playlist'] if object_type == 5 else node['children']
+            if object_type == 6 and switch is not None and node['group'] == wwise_id('Civilization'):
+                if node['groupType'] != 0:
+                    raise ValueError('Civilization container is not a switch group')
+                children = node['switches'].get(wwise_id(switch), ())
+            for child in children:
+                if child not in bank.objects:
+                    raise ValueError(f'missing audio graph child {child}')
+                descend(child, visited)
+            return
+        if structural:
+            raise ValueError(f'unsupported playable audio graph type {object_type}, object {object_id}')
         if object_type == 2 and len(object_payload) >= 9:
             media_id = unpack_from("<I", object_payload, 5)[0]
             if object_payload[4] in (1, 2) and not isinstance(bank.media.get(media_id), Stream):
@@ -293,22 +347,29 @@ def resolve_event_id(bank: Bank, event_id: int, switch: str | None = None) -> li
 
     for action_id in action_ids:
         action = bank.objects.get(action_id)
-        if not action or action[0] != 3 or len(action[1]) < 6 or action[1][1] != 4:
+        if not action or action[0] != 3:
+            raise ValueError(f'missing or invalid event action {action_id}')
+        kind = action_type(action[1])
+        if kind == 0x21:
+            raise ValueError('unsupported consumed PlayEvent action')
+        if kind != 4:
             continue
+        play_parameters(action[1], validate_playback=False)
         # Scope byte, action-type byte, then the target HIRC object ID.
         descend(unpack_from("<I", action[1], 2)[0], set())
     return media_ids
 
 
-def play_parameters(payload: bytes) -> dict[str, Any]:
-    """Pinned v154 Play action property bundles; exact walk, no mixer emulation.
+def play_parameters(payload: bytes, *, validate_playback: bool = True) -> dict[str, Any]:
+    """v154/v172 Play action property bundles; exact walk, no mixer emulation.
 
     Owned bytes corroborate the v154 property IDs:58 DelayTime (ms),59
     TransitionTime (ms),60 Probability (%). Ranged values are offsets. The
-    remaining nine bytes are interpolation curve, bank ID and reserved word.
+    remaining nine bytes are interpolation curve, bank ID and bank type.
+    Layout/IDs are unchanged in172 (wwiser08e937b wparser/wdefs).
     """
     if len(payload) < 18 or payload[1] != 4:
-        raise ValueError('malformed v154 Play action')
+        raise ValueError('malformed Play action')
     cursor = 7
     values: dict[int, int | float] = {}
     ranges: dict[int, list[int | float]] = {}
@@ -329,7 +390,7 @@ def play_parameters(payload: bytes) -> dict[str, Any]:
     if cursor + 9 != len(payload):
         raise ValueError('malformed Play action suffix')
     curve = payload[cursor]
-    if curve != 4:
+    if validate_playback and curve != 4:
         raise ValueError(f'unsupported Play interpolation curve {curve}')
     delay = values.get(58, 0)
     fade = values.get(59, 0)
@@ -346,28 +407,32 @@ def play_parameters(payload: bytes) -> dict[str, Any]:
     }
 
 
-def resolve_event_layers(bank: Bank, event_id: int, switch: str | None = None) -> list[dict[str, Any]]:
+def resolve_event_layers(bank: Bank, event_id: int, switch: str | None = None, *, structural: bool = False) -> list[dict[str, Any]]:
+    require_bank_version(bank.version)
     event_id &= 0xffffffff
     event = bank.objects.get(event_id)
     if not event or event[0] != 4:
         return []
-    if bank.version != 154:
-        raise ValueError(f'{bank.name}: unsupported Play-action bank version {bank.version}')
     payload = event[1]
-    if not payload or len(payload) != 1 + payload[0] * 4:
-        raise ValueError('malformed event action list')
+    actions = event_actions(payload, bank.version)
     layers = []
-    for index in range(payload[0]):
-        action_id = unpack_from('<I', payload, 1 + index * 4)[0]
+    for action_id in actions:
         action = bank.objects.get(action_id)
-        if not action or action[0] != 3 or len(action[1]) < 6 or action[1][1] != 4:
+        if not action or action[0] != 3:
+            raise ValueError(f'missing or invalid event action {action_id}')
+        kind = action_type(action[1])
+        if kind == 0x21:
+            raise ValueError('unsupported consumed PlayEvent action')
+        if kind != 4:
             continue
+        parameters = play_parameters(action[1])
         # Reuse the existing scoped effects resolver for this one root only.
-        one = Bank(bank.name, ChainMap({event_id: (4, bytes([1]) + action_id.to_bytes(4, 'little'))}, bank.objects),
+        one_payload = (bytes(7) if bank.version == 172 else b'') + bytes([1]) + action_id.to_bytes(4, 'little')
+        one = Bank(bank.name, ChainMap({event_id: (4, one_payload)}, bank.objects),
                    bank.media, bank.pack, bank.version)
-        media = resolve_event_id(one, event_id, switch)
+        media = resolve_event_id(one, event_id, switch, structural=structural)
         if media:
-            layers.append({'actionId': action_id, 'media': media, **play_parameters(action[1])})
+            layers.append({'actionId': action_id, 'media': media, **parameters})
     return layers
 
 
@@ -401,6 +466,7 @@ def music_catalogue(banks: Sequence[Bank]) -> dict[str, Any]:
     event_id = wwise_id('Ingame_Music')
     matches = []
     for bank in banks:
+        require_bank_version(bank.version)
         local = bank.objects.maps[0] if isinstance(bank.objects, ChainMap) else bank.objects
         if local.get(event_id, (None,))[0] == 15:
             matches.append(bank)

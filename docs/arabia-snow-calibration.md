@@ -3,7 +3,7 @@
 ## Scope and acceptance (2026-10-06)
 
 Evidence-first native survey, using owner-approved installed DE build **185872**,
-not pinned build 48987. Keep fullscreen 2560×1440 and UHD unchecked. Fresh
+reference build. Keep fullscreen 2560×1440 and UHD unchecked. Fresh
 single-player Tiny 1v1 Arabia, All Visible; at most 15 boards, never Play Again.
 Identify NEARCTIC_TEMPERATE against the owned RMS palette before interpreting
 pale terrain as POWDER_LIGHT (125). Capture whole-map world views and minimap;

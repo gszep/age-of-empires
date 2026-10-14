@@ -1,7 +1,7 @@
 # Native gate calibration — partial (#133)
 
 2026-10-06. **BLOCKED for completion**, not a native-parity pass.
-Observed visually on installed DE **build 185872, not pinned 48987**, with
+Observed visually on installed DE **reference build 185872**, with
 owner authorization. PID 22012; fullscreen 2560×1440; inherited UHD-unchecked
 settings were not changed. Single-player Scenario Editor/Test only. No cheats,
 research effects or gate-state triggers. No scenario was saved.

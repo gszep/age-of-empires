@@ -2,7 +2,7 @@
 
 ## Provenance and limits
 
-2026-10-06, **measured on current build 185872, not pinned 48987**,
+2026-10-06, **measured on reference build 185872**,
 owner-authorized installed DE process 22012. All screenshot readings below are
 **observed visually**, not internal engine values. Single-player scenario editor
 only; fullscreen 2560×1440, inherited UHD-unchecked configuration unchanged.

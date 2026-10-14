@@ -1,6 +1,6 @@
 # Native fog reference — #117
 
-2026-10-06, **current installed DE build 185872, not pinned build 48987**.
+2026-10-06, reference build 185872.
 Owner-authorized PID 22012, version `101.103.54800.0 (#185872) 25464371`.
 Documentation/evidence only; no runtime implementation or parity claim.
 

@@ -7,11 +7,12 @@ import { buildingRulesFor, unitRulesFor } from './rules';
 import { updateVisibility } from './visibility';
 import { synchronizationHash } from '../shared/checksum';
 import type { BuildingKind, Entity, GameState, PlayerId, UnitKind } from './types';
+import { legacyBeardedAxe } from './test-helpers/legacy-civ-effects';
 
 const path = 'public/imported/aoe2/manifest.json';
 const imported = existsSync(path) ? rulesFromManifest(JSON.parse(readFileSync(path, 'utf8'))) : undefined;
-function arena() {
-  const state = createGame(180, imported!, { 1: 'franks', 2: 'britons' });
+function arena(source = imported!) {
+  const state = createGame(180, source, { 1: 'franks', 2: 'britons' });
   state.entities = state.entities.filter(e => e.kind === 'town-center');
   state.terrain.fill(0); state.elevation.fill(0);
   for (const p of [1, 2] as const) Object.assign(state.players[p], {
@@ -49,12 +50,23 @@ function research(s: GameState, home: Entity, tech: string) {
 }
 
 describe.skipIf(!imported?.civilizations?.franks)('owned Frankish completion outcomes', () => {
-  it('pays for Bearded Axe, fires from added range, and preserves it through existing/garrisoned/new elite axemen', () => {
-    const s = arena(), castle = building(s, 'castle', 1);
+  it.each(['185872 built-in range', '48987-shaped paid range fixture'] as const)('fires from extended range and preserves it through existing/garrisoned/new elite axemen (%s)', version => {
+    const legacy = version === '48987-shaped paid range fixture';
+    const s = arena(legacy ? legacyBeardedAxe(imported!) : imported!), castle = building(s, 'castle', 1);
     const axe = unit(s, 'dat-unit-281', 1, 50);
     const passenger = unit(s, 'dat-unit-281', 1, 20);
     s.entities = s.entities.filter(e => e.id !== passenger.id); castle.garrison = [passenger];
-    research(s, castle, 'bearded-axe');
+    if (legacy) research(s, castle, 'bearded-axe');
+    else {
+      //185872 FRANKS.json no longer offers83. DAT281/531 base range3/4→5/6;
+      // the old effect291 definition still exists but must not apply twice.
+      expect(rulesForPlayer(s, 1).technologies['bearded-axe']).toBeUndefined();
+      const before = { ...s.players[1] };
+      expect(applyCommand(s, { kind: 'research', player: 1, buildingId: castle.id, tech: 'bearded-axe' }))
+        .toEqual({ ok: false, reason: 'unknown technology bearded-axe' });
+      expect(s.players[1]).toEqual(before);
+    }
+    expect(unitRulesFor(s, 1, 'dat-unit-281').range).toBe(5);
     const target = unit(s, 'villager', 2, 54.8);
     target.hp = target.maxHp = 1000;
     const at = { ...axe.position };
@@ -65,9 +77,11 @@ describe.skipIf(!imported?.civilizations?.franks)('owned Frankish completion out
     expect(applyCommand(s, { kind: 'stop', player: 1, entityIds: [axe.id] }).ok).toBe(true);
     research(s, castle, 'elite-throwing-axeman');
     expect(axe.kind).toBe('dat-unit-531'); expect(passenger.kind).toBe('dat-unit-531');
+    expect(unitRulesFor(s, 1, 'dat-unit-531').range).toBe(6);
     expect(applyCommand(s, { kind: 'train', player: 1, buildingId: castle.id, unit: 'dat-unit-531' }).ok).toBe(true);
     until(s, () => s.entities.some(e => e.kind === 'dat-unit-531' && e.id !== axe.id));
     target.hp = 1000;
+    target.position.x = 55.8; // beyond the base unit's reach, inside elite6
     updateVisibility(s);
     expect(applyCommand(s, { kind: 'order', player: 1, entityIds: [axe.id], target: target.position, targetId: target.id }).ok).toBe(true);
     until(s, () => target.hp < 1000);

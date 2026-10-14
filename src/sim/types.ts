@@ -305,8 +305,9 @@ export interface GameState {
   gridSpawnVersion?: 1;
   /** New matches apply owner ruling to herdable claims (earlier claimant, same-tick tie to lower id); absent in pre-v11 recordings/snapshots. */
   herdClaimVersion?: 1;
-  /** 1: Arabia's eleven biomes; 2: Islands offshore fish. Absent retains the legacy map. */
-  mapgenVersion?: 1 | 2;
+  /** 1: Arabia biomes; 2: Islands offshore fish; 3: Black Forest185872 clumping.
+   * Absent retains the legacy map, including Black Forest48987 land parameters. */
+  mapgenVersion?: 1 | 2 | 3;
   /** Opt-in fixed200-year Wonder victory. Absent preserves legacy conquest. */
   wonderVictory?: boolean;
   wonderDraw?: boolean;

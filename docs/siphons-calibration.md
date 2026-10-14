@@ -2,7 +2,7 @@
 
 2026-10-06 — **PASS for the authorized building-exclusion fix; partial native
 calibration**, not full Siphons parity acceptance.
-Measured on current installed DE build **185872, not pinned 48987**, with the
+Measured on installed reference build **185872**, with the
 owner's permission. Screenshot readings below were **observed visually**.
 The continuation fixes building-target charge expenditure and adds public-order
 regressions with JSON continuation; the prior acceptance coverage remains intact.

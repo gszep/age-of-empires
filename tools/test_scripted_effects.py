@@ -90,6 +90,38 @@ class ScriptRewriteTest(unittest.TestCase):
             (common / 'xs/Constants.xs').write_text(constants)
             return adapter(common, {})
 
+    def test_legacy_bimaristan_expands_targets(self):
+        # Authored48987-shaped explicit targets, not185872's unsupported mask.
+        targets = [0, 4, 6, 12, 18, 19, 23, 35, 36, 43, 44, 47, 49, 59]
+        constants = 'extern const int cMonkClass = 918;\nextern const int cMonkWithRelicClass = 943;\n'
+        constants += ''.join(f'extern const int cTarget{t}Class = {900+t};\n' for t in targets)
+        body = ['int WarriorPriestWithRelicID = 1831;']
+        body += [f'xsTaskAmount(cTaskAttr{name}, {value});' for name, value in [
+            ('WorkValue1', 75), ('WorkValue2', 1), ('WorkRange', 5),
+            ('GatheringSoundInt32', 13404), ('OwnerType', 4), ('CombatLevelFlag', 2),
+            ('SearchWaitTime', 109), ('GatherType', 21)]]
+        for source in ('cMonkClass', 'cMonkWithRelicClass'):
+            body.append(f'xsEffectAmount(cAddAttribute, {source}, cCombatAbility, 32, playerId);')
+            body += [f'xsTask({source}, cTaskTypeAura, cTarget{t}Class, playerId);' for t in targets]
+        body += [f'xsRemoveTask(WarriorPriestWithRelicID, cTaskTypeAura, cTarget{t}Class, playerId);' for t in targets]
+        result = self.extract(healing_aura, 'void EffectFunction7(int playerId = -1)\n{\n' + '\n'.join(body) + '\n}\n', constants)
+        self.assertEqual(result, {'sourceClasses': [18, 43], 'targetClasses': targets,
+                                 'excludedSourceIds': [1831], 'range': 5,
+                                 'hitPointsPerSecond': 1.25, 'helpStringId': 13404})
+        from import_content import effects_of
+        dat = NS(techs=[NS(effect_id=0)], effects=[NS(effect_commands=[
+            NS(type=1, a=33, b=0, c=-1, d=7)])])
+        entities = {'monk': {'id': 125, 'class': 18}, 'monk-relic': {'id': 286, 'class': 43},
+                    'excluded': {'id': 1831, 'class': 43}, 'infantry': {'id': 74, 'class': 6}}
+        effects, unmodelled, unreached = effects_of(dat, 0, entities, {'effectFunctionNumber': 33},
+                                                   scripted_effects={7: result})
+        self.assertEqual({e['unit'] for e in effects}, {'monk', 'monk-relic'})
+        for effect in effects:
+            self.assertEqual(effect['attribute'], 'healingAura')
+            self.assertEqual(effect['healingAura'], result)
+            self.assertNotIn('resource', effect)
+        self.assertEqual((unmodelled, unreached), ([], []))
+
     def test_stronghold_local_and_global_ids(self):
         program = ['xsResetTaskAmount();',
                    'xsEffectAmount(cAddAttribute, CastleID, cCombatAbility, 32, playerId);']
@@ -130,6 +162,15 @@ xsResetTaskAmount();'''
         result = self.extract(infantry_loot, old, constants)
         self.assertEqual(result, self.extract(infantry_loot, new, constants))
         self.assertEqual(result['targets'], [{'unitId': 1831, 'amount': 20}, {'classId': 4, 'amount': 5}])
+        from import_content import effects_of
+        dat = NS(techs=[NS(effect_id=0)], effects=[NS(effect_commands=[
+            NS(type=1, a=33, b=0, c=-1, d=5)])])
+        effects, unmodelled, unreached = effects_of(dat, 0,
+            {'militia': {'id': 74, 'class': 6}, 'knight': {'id': 38, 'class': 12}},
+            {'effectFunctionNumber': 33}, scripted_effects={5: result})
+        self.assertEqual(effects, [{'unit': 'militia', 'attribute': 'killReward', 'operation': 'set',
+                                   'amount': 1, 'killReward': result}])
+        self.assertEqual((unmodelled, unreached), ([], []))
         self.assertEqual(self.extract(infantry_loot, new.replace('WorkValue1, 20', 'WorkValue1, 25'),
                                       constants)['targets'][0]['amount'], 25)
 

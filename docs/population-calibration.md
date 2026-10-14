@@ -2,7 +2,7 @@
 
 ## Scope and default
 
-**Measured on current build 185872, not pinned 48987**, on 2026-10-06.
+**Measured on reference build 185872**, on 2026-10-06.
 The main-menu label is `101.103.54800.0 (#185872)`; the existing Windows
 process was PID 22012. All readouts below were **observed visually**, not
 extracted from engine memory. Display remained fullscreen 2560×1440, UHD

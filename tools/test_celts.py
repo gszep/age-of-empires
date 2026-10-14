@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from test_import_aoe2 import extracted_content, _dat, AUDIO_PACK, SOURCES, DAT
+from test_import_aoe2 import extracted_content, _dat, AUDIO_PACK, SOURCES, DAT, assert_roster_gaps
 from scripted_effects import stronghold_aura
 from import_audio import consumed_cues, read_audio_packs, resolve_event_id, reviewed_unavailable_cue
 
@@ -17,14 +17,16 @@ class CeltsImportTest(unittest.TestCase):
 
     def test_complete_source_roster_identity_and_foreign_unique_exclusion(self):
         row = self.content['civilizationCatalog']['celts']
-        self.assertEqual(row['missingRoster'], [])
+        assert_roster_gaps(self, self.content, 'celts', [2700, 2701])  #185872 Mounted Crossbowmen
         self.assertEqual((row['datIndex'], row['treeEffectId'], row['teamEffectId']), (13, 275, 401))
         self.assertEqual(row['hudStyle'], 'CivWest')
         self.assertTrue(row['enabled'])
         p = self.profile
         self.assertEqual(p['audio']['switch'], 'Celts')
         self.assertEqual(p['civilization']['displayName'], 'Celts')
-        self.assertTrue(all('do not have it' in t['reason'] for t in p['skippedTechnologies']))
+        regional, = [t for t in p['skippedTechnologies'] if t['techId'] == 1451]
+        self.assertEqual(regional['reason'], 'upgrades to a unit that is not imported (unit 2701)')
+        self.assertTrue(all('do not have it' in t['reason'] for t in p['skippedTechnologies'] if t['techId'] != 1451))
         for uid in [46, 557, 692, 694, 250, 533]:
             self.assertIn(uid, p['civilization']['unavailable']['units'])
 

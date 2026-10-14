@@ -1,5 +1,5 @@
 import unittest
-from test_import_aoe2 import extracted_content
+from test_import_aoe2 import extracted_content, assert_roster_gaps
 
 
 class TeutonImportTest(unittest.TestCase):
@@ -41,7 +41,7 @@ class TeutonImportTest(unittest.TestCase):
         self.assertEqual(p['entities']['bombard-tower-shot']['id'],506)
         effect = next(e for e in p['technologies']['bombard-tower']['effects'] if e.get('unit') == 'dat-projectile-54')
         self.assertEqual((effect['armorClass'],effect['amount']),(3,.5))
-        self.assertEqual(self.content['civilizationCatalog']['teutons']['missingRoster'],[])
+        assert_roster_gaps(self, self.content, 'teutons', [2700, 2701])  #185872 regional additions
 
 
 if __name__ == '__main__':

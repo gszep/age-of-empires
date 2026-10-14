@@ -25,7 +25,10 @@ class IncaImportTest(unittest.TestCase):
         # another Western TC piece. Preserve every drawable source annex.
         self.assertEqual([a['unitId'] for a in tc['annexes']], [618, 619, 620])
         self.assertEqual(_dat().civs[21].units[109].building.annexes[3].unit_id, 890)
-        self.assertEqual(_dat().civs[21].units[890].standing_graphic[0], -1)
+        #185872 replaces the absent graphic with explicit, cue-free BLANK1751.
+        self.assertEqual(_dat().civs[21].units[890].standing_graphic[0], 1751)
+        from import_content import empty_annex_graphic
+        self.assertTrue(empty_annex_graphic(_dat(), 1751))
         self.assertEqual(age_variants(_dat(), 890), {})
         self.assertEqual(set(tc['animationLayers']), {'idle-feudal', 'idle-castle', 'idle-imperial'})
         jobs = atlas_jobs({'entities': {'town-center': tc}})
@@ -50,6 +53,11 @@ class IncaImportTest(unittest.TestCase):
                 out = Path(directory) / f'{age}.png'
                 _, atlas, error = _convert_one((age, str(source), str(out), job['expected'], None))
                 self.assertIsNone(error)
+                repeat = Path(directory) / f'{age}-repeat.png'
+                _, repeated_atlas, repeated_error = _convert_one((age, str(source), str(repeat), job['expected'], None))
+                self.assertIsNone(repeated_error)
+                self.assertEqual(out.read_bytes(), repeat.read_bytes())
+                self.assertEqual(atlas['frames'], repeated_atlas['frames'])
                 frame = atlas['frames'][0]
                 self.assertEqual((frame['w'], frame['h'], frame['cx'], frame['cy']),
                                  (pixels.width, pixels.height, pixels.hotspot_x, pixels.hotspot_y))
@@ -59,6 +67,11 @@ class IncaImportTest(unittest.TestCase):
                 soot_out = Path(directory) / f'{age}-damage.png'
                 _, mask_atlas, error = _convert_one((age, str(source), str(soot_out), job['expected'], 'damage'))
                 self.assertIsNone(error)
+                repeated_soot = Path(directory) / f'{age}-damage-repeat.png'
+                _, repeated_mask, repeated_error = _convert_one((age, str(source), str(repeated_soot), job['expected'], 'damage'))
+                self.assertIsNone(repeated_error)
+                self.assertEqual(soot_out.read_bytes(), repeated_soot.read_bytes())
+                self.assertEqual(mask_atlas['frames'], repeated_mask['frames'])
                 f = mask_atlas['frames'][0]
                 self.assertEqual((f['w'], f['h'], f['cx'], f['cy']),
                                  (soot.width, soot.height, soot.hotspot_x, soot.hotspot_y))
@@ -98,7 +111,7 @@ class IncaImportTest(unittest.TestCase):
         profiles = extracted_content()['civilizations']
         for civ, ready, paid in [('goths', {886}, set()),
                 ('chinese', {979, 980, 981, 982, 1034}, {980, 982}),
-                ('byzantines', {235, 236, 886}, {236}), ('saracens', {235, 236}, {236}),
+                ('byzantines', {235, 236, 886, 1453, 1454}, {236, 1454}), ('saracens', {235, 236}, {236}),
                 ('turks', {235, 236}, {236}), ('mongols', {235, 236, 714, 715}, {236, 715})]:
             nodes = profiles[civ]['civilizationBonuses']['nodes']
             self.assertEqual({int(t) for t, n in nodes.items() if n.get('initialState') == 'ready'}, ready)
@@ -107,6 +120,15 @@ class IncaImportTest(unittest.TestCase):
                 self.assertEqual(node['automatic'], tid not in paid)
                 self.assertFalse(node.get('disabled', False))
             for tid in paid:
+                if tid == 1454:
+                    #185872 Elite Varangian Guard is new, outside this roster.
+                    source = _dat().techs[tid]
+                    self.assertTrue(any(l.research_time > 0 for l in source.research_locations))
+                    self.assertTrue(any(c.flag and c.amount > 0 for c in source.resource_costs))
+                    skipped, = [t for t in profiles[civ]['skippedTechnologies'] if t['techId'] == tid]
+                    self.assertEqual(skipped['reason'], 'upgrades to a unit that is not imported (unit 2704)')
+                    self.assertFalse(any(t['techId'] == tid for t in profiles[civ]['technologies'].values()))
+                    continue
                 tech, = [t for t in profiles[civ]['technologies'].values() if t['techId'] == tid]
                 self.assertGreater(tech['researchSeconds'], 0)
                 self.assertTrue(any(tech['cost'].values()))
@@ -201,7 +223,7 @@ class IncaSourceContractTest(unittest.TestCase):
             self.assertIn(2556, self.entities[key]['gather']['dropSites'])
 
     def test_ready_enables_bookkeeping_without_completing_paid_upgrades(self):
-        ready = {1353, 1350, 1402, 1351, 1352, 528, 378, 913}
+        ready = {1353, 1350, 1402, 1351, 1352, 528, 378, 913, 730}
         self.assertEqual({int(tid) for tid, node in self.nodes.items() if node.get('initialState') == 'ready'}, ready)
         for tid in ready:
             node, source = self.nodes[str(tid)], self.dat.techs[tid]
@@ -221,7 +243,7 @@ class IncaSourceContractTest(unittest.TestCase):
                         for c in self.dat.effects[self.dat.techs[tid].effect_id].effect_commands if c.type == 3]
             self.assertEqual(tech['upgrades'], expected)
         self.assertNotIn('champi-scout', self.technologies)
-        self.assertFalse(any('effect type 8' in s or 'effect type 2' in s
+        self.assertFalse(any('effect type 8' in s or 'effect type 18' in s or 'effect type 2' in s
                              for s in self.nodes['-1']['unmodelled']))
 
     def test_unique_techs_keep_source_targets_and_values(self):
@@ -249,8 +271,9 @@ class IncaSourceContractTest(unittest.TestCase):
             self.assertEqual(tech['hotkeyTextId'], location.hot_key_id)
 
     def test_food_discount_preserves_ordered_reciprocal_commands(self):
-        for tid, age, factors in [(152, 104, [.85]), (153, 101, [1.176, .8]),
-                                  (154, 102, [1.25, .75]), (155, 103, [1.33333, .7])]:
+        #185872 DAT153/155 change the reciprocal factors; retain exact order.
+        for tid, age, factors in [(152, 104, [.85]), (153, 101, [1.174, .8]),
+                                  (154, 102, [1.25, .75]), (155, 103, [1.328, .7])]:
             node = self.nodes[str(tid)]
             self.assertEqual(node['requiredTechs'], [age])
             effects = [e for e in node['effects'] if e.get('unit') == 'dat-unit-2550']
@@ -336,14 +359,14 @@ class IncaLlamaSourceContractTest(unittest.TestCase):
         xs_path = common_path / 'xs/Effects.xs'
         original_text = xs_path.read_text(encoding='utf-8-sig')
         constants = (common_path / 'xs/Constants.xs').read_text()
-        mutations = [('int llamaId = 305;', 'int llamaId = 306;'),
-                     ('llamaId = 1963;', 'llamaId = 305;'),
+        mutations = [('const int Llama1ID = 305;', 'const int Llama1ID = 306;'),
+                     ('const int Llama2ID = 1963;', 'const int Llama2ID = 305;'),
                      ('xsGetRandomNumberLH(0, 2)', 'xsGetRandomNumberLH(0, 3)'),
                      ('if (randomNumber == 1)', 'if (randomNumber == 0)'),
-                     ('llamaId, 619, 1, playerId', 'llamaId, 109, 1, playerId'),
-                     ('llamaId, 619, 1, playerId', 'llamaId, 619, 2, playerId'),
-                     ('llamaId, 619, 1, playerId', 'llamaId, 619, 1, 0'),
-                     ('int llamaId = 305;', 'int llamaId = 305;\n    llamaId = 1963;'),
+                     ('targetLlama, 619, 1, playerId', 'targetLlama, 109, 1, playerId'),
+                     ('targetLlama, 619, 1, playerId', 'targetLlama, 619, 2, playerId'),
+                     ('targetLlama, 619, 1, playerId', 'targetLlama, 619, 1, 0'),
+                     ('int targetLlama = Llama1ID;', 'int targetLlama = Llama1ID;\n    targetLlama = Llama2ID;'),
                      ('void EffectFunction1(', 'void MissingEffectFunction1(')]
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -351,8 +374,9 @@ class IncaLlamaSourceContractTest(unittest.TestCase):
             (tmp_path / 'xs/Constants.xs').write_text(constants)
             for before, after in mutations:
                 with self.subTest(mutation=after):
+                    self.assertEqual(original_text.count(before), 1, before)
                     mutated = original_text.replace(before, after, 1)
-                    self.assertNotEqual(mutated, original_text)
+                    self.assertTrue(mutated != original_text, f'mutation did not apply: {before}')
                     (tmp_path / 'xs/Effects.xs').write_text(mutated, encoding='utf-8-sig')
                     with self.assertRaisesRegex(ValueError, 'EffectFunction1'):
                         free_llama(tmp_path, {})

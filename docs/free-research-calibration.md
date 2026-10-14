@@ -64,7 +64,7 @@ age/unique-unit/research and art checks. No clocks are widened.
 
 ## Teuton native evidence, 2026-10-06
 
-**Measured on current build 185872, not pinned 48987.** All HP, resource,
+**Measured on reference build 185872.** All HP, resource,
 clock and panel readings below were **observed visually**, not extracted from
 native memory. PID 22012; fullscreen 2560×1440; UHD remained unchecked, with
 no graphics change or restart. Editor Tests only, Casual 1.5 speed.

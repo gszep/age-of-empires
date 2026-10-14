@@ -7,7 +7,7 @@
   },
   "black-forest": {
     "player": { "count": 2, "minStart": 24, "spacing": 24, "forest": 1, "cliff": 2, "edge": 2, "zoneDistance": 4, "circular": true, "excludeNeutral": true, "closest": true },
-    "land": { "percent": 44, "baseSize": 14, "clumping": 2, "clearance": 6 }
+    "land": { "percent": 44, "baseSize": 14, "clumping": 10, "clearance": 6 }
   },
   "islands": {
     "player": { "count": 2, "minStart": 18, "maxStart": 26, "spacing": 8, "forest": 2, "cliff": 3, "circular": false, "closest": false },

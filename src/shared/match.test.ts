@@ -19,6 +19,19 @@ function follow(host: SharedMatch, ...clients: GameState[]): void {
 }
 
 describe('one household match', () => {
+  it.each([0, 3] as const)('preserves Black Forest generation%s on rejoin and restarts with185872 land', version => {
+    const state = createGame(7, undefined, undefined, 'black-forest', undefined, undefined, undefined, version);
+    const host = new SharedMatch(JSON.parse(JSON.stringify(state))); host.humanTwo = true;
+    const clients: GameState[] = [1, 2].map(() => JSON.parse(JSON.stringify(host.snapshot())).state);
+    for (let i = 0; i < 25; i++) follow(host, ...clients);
+    for (const game of [host.state, ...clients]) {
+      expect(game.mapgenVersion).toBe(version || undefined);
+      expect(synchronizationHash(game)).toBe(synchronizationHash(host.state));
+    }
+    host.restart(7, 'black-forest');
+    expect(host.state.mapgenVersion).toBe(3);
+    expect(synchronizationHash(host.state)).toBe(synchronizationHash(createGame(7, undefined, undefined, 'black-forest')));
+  });
   it.each([0, 2] as const)('preserves Islands fish generation %s over two-client JSON/rejoin; restart uses current', version => {
     const state = createGame(95, undefined, undefined, 'islands', undefined, undefined, undefined, version);
     const host = new SharedMatch(JSON.parse(JSON.stringify(state))); host.humanTwo = true;

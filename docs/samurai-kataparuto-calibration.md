@@ -1,7 +1,7 @@
 # Samurai and Kataparuto native calibration (#259)
 
 2026-10-06 — **Packing continuation PASS; Samurai remains BLOCKED.** Measured on
-current build **185872, not pinned 48987**, with the owner's explicit approval.
+reference build **185872**, with the owner's explicit approval.
 All screenshot readings below were **observed visually**, not extracted from
 native simulation state. Packing is corrected below; this is not full #259 parity.
 
@@ -342,7 +342,7 @@ pinned-build engine equivalence. #259 remains open.
 ## Charge follow-up: current build 185872, afternoon
 
 **Native measurements obtained; runtime reconciliation remains BLOCKED.** This
-is the owner's authorized **current build185872, not pinned48987**. Readouts
+is the owner's authorized **reference build 185872**. Readouts
 were observed visually. New evidence root:
 `/home/fraser/repos/age-of-empires/.local/worktrees/issue-259-charge/.local/native/`.
 The new worktree started clean at `d1e43fd`; no partial patch or new failing

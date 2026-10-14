@@ -2,7 +2,7 @@
 
 ## Provenance and outcome
 
-2026-10-06: **measured on current build 185872, not pinned 48987**,
+2026-10-06: **measured on reference build 185872**,
 owner-authorized installed DE PID 22012. All screenshot readings are
 **observed visually**, not internal engine values. Single-player editor Tests,
 fullscreen 2560×1440; inherited UHD-unchecked configuration unchanged. No
@@ -239,7 +239,7 @@ No wounded/foundation or paid age-up HP experiment was completed.
 
 ## HP-only follow-up: candidate scan and fractional control
 
-2026-10-06, base `0d291e5`; **current build185872, not pinned48987, observed
+2026-10-06, base `0d291e5`; **reference build 185872, observed
 visually**. Same PID22012, fullscreen2560×1440, inherited UHD-unchecked settings.
 Only editor Tests; no restart, saved scenario, import, checkpoint, commit or push.
 The clean worktree inherited no partial diff; archived prior patch, failed healing

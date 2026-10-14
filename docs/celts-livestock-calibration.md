@@ -1,7 +1,7 @@
 # Celts livestock control — partial native calibration (#304)
 
 2026-10-06: **BLOCKED for implementation**, not a completed bonus. Measured on
-current build **185872, not pinned 48987**, as authorised by the owner. All
+reference build **185872**, as authorised by the owner. All
 ownership and clock readings below were **observed visually**. Native PID22012,
 fullscreen 2560×1440; inherited UHD-unchecked settings were not changed. Only
 single-player editor Tests were used. Final state is the main menu; no scenario

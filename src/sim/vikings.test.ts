@@ -7,12 +7,13 @@ import { updateVisibility } from './visibility';
 import { synchronizationHash } from '../shared/checksum';
 import { replayRecord, runMatch, type Strategy } from '../headless/runner';
 import type { BuildingKind, Entity, GameState, PlayerId, UnitKind } from './types';
+import { legacyChieftains } from './test-helpers/legacy-civ-effects';
 
 const path = process.env.CIV_PROFILE_CONTENT ?? 'public/imported/aoe2/manifest.json';
 const rules = existsSync(path) ? rulesFromManifest(JSON.parse(readFileSync(path, 'utf8'))) : undefined;
 if (process.env.CIV_PROFILE_CONTENT && !rules?.civilizations?.vikings) throw new Error('fixture lacks Vikings');
-function arena(age = 2, water = false) {
-  const s = createGame(189, rules!, { 1: 'vikings', 2: 'britons' });
+function arena(age = 2, water = false, source = rules!) {
+  const s = createGame(189, source, { 1: 'vikings', 2: 'britons' });
   s.entities = s.entities.filter(e => e.kind === 'town-center');
   s.entities.forEach((e, i) => e.position = { x: 10 + i * 80, y: 10 });
   s.terrain.fill(water ? 23 : 0); s.elevation.fill(0);
@@ -237,8 +238,14 @@ describe.skipIf(!rules?.civilizations?.vikings)('owned Vikings gameplay', () => 
     expect(a.hp).toBe(a.maxHp); expect(synchronizationHash(s)).toBe(synchronizationHash(saved));
   });
 
-  it('Chieftains increases cavalry damage and awards the XS amounts only on infantry kills', () => {
-    const s = arena(), castle = home(s, 'castle');
+  it.each(['185872 no loot', '48987-shaped loot fixture'] as const)('Chieftains increases cavalry damage and checks kill rewards (%s)', version => {
+    const legacy = version === '48987-shaped loot fixture';
+    const s = arena(2, false, legacy ? legacyChieftains(rules!) : rules!), castle = home(s, 'castle');
+    if (!legacy) {
+      // #324:185872 tech463/effect517 removes both the resource grant and XS5 call.
+      expect(rules!.civilizations!.vikings.technologies.chieftains.effects.some(e =>
+        e.resource === 'infantryKillReward' || e.attribute === 'killReward')).toBe(false);
+    }
     const noLoot = (kind: UnitKind) => {
       const a = unit(s, kind, 1, 50, 50), b = unit(s, 'villager', 2, 50.5, 50); b.hp = 1; b.attackCooldown = 100000;
       const gold = s.players[1].gold; order(s, a, b); until(s, () => !!b.dead, 100);
@@ -261,8 +268,8 @@ describe.skipIf(!rules?.civilizations?.vikings)('owned Vikings gameplay', () => 
       const saved: GameState = JSON.parse(JSON.stringify(s));
       for (let i = 0; i < 100 && !b.dead; i++) { stepGame(s); stepGame(saved); }
       expect(b.dead).toBe(true); expect(saved.entities.find(e => e.id === b.id)!.dead).toBe(true);
-      expect(s.players[1].gold - gold, victim).toBe(reward);
-      expect(saved.players[1].gold - gold, victim).toBe(reward);
+      expect(s.players[1].gold - gold, victim).toBe(legacy ? reward : 0);
+      expect(saved.players[1].gold - gold, victim).toBe(legacy ? reward : 0);
       expect(synchronizationHash(s)).toBe(synchronizationHash(saved));
       applyCommand(s, { kind: 'delete', player: 1, entityIds: [a.id] });
     }
@@ -270,7 +277,7 @@ describe.skipIf(!rules?.civilizations?.vikings)('owned Vikings gameplay', () => 
     const gold = s.players[2].gold; order(s, a, b); until(s, () => !!b.dead, 100); expect(s.players[2].gold).toBe(gold);
   });
 
-  it('Longboat fires four real shots, upgrades at the Dock, and Bogsveigar improves landed damage', () => {
+  it('185872 Longship fires four real shots, upgrades at the Dock, and Bogsveigar improves landed damage', () => {
     const s = arena(3, true), dock = home(s, 'dock'), castle = home(s, 'castle', 1, 25, 20);
     const a = train(s, dock, 'dat-unit-250'); a.position = { x: 50, y: 50 };
     const shoot = () => {
@@ -290,7 +297,10 @@ describe.skipIf(!rules?.civilizations?.vikings)('owned Vikings gameplay', () => 
       applyCommand(s, { kind: 'delete', player: 2, entityIds: [b.id] }); return damage;
     };
     const before = shoot(); research(s, castle, 'bogsveigar'); expect(shoot() - before).toBe(4);
-    research(s, dock, 'elite-longboat'); expect(a.kind).toBe('dat-unit-533');
+    // DAT372/effect370 still upgrades250→533; the185872 tree/localization
+    // renames Longboat→Longship, so the imported public key follows that name.
+    expect(rules!.civilizations!.vikings.technologies['elite-longship'].techId).toBe(372);
+    research(s, dock, 'elite-longship'); expect(a.kind).toBe('dat-unit-533');
     expect(train(s, dock, 'dat-unit-533').maxHp).toBe(130);
   });
 

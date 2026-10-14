@@ -116,9 +116,13 @@ export function createGame(
   civilizations: Record<PlayerId, string> = { 1: rules.civilization.key, 2: rules.civilization.key },
   map = 'arabia', mode: GameMode = 'random-map', populationLimit?: number, wonderVictory?: boolean,
   // Replay callers must choose before generating, not delete a marker afterwards.
-  mapgenVersion: 0 | 1 | 2 = 2,
+  mapgenVersion: 0 | 1 | 2 | 3 | undefined = undefined,
   gridSpawnVersion: 0 | 1 = 1,
 ): GameState {
+  // Preserve callers explicitly selecting pre-v10 placement while omitting
+  // the map policy: their historical generation ceiling was Islands(v2).
+  // Ordinary new games use v3; replay callers select each boundary explicitly.
+  const generation = mapgenVersion ?? (gridSpawnVersion === 0 ? 2 : 3);
   if (!validWonderVictory(wonderVictory)) throw new Error(`invalid Wonder victory setting ${wonderVictory}`);
   if (!validPopulationLimit(populationLimit)) throw new Error(`invalid population limit ${populationLimit}`);
   if (mode !== 'random-map' && mode !== 'regicide') throw new Error(`unknown game mode ${mode}`);
@@ -147,8 +151,9 @@ export function createGame(
     trebuchetTargetingVersion: 1,
     herdClaimVersion: 1,
     ...(gridSpawnVersion ? { gridSpawnVersion: 1 as const } : {}),
-    ...(map === 'arabia' && mapgenVersion >= 1 ? { mapgenVersion: 1 as const }
-      : map === 'islands' && mapgenVersion >= 2 ? { mapgenVersion: 2 as const } : {}),
+    ...(map === 'arabia' && generation >= 1 ? { mapgenVersion: 1 as const }
+      : map === 'islands' && generation >= 2 ? { mapgenVersion: 2 as const }
+      : map === 'black-forest' && generation >= 3 ? { mapgenVersion: 3 as const } : {}),
     ...(wonderVictory ? { wonderVictory: true } : {}),
     ...(populationLimit !== undefined ? { populationLimit } : {}),
     ...(mode === 'regicide' ? { mode } : {}),

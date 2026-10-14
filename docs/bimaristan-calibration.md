@@ -114,7 +114,7 @@ attempts are retained and are not counted as aura-range observations.
 
 ## Team bonus and garrison continuation, 2026-10-06
 
-**Measured on current build 185872, not pinned 48987.** All screenshot readings
+**Measured on reference build 185872.** All screenshot readings
 below were **observed visually**. Same live PID22012, fullscreen2560×1440;
 graphics settings were not changed (inherited UHD unchecked). Editor Test only;
 no scenario saved. No runtime or regression-test changes: the accepted native

@@ -8,12 +8,12 @@ The core importer consumes three independently downloaded depots. Shared UI audi
 
 | Purpose | Depot | Manifest |
 |---|---:|---:|
-| DAT and sound metadata | `813781` | `3067258457468070797` |
-| WEST `widgetui` | `813782` | `3503932408267359574` |
-| Shared Wwise audio | `813783` | `8547122694393480152` |
-| SLD graphics | `813784` | `8087696953400240386` |
-| English Wwise audio (optional) | `813787` | `3172067902980343375` |
-| Enhanced Graphics Pack, UHD SLD graphics (optional; DLC app `1039811`) | `1039811` | `2753360242865160896` |
+| DAT and sound metadata | `813781` | `3581466696383005432` |
+| WEST `widgetui` | `813782` | `3006144275181265661` |
+| Shared Wwise audio | `813783` | `6634091188630956531` |
+| SLD graphics | `813784` | `7974905023344454072` |
+| English Wwise audio (optional) | `813787` | `2073695665921061757` |
+| Enhanced Graphics Pack, UHD SLD graphics (optional; DLC app `1039811`) | `1039811` | `4436460500920989157` |
 
 You must own app `813780`; the Enhanced Graphics Pack is free but must be added to your Steam account (its store page) before its depot can be downloaded. Do not share Steam credentials, depot files, converted PNGs, or generated manifests.
 
@@ -24,12 +24,12 @@ Use Valve's SteamCMD for your platform. Start it interactively so your password 
 ```text
 steamcmd
 Steam> login YOUR_STEAM_ACCOUNT
-Steam> download_depot 813780 813781 3067258457468070797
-Steam> download_depot 813780 813782 3503932408267359574
-Steam> download_depot 813780 813783 8547122694393480152
-Steam> download_depot 813780 813784 8087696953400240386
-Steam> download_depot 813780 813787 3172067902980343375
-Steam> download_depot 813780 1039811 2753360242865160896
+Steam> download_depot 813780 813781 3581466696383005432
+Steam> download_depot 813780 813782 3006144275181265661
+Steam> download_depot 813780 813783 6634091188630956531
+Steam> download_depot 813780 813784 7974905023344454072
+Steam> download_depot 813780 813787 2073695665921061757
+Steam> download_depot 813780 1039811 4436460500920989157
 Steam> quit
 ```
 
@@ -126,6 +126,24 @@ sudo apt install build-essential git python3 python3-dev python3-venv
 ```
 
 Use a current Node.js release inside WSL rather than the Windows Node executable. Native Windows Python/PowerShell import is not currently supported; WSL2 is the supported Windows boundary.
+
+## Using an installed Steam copy
+
+If you have AoE2DE installed on your system via Steam (not SteamCMD), you can derive the depot tree from the installation without re-downloading. Copy the AoE2DE game folder (with the Enhanced Graphics Pack enabled) to a private location, then create a depot root directory with symlinks to that copy:
+
+```bash
+INSTALL_DIR="~/path/to/your/installed/AoE2DE"
+DEPOT_ROOT="~/path/to/depot-root"  # new private location
+
+mkdir -p "$DEPOT_ROOT"
+for depot in 813781 813782 813783 813784 813787 1039811; do
+  ln -s "$INSTALL_DIR" "$DEPOT_ROOT/depot_$depot"
+done
+
+export AOE2DE_DEPOT_ROOT="$DEPOT_ROOT"
+```
+
+All importer stages read depot-relative paths; no stage requires depot exclusivity, so this layout works correctly. The symlinks point all six depots to the same installation root, and the importer reads the appropriate content from each logical depot path.
 
 ## 3. Verify and import
 

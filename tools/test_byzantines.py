@@ -1,5 +1,5 @@
 import unittest
-from test_import_aoe2 import extracted_content, _dat, sld
+from test_import_aoe2 import extracted_content, _dat, sld, assert_roster_gaps
 
 
 class ByzantineImportTest(unittest.TestCase):
@@ -10,7 +10,7 @@ class ByzantineImportTest(unittest.TestCase):
 
     def test_complete_roster_and_owned_unique_research(self):
         p = self.profile
-        self.assertEqual(self.content['civilizationCatalog']['byzantines']['missingRoster'], [])
+        assert_roster_gaps(self, self.content, 'byzantines', [2703, 2704])  #185872 Varangian Guard line
         self.assertEqual(p['civilization']['hudStyle'], 'CivMedi')
         self.assertEqual(p['audio']['switch'], 'Byzantines')
         for key, uid in [('dat-unit-40', 40), ('dat-unit-553', 553), ('dat-unit-329', 329), ('dat-unit-330', 330)]:
@@ -22,7 +22,9 @@ class ByzantineImportTest(unittest.TestCase):
         for key in ['town-watch', 'town-patrol']:
             self.assertEqual(p['technologies'][key]['researchSeconds'], 0)
             self.assertFalse(any(p['technologies'][key]['cost'].values()))
-        self.assertTrue(all('do not have it' in row['reason'] for row in p['skippedTechnologies']))
+        regional, = [row for row in p['skippedTechnologies'] if row['techId'] == 1454]
+        self.assertEqual(regional['reason'], 'upgrades to a unit that is not imported (unit 2704)')
+        self.assertTrue(all('do not have it' in row['reason'] for row in p['skippedTechnologies'] if row['techId'] != 1454))
 
     def test_healing_task_product_and_team_effect_are_both_preserved(self):
         p = self.profile; monk = _dat().civs[7].units[125]

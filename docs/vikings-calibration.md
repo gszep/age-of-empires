@@ -1,6 +1,6 @@
 # Vikings native calibration — #301
 
-2026-10-06, **measured on current build 185872, not pinned 48987**.
+2026-10-06, **measured on reference build 185872**.
 Native PID 22012, single-player editor Tests, fullscreen 2560×1440, inherited
 UHD-unchecked configuration unchanged. All screenshot readings below were
 **observed visually**, not extracted engine state. Casual 1.5; timing uses the

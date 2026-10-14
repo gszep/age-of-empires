@@ -1,7 +1,7 @@
 # Converted-unit stats: native calibration #178
 
 2026-10-06: **PASS for the bounded infantry stat-panel questions below**, not
-closure of #178. Measured on current build **185872, not pinned 48987**;
+closure of #178. Measured on reference build **185872**;
 all screenshot readings are **observed visually**. Owner authorized this build
 as calibration evidence. Existing frozen donor rules agree; no runtime rewrite.
 

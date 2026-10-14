@@ -145,7 +145,7 @@ rasterization, spacing metric, scaling/rounding, phase order and RNG open.
 
 ## Setup and provenance
 
-- Installed DE **185872**, version101.103.54800.0, PID22012, not pinned48987.
+- reference build 185872: installed DE version 101.103.54800.0, PID22012.
   Fullscreen2560×1440, default zoom50%, UHD unchecked. Graphics were inspected
   after capture and left unchanged; no restart occurred.
 - Single-player Skirmish: Default data, Random Map, **Islands**, Tiny(2 player)

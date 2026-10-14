@@ -67,7 +67,7 @@ explicit approval. No calibration acceptance is waived by these dependencies.
   `.local/orchestrator/handoff.md`; per-issue evidence under
   `.local/orchestrator/evidence/`). Owner decision for this run: the installed
   DE 101.103.54800.0 (#185872) counts as calibration evidence, recorded as
-  "current build, not pinned 48987"; screenshot readings are "observed
+  "reference build"; screenshot readings are "observed
   visually". Native control: `.local/native-control.ps1` with tested macros and
   coordinates in `.local/native-macro.sh` / `.local/native-recipes.md`.
   - Closed: #161 ram crew, #253 population ceilings, #254 zero-time research,

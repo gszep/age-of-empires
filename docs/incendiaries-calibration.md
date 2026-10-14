@@ -1,7 +1,7 @@
 # Incendiaries native calibration (#252)
 
 2026-10-06 — **BLOCKED / partial evidence; no runtime change.** Measured on
-current build **185872, not pinned 48987**, under the owner's explicit approval.
+reference build **185872**, under the owner's explicit approval.
 All screenshot readings below were **observed visually**, not telemetry.
 
 ## Environment and source comparison

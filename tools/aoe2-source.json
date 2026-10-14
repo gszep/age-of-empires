@@ -1,11 +1,14 @@
 {
   "appId": 813780,
+  "build": "101.103.54800.0 (#185872)",
+  "steamBuildId": "25464371",
+  "datSha256": "4aa2f0a719e88e5f1502517eddb27c669aeb40c2fe9d8c4f3eec7751c01e7baa",
   "depots": {
-    "core": { "id": 813781, "manifest": "3067258457468070797" },
-    "art": { "id": 813782, "manifest": "3503932408267359574" },
-    "sound": { "id": 813783, "manifest": "8547122694393480152" },
-    "resources": { "id": 813784, "manifest": "8087696953400240386" },
-    "soundEnglish": { "id": 813787, "manifest": "3172067902980343375" },
-    "enhancedGraphics": { "id": 1039811, "manifest": "2753360242865160896", "dlcAppId": 1039811 }
+    "core": { "id": 813781, "manifest": "3581466696383005432" },
+    "art": { "id": 813782, "manifest": "3006144275181265661" },
+    "sound": { "id": 813783, "manifest": "6634091188630956531" },
+    "resources": { "id": 813784, "manifest": "7974905023344454072" },
+    "soundEnglish": { "id": 813787, "manifest": "2073695665921061757" },
+    "enhancedGraphics": { "id": 1039811, "manifest": "4436460500920989157", "dlcAppId": 1039811 }
   }
 }

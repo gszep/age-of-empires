@@ -195,21 +195,21 @@ describe('herd claim source and replay gates', () => {
     }
   });
 
-  it('accepts launch formats 10/11, writes 11, validates and replays across JSON', async () => {
-    expect(MATCH_FORMAT_VERSION).toBe(11);
+  it('accepts launch formats 10/11, writes current, validates and replays across JSON', async () => {
+    expect(MATCH_FORMAT_VERSION).toBeGreaterThanOrEqual(11);
     const idle = { decide: () => [] };
     for (const version of [10, 11] as const) {
       expect(validRecordedMode(version, 'random-map')).toBe(true);
       expect(validateMatchConfig({ version, seed: 330 })).toBe(true);
       const { record, result } = await runMatch({ version, seed: 330, maxTimeSeconds: 5 }, { 1: idle, 2: idle });
-      expect(record.version).toBe(11); expect(result.version).toBe(11);
+      expect(record.version).toBe(MATCH_FORMAT_VERSION); expect(result.version).toBe(MATCH_FORMAT_VERSION);
       const wire = JSON.parse(JSON.stringify(record));
       expect(validateMatchRecord(wire)).toBe(true);
       expect(validateMatchResult(result)).toBe(true);
       expect(replayRecord(wire)).toEqual({ ok: true, checked: record.checksums.length });
       expect(replayRecord({ ...wire, version: 10 }).ok).toBe(false);
     }
-    expect(validateMatchConfig({ version: 12, seed: 330 })).toBe(false);
-    expect(validRecordedMode(12, 'random-map')).toBe(false);
+    expect(validateMatchConfig({ version: MATCH_FORMAT_VERSION + 1, seed: 330 })).toBe(false);
+    expect(validRecordedMode(MATCH_FORMAT_VERSION + 1, 'random-map')).toBe(false);
   });
 });

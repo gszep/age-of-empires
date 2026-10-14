@@ -54,6 +54,18 @@ def _dat():
     return DatFile.parse(DAT)
 
 
+def assert_roster_gaps(test, content, key, expected):
+    """Exact185872 additions, not permission to lose existing roster coverage."""
+    row = content['civilizationCatalog'][key]
+    test.assertEqual(row['missingRoster'], expected)
+    profile = content if key == content['civilization']['key'] else content['civilizations'][key]
+    imported = {e['id'] for e in profile['entities'].values() if e.get('category') in ('unit', 'building')}
+    for uid in expected:
+        node, = [n for n in row['roster'] if n['Node ID'] == uid and n['Use Type'] == 'Unit']
+        test.assertNotEqual(node['Node Status'], 'NotAvailable')
+        test.assertNotIn(uid, imported)
+
+
 class CivilizationAuditTest(unittest.TestCase):
     def test_islands_fish_reference_matches_owned_global_passes(self):
         from fish_reference import extract as fish_reference
@@ -65,6 +77,17 @@ class CivilizationAuditTest(unittest.TestCase):
         from relic_reference import extract as relic_reference
         checked_in = Path(__file__).parent.parent / 'src/sim/refdata/relic-placement.json'
         self.assertEqual(relic_reference(ROOT), json.loads(checked_in.read_text()))
+
+    @unittest.skipUnless((ROOT.with_name('app_813780-48987') / 'depot_813784/resources/_common/drs/gamedata_x2/Black_Forest.rms').is_file(),
+                         'retained48987 RMS unavailable')
+    def test_legacy_black_forest_land_matches_retained_48987_source(self):
+        from relic_reference import extract as relic_reference
+        legacy_root = ROOT.with_name('app_813780-48987')
+        reference = json.loads((Path(__file__).parent.parent / 'src/sim/refdata/black-forest-48987.json').read_text())
+        self.assertIn('build48987', reference['source'])
+        self.assertEqual(reference['sha256'], sha256(legacy_root / 'depot_813784/resources/_common/drs/gamedata_x2/Black_Forest.rms'))
+        self.assertEqual(reference['land'], relic_reference(legacy_root)['black-forest']['land'])
+        self.assertEqual(reference['land']['clumping'], 2)
 
     def test_prerequisite_choices_and_disabled_slots_are_distinct(self):
         choice = prerequisites(SimpleNamespace(required_techs=(1, 2, 3, -1), required_tech_count=2))
@@ -220,8 +243,8 @@ class TrebuchetPackingImportTest(unittest.TestCase):
             packed = extract_entity(dat, units, specs['trebuchet'], GRAPHICS, {})
             deployed = extract_entity(dat, units, specs['trebuchet-unpacked'], GRAPHICS, {})
             task = next(t for t in units[331].bird.tasks if t.action_type == 125)
-            self.assertEqual((task.unit_id, task.work_value_1, task.work_value_2, task.gather_type), (-1, 0, 0, 0))
-            self.assertNotIn('packingWork', packed)  # legacy DAT does not state50
+            self.assertEqual((task.unit_id, task.work_value_1, task.work_value_2, task.gather_type), (42, 50, 1, 1))
+            self.assertEqual(packed['packingWork'], 50)  #185872 now states the work
             self.assertEqual(deployed['workRate'], 4.5)
             self.assertEqual(units[331].building.transform_unit, 42)
             self.assertEqual(units[42].building.transform_unit, 331)
@@ -231,6 +254,10 @@ class TrebuchetPackingImportTest(unittest.TestCase):
         units[331] = deepcopy(units[331])
         units[331].creatable.train_locations[0].train_time = 999
         task = next(t for t in units[331].bird.tasks if t.action_type == 125)
+        # Preserve48987's absent-clock compatibility in a copied task fixture.
+        task.unit_id = -1
+        task.work_value_1 = task.work_value_2 = task.gather_type = 0
+        self.assertNotIn('packingWork', extract_entity(dat, units, specs['trebuchet'], GRAPHICS, {}))
         task.unit_id = 42
         task.work_value_2 = task.gather_type = 1
         task.work_value_1 = 72
@@ -826,13 +853,16 @@ class ContentImportIntegrationTest(unittest.TestCase):
         )
         nodes = tree["civ_techs_buildings"] + tree["civ_techs_units"]
         by_use = {"Tech": "technologies", "Unit": "units", "Building": "buildings"}
+        exclusions = self.result['civilizationCatalog']['britons']['deferredExclusions']
+        self.assertEqual({row['unitId'] for row in exclusions}, {2700, 2701})
+        self.assertTrue(all(row['issue'] == 331 for row in exclusions))
         for node in nodes:
             bucket = by_use.get(node["Use Type"])
             if bucket is None:
                 continue
             listed = int(node["Node ID"]) in civ["unavailable"][bucket]
             self.assertEqual(
-                listed, node["Node Status"] == "NotAvailable",
+                listed, node["Node Status"] == "NotAvailable" or (bucket == 'units' and node['Node ID'] in {2700, 2701}),
                 f"{node['Name']} ({bucket} {node['Node ID']})",
             )
 
@@ -2274,24 +2304,25 @@ class AudioImportIntegrationTest(unittest.TestCase):
                                      (root / 'second' / file['file']).read_bytes())
 
     def test_second_pack_stream_decodes_completely_and_repeatably(self):
-        from import_audio import resolve_event_id
-        # Base.1 has no HIRC banks: its event lives in Base, with only a short
-        # DIDX prefetch. Decode through the public importer, not the index alone.
-        streamed = next((event_id, media_id) for bank in self.banks
-                        for event_id, (kind, _) in bank.objects.items() if kind == 4
-                        for media_id in resolve_event_id(bank, event_id)
-                        if isinstance(bank.media[media_id], Stream)
-                        and bank.media[media_id].pack.name == 'Base.1.pck')
-        event_id, media_id = streamed
+        from import_audio import music_catalogue
+        #185872's consumed ordinary cues are embedded; the published Base.1
+        # streams are music. Select a real gameplay dialogue leaf, not an
+        # arbitrary unused event (which may legitimately lack complete media).
+        # Decode through the public importer twice, not the index alone.
+        banks = {int(bank.name): bank for bank in self.banks}
+        track = next(t for t in music_catalogue(self.banks)['tracks']
+                     if isinstance(banks[t['bankId']].media[t['mediaId']], Stream)
+                     and banks[t['bankId']].media[t['mediaId']].pack.name == 'Base.1.pck')
+        media_id = track['mediaId']
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             ui, content = root / 'ui.json', root / 'content.json'
             ui.write_text('{"sounds":{}}')
-            content.write_text(json.dumps({'entities': {'probe': {'sounds': {'stream': event_id}}}}))
-            first = import_audio(self.packs, ui, root / 'first', content=content)
-            second = import_audio(list(reversed(self.packs)), ui, root / 'second', content=content)
+            content.write_text('{"entities":{}}')
+            first = import_audio(self.packs, ui, root / 'first', content=content, music=True)
+            second = import_audio(list(reversed(self.packs)), ui, root / 'second', content=content, music=True)
             self.assertEqual(first, second)
-            files = first['audio']['probe-stream']['files']
+            files = first['audio'][f"music/{track['name']}"]['files']
             cue = next(file for file in files if file['mediaId'] == media_id)
             self.assertEqual((cue['pack'], cue['storage']), ('Base.1.pck', 'stream'))
             self.assertGreater(cue['seconds'], 1)
@@ -2319,7 +2350,7 @@ class AudioImportIntegrationTest(unittest.TestCase):
     def test_owned_play_layers_and_timing_are_published_without_flattening(self):
         from import_audio import resolve_event_layers
         bank = next(bank for bank in self.banks if bank.name == '232745270')
-        self.assertEqual(bank.version, 154)
+        self.assertEqual(bank.version, 172)  #185872 BKHD; both parsers have synthetic coverage
         train = resolve_event_layers(bank, 1091801433, 'Britons')
         self.assertEqual(len(train), 2)
         self.assertEqual(train[0]['media'], [603334752])

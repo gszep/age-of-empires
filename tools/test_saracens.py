@@ -1,5 +1,5 @@
 import unittest
-from test_import_aoe2 import extracted_content
+from test_import_aoe2 import extracted_content, DAT, _dat
 
 
 class SaracensImportTest(unittest.TestCase):
@@ -18,19 +18,23 @@ class SaracensImportTest(unittest.TestCase):
         self.assertEqual(p['technologies']['counterweights']['techId'], 454)
         self.assertNotIn('zealotry', p['technologies'])
         self.assertNotIn('madrasah', p['technologies'])
-        self.assertFalse(any(t['name'] == 'Bimaristan' for t in p['skippedTechnologies']))
+        skipped, = [t for t in p['skippedTechnologies'] if t['techId'] == 28]
+        self.assertEqual(skipped['name'], 'Bimaristan')
+        self.assertIn('deferred-civ exclusion #324', skipped['reason'])
 
-    def test_bimaristan_expands_owned_xs_instead_of_granting_resource33(self):
-        t = self.profile['technologies']['bimaristan']
-        self.assertEqual(t['cost'], {'wood': 300, 'gold': 200})
-        self.assertEqual(t['researchSeconds'], 50)
-        self.assertEqual({e['unit'] for e in t['effects']}, {'monk', 'monk-relic'})
-        for e in t['effects']:
-            self.assertEqual(e['attribute'], 'healingAura')
-            self.assertEqual(e['healingAura']['range'], 5)
-            self.assertEqual(e['healingAura']['hitPointsPerSecond'], 1.25)
-            self.assertEqual(e['healingAura']['targetClasses'], [0, 4, 6, 12, 18, 19, 23, 35, 36, 43, 44, 47, 49, 59])
-            self.assertNotIn('resource', e)
+    def test_185872_bimaristan_is_explicitly_excluded_not_approximated_with_old_targets(self):
+        from scripted_effects import healing_aura, UnsupportedBimaristanMask
+        self.assertNotIn('bimaristan', self.profile['technologies'])
+        with self.assertRaisesRegex(UnsupportedBimaristanMask, 'complement class mask'):
+            healing_aura(DAT.parent.parent, {})
+        tech = _dat().techs[28]
+        self.assertEqual(tech.effect_id, 28)
+        self.assertEqual({c.type: c.amount for c in tech.resource_costs if c.flag}, {1: 300, 3: 200})
+        self.assertEqual(tech.research_locations[0].research_time, 50)
+        self.assertFalse(any(e.get('attribute') == 'healingAura' for node in
+                             self.profile['civilizationBonuses']['nodes'].values() for e in node['effects']))
+        # Positive48987 target/amount coverage lives in the synthetic XS fixture
+        # test_scripted_effects.ScriptRewriteTest.test_legacy_bimaristan_expands_targets.
 
 
 if __name__ == '__main__':

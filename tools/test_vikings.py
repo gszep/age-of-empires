@@ -1,5 +1,5 @@
 import unittest
-from test_import_aoe2 import extracted_content
+from test_import_aoe2 import extracted_content, assert_roster_gaps, DAT, _dat
 
 
 class VikingsImportTest(unittest.TestCase):
@@ -10,10 +10,10 @@ class VikingsImportTest(unittest.TestCase):
 
     def test_complete_roster_and_unique_units(self):
         row = self.content['civilizationCatalog']['vikings']
-        self.assertEqual(row['missingRoster'], [])
-        self.assertEqual(row['hudStyle'], 'CivSlav')
+        assert_roster_gaps(self, self.content, 'vikings', [2700, 2703, 2704])
+        self.assertEqual(row['hudStyle'], 'CivNord')  #185872 Nordic art/UI
         self.assertTrue(row['enabled'])
-        for uid, name in [(250, 'Longboat'), (533, 'Elite Longboat'), (692, 'Berserk'), (694, 'Elite Berserk')]:
+        for uid, name in [(250, 'Longship'), (533, 'Elite Longship'), (692, 'Berserk'), (694, 'Elite Berserk')]:
             e = self.profile['entities'][f'dat-unit-{uid}']
             self.assertEqual(e['text']['name'], name)
             self.assertTrue(e['animations']['idle'])
@@ -50,13 +50,22 @@ class VikingsImportTest(unittest.TestCase):
         self.assertEqual(g['requiredTechs'], requirements)
         self.assertEqual(g['requiredTechCount'], count)
 
-    def test_current_unique_research_uses_xs_loot_not_tooltip_numbers(self):
+    def test_185872_chieftains_omits_loot_but_retains_the_legacy_xs_adapter(self):
         p = self.profile
         self.assertEqual(p['technologies']['bogsveigar']['techId'], 49)
         self.assertNotIn('berserkergang', p['technologies'])
         t = p['technologies']['chieftains']
         self.assertEqual(t['techId'], 463)
-        reward = next(e['killReward'] for e in t['effects'] if e.get('unit') == 'militia' and 'killReward' in e)
+        # #324: effect517 no longer grants resource nor invokes XS5.
+        self.assertFalse(any(e.get('resource') == 'infantryKillReward' or 'killReward' in e for e in t['effects']))
+        source = _dat().effects[_dat().techs[463].effect_id]
+        self.assertEqual(_dat().techs[463].effect_id, 517)
+        self.assertTrue(all(c.type == 4 and c.c == 9 for c in source.effect_commands))
+        self.assertIn({'unit': 'militia', 'attribute': 'attack', 'operation': 'add', 'armorClass': 8, 'amount': 5}, t['effects'])
+        # The unused XS5 function remains source-readable; keep every reviewed
+        # legacy target/amount check without asserting it is granted in185872.
+        from scripted_effects import infantry_loot
+        reward = infantry_loot(DAT.parent.parent, {})
         self.assertEqual(reward['resource'], 'infantryKillReward')
         self.assertEqual(reward['targets'], [
             {'classId': 2, 'amount': 20}, {'classId': 43, 'amount': 20},

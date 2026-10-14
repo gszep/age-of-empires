@@ -15,7 +15,11 @@ class ProfileImportTest(unittest.TestCase):
 
     def test_base_catalogue_and_explicit_enablement(self):
         rows = self.content['civilizationCatalog']
-        self.assertEqual(len(rows), 53)
+        self.assertEqual(len(rows), 56)  #185872 adds Saxons/Varangians/Danes
+        self.assertEqual({key: rows[key]['datIndex'] for key in ('saxons', 'varangians', 'danes')},
+                         {'saxons': 60, 'varangians': 61, 'danes': 62})
+        self.assertTrue(all(not rows[key]['enabled'] and not rows[key]['extracted']
+                            for key in ('saxons', 'varangians', 'danes')))
         self.assertTrue(all(row['era'] == 'base' for row in rows.values()))
         self.assertEqual({key for key, row in rows.items() if row['enabled']},
                          {'britons', *SPEC['enabledCivilizations']})

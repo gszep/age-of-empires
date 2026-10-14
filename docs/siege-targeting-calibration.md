@@ -1,6 +1,6 @@
 # Native siege targeting (#131)
 
-2026-10-06, **current installed build185872, not pinned48987**, accepted by the
+2026-10-06, installed reference build **185872**, accepted by the
 owner for this calibration. Observed visually in single-player editor Tests;
 PID22012 throughout. Fullscreen2560×1440, existing UHD-unchecked settings left
 unchanged, Casual1.5. P1 Teutons/Imperial; P2 Teutons/Dark, personality None

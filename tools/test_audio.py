@@ -17,11 +17,12 @@ def chunk(tag, payload):
     return tag + struct.pack('<I', len(payload)) + payload
 
 
-def bank(objects, media=None):
+def bank(objects, media=None, version=154):
     hirc = struct.pack('<I', len(objects))
     for id, type, payload in objects:
         hirc += struct.pack('<BII', type, len(payload) + 4, id) + payload
-    result = chunk(b'HIRC', hirc)
+    result = (chunk(b'BKHD', struct.pack('<I', version) + bytes(36)) if version is not None else b'')
+    result += chunk(b'HIRC', hirc)
     if media is not None:
         didx = b''
         data = b''
@@ -30,6 +31,10 @@ def bank(objects, media=None):
             data += payload
         result += chunk(b'DIDX', didx) + chunk(b'DATA', data)
     return result
+
+
+def play_action(target):
+    return struct.pack('<BBIB', 3, 4, target, 0) + bytes(2) + struct.pack('<BII', 4, 1, 0)
 
 
 def pack(path, banks=(), streams=()):
@@ -89,7 +94,7 @@ class AudioPackTest(unittest.TestCase):
             objects[sound] = (2, struct.pack('<IBI', 0x140001, 1, sound + 1))
         media = {101: Stream(Path('Base.pck'), PackedFile(101, 0, 10, 0)),
                  201: Stream(Path('Base.1.pck'), PackedFile(201, 0, 10, 0)), 301: b'prefix'}
-        catalogue = music_catalogue([Bank('1', objects, media)])
+        catalogue = music_catalogue([Bank('1', objects, media, version=154)])
         self.assertEqual([row['name'] for row in catalogue['tracks']], ['MUSIC01', 'MUSIC02'])
         self.assertEqual(catalogue['unavailable'][0]['name'], 'MUSIC03')
         self.assertIn('prefetch', catalogue['unavailable'][0]['reason'])
@@ -98,16 +103,16 @@ class AudioPackTest(unittest.TestCase):
 
     def test_missing_stream_is_never_mistaken_for_its_embedded_prefix(self):
         objects = {1: (4, b'\x01' + struct.pack('<I', 2)),
-                   2: (3, b'\x03\x04' + struct.pack('<I', 3)),
+                   2: (3, play_action(3)),
                    3: (2, struct.pack('<IBI', 0x140001, 1, 4))}
-        self.assertEqual(resolve_event_id(Bank('1', objects, {4: b'prefix'}), 1), [])
+        self.assertEqual(resolve_event_id(Bank('1', objects, {4: b'prefix'}, version=154), 1), [])
 
     def test_cross_bank_play_reaches_full_stream_in_second_pack(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             base, extra = root / 'Base.pck', root / 'Base.1.pck'
             event = (100, 4, b'\x01' + struct.pack('<I', 200))
-            action = (200, 3, b'\x03\x04' + struct.pack('<I', 300))
+            action = (200, 3, play_action(300))
             sound = (300, 2, b'\0' * 5 + struct.pack('<I', 400))
             pack(base, [(1, bank([event, action])), (2, bank([sound], {400: b'prefix'}))])
             pack(extra, streams=[(400, b'prefix and the rest of the sound')])
@@ -124,8 +129,8 @@ class AudioPackTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'Base.pck'
             objects = [(100, 4, b'\x02' + struct.pack('<II', 200, 201)),
-                       (200, 3, b'\x03\x04' + struct.pack('<I', 300)),
-                       (201, 3, b'\x03\x01' + struct.pack('<I', 301)),
+                       (200, 3, play_action(300)),
+                       (201, 3, struct.pack('<BBIB', 3, 1, 301, 0) + bytes(2) + bytes([4, 0, 0])),
                        (300, 2, b'\0' * 5 + struct.pack('<I', 400)),
                        (301, 2, b'\0' * 5 + struct.pack('<I', 401))]
             pack(path, [(1, bank(objects, {400: b'play', 401: b'stop'})),
@@ -143,7 +148,8 @@ class AudioPackTest(unittest.TestCase):
 
     def test_malformed_bank_is_not_silently_skipped(self):
         with self.assertRaisesRegex(ValueError, 'truncated HIRC'):
-            read_bank('bad', chunk(b'HIRC', struct.pack('<I', 1)))
+            read_bank('bad', chunk(b'BKHD', struct.pack('<I', 154) + bytes(36))
+                      + chunk(b'HIRC', struct.pack('<I', 1)))
 
 
 class ReviewedAudioGapTest(unittest.TestCase):
@@ -165,7 +171,7 @@ class ReviewedAudioGapTest(unittest.TestCase):
             }}}}}))
 
     def source(self, objects=(), media=None):
-        pack(self.pack, [(1, chunk(b'BKHD', struct.pack('<I', 154)) + bank(objects, media))])
+        pack(self.pack, [(1, bank(objects, media))])
 
     @staticmethod
     def playable(event_id):

@@ -1,5 +1,108 @@
 # Owned audio evidence
 
+## Build185872 Wwise172 format audit (#324)
+
+The frozen185872 common and English banks declare **BKHD172**; the retained
+48987 common banks declare154. Source format reference:
+[wwiser08e937b](https://github.com/bnnm/wwiser/tree/08e937b649bc7007c234bbd59e34a41d5eef3b38),
+particularly `parser/wparser.py` (Event, LoadSource, NodeBaseParams, StateChunk,
+RanSeqCntr, SwitchCntr, ActionPlay, DialogueEvent and BankHeader) and `wdefs.py`.
+No explicit redistribution licence was present at that revision: wwiser was
+used only as a private research/audit executable, not vendored or added as a
+dependency. `tools/wwise_hirc.py` independently implements the documented field
+layouts; no third-party implementation is incorporated.
+
+| Structure read |154 →172|
+|---|---|
+| AKPK/PCK | Still version1; sized language/bank/stream/external tables,20-byte bank/stream entries addressed by block×index. Common map names `sfx`; English map contains `en` and `sfx`. Bounds/counts/string offsets are now validated; nonempty external-source tables remain unsupported and fail explicitly. |
+| BKHD | Same40-byte header (six u32 values plus16-byte hash), with optional alignment padding. Missing/truncated headers or versions other than154/172 fail at bank load, before sharing objects; music and event consumers also enforce the version. No version inferred from filenames. |
+| HIRC envelope | Same u8 type/u32 section length/u32 ID; exact table end, duplicate chunks/IDs and truncated bodies checked. |
+| Event4 | **Seven new bytes**: flags u8, instance limit u16, cooldown f32, before the variable-length action count. All audited172 events use zero; non-default event-control semantics fail instead of being ignored. Action count uses MSB-first7-bit groups, not LEB128. |
+| Action3 | Same scope/type u16, target u32, bus flag and scalar/ranged property bundles. Every action body is validated before filtering Play versus control actions: exact suffixes for audited Stop/Pause/Resume/SetBusVolume/SetState/PlayEvent/Play forms. Short/malformed siblings cannot disappear behind a valid Play. Play adds curve u8/bank ID u32/bank type u32; Delay58/transition59/probability60 unchanged. All consumed Play actions remain linear curve4. Other curves in unconsumed actions can be structurally audited but still fail if requested for playback. |
+| Sound2 | Same plugin u32/stream u8/source ID u32/cache ID u32/in-memory size u32/source flags u8; sized source-plugin data when plugin type2. Media ID is still at offset5, not cache ID. Complete streams take precedence over DIDX prefixes. |
+| Shared audio-node parameters | FX/metadata/property/positioning/aux/voice/RTPC structures unchanged for these versions. **Each nonempty state group gains a u32 group-usage ID** after group ID. The complete counted structure is walked, including inline state properties. |
+| Random/sequence5 | Same loop/range/transition/mode fields, child IDs and u16-counted (play ID,weight) playlist.172 follows actual playlist edges, not incidental IDs in parent/FX/parameter fields. Playlists can reference objects in another bank outside the bank-local child inventory. |
+| Switch6 | Same group/default/continuous flag, child IDs, switch packages and node/fade records. One switch-node flag bit is renamed ContinuePlayback→ContinueAcrossSwitch, with no width change. Civilization branches retain source order; unsupported graph nodes and missing referenced media fail. |
+| Dialogue15 / music | Same one-argument decision-tree layout and12-byte leaf records. Existing exact tree/weight/property-suffix guards remain. |
+| DIDX/DATA | Unchanged12-byte ID/offset/size records, bounded against DATA. Their existence does not prove a streaming prefix is a playable file. |
+
+The external reference parser consumed **44,236 HIRC objects in13 banks**
+(48987:17,012;185872 common:17,828;185872 English:9,396), with **zero parser
+errors and zero unexplained-byte skips**. This includes control/bus/music and
+attenuation objects outside the importer's gameplay graph traversal. The
+independent reader exactly walks **43,019** Sound/Random/Switch/Event/Action
+objects across those banks. Non-consumed structures remain outside the local
+mixer implementation, not evidence for acoustic equivalence. Synthetic tests
+cover both versions, state usage IDs, multibyte counts, complete/truncated
+containers, incidental-ID rejection, split-bank playlists and broken layers.
+
+Version154 uses the existing resolver unchanged. A private full48987 decode
+was followed by a full current-code manifest rerun, reusing PCM only after
+checking each alias's media ID, source SHA256 and WAV SHA256: **manifest bytes
+identical,42,309 WAV selections verified**. No source or public asset writes.
+
+### 185872 pack placement and coverage
+
+| Snapshot path | Bytes | Banks | Streams |
+|---|---:|---:|---:|
+| `wwise/Base.pck` |292260719|5|228|
+| `wwise/Base.1.pck` |733879405|0|680|
+| `wwise/en/Base.pck` |24415107|3|160|
+| `wwise/en/Base.1.pck` |205106290|0|2650|
+
+In the merged-install facade,813783 and813787 point at the same install root.
+The English material is under **`wwise/en`**, not a second copy of the common
+`wwise/Base.pck`. DLC packs are also present (including English DLCParis).
+The common pair resolves all currently consumed cues except the six reviewed
+Trade Cart gaps below. Joining the two English Base
+packs adds **zero** consumed cue resolutions and does not recover MUSIC17/27/30.
+
+The private185872 audio stage decoded **8,139 cues /42,373 WAV entries**,
+including27 music tracks. Relative to the published48987 manifest:1 alias
+added,2 removed,6,825 serialized cue records changed,1,313 unchanged. Only217
+common cues change normalized media/PCM pools or action layers;6,608 changes
+are **ordering-only**, not provenance or new audio. A controlled three-way
+comparison forces the structural reader on154 as well: structural48987 versus
+published48987 yields **zero substantive parser changes**; structural48987
+versus structural185872 yields **217 source changes** (213 Byzantine bank-only
+playlist changes,1 Viking monk train DAT-only reroute,3 Viking monk DAT reroutes
+whose newly selected bank paths also change). Normalization sorts each variation
+pool and remaps layer file indices to media IDs, preserving PCM hashes/durations,
+action IDs and all timing/probability fields. The unchanged154 production path
+still reproduces published bytes;172 deterministically follows playlist order
+instead of legacy byte-occurrence order. Positional WAV filenames consequently
+reorder with the pool; no samples or layers are added/lost by that reordering.
+This is not a claim that every source delta is a newly recorded sound.
+The added alias is Vikings graphic event2841441069; removed aliases are
+Vikings graphic events2300401013 and2467571964.
+
+All following edges are in bank232745270. These controls distinguish unchanged
+DAT routes with changed bank children from changed DAT routes into existing
+bank paths:
+
+| Cue | Source attribution |
+|---|---|
+| Byzantine Archer4 select | DAT event2301632855 unchanged → action657013067 → switch11356742 (Byzantines branch3777346574) → random195043900. Playlist sound IDs565525228/561195654/738659447 become566833236/580647850/400809331. Media840928471/1038182325/296425037 become232406091/99901242/968752947. Bank-edge change, not parser selection. |
+| Byzantine Militia74 select | Same DAT event and same bank path as Archer4; the same three playlist replacements explain the change. |
+| Byzantine Villager83 select | DAT event3746790103 unchanged → action49029369 → switch310994831 → random252110874. Media885874642/122946151/747618557/138669935 become976663584/458032094/743959926/470328306 through replacement sound children. Bank-edge change. |
+| Viking Monk125 train | DAT event4162654086 →2235729375. Old path: action517516224→random789163948→sound48084166→media1010371078. New path: action925796198→random779885862→sound814157156→media531099322. Both paths already exist in both builds' banks; crossed DAT/bank inputs confirm a DAT reroute. |
+
+There are **no unreviewed unresolved consumed cues in this common-pack run**.
+The same six Saracen/Turk Trade Cart aliases remain explicitly unavailable under#271, and the same three
+incomplete music streams remain listed under#244. No new silence exceptions
+were added. Container weighting/continuous-loop scheduling, bus DSP, spatial
+mixing and switch-transition envelopes retain the existing#243 boundary.
+
+**New#271 recovery evidence, not a substitution:** scanning30 additional DLC
+banks finds all three missing event IDs in `Pompeii.pck`, bank966081492. The
+standalone bank resolves them to complete pools (four media for selection/train,
+six for death), without a Civilization switch. However, joining Pompeii with
+the common packs fails on conflicting embedded media76423142. That pack belongs
+to a different content mode; importing it indiscriminately could change unrelated
+cues. The events are no longer accurately described as absent from *all owned
+files*. The current pipeline's common/English absence and reviewed silence are
+unchanged; safe source scoping/recovery remains a separate#271 decision.
+
 ## Pack boundary (#57, 2026-09-27)
 
 Patch pins are in `tools/aoe2-source.json`. `tools/audio_inventory.py` reads the

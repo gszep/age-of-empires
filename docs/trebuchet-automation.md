@@ -46,7 +46,7 @@ seconds normally and50/18 after Kataparuto. That50-work default is explicit in
 the installed185872 task125, but inferred for the pinned legacy task. See the
 [native cycle table](samurai-kataparuto-calibration.md) for precision and limits.
 
-**Observed visually, current build185872, not pinned48987:** packed idle does not
+**Observed visually, reference build 185872:** packed idle does not
 deploy; public Unpack enables automatic building fire; a nearer villager is
 ignored in favour of a house; no repack occurred during a99-game-second
 post-destruction interval. [Captures and limits](siege-targeting-calibration.md).

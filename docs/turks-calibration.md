@@ -5,7 +5,7 @@
 **Partial / BLOCKED for stored fractional HP**, 2026-10-06, including the
 coordinator-authorized continuation. Payment and naval measurements now complete;
 ordinary Camel progression measured against a control. Measured on current build
-**185872, not pinned 48987**, by owner authorization. All screenshot readings
+**reference build 185872**, by owner authorization. All screenshot readings
 below were **observed visually**, not extracted from native memory. Process
 22012, installed at `D:\SteamLibrary\steamapps\common\AoE2DE`; 2560×1440
 fullscreen, inherited UHD-unchecked configuration, unchanged during this run.
@@ -35,7 +35,7 @@ derived crops/contact sheets. Preserve this directory before retiring the tree.
 
 ### Continuation: prices, naval HP and ordinary Camel progression
 
-All values below are also **observed visually on build 185872**, not pinned
+All values below are also reference build 185872
 48987. W/F/G denote wood/food/gold. Control civs are named explicitly.
 
 | Check | Turks | Control | Captures relative to evidence root |

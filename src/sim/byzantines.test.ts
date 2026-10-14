@@ -107,7 +107,7 @@ describe.skipIf(!rules?.civilizations?.byzantines)('owned Byzantine gameplay', (
     expect(monk.faith ?? 100).toBe(100);
   });
 
-  it('paid Logistica adds infantry damage and fixed five-HP collateral, excludes allies and preserves the outer boundary', () => {
+  it('185872 paid Logistica preserves base infantry damage and adds fixed five-HP collateral, excludes allies and preserves the outer boundary', () => {
     const s = arena(3), castle = home(s, 'castle'), cat = train(s, castle, 'dat-unit-40');
     cat.position = { x: 50, y: 50 };
     const hit = (upgraded: boolean) => {
@@ -117,7 +117,9 @@ describe.skipIf(!rules?.civilizations?.byzantines)('owned Byzantine gameplay', (
       // Isolate one attack from retaliation and allied auto-attacks.
       for (const e of [target, nearby, ally, far]) e.attackCooldown = 10000;
       order(s, cat, target); until(s, () => target.hp < target.maxHp, 100);
-      expect(target.maxHp - target.hp).toBe(upgraded ? 24 : 18);
+      //185872 Cataphract40: melee9 + infantry13 =22 against militia74.
+      // Logistica61/effect493 now adds radius only (old +6 infantry removed).
+      expect(target.maxHp - target.hp).toBe(22);
       expect(nearby.maxHp - nearby.hp).toBe(upgraded ? 5 : 0);
       expect(ally.hp).toBe(ally.maxHp); expect(far.hp).toBe(far.maxHp);
       for (const e of [target, nearby, ally, far]) expect(applyCommand(s, { kind: 'delete', player: e.owner as PlayerId, entityIds: [e.id] }).ok).toBe(true);

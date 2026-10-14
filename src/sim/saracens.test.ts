@@ -7,12 +7,18 @@ import { updateVisibility } from './visibility';
 import { synchronizationHash } from '../shared/checksum';
 import { replayRecord, runMatch, type Strategy } from '../headless/runner';
 import type { BuildingKind, Entity, GameState, PlayerId, UnitKind } from './types';
+import { legacyBimaristan } from './test-helpers/legacy-civ-effects';
 
 const path = process.env.CIV_PROFILE_CONTENT ?? 'public/imported/aoe2/manifest.json';
-const rules = existsSync(path) ? rulesFromManifest(JSON.parse(readFileSync(path, 'utf8'))) : undefined;
+const imported = existsSync(path) ? (() => {
+  const manifest = JSON.parse(readFileSync(path, 'utf8'));
+  return { rules: rulesFromManifest(manifest), bimaristanExclusion:
+    manifest.civilizations?.saracens?.skippedTechnologies?.find((t: { techId: number }) => t.techId === 28) };
+})() : undefined;
+const rules = imported?.rules;
 if (rules?.civilizations?.saracens) rules.civilizations.saracens.civilization.enabled = true;
-function arena(age = 2, water = false, rival = 'britons') {
-  const s = createGame(187, rules!, { 1: 'saracens', 2: rival });
+function arena(age = 2, water = false, rival = 'britons', source = rules!) {
+  const s = createGame(187, source, { 1: 'saracens', 2: rival });
   s.entities = s.entities.filter(e => e.kind === 'town-center');
   s.entities.forEach((e, i) => e.position = { x: 10 + i * 80, y: 10 });
   s.terrain.fill(water ? 23 : 0); s.elevation.fill(0);
@@ -40,6 +46,24 @@ function order(s: GameState, actor: Entity, target: Entity) {
 function research(s: GameState, building: Entity, tech: string) {
   expect(applyCommand(s, { kind: 'research', player: building.owner as PlayerId, buildingId: building.id, tech }), tech).toEqual({ ok: true });
   until(s, () => s.players[building.owner as PlayerId].researched.includes(tech));
+}
+function bimaristan(s: GameState, castle: Entity, legacy: boolean) {
+  const before = { ...s.players[1] };
+  if (legacy) {
+    research(s, castle, 'bimaristan');
+    expect(before.wood - s.players[1].wood).toBe(300);
+    expect(before.gold - s.players[1].gold).toBe(200);
+  } else {
+    // #324 deliberately excludes185872's dynamic XS7 target mask; do not
+    // reintroduce the48987 enumerated aura merely to make the owned test pass.
+    expect(imported?.bimaristanExclusion?.reason).toContain('deferred-civ exclusion #324');
+    expect(imported?.bimaristanExclusion?.techId).toBe(28);
+    expect(rules!.civilizations!.saracens.technologies.bimaristan).toBeUndefined();
+    expect(applyCommand(s, { kind: 'research', player: 1, buildingId: castle.id, tech: 'bimaristan' }))
+      .toEqual({ ok: false, reason: 'unknown technology bimaristan' });
+    expect(s.players[1]).toEqual(before);
+    expect(s.players[1].researched).not.toContain('bimaristan');
+  }
 }
 function train(s: GameState, building: Entity, kind: UnitKind) {
   const first = s.nextId;
@@ -89,39 +113,48 @@ describe.skipIf(!rules?.civilizations?.saracens)('owned Saracen gameplay', () =>
     expect(s.players[1].researched).not.toContain('zealotry');
   });
 
-  it('Bimaristan passively heals multiple eligible nearby units, excludes self/enemy/siege/outside, and does not stack', () => {
-    const s = arena(), castle = home(s, 'castle'); research(s, castle, 'bimaristan');
+  it.each(['185872 excluded #324', '48987-shaped aura fixture'] as const)('Bimaristan healing/self/enemy/siege/boundary/stacking contract (%s)', version => {
+    const legacy = version === '48987-shaped aura fixture';
+    const s = arena(2, false, 'britons', legacy ? legacyBimaristan(rules!) : rules!), castle = home(s, 'castle');
+    bimaristan(s, castle, legacy);
     const monk = unit(s, 'monk', 1, 40, 40); monk.hp = 1;
     const patients = [unit(s, 'militia', 1, 43, 40), unit(s, 'villager', 1, 40, 43)];
     const excluded = [unit(s, 'militia', 2, 43, 43), unit(s, 'battering-ram', 1, 42, 42), unit(s, 'villager', 1, 46, 40)];
     for (const e of [...patients, ...excluded]) { e.hp = 1; e.attackCooldown = 100000; }
     for (let i = 0; i < 4 * TICKS_PER_SECOND; i++) stepGame(s);
-    for (const e of patients) expect(e.hp).toBeCloseTo(6);
+    for (const e of patients) expect(e.hp).toBeCloseTo(legacy ? 6 : 1);
     for (const e of excluded) expect(e.hp).toBe(1);
     expect(monk.hp).toBe(1);
     unit(s, 'monk', 1, 40, 41);
     const before = patients[0].hp;
     for (let i = 0; i < 4 * TICKS_PER_SECOND; i++) stepGame(s);
-    expect(patients[0].hp - before).toBeCloseTo(5);
-    expect(monk.hp).toBeCloseTo(6);
+    expect(patients[0].hp - before).toBeCloseTo(legacy ? 5 : 0);
+    expect(monk.hp).toBeCloseTo(legacy ? 6 : 1);
     const saved = JSON.parse(JSON.stringify(s));
     for (let i = 0; i < 40; i++) { stepGame(s); stepGame(saved); }
     expect(synchronizationHash(s)).toBe(synchronizationHash(saved));
   });
 
-  it('garrison removes an aura source and ungarrison restores it', () => {
-    const s = arena(), castle = home(s, 'castle'); research(s, castle, 'bimaristan');
+  it.each(['185872 excluded #324', '48987-shaped aura fixture'] as const)('garrison and ungarrison cannot bypass the aura research contract (%s)', version => {
+    const legacy = version === '48987-shaped aura fixture';
+    const s = arena(2, false, 'britons', legacy ? legacyBimaristan(rules!) : rules!), castle = home(s, 'castle');
+    bimaristan(s, castle, legacy);
     const monk = unit(s, 'monk', 1, 20, 23), patient = unit(s, 'villager', 1, 23, 23); patient.hp = 1;
     order(s, monk, castle); until(s, () => !!castle.garrison?.length);
     const before = patient.hp;
     for (let i = 0; i < 40; i++) stepGame(s);
     expect(patient.hp).toBe(before);
     expect(applyCommand(s, { kind: 'ungarrison', player: 1, buildingId: castle.id }).ok).toBe(true);
-    until(s, () => patient.hp > before, 100);
+    if (legacy) until(s, () => patient.hp > before, 100);
+    else {
+      for (let i = 0; i < 100; i++) stepGame(s);
+      expect(patient.hp).toBe(before);
+    }
   });
 
-  it('research reaches existing relic carriers and captured aura monks keep their researched rules', () => {
-    const s = arena(2, false, 'teutons'), castle = home(s, 'castle');
+  it.each(['185872 excluded #324', '48987-shaped aura fixture'] as const)('relic carriers and captured monks retain only actually researched aura rules (%s)', version => {
+    const legacy = version === '48987-shaped aura fixture';
+    const s = arena(2, false, 'teutons', legacy ? legacyBimaristan(rules!) : rules!), castle = home(s, 'castle');
     const monk = unit(s, 'monk', 1, 50, 50), patient = unit(s, 'villager', 1, 53, 50); patient.hp = 1;
     // A carried relic is already part of this saved scenario; passive healing
     // must not depend on eligibility for the explicit heal command.
@@ -129,17 +162,22 @@ describe.skipIf(!rules?.civilizations?.saracens)('owned Saracen gameplay', () =>
       hp: 1, maxHp: 1, radius: .25, activity: 'idle', order: { kind: 'idle' } }];
     for (let i = 0; i < 20; i++) stepGame(s);
     expect(patient.hp).toBe(1);
-    research(s, castle, 'bimaristan');
-    until(s, () => patient.hp > 2, 60);
+    bimaristan(s, castle, legacy);
+    if (legacy) until(s, () => patient.hp > 2, 60);
+    else {
+      for (let i = 0; i < 60; i++) stepGame(s);
+      expect(patient.hp).toBe(1);
+    }
     monk.relics = undefined;
     const temple = home(s, 'monastery', 2, 80, 80); research(s, temple, 'atonement');
     const converter = unit(s, 'monk', 2, 57, 50); converter.hp = converter.maxHp = 10000;
     order(s, converter, monk); until(s, () => monk.owner === 2, 600);
-    expect(monk.convertedRules?.healingAura?.range).toBe(5);
+    if (legacy) expect(monk.convertedRules?.healingAura?.range).toBe(5);
+    else expect(monk.convertedRules?.healingAura).toBeUndefined();
     const enemyPatient = unit(s, 'villager', 2, 50, 53); enemyPatient.hp = 1;
     const before = patient.hp;
     for (let i = 0; i < 40; i++) stepGame(s);
-    expect(enemyPatient.hp).toBeCloseTo(3.5); expect(patient.hp).toBe(before);
+    expect(enemyPatient.hp).toBeCloseTo(legacy ? 3.5 : 1); expect(patient.hp).toBe(before);
   });
 
   it('Counterweights increases real mangonel damage and keeps opponent damage unchanged', () => {

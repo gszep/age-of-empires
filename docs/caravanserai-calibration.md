@@ -6,7 +6,7 @@ resolved. Short-route displayed payout comparison only. No runtime change.
 
 ## Scope and provenance
 
-Measured on **current installed build 185872, not pinned 48987**, with owner
+Measured on installed reference build **185872**, with owner
 approval. Screenshot readings below are **observed visually**, except the
 explicit pixel extraction. PID 22012; fullscreen 2560×1440; inherited UHD-off
 settings unchanged. Single-player Scenario Editor Test, Imperial Persian P1,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES, TICKS_PER_SECOND, type GameRules } from './data';
-import { applyCommand, createGame, placementLegal, stepGame } from './game';
-import type { Entity, GameState } from './types';
+import { applyCommand, createGame, placementLegal, stepGame, trainableUnitsAt } from './game';
+import type { BuildingKind, Entity, GameState } from './types';
 import { importedRules, run, inFeudal } from './test-helpers/economy';
 
 
@@ -160,17 +160,45 @@ describe('civilisations', () => {
     for (const [key, tech] of Object.entries(importedRules.technologies)) {
       expect(missing.technologies, `${key} is not in the Britons' tree`).not.toContain(tech.techId);
     }
-    for (const [kind, rules] of Object.entries(importedRules.units)) {
-      // Definitions also include foreign captures and spawn-only Kings.
-      // Their public production denial is covered by profile/Regicide tests;
-      // only units actually offered for training belong to this invariant.
-      if (rules.datId === undefined || rules.trainable === false || kind.startsWith('dat-unit-')) continue;
-      expect(missing.units, `${kind} is not in the Britons' tree`).not.toContain(rules.datId);
+    const state = createGame(91, importedRules);
+    state.players[1].age = 3;
+    expect(trainableUnitsAt(state, 1, 'town-center')).toContain('villager');
+    // Definitions include foreign captures, even named kinds:185872 removes
+    // Cavalry Archer39/474 from Britons. Assert actual public menu offers, not
+    // the old assumption that every named definition is civ-available.
+    for (const building of Object.keys(importedRules.buildings) as BuildingKind[]) {
+      for (const kind of trainableUnitsAt(state, 1, building)) {
+        const unit = importedRules.units[kind];
+        if (unit.datId === undefined) continue;
+        expect(missing.units, `${kind} is not in the Britons' tree`).not.toContain(unit.treeUnitId ?? unit.datId);
+      }
     }
     for (const [kind, rules] of Object.entries(importedRules.buildings)) {
       if (rules.datId === undefined || !rules.buildable) continue;
       expect(missing.buildings, `${kind} is not in the Britons' tree`).not.toContain(rules.datId);
     }
+  });
+
+  it('185872 retains captured cavalry-archer definitions but offers/trains neither them nor #331 deferred replacements', () => {
+    if (!importedRules) return;
+    const state = createGame(324, importedRules);
+    Object.assign(state.players[1], { age: 3, food: 5000, wood: 5000, gold: 5000, populationCap: 100 });
+    const rule = importedRules.buildings['archery-range'];
+    const range: Entity = { id: state.nextId++, kind: 'archery-range', owner: 1, position: { x: 50, y: 50 },
+      hp: rule.hp, maxHp: rule.hp, radius: rule.radius, activity: 'idle', order: { kind: 'idle' } };
+    state.entities.push(range);
+    for (const [kind, id] of [['cavalry-archer', 39], ['heavy-cavalry-archer', 474],
+                            ['dat-unit-2700', 2700], ['dat-unit-2701', 2701]] as const) {
+      expect(importedRules.civilization.unavailable.units).toContain(id);
+      if (id < 2700) expect(importedRules.units[kind].datId).toBe(id); // retain capture rules
+      expect(trainableUnitsAt(state, 1, 'archery-range')).not.toContain(kind);
+      const before = { ...state.players[1] };
+      expect(applyCommand(state, { kind: 'train', player: 1, buildingId: range.id, unit: kind }).ok).toBe(false);
+      expect(state.players[1]).toEqual(before);
+      expect(range.training).toBeUndefined();
+    }
+    expect(trainableUnitsAt(state, 1, 'archery-range')).toContain('archer');
+    expect(applyCommand(state, { kind: 'train', player: 1, buildingId: range.id, unit: 'archer' })).toEqual({ ok: true });
   });
 
   it('refuses a unit its civilisation was never given', () => {

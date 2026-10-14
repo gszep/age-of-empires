@@ -1,6 +1,6 @@
 # Chinese native calibration — #260
 
-2026-10-06: **measured on current build 185872, not pinned 48987**, with
+2026-10-06: **measured on reference build 185872**, with
 owner authorization. All screenshot readings below are **observed visually**.
 Overall result: **partial / BLOCKED for full issue acceptance**. Research-price
 rounding has a decisive native disagreement and a tested fix. The volley follow-up

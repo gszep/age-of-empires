@@ -1,6 +1,6 @@
 # Ram crew native calibration (#161)
 
-2026-10-06: **measured on current build 185872, not pinned 48987**.
+2026-10-06: **measured on reference build 185872**.
 The owner authorized installed Steam DE 101.103.54800.0 as evidence for this
 run. All numbers below were **observed visually**, not read from process memory.
 
@@ -66,7 +66,7 @@ was retained, with the game returned to the main menu.
 
 ## Speed — simultaneous native race, 2026-10-06
 
-**Measured on current build 185872, not pinned 48987.** Three Teuton Battering
+**Measured on reference build 185872.** Three Teuton Battering
 Rams on flat editor grass, no technologies, separately selected/ordered along
 three parallel horizontal screen lanes. Top empty, middle four Militia, bottom
 one female Villager. Occupancy and attack controls are observed visually in

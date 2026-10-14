@@ -8,7 +8,7 @@ No decisive disagreement with the current implementation; no runtime/test edits.
 
 ## Provenance
 
-Measured on **current installed build 185872, not pinned 48987**, with owner
+Measured on installed reference build **185872**, with owner
 approval. All screenshot readings below are **observed visually**. Native
 PID22012, fullscreen2560×1440, inherited UHD-off settings unchanged. Single-player
 Scenario Editor Test, fixed **Celts**, Imperial start, Casual1.5 speed, one player,

@@ -24,6 +24,7 @@ import paintedProof from './maps/painted-proof.json';
 import senlac from './maps/senlac.json';
 import windsor from './maps/windsor.json';
 import relicReference from './refdata/relic-placement.json';
+import legacyBlackForestReference from './refdata/black-forest-48987.json';
 import fishReference from './refdata/islands-fish.json';
 import { FALLBACK_RULES, OPEN_WATER_TERRAINS } from './data';
 import { random01, seedFrom } from './random';
@@ -460,9 +461,10 @@ export const BLACK_FOREST: MapDescriptor = {
     { ground: 'forest', levels: [{ chance: 100, rise: 5, tiles: 1024, clumps: 32 }] },
   ],
   // The owned script's own numbers: `create_player_lands` at land_percent 44
-  // shared across both players (3168 tiles each on a 120-square board), a circular
-  // base of 14, clumping_factor 2 -- a round core with a soft ragged fringe --
-  // and 6 tiles of avoidance to the other land's zone.
+  // shared across both players (3168 tiles each on a 120-square board),
+  // base_size14, clumping_factor10 in185872 (formerly2), and6 tiles of
+  // avoidance. The inherited circular-base adapter remains inferred (#130);
+  //185872 no longer explicitly requests set_circular_base (ledger).
   land: relicReference['black-forest'].land,
   road: { width: 3 },
   opening: ARABIA.opening,
@@ -543,7 +545,7 @@ export interface MapgenContext {
   width: number;
   height: number;
   /** 1 selects Arabia's eleven biomes; 2 corrects Islands fish zone clearance. */
-  mapgenVersion?: 1 | 2;
+  mapgenVersion?: 1 | 2 | 3;
   /** Tile centre free of the edge and of every footprint already placed.
    * The board has no terrain yet when this is asked, so a water node is the
    * generator's own business: it reads its terrain before asking. */
@@ -828,10 +830,20 @@ function paintBiome(
   }
 }
 
+/** Map-specific compatibility selection, before any growth/RNG consumption.
+ * The current Black Forest descriptor uses the185872 RMS contract; marker-less
+ * states keep the complete48987 land parameters, not a mutable current copy. */
+export function descriptorForMapgen(descriptor: MapDescriptor, version?: MapgenContext['mapgenVersion']): MapDescriptor {
+  return descriptor === BLACK_FOREST && version !== 3
+    ? { ...descriptor, land: legacyBlackForestReference.land }
+    : descriptor;
+}
+
 export function generateMap(
   ctx: MapgenContext, descriptor: MapDescriptor, starts: Point[],
   mirror: (p: Point) => Point,
 ): { terrain: number[]; elevation: number[]; landIds: number[] } {
+  descriptor = descriptorForMapgen(descriptor, ctx.mapgenVersion);
   // One biome per match, rolled before anything is laid so the base ground is
   // already the biome's own. A baked survey board names no biomes: its ground
   // is the geography.
