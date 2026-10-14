@@ -47,27 +47,6 @@ simulation; Three.js is only a view.
   `docs/ledger.md` for every approximation. Prune stale status/lessons at
   handoff rather than only appending.
 
-## Hard Boundaries
-
-- `src/sim/` is authoritative. Rendering, UI, agents, debug tools, and imported
-  assets may issue public commands but never mutate game state directly.
-- Before inventing any rule, value, string, layout, visual, timing, icon, or
-  cue, inspect the patch-matched owned DAT/RMS/AI/XS, `widgetui`, graphics,
-  localization, shader resources, and sound metadata. Import original content
-  deterministically where it exists. Record unavoidable approximations or
-  remembered behavior as inferred in `docs/ledger.md` in the same change.
-- Do not disassemble `AoE2DE_s.exe`. Compiled shader resources under
-  `resources/_common/shaders/d3d11` may be inspected; `tools/probes/sm2dis.py`
-  handles their documented Shader Model 2 chunks.
-- Preserve the open fallback for users without owned content, but do not lower
-  imported-mode fidelity to match it. Desktop is canonical; mobile is remote
-  QA only.
-- Never commit Steam credentials, game files, converted Microsoft assets,
-  `.local/`, `.tools/`, or `public/imported/`. Do not copy GPL/AGPL code into
-  this MIT repository.
-- Preserve the existing Tailscale routes and Vite mobile URL; never run
-  `tailscale serve reset`. Never rebase or rewrite commits on `origin/main`.
-
 ## Commands And Verification
 
 ```bash
