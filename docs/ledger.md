@@ -1,5 +1,22 @@
 # Ledger of approximations
 
+## Local checksum-mismatch receipt (#332)
+
+**Chosen diagnostic policy:** keep only the latest host/client checksum mismatch
+in client statistics, captured before recovery clears playback. Preserve both
+hashes, host/local/received ticks, pending tick count, player, generation, protocol
+version, internal match seed and a detached copy of launch setup when supplied.
+The internal seed is not the original menu seed; absent setup is not reconstructed.
+Recovery and manual resync preserve the receipt; the next mismatch replaces it.
+It is session-local memory exposed by the existing development debug connection,
+not authoritative state, a saved replay or an automatic upload.
+
+**Motivation, not native semantics:** AoE2DE binary audit (.local), 2026-10,
+names desync tracking/upload settings. Those strings do not specify native
+retention, payloads or upload behavior. This adapter adds no DAT/RMS/XS value,
+gameplay timing or compatibility marker. See the
+[comparison and evidence limits](aoe2de-binary-learnings.md).
+
 ## Herdable claim owner ruling (#308/#330, 2026-10-13)
 
 **Owner ruling, inferred rather than natively measured:** The first claimant

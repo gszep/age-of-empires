@@ -10,6 +10,22 @@ import { validWonderVictory } from '../sim/wonder';
 
 const RECONNECT_DELAY_MS = 1500;
 
+/** One local diagnostic, outside authoritative state and replay hashes. Keep
+ * its original match context when a recovery snapshot replaces the world. */
+interface ChecksumMismatch {
+  version: number;
+  player: PlayerId;
+  generation: number;
+  matchSeed: number;
+  setup?: MatchSetup;
+  hostTick: number;
+  localTick: number;
+  receivedTick: number;
+  pendingTicks: number;
+  expectedHash: string;
+  actualHash: string;
+}
+
 /** Absence of a shared endpoint is a standalone host; failure of one is not.
  * Keep startup pending until discovery recovers, just like socket reconnects. */
 async function sharedConfiguration(notice?: (text: string) => void): Promise<{ version: number; player: PlayerId } | undefined> {
@@ -56,6 +72,7 @@ export class SharedClient {
   private renderAlpha = 1;
   readonly stats = {
     checks: 0, resyncs: 0, snapshots: 0, lastReason: '',
+    lastChecksumMismatch: undefined as ChecksumMismatch | undefined,
     maxQueuedTicks: 0, maxStepMs: 0, maxHashMs: 0,
     ticksApplied: 0, totalStepMs: 0, totalHashMs: 0,
   };
@@ -126,7 +143,17 @@ export class SharedClient {
           this.stats.totalHashMs += hashMs;
           this.stats.maxHashMs = Math.max(this.stats.maxHashMs, hashMs);
           this.stats.checks++;
-          if (hash !== message.hash) { this.resync(`checksum at tick ${message.tick}`); return; }
+          if (hash !== message.hash) {
+            this.stats.lastChecksumMismatch = {
+              version: SHARED_VERSION, player: this.player,
+              generation: message.settings.generation, matchSeed: this.state.matchSeed,
+              ...(this.setup ? { setup: structuredClone(this.setup) } : {}),
+              hostTick: message.tick, localTick: this.state.tick, receivedTick: this.receivedTick,
+              pendingTicks: this.pendingTicks, expectedHash: message.hash, actualHash: hash,
+            };
+            this.resync(`checksum at tick ${message.tick}`);
+            return;
+          }
         }
       }
       this.settings = message.settings;
