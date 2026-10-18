@@ -87,6 +87,10 @@ facts from inferred scheduling. Do not create per-civilisation timing tables or
 another animation framework without a demonstrated shared gap. The three-civ
 development cap is defined in [product priorities](product.md).
 
+The [binary-audit comparison](aoe2de-binary-learnings.md) records which native
+concepts are useful here and why we retain our plain-data rules/orders and
+single-runtime architecture.
+
 ### Delivered implementation
 
 The slice has grown well past the first horizontal cut: deterministic
