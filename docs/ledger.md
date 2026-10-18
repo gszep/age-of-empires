@@ -17,6 +17,15 @@ retention, payloads or upload behavior. This adapter adds no DAT/RMS/XS value,
 gameplay timing or compatibility marker. See the
 [comparison and evidence limits](aoe2de-binary-learnings.md).
 
+## Deterministic formation slots evaluation (#333, 2026-10-17)
+
+**Evaluated, not adopted:** Deterministic line/column formation slots remain unimplemented. A full evaluation (docs/formation-slots-evaluation.md) measured the current baseline with the harness (seed 42, flat map: 0.60–1.08 tiles maximum arrival radius across 9/12/25-unit, mixed-radii, reverse and 50-tile groups) and concluded that current golden-angle collision separation already produces compact 2D arrivals. Formation slots alone would introduce a breaking change without recovering native behavior or delivering selectable formation modes (box/line/staggered/flank), slowest-member speed limiting, or garrison-formation preservation. Better alternatives include:
+- Measuring native arrival spreads via high-FPS capture (Issue #311)
+- Implementing slowest-member speed limiting (Issue #54 motion/formation)
+- Preserving garrison-formation positions on ungarrison (Issue #54 garrison)
+
+**Current system remains:** nav.ts `separateUnits` (lines 427–456) applies entity-ID-based golden-angle perturbation (1e-6 tile offset) to collision normals, avoiding axis-only tie-breaks. Contact distance is the sum of unit radii. No formation version gate is added; old and new matches use the same separation. A deterministic evaluation harness exists at `tools/formation_slots_eval.mts` for future measurements if conditions change.
+
 ## Herdable claim owner ruling (#308/#330, 2026-10-13)
 
 **Owner ruling, inferred rather than natively measured:** The first claimant
