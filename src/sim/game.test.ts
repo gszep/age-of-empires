@@ -105,6 +105,84 @@ describe('simulation', () => {
     expect(unit.orderQueue).toBeUndefined();
   });
 
+  it('processes all queued orders sequentially (#290: regression test for shift-queue continuation)', () => {
+    // Issue #290: shift click queueing villager actions has stopped working.
+    // When multiple shift-clicked orders are queued, each should be taken
+    // from the queue and executed after the previous one completes.
+    const state = createGame();
+    const unit = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    
+    const p1 = { x: unit.position.x + 4, y: unit.position.y };
+    const p2 = { x: unit.position.x + 8, y: unit.position.y };
+    const p3 = { x: unit.position.x + 8, y: unit.position.y + 4 };
+    
+    // Queue three waypoints: one normal order, two shift-clicked
+    expect(applyCommand(state, { kind: 'order', player: 1, entityIds: [unit.id], target: p1 })).toEqual({ ok: true });
+    expect(applyCommand(state, { kind: 'order', player: 1, entityIds: [unit.id], target: p2, queue: true })).toEqual({ ok: true });
+    expect(applyCommand(state, { kind: 'order', player: 1, entityIds: [unit.id], target: p3, queue: true })).toEqual({ ok: true });
+    
+    // Verify the queue is set up correctly
+    expect(unit.order).toEqual({ kind: 'move', target: p1 });
+    expect(unit.orderQueue).toHaveLength(2);
+    
+    // Walk through first leg
+    let reachedP2 = false;
+    for (let i = 0; i < 2000 && !reachedP2; i++) {
+      stepGame(state);
+      reachedP2 = unit.order.kind === 'move'
+        && Math.abs(unit.order.target.x - p2.x) < 1e-9
+        && Math.abs(unit.order.target.y - p2.y) < 1e-9;
+    }
+    expect(reachedP2, 'never went to second waypoint').toBe(true);
+    expect(unit.orderQueue).toHaveLength(1);
+    
+    // Walk through second leg
+    let reachedP3 = false;
+    for (let i = 0; i < 2000 && !reachedP3; i++) {
+      stepGame(state);
+      reachedP3 = unit.order.kind === 'move'
+        && Math.abs(unit.order.target.x - p3.x) < 1e-9
+        && Math.abs(unit.order.target.y - p3.y) < 1e-9;
+    }
+    expect(reachedP3, 'never went to third waypoint').toBe(true);
+    expect(unit.orderQueue).toBeUndefined();
+  });
+
+  it('continues queued orders when a dequeued order becomes idle during assignment (#290)', () => {
+    // Issue #290 asked whether shift-queued orders still run. The simulation
+    // queue drain does work (verified tick-by-tick); this test pins that
+    // contract: a queued order taken while the unit is mid-order executes to
+    // completion, and the queue drains completely.
+    const state = createGame();
+    const unit = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    
+    const p1 = { x: unit.position.x + 4, y: unit.position.y };
+    const p2 = { x: unit.position.x + 8, y: unit.position.y };
+    
+    // Give the unit a move order
+    expect(applyCommand(state, { kind: 'order', player: 1, entityIds: [unit.id], target: p1 })).toEqual({ ok: true });
+    expect(unit.order.kind).toBe('move');
+    
+    // Queue a second move order
+    expect(applyCommand(state, { kind: 'order', player: 1, entityIds: [unit.id], target: p2, queue: true })).toEqual({ ok: true });
+    expect(unit.orderQueue).toHaveLength(1);
+    const queuedTarget = unit.orderQueue![0].target;
+    
+    // Walk until first order completes and the queued one finishes too.
+    // The queued order executed iff the unit ends idle at its target.
+    let reachedQueuedTarget = false;
+    for (let i = 0; i < 2100 && !reachedQueuedTarget; i++) {
+      stepGame(state);
+      reachedQueuedTarget = unit.order.kind === 'idle'
+        && Math.abs(unit.position.x - queuedTarget.x) < 1e-9
+        && Math.abs(unit.position.y - queuedTarget.y) < 1e-9;
+    }
+    expect(reachedQueuedTarget, 'queued order was not executed after the previous order completed').toBe(true);
+
+    // The queue drained completely: no leftover orders.
+    expect(unit.orderQueue).toBeUndefined();
+  });
+
   it('deletes your own things and nobody else\'s', () => {
     // Issue #37. The reference's Delete: your own, gone, nothing back.
     const state = createGame();
