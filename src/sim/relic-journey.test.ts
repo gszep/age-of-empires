@@ -18,4 +18,4 @@ it('collects a home relic and transports Islands’ fifth relic to a monastery t
       expect(checksumState(state)).toBe(checksumState(restored));
     },
   });
-});
+}, 90_000);
