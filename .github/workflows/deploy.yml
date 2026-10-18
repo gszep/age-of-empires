@@ -1,0 +1,48 @@
+name: Deploy public client
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-public
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Verify, build and deploy to Cloud Run
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      # Workload Identity Federation: no stored secret material. The pool
+      # provider is attribute-conditioned to this repository only, and the
+      # ephemeral token impersonates the dedicated build identity.
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: projects/425855636482/locations/global/workloadIdentityPools/github-actions/providers/github-oidc
+          service_account: empires-build@ninth-iris-405514.iam.gserviceaccount.com
+          project_id: ninth-iris-405514
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+      - run: npm ci
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+      # The deploy gate: the same full public verification main CI runs.
+      - name: Full verification gate
+        run: npm run verify:full
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+      # deploy/gcp.sh builds the public-only client, refuses to deploy any
+      # build that contains imported content, and ships the Cloud Run revision.
+      - name: Build and deploy
+        run: bash deploy/gcp.sh
