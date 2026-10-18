@@ -194,6 +194,7 @@ describe('research queueing (#293)', () => {
     useLegacySiphons(legacyState);
     useLegacyTrebuchetTargeting(legacyState);
     delete legacyState.herdClaimVersion;
+    delete legacyState.settlementReseedVersion;
     delete legacyState.researchQueueVersion;
     // Original semantics: the first research is paid; busy second command is rejected.
     expect(applyCommand(legacyState, record.commands[0].command).ok).toBe(true);

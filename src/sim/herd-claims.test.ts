@@ -119,8 +119,9 @@ function outcomes(rules: GameRules) {
         const expected = !defended && distance <= rules.units.sheep.herdRange! && tick >= 5 ? 1 : 2;
         expect(current.sheep.owner, `tick ${tick}, defended=${defended}`).toBe(expected);
         expect(legacy.sheep.owner).toBe(expected);
-        const { herdClaimVersion, ...dynamic } = JSON.parse(canonicalSnapshot(current.state));
+        const { herdClaimVersion, settlementReseedVersion, ...dynamic } = JSON.parse(canonicalSnapshot(current.state));
         expect(herdClaimVersion).toBe(1);
+        expect(settlementReseedVersion).toBe(1);
         expect(dynamic).toEqual(JSON.parse(canonicalSnapshot(legacy.state)));
       }
     }

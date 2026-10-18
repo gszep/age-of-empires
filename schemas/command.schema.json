@@ -324,7 +324,7 @@
         },
         "buildingId": {
           "type": "integer",
-          "$comment": "One of the player's finished mills: where the option is offered."
+          "$comment": "One of the player's finished Mills or Inca Settlements: where the option is offered. Legacy matches without the Settlement reseed marker remain Mill-only."
         },
         "enabled": {
           "type": "boolean",

@@ -678,11 +678,14 @@ export function exampleAiCommands(
   // asks (issue #24). Nobody had ever asked: by minute thirty-five every
   // farm spot was spent, food income was zero, and two matches in sixteen
   // sat at a gold-rich food-dead stalemate until the clock -- measured, gold
-  // banks of 1160 and 1480 beside 164 and 28 food. Ask at the mill the first
-  // time a fallow farm is seen; the toggle stays on for the match.
-  const mill = mine.find(e => e.kind === 'mill' && (e.buildProgress ?? 1) >= 1);
-  if (mill && !observation.autoReseedFarms) {
-    commands.push({ kind: 'reseed', player, buildingId: mill.id, enabled: true });
+  // banks of 1160 and 1480 beside 164 and 28 food. Enable the toggle as soon
+  // as a completed venue is available; no fallow farm is required.
+  // For Inca, use their Settlement since they cannot build a Mill (#321).
+  const reseedVenue = inca
+    ? mine.find(e => e.kind === 'settlement' && (e.buildProgress ?? 1) >= 1)
+    : mine.find(e => e.kind === 'mill' && (e.buildProgress ?? 1) >= 1);
+  if (reseedVenue && !observation.autoReseedFarms) {
+    commands.push({ kind: 'reseed', player, buildingId: reseedVenue.id, enabled: true });
   }
 
   // The next age, and whether it is close enough to be worth saving for.

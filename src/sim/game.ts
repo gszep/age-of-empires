@@ -39,6 +39,16 @@ import type {
 export type CommandResult = { ok: true } | { ok: false; reason: string };
 const rejected = (reason: string): CommandResult => ({ ok: false, reason });
 
+/** Buildings that offer farm reseeding (owner observation #321: native Inca Settlement
+ * offers reseed like the Mill, enabling Inca auto-farm management). */
+const RESEED_VENUES = ['mill', 'settlement'] as const;
+
+/** Predicate for buildings offering farm reseeding. */
+export function offersFarmReseed(kind: string, state: Pick<GameState, 'settlementReseedVersion'>): boolean {
+  return (RESEED_VENUES as readonly string[]).includes(kind)
+    && (kind === 'mill' || state.settlementReseedVersion === 1);
+}
+
 function addEntity(
   state: GameState, kind: Entity['kind'], owner: Entity['owner'], position: Point,
   base: { hp: number; radius: number; cost?: Cost }, extra: Partial<Entity> = {},
@@ -150,6 +160,7 @@ export function createGame(
     siphonsVersion: 1,
     trebuchetTargetingVersion: 1,
     herdClaimVersion: 1,
+    settlementReseedVersion: 1,
     ...(gridSpawnVersion ? { gridSpawnVersion: 1 as const } : {}),
     ...(map === 'arabia' && generation >= 1 ? { mapgenVersion: 1 as const }
       : map === 'islands' && generation >= 2 ? { mapgenVersion: 2 as const }
@@ -1063,12 +1074,12 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
   }
 
   if (command.kind === 'reseed') {
-    // Asked for at a mill, because that is where the player looks for it, and
-    // because a player with no mill has no farms to re-sow either.
-    const mill = state.entities.find(
-      e => e.id === command.buildingId && e.owner === command.player && !e.dead && e.kind === 'mill');
-    if (!mill) return rejected(`building ${command.buildingId} is not an owned mill`);
-    if (mill.buildProgress !== undefined) return rejected('building is under construction');
+    // Mill and Settlement expose the same player-wide toggle; the venue
+    // need not be near the farms, and losing it does not clear the option.
+    const venue = state.entities.find(
+      e => e.id === command.buildingId && e.owner === command.player && !e.dead && offersFarmReseed(e.kind, state));
+    if (!venue) return rejected(`building ${command.buildingId} does not offer farm reseeding for this player`);
+    if (venue.buildProgress !== undefined) return rejected('building is under construction');
     state.players[command.player].autoReseedFarms = command.enabled;
     return { ok: true };
   }

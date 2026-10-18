@@ -234,10 +234,8 @@ export interface PlayerState {
   retainedHousing?: number;
   /**
    * Whether a villager whose farm goes fallow sows it again on the spot,
-   * paying the farm's wood. Off unless the player turns it on at a mill: the
-   * DAT gives the farm one build location, the villager, so a mill that
-   * re-sows is the engine's behaviour rather than the data's, and nothing
-   * about an existing match changes until it is asked for (issue #24).
+   * paying the farm's wood. Off until enabled at a Mill or, in v13+ matches,
+   * an Inca Settlement. Player-wide: losing the venue does not clear it.
    */
   autoReseedFarms?: boolean;
   /** Raw resources spent on completed research; absent legacy counters = 0. */
@@ -305,6 +303,8 @@ export interface GameState {
   gridSpawnVersion?: 1;
   /** New matches apply owner ruling to herdable claims (earlier claimant, same-tick tie to lower id); absent in pre-v11 recordings/snapshots. */
   herdClaimVersion?: 1;
+  /** New matches allow Settlement reseeding; absent in pre-v13 recordings/snapshots. */
+  settlementReseedVersion?: 1;
   /** 1: Arabia biomes; 2: Islands offshore fish; 3: Black Forest185872 clumping.
    * Absent retains the legacy map, including Black Forest48987 land parameters. */
   mapgenVersion?: 1 | 2 | 3;
@@ -383,7 +383,7 @@ export type Command =
   | { kind: 'rally'; player: PlayerId; buildingId: number; target: Point; targetId?: number }
   | { kind: 'stop'; player: PlayerId; entityIds: number[] }
   | { kind: 'research'; player: PlayerId; buildingId: number; tech: string }
-  /** Turn automatic farm re-sowing on or off, from one of the player's mills. */
+  /** Toggle player-wide farm re-sowing at an owned Mill or Inca Settlement (v13+ matches). */
   | { kind: 'reseed'; player: PlayerId; buildingId: number; enabled: boolean }
   /** Set a siege engine up to shoot, or pack it up to travel. */
   | { kind: 'pack'; player: PlayerId; entityIds: number[]; unpacked: boolean }

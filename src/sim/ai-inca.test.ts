@@ -278,4 +278,28 @@ describe('Inca AI public-command outcomes', () => {
     expect(state.players[2].researched).not.toContain('double-bit-axe');
     expect(settlement.researching).toBeUndefined();
   });
+
+  it('(e) emits reseed command at a completed Settlement when autoReseedFarms is unset (#321)', () => {
+    const state = arena();
+    const worker = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
+    worker.position = { x: 47, y: 60 };
+    expect(applyCommand(state, { kind: 'build', player: 1, builderIds: [worker.id],
+      building: 'settlement', target: { x: 50, y: 60 } }).ok).toBe(true);
+    const settlement = state.entities.find(e => e.owner === 1 && e.kind === 'settlement')!;
+    // Settlement is under construction: no reseed command.
+    let commands = decide(state);
+    expect(commands.some(c => c.kind === 'reseed')).toBe(false);
+    // Settlement is completed: reseed command is issued.
+    for (let tick = 0; tick < 60 / TICK_SECONDS && settlement.buildProgress !== undefined; tick++) stepGame(state);
+    expect(settlement.buildProgress).toBeUndefined();
+    expect(state.players[1].autoReseedFarms).toBeFalsy();
+    commands = decide(state);
+    const reseed = commands.find(c => c.kind === 'reseed');
+    expect(reseed).toEqual({ kind: 'reseed', player: 1, buildingId: settlement.id, enabled: true });
+    // Once applied, toggle stays on and no second command is emitted.
+    expect(applyCommand(state, reseed!)).toEqual({ ok: true });
+    expect(state.players[1].autoReseedFarms).toBe(true);
+    commands = decide(state);
+    expect(commands.filter(c => c.kind === 'reseed')).toHaveLength(0);
+  });
 });

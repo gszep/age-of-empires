@@ -88,8 +88,12 @@ and requires reloading matching client code.
 
 ## Match behaviour
 
-Current source uses shared **protocol 10** (`SHARED_VERSION`): Inca Settlement and
-source herdables change local simulation, so older peers must reload (#199). Protocol 4
+Current source uses shared **protocol 11** (`SHARED_VERSION`): Settlement farm reseeding
+changes local simulation (#321), so older peers must reload. Protocol 10 added Inca
+Settlement and source herdables (#199). Marker-less v5 checkpoints retain Mill-only
+reseeding. In-game **Restart / Start Game** creates a new match with Settlement
+reseeding enabled; reloading or restarting the host service resumes the saved
+checkpoint and leaves it Mill-only. Protocol 4
 introduced configurable population ceilings (#253) and optional Wonder countdowns (#110).
 The Ysgramor host and its frontend run protocol 4 since October 5; the switch
 needed no checkpoint migration because none existed. Protocol2 checkpoints are

@@ -3,7 +3,7 @@ import './view/style.css';
 import { exampleAiCommands } from './sim/ai';
 import { garrisonCount } from './sim/garrison';
 import { observe } from './sim/observe';
-import { TRAINING_QUEUE_LIMIT, applyCommand as applyLocalCommand, buildingFootprint, civHas, createGame, gameTimeSeconds, isCarcass, isRepairable, placementLegal, planContextCommand, queuedCount, shortfall, stepGame, trainableUnitsAt, rulesForPlayer } from './sim/game';
+import { TRAINING_QUEUE_LIMIT, applyCommand as applyLocalCommand, buildingFootprint, civHas, createGame, gameTimeSeconds, isCarcass, isRepairable, placementLegal, planContextCommand, queuedCount, shortfall, stepGame, trainableUnitsAt, rulesForPlayer, offersFarmReseed } from './sim/game';
 import { connectSharedMatch } from './shared/client';
 import { AGE_NAMES, FALLBACK_RULES, TICK_SECONDS, isAnimal, isBuilding, isUnit, rulesFromManifest, type AttackValue, type ContentManifest, type Cost, type GameRules, type TechKey, type UnitRules } from './sim/data';
 import { MAPS } from './sim/mapgen';
@@ -797,10 +797,10 @@ function runUiCommand(id: string, shift = false): void {
     return;
   }
   if (id === 'reseed') {
-    const mill = selection.find(e => e.kind === 'mill' && e.buildProgress === undefined);
-    if (!mill) return;
+    const venue = selection.find(e => offersFarmReseed(e.kind, game) && e.buildProgress === undefined);
+    if (!venue) return;
     applyCommand(game, {
-      kind: 'reseed', player: localPlayer, buildingId: mill.id,
+      kind: 'reseed', player: localPlayer, buildingId: venue.id,
       enabled: !(game.players[localPlayer].autoReseedFarms === true),
     });
     return;
@@ -1466,12 +1466,10 @@ function currentCommands(): CommandButton[] {
       icon: hud.iconFor('Techs', tech.iconId, localPlayer),
     });
   }
-  // The mill's one standing option: whether a fallow farm is sown again where
-  // it stood. AoE2 puts re-sowing at the mill and this is the same place for
-  // it; the DAT gives the farm one build location, the villager, so there is
-  // nothing here to import (issue #24).
-  const mill = selection.find(e => e.kind === 'mill' && e.buildProgress === undefined);
-  if (mill) {
+  // Mill and Inca Settlement offer the same player-wide auto-reseed option
+  // (native observation #321). Counted farm queue buttons remain separate (#345).
+  const venue = selection.find(e => offersFarmReseed(e.kind, game) && e.buildProgress === undefined);
+  if (venue) {
     const on = player1.autoReseedFarms === true;
     buttons.push({
       id: 'reseed',

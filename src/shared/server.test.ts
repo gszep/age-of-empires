@@ -174,6 +174,7 @@ it('rejects v4 simulators while preserving a marker-less v4 checkpoint and its l
 it.each([0, 1] as const)('rejects old peers and resumes a v5 checkpoint with Arabia generation %s intact (#305/#118)', async mapgenVersion => {
   const { directory, checkpoint } = fixture();
   const original = createGame(305, undefined, undefined, 'arabia', undefined, undefined, undefined, mapgenVersion);
+  delete original.settlementReseedVersion; // pre-#321 v5 checkpoint, not a new match
   const buildingId = original.entities.find(e => e.owner === 1 && e.kind === 'town-center')!.id;
   expect(applyCommand(original, { kind: 'research', player: 1, buildingId, tech: 'loom' })).toEqual({ ok: true });
   expect(applyCommand(original, { kind: 'train', player: 1, buildingId, unit: 'villager' })).toEqual({ ok: true });
@@ -227,6 +228,7 @@ it.each([0, 1] as const)('rejects old peers and resumes a v5 checkpoint with Ara
         const expected: GameState = JSON.parse(JSON.stringify(original));
         const resumed: GameState = snapshot.state;
         expect(resumed.mapgenVersion).toBe(mapgenVersion || undefined);
+        expect(resumed).not.toHaveProperty('settlementReseedVersion');
         for (let i = 0; i < 600; i++) { stepGame(expected); stepGame(resumed); }
         expect(resumed.players[1].researched).toContain('loom');
         expect(resumed.entities.filter(e => e.owner === 1 && e.kind === 'villager')).toHaveLength(4);

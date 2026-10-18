@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_RULES } from './data';
 import { checksumState } from './checksum';
-import { applyCommand, createGame, farmFoodAmountFor, stepGame } from './game';
+import { applyCommand, createGame, farmFoodAmountFor, rulesForPlayer, stepGame } from './game';
 import type { Entity, GameState } from './types';
 import { importedRules, run, villagerOf, freeSpot } from './test-helpers/economy';
 
@@ -180,6 +180,73 @@ describe('sowing a fallow farm again', () => {
       return checksumState(state);
     };
     expect(play()).toBe(play());
+  });
+
+  /** A finished settlement, usable for Inca reseed. */
+  const settlementFor = (state: GameState): Entity => {
+    const villager = villagerOf(state);
+    state.players[1].wood = 1000;
+    const at = freeSpot(state, 'settlement', villager.position);
+    expect(applyCommand(state, {
+      kind: 'build', player: 1, builderIds: [villager.id], building: 'settlement', target: at,
+    })).toEqual({ ok: true });
+    const settlement = state.entities.find(e => e.kind === 'settlement')!;
+    settlement.buildProgress = undefined;
+    return settlement;
+  };
+
+  it.skipIf(!importedRules)('an Inca Settlement toggles farm reseeding', () => {
+    const state = createGame(95, importedRules, { 1: 'incas', 2: 'britons' });
+    const settlement = settlementFor(state);
+    expect(rulesForPlayer(state, 1).buildings.mill.buildable).toBe(false);
+    expect(state.players[1].autoReseedFarms).toBeFalsy();
+    expect(applyCommand(state, { kind: 'reseed', player: 1, buildingId: settlement.id, enabled: true }))
+      .toEqual({ ok: true });
+    expect(state.players[1].autoReseedFarms).toBe(true);
+    expect(applyCommand(state, { kind: 'reseed', player: 1, buildingId: settlement.id, enabled: false }))
+      .toEqual({ ok: true });
+    expect(state.players[1].autoReseedFarms).toBe(false);
+    // Other building kinds and another player's venue are rejected.
+    const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
+    expect(applyCommand(state, { kind: 'reseed', player: 1, buildingId: tc.id, enabled: true }).ok)
+      .toBe(false);
+    expect(applyCommand(state, { kind: 'reseed', player: 2, buildingId: settlement.id, enabled: true }).ok)
+      .toBe(false);
+    // Under-construction settlement is rejected.
+    state.players[1].wood = 1000;
+    const villager = villagerOf(state);
+    const at = freeSpot(state, 'settlement', villager.position);
+    expect(applyCommand(state, {
+      kind: 'build', player: 1, builderIds: [villager.id], building: 'settlement', target: at,
+    })).toEqual({ ok: true });
+    const unfinished = state.entities.find(e => e.kind === 'settlement' && e.id !== settlement.id)!;
+    expect(unfinished.buildProgress).not.toBeUndefined();
+    expect(applyCommand(state, { kind: 'reseed', player: 1, buildingId: unfinished.id, enabled: true }).ok)
+      .toBe(false);
+    settlement.dead = true;
+    expect(applyCommand(state, { kind: 'reseed', player: 1, buildingId: settlement.id, enabled: true }).ok)
+      .toBe(false);
+    expect(state.players[1].autoReseedFarms).toBe(false);
+    expect(state.players[2].autoReseedFarms).toBeFalsy();
+  });
+
+  it.skipIf(!importedRules)('a fallow farm is re-sown after reseeding is enabled at a Settlement', () => {
+    const state = createGame(96, importedRules, { 1: 'incas', 2: 'britons' });
+    const settlement = settlementFor(state);
+    expect(applyCommand(state, { kind: 'reseed', player: 1, buildingId: settlement.id, enabled: true }))
+      .toEqual({ ok: true });
+    const { farm, villager } = nearlySpentFarm(state);
+    const where = { ...farm.position };
+    const wood = state.players[1].wood;
+    for (let i = 0; i < 600 && !farm.dead; i++) stepGame(state);
+    expect(farm.dead).toBe(true);
+    run(state, 5);
+    const sown = state.entities.find(
+      e => e.kind === 'farm' && e.owner === 1 && !e.dead
+        && Math.hypot(e.position.x - where.x, e.position.y - where.y) < 0.01);
+    expect(sown, 'a new farm where the old one stood').toBeDefined();
+    expect(state.players[1].wood).toBe(wood - rulesForPlayer(state, 1).buildings.farm.cost.wood);
+    expect(villager.order).toEqual({ kind: 'build', targetId: sown!.id });
   });
 });
 

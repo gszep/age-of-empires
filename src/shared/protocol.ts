@@ -1,9 +1,10 @@
 import type { Command, GameState } from '../sim/types';
 import type { MatchSetup } from '../match-setup';
 
-/** v10: Inca Settlement and source herdables (llama) change local simulation
- * (v9: offshore Islands fish; v8: Arabia biomes). Older peers must reload. */
-export const SHARED_VERSION = 10;
+/** v11: Inca Settlement offers farm reseeding (#321).
+ * v10: Settlement/llama; v9: offshore Islands fish; v8: Arabia biomes.
+ * Older peers must reload. */
+export const SHARED_VERSION = 11;
 /** Persisted format is separate from client admission. The host also reads v4
  * checkpoints without adding the new research-rule marker to their state. */
 export const SHARED_CHECKPOINT_VERSION = 5;

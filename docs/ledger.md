@@ -1962,10 +1962,12 @@ when the result looks right. When a row is later read from a file, delete it
   Settlement as a food/wood/gold/stone bank and builds it instead of the camps the Inca
   tree disables. These branches use the public civilisation identity because observations
   do not yet expose buildable/bank capabilities. Boundary and scout-loss regressions cover them.
-- **Settlement reseeding — unresolved.** DAT tasks (68/2556 both empty, class 3/interface 2),
-  `hotkeys.json` (Mill actions 173/184 queue/toggle farms; the Settlement group lists only
-  research/training), `widgetui/commandpanel.json` and localization do not bind farm
-  reseeding to the Settlement. Mill-only reseeding remains; Inca reseeding is not delivered.
+- **Settlement reseeding (#321).** Owner observed in native AoE2DE (2026-10-18) that the Inca
+  Settlement offers farm reseeding like the Mill. Implemented as the same player-wide auto-reseed
+  toggle at Mill or Settlement; both buildings offer it to the UI button and to AI. Native
+  counted queue buttons (add 1/5 farms) are separate (#345).
+  Recording format 13 gates Settlement acceptance: earlier recordings may contain rejected
+  commands. Marker-less saved matches/checkpoints remain Mill-only until restarted.
 
 ## Block-compressed sprite pages (#163)
 

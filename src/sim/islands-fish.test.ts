@@ -45,10 +45,12 @@ it.each([
 ] as const)('keeps the pre-offshore Islands state/JSON digest, seed %i', (seed, initial, tick20) => {
   const state = createGame(seed, undefined, undefined, 'islands', undefined, undefined, undefined, 1, 0);
   delete state.herdClaimVersion;
+  delete state.settlementReseedVersion;
   expect(state).not.toHaveProperty('mapgenVersion');
   expect(checksumState(state)).toBe(initial);
   const preBiomes = createGame(seed, undefined, undefined, 'islands', undefined, undefined, undefined, 0, 0);
   delete preBiomes.herdClaimVersion;
+  delete preBiomes.settlementReseedVersion;
   expect(checksumState(preBiomes)).toBe(initial);
   const restored = JSON.parse(JSON.stringify(state));
   for (let i = 0; i < 20; i++) { stepGame(state); stepGame(restored); }

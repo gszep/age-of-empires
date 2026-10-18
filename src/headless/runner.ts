@@ -24,7 +24,7 @@ export async function runMatch(
   strategies: Record<PlayerId, Strategy>,
   rules: GameRules = FALLBACK_RULES,
 ): Promise<{ result: MatchResult; record: MatchRecord }> {
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, MATCH_FORMAT_VERSION].includes(config.version)) throw new Error('unknown match format');
+  if (!Number.isInteger(config.version) || config.version < 1 || config.version > MATCH_FORMAT_VERSION) throw new Error('unknown match format');
   if (config.version === 1 && config.mode !== undefined) throw new Error('game mode requires match format v2');
   if (config.version === 1 && config.populationLimit !== undefined) throw new Error('population limit requires match format v2');
   if (config.version === 1 && config.wonderVictory !== undefined) throw new Error('Wonder victory requires match format v2');

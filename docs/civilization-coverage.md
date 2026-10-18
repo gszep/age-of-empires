@@ -840,7 +840,9 @@ public build, 233 owned-import tests and real-browser smoke in 572 s
   units unavailable.
 - **Free llama (team bonus 730):** reviewed XS EffectFunction1 grants one llama 305/1963
   (persisted sim RNG) at the TC; DAT class 58 + food make it a normal herdable; the AI
-  sees it through observation v12 `livestock`. Shared protocol is v10.
-- **Not delivered / approximate:** Settlement farm
-  reseeding (#321), Xolotl/Catapult Galleon availability only, native timing/visual
+  sees it through observation v12 `livestock`. Shared protocol is v11.
+- **Settlement reseeding (#321):** player-wide auto-reseed toggle delivered for humans
+  and AI in new matches (recording format 13). Legacy recordings and marker-less saved
+  matches remain Mill-only; native counted farm queue buttons remain #345.
+- **Not delivered / approximate:** Xolotl/Catapult Galleon availability only, native timing/visual
   calibration of the Andean TC composition. Approximations are in the ledger (#199 section).
