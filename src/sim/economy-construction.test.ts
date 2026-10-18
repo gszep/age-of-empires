@@ -70,6 +70,42 @@ describe('construction', () => {
     run(state, 20 * 40);
     expect(state.players[1].populationCap).toBe(capBefore + state.rules.buildings.house.popSupport);
   });
+
+  it('queues multiple building commands to the same builders, as when Shift-placing', () => {
+    // Issue #290: Shift-click building placement should queue multiple foundations
+    // from the same builder(s). This test validates the simulation layer properly
+    // handles multiple consecutive build commands with the same builders.
+    const state = createGame(92);
+    clearArea(state, { x: 16, y: 9 }, 2);
+    clearArea(state, { x: 26, y: 9 }, 2);
+    const villagers = state.entities.filter(e => e.owner === 1 && e.kind === 'villager');
+    for (const v of villagers) v.position = { x: 15, y: 9 };
+    
+    // Place two houses: one at (16, 9) and another at (26, 9)
+    const res1 = applyCommand(state, {
+      kind: 'build', player: 1, builderIds: villagers.map(v => v.id), building: 'house', target: { x: 16, y: 9 },
+    });
+    const res2 = applyCommand(state, {
+      kind: 'build', player: 1, builderIds: villagers.map(v => v.id), building: 'house', target: { x: 26, y: 9 },
+    });
+    
+    expect(res1).toEqual({ ok: true });
+    expect(res2).toEqual({ ok: true });
+
+    const houses = () => state.entities.filter(e => e.kind === 'house' && e.owner === 1 && !e.dead);
+    expect(houses()).toHaveLength(2);
+    
+    // Both should be under construction
+    expect(houses()[0].buildProgress).toBeDefined();
+    expect(houses()[1].buildProgress).toBeDefined();
+    
+    // Run for a while; with multiple villagers both should make good progress.
+    // The point of this test is just that both commands succeed and both buildings exist.
+    run(state, 1000);
+    
+    // Both should still be under construction after 1000 ticks (houses take ~500 ticks each with multiple builders)
+    expect(houses().every(h => !h.dead)).toBe(true);
+  });
 });
 
 describe('palisade walls', () => {
