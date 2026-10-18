@@ -21,7 +21,21 @@ and requires reloading matching client code.
   localhost:5173 behind the existing Tailscale route. Your usual link is unchanged.
 - Artemis: the same user-service name runs `tools/shared-join.mjs` on
   localhost:5174. Open **http://localhost:5174/** on Artemis.
-- Since October 10, 20:21 BST, Ysgramor serves `.local/releases/autonomous-20261010-7e7f214`
+- Since October 18, 13:45 JST, Ysgramor serves `.local/releases/autonomous-20261018-364824c`
+  (source `364824c`, protocol 10, fingerprint
+  `163697cb14825d6c104d89bca6f6065c7d307fcf4f63c29e3d7d860e4f0670bf`): the AoE2DE
+  binary-audit learnings program — local checksum-mismatch receipt diagnostics (#332),
+  shift-queued building placement (#290) and its queue-continuation regression tests,
+  the measured formation-slots no-adopt evaluation (#333), and the native-machinery
+  notes. Before switching, the release's own `shared_smoke.mts` passed privately
+  (SHARED SMOKE GREEN, including host-restart checkpoint recovery and automatic guest
+  reconnection) and no shared checkpoint or client existed (zero join activity in the
+  preceding two hours). Afterwards the service was active with zero restarts
+  (NRestarts=0), logged the verified release fingerprint at startup, and answered
+  HTTP 200 locally and over Tailscale. The previous
+  `autonomous-20261010-7e7f214` release remains for rollback:
+  `node tools/install-shared.mjs host <that absolute path>`.
+- Since October 10, 20:21 BST, Ysgramor served `.local/releases/autonomous-20261010-7e7f214`
   (twelve profiles, minimap modes, Objectives, feedback particles); see the handoff for its acceptance.
   The superseded October 5 arrangement follows.
 - From October 5, 12:11 BST, Ysgramor served
