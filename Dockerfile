@@ -5,6 +5,8 @@ RUN npm ci --ignore-scripts
 COPY index.html tsconfig.json vite.config.ts ./
 COPY src ./src
 COPY schemas ./schemas
+# vite.config.ts and the typechecked test graph import these three tool modules.
+COPY tools/vite-compression.ts tools/vite-watch.ts tools/relic_journey.ts ./tools/
 ENV OPEN_CONTENT_ONLY=1
 RUN npm run build:public
 
