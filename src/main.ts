@@ -955,7 +955,8 @@ renderer.domElement.addEventListener('pointerdown', event => {
     if (buildMode && !replay) {
       // Commit exactly where the preview showed it, not the raw cursor point.
       placeBuilding(buildMode, [placementTarget()]);
-      buildMode = undefined;
+      // Keep build mode active if Shift is held, to allow queuing multiple foundations.
+      if (!event.shiftKey) buildMode = undefined;
       return;
     }
     if (repairMode && !replay) {
@@ -998,7 +999,8 @@ addEventListener('pointerup', event => {
     const end = screenToWorld(event.clientX, event.clientY);
     placeBuilding(buildMode, wallLine(wallStart, end, playerRules().buildings[buildMode].radius));
     wallStart = undefined;
-    buildMode = undefined;
+    // Keep build mode active if Shift is held, to allow queuing multiple wall segments.
+    if (!event.shiftKey) buildMode = undefined;
     return;
   }
   if (event.button !== 0 || !dragStart) return;

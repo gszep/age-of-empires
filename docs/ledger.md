@@ -2021,3 +2021,17 @@ when the result looks right. When a row is later read from a file, delete it
   reserve nothing. The reservation and issued build are counted once, including
   the inert open Settlement placeholder's otherwise zero cost. This is an
   observation-only strategy priority, not new native placement or economy rules.
+
+## Shift-queued building placement (#290)
+
+**Implemented:** the input layer in `src/main.ts` now checks `event.shiftKey` when a building foundation is placed (regular building at line 959, wall at line 1003). If Shift is held, `buildMode` remains active after `placeBuilding()` returns, allowing the player to click additional foundations without re-entering build mode. When Shift is released or the player exits build mode via Escape/right-click, the normal flow resumes.
+
+**Simulation layer:** the 'build' command in `src/sim/game.ts` already queues multiple build commands to the same builders without issue; the test `src/sim/economy-construction.test.ts::queues multiple building commands to the same builders` verifies two consecutive `applyCommand({kind: 'build'})` calls with the same builder IDs both succeed and both foundations exist.
+
+**Limits (not implemented):**
+- **Drag-place wall runs:** the reference allows dragging to place a whole wall in one gesture; we still place walls one segment at a time on individual clicks. The Shift-held mode queues them the same way separate clicks would.
+- **UI text cues:** the reference may highlight or annotate the build cursor differently under Shift; we have no such feedback.
+- **Foundation legality recheck on Shift-held:** if a Shift-queued placement fails (e.g., overlaps with another building placed in the meantime), we reject it and keep the mode active. The player sees the rejection once and may click again or release Shift.
+- **Drag-selection during Shift-placement:** the reference may allow multi-unit selection while in build mode; this is unchanged (single-unit selection only).
+
+The behavior is behaviorally equivalent to holding Shift and clicking multiple times in the reference, which is the minimal correct implementation without wall-drag or UI polish.
