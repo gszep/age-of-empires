@@ -1,13 +1,17 @@
 name: Deploy public client
 
 on:
-  push:
+  # Consume the merge commit's already-green Public CI run; never duplicate it.
+  workflow_run:
+    workflows: [Public CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
   id-token: write
+  actions: read
 
 concurrency:
   group: deploy-public
@@ -15,13 +19,22 @@ concurrency:
 
 jobs:
   deploy:
-    name: Verify, build and deploy to Cloud Run
+    name: Build and deploy to Cloud Run
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Automatic deploys only follow a green Public CI run for the exact commit;
+    # manual dispatches gate below instead.
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+      }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The exact commit Public CI verified (workflow_dispatch: default ref).
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
           # Full history: the test-selection tool narrows against git ancestry
           # and bails to a full run on shallow checkouts.
           fetch-depth: 0
@@ -40,8 +53,10 @@ jobs:
       - run: npm ci
         env:
           PUPPETEER_SKIP_DOWNLOAD: 'true'
-      # The deploy gate: the same full public verification main CI runs.
-      - name: Full verification gate
+      # Automatic runs carry Public CI's green result for this exact commit;
+      # a manual dispatch on any other state runs the full gate here.
+      - name: Full verification gate (manual dispatch only)
+        if: github.event_name == 'workflow_dispatch'
         run: npm run verify:full
         env:
           PUPPETEER_SKIP_DOWNLOAD: 'true'
