@@ -8,7 +8,7 @@ import { materialUrl, iconUrl, ownedIconUrl, type ImportedHotkey, type PlayerCol
 import { placeCommands } from './command-grid';
 import { widgetBox } from './layout';
 import { findWidget, installUiColors, placeFeedback } from './feedback';
-import { animateEmbers, buttonText, placeEndScreen } from './native-feedback';
+import { animateEmbers, buttonText, placeEndScreen, slices } from './native-feedback';
 import { Minimap, type MinimapColorMode, type MinimapFilter } from './minimap';
 import { DiplomacyDialog, type TributeDraft } from './diplomacy';
 import { TechTreeDialog } from './techtree';
@@ -153,6 +153,10 @@ export class Hud {
   private productionSignature = '';
   private resolveConfirmation?: (result: ConfirmationResult) => void;
   private menuDialog!: HTMLElement;
+  private labDialog!: HTMLDialogElement;
+  /** A canceled file picker rides the modal dialog's close-watcher chain and
+   * fires `cancel` at the lab dialog; that is not the user asking it to close. */
+  private labPickerOpen = false;
   private endDialog!: HTMLElement;
   private buttons = new Map<string, HTMLButtonElement>();
   private lastCommandSignature = '';
@@ -275,6 +279,7 @@ export class Hud {
   destroy(): void {
     this.sdfLabels.destroy();
     this.options.close();
+    this.closeLab();
     this.diplomacy.close();
     this.techtree.close();
     this.objectives.close();
@@ -380,11 +385,19 @@ export class Hud {
       <div id="defeat-notification" hidden role="status" aria-live="polite">
         <span class="defeat-civ"></span><span class="defeat-number"></span><span class="defeat-text"></span>
       </div>
-      <div id="menu-dialog" class="dialog hidden">
-        <h2>Menu</h2>
-        <button data-menu="resume">Resume</button>
-        <button data-menu="restart">Restart</button>
-        <button data-options>Options</button>
+      <!-- #349: the native in-game menu (dialogingamemenu.xaml) is one ButtonLarge
+         stack in a dialog2 frame with no heading and no Resume control; Cancel
+         and the X close carry the old dialog's resume/close semantics. The
+         match-setup form and replay loading live in the separate lab surface
+         below, reachable through the pause stack's clearly labelled entry. -->
+      <div id="menu-dialog" class="dialog hidden" role="dialog" aria-modal="true" aria-label="Menu">
+        <div class="menu-frame"></div>
+        <button type="button" class="menu-close" data-menu="close"></button>
+        <div class="menu-stack"></div>
+      </div>
+      <dialog id="lab-dialog" class="dialog" aria-labelledby="lab-title">
+        <h2 id="lab-title">Game Setup (Lab)</h2>
+        <p class="lab-note">Lab surface: match setup, civilizations and replays. Not a native in-game menu action.</p>
         <form id="map-setup">
           <h3 data-map-label="gameSettings">Game Settings</h3>
           <label for="map-choice" data-map-label="mapType">Map Type</label>
@@ -405,7 +418,8 @@ export class Hud {
         </form>
         <button data-menu="load-replay">Load replay…</button>
         <input id="replay-file" type="file" accept=".json" style="display:none">
-      </div>
+        <button type="button" data-lab-close>Close</button>
+      </dialog>
       <dialog id="end-dialog" aria-labelledby="end-title" tabindex="-1">
         <div class="end-frame"></div>
         <div class="end-content">
@@ -416,6 +430,7 @@ export class Hud {
         <canvas class="end-embers" aria-hidden="true"></canvas>
       </dialog>
     `;
+    this.buildPauseMenu();
     for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-options]')) {
       button.title = this.strings.options ?? 'Options';
       if (!button.classList.contains('menu-button')) button.textContent = button.title;
@@ -469,6 +484,17 @@ export class Hud {
     this.selectionPanel = this.root.querySelector('#selection-content')!;
     this.messageBox = this.root.querySelector('#game-message')!;
     this.menuDialog = this.root.querySelector('#menu-dialog')!;
+    this.stylePauseMenu();
+    this.labDialog = this.root.querySelector<HTMLDialogElement>('#lab-dialog')!;
+    this.labDialog.addEventListener('cancel', event => {
+      event.preventDefault();
+      if (this.labPickerOpen) { this.labPickerOpen = false; return; }
+      this.closeLab();
+    });
+    this.labDialog.addEventListener('keydown', event => { if (this.labDialog.open) event.stopPropagation(); });
+    this.labDialog.querySelector('[data-lab-close]')!.addEventListener('click', () => {
+      this.callbacks.onSound('button_ui'); this.closeLab();
+    });
     this.endDialog = this.root.querySelector('#end-dialog')!;
     const confirmation = this.root.querySelector<HTMLDialogElement>('#confirm-dialog')!;
     confirmation.addEventListener('cancel', event => { event.preventDefault(); this.resolveConfirmation?.('no'); });
@@ -574,9 +600,19 @@ export class Hud {
       else if (menu === 'resume') { this.toggleMenu(false); this.callbacks.onMenu('resume'); }
       else if (menu === 'pause') this.callbacks.onMenu('pause');
       else if (menu === 'restart') { this.toggleMenu(false); this.callbacks.onMenu('restart'); }
-      else if (menu === 'load-replay') this.root.querySelector<HTMLInputElement>('#replay-file')!.click();
+      else if (menu === 'load-replay') {
+        this.labPickerOpen = true;
+        this.root.querySelector<HTMLInputElement>('#replay-file')!.click();
+      }
+      // Cancel (locale 19240) performs the old Resume affordance — close and
+      // explicitly unpause; the X close (10824) closes without forcing an
+      // unpause, exactly as Escape always has. #349, menu-evidence §7A.
+      else if (menu === 'cancel') { this.toggleMenu(false); this.callbacks.onMenu('resume'); }
+      else if (menu === 'close') this.toggleMenu(false);
+      else if (menu === 'setup') this.openLab();
     });
     this.root.querySelector<HTMLInputElement>('#replay-file')!.addEventListener('change', async event => {
+      this.labPickerOpen = false;
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
       try {
@@ -774,11 +810,105 @@ export class Hud {
   toggleMenu(open?: boolean): void {
     const wantOpen = open ?? this.menuDialog.classList.contains('hidden');
     this.menuDialog.classList.toggle('hidden', !wantOpen);
+    // The lab surface hangs off the pause dialog; a closed pause menu never
+    // leaves it stranded open behind an invisible dialog.
+    if (!wantOpen) this.closeLab();
   }
 
   get menuOpen(): boolean {
     return !this.menuDialog.classList.contains('hidden');
   }
+
+  /**
+   * The pause stack (#349): `dialogingamemenu.xaml`'s eleven named ButtonLarge
+   * entries in their fixed XAML order. Labels are the owned key-value table's
+   * observed English (locale ids cited inline); wiring them through
+   * `import_content.py`'s hand-list is an importer change this slice does not
+   * make. Every stack entry defaults Collapsed in the XAML and which the
+   * engine reveals per game state is unverified (menu-evidence §1/§8), so
+   * unsupported actions stay visible and greyed as our own product policy —
+   * present, never removed, and never claimed as a native runtime match.
+   * No heading and no Resume control: Cancel and the X close carry the old
+   * dialog's resume/close semantics.
+   */
+  private buildPauseMenu(): void {
+    const stack = this.root.querySelector<HTMLElement>('#menu-dialog .menu-stack')!;
+    const policy = (reason: string): string =>
+      `Unavailable in this build (${reason}); greyed by our product policy — native runtime visibility is unverified.`;
+    const entry = (menu: string, label: string, reason?: string): HTMLButtonElement => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.menu = menu;
+      button.textContent = label;
+      if (reason) {
+        button.disabled = true;
+        button.title = policy(reason);
+        button.setAttribute('aria-label', `${label}: ${button.title}`);
+      }
+      stack.append(button);
+      return button;
+    };
+    entry('invitations', 'Invitations', 'multiplayer invitations'); // 300008
+    entry('quit', 'Quit Current Game', 'no start destination to quit to yet'); // 9273
+    entry('resign', 'Resign', 'no resign flow exists yet'); // 9280
+    entry('statistics', 'Statistics', 'no statistics screen'); // 9271
+    entry('save', 'Save Game', 'no save system'); // 9272
+    entry('load', 'Load Game', 'replays load from the lab setup surface'); // 9276
+    entry('spectate', 'Spectate With CA', 'native spectator action unsupported'); // 19353
+    entry('chapter', 'Save Chapter', 'no chapter system'); // 9289
+    const options = document.createElement('button'); // 9274 — the existing options overlay
+    options.type = 'button';
+    options.dataset.options = '';
+    options.textContent = this.strings.options ?? 'Options';
+    stack.append(options);
+    const restart = entry('restart', 'Restart'); // 9279
+    restart.title = 'Restart the match from the active setup';
+    const cancel = entry('cancel', 'Cancel'); // 19240 — the old Resume affordance
+    cancel.title = 'Close the menu and resume the match';
+    const lab = entry('setup', 'Game Setup (Lab)'); // our labelled entry, not a native slot
+    lab.title = 'Open the lab setup surface: map, civilizations, seed, population, victory options and replay loading. Lab extension, not a native in-game menu action.';
+    const close = this.root.querySelector<HTMLButtonElement>('#menu-dialog .menu-close')!; // 10824
+    close.setAttribute('aria-label', this.strings.close ?? 'Close');
+    close.title = close.getAttribute('aria-label')!;
+    close.textContent = '×';
+  }
+
+  /**
+   * Static approximation of the owned pause dialog (menu-evidence §2/§9):
+   * the dialog2 nine-slice frame (the same `DialogBackgroundRect` resource —
+   * P1 84,133 / P2 133,84 — the yes/no dialog already imports), the large
+   * button states, the close cross and the Trajan faces are all imported;
+   * the shiny blur mask, `Age2SwipeEffect` entrance, `ControlDropShadowBig`
+   * and the disabled/pressed border brushes are not, and no importer change
+   * is made here. Falls back to the open dialog skin without them.
+   */
+  private stylePauseMenu(): void {
+    const native = this.ui?.nativeFeedback;
+    if (!native) return;
+    this.menuDialog.classList.add('native-pause');
+    slices(this.root.querySelector<HTMLElement>('#menu-dialog .menu-frame')!, native.confirm.frame, this.ui!);
+    for (const button of this.menuDialog.querySelectorAll<HTMLButtonElement>('.menu-stack button')) {
+      button.classList.add('native-button');
+      buttonText(button, button.textContent!);
+    }
+    const close = this.menuDialog.querySelector<HTMLButtonElement>('.menu-close')!;
+    close.textContent = '';
+    close.style.setProperty('--menu-close-icon', `url('${this.ui!.base}${native.images.button_close_cross}')`);
+  }
+
+  /** The separate lab setup surface (#349): reachable only from the pause
+   * stack's labelled entry, never a native in-game menu action. */
+  openLab(): void {
+    if (!this.labDialog.open) this.labDialog.showModal();
+    this.labDialog.querySelector<HTMLButtonElement>('[data-lab-close]')!.focus();
+  }
+
+  closeLab(): void {
+    if (this.labDialog.open) this.labDialog.close();
+    if (this.labDialog.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+  }
+
+  get labOpen(): boolean { return this.labDialog.open; }
 
   showMessage(text: string): void {
     const lines = this.messageBox.querySelector<HTMLElement>('.message-lines')!;
@@ -804,7 +934,9 @@ export class Hud {
   get confirmationOpen(): boolean { return this.root.querySelector<HTMLDialogElement>('#confirm-dialog')!.open; }
 
   get modalOpen(): boolean {
-    return this.options.element.open || this.diplomacy.open || this.techtree.open || this.objectives.open || this.confirmationOpen || this.root.querySelector<HTMLDialogElement>('#popup-dialog')!.open || this.endOpen;
+    return this.options.element.open || this.diplomacy.open || this.techtree.open || this.objectives.open
+      || this.confirmationOpen || this.root.querySelector<HTMLDialogElement>('#popup-dialog')!.open || this.endOpen
+      || this.labOpen;
   }
 
   /** Errors that need acknowledgement use the owned generic OK modal. */

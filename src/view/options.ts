@@ -63,7 +63,10 @@ export class OptionsDialog {
     }
     form.append(actions); dialog.append(form); parent.append(dialog);
     form.addEventListener('submit', event => { event.preventDefault(); this.apply(this.read()); this.close(); });
-    dialog.addEventListener('keydown', event => event.stopPropagation());
+    // Only swallow game keys while the dialog is actually open: a closed
+    // <dialog> is still an ancestor in the DOM, so an unconditional
+    // stopPropagation here keeps eating keys if focus is left inside it (#349).
+    dialog.addEventListener('keydown', event => { if (dialog.open) event.stopPropagation(); });
     dialog.addEventListener('cancel', event => { event.preventDefault(); this.close(); });
     const native = ui?.nativeFeedback;
     if (native?.options) {
@@ -94,7 +97,15 @@ export class OptionsDialog {
     if (!this.element.open) this.element.showModal();
   }
 
-  close(): void { this.element.close(); }
+  close(): void {
+    this.element.close();
+    // Chrome can leave document.activeElement on a button inside the now
+    // closed dialog, and the closed subtree cannot hold focus but the browser
+    // does not re-sync it; every later game key would land on the dead
+    // button. Release it synchronously here, as the confirmation dialog's
+    // click handlers do (#349).
+    if (this.element.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+  }
 
   private read(): Preferences {
     if (!this.model) return { ...DEFAULT_PREFERENCES };

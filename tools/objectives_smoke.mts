@@ -86,6 +86,8 @@ try {
     assert.equal((await query({ type: 'sim' })).synchronizationHash, before.synchronizationHash, 'dialog actions cannot mutate simulation');
     // Enable Wonder victory through real Game Settings, not a state injection.
     await page.click('[data-menu="open"]');
+    await page.click('#menu-dialog [data-menu="setup"]');
+    await page.waitForSelector('#lab-dialog[open]');
     await page.click('#wonder-victory');
     await page.click('#map-setup [type="submit"]');
     await page.waitForFunction(() => document.querySelector('#menu-dialog')!.classList.contains('hidden'));

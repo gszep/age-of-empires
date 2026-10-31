@@ -64,10 +64,17 @@ async function fillSeed(page: Page, seed: string): Promise<void> {
   if (seed) await page.keyboard.type(seed);
   assert.equal(await page.$eval('#map-seed', e => (e as HTMLInputElement).value), seed);
 }
+/** #349: the setup form lives in the lab surface reached from the pause menu. */
+async function openLab(page: Page): Promise<void> {
+  if (await page.$eval('#menu-dialog', e => e.classList.contains('hidden'))) await page.keyboard.press('F10');
+  if (!(await page.$eval('#lab-dialog', e => (e as HTMLDialogElement).open))) {
+    await page.click('#menu-dialog [data-menu="setup"]');
+    await page.waitForSelector('#lab-dialog[open]');
+  }
+}
 async function choose(page: Page, map: string, seed: number): Promise<void> {
   await page.bringToFront();
-  const opened = await page.$eval('#menu-dialog', e => !e.classList.contains('hidden'));
-  if (!opened) await page.keyboard.press('F10');
+  await openLab(page);
   await page.select('#map-choice', map);
   await fillSeed(page, String(seed));
   await page.click('#map-setup button[type="submit"]');
@@ -81,6 +88,7 @@ try {
   const worker = (await query(solo, { type: 'entities', owner: 1 })).entities.find((e: any) => e.kind === 'villager');
   await solo.mouse.click(worker.screen.x, worker.screen.y);
   await solo.keyboard.press('F10');
+  await openLab(solo);
   assert.deepEqual(await solo.$$eval('#map-choice option', options => options.map(o => (o as HTMLOptionElement).value)), Object.keys(MAPS));
   const before = await query(solo, { type: 'sim' });
   assert.deepEqual(await solo.$$eval('#population-limit option', options => options.map(o => Number((o as HTMLOptionElement).value))), POPULATION_LIMITS);
@@ -126,13 +134,14 @@ try {
   await choose(solo, 'black-forest', 9);
   assert.equal((await query(solo, { type: 'snapshot' })).width, 120);
   await solo.keyboard.press('F10');
+  await openLab(solo);
   await solo.click('#random-map-seed');
   assert.equal(await solo.$eval('#map-seed', e => (e as HTMLInputElement).value), '');
   await solo.click('#map-setup button[type="submit"]');
   await until(solo, "s.connection.setup.seed !== 9");
   const random = (await query(solo, { type: 'sim' })).connection.setup;
   assert.equal(random.map, 'black-forest'); assert(Number.isInteger(random.seed) && random.seed > 0);
-  await solo.keyboard.press('F10'); await solo.select('#population-limit', '500');
+  await solo.keyboard.press('F10'); await openLab(solo); await solo.select('#population-limit', '500');
   await solo.click('#map-setup button[type="submit"]');
   await until(solo, 's.connection.setup.populationLimit === 500');
   await solo.keyboard.press('F10'); await solo.click('[data-menu="restart"]');
@@ -161,10 +170,14 @@ try {
   const guest = await open('/?player=2', 0);
   assert.equal((await query(guest, { type: 'sim' })).connection.speed, DEFAULT_GAME_SPEED);
   await guest.keyboard.press('F10');
+  await openLab(guest);
+  await guest.waitForSelector('#lab-dialog[open]');
+  assert.equal(await guest.$eval('#map-host-note', e => e.hidden), false);
   assert(await guest.$eval('#map-choice', e => (e as HTMLSelectElement).disabled));
   assert(await guest.$eval('#population-limit', e => (e as HTMLSelectElement).disabled));
   assert(await guest.$eval('#wonder-victory', e => (e as HTMLInputElement).disabled));
   assert(await guest.$eval('#map-setup button[type="submit"]', e => (e as HTMLButtonElement).disabled));
+  await guest.click('#lab-dialog [data-lab-close]');
   await guest.click('#menu-dialog [data-options]');
   await guest.waitForSelector('#options-dialog[open]');
   await guest.select('#option-speed', '4'); await guest.click('[data-option-action="ok"]');
@@ -174,7 +187,7 @@ try {
   assert.equal((await query(guest, { type: 'sim' })).connection.speed, 4, 'reload preserves authoritative shared speed');
   assert.equal((await query(host, { type: 'sim' })).connection.speed, 4);
   console.log('Shared options: local saved speed never overwrites host on join/reload; explicit Apply uses shared settings');
-  await host.bringToFront(); await host.keyboard.press('F10'); await host.select('#population-limit', '50');
+  await host.bringToFront(); await host.keyboard.press('F10'); await openLab(host); await host.select('#population-limit', '50');
   if (!(await host.$eval('#wonder-victory', e => (e as HTMLInputElement).checked))) await host.click('#wonder-victory');
   await choose(host, 'islands', 2);
   await until(guest, "s.connection.setup.map === 'islands' && s.connection.setup.seed === 2");
@@ -194,6 +207,25 @@ try {
   assert.equal((await query(guest, { type: 'snapshot' })).wonderVictory, true);
   assert.equal((await query(host, { type: 'sim' })).synchronizationHash, (await query(guest, { type: 'sim' })).synchronizationHash);
   console.log('Shared: host menu changes both clients; guest is read-only; setup is checkpointed');
+  // A visible host Restart restores a deleted worker on both clients while
+  // retaining the setup. This proves the action, not just a matching label.
+  await host.bringToFront();
+  const restartWorker = (await query(host, { type: 'entities', owner: 1 })).entities.find((e: any) => e.kind === 'villager');
+  assert(restartWorker);
+  assert.equal((await query(host, { type: 'command', command: { kind: 'delete', player: 1, entityIds: [restartWorker.id] } })).ok, true);
+  // Shared commands are queued until an authoritative tick, not applied while paused.
+  await host.keyboard.press('F3'); await until(host, '!s.connection.paused');
+  await host.waitForFunction(async id => !(await (globalThis as any).__empiresDebug({ type: 'entities', id })).entities.some((e: any) => !e.dead), {}, restartWorker.id);
+  await host.keyboard.press('F10');
+  await host.click('#menu-dialog [data-menu="restart"]');
+  await host.waitForFunction(async id => (await (globalThis as any).__empiresDebug({ type: 'entities', id })).entities.some((e: any) => !e.dead), {}, restartWorker.id);
+  if (!(await query(host, { type: 'sim' })).connection.paused) await host.keyboard.press('F3');
+  await until(host, 's.connection.paused'); await until(guest, 's.connection.paused');
+  await guest.waitForFunction(async id => (await (globalThis as any).__empiresDebug({ type: 'entities', id })).entities.some((e: any) => !e.dead), {}, restartWorker.id);
+  assert.equal((await query(host, { type: 'sim' })).synchronizationHash, (await query(guest, { type: 'sim' })).synchronizationHash);
+  assert.equal((await query(guest, { type: 'sim' })).connection.setup.seed, 2);
+  assert.equal((await query(guest, { type: 'snapshot' })).populationLimit, 50);
+  console.log('Shared: visible host Restart restores the worker and synchronizes the retained setup');
   assert.deepEqual(errors, []);
   console.log('MAP MENU SMOKE GREEN');
 } finally {

@@ -88,6 +88,7 @@ try {
     await ready();
     console.log(civ, 'selecting menu');
     await page.keyboard.press('F10');
+    await page.click('#menu-dialog [data-menu="setup"]');
     const enabled = [manifest.civilization.key, ...Object.entries(manifest.civilizations ?? {})
       .filter(([, p]: any) => p.civilization.enabled !== false).map(([key]) => key)].sort();
     assert.deepEqual(await page.$$eval('#civilization-1 option', options => options.map(e => (e as HTMLOptionElement).value).sort()), enabled);

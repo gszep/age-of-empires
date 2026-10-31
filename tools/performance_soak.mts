@@ -167,6 +167,7 @@ try {
         const latest = await page.evaluate(() => (window as any).__performanceSoak());
         if (latest.winner || latest.draw) await page.locator('#end-dialog [data-end="leave"]').click();
         else if (await page.$eval('#menu-dialog', e => e.classList.contains('hidden'))) await page.keyboard.press('F10');
+        await page.click('#menu-dialog [data-menu="setup"]');
         await page.select('#map-choice', maps[rounds % maps.length]);
         await page.locator('#map-seed').fill(String(3 + rounds));
         await page.locator('#map-setup button[type="submit"]').click();

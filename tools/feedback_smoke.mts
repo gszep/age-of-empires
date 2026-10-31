@@ -129,6 +129,10 @@ try {
   ]) {
     const hash = (await query({ type: 'sim' })).synchronizationHash;
     if (await page.$eval('#menu-dialog', e => e.classList.contains('hidden'))) await page.keyboard.press('F10');
+    if (!(await page.$eval('#lab-dialog', e => (e as HTMLDialogElement).open))) {
+      await page.click('#menu-dialog [data-menu="setup"]');
+      await page.waitForSelector('#lab-dialog[open]');
+    }
     const chooser = page.waitForFileChooser();
     await page.click('[data-menu="load-replay"]');
     await (await chooser).accept([`${fixtures}/${file}`]);
@@ -341,6 +345,8 @@ try {
   await page.click('[data-end="leave"]');
   assert.equal(await page.$eval('#end-dialog', e => (e as HTMLDialogElement).open), false);
   assert.equal(await page.$eval('#menu-dialog', e => e.classList.contains('hidden')), false, 'Leave Map opens the existing match launcher');
+  await page.click('#menu-dialog [data-menu="setup"]');
+  await page.waitForSelector('#lab-dialog[open]');
   await page.select('#map-choice', 'arabia');
   await page.locator('#map-seed').fill('59');
   await page.click('#map-setup button[type="submit"]');

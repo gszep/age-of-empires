@@ -515,3 +515,49 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
   background: rgba(0, 0, 0, 0.6);
 }
 .member-hp-fill { display: block; height: 100%; background: var(--ui-LifeBarHealthy, #46c02c); }
+
+/* #349: the native in-game pause menu (dialogingamemenu.xaml) — dialog2
+   nine-slice frame, one ButtonLarge stack, close cross top-right. Dimensions
+   are the XAML's own design units on the 3840x2160 canvas, routed through
+   --ui-scale: dialog MinWidth 1100, stack margins 130/25 (50 between rows),
+   grid rows 100 / star / 80, close 85x87. Static approximation per menu-evidence §2/
+   §9: the Age2NineSliceShinyEffect shine (blur mask not imported),
+   Age2SwipeEffect entrance, ControlDropShadowBig, and the disabled/pressed
+   border-brush and forced-white text treatment are omitted — the disable
+   brush below is the only native disabled material imported. Greying the
+   unsupported actions is our product policy, not a native runtime claim. */
+#menu-dialog.native-pause {
+  /* Isolation keeps the frame behind its buttons; the whole stack must also
+     sit above the selection panel's z-index: 1 on short viewports. */
+  background: transparent; border: 0; box-shadow: none; isolation: isolate; z-index: 2;
+  min-width: calc(1100px * var(--ui-scale)); max-width: 94vw;
+  padding: calc(160px * var(--ui-scale)) calc(130px * var(--ui-scale)) calc(105px * var(--ui-scale));
+}
+#menu-dialog .menu-stack { display: flex; flex-direction: column; gap: calc(50px * var(--ui-scale)); }
+#menu-dialog .menu-stack .native-button { display: block; margin: 0; min-width: 0; width: 100%; }
+#menu-dialog .menu-close {
+  position: absolute; top: 0; right: 0; min-width: 0; margin: 0; padding: 0;
+  width: calc(60px * var(--ui-scale)); height: calc(60px * var(--ui-scale));
+  font-size: calc(40px * var(--text-scale)); line-height: 1;
+}
+#menu-dialog.native-pause .menu-close {
+  width: calc(85px * var(--ui-scale)); height: calc(87px * var(--ui-scale));
+  font-size: 0;
+  border: var(--native-button-border) solid var(--native-border-color);
+  background: var(--menu-close-icon), var(--native-button-normal) center / 100% 100%;
+}
+#menu-dialog.native-pause .menu-close:hover,
+#menu-dialog.native-pause .menu-close:focus-visible {
+  background-image: var(--menu-close-icon), var(--native-button-hover);
+}
+#menu-dialog.native-pause .menu-close:active {
+  background-image: var(--menu-close-icon), var(--native-button-active);
+}
+#hud .native-button:disabled { background-image: var(--native-button-disable); cursor: default; }
+#hud .native-button:disabled span { background: none; color: #dedede; filter: none; }
+
+/* The separate lab setup surface (#349): the old dialog palette, clearly its
+   own dialog, holding the unchanged #map-setup form and replay loading. */
+#lab-dialog { max-width: 94vw; max-height: 92vh; overflow-y: auto; }
+#lab-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+.lab-note { font-size: calc(28px * var(--text-scale)); color: #cfc39a; margin-bottom: calc(16px * var(--ui-scale)); }

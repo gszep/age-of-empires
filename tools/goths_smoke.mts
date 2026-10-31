@@ -59,7 +59,7 @@ try {
     } finally { await pause(true); }
   };
   await page.goto('http://127.0.0.1:5268/?solo=1', { waitUntil: 'domcontentloaded' }); await ready();
-  await page.keyboard.press('F10'); await page.select('#civilization-1', 'goths'); await page.select('#civilization-2', 'franks');
+  await page.keyboard.press('F10'); await page.click('#menu-dialog [data-menu="setup"]'); await page.select('#civilization-1', 'goths'); await page.select('#civilization-2', 'franks');
   await page.locator('#map-setup button[type="submit"]').click(); await pause(true);
   assert.equal((await snapshot()).players[1].civilization, 'goths');
   await page.reload({ waitUntil: 'domcontentloaded' }); await ready();

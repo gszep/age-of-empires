@@ -73,7 +73,7 @@ export async function civilizationBrowser(civ: string, port = 5269) {
   const reload=async()=>{await page.reload({waitUntil:'domcontentloaded'});await ready();};
   const menu=async(rival:string)=>{
     await page.goto(`http://127.0.0.1:${port}/?solo=1`,{waitUntil:'domcontentloaded'});await ready();
-    await page.keyboard.press('F10');await page.select('#civilization-1',civ);await page.select('#civilization-2',rival);
+    await page.keyboard.press('F10');await page.click('#menu-dialog [data-menu="setup"]');await page.select('#civilization-1',civ);await page.select('#civilization-2',rival);
     await page.locator('#map-setup button[type="submit"]').click();await pause(true);
     assert.equal((await snapshot()).players[1].civilization,civ);
     await reload();assert.equal((await snapshot()).players[1].civilization,civ);
