@@ -27,13 +27,19 @@ reviews. Do not append old test counts here as if they describe the latest tree.
 
 ### Environment facts you will hit immediately
 
-- **Owned checks require the 185872 source facade on Artemis** (#334): the local
-  SteamCMD depot content is still the pre-repin build, so `npm run verify:owned`
-  without `AOE2DE_DEPOT_ROOT=~/.local/share/aoe2de-185872-facade` fails 23
-  import-consistency assertions. The facade symlinks the six depots at
-  Artemis's Steam client install (build 25464371, the pinned reference). Until
-  #334 lands a permanent resolution, export the variable wherever owned checks
-  run on Artemis; Ysgramor's own depot tree remains valid there.
+- **Source resolution is pin-validated (#334, verified November 1)**:
+  `tools/depot.py` auto-chooses only a depot tree whose DAT
+  is the build `tools/aoe2-source.json` pins, and discovers installed-copy
+  facades by the documented `~/.local/share/aoe2de-*-facade` naming
+  convention ([owned-assets-setup](owned-assets-setup.md)). Measured on
+  Artemis: the stale SteamCMD content is skipped, the 185872 facade resolves
+  with no env var (`tools/depot.py --check` MATCH; the import-test module
+  resolves the facade; the full owned checkpoint passed without an override).
+  Ysgramor's valid SteamCMD tree is expected to keep
+  resolving as before — that order is covered by the resolver's fixture
+  test, not yet re-measured on that host. An explicit `AOE2DE_DEPOT_ROOT` is
+  still used as given — `uv run --locked python tools/depot.py --check`
+  reports any root's DAT hash against the pin without importing.
 - gcloud on Artemis: `contact@gszep.com` was re-authenticated October 18 into
   the private `empires-deploy` config only; the human `default` config is
   unchanged. Actions deploys do not use this login at all.
@@ -107,8 +113,6 @@ committing hours.
 
 ## Standing follow-ups
 
-- #334: make `tools/depot.py` consider the installed-copy facade, or refresh
-  the SteamCMD content, so owned checks are not env-dependent.
 - #290: confirm Shift-queued placement in play and close, or name the actual
   failing interaction.
 - Deploy-gate consolidation: the deploy workflow re-runs `verify:full` although

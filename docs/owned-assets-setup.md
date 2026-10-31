@@ -61,9 +61,20 @@ import script and the integration tests resolve it the same way:
 ~/.local/share/Steam/steamcmd/linux32/steamapps/content/app_813780
 ~/.local/share/Steam/steamapps/content/app_813780
 ~/.steam/steam/steamapps/content/app_813780
+~/.local/share/aoe2de-*-facade   # installed-copy facades, by naming convention
 ```
 
-For any other location, set `AOE2DE_DEPOT_ROOT` to the directory that directly contains `depot_813781`, `depot_813782`, and `depot_813784`. Without a tree in any of these, `npm run test:import` skips its integration tests rather than failing — so check the run reports tests, not skips.
+A candidate is only chosen after its `empires2_x2_p1.dat` proves to be the
+pinned build (`datSha256` in `tools/aoe2-source.json`), so a tree left stale
+by a later re-pin (#334) is skipped instead of silently imported against, and
+a tree that carries no DAT counts as an incomplete candidate. When candidates
+exist but none matches, resolution fails with their DAT hashes instead of
+guessing; `uv run --locked python tools/depot.py --check` reports the
+resolved root's hash against the pin without importing anything. Without a
+tree anywhere, `npm run test:import` skips its integration tests rather than
+failing — so check the run reports tests, not skips.
+
+For any other location, set `AOE2DE_DEPOT_ROOT` to the directory that directly contains `depot_813781`, `depot_813782`, and `depot_813784`. An explicit root is a deliberate choice: it is used exactly as given, and `--check` is the way to confirm it is the pinned build.
 
 ### macOS
 
@@ -145,12 +156,17 @@ export AOE2DE_DEPOT_ROOT="$DEPOT_ROOT"
 
 All importer stages read depot-relative paths; no stage requires depot exclusivity, so this layout works correctly. The symlinks point all six depots to the same installation root, and the importer reads the appropriate content from each logical depot path.
 
+Name the facade `aoe2de-<build>-facade` under `~/.local/share/` — for example `~/.local/share/aoe2de-185872-facade` for build 185872 — and resolution discovers it by that convention, with no export. Facades are still only used when their DAT is the pinned build, so several facades of different builds never shadow each other. Keep `export AOE2DE_DEPOT_ROOT="$DEPOT_ROOT"` for facades kept anywhere else.
+
 ## 3. Verify and import
 
-From the repository root, with `AOE2DE_DEPOT_ROOT` exported if needed:
+From the repository root — the import script and the tests both resolve the
+root through `tools/depot.py`, which honours an explicit `AOE2DE_DEPOT_ROOT`
+and otherwise chooses a pin-matched tree (see §2), so derive it the same way
+rather than hardcoding a download location:
 
 ```bash
-DEPOT_ROOT="${AOE2DE_DEPOT_ROOT:-$HOME/Steam/steamapps/content/app_813780}"
+DEPOT_ROOT="$(uv run --locked python tools/depot.py)"
 test -f "$DEPOT_ROOT/depot_813781/resources/_common/dat/empires2_x2_p1.dat"
 test -d "$DEPOT_ROOT/depot_813782/widgetui"
 test -d "$DEPOT_ROOT/depot_813784/resources/_common/drs/graphics"

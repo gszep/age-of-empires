@@ -7,7 +7,7 @@ import puppeteer from 'puppeteer';
 import { createServer } from 'vite';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { FALLBACK_RULES, rulesFromManifest } from '../src/sim/data.ts';
-import { createGame } from '../src/sim/game.ts';
+import { createGame, rulesForPlayer } from '../src/sim/game.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const fallback = process.env.OPEN_FALLBACK === '1';
@@ -38,6 +38,7 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
     return code.replace(anchor,
       'Object.defineProperty(window, "__feedbackHud", { get: () => hud });\n'
       + '(window as any).__feedbackRebuild = rebuildPresentation;\n'
+      + '(window as any).__feedbackOpponentNames = (names: string[]) => { rulesForPlayer(game, 2).civilization.computerNames = names; };\n'
       + anchor + '\npaused = !(window as any).__feedbackRun;');
   },
 }], server: { host: '127.0.0.1', port: 5268, strictPort: true }, logLevel: 'error' });
@@ -328,7 +329,26 @@ try {
   await page.waitForFunction(() => !!(window as any).__feedbackHud, { timeout: 60_000 });
   assert.equal((await query({ type: 'sim' })).tick, state.tick);
   await page.waitForSelector('.score-row:nth-child(2) .score-name');
-  const opponentName = await page.$eval('.score-row:nth-child(2) .score-name', e => e.textContent!);
+  // #351: `.score-name` renders the name and the score in one label, so the
+  // expected semantic name comes from the authoritative staged rules and
+  // match seed — the same inputs the view's own `scoreRows()` reads — never
+  // by trimming a colon suffix off a rendered label, which a valid name may
+  // itself contain.
+  const computerNames = rulesForPlayer(state, 2).civilization.computerNames ?? [];
+  const naturalName = computerNames.length ? computerNames[state.matchSeed % computerNames.length] : 'Computer';
+  const scoreLabel = await page.$eval('.score-row:nth-child(2) .score-name', e => e.textContent!);
+  assert(scoreLabel.startsWith(naturalName), `score row must present the authoritative opponent name: ${scoreLabel}`);
+  // The exact-preservation fixture: a computer name that itself contains a
+  // colon. Set into the page's own player-2 rules, so the whole defeat flow
+  // below runs with it, and the full name — colons included — must survive
+  // both the score label and the defeat text; nothing may read a colon as
+  // a separator to strip.
+  const opponentName = 'Computer: 2B';
+  await page.evaluate(names => (window as any).__feedbackOpponentNames(names), [opponentName]);
+  await page.evaluate(() => (window as any).__feedbackRebuild());
+  const colonLabel = await page.$eval('.score-row:nth-child(2) .score-name', e => e.textContent!);
+  assert(colonLabel.startsWith(`${opponentName}: `) && /^\d+$/.test(colonLabel.slice(opponentName.length + 2)),
+    `score label must render the full colon-bearing name then the score: ${colonLabel}`);
   await query({ type: 'select', ids: [tc.id, worker.id] });
   await page.keyboard.press('Delete');
   await page.waitForSelector('#confirm-dialog[open]');

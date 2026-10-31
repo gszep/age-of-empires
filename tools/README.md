@@ -31,7 +31,7 @@ contract checked against `src/sim/refdata/regicide.json`. Black Forest's
 `REGICIDE_BACKWARD` override is retained. Exact Treason timing is not in this
 owned-value contract; it remains a labelled runtime inference (#240).
 
-See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matched SteamCMD downloads and source paths on macOS, Linux, and Windows/WSL2. `tools/depot.py` resolves the depot root — `AOE2DE_DEPOT_ROOT` first, then the usual SteamCMD/Steam download locations — for both `npm run import:aoe2` and the integration tests.
+See [`docs/owned-assets-setup.md`](../docs/owned-assets-setup.md) for patch-matched SteamCMD downloads and source paths on macOS, Linux, and Windows/WSL2. `tools/depot.py` resolves the depot root — `AOE2DE_DEPOT_ROOT` first, then the usual SteamCMD/Steam download locations and `~/.local/share/aoe2de-*-facade` installed-copy facades — for both `npm run import:aoe2` and the integration tests, auto-choosing only a tree whose DAT matches the pin in `aoe2-source.json`; `--check` reports the resolved root's hash against the pin without importing.
 
 ## Pipeline
 
