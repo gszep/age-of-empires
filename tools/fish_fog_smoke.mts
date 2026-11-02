@@ -1,16 +1,11 @@
 /** #258: actual live → remembered → live resource art through scout movement. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
-import puppeteer from 'puppeteer';
+import { ownedManifest, startServer, launchBrowser } from './smoke-harness.mjs';
 import { addNode, createGame } from '../src/sim/game.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
+const manifest = ownedManifest();
 const rules = rulesFromManifest(manifest);
 const state = createGame(258, rules);
 const scout = state.entities.find(e => e.kind === 'scout-cavalry' && e.owner === 1)!;
@@ -28,19 +23,15 @@ const resources = [
   addNode(state, 'fish-dorado', { x: 51, y: 47 }),
 ];
 const { rules: omitted, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ plugins: [{
   name: 'fish-fog-probe', enforce: 'pre', transform(code, id) {
     if (!id.endsWith('/src/dev-debug.ts')) return;
     const anchor = 'const hot = import.meta.hot!;';
     assert(code.includes(anchor));
     return code.replace(anchor, 'Object.assign(globalThis, { __fishContext: context }); ' + anchor);
   },
-}], server: { host: '127.0.0.1', port: 5238, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+}], port: 5238 });
+const browser = await launchBrowser();
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 800 });

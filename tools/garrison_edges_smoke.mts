@@ -1,17 +1,13 @@
 /** #137: real bell, self-rally production and ram boarding/unload, plus flag pixels. */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { root, ownedManifest, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { addNode, applyCommand, createGame, stepGame } from '../src/sim/game.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import type { BuildingKind, Entity, UnitKind } from '../src/sim/types.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const rules = rulesFromManifest(JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8')));
+const rules = rulesFromManifest(ownedManifest());
 const audioPath = `${root}public/imported/aoe2/audio/manifest.json`;
 if (existsSync(audioPath)) {
   const audio = JSON.parse(readFileSync(audioPath, 'utf8')).audio;
@@ -40,18 +36,10 @@ const berries = addNode(state, 'berries', { x: tc.position.x + 5, y: tc.position
 applyCommand(state, { kind: 'order', player: 1, entityIds: workers.map(e => e.id), target: berries.position, targetId: berries.id });
 stepGame(state);
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`,
-  server: { host: '127.0.0.1', port: 5237, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const server = await startServer({ port: 5237 });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1600, height: 1000 });
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(String(error)));
+  const { page, errors } = await newPage(browser, { viewport: { width: 1600, height: 1000 } });
   await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),
     { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });
   await page.goto('http://127.0.0.1:5237/?solo=1', { waitUntil: 'domcontentloaded' });

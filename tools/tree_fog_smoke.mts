@@ -1,18 +1,14 @@
 /** Screenshot-driven acceptance: revealing a tree's tile reveals its whole
  * canopy. Compare opaque leaf pixels with F4 on/off, not a whole-screen mean. */
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
-import puppeteer from 'puppeteer';
+import { writeFileSync } from 'node:fs';
+import { root, ownedManifest, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { createGame } from '../src/sim/game.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { updateVisibility } from '../src/sim/visibility.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
+const manifest = ownedManifest();
 const rules = rulesFromManifest(manifest);
 const state = createGame(2, rules);
 const tree = state.entities.find(e => e.resourceKind === 'wood' && e.id % manifest.entities['tree-oak'].atlases.idle.framesInFile === 0)!;
@@ -27,23 +23,19 @@ state.players[2].food = state.players[2].wood = 0;
 state.visibility[1].explored.fill(0); state.visibility[1].memory = {};
 updateVisibility(state);
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ plugins: [{
   name: 'tree-fog-probe', enforce: 'pre', transform(code, id) {
     if (!id.endsWith('/src/dev-debug.ts')) return;
     const anchor = 'const hot = import.meta.hot!;';
     assert(code.includes(anchor));
     return code.replace(anchor, 'Object.assign(globalThis, { __treeContext: context }); ' + anchor);
   },
-}], server: { host: '127.0.0.1', port: 5216, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+}], port: 5216 });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage(); await page.setViewport({ width: 1280, height: 800 });
+  const { page, errors } = await newPage(browser);
   // tsx's function-name helper is otherwise absent from serialized callbacks.
   await page.evaluateOnNewDocument('globalThis.__name = fn => fn;');
-  const errors: string[] = []; page.on('pageerror', error => errors.push(String(error)));
   await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),
     { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });
   await page.goto('http://127.0.0.1:5216/?solo=1', { waitUntil: 'domcontentloaded' });

@@ -1,15 +1,9 @@
 /** #91: the actual player-2 example AI starts from an untouched Islands opening. */
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { startServer, launchBrowser, newPage, blockImported } from './smoke-harness.mjs';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const fallback = process.env.OPEN_FALLBACK === '1';
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, logLevel: 'error',
-  server: { host: '127.0.0.1', port: 5298, strictPort: true }, plugins: [{
+const server = await startServer({ port: 5298, plugins: [{
     name: 'private-fishing-observer', enforce: 'pre',
     transform(code, id) {
       if (!id.endsWith('/src/main.ts')) return;
@@ -35,18 +29,10 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, l
           Object.assign(globalThis,{__fishingProbe});\n${anchor}`);
     },
   }] });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage(); await page.setViewport({ width: 1280, height: 800 });
-  const errors: string[] = []; page.on('pageerror', e => errors.push(String(e)));
-  if (fallback) {
-    await page.setRequestInterception(true);
-    page.on('request', r => { void (r.url().includes('/imported/') ? r.respond({ status: 404, body: '' }) : r.continue()); });
-  }
+  const { page, errors } = await newPage(browser);
+  if (fallback) await blockImported(page);
   await page.goto('http://127.0.0.1:5298/?solo=1&map=islands&seed=2', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => typeof (window as any).__empiresDebug === 'function', { timeout: 120000 });
   const query = (q: object): Promise<any> => page.evaluate(q => (window as any).__empiresDebug(q), q);

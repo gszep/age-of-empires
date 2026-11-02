@@ -1,19 +1,16 @@
 /** Real two-page mode setup and Treason through a private authoritative host. */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer, { type Page } from 'puppeteer';
-import { createServer } from 'vite';
+import { readFileSync, writeFileSync, rmSync } from 'node:fs';
+import type { Page } from 'puppeteer';
+import { root, ownedManifest, startServer, launchBrowser } from './smoke-harness.mjs';
 import { sharedMatchPlugin } from '../src/shared/server.ts';
 import { SHARED_CHECKPOINT_VERSION } from '../src/shared/protocol.ts';
 import { createGame } from '../src/sim/game.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const checkpoint = `${root}.local/regicide-shared-${process.pid}.json`;
-const rules = rulesFromManifest(JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8')));
+const rules = rulesFromManifest(ownedManifest());
 const { rules: omitted, ...state } = createGame(130, rules, undefined, 'islands', 'regicide');
 state.players[1].gold = 900; // funded starting fixture; subsequent changes are public commands
 // #346: the persisted checkpoint's version is SHARED_CHECKPOINT_VERSION —
@@ -23,13 +20,8 @@ writeFileSync(checkpoint, JSON.stringify({ version: SHARED_CHECKPOINT_VERSION,
   rulesHash: createHash('sha256').update(JSON.stringify(rules)).digest('hex'), state,
   settings: { paused: true, speed: 1, generation: 0 }, humanTwo: true,
   setup: { map: 'islands', seed: 130, mode: 'regicide' } }));
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, logLevel: 'error',
-  plugins: [sharedMatchPlugin(root, checkpoint)], server: { host: '127.0.0.1', port: 5294, strictPort: true } });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const server = await startServer({ plugins: [sharedMatchPlugin(root, checkpoint)], port: 5294 });
+const browser = await launchBrowser();
 const query = (page: Page, q: object): Promise<any> => page.evaluate(q => (window as any).__empiresDebug(q), q);
 const wait = (page: Page, mode: string) => page.waitForFunction(async mode => {
   const s = await (window as any).__empiresDebug({ type: 'sim' }); return s.mode === mode;

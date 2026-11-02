@@ -1,15 +1,11 @@
 /** #140: actual portrait clicks, mixed queues, refunds and full-queue geometry. */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { root, startServer, launchBrowser } from './smoke-harness.mjs';
 import { createGame } from '../src/sim/game.ts';
 import { FALLBACK_RULES, rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const manifest = `${root}public/imported/aoe2/manifest.json`;
 const fallback = process.env.OPEN_FALLBACK === '1';
 const rules = !fallback && existsSync(manifest) ? rulesFromManifest(JSON.parse(readFileSync(manifest, 'utf8'))) : FALLBACK_RULES;
@@ -18,12 +14,8 @@ const tc = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
 tc.training = { kind: 'militia', remainingTicks: 5000 };
 tc.trainingQueue = ['militia', 'militia', 'militia', 'spearman', 'spearman', 'spearman', 'militia'];
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`,
-  server: { host: '127.0.0.1', port: 5210, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const server = await startServer({ port: 5210 });
+const browser = await launchBrowser();
 try {
   const page = await browser.newPage();
   if (fallback) {

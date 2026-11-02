@@ -1,11 +1,7 @@
 /** Real Briton/Frank selection, construction, research, unique production and art. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { ownedManifest, startServer, launchBrowser } from './smoke-harness.mjs';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { activateAutomaticTechnologies, createGame } from '../src/sim/game.ts';
@@ -13,15 +9,14 @@ import { buildingRulesFor, unitRulesFor } from '../src/sim/rules.ts';
 import type { BuildingKind, Entity } from '../src/sim/types.ts';
 import { pageOf } from '../src/view/build-menu.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
+const manifest = ownedManifest();
 assert(manifest.civilizations?.franks?.civilizationBonuses, 'full profile publication required');
 const pending = process.env.CIV_ACCEPT_PENDING === '1';
 if (pending) manifest.civilizations.franks.civilization.enabled = true;
 assert.equal(manifest.civilizations.franks.civilization.enabled, true, 'Franks enabled, or explicit pre-enablement acceptance');
 const rules = rulesFromManifest(manifest);
 const pendingBody = pending ? gzipSync(JSON.stringify(manifest)) : undefined;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ plugins: [{
   name: 'civilization-acceptance-observation', enforce: 'pre',
   configureServer(server) {
     if (!pendingBody) return;
@@ -51,12 +46,8 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
             sources: Object.fromEntries(Object.entries(imported?.animations ?? {}).map(([k,a]) => [k,a.source])) }; },
       } });`);
   },
-}], server: { host: '127.0.0.1', port: 5267, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true, dumpio: process.env.CIV_BROWSER_DIAGNOSTICS === '1',
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+}], port: 5267 });
+const browser = await launchBrowser({ dumpio: process.env.CIV_BROWSER_DIAGNOSTICS === '1' });
 browser.process()?.on('exit', (code, signal) => console.log('browser exit', { code, signal }));
 try {
   for (const civ of ['britons', 'franks'] as const) {

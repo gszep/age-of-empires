@@ -4,21 +4,17 @@
  * No import, clock shim or simulation mutation. */
 import assert from 'node:assert/strict';
 import { createReadStream, existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { extname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import type { Browser } from 'puppeteer';
+import { root, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const fallback = process.env.OPEN_FALLBACK === '1';
 const publicDir = resolve(process.env.OWNED_PUBLIC ?? `${root}public`);
 // Optional isolated UI-stage fixture; other content remains read-only.
 const privateUi = process.env.MINIMAP_UI ? resolve(process.env.MINIMAP_UI) : undefined;
 const out = `${root}.local/minimap-modes-${fallback ? 'fallback' : 'owned'}`;
 mkdirSync(`${root}.local`, { recursive: true });
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, publicDir, logLevel: 'error',
-  server: { host: '127.0.0.1', port: 5231, strictPort: true }, plugins: [{
+const server = await startServer({ publicDir, port: 5231, plugins: [{
     name: 'minimap-open-fallback', enforce: 'pre', configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const url = decodeURIComponent((req.url ?? '').split('?')[0]);
@@ -34,21 +30,15 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
       });
     },
   }] });
-let browser: Awaited<ReturnType<typeof puppeteer.launch>> | undefined;
+let browser: Browser | undefined;
 const evidence: Record<string, unknown> = { mode: fallback ? 'fallback' : 'owned', seed: 138, port: 5231,
   publicDir, privateUi, colorSpace: 'sRGB (Canvas2D RGBA8)', deltas: [] };
 try {
-  await server.listen();
-  const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-  browser = await puppeteer.launch({ headless: true,
-    env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-    args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+  browser = await launchBrowser();
   evidence.pid = process.pid; evidence.browserPid = browser.process()?.pid;
   console.log(JSON.stringify({ pid: process.pid, browserPid: browser.process()?.pid, port: 5231 }));
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800 });
+  const { page, errors } = await newPage(browser);
   await page.evaluateOnNewDocument('globalThis.__name = f => f');
-  const errors: string[] = []; page.on('pageerror', e => errors.push(String(e)));
   await page.goto('http://127.0.0.1:5231/?solo=1&seed=138', { waitUntil: 'networkidle0', timeout: 120000 });
   await page.waitForFunction(() => typeof (window as any).__empiresDebug === 'function', { timeout: 60000 });
   assert.equal(await page.$eval('#hud', e => e.classList.contains('fallback')), fallback, 'requested content mode loaded');

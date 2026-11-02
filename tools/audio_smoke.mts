@@ -1,16 +1,12 @@
 /** Real gestures, owned media playback, frame cues and public construction. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { readFileSync } from 'node:fs';
+import { root, ownedManifest, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { createGame, stepGame } from '../src/sim/game.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
+const manifest = ownedManifest();
 const rules = rulesFromManifest(manifest);
 const audio = JSON.parse(readFileSync(`${root}public/imported/aoe2/audio/manifest.json`, 'utf8'));
 const state = createGame(114, rules);
@@ -31,8 +27,7 @@ const barracks = { ...home, id: state.nextId++, kind: 'barracks' as const, footp
 state.entities.push(soldier, target, barracks);
 stepGame(state);
 const { rules: omitted, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, logLevel: 'error',
-  server: { host: '127.0.0.1', port: 5295, strictPort: true }, plugins: [{
+const server = await startServer({ port: 5295, plugins: [{
     name: 'private-audio-clock', enforce: 'pre',
     transform(code, id) {
       if (!id.endsWith('/src/main.ts')) return;
@@ -49,15 +44,9 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, l
         });\n${anchor}`);
     },
   }] });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800 });
-  const errors: string[] = []; page.on('pageerror', e => errors.push(String(e)));
+  const { page, errors } = await newPage(browser);
   await page.evaluateOnNewDocument(snapshot => {
     sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot));
     const plays: { url: string; playing: boolean; error?: string; called: number; started?: number; initialVolume: number }[] = [];

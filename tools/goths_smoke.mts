@@ -1,27 +1,21 @@
 /** Owned Goth selection, paid unique research, both Huskarl producers and art. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { ownedManifest, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { activateAutomaticTechnologies, createGame } from '../src/sim/game.ts';
 import { buildingRulesFor, unitRulesFor } from '../src/sim/rules.ts';
 import type { BuildingKind, Entity } from '../src/sim/types.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
+const manifest = ownedManifest();
 const pending = process.env.CIV_ACCEPT_PENDING === '1';
 assert(manifest.civilizations.goths);
 if (pending) manifest.civilizations.goths.civilization.enabled = true;
 assert.equal(manifest.civilizations.goths.civilization.enabled, true);
 const body = pending ? gzipSync(JSON.stringify(manifest)) : undefined;
 const rules = rulesFromManifest(manifest);
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, logLevel: 'error',
-  server: { host: '127.0.0.1', port: 5268, strictPort: true }, plugins: [{
+const server = await startServer({ port: 5268, plugins: [{
     name: 'goth-acceptance', enforce: 'pre',
     configureServer(server) { if (body) server.middlewares.use((req, res, next) => {
       if (req.url?.split('?')[0] !== '/imported/aoe2/manifest.json') return next();
@@ -38,14 +32,9 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, l
                 pending: v?.body.pendingTexture, fallback: v?.fallback }; } } });`);
     },
   }] });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage(); await page.setViewport({ width: 1280, height: 800 });
-  const errors: string[] = []; page.on('pageerror', e => errors.push(String(e)));
+  const { page, errors } = await newPage(browser);
   const ready = () => page.waitForFunction(() => !!(window as any).__goth && !!(window as any).__empiresDebug, { timeout: 120000 });
   const query = (q: object): Promise<any> => page.evaluate(q => (window as any).__empiresDebug(q), q);
   const snapshot = () => query({ type: 'snapshot' });

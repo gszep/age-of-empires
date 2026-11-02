@@ -1,19 +1,14 @@
 /** #133: private-browser public move orders and actual imported gate poses. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { ownedManifest, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { createGame } from '../src/sim/game.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { updateVisibility } from '../src/sim/visibility.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import type { Entity, Point } from '../src/sim/types.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const rules = rulesFromManifest(JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8')));
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const rules = rulesFromManifest(ownedManifest());
+const server = await startServer({ plugins: [{
   name: 'gate-observation', enforce: 'pre', transform(code, id) {
     if (!id.endsWith('/src/main.ts')) return;
     const anchor = 'renderer.setAnimationLoop(now => {';
@@ -27,12 +22,8 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
           pieces: [v.body, ...v.annexes].filter(p => p.mesh.visible).map(p => ({ image: p.textureImage, pending: p.pendingTexture })) };
       } } });`);
   },
-}], server: { host: '127.0.0.1', port: 5273, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+}], port: 5273 });
+const browser = await launchBrowser();
 try {
   for (const [kind, axis] of [['palisade-gate', 'x'], ['stone-gate', 'y'], ['fortified-gate', 'x']] as const) {
     const state = createGame(133, rules, { 1: 'britons', 2: 'britons' });
@@ -58,8 +49,7 @@ try {
     const friend = add(1, 32.5), enemy = add(2, 48.5);
     updateVisibility(state);
     const { rules: ignored, ...saved } = state;
-    const page = await browser.newPage(); await page.setViewport({ width: 1280, height: 800 });
-    const errors: string[] = []; page.on('pageerror', e => errors.push(String(e)));
+    const { page, errors } = await newPage(browser);
     const handle = await page.evaluateOnNewDocument(value => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(value)),
       { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });
     await page.goto('http://127.0.0.1:5273/?solo=1', { waitUntil: 'domcontentloaded' });

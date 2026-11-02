@@ -1,10 +1,6 @@
 /** #131: actual Stop/train/right-click/group pack controls and original poses. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { root, ownedManifest, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { FALLBACK_RULES, isBuilding, rulesFromManifest } from '../src/sim/data.ts';
 import { activateAutomaticTechnologies, createGame } from '../src/sim/game.ts';
 import { buildingRulesFor, unitRulesFor } from '../src/sim/rules.ts';
@@ -13,11 +9,10 @@ import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { startupDiagnostics } from './browser-startup-diagnostics.mjs';
 import type { BuildingKind, Entity, GameState, Point, UnitKind } from '../src/sim/types.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url)), fallback = process.env.OPEN_FALLBACK === '1';
-const manifest = fallback ? undefined : JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
+const fallback = process.env.OPEN_FALLBACK === '1';
+const manifest = fallback ? undefined : ownedManifest();
 const rules = fallback ? FALLBACK_RULES : rulesFromManifest(manifest);
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, logLevel: 'error',
-  server: { host: '127.0.0.1', port: 5274, strictPort: true }, plugins: [{ name: 'trebuchet-observation', enforce: 'pre',
+const server = await startServer({ port: 5274, plugins: [{ name: 'trebuchet-observation', enforce: 'pre',
     configureServer(server) { if (fallback) server.middlewares.use((req, res, next) => {
       if (!req.url?.startsWith('/imported/')) { next(); return; } res.writeHead(404); res.end();
     }); },
@@ -36,13 +31,8 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, l
         } });`);
     },
   }] });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
-const page = await browser.newPage(); await page.setViewport({ width: 1280, height: 800 });
-const errors: string[] = []; page.on('pageerror', e => errors.push(String(e)));
+const browser = await launchBrowser();
+const { page, errors } = await newPage(browser);
 const diagnostics = startupDiagnostics(page, browser, `${root}.local/browser-diagnostics/trebuchet-${fallback ? 'open' : 'owned'}`);
 const query = (q: object): Promise<any> => page.evaluate(q => (window as any).__empiresDebug(q), q);
 const snapshot = () => query({ type: 'snapshot' });

@@ -2,13 +2,10 @@
  * OWNED_PUBLIC may point at an existing publication, both read-only. No imports. */
 import assert from 'node:assert/strict';
 import { createReadStream, existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { resolve, extname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import type { Browser } from 'puppeteer';
+import { root, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const publicDir = resolve(process.env.OWNED_PUBLIC ?? `${root}public`);
 const privateUi = resolve(process.env.TECHTREE_UI ?? `${publicDir}/imported/aoe2/ui`);
 const fallback = process.env.OPEN_FALLBACK === '1';
@@ -16,8 +13,7 @@ const port = Number(process.env.TECHTREE_PORT ?? 5298);
 const out = `${root}.local/techtree-${fallback ? 'fallback' : 'owned'}`;
 mkdirSync(`${root}.local`, { recursive: true });
 const manifest = fallback ? undefined : JSON.parse(readFileSync(`${privateUi}/manifest.json`, 'utf8'));
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, publicDir, logLevel: 'error',
-  server: { host: '127.0.0.1', port, strictPort: true }, plugins: [{
+const server = await startServer({ publicDir, port, plugins: [{
     name: 'private-tech-tree-ui', enforce: 'pre',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
@@ -33,18 +29,12 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
       });
     },
   }] });
-let browser: Awaited<ReturnType<typeof puppeteer.launch>> | undefined;
+let browser: Browser | undefined;
 try {
-  await server.listen();
-  const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-  browser = await puppeteer.launch({ headless: true,
-    env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-    args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+  browser = await launchBrowser();
   console.log(JSON.stringify({ pid: process.pid, browserPid: browser.process()?.pid, port }));
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800 });
+  const { page, errors } = await newPage(browser);
   await page.evaluateOnNewDocument('globalThis.__name = f => f');
-  const errors: string[] = []; page.on('pageerror', e => errors.push(String(e)));
   await page.goto(`http://127.0.0.1:${port}/?solo=1&seed=138`, { waitUntil: 'networkidle0', timeout: 120000 });
   await page.waitForFunction(() => typeof (window as any).__empiresDebug === 'function');
   const button = '[data-command="techtree"]';

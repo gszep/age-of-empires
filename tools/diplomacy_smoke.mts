@@ -1,17 +1,12 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { ownedManifest, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { createGame } from '../src/sim/game.ts';
 import { rulesFromManifest, FALLBACK_RULES } from '../src/sim/data.ts';
 import type { Entity } from '../src/sim/types.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const fallback = process.env.OPEN_FALLBACK === '1';
-const rules = fallback ? FALLBACK_RULES : rulesFromManifest(JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8')));
+const rules = fallback ? FALLBACK_RULES : rulesFromManifest(ownedManifest());
 const state = createGame(138, rules);
 state.entities = state.entities.filter(e => e.kind === 'town-center');
 state.terrain = state.terrain.map(() => 0); state.elevation.fill(0);
@@ -21,8 +16,7 @@ const market: Entity = { id: state.nextId++, kind: 'market', owner: 1, position:
   maxHp: r.hp, radius: r.radius, activity: 'idle', order: { kind: 'idle' } };
 state.entities.push(market);
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, logLevel: 'error',
-  server: { host: '127.0.0.1', port: 5292, strictPort: true }, plugins: [{
+const server = await startServer({ port: 5292, plugins: [{
     name: 'private-diplomacy-clock', enforce: 'pre',
     configureServer(server) {
       if (fallback) server.middlewares.use((req, res, next) => {
@@ -35,14 +29,9 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, l
       return code.replace(anchor, `Object.assign(globalThis, { __dipStep: (n: number) => { for (let i=0;i<n;i++) stepGame(game); } });\n${anchor}\npaused = true;`);
     },
   }] });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage(); await page.setViewport({ width: 1280, height: 800 });
-  const errors: string[] = []; page.on('pageerror', e => errors.push(String(e)));
+  const { page, errors } = await newPage(browser);
   await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),
     { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });
   await page.goto('http://127.0.0.1:5292/?solo=1', { waitUntil: 'networkidle0', timeout: 120000 });

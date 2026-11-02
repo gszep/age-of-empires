@@ -3,19 +3,10 @@
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import { brotliDecompressSync, gunzipSync } from 'node:zlib';
-import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
-import puppeteer from 'puppeteer';
+import { startServer, launchBrowser, newPage, blockImported } from './smoke-harness.mjs';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const server = await createServer({ root, configFile: `${root}vite.config.ts`,
-  server: { host: '127.0.0.1', port: 5234, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const server = await startServer({ port: 5234 });
+const browser = await launchBrowser();
 function raw(url: string, encoding: string, etag?: string) {
   return new Promise<{ body: Buffer; headers: import('node:http').IncomingHttpHeaders; status: number }>((resolve, reject) => {
     const req = request(url, { headers: { 'accept-encoding': encoding, ...(etag ? { 'if-none-match': etag } : {}) } }, res => {
@@ -28,12 +19,8 @@ function raw(url: string, encoding: string, etag?: string) {
   });
 }
 try {
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1000, height: 700 });
-  await page.setRequestInterception(true);
-  page.on('request', req => { void (req.url().includes('/imported/') ? req.respond({ status: 404, body: '' }) : req.continue()); });
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(String(error)));
+  const { page, errors } = await newPage(browser, { viewport: { width: 1000, height: 700 } });
+  await blockImported(page);
   const loads = [];
   for (const kind of ['cold', 'warm']) {
     const start = performance.now();

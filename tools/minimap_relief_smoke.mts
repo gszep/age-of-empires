@@ -1,14 +1,9 @@
 /** #96: actual sRGB canvas pixels for relief, forests, fog and palette refresh. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { ownedManifest, startServer, launchBrowser } from './smoke-harness.mjs';
 import { createGame } from '../src/sim/game.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
+const manifest = ownedManifest();
 // Exact palette entries, read from original.pal and terrain slots 0/10. These
 // are exact colour expectations. The editor screenshot supplies the screen-right
 // lighting orientation; the game's full discrete slope classifier is inferred.
@@ -24,9 +19,7 @@ state.elevation = new Array(96).fill(0);
 for (const player of [1, 2] as const) {
   state.visibility[player] = { explored: new Array(96).fill(1), visible: new Array(96).fill(1), memory: {} };
 }
-const server = await createServer({ root, configFile: `${root}vite.config.ts`,
-  server: { host: '127.0.0.1', port: 5228, strictPort: true }, logLevel: 'error',
-  plugins: [{ name: 'minimap-fixture', configureServer(server) {
+const server = await startServer({ port: 5228, plugins: [{ name: 'minimap-fixture', configureServer(server) {
     server.middlewares.use('/__minimap_fixture', (_req, res) => {
       res.setHeader('Content-Type', 'text/html');
       // tsx preserves local function names with this helper when Puppeteer
@@ -34,11 +27,7 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`,
       res.end('<!doctype html><script>window.__name = fn => fn;</script><canvas id="probe" width="240" height="160"></canvas>');
     });
   } }] });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox'] });
+const browser = await launchBrowser({ args: ['--no-sandbox'] });
 try {
   const page = await browser.newPage();
   const errors: string[] = [];

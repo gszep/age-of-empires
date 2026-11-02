@@ -5,13 +5,10 @@
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { createReadStream, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import type { Browser } from 'puppeteer';
+import { root, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const fallback = process.env.OPEN_FALLBACK === '1';
 const published = fallback ? undefined : process.env.OWNED_PUBLIC;
 const fixture = fallback || published ? undefined : JSON.parse(execFileSync('uv', ['run', '--locked', 'python',
@@ -19,8 +16,7 @@ const fixture = fallback || published ? undefined : JSON.parse(execFileSync('uv'
 const port = 5233;
 const out = `${root}.local/objectives-${fallback ? 'fallback' : published ? 'owned-published' : 'owned-source'}`;
 mkdirSync(`${root}.local`, { recursive: true });
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, publicDir: published ?? false, logLevel: 'error',
-  server: { host: '127.0.0.1', port, strictPort: true }, plugins: [{
+const server = await startServer({ publicDir: published ?? false, port, plugins: [{
     name: 'objectives-read-only-source-fixture', enforce: 'pre',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
@@ -36,18 +32,12 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
       });
     },
   }] });
-let browser: Awaited<ReturnType<typeof puppeteer.launch>> | undefined;
+let browser: Browser | undefined;
 try {
-  await server.listen();
-  const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-  browser = await puppeteer.launch({ headless: true,
-    env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-    args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+  browser = await launchBrowser();
   console.log(JSON.stringify({ pid: process.pid, browserPid: browser.process()?.pid, port }));
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800 });
+  const { page, errors } = await newPage(browser);
   await page.evaluateOnNewDocument('globalThis.__name = f => f');
-  const errors: string[] = []; page.on('pageerror', e => errors.push(String(e)));
   await page.goto(`http://127.0.0.1:${port}/?solo=1&seed=138`, { waitUntil: 'networkidle0', timeout: 120000 });
   await page.waitForFunction(() => typeof (window as any).__empiresDebug === 'function');
   const button = '[data-command="objectives"]';

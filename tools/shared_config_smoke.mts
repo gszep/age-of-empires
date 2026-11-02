@@ -1,28 +1,24 @@
 /** #276: failed discovery must not become a solo game; recover in the same page. */
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
-import puppeteer, { type Page } from 'puppeteer';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import type { Page } from 'puppeteer';
+import { root, ownedManifest, startServer, launchBrowser } from './smoke-harness.mjs';
 import { sharedMatchPlugin } from '../src/shared/server.ts';
 import { createGame, stepGame } from '../src/sim/game.ts';
 import { FALLBACK_RULES, rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { startupDiagnostics } from './browser-startup-diagnostics.mjs';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const directory = mkdtempSync(`${root}.local/shared-config-`), checkpoint = `${directory}/match.json`;
 const fallback = process.env.OPEN_FALLBACK === '1';
-const rules = fallback ? FALLBACK_RULES : rulesFromManifest(JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8')));
+const rules = fallback ? FALLBACK_RULES : rulesFromManifest(ownedManifest());
 const state = createGame(276, rules);
 for (let i = 0; i < 150; i++) stepGame(state);
 const { rules: omitted, ...saved } = state;
 const snapshot = JSON.stringify({ version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });
 let mode: 'offline' | 'shared' | 'missing' | 'html' | 'disabled' = 'offline';
 let requests = 0;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, logLevel: 'error',
-  plugins: [{ name: 'shared-config-failure-fixture', enforce: 'pre', configureServer(server) {
+const server = await startServer({ plugins: [{ name: 'shared-config-failure-fixture', enforce: 'pre', configureServer(server) {
     server.middlewares.use((req, res, next) => {
       const path = (req.url ?? '').split('?')[0];
       if (fallback && path.startsWith('/imported/')) { res.writeHead(404); res.end(); return; }
@@ -36,13 +32,9 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, l
       res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ enabled: false }));
     });
   } }, sharedMatchPlugin(fallback ? directory : root, checkpoint)],
-  server: { host: '127.0.0.1', port: 5246, strictPort: true },
+  port: 5246,
 });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const browser = await launchBrowser();
 const errors: string[] = [];
 const diagnostics: ReturnType<typeof startupDiagnostics>[] = [];
 const page = async () => {

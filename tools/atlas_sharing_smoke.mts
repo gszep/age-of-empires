@@ -2,19 +2,15 @@
  * Private internal rewrites serve identical bytes at the old URLs, allowing
  * the baseline on fresh imports too. Browser mutations are presentation-only. */
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import { createServer } from 'vite';
-import puppeteer from 'puppeteer';
+import type { Browser } from 'puppeteer';
+import { ownedManifest, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { createGame } from '../src/sim/game.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import type { Entity, UnitKind } from '../src/sim/types.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
+const manifest = ownedManifest();
 const legacy = structuredClone(manifest);
 const aliases = new Map<string, string>();
 for (const [key, entity] of Object.entries(legacy.entities) as [string, any][]) {
@@ -51,7 +47,7 @@ const { rules: ignored, ...saved } = state;
 // Serve the fixture privately over HTTP instead of base64 interception.
 const bodies = { legacy: gzipSync(JSON.stringify(legacy)), shared: gzipSync(JSON.stringify(manifest)) };
 let activeMode: keyof typeof bodies = 'legacy';
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ plugins: [{
   name: 'atlas-sharing-probe', enforce: 'pre', configureServer(s) {
     s.middlewares.use((req, res, next) => {
       if (req.url === '/imported/aoe2/manifest.json') {
@@ -69,20 +65,14 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
     assert(code.includes(anchor));
     return code.replace(anchor, anchor + '\npaused = true; Object.assign(globalThis, { __sharingAssets: assets, __sharingViews: views, __sharingRenderer: renderer });');
   },
-}], server: { host: '127.0.0.1', port: 5236, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
+}], port: 5236 });
 const results: any[] = [];
 try {
   for (const mode of ['legacy', 'shared'] as const) {
     activeMode = mode;
-    const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-      args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+    const browser = await launchBrowser();
     try {
-      const page = await browser.newPage();
-      await page.setViewport({ width: 1280, height: 800 });
-      const errors: string[] = [];
-      page.on('pageerror', error => errors.push(String(error)));
+      const { page, errors } = await newPage(browser);
       page.on('response', response => { if (response.url().endsWith('.png') && response.status() !== 200 && response.status() !== 304) errors.push(response.url()); });
       await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),
         { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });

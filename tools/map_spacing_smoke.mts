@@ -3,18 +3,14 @@
  * for before/after inspection; it never restores or edits the working tree. */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
-import puppeteer from 'puppeteer';
+import { writeFileSync } from 'node:fs';
+import { root, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const ref = process.env.MAPGEN_REF;
 const label = ref ? 'before' : 'after';
 const output = process.env.MAPGEN_OUTPUT ?? 'map90';
 const baseline = ref ? execFileSync('git', ['show', `${ref}:src/sim/mapgen.ts`], { cwd: root, encoding: 'utf8' }) : undefined;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ plugins: [{
   name: 'map-spacing-review', enforce: 'pre', transform(code, id) {
     if (baseline && id.endsWith('/src/sim/mapgen.ts')) return baseline;
     if (!id.endsWith('/src/main.ts')) return;
@@ -25,19 +21,12 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
     // every world sprite page or changing authoritative fog/state.
     return code.replace(loop, loop + '\npaused = true;').replace(minimap, '}, assets, true);');
   },
-}], server: { host: '127.0.0.1', port: 5276, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+}], port: 5276 });
+const browser = await launchBrowser();
 try {
   const results = [];
   for (const map of ['arabia', 'black-forest', 'islands']) for (const seed of [3, 7]) {
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 800 });
-    const errors: string[] = [];
-    page.on('pageerror', e => errors.push(String(e)));
+    const { page, errors } = await newPage(browser);
     const ready = async () => {
       await page.waitForFunction(() => typeof (window as any).__empiresDebug === 'function', { timeout: 60_000 });
       await page.waitForNetworkIdle({ idleTime: 500, timeout: 60_000 });

@@ -1,17 +1,12 @@
 /** #296: a farm built through the public command shows each owned construction stage. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { ownedManifest, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { createGame } from '../src/sim/game.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { updateVisibility } from '../src/sim/visibility.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
+const manifest = ownedManifest();
 for (const slot of ['farm-construction', 'farm-construction-2', 'farm-construction-3']) {
   assert(manifest.terrain[slot], `owned import publishes ${slot}; run npm run import:aoe2`);
 }
@@ -24,23 +19,17 @@ const site = { x: home.position.x + 6.5, y: home.position.y + .5 };
 builder.position = { x: site.x - 2, y: site.y };
 updateVisibility(state);
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ plugins: [{
   name: 'farm-construction-fixture', enforce: 'pre', transform(code, id) {
     if (!id.endsWith('/src/main.ts')) return;
     assert(code.includes('renderer.render(scene, camera);') && code.includes('let paused = false;'));
     return code.replace('let paused = false;', 'let paused = true;').replace('renderer.render(scene, camera);',
       'Object.assign(globalThis, { __farm: { views } }); renderer.render(scene, camera);');
   },
-}], server: { host: '127.0.0.1', port: 5270, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+}], port: 5270 });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage(), errors: string[] = [];
-  page.on('pageerror', error => errors.push(String(error)));
-  await page.setViewport({ width: 1280, height: 800 });
+  const { page, errors } = await newPage(browser);
   // tsx keeps function names through an `__name` helper the page lacks.
   await page.evaluateOnNewDocument('globalThis.__name = f => f');
   await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),

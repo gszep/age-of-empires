@@ -1,19 +1,14 @@
 /** #251: real boarding clicks and HUD occupancy for loaded rams. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
-import puppeteer from 'puppeteer';
+import { ownedManifest, startServer, launchBrowser, blockImported } from './smoke-harness.mjs';
 import { createGame } from '../src/sim/game.ts';
 import { FALLBACK_RULES, rulesFromManifest } from '../src/sim/data.ts';
 import { updateVisibility } from '../src/sim/visibility.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import type { Entity, UnitKind } from '../src/sim/types.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const fallback = process.env.OPEN_FALLBACK === '1';
-const rules = fallback ? FALLBACK_RULES : rulesFromManifest(JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8')));
+const rules = fallback ? FALLBACK_RULES : rulesFromManifest(ownedManifest());
 const state = createGame(251, rules);
 state.entities = state.entities.filter(e => e.kind === 'town-center');
 state.terrain.fill(0); state.elevation.fill(0);
@@ -39,24 +34,17 @@ captured.ship.convertedRules = { ...rules.units['transport-ship'], transportCapa
 captured.ship.garrison = [captured.ram]; state.entities = state.entities.filter(e => e.id !== captured.ram.id);
 updateVisibility(state);
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ plugins: [{
   name: 'paused-capacity-fixture', enforce: 'pre', transform(code, id) {
     if (!id.endsWith('/src/main.ts')) return;
     assert(code.includes('let paused = false;'));
     return code.replace('let paused = false;', 'let paused = true;');
   },
-}], server: { host: '127.0.0.1', port: 5277, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+}], port: 5277 });
+const browser = await launchBrowser();
 try {
   const page = await browser.newPage(); await page.setViewport({ width: 1280, height: 800 });
-  if (fallback) {
-    await page.setRequestInterception(true);
-    page.on('request', r => { void (r.url().includes('/imported/') ? r.respond({ status: 404, body: '' }) : r.continue()); });
-  }
+  if (fallback) await blockImported(page);
   const handle = await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),
     { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });
   const errors: string[] = []; page.on('pageerror', e => errors.push(String(e)));

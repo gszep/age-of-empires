@@ -4,13 +4,9 @@
  */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { extname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { root, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const fixture = resolve(root, '.local/sdf-ui'), output = resolve(root, '.local/sdf-browser');
 assert(existsSync(`${fixture}/manifest.json`), 'private UI extraction required');
 mkdirSync(output, { recursive: true });
@@ -33,8 +29,7 @@ const update = () => hud.updateResources(state, 1, status);
 update(); await hud.sdfLabels.ready; await document.fonts.ready;
 window.fixture = { hud, state, status, update };
 </script></body></html>`;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, logLevel: 'error',
-  server: { host: '127.0.0.1', port: 5292, strictPort: true }, plugins: [{
+const server = await startServer({ port: 5292, plugins: [{
     name: 'private-sdf-fixture', configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
@@ -47,18 +42,12 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, l
       });
     },
   }] });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox'] });
+const browser = await launchBrowser({ args: ['--no-sandbox'] });
 try {
   const results: Record<string, unknown> = {};
   for (const mode of ['owned-before', 'owned-after', 'fallback-before', 'fallback-after', 'broken']) {
-    const page = await browser.newPage(), errors: string[] = [];
-    page.on('pageerror', e => errors.push(String(e)));
+    const { page, errors } = await newPage(browser, { viewport: { width: 2000, height: 1125, deviceScaleFactor: 1 } });
     await page.evaluateOnNewDocument('globalThis.__name = f => f');
-    await page.setViewport({ width: 2000, height: 1125, deviceScaleFactor: 1 });
     const query = `${mode.startsWith('fallback') ? 'fallback&' : ''}${mode.endsWith('before') ? 'before&' : ''}${mode === 'broken' ? 'broken' : ''}`;
     await page.goto(`http://127.0.0.1:5292/__sdf?${query}`, { waitUntil: 'networkidle0' });
     await page.waitForFunction(() => !!(window as any).fixture);

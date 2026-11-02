@@ -1,17 +1,13 @@
 /** #177: press the economic TC button and place/finish a replacement or expansion. */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { root, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { activateAutomaticTechnologies, createGame, placementLegal } from '../src/sim/game.ts';
 import { buildingRulesFor } from '../src/sim/rules.ts';
 import { FALLBACK_RULES, rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const path = `${root}public/imported/aoe2/manifest.json`;
 const manifest = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : undefined;
 // Exercise freshly extracted construction metadata without publishing a partial
@@ -22,7 +18,7 @@ if (manifest && process.env.TC_CONTENT) {
 }
 const rules = manifest ? rulesFromManifest(manifest) : FALLBACK_RULES;
 const override = manifest && process.env.TC_CONTENT ? gzipSync(JSON.stringify(manifest)) : undefined;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ plugins: [{
   name: 'town-center-preview-probe', enforce: 'pre',
   configureServer(server) {
     if (!override) return;
@@ -47,11 +43,8 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
       }) });`);
   },
 }],
-  server: { host: '127.0.0.1', port: 5247, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+  port: 5247 });
+const browser = await launchBrowser();
 try {
   for (const age of [0, 2]) {
     const state = createGame(177, rules);
@@ -67,10 +60,7 @@ try {
     assert(placementLegal(state, 'town-center', { x: 40, y: 40 }).ok);
     state.elevation[39 * state.width + 39] = 1;
     const { rules: ignored, ...saved } = state;
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 800 });
-    const errors: string[] = [];
-    page.on('pageerror', error => errors.push(String(error)));
+    const { page, errors } = await newPage(browser);
     await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),
       { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });
     await page.goto('http://127.0.0.1:5247/?solo=1', { waitUntil: 'domcontentloaded' });

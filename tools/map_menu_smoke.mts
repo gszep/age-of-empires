@@ -1,10 +1,8 @@
 /** #144/#141: real map/options controls on a private host and its solo override. */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer, { type Page } from 'puppeteer';
-import { createServer } from 'vite';
+import type { Page } from 'puppeteer';
+import { root, startServer, launchBrowser } from './smoke-harness.mjs';
 import { sharedMatchPlugin } from '../src/shared/server.ts';
 import { createGame } from '../src/sim/game.ts';
 import { FALLBACK_RULES, rulesFromManifest } from '../src/sim/data.ts';
@@ -13,9 +11,8 @@ import { POPULATION_LIMITS } from '../src/sim/population.ts';
 import { DEFAULT_GAME_SPEED } from '../src/shared/protocol.ts';
 import { runMatch } from '../src/headless/runner.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const checkpoint = `${root}.local/map-menu-smoke-${process.pid}.json`;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [sharedMatchPlugin(root, checkpoint), {
+const server = await startServer({ plugins: [sharedMatchPlugin(root, checkpoint), {
   name: 'population-replay-observer', enforce: 'pre',
   transform(code, id) {
     if (!id.endsWith('/src/main.ts')) return;
@@ -25,12 +22,9 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
     });\n${anchor}`);
   },
 }],
-  server: { host: '127.0.0.1', port: 5209, strictPort: true }, logLevel: 'error' });
-await server.listen();
+  port: 5209 });
 const base = 'http://127.0.0.1:5209';
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const browser = await launchBrowser();
 const manifest = `${root}public/imported/aoe2/manifest.json`;
 const rules = existsSync(manifest) ? rulesFromManifest(JSON.parse(readFileSync(manifest, 'utf8'))) : FALLBACK_RULES;
 const query = (page: Page, value: object): Promise<any> => page.evaluate(q => (globalThis as any).__empiresDebug(q), value);

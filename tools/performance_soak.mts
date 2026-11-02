@@ -3,15 +3,11 @@
  * No simulation shortcuts, skipped rendering, artificial cache clock or GC. */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
+import { writeFileSync } from 'node:fs';
 import { setTimeout as sampleDelay } from 'node:timers/promises';
-import { createServer } from 'vite';
-import puppeteer from 'puppeteer';
+import { root, startServer, launchBrowser } from './smoke-harness.mjs';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const sampleMs = Number(process.env.SAMPLE_MS ?? 60_000);
 const tickLimit = Number(process.env.MATCH_TICKS ?? 36_000);
 const until = process.env.SOAK_UNTIL ? Date.parse(process.env.SOAK_UNTIL) : Date.now() + Number(process.env.SOAK_MINUTES ?? 30) * 60_000;
@@ -69,7 +65,7 @@ Object.assign(globalThis, { __performanceSoak: () => ({
     ?? game.entities.find(e => e.owner === 1 && e.kind === 'town-center' && !e.dead)?.id,
 }) });
 `;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ plugins: [{
   name: 'performance-soak', enforce: 'pre', transform(code, id) {
     if (!id.endsWith('/src/main.ts')) return;
     const ai = 'for (const command of exampleAiCommands(observe(game, 2))) applyCommand(game, command);';
@@ -84,12 +80,8 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
       .replace(sync, '  const soakSync = performance.now();\n  syncScene(gameTimeSeconds(game));\n  soakSamples.sync.push(performance.now() - soakSync);\n  fog.mesh.visible')
       .replace(render, '  const soakRender = performance.now();\n' + render + '\n  soakSamples.render.push(performance.now()-soakRender); soakSamples.frame.push(performance.now()-soakStart);');
   },
-}], server: { host: '127.0.0.1', port, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true, protocolTimeout: 120_000,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+}], port });
+const browser = await launchBrowser({ protocolTimeout: 120_000 });
 const errors: string[] = [];
 const interruption = new AbortController();
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => {

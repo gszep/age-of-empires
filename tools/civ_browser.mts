@@ -1,11 +1,7 @@
 /** Private owned-profile acceptance. Explicit staging, passive opponent, UI/public commands. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { ownedManifest, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { researchCostFor } from '../src/sim/technologies.ts';
@@ -14,15 +10,13 @@ import { displayName } from '../src/view/names.ts';
 import type { BuildingKind, GameState } from '../src/sim/types.ts';
 
 export async function civilizationBrowser(civ: string, port = 5269) {
-  const root = fileURLToPath(new URL('../', import.meta.url));
-  const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
+  const manifest = ownedManifest();
   const profile = manifest.civilizations[civ]; assert(profile, `${civ} must be imported`);
   const pending = process.env.CIV_ACCEPT_PENDING === '1';
   if (pending) profile.civilization.enabled = true;
   assert.equal(profile.civilization.enabled, true);
   const rules = rulesFromManifest(manifest), body = pending ? gzipSync(JSON.stringify(manifest)) : undefined;
-  const server = await createServer({ root, configFile: `${root}vite.config.ts`, logLevel: 'error',
-    server: { host: '127.0.0.1', port, strictPort: true }, plugins: [{
+  const server = await startServer({ port, plugins: [{
       name: 'owned-civ-acceptance', enforce: 'pre',
       configureServer(server) { if (body) server.middlewares.use((req,res,next) => {
         if (req.url?.split('?')[0] !== '/imported/aoe2/manifest.json') return next();
@@ -44,13 +38,8 @@ export async function civilizationBrowser(civ: string, port = 5269) {
                 pending:v?.body.pendingTexture,fallback:v?.fallback};}}});`);
       },
     }] });
-  await server.listen();
-  const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-  const browser = await puppeteer.launch({ headless:true,
-    env: existsSync(libs) ? {...process.env,LD_LIBRARY_PATH:libs} : process.env,
-    args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-features=WebGPU'] });
-  const page = await browser.newPage(); await page.setViewport({width:1280,height:800});
-  const errors:string[]=[];page.on('pageerror',e=>errors.push(String(e)));
+  const browser = await launchBrowser();
+  const { page, errors } = await newPage(browser);
   const ready=()=>page.waitForFunction(()=>!!(window as any).__civProbe&&!!(window as any).__empiresDebug,{timeout:120000});
   const query=(q:object):Promise<any>=>page.evaluate(q=>(window as any).__empiresDebug(q),q);
   const snapshot=()=>query({type:'snapshot'});

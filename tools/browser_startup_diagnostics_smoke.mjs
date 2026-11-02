@@ -1,11 +1,9 @@
 /** #265: real browser failure fixture; the game smoke's clocks are unchanged. */
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
-import puppeteer from 'puppeteer';
+import { launchBrowser } from './smoke-harness.mjs';
 import { startupDiagnostics } from './browser-startup-diagnostics.mjs';
 
 const root = join(import.meta.dirname, '..');
@@ -24,10 +22,7 @@ const server = createServer((request, response) => {
     </script>`);
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-const libs = join(homedir(), '.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu');
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const browser = await launchBrowser();
 try {
   const page = await browser.newPage();
   const diagnostics = startupDiagnostics(page, browser, join(root, '.local/browser-diagnostics-fixture'));
