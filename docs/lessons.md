@@ -256,9 +256,6 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   The two-profile atlas manifest exceeded Chrome's 100 MiB DevTools message
   buffer after base 64 encoding; the only surfaced error was “frame got detached”.
   A private Vite middleware serving gzip retained the full fixture and fixed it.
-- **A timeout under a CPU-bound job is contention before it is a
-  regression**; and a green run can exit 1 when the worker's RPC starves
-  (`src/test-setup.ts` yields a macrotask after each test for that).
 - **A widened fixture clock is a finding.** Name it in the report.
 - **The renderer's own walk over fog memory is invisible to every protocol
   check** — `observe` filters it and the canvas does not — so a bug there
@@ -297,10 +294,6 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 - **Before restarting a job that "seems stuck", look at the process table.**
   Three atlas conversions once ran at once and looked exactly like a hang;
   Python logs are block-buffered — pass `-u`.
-- **Decoder edits cost the hour; batch them and run them first, alone.**
-- **`convert_sld.py --terrain-only` for a terrain slot**; the full pipeline
-  for everything else, and always the pipeline, never one step.
-- **The owned checkpoint runs on an idle machine.**
 - **WSL idle CPU is not host idle CPU.** On 2026-09-22 Linux reported 85–87%
   idle while Windows reported Cyberpunk at 584% CPU. Two checkpoint runs timed out
   in different existing long tests; the sheep test passed alone at 21 s against
@@ -333,9 +326,6 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   a wait.** The x2 conversion paced at five hours on one worker; four
   workers took 57 minutes, and the change was outside the decoder's
   fingerprint.
-- **Killing a wrapper shell leaves its Python child running.** `kill` on
-  `import_aoe2.sh`'s PID left `convert_sld.py` converting at full speed;
-  read the table after a kill and kill the child by its own PID.
 - **Never edit a shell script while it is running.** Bash reads a script
   incrementally, so an edit to a running shell script mid-run hands the running
   copy a different file from the offset it had reached; kill the run,
@@ -345,9 +335,6 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   during#184 caused a full reload and restored the fixture paused halfway through
   research. The wait correctly timed out; repeating with frozen code passed.
   Finish edits before measuring, or stop and restart the probe explicitly.
-- **More than two or three DAT questions is a one-shot script.**
-  `tools/datq.py` reloads the DAT per call; fourteen calls beside a running
-  checkpoint hit the tool timeout.
 
 ## Before declaring something done
 
@@ -379,8 +366,6 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
 
 - **A doc that names a path checks the path is tracked**
   (`git ls-files --error-unmatch`). Tooling worth a doc is worth committing.
-- **Read the checkpoint's status on the line after it, never through a pipe or a
-  `:`** (`AGENTS.md`); the script exists because prose did not hold.
 - **The commit guard matches `git commit` anywhere in a shell command**,
   including a heredoc's text, and refuses until the owned checkpoint is fresh.
   Write a script that mentions it to a file and run the file.
@@ -394,5 +379,3 @@ re-recorded — it becomes a tool, a test or a hook (`docs/reviews/2026-09-19.md
   fails under tsx's CommonJS transform; write probes as `.mts` under
   `.local/probes/`, where puppeteer also resolves.** Both cost a failed call
   in three sessions.
-- **Python tooling is the locked uv project**: dependencies in
-  `pyproject.toml`, everything through `uv run --locked`.

@@ -1,6 +1,7 @@
 # Map generation: the build plan
 
-An overnight run plan. `map-generation-design.md` is the research on what the
+An overnight run plan, run on 2026-08-29 (outcome at the end) and kept for its
+milestone acceptance and constraints. `map-generation-design.md` is the research on what the
 original does; `map-conditioning-design.md` is the research on driving it from
 real geography and on the fidelity dial. **Neither is a specification.** They are
 what one session could establish from public sources in an afternoon, and the
@@ -180,15 +181,6 @@ materially different outcomes. Three specific ones live here:
 - **Board size.** Changing `MAP_TILES` changes every stored replay and every
   performance figure in `status.md`. Measure it, propose it, do not do it
   overnight.
-
-## At dawn
-
-Leave the repo honest: `status.md` truthful about what the map now is and what
-it still isn't, `backlog.md` updated (the two map items it records — the empty
-middle and the ragged forest interiors — should be closed by M1 and M3, so close
-them and say by what), new operational facts in `lessons.md`, and this file
-marked with where the queue actually got to. Then the hygiene pass: list what is
-still running, kill the litter, name what deliberately survives.
 
 ## Where the run got to (2026-08-29, at dawn)
 
