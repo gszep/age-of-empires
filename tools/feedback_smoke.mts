@@ -71,7 +71,7 @@ try {
     }, { data: 'data:image/png;base64,' + Buffer.from(screenshot).toString('base64'), points });
   };
   const checkTransparentCorner = async (selector: string) => {
-    const points = await page.$eval(selector, async element => {
+    const { inside, outside, labShadow } = await page.$eval(selector, async element => {
       const image = new Image();
       image.src = getComputedStyle(element).backgroundImage.slice(5, -2);
       await image.decode();
@@ -81,15 +81,54 @@ try {
       const plane = document.createElement('div'); plane.id = 'dialog-test-plane';
       Object.assign(plane.style, { position: 'absolute', inset: '0', background: 'rgb(240, 240, 240)' });
       // Above the ordinary HUD/menu (including its shadow), below native
-      // top-layer dialog/backdrop. Both sample positions share one backdrop.
+      // top-layer dialog/backdrop. Both sample positions share one backdrop —
+      // except a native top-layer panel can sit open beneath this popup (the
+      // lab match-setup dialog during the load-replay flow), whose 40px
+      // `box-shadow` sweeps the popup's corners above the plane as a gradient
+      // no two sample positions share (#353). A shadow is paint, not
+      // stacking: neutralise it for the measurement and restore it after.
       document.querySelector('#hud')!.after(plane);
+      const lab = document.querySelector<HTMLElement>('#lab-dialog');
+      const labShadow = lab ? lab.style.boxShadow : null;
+      if (lab) lab.style.boxShadow = 'none';
       const r = element.getBoundingClientRect();
-      return [{ x: Math.ceil(r.x) + 1, y: Math.ceil(r.y) + 1 }, { x: Math.floor(r.x) - 2, y: Math.ceil(r.y) + 1 }];
+      // The owned art minifies ~3:1 into the dialog, so one screenshot pixel
+      // near the corner averages a source footprint — not the single source
+      // pixel the precondition reads. #353: the fixed +1px offset landed on
+      // 1/255 anti-aliased residue and read a shade dark. Render the art at
+      // dialog scale and sample the nearest corner pixel whose whole
+      // footprint is exactly transparent, so exact equality stays honest.
+      const rc = document.createElement('canvas');
+      rc.width = Math.max(1, Math.round(r.width)); rc.height = Math.max(1, Math.round(r.height));
+      const rctx = rc.getContext('2d')!; rctx.drawImage(image, 0, 0, rc.width, rc.height);
+      let inside: { x: number; y: number } | null = null;
+      for (let dy = 0; dy <= 4 && !inside; dy++) {
+        for (let dx = 0; dx <= 10 && !inside; dx++) {
+          const x = Math.ceil(r.x) + dx, y = Math.ceil(r.y) + dy;
+          let transparent = true;
+          for (let u = x - r.x; u < x + 1 - r.x && transparent;) {
+            const c = Math.floor(u); u = c + 1;
+            for (let v = y - r.y; v < y + 1 - r.y && transparent;) {
+              const w = Math.floor(v); v = w + 1;
+              if (c < 0 || w < 0 || c >= rc.width || w >= rc.height) transparent = false;
+              else if (rctx.getImageData(c, w, 1, 1).data[3] !== 0) transparent = false;
+            }
+          }
+          if (transparent) inside = { x, y };
+        }
+      }
+      if (!inside) throw new Error('no corner screenshot pixel with a fully transparent rendered footprint');
+      const outside = { x: Math.floor(r.x) - 2, y: inside.y };
+      return { inside, outside, labShadow };
     });
-    const [inside, outside] = await pixelsAt(points);
-    assert.deepEqual(inside, outside, `${selector}: transparent owned corner must show the dimmed battlefield, not fallback fill`);
-    console.log(`${selector} corner sRGB:`, { inside, outside });
-    await page.evaluate(() => document.querySelector('#dialog-test-plane')!.remove());
+    const [insideSample, outsideSample] = await pixelsAt([inside, outside]);
+    assert.deepEqual(insideSample, outsideSample, `${selector}: transparent owned corner must show the dimmed battlefield, not fallback fill`);
+    console.log(`${selector} corner sRGB:`, { inside: insideSample, outside: outsideSample, at: inside });
+    await page.evaluate(labShadow => {
+      document.querySelector('#dialog-test-plane')!.remove();
+      const lab = document.querySelector<HTMLElement>('#lab-dialog');
+      if (lab && labShadow !== null) lab.style.boxShadow = labShadow;
+    }, labShadow);
   };
   assert.equal((await query({ type: 'sim' })).tick, state.tick);
   await page.waitForSelector('.production-item[title="Loom"]');
