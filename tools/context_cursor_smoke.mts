@@ -1,18 +1,13 @@
 /** #51: native owned cursor requests/hotspots and matching real right-click orders. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { ownedManifest, startServer, launchBrowser, newPage, blockImported } from './smoke-harness.mjs';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { FALLBACK_RULES, isBuilding, rulesFromManifest } from '../src/sim/data.ts';
 import { addNode, createGame } from '../src/sim/game.ts';
 import type { BuildingKind, Entity, EntityKind, UnitKind } from '../src/sim/types.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const fallback = process.env.OPEN_FALLBACK === '1';
-const rules = fallback ? FALLBACK_RULES : rulesFromManifest(JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8')));
+const rules = fallback ? FALLBACK_RULES : rulesFromManifest(ownedManifest());
 const state = createGame(51, rules);
 state.entities = state.entities.filter(e => e.kind === 'town-center');
 state.terrain.fill(0); state.elevation.fill(0);
@@ -51,28 +46,20 @@ state.visibility[1].visible[100 * state.width + 105] = 0;
 state.visibility[1].memory[remembered.id] = { id: remembered.id, kind: 'resource', owner: 0,
   x: 105.5, y: 100.5, hp: 0, maxHp: 0, node: 'gold', resource: 'gold', amount: rememberedAmount, lastSeenAt: 0 };
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ plugins: [{
   name: 'context-cursor-probe', enforce: 'pre', transform(code, id) {
     if (!id.endsWith('/src/main.ts')) return;
     const anchor = 'renderer.setAnimationLoop(now => {';
     assert(code.includes(anchor));
     return code.replace(anchor, anchor + '\npaused = true;');
   },
-}], server: { host: '127.0.0.1', port: 5265, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+}], port: 5265 });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage(); await page.setViewport({ width: 1280, height: 800 });
-  const errors: string[] = []; page.on('pageerror', error => errors.push(String(error)));
+  const { page, errors } = await newPage(browser);
   const fetched = new Set<string>();
   page.on('response', response => { if (response.url().endsWith('.cur') && response.ok()) fetched.add(new URL(response.url()).pathname.split('/').at(-1)!); });
-  if (fallback) {
-    await page.setRequestInterception(true);
-    page.on('request', request => { void (request.url().includes('/imported/') ? request.respond({ status: 404, body: '' }) : request.continue()); });
-  }
+  if (fallback) await blockImported(page);
   await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),
     { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });
   await page.goto('http://127.0.0.1:5265/?solo=1', { waitUntil: 'networkidle0', timeout: 120_000 });

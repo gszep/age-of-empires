@@ -1,16 +1,11 @@
 /** #120: an old corpse must not die again when a scout re-enters sight. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { ownedManifest, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { applyCommand, createGame, stepGame } from '../src/sim/game.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const rules = rulesFromManifest(JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8')));
+const rules = rulesFromManifest(ownedManifest());
 const state = createGame(120, rules);
 const home = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!;
 const scout = state.entities.find(e => e.owner === 1 && e.kind === 'scout-cavalry')!;
@@ -22,17 +17,10 @@ scout.position = { x: corpse.position.x + 1, y: corpse.position.y };
 assert(applyCommand(state, { kind: 'delete', player: 2, entityIds: [corpse.id] }).ok);
 for (let i = 0; i < 200; i++) stepGame(state);
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`,
-  server: { host: '127.0.0.1', port: 5227, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const server = await startServer({ port: 5227 });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800 });
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(String(error)));
+  const { page, errors } = await newPage(browser);
   await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),
     { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });
   await page.goto('http://127.0.0.1:5227/?solo=1', { waitUntil: 'domcontentloaded' });

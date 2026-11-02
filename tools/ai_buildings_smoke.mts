@@ -1,16 +1,12 @@
 /** #86: a resource-constrained AI saves, builds and displays its blacksmith. */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { root, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { addNode, applyCommand, createGame, stepGame } from '../src/sim/game.ts';
 import { FALLBACK_RULES, rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import type { BuildingKind, Entity } from '../src/sim/types.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const manifest = `${root}public/imported/aoe2/manifest.json`;
 const rules = existsSync(manifest) ? rulesFromManifest(JSON.parse(readFileSync(manifest, 'utf8'))) : FALLBACK_RULES;
 const state = createGame(86, rules);
@@ -35,17 +31,10 @@ applyCommand(state, { kind: 'order', player: 2, entityIds: [woodWorker.id], targ
 Object.assign(state.players[2], { age: 1, researched: ['feudal-age', 'loom'], wood: 125, food: 0, gold: 100, populationCap: 15 });
 stepGame(state);
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`,
-  server: { host: '127.0.0.1', port: 5226, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const server = await startServer({ port: 5226 });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800 });
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(String(error)));
+  const { page, errors } = await newPage(browser);
   await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),
     { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });
   await page.goto('http://127.0.0.1:5226/?solo=1', { waitUntil: 'domcontentloaded' });

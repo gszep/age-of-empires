@@ -2,10 +2,8 @@
  * AOE2_PUBLIC_DIR may point at an existing owned public tree, read-only. */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import type { Browser } from 'puppeteer';
+import { root, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { createGame } from '../src/sim/game.ts';
 import { FALLBACK_RULES, rulesFromManifest } from '../src/sim/data.ts';
 import { researchCostFor } from '../src/sim/technologies.ts';
@@ -13,7 +11,6 @@ import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { DEFAULT_PREFERENCES, PREFERENCES_KEY } from '../src/view/preferences.ts';
 import { updateVisibility } from '../src/sim/visibility.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const publicDir = process.env.AOE2_PUBLIC_DIR ?? `${root}public`;
 const manifestPath = `${publicDir}/imported/aoe2/manifest.json`;
 const rules = existsSync(manifestPath) ? rulesFromManifest(JSON.parse(readFileSync(manifestPath, 'utf8'))) : FALLBACK_RULES;
@@ -28,23 +25,17 @@ if (age) state.players[1].researched.push('feudal-age');
 const tc = state.entities.find(e => e.kind === 'town-center' && e.owner === 1)!;
 updateVisibility(state);
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, publicDir, plugins: [{
+const server = await startServer({ publicDir, plugins: [{
   name: 'research-queue-fixture', enforce: 'pre', transform(code, id) {
     if (!id.endsWith('/src/main.ts')) return;
     assert(code.includes('let paused = false;'));
     return code.replace('let paused = false;', 'let paused = true;');
   },
-}], server: { host: '127.0.0.1', port: 5293, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-let browser: Awaited<ReturnType<typeof puppeteer.launch>> | undefined;
+}], port: 5293 });
+let browser: Browser | undefined;
 try {
-  browser = await puppeteer.launch({ headless: true,
-    env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-    args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
-  const page = await browser.newPage(), errors: string[] = [];
-  page.on('pageerror', error => errors.push(String(error)));
-  await page.setViewport({ width: 1280, height: 800 });
+  browser = await launchBrowser();
+  const { page, errors } = await newPage(browser);
   await page.evaluateOnNewDocument('globalThis.__name = f => f');
   await page.evaluateOnNewDocument(({ snapshot, preferences, key }) => {
     sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot));

@@ -1,16 +1,11 @@
 /** Mixed-rule plumbing through the real page; synthetic profile, not Frankish fidelity. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { ownedManifest, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { createGame, placementLegal } from '../src/sim/game.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
+const manifest = ownedManifest();
 const profile = structuredClone({
   civilization: { ...manifest.civilization, key: 'fixture-other', name: 'Fixture Other' },
   entities: Object.fromEntries(Object.entries(manifest.entities).map(([key, value]: [string, any]) => {
@@ -43,7 +38,7 @@ state.entities.push(barracks);
 const target = { x: 36.5, y: 56.5 };
 assert(placementLegal(state, 'house', target, 'x', 1).ok);
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ plugins: [{
   name: 'civilization-rule-probe', enforce: 'pre', transform(code, id) {
     if (!id.endsWith('/src/main.ts')) return;
     assert(code.includes('let paused = false;'));
@@ -59,17 +54,10 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
         preview: () => ({ kind: buildMode, target: placementTarget(), radius: ghostEntity('house', placementTarget()).radius }),
       } });`);
   },
-}], server: { host: '127.0.0.1', port: 5263, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+}], port: 5263 });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800 });
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(String(error)));
+  const { page, errors } = await newPage(browser);
   await page.setRequestInterception(true);
   const body = JSON.stringify(manifest);
   page.on('request', request => { void (new URL(request.url()).pathname === '/imported/aoe2/manifest.json'

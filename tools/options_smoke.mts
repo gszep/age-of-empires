@@ -1,18 +1,14 @@
 /** #141: real options controls, persisted preferences and native hotkey profiles. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { readFileSync } from 'node:fs';
+import { root, ownedManifest, startServer, launchBrowser, newPage, blockImported } from './smoke-harness.mjs';
 import { createGame } from '../src/sim/game.ts';
 import { FALLBACK_RULES, rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const fallback = process.env.OPEN_FALLBACK === '1';
 const ui = JSON.parse(readFileSync(`${root}public/imported/aoe2/ui/manifest.json`, 'utf8'));
-const rules = fallback ? FALLBACK_RULES : rulesFromManifest(JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8')));
+const rules = fallback ? FALLBACK_RULES : rulesFromManifest(ownedManifest());
 const state = createGame(141, rules);
 state.players[1].food = 5000; state.players[1].wood = 5000;
 state.visibility[1].visible.fill(1); state.visibility[1].explored.fill(1);
@@ -20,8 +16,7 @@ const own = state.entities.find(e => e.owner === 1 && e.kind === 'town-center')!
 const enemy = state.entities.find(e => e.owner === 2 && e.kind === 'town-center')!;
 const worker = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
 const { rules: omitted, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, logLevel: 'error',
-  server: { host: '127.0.0.1', port: 5297, strictPort: true }, plugins: [{
+const server = await startServer({ port: 5297, plugins: [{
     name: 'private-options-clock', enforce: 'pre',
     transform(code, id) {
       if (!id.endsWith('/src/main.ts')) return;
@@ -35,18 +30,10 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, l
         }), __optionsMapPoint: (p: Point) => hud.minimap.toCanvas(game,p.x,p.y) });\n${anchor}`);
     },
   }] });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage(); await page.setViewport({ width: 1280, height: 800 });
-  const errors: string[] = []; page.on('pageerror', e => errors.push(String(e)));
-  if (fallback) {
-    await page.setRequestInterception(true);
-    page.on('request', r => { void (r.url().includes('/imported/') ? r.respond({ status: 404, body: '' }) : r.continue()); });
-  }
+  const { page, errors } = await newPage(browser);
+  if (fallback) await blockImported(page);
   await page.evaluateOnNewDocument(snapshot => {
     if (!sessionStorage.getItem('open-empires-lab:dev-session')) sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot));
   }, { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved, setup: { map: 'arabia', seed: 141 } });

@@ -1,10 +1,6 @@
 /** Owned petard impact, live ram crew and siege-tower wall crossing via real input. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { ownedManifest, startServer, launchBrowser } from './smoke-harness.mjs';
 import { activateAutomaticTechnologies, createGame } from '../src/sim/game.ts';
 import { buildingRulesFor, unitRulesFor } from '../src/sim/rules.ts';
 import { isBuilding, rulesFromManifest } from '../src/sim/data.ts';
@@ -12,11 +8,10 @@ import { updateVisibility } from '../src/sim/visibility.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import type { BuildingKind, UnitKind, Entity, PlayerId } from '../src/sim/types.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
+const manifest = ownedManifest();
 assert(manifest.entities.petard?.deathEffect && manifest.entities['siege-tower']?.unloadOverWall, 'full specialist import required');
 const rules = rulesFromManifest(manifest);
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ plugins: [{
   name: 'specialist-readonly-observation', enforce: 'pre', transform(code, id) {
     if (!id.endsWith('/src/main.ts')) return;
     const anchor = 'renderer.setAnimationLoop(now => {'; assert(code.includes(anchor));
@@ -35,12 +30,8 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
             rect: [(center.x + 1) * innerWidth / 2 - w/2, (1 - center.y) * innerHeight / 2 - h/2, w, h] }; },
       } });`);
   },
-}], server: { host: '127.0.0.1', port: 5268, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+}], port: 5268 });
+const browser = await launchBrowser();
 try {
   for (const civ of ['britons', 'franks']) {
     const state = createGame(161, rules, { 1: civ, 2: civ === 'britons' ? 'franks' : 'britons' });

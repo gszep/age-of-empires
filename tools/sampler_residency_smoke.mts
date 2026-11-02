@@ -1,18 +1,10 @@
-import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { createServer } from 'vite';
-import puppeteer from 'puppeteer';
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
-const root = fileURLToPath(new URL('../', import.meta.url));
-const server = await createServer({ root, configFile: root + 'vite.config.ts', server: { host: '127.0.0.1', port: 5243, strictPort: true },
+import { startServer, launchBrowser } from './smoke-harness.mjs';
+const server = await startServer({ port: 5243,
   plugins: [{ name: 'sampler-fixture', configureServer(s) { s.middlewares.use('/fixture', (_req, res) => {
     res.setHeader('content-type', 'text/html'); res.end('<script type="module" src="/tools/sampler_residency_fixture.ts"></script>');
-  }); } }], logLevel: 'error' });
-await server.listen();
-const libs = homedir() + '/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu';
-const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+  }); } }] });
+const browser = await launchBrowser();
 try {
   for (const mode of ['', '?ramp=1']) {
     const page = await browser.newPage();

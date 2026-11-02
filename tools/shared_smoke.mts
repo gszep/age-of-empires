@@ -3,8 +3,7 @@ import { createServer } from 'vite';
 import puppeteer, { type Browser, type Page } from 'puppeteer';
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
+import { root, launchBrowser } from './smoke-harness.mjs';
 import { sharedMatchPlugin } from '../src/shared/server.ts';
 import assert from 'node:assert/strict';
 import { createGame, stepGame } from '../src/sim/game.ts';
@@ -12,7 +11,6 @@ import { rulesFromManifest, FALLBACK_RULES } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { startupDiagnostics } from './browser-startup-diagnostics.mjs';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 // Dedicated remote Chrome and gateway only; their operator keeps both endpoints
 // private and points the gateway at this test's host (e.g. through SSH tunnels).
 const remoteGuest = process.env.SHARED_GUEST_URL;
@@ -33,9 +31,7 @@ const gateway = remoteGuest ? undefined : spawn(process.execPath, [`${root}tools
 });
 if (gateway) await new Promise<void>(resolve => gateway.stdout!.once('data', () => resolve()));
 console.log(remoteGuest ? `Dedicated remote gateway: ${remoteGuest}` : 'Private gateway listening');
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const browser = await launchBrowser();
 const debug = (page: Page, query: object): Promise<any> => page.evaluate(q => (globalThis as any).__empiresDebug(q), query);
 const ready = (page: Page) => page.waitForFunction(() => typeof (globalThis as any).__empiresDebug === 'function', { timeout: 120_000, polling: 100 });
 const wait = (page: Page, predicate: string) => page.waitForFunction(async p => {

@@ -113,7 +113,9 @@ the corrected endpoint bug and permitted hardware interpolation differences.
 
 These scripts live directly under `tools/` and start private Vite/browser
 fixtures. Run `npx tsx tools/<name>.mts`; they supplement the owned checkpoint's general
-browser smoke and are maintained regression tools.
+browser smoke and are maintained regression tools. They share the private-server,
+SwiftShader-launch and page setup in `tools/smoke-harness.mjs`; each keeps its own
+fixed port, plugins, waits and timeouts.
 
 - **`audio_smoke.mts`** — #114's real select/move/attack and paid house-build
   gestures; observes native media playing, owned weapon/hammer frame events,

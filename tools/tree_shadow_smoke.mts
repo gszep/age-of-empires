@@ -3,18 +3,14 @@
  * A private-server transform exposes view handles for the render comparison;
  * the match itself is staged once, then driven only through public commands. */
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
-import puppeteer, { type HTTPRequest } from 'puppeteer';
+import type { HTTPRequest } from 'puppeteer';
+import { ownedManifest, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { createGame } from '../src/sim/game.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { worldToIso } from '../src/view/iso.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
+const manifest = ownedManifest();
 const rules = rulesFromManifest(manifest);
 const state = createGame(42, rules);
 const variants = manifest.entities['tree-oak'].atlases.idle.framesInFile;
@@ -26,23 +22,17 @@ scout.position = { x: 50, y: 51 };
 state.elevation.fill(0);
 state.entities = state.entities.filter(e => e.kind === 'town-center' || e.id === tree.id || e.id === scout.id);
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ plugins: [{
   name: 'tree-shadow-probe', enforce: 'pre', transform(code, id) {
     if (!id.endsWith('/src/dev-debug.ts')) return;
     const anchor = 'const hot = import.meta.hot!;';
     assert(code.includes(anchor), 'probe must expose the real debug view context');
     return code.replace(anchor, 'Object.assign(globalThis, { __treeContext: context }); ' + anchor);
   },
-}], server: { host: '127.0.0.1', port: 5215, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+}], port: 5215 });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800 });
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(String(error)));
+  const { page, errors } = await newPage(browser);
   const held: HTTPRequest[] = [];
   let holdShadow = true;
   const shadowPath = `/imported/aoe2/${manifest.entities['tree-oak'].atlases['idle-shadow'].image}`;

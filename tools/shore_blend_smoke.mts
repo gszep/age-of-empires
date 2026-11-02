@@ -1,25 +1,14 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
-import puppeteer from 'puppeteer';
+import { startServer, launchBrowser } from './smoke-harness.mjs';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const server = await createServer({ root, configFile: `${root}vite.config.ts`,
-  server: { host: '127.0.0.1', port: 5247, strictPort: true }, logLevel: 'error',
-  plugins: [{ name: 'shore-shape-fixture', configureServer(s) {
+const server = await startServer({ port: 5247, plugins: [{ name: 'shore-shape-fixture', configureServer(s) {
     s.middlewares.use('/__shore_fixture', (_req, res) => {
       res.setHeader('content-type', 'text/html');
       res.end('<!doctype html><script type="module" src="/tools/shore_blend_fixture.ts"></script>');
     });
   } }],
 });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const browser = await launchBrowser();
 try {
   const page = await browser.newPage();
   const errors: string[] = [];

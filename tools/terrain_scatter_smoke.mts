@@ -1,24 +1,19 @@
 /** #55: real owned plant pixels, deterministic reload and authoritative fog.
  * Private paused fixture; simulation state is never edited in the browser. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
-import puppeteer from 'puppeteer';
+import { root, ownedManifest, startServer, launchBrowser } from './smoke-harness.mjs';
 import { createGame } from '../src/sim/game.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
+const manifest = ownedManifest();
 const state = createGame(55, rulesFromManifest(manifest));
 state.terrain.fill(12); state.elevation.fill(0);
 // Keep real town centers as occluders; no resource sprites camouflage plants.
 state.entities = state.entities.filter(e => e.kind === 'town-center');
 const home = state.entities.find(e => e.owner === 1)!;
 const { rules, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ plugins: [{
   name: 'terrain-scatter-probe', enforce: 'pre', transform(code, id) {
     if (!id.endsWith('/src/main.ts')) return;
     const anchor = 'renderer.setAnimationLoop(now => {';
@@ -27,12 +22,8 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
       paused = true;
       Object.assign(globalThis, { __scatterProbe: { scatter, assets } });`);
   },
-}], server: { host: '127.0.0.1', port: 5273, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+}], port: 5273 });
+const browser = await launchBrowser();
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 800 });

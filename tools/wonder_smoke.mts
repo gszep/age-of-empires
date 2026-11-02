@@ -1,18 +1,13 @@
 /** #110: paid public construction, owned timer pixels, focus, reload, destruction and victory. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { root, ownedManifest, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { createGame } from '../src/sim/game.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { createVisibility, updateVisibility } from '../src/sim/visibility.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { WONDER_VICTORY_TICKS } from '../src/sim/wonder.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const rules = rulesFromManifest(JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8')));
+const rules = rulesFromManifest(ownedManifest());
 const state = createGame(110, rules, undefined, 'arabia', 'random-map', undefined, true);
 const worker = state.entities.find(e => e.owner === 1 && e.kind === 'villager')!;
 state.entities = state.entities.filter(e => e.kind === 'town-center' || e.id === worker.id);
@@ -23,8 +18,7 @@ worker.position = { x: 12, y: 12 };
 Object.assign(state.players[1], { age: 3, researched: ['feudal-age', 'castle-age', 'imperial-age'], wood: 10000, gold: 10000, stone: 10000 });
 state.visibility = createVisibility(state); state.visibility[1].explored.fill(1); updateVisibility(state);
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, logLevel: 'error',
-  server: { host: '127.0.0.1', port: 5298, strictPort: true }, plugins: [{
+const server = await startServer({ port: 5298, plugins: [{
     name: 'wonder-public-outcome-clock', enforce: 'pre', transform(code, id) {
       if (!id.endsWith('/src/main.ts')) return;
       const anchor = 'renderer.setAnimationLoop(now => {'; assert(code.includes(anchor));
@@ -34,13 +28,9 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, l
       });\n${anchor}\npaused = true;`);
     },
   }] });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage(); await page.setViewport({ width: 1280, height: 800 });
-  const errors: string[] = []; page.on('pageerror', e => errors.push(String(e)));
+  const { page, errors } = await newPage(browser);
   await page.evaluateOnNewDocument(snapshot => {
     if (sessionStorage.getItem('wonder-fixture')) return;
     sessionStorage.setItem('wonder-fixture', '1');

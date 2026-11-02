@@ -1,15 +1,11 @@
 /** #143: Shift-click beyond housing, wait at 100%, cancel and resume with a house. */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { root, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { createGame, placementLegal } from '../src/sim/game.ts';
 import { FALLBACK_RULES, rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const path = `${root}public/imported/aoe2/manifest.json`;
 const manifest = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : undefined;
 const rules = manifest ? rulesFromManifest(manifest) : FALLBACK_RULES;
@@ -24,17 +20,10 @@ assert(placementLegal(state, 'house', houseAt).ok, 'fixture has room for housing
 const opening = state.players[1].population;
 const cost = rules.units.villager.cost.food;
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`,
-  server: { host: '127.0.0.1', port: 5218, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const server = await startServer({ port: 5218 });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800 });
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(String(error)));
+  const { page, errors } = await newPage(browser);
   await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),
     { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });
   await page.goto('http://127.0.0.1:5218/?solo=1', { waitUntil: 'domcontentloaded' });

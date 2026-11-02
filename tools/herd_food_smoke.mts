@@ -2,16 +2,12 @@
  * visible and manual sheep orders are independent. OPEN_FALLBACK=1 supported. */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { root, startServer, launchBrowser, newPage, blockImported } from './smoke-harness.mjs';
 import { applyCommand, createGame } from '../src/sim/game.ts';
 import { FALLBACK_RULES, rulesFromManifest, TICK_SECONDS } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import type { Entity } from '../src/sim/types.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
 const manifest = `${root}public/imported/aoe2/manifest.json`;
 const fallback = process.env.OPEN_FALLBACK === '1';
 const rules = !fallback && existsSync(manifest) ? rulesFromManifest(JSON.parse(readFileSync(manifest, 'utf8'))) : FALLBACK_RULES;
@@ -33,27 +29,18 @@ state.entities.filter(e => e.owner === 2 && e.kind === 'villager').forEach((e, i
 state.players[2].food = 0; state.players[2].wood = 0;
 assert(applyCommand(state, { kind: 'delete', player: 1, entityIds: [carcass.id] }).ok);
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ plugins: [{
   name: 'paused-herding-fixture', enforce: 'pre', transform(code, id) {
     if (!id.endsWith('/src/main.ts')) return;
     assert(code.includes('let paused = false;'));
     return code.replace('let paused = false;', 'let paused = true;');
   },
 }],
-  server: { host: '127.0.0.1', port: 5225, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true, env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+  port: 5225 });
+const browser = await launchBrowser();
 try {
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800 });
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(String(error)));
-  if (fallback) {
-    await page.setRequestInterception(true);
-    page.on('request', r => { void (r.url().includes('/imported/') ? r.respond({ status: 404, body: '' }) : r.continue()); });
-  }
+  const { page, errors } = await newPage(browser);
+  if (fallback) await blockImported(page);
   await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),
     { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });
   await page.goto('http://127.0.0.1:5225/?solo=1', { waitUntil: 'domcontentloaded' });

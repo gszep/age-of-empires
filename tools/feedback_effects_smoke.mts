@@ -6,18 +6,16 @@
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
+import { createReadStream, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import type { Browser } from 'puppeteer';
+import { root, startServer, launchBrowser, newPage } from './smoke-harness.mjs';
 import { createGame, placementLegal } from '../src/sim/game.ts';
 import { FALLBACK_RULES, rulesFromManifest } from '../src/sim/data.ts';
 import { updateVisibility } from '../src/sim/visibility.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url)), port = 5235;
+const port = 5235;
 const fallback = process.env.OPEN_FALLBACK === '1';
 const published = fallback ? undefined : process.env.OWNED_PUBLIC;
 assert(fallback || published, 'set OPEN_FALLBACK=1 or OWNED_PUBLIC');
@@ -59,8 +57,7 @@ const names = fallback ? { spawn: 'spawn', glow: '', complete: '', dust: '' } : 
 };
 if (!fallback) for (const name of ['move', 'idlepointer', ...Object.values(names)]) assert(manifest.particles?.[name], `missing imported particle ${name}`);
 
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, publicDir: published ?? false,
-  logLevel: 'error', server: { host: '127.0.0.1', port, strictPort: true }, plugins: [{
+const server = await startServer({ port, publicDir: published ?? false, plugins: [{
     name: 'feedback-private-probe', enforce: 'pre',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
@@ -124,17 +121,11 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
           Object.assign(globalThis, { __feedback: probe });`);
     },
   }] });
-let browser: Awaited<ReturnType<typeof puppeteer.launch>> | undefined;
+let browser: Browser | undefined;
 try {
-  await server.listen();
-  const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-  browser = await puppeteer.launch({ headless: true,
-    env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-    args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+  browser = await launchBrowser();
   console.log(JSON.stringify({ pid: process.pid, browserPid: browser.process()?.pid, port }));
-  const page = await browser.newPage(), errors: string[] = [];
-  page.on('pageerror', e => errors.push(String(e)));
-  await page.setViewport({ width: 1280, height: 800 });
+  const { page, errors } = await newPage(browser);
   await page.evaluateOnNewDocument('globalThis.__name = f => f');
   await page.evaluateOnNewDocument(snapshot => sessionStorage.setItem('open-empires-lab:dev-session', JSON.stringify(snapshot)),
     { version: SNAPSHOT_VERSION, rulesOrigin: rules.origin, state: saved });

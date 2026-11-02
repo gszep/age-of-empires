@@ -3,11 +3,9 @@
  * contour. CONTOUR_ANIMATION=attack stages the monk attack-art fixture.
  * CONTOUR_ROOT can select an isolated full base-resolution import worktree. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import puppeteer, { type HTTPRequest } from 'puppeteer';
-import { createServer } from 'vite';
+import type { HTTPRequest } from 'puppeteer';
+import { ownedManifest, startServer, launchBrowser } from './smoke-harness.mjs';
 import { createGame } from '../src/sim/game.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
@@ -15,7 +13,7 @@ import { skinFamilies, skinnedKey } from '../src/view/skins.ts';
 
 const root = process.env.CONTOUR_ROOT
   ? `${process.env.CONTOUR_ROOT.replace(/\/$/, '')}/` : fileURLToPath(new URL('../', import.meta.url));
-const manifest = JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8'));
+const manifest = ownedManifest(root);
 const far = process.env.CONTOUR_FAR === '1';
 const kind = process.env.CONTOUR_KIND ?? 'galley';
 assert(kind === 'galley' || kind === 'villager' || kind === 'monk');
@@ -50,7 +48,7 @@ assert(manifest.entities[key].atlases[maskName], `${key} has the imported ${mask
 if (process.env.CONTOUR_SCALE) assert.equal(manifest.entities[key].atlases[maskName].scale ?? 1, Number(process.env.CONTOUR_SCALE));
 const image = manifest.entities[key].atlases[maskName].image;
 const { rules: ignored, ...saved } = state;
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, plugins: [{
+const server = await startServer({ root, plugins: [{
   name: 'composite-contour-probe', enforce: 'pre', transform(code, id) {
     if (id.endsWith('/src/main.ts')) {
       const anchor = 'renderer.setAnimationLoop(now => {';
@@ -66,12 +64,8 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, p
     if (id.endsWith('/src/view/sprite-residency.ts')) return code.replace('() => performance.now()',
       '() => performance.now() + (globalThis.__shipClockOffset ?? 0)');
   },
-}], server: { host: '127.0.0.1', port: 5264, strictPort: true }, logLevel: 'error' });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+}], port: 5264 });
+const browser = await launchBrowser();
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 800 });

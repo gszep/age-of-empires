@@ -1,17 +1,13 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
-import { createServer } from 'vite';
+import { readFileSync } from 'node:fs';
+import { root, ownedManifest, startServer, launchBrowser } from './smoke-harness.mjs';
 import { SNAPSHOT_VERSION } from '../src/dev-session.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 import { applyCommand, createGame, stepGame } from '../src/sim/game.ts';
 import { runMatch } from '../src/headless/runner.ts';
 import { TREASON_TICKS } from '../src/sim/regicide.ts';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
-const rules = rulesFromManifest(JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8')));
+const rules = rulesFromManifest(ownedManifest());
 const audio = JSON.parse(readFileSync(`${root}public/imported/aoe2/audio/manifest.json`, 'utf8'));
 assert(audio.audio['king-select']?.files.length, 'original King voice must be published');
 const state = createGame(130, rules, undefined, 'islands', 'regicide');
@@ -25,8 +21,7 @@ while (state.tick % 20) stepGame(state);
 const { rules: omitted, ...saved } = state;
 const replay = await runMatch({ version: 2, seed: 131, mode: 'regicide', map: 'islands', maxTimeSeconds: 5 },
   { 1: { decide: () => [] }, 2: { decide: () => [] } }, rules);
-const server = await createServer({ root, configFile: `${root}vite.config.ts`, logLevel: 'error',
-  server: { host: '127.0.0.1', port: 5293, strictPort: true }, plugins: [{
+const server = await startServer({ port: 5293, plugins: [{
     name: 'private-regicide-clock', enforce: 'pre',
     transform(code, id) {
       if (!id.endsWith('/src/main.ts')) return;
@@ -39,11 +34,7 @@ const server = await createServer({ root, configFile: `${root}vite.config.ts`, l
       });\n${anchor}\nif (!(globalThis as any).__regicidePlayback) paused = true;`);
     },
   }] });
-await server.listen();
-const libs = `${homedir()}/.cache/puppeteer/extra-libs/usr/lib/x86_64-linux-gnu`;
-const browser = await puppeteer.launch({ headless: true,
-  env: existsSync(libs) ? { ...process.env, LD_LIBRARY_PATH: libs } : process.env,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebGPU'] });
+const browser = await launchBrowser();
 const errors: string[] = [];
 try {
   const page = await browser.newPage(); await page.setViewport({ width: 1280, height: 800 });
