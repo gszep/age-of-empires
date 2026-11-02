@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import puppeteer, { type Page } from 'puppeteer';
 import { createServer } from 'vite';
 import { sharedMatchPlugin } from '../src/shared/server.ts';
-import { SHARED_VERSION } from '../src/shared/protocol.ts';
+import { SHARED_CHECKPOINT_VERSION } from '../src/shared/protocol.ts';
 import { createGame } from '../src/sim/game.ts';
 import { rulesFromManifest } from '../src/sim/data.ts';
 
@@ -16,7 +16,10 @@ const checkpoint = `${root}.local/regicide-shared-${process.pid}.json`;
 const rules = rulesFromManifest(JSON.parse(readFileSync(`${root}public/imported/aoe2/manifest.json`, 'utf8')));
 const { rules: omitted, ...state } = createGame(130, rules, undefined, 'islands', 'regicide');
 state.players[1].gold = 900; // funded starting fixture; subsequent changes are public commands
-writeFileSync(checkpoint, JSON.stringify({ version: SHARED_VERSION,
+// #346: the persisted checkpoint's version is SHARED_CHECKPOINT_VERSION —
+// the host accepts only that (or legacy 4) — never the admission protocol's
+// SHARED_VERSION, which the server rejects as an incompatible checkpoint.
+writeFileSync(checkpoint, JSON.stringify({ version: SHARED_CHECKPOINT_VERSION,
   rulesHash: createHash('sha256').update(JSON.stringify(rules)).digest('hex'), state,
   settings: { paused: true, speed: 1, generation: 0 }, humanTwo: true,
   setup: { map: 'islands', seed: 130, mode: 'regicide' } }));
@@ -55,7 +58,12 @@ try {
   }
   const [a, b] = pages;
   await click(b, '[data-menu="open"]');
+  // #349 separated match setup into the lab surface behind the pause menu;
+  // the guest must find the setup form there, read-only.
+  await click(b, '#menu-dialog [data-menu="setup"]');
+  await b.waitForSelector('#lab-dialog[open]', { timeout: 30_000 });
   assert(await b.$eval('#regicide-mode', e => (e as HTMLInputElement).checked && (e as HTMLInputElement).disabled));
+  await click(b, '[data-lab-close]');
   await b.keyboard.press('F10');
   await a.bringToFront();
   const castle = state.entities.find(e => e.kind === 'castle' && e.owner === 1)!;
@@ -71,7 +79,13 @@ try {
   const [one, two] = await Promise.all(pages.map(page => query(page, { type: 'sim' })));
   assert.equal(one.synchronizationHash, two.synchronizationHash, 'both browser simulations agree after paid Treason');
   for (const mode of ['random-map', 'regicide']) {
-    await a.bringToFront(); await click(a, '[data-menu="open"]');
+    await a.bringToFront();
+    await click(a, '[data-menu="open"]');
+    // #349 moved match setup into the lab dialog behind the pause menu; the
+    // host reaches the form through the labelled setup entry, and submitting
+    // closes both panels again (hud submit -> toggleMenu(false)).
+    await click(a, '#menu-dialog [data-menu="setup"]');
+    await a.waitForSelector('#lab-dialog[open]', { timeout: 30_000 });
     await click(a, '#regicide-mode'); await click(a, '#map-setup button[type="submit"]');
     for (const page of pages) await wait(page, mode);
     for (const page of pages) {
