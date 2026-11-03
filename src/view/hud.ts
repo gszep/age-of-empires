@@ -9,6 +9,7 @@ import { placeCommands } from './command-grid';
 import { widgetBox } from './layout';
 import { findWidget, installUiColors, placeFeedback } from './feedback';
 import { animateEmbers, buttonText, placeEndScreen, slices } from './native-feedback';
+import { SetupScreen } from './setup-screen';
 import { Minimap, type MinimapColorMode, type MinimapFilter } from './minimap';
 import { DiplomacyDialog, type TributeDraft } from './diplomacy';
 import { TechTreeDialog } from './techtree';
@@ -115,13 +116,17 @@ export interface HudCallbacks {
   /** The flare button, then a minimap click: signal that spot (canvas point). */
   onFlare(point: Point): void;
   onSelectIdleVillager(): void;
-  onMenu(action: 'resume' | 'restart' | 'pause'): void;
+  onMenu(action: 'resume' | 'restart' | 'pause' | 'quit'): void;
   onReplayFile(record: unknown): void;
   onSound(alias: string): void;
   onStartMatch(setup: import('../match-setup').MatchSetup): boolean;
 }
 
 const REFERENCE_WIDTH = 3840;
+
+/** The greying is stated as ours, never as native runtime behaviour (#349). */
+const MENU_POLICY = (reason: string): string =>
+  `Unavailable in this build (${reason}); greyed by our product policy — native runtime visibility is unverified.`;
 
 /** Teardown is not a player response and must never dispatch a command. */
 export type ConfirmationResult = 'yes' | 'no' | 'aborted';
@@ -153,10 +158,9 @@ export class Hud {
   private productionSignature = '';
   private resolveConfirmation?: (result: ConfirmationResult) => void;
   private menuDialog!: HTMLElement;
-  private labDialog!: HTMLDialogElement;
-  /** A canceled file picker rides the modal dialog's close-watcher chain and
-   * fires `cancel` at the lab dialog; that is not the user asking it to close. */
-  private labPickerOpen = false;
+  /** The separate setup surface (#349): owns the #lab-dialog DOM and its
+   * open/close mechanics; behaviour stays wired here. */
+  private setup!: SetupScreen;
   private endDialog!: HTMLElement;
   private buttons = new Map<string, HTMLButtonElement>();
   private lastCommandSignature = '';
@@ -389,37 +393,13 @@ export class Hud {
          stack in a dialog2 frame with no heading and no Resume control; Cancel
          and the X close carry the old dialog's resume/close semantics. The
          match-setup form and replay loading live in the separate lab surface
-         below, reachable through the pause stack's clearly labelled entry. -->
+         (SetupScreen), reachable through the pause stack's clearly labelled
+         entry and, before a match, from the start screen's Single Player. -->
       <div id="menu-dialog" class="dialog hidden" role="dialog" aria-modal="true" aria-label="Menu">
         <div class="menu-frame"></div>
         <button type="button" class="menu-close" data-menu="close"></button>
         <div class="menu-stack"></div>
       </div>
-      <dialog id="lab-dialog" class="dialog" aria-labelledby="lab-title">
-        <h2 id="lab-title">Game Setup (Lab)</h2>
-        <p class="lab-note">Lab surface: match setup, civilizations and replays. Not a native in-game menu action.</p>
-        <form id="map-setup">
-          <h3 data-map-label="gameSettings">Game Settings</h3>
-          <label for="map-choice" data-map-label="mapType">Map Type</label>
-          <select id="map-choice" name="map"></select>
-          <label for="regicide-mode" data-map-label="regicideMode">Regicide Mode</label>
-          <input id="regicide-mode" name="regicide" type="checkbox">
-          <label for="population-limit" data-map-label="populationLimit">Population:</label>
-          <select id="population-limit" name="populationLimit"></select>
-          <label for="wonder-victory" id="wonder-victory-label">Wonder: 200 Years</label>
-          <input id="wonder-victory" name="wonderVictory" type="checkbox">
-          <label for="map-seed" data-map-label="mapSeed">Seed</label>
-          <div class="seed-row">
-            <input id="map-seed" name="seed" type="number" min="1" max="4294967295" step="1" inputmode="numeric" placeholder="Random">
-            <button type="button" id="random-map-seed" data-map-label="randomSeed">Random</button>
-          </div>
-          <button type="submit" data-map-label="startGame">Start Game</button>
-          <p id="map-host-note" hidden>Ysgramor starts shared matches.</p>
-        </form>
-        <button data-menu="load-replay">Load replay…</button>
-        <input id="replay-file" type="file" accept=".json" style="display:none">
-        <button type="button" data-lab-close>Close</button>
-      </dialog>
       <dialog id="end-dialog" aria-labelledby="end-title" tabindex="-1">
         <div class="end-frame"></div>
         <div class="end-content">
@@ -485,16 +465,9 @@ export class Hud {
     this.messageBox = this.root.querySelector('#game-message')!;
     this.menuDialog = this.root.querySelector('#menu-dialog')!;
     this.stylePauseMenu();
-    this.labDialog = this.root.querySelector<HTMLDialogElement>('#lab-dialog')!;
-    this.labDialog.addEventListener('cancel', event => {
-      event.preventDefault();
-      if (this.labPickerOpen) { this.labPickerOpen = false; return; }
-      this.closeLab();
-    });
-    this.labDialog.addEventListener('keydown', event => { if (this.labDialog.open) event.stopPropagation(); });
-    this.labDialog.querySelector('[data-lab-close]')!.addEventListener('click', () => {
-      this.callbacks.onSound('button_ui'); this.closeLab();
-    });
+    // The setup surface: its own module owns the #lab-dialog DOM (#349 stage 2
+    // layout); every behaviour below stays wired exactly where it was.
+    this.setup = new SetupScreen(this.root, () => this.callbacks.onSound('button_ui'));
     this.endDialog = this.root.querySelector('#end-dialog')!;
     const confirmation = this.root.querySelector<HTMLDialogElement>('#confirm-dialog')!;
     confirmation.addEventListener('cancel', event => { event.preventDefault(); this.resolveConfirmation?.('no'); });
@@ -600,8 +573,12 @@ export class Hud {
       else if (menu === 'resume') { this.toggleMenu(false); this.callbacks.onMenu('resume'); }
       else if (menu === 'pause') this.callbacks.onMenu('pause');
       else if (menu === 'restart') { this.toggleMenu(false); this.callbacks.onMenu('restart'); }
+      // Quit Current Game (9273): a real action once the start screen exists
+      // as a working destination (#349 stage 2); its enabled-state is the
+      // app's call through setQuitToStart, never a reload.
+      else if (menu === 'quit') { this.toggleMenu(false); this.callbacks.onMenu('quit'); }
       else if (menu === 'load-replay') {
-        this.labPickerOpen = true;
+        this.setup.pickerOpen = true;
         this.root.querySelector<HTMLInputElement>('#replay-file')!.click();
       }
       // Cancel (locale 19240) performs the old Resume affordance — close and
@@ -612,12 +589,14 @@ export class Hud {
       else if (menu === 'setup') this.openLab();
     });
     this.root.querySelector<HTMLInputElement>('#replay-file')!.addEventListener('change', async event => {
-      this.labPickerOpen = false;
+      this.setup.pickerOpen = false;
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
+      // Allow retrying the same rejected file. Only the app knows whether a
+      // replay was accepted and may close setup; rejection leaves it intact.
+      (event.target as HTMLInputElement).value = '';
       try {
         this.callbacks.onReplayFile(JSON.parse(await file.text()));
-        this.toggleMenu(false);
       } catch {
         this.showPopup('Not a valid replay file');
       }
@@ -769,6 +748,10 @@ export class Hud {
       if (text) label.textContent = text;
     }
     for (const control of this.root.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>('#map-setup input, #map-setup select, #map-setup button')) {
+      // The bottom bar's unsupported native slots (Technology Tree, Reset,
+      // Randomize) stay greyed for every player; only real controls follow
+      // the host/guest enabling.
+      if (control.dataset.unsupported !== undefined) continue;
       control.disabled = !enabled;
     }
     for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-menu="restart"]')) {
@@ -783,6 +766,7 @@ export class Hud {
     enabled: boolean, label: string, internalName?: string, hudStyle = 'CivWest'): void {
     if (internalName) this.civilizationName = internalName;
     const form = this.root.querySelector<HTMLFormElement>('#map-setup')!;
+    const slots = form.querySelector<HTMLElement>('#setup-slots')!;
     for (const player of [1, 2] as const) {
       let select = form.querySelector<HTMLSelectElement>(`#civilization-${player}`);
       if (!select) {
@@ -791,7 +775,10 @@ export class Hud {
         caption.textContent = `${label} ${player}`;
         select = document.createElement('select');
         select.id = caption.htmlFor;
-        form.append(caption, select);
+        const slot = document.createElement('div');
+        slot.className = 'setup-slot';
+        slot.append(caption, select);
+        slots.append(slot);
       }
       select.replaceChildren(...choices.map(choice => new Option(choice.label, choice.id)));
       select.value = selected[player];
@@ -815,6 +802,23 @@ export class Hud {
     if (!wantOpen) this.closeLab();
   }
 
+  /**
+   * #349 stage 2: Quit Current Game (9273) becomes a real action — leave for
+   * the start screen, which stays a working destination — but only when the
+   * app offers one: every solo launch, including pinned boards, but never
+   * shared play (menu-evidence §7A/§C). The disabled
+   * title keeps our policy phrasing so the greying is never read as native
+   * runtime behaviour.
+   */
+  setQuitToStart(enabled: boolean, reason: string): void {
+    const button = this.menuDialog.querySelector<HTMLButtonElement>('[data-menu="quit"]')!;
+    button.disabled = !enabled;
+    button.title = enabled
+      ? 'Leave the match for the start screen; the match stays paused behind it (lab extension of the native action, menu-evidence §7A/§C).'
+      : MENU_POLICY(reason);
+    button.setAttribute('aria-label', `Quit Current Game: ${button.title}`);
+  }
+
   get menuOpen(): boolean {
     return !this.menuDialog.classList.contains('hidden');
   }
@@ -833,8 +837,7 @@ export class Hud {
    */
   private buildPauseMenu(): void {
     const stack = this.root.querySelector<HTMLElement>('#menu-dialog .menu-stack')!;
-    const policy = (reason: string): string =>
-      `Unavailable in this build (${reason}); greyed by our product policy — native runtime visibility is unverified.`;
+    const policy = MENU_POLICY;
     const entry = (menu: string, label: string, reason?: string): HTMLButtonElement => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -849,7 +852,7 @@ export class Hud {
       return button;
     };
     entry('invitations', 'Invitations', 'multiplayer invitations'); // 300008
-    entry('quit', 'Quit Current Game', 'no start destination to quit to yet'); // 9273
+    entry('quit', 'Quit Current Game', 'no start destination offered on this launch'); // 9273 — setQuitToStart owns this
     entry('resign', 'Resign', 'no resign flow exists yet'); // 9280
     entry('statistics', 'Statistics', 'no statistics screen'); // 9271
     entry('save', 'Save Game', 'no save system'); // 9272
@@ -896,19 +899,18 @@ export class Hud {
     close.style.setProperty('--menu-close-icon', `url('${this.ui!.base}${native.images.button_close_cross}')`);
   }
 
-  /** The separate lab setup surface (#349): reachable only from the pause
-   * stack's labelled entry, never a native in-game menu action. */
+  /** The separate lab setup surface (#349): reachable from the pause stack's
+   * labelled entry and, before a match, from the start screen's Single
+   * Player — never a native in-game menu action. */
   openLab(): void {
-    if (!this.labDialog.open) this.labDialog.showModal();
-    this.labDialog.querySelector<HTMLButtonElement>('[data-lab-close]')!.focus();
+    this.setup.open();
   }
 
   closeLab(): void {
-    if (this.labDialog.open) this.labDialog.close();
-    if (this.labDialog.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+    this.setup.close();
   }
 
-  get labOpen(): boolean { return this.labDialog.open; }
+  get labOpen(): boolean { return this.setup.shown; }
 
   showMessage(text: string): void {
     const lines = this.messageBox.querySelector<HTMLElement>('.message-lines')!;

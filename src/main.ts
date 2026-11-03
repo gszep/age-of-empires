@@ -47,6 +47,7 @@ import { loadPreferences, normalizePreferences, savePreferences, type Preference
 import { commandHotkey, hotkeyLabel, matchesHotkey } from './view/hotkeys';
 import { WorldSounds, type SoundPose } from './view/world-sounds';
 import { Hud, type CommandButton, type SelectionInfo } from './view/hud';
+import { StartScreen, quitToStartAvailable, startScreenBoot } from './view/start-screen';
 
 /**
  * Mutable presentation bindings so Vite can hot-swap rendering, animation, and
@@ -221,25 +222,29 @@ interface ReplayState {
 }
 let replay: ReplayState | undefined;
 
-function startReplay(raw: unknown): void {
-  if (shared) { hud.showPopup('Open a standalone game to watch a replay'); return; }
+function startReplay(raw: unknown): boolean {
+  if (shared) { hud.showPopup('Open a standalone game to watch a replay'); return false; }
   const record = raw as MatchRecord;
   if (!record || !validRecordedMode(record.version, record.mode) || !Array.isArray(record.commands) || !Array.isArray(record.checksums)
     || (record.version === 1 && (record.populationLimit !== undefined || record.wonderVictory !== undefined))
     || !validMatchSetup({ map: record.map ?? 'arabia', seed: record.seed, mode: record.mode, populationLimit: record.populationLimit, wonderVictory: record.wonderVictory })) {
     hud.showPopup('Not a valid replay file');
-    return;
+    return false;
   }
   if (record.rulesOrigin !== rules.origin) {
     hud.showPopup(`Replay was recorded with ${record.rulesOrigin} rules; local rules are ${rules.origin}`);
-    return;
+    return false;
   }
+  // Construct before touching the current match or its snapshot: a rejected
+  // replay must leave the setup surface and the resumable match intact.
+  const next = createReplayGame(record, rules);
+  const replayChecksums = new Map(record.checksums.map(entry => [entry.tick, entry.hash]));
   // A replay drives its own command stream; snapshotting it would resume a
   // spectated match as if it were played.
   clearSession();
   // A record from before civilisations were written down replays as whatever
   // the content is for, which is what it was played as.
-  game = createReplayGame(record, rules);
+  game = next;
   resetFeedbackEffects();
   activeSetup = { map: record.map ?? 'arabia', seed: record.seed, mode: record.mode, civilizations: record.civilizations,
     ...(record.populationLimit !== undefined ? { populationLimit: record.populationLimit } : {}),
@@ -258,13 +263,15 @@ function startReplay(raw: unknown): void {
   replay = {
     record,
     commands: [...record.commands],
-    checksums: new Map(record.checksums.map(entry => [entry.tick, entry.hash])),
+    checksums: replayChecksums,
     lastTick: record.checksums.at(-1)?.tick ?? 0,
     verified: 0,
     failed: false,
   };
   resetMatchView();
   hud.showMessage(`Replaying seed ${record.seed}`);
+  matchEngaged = true;
+  return true;
 }
 
 const scene = new THREE.Scene();
@@ -493,16 +500,38 @@ function createHud(): Hud {
         if (setupKnown) restart();
         else { hud.hideEnd(); hud.toggleMenu(true); }
       }
+      if (action === 'quit') {
+        // A real destination, not a reload (#349 stage 2): the match stays
+        // behind the start screen, paused, and the screen can return to it.
+        if (!shared) setPaused(true);
+        heldKeys.clear();
+        dragStart = undefined;
+        wallStart = undefined;
+        selectionBox.style.display = 'none';
+        startScreen.open({ liveMatch: true });
+      }
     },
-    onReplayFile: record => startReplay(record),
+    onReplayFile: record => {
+      // Review finding 2: a replay loaded from the start screen's setup
+      // surface must take over the page — successful loads leave the start
+      // screen; rejected or cancelled loads leave the setup surface up.
+      if (startReplay(record)) {
+        hud.toggleMenu(false);
+        startScreen.close();
+      }
+    },
     onSound: alias => playSound(alias),
     onStartMatch: setup => {
       if (!restart(setup)) return false;
       // The menu now owns setup. Keep solo/player flags, and let ordinary
       // reloads resume the saved match instead of re-dealing an old URL map.
+      // Starting a game also leaves the startup flow, so a reload after it
+      // resumes the match rather than reopening the start screen.
       const url = new URL(location.href);
       url.searchParams.delete('map'); url.searchParams.delete('seed'); url.searchParams.delete('mode');
+      url.searchParams.delete('menu');
       history.replaceState(null, '', url);
+      startScreen.close();
       return true;
     },
   }, messages);
@@ -510,6 +539,11 @@ function createHud(): Hud {
   created.setPalette(preferences.palette);
   created.minimap.player = localPlayer;
   configureMapMenu(created);
+  // #349 stage 2: Quit Current Game needs a working start destination on an
+  // standalone page, pinned or not; the state is re-applied whenever the HUD is
+  // rebuilt on hot reload.
+  created.setQuitToStart(quitToStartAvailable(shared !== undefined),
+    'the shared match keeps running for the other player');
   return created;
 }
 
@@ -524,6 +558,33 @@ function configureMapMenu(target: Hud): void {
 }
 
 let hud = createHud();
+
+// #349 stage 2: the start screen — the pre-match destination for start ->
+// Single Player -> match setup -> Start Game, separate from the pause menu.
+// A normal fresh standalone launch (including ?solo=1) starts here; ?menu=0, explicit
+// ?map=/?seed=/?mode= boards, restored sessions and shared connections all
+// keep going straight to their match, and ?menu=1 forces the screen for
+// solo sessions only (the deterministic QA entry). The hidden placeholder
+// board is paused while the screen is up so it cannot end or progress
+// unseen — and it is never a real match: until something engages a match
+// (Start Game, a replay, or returning to a restored board), the session
+// snapshot must not save the placeholder as if the player had one.
+const startBoot = startScreenBoot(pageParams, restored !== undefined, shared !== undefined);
+let matchEngaged = !startBoot.show || startBoot.liveMatch;
+const startScreen = new StartScreen(app, uiAssets, {
+  onSinglePlayer: () => hud.openLab(),
+  onReturnToMatch: () => {
+    startScreen.close();
+    matchEngaged = true;
+    if (matchOver(game) && game.winner) hud.showEnd(game.winner === localPlayer);
+    else if (!shared && paused && !matchOver(game)) hud.showMessage('Match paused — press F3 to resume');
+  },
+  onSound: alias => playSound(alias),
+});
+if (startBoot.show) {
+  if (!shared) paused = true;
+  startScreen.open({ liveMatch: startBoot.liveMatch });
+}
 
 function setPreferredSpeed(speed: number): void {
   preferences = { ...preferences, speed };
@@ -617,6 +678,7 @@ function restart(setup: MatchSetup | undefined = setupKnown ? activeSetup : unde
   clearSession();
   activeSetup = setup;
   setupKnown = true;
+  matchEngaged = true;
   game = next;
   saveMapPreference(setup);
   saveSession(game, setup);
@@ -1112,7 +1174,7 @@ function announceTrained(): void {
 // Keyboard: camera, hotkeys, menu.
 const heldKeys = new Set<string>();
 addEventListener('keydown', event => {
-  if (hud.modalOpen) return;
+  if (hud.modalOpen || startScreen.shown) return;
   const key = event.key;
   if (event.target instanceof HTMLElement && event.target.closest('input, select, textarea, [contenteditable="true"]')) {
     if (key === 'Escape' || key === 'F10') {
@@ -1250,11 +1312,16 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') heldKeys.clear();
 });
 addEventListener('wheel', event => {
-  if ((event.target as HTMLElement).closest('#hud')) return;
+  // #349 stage 2: the start screen owns the wheel while it is up — its own
+  // scrolling — and must not zoom the covered match (review finding 3). The
+  // setup dialog inside #hud keeps its existing exclusion.
+  if (startScreen.shown || hud.modalOpen || (event.target as HTMLElement).closest('#hud, #start-screen')) return;
   zoom = Math.max(0.4, Math.min(2, zoom * (event.deltaY > 0 ? 0.9 : 1.1)));
 }, { passive: true });
 
 function panCamera(dt: number): void {
+  // Keys held before opening an overlay must not keep moving its background.
+  if (startScreen.shown || hud.modalOpen) { heldKeys.clear(); return; }
   const speed = 900 * dt / zoom;
   let dx = 0;
   let dy = 0;
@@ -2127,8 +2194,10 @@ resize();
 
 // Snapshot the live match so a full reload (a simulation edit, or any change
 // HMR cannot accept) resumes instead of restarting. Reloads fire pagehide;
-// visibilitychange also covers a tab being backgrounded and discarded.
-const snapshot = (): void => { if (!replay && !shared) saveSession(game, setupKnown ? activeSetup : undefined); };
+// visibilitychange also covers a tab being backgrounded and discarded. A
+// never-started placeholder board behind the start screen is not a match and
+// must not be saved as one (review finding 5).
+const snapshot = (): void => { if (!replay && !shared && matchEngaged) saveSession(game, setupKnown ? activeSetup : undefined); };
 addEventListener('pagehide', snapshot);
 addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') snapshot(); });
 
@@ -2223,14 +2292,14 @@ renderer.setAnimationLoop(now => {
       w: innerWidth / zoom / TILE_W * 1.2,
       h: innerHeight / zoom / TILE_H * 0.9,
     }, assets, revealMap);
-    if (game.draw && !ended) {
+    if (game.draw && !ended && !startScreen.shown) {
       ended = true;
       hud.diplomacy.close();
       hud.techtree.close();
       hud.objectives.close();
       hud.showPopup(`${(messages.gameOver ?? 'Game over.').split('.')[0]}.\n${game.wonderDraw ? 'Draw: both Wonder countdowns expired together.' : 'Draw: both Kings were lost in the same tick.'}`);
     }
-    if (game.winner && !ended) {
+    if (game.winner && !ended && !startScreen.shown) {
       ended = true;
       hud.diplomacy.close();
       hud.techtree.close();

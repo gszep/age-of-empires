@@ -557,7 +557,94 @@ canvas.battlefield { display: block; position: absolute; inset: 0; }
 #hud .native-button:disabled span { background: none; color: #dedede; filter: none; }
 
 /* The separate lab setup surface (#349): the old dialog palette, clearly its
-   own dialog, holding the unchanged #map-setup form and replay loading. */
+   own dialog, holding the #map-setup form and replay loading. */
 #lab-dialog { max-width: 94vw; max-height: 92vh; overflow-y: auto; }
 #lab-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
 .lab-note { font-size: calc(28px * var(--text-scale)); color: #cfc39a; margin-bottom: calc(16px * var(--ui-scale)); }
+/* #349 stage 2: the setup groups after ScreenSinglePlayerCreate.xaml
+   (menu-evidence §4): a Players panel with per-player slots, Game Settings
+   and Map groups, then the native bottom bar Technology Tree | Reset |
+   Randomize | Start Game with unsupported entries greyed in place. */
+#map-setup .setup-columns { display: flex; flex-wrap: wrap; gap: calc(12px * var(--ui-scale)) calc(40px * var(--ui-scale)); }
+#map-setup .setup-panel { flex: 1 1 calc(560px * var(--ui-scale)); min-width: calc(400px * var(--ui-scale)); }
+#map-setup .setup-slots { display: flex; flex-direction: column; gap: calc(20px * var(--ui-scale)); }
+#map-setup .setup-slot { display: flex; flex-direction: column; gap: calc(8px * var(--ui-scale)); }
+#map-setup .setup-actions {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: calc(16px * var(--ui-scale)); margin-top: calc(8px * var(--ui-scale));
+}
+#map-setup .setup-actions button { display: inline-block; min-width: calc(360px * var(--ui-scale)); margin: 0; }
+
+/* #349 stage 2: the start screen. Native-informed geometry from
+   screensimplemainmenu.xaml on its 3840x2160 design canvas (menu-evidence
+   §3): left ribbon x=265 width 970, buttons width 754, ButtonLarge height 100
+   with 52 pt text, one mainmenu_hr divider (544x96). No main-menu art is
+   imported (§2), so the ribbon is the open fallback composition over the
+   dark background; entries reuse the imported ButtonLarge states where the
+   UI import provides them. Greying unsupported modes in place is our
+   product policy — the native twins' runtime visibility is unverified. */
+#start-screen {
+  position: fixed; inset: 0; z-index: 4; overflow-y: auto;
+  background: #14100a; color: #f3ead2;
+  font-family: Georgia, 'Times New Roman', serif;
+  --text-scale: calc(var(--ui-scale) * 0.7);
+}
+#start-screen.hidden { display: none; }
+/* Review finding 1: an entry's own display rules must not defeat the hidden
+   attribute — the Return entry is truly invisible and unfocusable until a
+   live match is behind the screen. */
+#start-screen [hidden] { display: none !important; }
+#start-screen button { cursor: pointer; border: 0; background-color: transparent; color: inherit; font-family: inherit; }
+/* Review finding 3: an ordinary overlay div traps neither focus nor wheel the
+   way a modal <dialog> does, so while the start screen is up everything
+   behind it is removed from rendering — and therefore from tab order, hit
+   testing and wheel targeting. The setup dialog (Single Player) and its
+   invalid-file popup stay interactive. */
+body:has(#start-screen:not(.hidden)) #hud > :not(#lab-dialog):not(#popup-dialog) { visibility: hidden; }
+body:has(#start-screen:not(.hidden)) canvas.battlefield { visibility: hidden; }
+.start-ribbon {
+  margin: calc(200px * var(--ui-scale)) 0 calc(140px * var(--ui-scale)) calc(265px * var(--ui-scale));
+  width: calc(970px * var(--ui-scale));
+  display: flex; flex-direction: column;
+}
+.start-title {
+  font-size: calc(72px * var(--ui-scale)); font-weight: bold; color: #ffd966;
+  margin: 0 0 calc(48px * var(--ui-scale)) calc(20px * var(--ui-scale));
+}
+.start-stack { display: flex; flex-direction: column; gap: calc(20px * var(--ui-scale)); }
+.start-entry {
+  width: calc(754px * var(--ui-scale)); min-height: calc(100px * var(--ui-scale));
+  padding: calc(12px * var(--ui-scale)) calc(30px * var(--ui-scale));
+  text-align: left; display: block;
+  font-size: calc(44px * var(--text-scale));
+  background: linear-gradient(#57462a, #3a2f1c);
+  border: calc(3px * var(--ui-scale)) solid #8a7340;
+  color: #f3ead2;
+}
+.start-entry:hover { filter: brightness(1.2); }
+.start-entry:disabled { opacity: 0.45; cursor: default; }
+/* The native mainmenu_hr divider image is not imported; a plain rule stands
+   in, labelled here as the approximation it is. */
+.start-divider {
+  width: calc(544px * var(--ui-scale)); height: calc(12px * var(--ui-scale));
+  margin: calc(20px * var(--ui-scale)) 0;
+  border-bottom: calc(6px * var(--ui-scale)) solid #8a7340;
+}
+#start-screen .native-button {
+  /* Keep the native height as a floor, not a clipping box for long lab labels
+     or translations. This responsive wrapping is ours, not native evidence. */
+  height: auto; min-height: var(--native-button-height); min-width: 0; width: calc(754px * var(--ui-scale));
+  margin: 0; padding: 0; display: block;
+  border: var(--native-button-border) solid var(--native-border-color);
+  background: var(--native-button-normal) center / 100% 100%;
+  font: bold var(--native-button-font) 'AoE2 button', Georgia, serif;
+}
+#start-screen .native-button:hover, #start-screen .native-button:focus-visible { background-image: var(--native-button-hover); }
+#start-screen .native-button:active { background-image: var(--native-button-active); }
+#start-screen .native-button span { background: var(--native-button-gradient); background-clip: text; color: transparent; filter: drop-shadow(0 1px 1px #000); }
+#start-screen .native-button:disabled { background-image: var(--native-button-disable); cursor: default; opacity: 1; }
+#start-screen .native-button:disabled span { background: none; color: #dedede; filter: none; }
+
+@media (max-width: 900px) {
+  #start-screen { --ui-scale: 0.24 !important; }
+}

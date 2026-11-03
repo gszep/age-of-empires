@@ -55,9 +55,15 @@ try {
   assert(await page.$eval('#menu-dialog', e => e.querySelector('h1, h2, h3') === null), 'no heading element');
   assert.equal(await page.$$eval('[data-menu="resume"]', bs => bs.length), 0, 'no Resume label: Cancel carries it');
   const disabled = entries.filter(e => e.disabled);
+  // #349 stage 2 (review finding 6): Quit Current Game is now a working start
+  // destination on every solo launch — pinned ?map=/?seed= included — so it
+  // is enabled here, with the destination named in its title.
   assert.deepEqual(disabled.map(e => e.menu),
-    ['invitations', 'quit', 'resign', 'statistics', 'save', 'load', 'spectate', 'chapter'],
+    ['invitations', 'resign', 'statistics', 'save', 'load', 'spectate', 'chapter'],
     'unsupported native actions stay present and disabled');
+  const quit = entries.find(e => e.menu === 'quit')!;
+  assert.equal(quit.disabled, false, 'a solo launch can quit to the start screen');
+  assert(quit.title.includes('start screen'), 'the enabled Quit names its destination');
   for (const entry of disabled) {
     assert(entry.title.includes('our product policy') && entry.title.includes('unverified'),
       `${entry.menu}: grey-out is stated as our policy, not native runtime behaviour`);
@@ -162,6 +168,25 @@ try {
   await page.click('[data-end="leave"]');
   assert.equal(await page.$eval('#end-dialog', e => (e as HTMLDialogElement).open), false);
   assert(await menuShown());
+  const endedState = await query({ type: 'sim' });
+  await page.click('#menu-dialog [data-menu="quit"]');
+  await page.waitForSelector('#start-screen:not(.hidden)');
+  assert.equal(await page.$$eval('dialog[open]', dialogs => dialogs.length), 0,
+    'no invisible top-layer modal blocks the ended-match start screen');
+  await page.click('#start-screen [data-start="return"]');
+  await page.waitForSelector('#end-dialog[open]');
+  assert.equal((await query({ type: 'sim' })).synchronizationHash, endedState.synchronizationHash,
+    'Return preserves the ended match and restores its feedback');
+  // The same ended snapshot can be explicitly opened behind startup on reload.
+  await page.goto(`http://127.0.0.1:${port}/?solo=1&menu=1`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+  await page.waitForFunction(() => typeof (window as any).__empiresDebug === 'function', { timeout: 120_000 });
+  await page.waitForSelector('#start-screen:not(.hidden)');
+  await until('s.winner === 1');
+  assert.equal(await page.$$eval('dialog[open]', dialogs => dialogs.length), 0);
+  await page.click('#start-screen [data-start="return"]');
+  await page.waitForSelector('#end-dialog[open]');
+  await page.click('[data-end="leave"]');
+  console.log('Ended match Quit/Return and restored startup: exact state, visible end feedback, no blocking modal: PASS');
   await page.click('#menu-dialog [data-menu="setup"]');
   await page.waitForSelector('#lab-dialog[open]');
   await page.select('#map-choice', 'arabia');
@@ -212,6 +237,33 @@ try {
   }
   await page.keyboard.press('Escape');
   await page.waitForSelector('#menu-dialog.hidden');
+
+  // #349 stage 2 (review finding 6): this pinned ?map=/?seed= solo launch can
+  // quit to the start screen — a real destination, no reload — and Return
+  // brings the exact match back, paused. Pause first so the comparison is
+  // not a tick race.
+  if (!(await query({ type: 'sim' })).connection.paused) await page.keyboard.press('F3');
+  await until('s.connection.paused');
+  const beforeQuit = await query({ type: 'sim' });
+  await page.keyboard.press('F10');
+  await page.click('#menu-dialog [data-menu="quit"]');
+  await page.waitForSelector('#start-screen:not(.hidden)');
+  await page.waitForSelector('#menu-dialog.hidden');
+  assert.equal(await page.$eval('#start-screen', e => e.contains(document.activeElement)), true,
+    'focus stays inside the start screen');
+  assert.equal(await page.$eval('#start-screen [data-start="return"]', e => (e as HTMLElement).hidden), false,
+    'a live match behind the start screen offers Return');
+  await page.click('#start-screen [data-start="return"]');
+  await page.waitForSelector('#start-screen.hidden');
+  await until('s.connection.paused');
+  const afterReturn = await query({ type: 'sim' });
+  assert.equal(afterReturn.connection.setup.seed, beforeQuit.connection.setup.seed, 'Return restores the exact setup');
+  assert.equal(afterReturn.connection.setup.map, beforeQuit.connection.setup.map, 'Return restores the exact map');
+  assert.equal(afterReturn.synchronizationHash, beforeQuit.synchronizationHash, 'quit and return preserve the match');
+  assert.equal(afterReturn.tick, beforeQuit.tick, 'the paused match never advanced behind the start screen');
+  await page.keyboard.press('F3');
+  await until('!s.connection.paused');
+  console.log('Pinned solo Quit-to-start and Return (exact setup, no reload): PASS');
 
   // The native materials resolve on the loaded page (owned mode only; the
   // open fallback correctly has none).
@@ -270,7 +322,7 @@ try {
   const fixture = await page.evaluate(async () => {
     const modulePath = '/src/view/hud.ts';
     const { Hud } = await import(/* @vite-ignore */ modulePath);
-    const parent = document.createElement('div'); document.body.append(parent);
+    const parent = document.createElement('div'); parent.id = 'native-fixture'; document.body.append(parent);
     const image = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=';
     const frame = { images: Array.from({ length: 9 }, (_, i) => `${image}#${i}`), columns: [84, 83, 133], rows: [133, 83, 84] };
     const ui = { base: '', layouts: {}, materials: {}, icons: {}, nativeFeedback: {
@@ -280,7 +332,9 @@ try {
         buttonWidth: 500, buttonMargin: [0, 25, 25, 0], side: 100, close: [85, 87], gradient: [{ color: '#ffffff', offset: 0 }] },
     } };
     Object.assign(ui.nativeFeedback.images, { button_close_cross: `${image}#cross` });
-    const hud = new Hud(parent, ui, { onSound: () => {} });
+    const hud = new Hud(parent, ui, { onSound: () => {}, onStartMatch: setup => {
+      (window as any).__nativeSubmitted = setup; return true;
+    } });
     try {
       const menu = parent.querySelector('#menu-dialog')!;
       hud.toggleMenu(true);
@@ -302,11 +356,44 @@ try {
       for (const element of menu.querySelectorAll('.menu-frame span, .menu-close, .menu-stack .native-button')) {
         for (const match of getComputedStyle(element).backgroundImage.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/g)) urls.add(match[1]);
       }
+      hud.configureMapMenu([{ id: 'arabia', label: 'Arabia' }, { id: 'senlac', label: 'Senlac' }],
+        { map: 'arabia', seed: 42 }, true, {});
+      hud.configureCivilizations([{ id: 'britons', label: 'Britons' }, { id: 'inca', label: 'Inca' }],
+        { 1: 'britons', 2: 'britons' }, true, 'Civilization');
+      (window as any).__nativeFixtureCleanup = () => { hud.destroy(); parent.remove(); };
       return { native: menu.classList.contains('native-pause'), frames: menu.querySelectorAll('.menu-frame span').length,
         buttons: menu.querySelectorAll('.menu-stack .native-button').length, urls: urls.size };
-    } finally { hud.destroy(); parent.remove(); }
+    } catch (error) { hud.destroy(); parent.remove(); throw error; }
   });
   assert.deepEqual(fixture, { native: true, frames: 9, buttons: 12, urls: 12 });
+  try {
+    const scope = '#native-fixture ';
+    await page.click(scope + '[data-menu="setup"]');
+    for (const selector of ['#civilization-1', '#civilization-2', '#map-choice', '#population-limit', '#map-seed',
+      '#random-map-seed', '#regicide-mode', '#wonder-victory', '#map-setup button[type="submit"]']) {
+      assert(await page.$eval(scope + selector, element => {
+        element.scrollIntoView({ block: 'nearest' });
+        const rect = element.getBoundingClientRect();
+        return element.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+      }), `${selector}: synthetic native setup control is reachable at 480x360`);
+    }
+    await page.select(scope + '#civilization-1', 'inca');
+    await page.select(scope + '#civilization-2', 'britons');
+    await page.select(scope + '#map-choice', 'senlac');
+    await page.select(scope + '#population-limit', '25');
+    await page.click(scope + '#random-map-seed');
+    assert.equal(await page.$eval(scope + '#map-seed', e => (e as HTMLInputElement).value), '');
+    await page.locator(scope + '#map-seed').fill('91');
+    await page.click(scope + '#regicide-mode');
+    await page.click(scope + '#wonder-victory');
+    await page.click(scope + '#map-setup button[type="submit"]');
+    assert.deepEqual(await page.evaluate(() => (window as any).__nativeSubmitted), {
+      map: 'senlac', seed: 91, civilizations: { 1: 'inca', 2: 'britons' },
+      mode: 'regicide', populationLimit: 25, wonderVictory: true,
+    });
+    assert.equal(await page.$eval(scope + '#lab-dialog', e => (e as HTMLDialogElement).open), false);
+  } finally { await page.evaluate(() => (window as any).__nativeFixtureCleanup()); }
+  console.log('Synthetic native small setup: all controls reachable and submitted through real clicks: PASS');
   console.log('Synthetic native constructor + CSSOM material URL extraction: PASS (not owned-art verification)');
 
   assert.deepEqual(errors, []);

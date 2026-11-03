@@ -108,7 +108,25 @@ try {
       return { inside, outside, labShadow };
     });
     const [insideSample, outsideSample] = await pixelsAt([inside, outside]);
-    assert.deepEqual(insideSample, outsideSample, `${selector}: transparent owned corner must show the dimmed battlefield, not fallback fill`);
+    // The nested setup dialog can paint text beneath these two nearby pixels.
+    // Compare the SAME source-proven transparent footprint with and without
+    // the popup background instead of assuming a spatially uniform underlay.
+    const previousStyle = await page.$eval(selector, element => {
+      const previous = (element as HTMLElement).style.cssText;
+      (element as HTMLElement).style.setProperty('background', 'none', 'important');
+      return previous;
+    });
+    try {
+      const [underlyingSample] = await pixelsAt([inside]);
+      assert.deepEqual(insideSample, underlyingSample,
+        `${selector}: transparent owned corner must show the underlying surface, not fallback fill`);
+      // A negative control proves this comparison still rejects opaque fill.
+      await page.$eval(selector, element => { (element as HTMLElement).style.setProperty('background-color', 'red', 'important'); });
+      const [opaqueSample] = await pixelsAt([inside]);
+      assert.notDeepEqual(opaqueSample, underlyingSample, 'opaque popup fill must be detected');
+    } finally {
+      await page.$eval(selector, (element, previous) => { (element as HTMLElement).style.cssText = previous; }, previousStyle);
+    }
     console.log(`${selector} corner sRGB:`, { inside: insideSample, outside: outsideSample, at: inside });
     await page.evaluate(labShadow => {
       document.querySelector('#dialog-test-plane')!.remove();
@@ -117,6 +135,8 @@ try {
     }, labShadow);
   };
   assert.equal((await query({ type: 'sim' })).tick, state.tick);
+  assert.equal(await page.$eval('#start-screen', e => e.classList.contains('hidden')), true,
+    'the valid staged snapshot bypasses fresh startup');
   await page.waitForSelector('.production-item[title="Loom"]');
   await page.waitForSelector('#production-warning:not([hidden])');
   assert.equal(await page.$eval('.warning-text', e => e.textContent), 'You need more houses to continue unit production.');
@@ -189,6 +209,9 @@ try {
     await page.waitForFunction(() => !document.querySelector<HTMLDialogElement>('#popup-dialog')!.open);
     assert.equal((await query({ type: 'sim' })).synchronizationHash, hash, 'invalid replay acknowledgement is read-only');
   }
+  assert.equal(await page.$eval('#lab-dialog', e => (e as HTMLDialogElement).open), true,
+    'rejected replay loading preserves setup');
+  await page.click('#lab-dialog [data-lab-close]');
   if (!await page.$eval('#menu-dialog', e => e.classList.contains('hidden'))) await page.keyboard.press('F10');
   await query({ type: 'select', ids: [tc.id] });
   await page.keyboard.press('Delete');

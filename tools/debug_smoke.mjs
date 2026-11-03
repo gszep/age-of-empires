@@ -50,7 +50,6 @@ const server = await createServer({
 await server.listen();
 const BASE = `http://127.0.0.1:${server.config.server.port}`;
 console.log(`private dev server at ${BASE}`);
-
 const browser = await puppeteer.launch({
   headless: true,
   env: launchEnv,
@@ -67,7 +66,10 @@ try {
   const diagnostics = startupDiagnostics(page, browser, join(ROOT, '.local', 'browser-diagnostics'));
   let phase = 'navigation';
   try {
-    await page.goto(BASE, { waitUntil: 'networkidle2', timeout: 60_000 });
+    // #349 stage 2: a bare no-parameter launch now opens the start screen, so
+    // this gameplay check explicitly bypasses startup. solo only chooses
+    // standalone transport; menu=0 is the deterministic direct-match entry.
+    await page.goto(`${BASE}/?solo=1&menu=0`, { waitUntil: 'networkidle2', timeout: 60_000 });
     // The canvas is inserted before owned content finishes loading and before
     // the debug listener is installed. Wait for readiness, not a three-second race.
     phase = 'canvas/debug readiness';
