@@ -1,0 +1,159 @@
+/* Styles for the `?agents=2` live agent-match spectator page (#352). */
+
+#agents-app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  box-sizing: border-box;
+  color: #dfe7e1;
+  background: #10160f;
+  font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.agents-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+}
+
+.agents-header h1 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.agents-badge {
+  font-size: 12px;
+  color: #9fb4a5;
+  border: 1px solid #31402f;
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+
+.agents-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.agents-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: #9fb4a5;
+  min-width: 0;
+}
+
+.agents-select {
+  background: #1b241a;
+  border: 1px solid #31402f;
+  border-radius: 4px;
+  color: #dfe7e1;
+  font: inherit;
+  padding: 4px 6px;
+  min-width: 140px;
+  max-width: 100%;
+}
+
+.agents-button {
+  background: #24502f;
+  border: 1px solid #35693f;
+  border-radius: 4px;
+  color: #eaf3ea;
+  font: inherit;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.agents-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.agents-stop {
+  background: #5a2f2f;
+  border-color: #7a3f3f;
+}
+
+.agents-catalogue {
+  font-size: 12px;
+  color: #9fb4a5;
+  min-height: 1em;
+}
+
+.agents-status {
+  font-size: 15px;
+}
+
+.agents-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 12px;
+  color: #b8c7ba;
+}
+
+.agents-failure {
+  border: 1px solid #7a3f3f;
+  background: #3a1f1f;
+  border-radius: 4px;
+  padding: 6px 10px;
+  color: #f3d7d7;
+  font-size: 13px;
+}
+
+.agents-hidden {
+  display: none;
+}
+
+.agents-board {
+  width: 100%;
+  height: 320px;
+  border: 1px solid #31402f;
+  border-radius: 4px;
+  background: #182119;
+  image-rendering: pixelated;
+}
+
+.agents-board-note {
+  font-size: 11px;
+  color: #7d917f;
+}
+
+.agents-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.agents-replays-heading {
+  color: #9fb4a5;
+  font-size: 12px;
+}
+
+.agents-replay-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.agents-loading {
+  padding: 16px;
+  color: #9fb4a5;
+}
+
+@media (max-width: 560px) {
+  .agents-board {
+    height: 220px;
+  }
+
+  .agents-select {
+    min-width: 120px;
+  }
+}

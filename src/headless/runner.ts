@@ -19,10 +19,97 @@ export interface Strategy {
   stop?(): void | Promise<void>;
 }
 
+/**
+ * Everything needed to rebuild the match world deterministically: the exact
+ * `createGame` recipe plus the cadence, and a checksum of the freshly created
+ * state so a viewer can verify its rebuild before applying any command.
+ */
+export interface MatchStart {
+  seed: number;
+  civilizations: { 1: string; 2: string };
+  map: string;
+  mode: import('../sim/types').GameMode;
+  decideIntervalSeconds: number;
+  maxTimeSeconds: number;
+  populationLimit?: number;
+  wonderVictory?: boolean;
+  rulesOrigin: GameRules['origin'];
+  initialChecksum: string;
+}
+
+/** One decision lifecycle step for a player's strategy. */
+export interface MatchDecisionEvent {
+  player: PlayerId;
+  phase: 'begin' | 'end' | 'fail';
+  tick: number;
+  time: number;
+  /** Present on 'end'. */
+  commands?: number;
+  /** Present on 'fail'; generic, with no strategy payload. */
+  error?: string;
+}
+
+/**
+ * Additive live-match hooks (#352): optional observations sufficient for
+ * snapshot-plus-tick spectator replay, plus an explicit external abort
+ * signal. With no hooks the runner behaves exactly as before.
+ */
+export interface MatchHooks {
+  /** Called once after the game state is created, before any decision. */
+  onInit?(start: MatchStart): void;
+  /** Called for each recorded command, at the moment it enters the record. */
+  onCommand?(entry: { tick: number; command: Command }): void;
+  /** Called after each simulated tick. */
+  onTick?(progress: { tick: number; timeSeconds: number }): void;
+  /** Called around each strategy decision. */
+  onDecision?(event: MatchDecisionEvent): void;
+  /**
+   * External abort: the match stops promptly (a blocked decision is
+   * abandoned), strategies are stopped, and the partial record returned is
+   * still a valid replayable prefix.
+   */
+  signal?: AbortSignal;
+}
+
+const DECIDE_ABORTED = Symbol('decision-aborted-by-match-signal');
+
+/**
+ * Await a decision, abandoning it if the match signal aborts first. The
+ * abandoned promise keeps handlers attached so its eventual settlement can
+ * never surface as an unhandled rejection; only an abort swallows its result.
+ */
+async function decideWithAbort(
+  decide: Promise<Command[]> | Command[],
+  signal: AbortSignal | undefined,
+): Promise<Command[] | typeof DECIDE_ABORTED> {
+  const pending = Promise.resolve(decide);
+  if (!signal) return pending;
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      pending.then(() => {}, () => {});
+      resolve(DECIDE_ABORTED);
+      return;
+    }
+    const onAbort = () => resolve(DECIDE_ABORTED);
+    signal.addEventListener('abort', onAbort, { once: true });
+    pending.then(
+      commands => {
+        signal.removeEventListener('abort', onAbort);
+        if (!signal.aborted) resolve(commands);
+      },
+      error => {
+        signal.removeEventListener('abort', onAbort);
+        if (!signal.aborted) reject(error);
+      },
+    );
+  });
+}
+
 export async function runMatch(
   config: MatchConfig,
   strategies: Record<PlayerId, Strategy>,
   rules: GameRules = FALLBACK_RULES,
+  hooks: MatchHooks = {},
 ): Promise<{ result: MatchResult; record: MatchRecord }> {
   if (!Number.isInteger(config.version) || config.version < 1 || config.version > MATCH_FORMAT_VERSION) throw new Error('unknown match format');
   if (config.version === 1 && config.mode !== undefined) throw new Error('game mode requires match format v2');
@@ -39,10 +126,29 @@ export async function runMatch(
   const checksums: MatchRecord['checksums'] = [];
 
   const stepsPerDecision = Math.max(1, Math.round(decideInterval / TICK_SECONDS));
+  let aborted = false;
   try {
+    hooks.onInit?.({
+      seed: config.seed,
+      civilizations: { 1: state.players[1].civilization, 2: state.players[2].civilization },
+      map: config.map ?? 'arabia',
+      mode: config.mode ?? 'random-map',
+      decideIntervalSeconds: decideInterval,
+      maxTimeSeconds: maxTime,
+      ...(config.populationLimit !== undefined ? { populationLimit: config.populationLimit } : {}),
+      ...(config.wonderVictory !== undefined ? { wonderVictory: config.wonderVictory } : {}),
+      rulesOrigin: rules.origin,
+      initialChecksum: checksumState(state),
+    });
     while (!matchOver(state) && gameTimeSeconds(state) < maxTime - 1e-9) {
+      if (hooks.signal?.aborted) {
+        aborted = true;
+        break;
+      }
       if (state.tick % stepsPerDecision === 0) {
         for (const player of [1, 2] as PlayerId[]) {
+          if (hooks.signal?.aborted) { aborted = true; break; }
+          const time = gameTimeSeconds(state);
           const observation = observe(state, player);
           const input: StrategyInputMessage = {
             type: 'observation',
@@ -51,23 +157,45 @@ export async function runMatch(
             rejected: pendingRejections[player],
           };
           pendingRejections[player] = [];
-          const commands = await strategies[player].decide(input);
+          hooks.onDecision?.({ player, phase: 'begin', tick: state.tick, time });
+          if (hooks.signal?.aborted) {
+            aborted = true;
+            hooks.onDecision?.({ player, phase: 'fail', tick: state.tick, time, error: 'match aborted' });
+            break;
+          }
+          let commands: Command[] | typeof DECIDE_ABORTED;
+          try {
+            commands = await decideWithAbort(strategies[player].decide(input), hooks.signal);
+          } catch (error) {
+            hooks.onDecision?.({ player, phase: 'fail', tick: state.tick, time, error: 'strategy decision failed' });
+            throw error;
+          }
+          if (commands === DECIDE_ABORTED) {
+            aborted = true;
+            hooks.onDecision?.({ player, phase: 'fail', tick: state.tick, time, error: 'match aborted' });
+            break;
+          }
+          hooks.onDecision?.({ player, phase: 'end', tick: state.tick, time, commands: commands.length });
+          if (hooks.signal?.aborted) { aborted = true; break; }
           for (const command of commands) {
             if (command.player !== player) {
               pendingRejections[player].push({ time: gameTimeSeconds(state), player, reason: 'command for another player', command });
               continue;
             }
             recordedCommands.push({ tick: state.tick, command });
+            hooks.onCommand?.(structuredClone({ tick: state.tick, command }));
             const result = applyCommand(state, command);
             if (!result.ok) pendingRejections[player].push({ time: gameTimeSeconds(state), player, reason: result.reason, command });
           }
           rejectedCommands.push(...pendingRejections[player]);
         }
       }
+      if (aborted) break;
       stepGame(state);
       if (state.tick % CHECKSUM_INTERVAL_TICKS === 0 || matchOver(state)) {
         checksums.push({ tick: state.tick, hash: checksumState(state) });
       }
+      hooks.onTick?.({ tick: state.tick, timeSeconds: gameTimeSeconds(state) });
       // Await only ever reaches the microtask queue, so a long match is one
       // unbroken block of CPU to the event loop -- and under vitest that
       // starves the worker's RPC until the run is flagged failed with every
@@ -75,7 +203,7 @@ export async function runMatch(
       if (state.tick % 2048 === 0) await new Promise(resolve => setImmediate(resolve));
     }
   } finally {
-    await Promise.all([strategies[1].stop?.(), strategies[2].stop?.()]);
+    await Promise.all([1, 2].map(player => Promise.resolve().then(() => strategies[player as PlayerId].stop?.())));
   }
 
   const result: MatchResult = {
